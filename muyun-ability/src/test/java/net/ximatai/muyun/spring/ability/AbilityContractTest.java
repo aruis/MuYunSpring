@@ -149,15 +149,15 @@ class AbilityContractTest {
     void pageQueryShouldHideSoftDeletedRows() {
         DemoOrganizationService service = new DemoOrganizationService();
         String activeId = service.insert(new DemoOrganization("Active", TreeAbility.ROOT_ID));
-        DemoOrganization legacy = new DemoOrganization("Legacy", TreeAbility.ROOT_ID);
-        String legacyId = service.insert(legacy);
-        legacy.setDeleted(null);
+        DemoOrganization nullDeleted = new DemoOrganization("Null Deleted", TreeAbility.ROOT_ID);
+        String nullDeletedId = service.insert(nullDeleted);
+        nullDeleted.setDeleted(null);
         String deletedId = service.insert(new DemoOrganization("Deleted", TreeAbility.ROOT_ID));
         service.delete(deletedId);
 
         assertThat(service.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .extracting(DemoOrganization::getId)
-                .containsExactly(activeId, legacyId);
+                .containsExactly(activeId, nullDeletedId);
     }
 
     @Test

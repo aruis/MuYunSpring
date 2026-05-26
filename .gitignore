@@ -4,3 +4,4 @@ out/
 .idea/
 *.iml
 *.log
+LOCAL_ENVIRONMENT.md
