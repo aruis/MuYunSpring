@@ -160,6 +160,17 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldRequireCrudCapabilityForDynamicRecordEntities() {
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code"))
+        ).withCapabilities(EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("requires CRUD capability");
+    }
+
+    @Test
     void shouldRejectInvalidFieldTypeOptionsBeforeDdl() {
         assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
                 "contract",
@@ -206,6 +217,22 @@ class DynamicTableMapperTest {
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one sortable field");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.integer("sort_order", "Sort Order").sortable())
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("requires SORT capability");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code"))
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("SORT capability requires a sortable field");
     }
 
     @Test
@@ -228,6 +255,22 @@ class DynamicTableMapperTest {
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one title field");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("name", "Name").title())
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("requires REFERENCE capability");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code"))
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("REFERENCE capability requires a title field");
     }
 
     private EntityDefinition contractEntity() {

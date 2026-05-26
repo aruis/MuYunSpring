@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 
 import java.util.ArrayList;
@@ -77,6 +78,7 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
     }
 
     public String getSortField() {
+        requireCapability(EntityCapability.SORT);
         return dao.getEntity().fields().stream()
                 .filter(FieldDefinition::isSortable)
                 .map(FieldDefinition::code)
@@ -114,6 +116,7 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
     }
 
     public String getTitleField() {
+        requireCapability(EntityCapability.REFERENCE);
         return dao.getEntity().fields().stream()
                 .filter(FieldDefinition::isTitle)
                 .map(FieldDefinition::code)
@@ -181,6 +184,12 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
                 .stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void requireCapability(EntityCapability capability) {
+        if (!dao.getEntity().supports(capability)) {
+            throw new IllegalStateException("dynamic entity does not support capability: " + capability);
+        }
     }
 
     private String stringValue(Object value) {

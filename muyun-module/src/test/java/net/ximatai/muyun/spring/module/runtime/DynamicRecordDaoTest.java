@@ -6,8 +6,10 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -311,7 +313,9 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
-        DynamicRecordAbility ability = new DynamicRecordRuntime(operations).ability("contract", contractEntity());
+        DynamicRecordAbility ability = new DynamicRecordRuntime(operations)
+                .register(new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity())))
+                .ability("sales.contract", "contract");
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
@@ -354,7 +358,7 @@ class DynamicRecordDaoTest {
         assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
                 .sortedList(Criteria.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no sortable field");
+                .hasMessageContaining("does not support capability: SORT");
     }
 
     @Test
@@ -389,7 +393,15 @@ class DynamicRecordDaoTest {
         assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
                 .title("contract-1"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no title field");
+                .hasMessageContaining("does not support capability: REFERENCE");
+    }
+
+    @Test
+    void shouldRejectSortMethodsWithoutSortCapability() {
+        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+                .sortedList(Criteria.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not support capability: SORT");
     }
 
     @Test
@@ -449,7 +461,7 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                         FieldDefinition.integer("sort_order", "Sort Order").sortable()
                 )
-        );
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT);
     }
 
     private EntityDefinition referenceEntity() {
@@ -462,7 +474,7 @@ class DynamicRecordDaoTest {
                         FieldDefinition.string("name", "Name").length(128).required().title(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
-        );
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
 
     private Map<String, Object> row(String id, int sortOrder) {

@@ -47,11 +47,26 @@ public class ModuleDefinitionValidator {
                 titleFields++;
             }
         }
+        if (!entity.supports(EntityCapability.CRUD)) {
+            throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.code());
+        }
         if (sortableFields > 1) {
             throw new ModuleDefinitionException("entity can only have one sortable field: " + entity.code());
         }
         if (titleFields > 1) {
             throw new ModuleDefinitionException("entity can only have one title field: " + entity.code());
+        }
+        if (sortableFields > 0 && !entity.supports(EntityCapability.SORT)) {
+            throw new ModuleDefinitionException("sortable field requires SORT capability: " + entity.code());
+        }
+        if (entity.supports(EntityCapability.SORT) && sortableFields == 0) {
+            throw new ModuleDefinitionException("SORT capability requires a sortable field: " + entity.code());
+        }
+        if (titleFields > 0 && !entity.supports(EntityCapability.REFERENCE)) {
+            throw new ModuleDefinitionException("title field requires REFERENCE capability: " + entity.code());
+        }
+        if (entity.supports(EntityCapability.REFERENCE) && titleFields == 0) {
+            throw new ModuleDefinitionException("REFERENCE capability requires a title field: " + entity.code());
         }
     }
 
