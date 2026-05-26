@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +50,69 @@ class DynamicRecordDaoTest {
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE);
         assertThat(body.getValue()).containsKeys("created_at", "updated_at");
+    }
+
+    @Test
+    void shouldRunLifecycleHooksAroundCrudOperations() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        RecordingLifecycle lifecycle = new RecordingLifecycle();
+        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity(), lifecycle);
+
+        DynamicRecord inserted = new DynamicRecord(contractEntity())
+                .setValue("amount", BigDecimal.TEN);
+        dao.insert(inserted);
+        DynamicRecord selected = dao.findById("contract-1");
+        dao.update(selected.setValue("amount", BigDecimal.ONE));
+        dao.delete("contract-1");
+
+        assertThat(lifecycle.events)
+                .containsExactly(
+                        "beforeInsert:HOOK-CODE",
+                        "afterSelect:contract-1",
+                        "beforeUpdate:3",
+                        "beforeDelete:contract-1"
+                );
+        ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
+        assertThat(insertBody.getValue()).containsEntry("code", "HOOK-CODE");
+    }
+
+    @Test
+    void shouldNotRunAfterSelectForInternalReadsOrListQueries() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        RecordingLifecycle lifecycle = new RecordingLifecycle();
+        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity(), lifecycle);
+
+        DynamicRecord partial = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
+        partial.setId("contract-1");
+        dao.update(partial);
+        dao.delete("contract-1");
+        dao.query(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
+        dao.page(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
+        dao.count(Criteria.of().eq("code", "C-001"));
+
+        assertThat(lifecycle.events)
+                .containsExactly(
+                        "beforeUpdate:3",
+                        "beforeDelete:contract-1"
+                );
     }
 
     @Test
@@ -184,6 +248,25 @@ class DynamicRecordDaoTest {
                 .contains("\"deleted\" =");
     }
 
+    @Test
+    void shouldNotMutateCallerCriteria() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordDao dao = dao(operations);
+        Criteria criteria = Criteria.of().eq("code", "C-001");
+
+        dao.query(criteria, PageRequest.of(1, 10));
+        dao.page(criteria, PageRequest.of(1, 10));
+        dao.count(criteria);
+
+        assertThat(criteria.getClauses())
+                .hasSize(1)
+                .first()
+                .extracting(clause -> clause.getField())
+                .isEqualTo("code");
+    }
+
     private DynamicRecordDao dao(IDatabaseOperations<Object> operations) {
         return new DynamicRecordDao(operations, contractEntity());
     }
@@ -206,6 +289,31 @@ class DynamicRecordDaoTest {
                         new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
                 )
         );
+    }
+
+    private static class RecordingLifecycle implements DynamicRecordLifecycle {
+        private final List<String> events = new ArrayList<>();
+
+        @Override
+        public void beforeInsert(DynamicRecord record) {
+            record.setValue("code", "HOOK-CODE");
+            events.add("beforeInsert:" + record.getValue("code"));
+        }
+
+        @Override
+        public void beforeUpdate(DynamicRecord record) {
+            events.add("beforeUpdate:" + record.getVersion());
+        }
+
+        @Override
+        public void beforeDelete(String id) {
+            events.add("beforeDelete:" + id);
+        }
+
+        @Override
+        public void afterSelect(DynamicRecord record) {
+            events.add("afterSelect:" + record.getId());
+        }
     }
 
     private int occurrences(String value, String part) {

@@ -28,15 +28,22 @@ public class DynamicRecordDao {
     private final EntityDefinition entity;
     private final String schema;
     private final DynamicRecordMapping mapping;
+    private final DynamicRecordLifecycle lifecycle;
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
 
     @SuppressWarnings("unchecked")
     public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity) {
+        this(operations, entity, DynamicRecordLifecycle.NONE);
+    }
+
+    @SuppressWarnings("unchecked")
+    public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity, DynamicRecordLifecycle lifecycle) {
         this.operations = (IDatabaseOperations<Object>) Objects.requireNonNull(operations, "operations must not be null");
         new ModuleDefinitionValidator().validateEntity(entity);
         this.entity = entity;
         this.schema = operations.getDefaultSchemaName();
         this.mapping = new DynamicRecordMapping(entity);
+        this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
     }
 
     public String insert(DynamicRecord record) {
@@ -49,6 +56,7 @@ public class DynamicRecordDao {
         record.setDeleted(Boolean.FALSE);
         record.setCreatedAt(record.getCreatedAt() == null ? now : record.getCreatedAt());
         record.setUpdatedAt(now);
+        lifecycle.beforeInsert(record);
         record.validateForInsert();
 
         Object id = operations.insertItem(schema, entity.tableName(), toColumnMap(record, false));
@@ -59,7 +67,11 @@ public class DynamicRecordDao {
     }
 
     public DynamicRecord findById(String id) {
-        return query(Criteria.of().eq("id", id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
+        DynamicRecord record = loadActiveById(id);
+        if (record != null) {
+            lifecycle.afterSelect(record);
+        }
+        return record;
     }
 
     public int update(DynamicRecord record) {
@@ -69,11 +81,13 @@ public class DynamicRecordDao {
         }
         record.setUpdatedAt(Instant.now());
         record.setVersion(nextVersion(record));
+        lifecycle.beforeUpdate(record);
         return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toUpdateMap(record));
     }
 
     public int delete(String id) {
-        DynamicRecord record = findById(id);
+        lifecycle.beforeDelete(id);
+        DynamicRecord record = loadActiveById(id);
         if (record == null) {
             return 0;
         }
@@ -124,6 +138,10 @@ public class DynamicRecordDao {
         return scoped;
     }
 
+    private DynamicRecord loadActiveById(String id) {
+        return query(Criteria.of().eq("id", id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
+    }
+
     private Map<String, Object> toColumnMap(DynamicRecord record, boolean includeId) {
         Map<String, Object> body = new LinkedHashMap<>();
         if (includeId) {
@@ -150,7 +168,7 @@ public class DynamicRecordDao {
         if (record.getVersion() != null) {
             return record.getVersion() + 1;
         }
-        DynamicRecord current = findById(record.getId());
+        DynamicRecord current = loadActiveById(record.getId());
         if (current == null) {
             throw new IllegalArgumentException("dynamic record not found: " + record.getId());
         }
