@@ -1,0 +1,25 @@
+package net.ximatai.muyun.spring.module.metadata;
+
+public record EntityRelationDefinition(
+        String code,
+        String parentEntity,
+        String childEntity,
+        String childForeignKeyField,
+        boolean autoPopulate,
+        boolean autoDeleteWithParent
+) {
+    public static EntityRelationDefinition child(String code,
+                                                 String parentEntity,
+                                                 String childEntity,
+                                                 String childForeignKeyField) {
+        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, false, false);
+    }
+
+    public EntityRelationDefinition withAutoPopulate() {
+        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, true, autoDeleteWithParent);
+    }
+
+    public EntityRelationDefinition withAutoDeleteWithParent() {
+        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, autoPopulate, true);
+    }
+}

@@ -4,6 +4,9 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.HashSet;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.Set;
 
 public class ModuleDefinitionValidator {
@@ -23,6 +26,16 @@ public class ModuleDefinitionValidator {
             validateEntity(entity);
             requireUnique(entityCodes, entity.code(), "entity code");
             requireUnique(tableNames, entity.tableName(), "table name");
+        }
+        Map<String, EntityDefinition> entities = module.entities().stream()
+                .collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
+        Set<String> relationCodes = new HashSet<>();
+        for (EntityRelationDefinition relation : module.relations()) {
+            validateRelation(relation, entities);
+            requireUnique(relationCodes, relation.parentEntity() + "." + relation.code(), "relation code");
+        }
+        for (EntityReferenceDefinition reference : module.references()) {
+            validateReference(reference, entities);
         }
     }
 
@@ -124,6 +137,30 @@ public class ModuleDefinitionValidator {
         }
     }
 
+    public void validateRelation(EntityRelationDefinition relation, Map<String, EntityDefinition> entities) {
+        if (relation == null) {
+            throw new ModuleDefinitionException("relation must not be null");
+        }
+        requireIdentifier(relation.code(), "relation code");
+        EntityDefinition parent = requireEntity(entities, relation.parentEntity(), "relation parent entity");
+        EntityDefinition child = requireEntity(entities, relation.childEntity(), "relation child entity");
+        requireFieldName(relation.childForeignKeyField(), "relation child foreign key field");
+        if (parent.code().equals(child.code())) {
+            throw new ModuleDefinitionException("child relation must use different parent and child entities: " + relation.code());
+        }
+        requireField(child, relation.childForeignKeyField(), "relation child foreign key field");
+    }
+
+    public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities) {
+        if (reference == null) {
+            throw new ModuleDefinitionException("reference must not be null");
+        }
+        EntityDefinition source = requireEntity(entities, reference.sourceEntity(), "reference source entity");
+        requireFieldName(reference.sourceField(), "reference source field");
+        requireModuleAlias(reference.targetReferenceNamespace(), "reference target namespace");
+        requireField(source, reference.sourceField(), "reference source field");
+    }
+
     private void requireText(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new ModuleDefinitionException(name + " must not be blank");
@@ -189,5 +226,21 @@ public class ModuleDefinitionValidator {
         if (!values.add(value)) {
             throw new ModuleDefinitionException("duplicate " + name + ": " + value);
         }
+    }
+
+    private EntityDefinition requireEntity(Map<String, EntityDefinition> entities, String code, String name) {
+        requireIdentifier(code, name);
+        EntityDefinition entity = entities.get(code);
+        if (entity == null) {
+            throw new ModuleDefinitionException("unknown " + name + ": " + code);
+        }
+        return entity;
+    }
+
+    private FieldDefinition requireField(EntityDefinition entity, String fieldName, String name) {
+        return entity.fields().stream()
+                .filter(field -> field.fieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": " + entity.code() + "." + fieldName));
     }
 }

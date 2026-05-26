@@ -44,7 +44,14 @@ public class DynamicRecordRuntime {
     }
 
     public DynamicEntityService entityService(String moduleAlias, String entityCode, DynamicRecordLifecycle lifecycle) {
+        ModuleDefinition module = registry.requireModule(moduleAlias);
         EntityDefinition entity = registry.requireEntity(moduleAlias, entityCode);
-        return new DynamicEntityService(new DynamicRecordDao(operations, entity), moduleAlias, lifecycle);
+        return new DynamicEntityService(
+                new DynamicRecordDao(operations, entity),
+                moduleAlias,
+                lifecycle,
+                module,
+                childEntityCode -> entityService(moduleAlias, childEntityCode)
+        );
     }
 }

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
+    private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
 
     private String id;
     private Integer version;
@@ -64,6 +66,26 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
 
     public Map<String, Object> getValues() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
+    public DynamicRecord setChildren(String relationCode, List<DynamicRecord> records) {
+        if (relationCode == null || relationCode.isBlank()) {
+            throw new IllegalArgumentException("relationCode must not be blank");
+        }
+        if (records == null) {
+            children.put(relationCode, null);
+            return this;
+        }
+        children.put(relationCode, List.copyOf(records));
+        return this;
+    }
+
+    public List<DynamicRecord> getChildren(String relationCode) {
+        return children.get(relationCode);
+    }
+
+    public Map<String, List<DynamicRecord>> getChildren() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(children));
     }
 
     @Override
