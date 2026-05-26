@@ -10,7 +10,9 @@ import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 public interface CrudAbility<T extends EntityContract> {
     BaseDao<T, String> getDao();
@@ -22,7 +24,21 @@ public interface CrudAbility<T extends EntityContract> {
         prepareAbilityDefaults(entity);
         beforeInsert(entity);
         validateTreePlacementIfNeeded(entity);
-        return getDao().insert(entity);
+        String id = getDao().insert(entity);
+        afterInsert(id, entity);
+        afterChanged(entity);
+        return id;
+    }
+
+    default List<String> insertBatch(Collection<T> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = new ArrayList<>();
+        for (T entity : entities) {
+            ids.add(insert(entity));
+        }
+        return ids;
     }
 
     default T select(String id) {
@@ -38,7 +54,12 @@ public interface CrudAbility<T extends EntityContract> {
         EntityLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
-        return getDao().updateById(entity);
+        int updated = getDao().updateById(entity);
+        afterUpdate(entity, updated);
+        if (updated > 0) {
+            afterChanged(entity);
+        }
+        return updated;
     }
 
     default int delete(String id) {
@@ -47,7 +68,12 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null) {
             return 0;
         }
-        return getDao().deleteById(id);
+        int deleted = getDao().deleteById(id);
+        afterDelete(id, entity, deleted);
+        if (deleted > 0) {
+            afterChanged(entity);
+        }
+        return deleted;
     }
 
     default int delete(T entity) {
@@ -83,6 +109,18 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default void beforeDelete(String id) {
+    }
+
+    default void afterInsert(String id, T entity) {
+    }
+
+    default void afterUpdate(T entity, int updated) {
+    }
+
+    default void afterDelete(String id, T entity, int deleted) {
+    }
+
+    default void afterChanged(T entity) {
     }
 
     default void afterSelect(T entity) {

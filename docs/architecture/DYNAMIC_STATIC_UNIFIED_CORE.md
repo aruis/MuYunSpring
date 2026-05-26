@@ -22,6 +22,7 @@ M1 先建设以下底座：
 5. `SortAbility`：统一排序字段、列表排序和相邻移动。
 6. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
 7. `ReferenceAbility`：统一标题解析和引用选项读取，保留 RAW 读取入口。
+8. `ChildAbility` / `ChildrenAbility`：统一父子聚合的子表插入、更新替换、自动装配和父删联动；父子写链路必须由调用方事务包裹。
 
 动态模块进入 M1 后，应复用同一套语义，而不是另起一套动态 CRUD。
 
@@ -37,7 +38,7 @@ DynamicRecordService
 ```
 
 `DynamicRecordService` 是动态记录对外门面，负责按模块别名和实体编码定位运行态服务。
-`DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用等平台能力，并按元数据能力开关决定哪些入口可用。
+`DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用等平台能力，并按元数据能力开关决定哪些入口可用。父子聚合能力先在静态能力层固化语义，动态侧后续按元数据关系配置接入同一套 `ChildRelation`。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
 
 ## 模型定义边界

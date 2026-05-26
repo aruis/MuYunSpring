@@ -68,6 +68,104 @@ class AbilityContractTest {
     }
 
     @Test
+    void childrenAbilityShouldInsertLoadReplaceAndCascadeDeleteChildren() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoiceLine secondLine = new DemoInvoiceLine("Second line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine, secondLine));
+
+        String invoiceId = invoiceService.insert(invoice);
+
+        assertThat(firstLine.getInvoiceId()).isEqualTo(invoiceId);
+        assertThat(secondLine.getInvoiceId()).isEqualTo(invoiceId);
+
+        invoice.setLines(null);
+        assertThat(invoiceService.select(invoiceId).getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line", "Second line");
+
+        firstLine.setTitle("First line updated");
+        DemoInvoiceLine thirdLine = new DemoInvoiceLine("Third line");
+        invoice.setLines(List.of(firstLine, thirdLine));
+        invoiceService.update(invoice);
+
+        assertThat(invoiceService.lineService().select(firstLine.getId()).getTitle()).isEqualTo("First line updated");
+        assertThat(invoiceService.lineService().select(secondLine.getId())).isNull();
+        assertThat(invoiceService.lineService().select(thirdLine.getId())).isNotNull();
+
+        invoiceService.delete(invoiceId);
+
+        assertThat(invoiceService.select(invoiceId)).isNull();
+        assertThat(invoiceService.lineService().select(firstLine.getId())).isNull();
+        assertThat(invoiceService.lineService().select(thirdLine.getId())).isNull();
+        assertThat(invoiceService.lineService().selectIgnoreSoftDelete(firstLine.getId())).isNotNull();
+        assertThat(invoiceService.lineService().selectIgnoreSoftDelete(thirdLine.getId())).isNotNull();
+    }
+
+    @Test
+    void childrenAbilityShouldKeepChildrenWhenPayloadIsNullAndClearWhenEmpty() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoiceLine secondLine = new DemoInvoiceLine("Second line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine, secondLine));
+
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoice.setLines(null);
+        invoiceService.update(invoice);
+
+        assertThat(invoiceService.lineService().select(firstLine.getId())).isNotNull();
+        assertThat(invoiceService.lineService().select(secondLine.getId())).isNotNull();
+
+        invoice.setLines(List.of());
+        invoiceService.update(invoice);
+
+        assertThat(invoiceService.lineService().select(firstLine.getId())).isNull();
+        assertThat(invoiceService.lineService().select(secondLine.getId())).isNull();
+        assertThat(invoiceService.select(invoiceId).getLines()).isEmpty();
+    }
+
+    @Test
+    void childrenAbilityShouldRejectDuplicateAndForeignChildIds() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoice firstInvoice = new DemoInvoice("First invoice", List.of(new DemoInvoiceLine("First line")));
+        DemoInvoice secondInvoice = new DemoInvoice("Second invoice", List.of(new DemoInvoiceLine("Second line")));
+        invoiceService.insert(firstInvoice);
+        invoiceService.insert(secondInvoice);
+        DemoInvoiceLine firstLine = firstInvoice.getLines().getFirst();
+        DemoInvoiceLine secondLine = secondInvoice.getLines().getFirst();
+
+        firstInvoice.setLines(List.of(firstLine, firstLine));
+        assertThatThrownBy(() -> invoiceService.update(firstInvoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("Duplicate child id");
+
+        firstInvoice.setLines(List.of(secondLine));
+        assertThatThrownBy(() -> invoiceService.update(firstInvoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("does not belong to parent");
+    }
+
+    @Test
+    void childrenAbilityShouldRejectInvalidChildIdsOnParentInsert() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine duplicateLine = new DemoInvoiceLine("Duplicate line");
+        duplicateLine.setId("same-line");
+
+        assertThatThrownBy(() -> invoiceService.insert(new DemoInvoice("Duplicate invoice", List.of(duplicateLine, duplicateLine))))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("Duplicate child id");
+
+        DemoInvoice existingInvoice = new DemoInvoice("Existing invoice", List.of(new DemoInvoiceLine("Existing line")));
+        invoiceService.insert(existingInvoice);
+        DemoInvoiceLine existingLine = existingInvoice.getLines().getFirst();
+
+        assertThatThrownBy(() -> invoiceService.insert(new DemoInvoice("Foreign invoice", List.of(existingLine))))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("does not belong to parent");
+    }
+
+    @Test
     void crudAbilityShouldIncreaseVersionOnUpdate() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization organization = new DemoOrganization("Versioned", TreeAbility.ROOT_ID);

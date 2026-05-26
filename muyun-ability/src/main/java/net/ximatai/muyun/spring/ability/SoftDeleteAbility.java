@@ -30,7 +30,12 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             return 0;
         }
         EntityLifecycle.prepareDelete(entity, Instant.now());
-        return getDao().updateById(entity);
+        int deleted = getDao().updateById(entity);
+        afterDelete(id, entity, deleted);
+        if (deleted > 0) {
+            afterChanged(entity);
+        }
+        return deleted;
     }
 
     @Override
