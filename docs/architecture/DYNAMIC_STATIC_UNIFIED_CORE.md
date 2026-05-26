@@ -60,6 +60,10 @@ DynamicRecordService
 
 静态和动态两条路径的共同交汇点是 MuYunDatabase 的 `TableWrapper`。平台标准字段由 `PlatformTableValidator` 统一校验，避免两条路径演化出不同的基础字段、主键或生命周期列。
 
+静态 DAO 继承的 `ensureTable()` 保留为 MuYunDatabase 提供的开箱入口，适合单个 repository 自检或轻量场景。
+平台级初始化、批量拉齐、dry-run、strict migration 和后续审计治理，应统一从 `StaticSchemaService` 进入。
+业务 Service 不应为了保存普通业务数据而手工触发表结构变更。
+
 ## 能力挂载原则
 
 后续工作流、编码规则、生成规则、回写、导入导出、附件、字典、权限、审计等能力，都应优先考虑能否同时挂载到静态模块和动态模块。

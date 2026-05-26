@@ -2,22 +2,30 @@ package net.ximatai.muyun.spring.iam.organization;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.IMetaDataLoader;
+import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.database.core.metadata.DBColumn;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.metadata.DBIndex;
 import net.ximatai.muyun.database.core.metadata.DBSchema;
 import net.ximatai.muyun.database.core.metadata.DBTable;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.MigrationOptions;
+import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.spring.boot.sql.MuYunRepositoryFactory;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
+import net.ximatai.muyun.spring.common.schema.StaticModelTableMapper;
+import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -74,6 +82,37 @@ class OrganizationRepositoryContractTest {
     }
 
     @Test
+    void staticSchemaServiceShouldDryRunOrganizationTableWithoutExecutingDdl() {
+        IDatabaseOperations<Object> operations = mockedOperations();
+
+        MigrationResult result = new StaticSchemaService(operations)
+                .ensureTable(Organization.class, MigrationOptions.dryRun());
+
+        assertThat(result.isChanged()).isTrue();
+        assertThat(result.isDryRun()).isTrue();
+        assertThat(result.getStatements()).anySatisfy(sql -> assertThat(sql).contains("iam_organization"));
+        verify(operations, never()).execute(anyString());
+    }
+
+    @Test
+    void staticModelMapperShouldCompileOrganizationAsPlatformTable() {
+        TableWrapper table = new StaticModelTableMapper().toTable(Organization.class);
+
+        assertThat(table.getName()).isEqualTo(TABLE);
+        assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
+        assertThat(table.getPrimaryKey().getLength()).isEqualTo(32);
+        assertThat(columnNames(table)).containsAll(StandardModelSchema.columnNames());
+        assertThat(columnNames(table))
+                .contains("parent_id", "code", "name", "sort_order", "enabled");
+        assertThat(table.getColumns().stream().filter(column -> "code".equals(column.getName())).findFirst())
+                .get()
+                .satisfies(column -> {
+                    assertThat(column.getLength()).isEqualTo(64);
+                    assertThat(column.isNullable()).isFalse();
+                });
+    }
+
+    @Test
     void abilityQueriesShouldCompileThroughMuYunRepositoryProxy() {
         IDatabaseOperations<Object> operations = mockedOperations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -102,6 +141,15 @@ class OrganizationRepositoryContractTest {
 
     private OrganizationDao repository(IDatabaseOperations<Object> operations) {
         return new MuYunRepositoryFactory(operations, new MockEnvironment()).create(OrganizationDao.class);
+    }
+
+    private Set<String> columnNames(TableWrapper table) {
+        Set<String> names = new LinkedHashSet<>();
+        if (table.getPrimaryKey() != null) {
+            names.add(table.getPrimaryKey().getName());
+        }
+        table.getColumns().forEach(column -> names.add(column.getName()));
+        return names;
     }
 
     @SuppressWarnings("unchecked")
