@@ -35,6 +35,10 @@ public class DynamicModuleRegistry {
         return Optional.ofNullable(modules.get(moduleAlias));
     }
 
+    public boolean containsModule(String moduleAlias) {
+        return modules.containsKey(moduleAlias);
+    }
+
     public ModuleDefinition requireModule(String moduleAlias) {
         return findModule(moduleAlias)
                 .orElseThrow(() -> new ModuleDefinitionException("unknown module alias: " + moduleAlias));

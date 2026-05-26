@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -107,6 +108,31 @@ class DynamicSchemaServiceIT {
         assertThat(ability.select(id)).isNull();
         assertThat(ability.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
         assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
+    }
+
+    @Test
+    void shouldPublishModuleThenRunDynamicRecordOnRealDatabase() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(entity("app_contract_publish_it"))
+        );
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        DynamicModulePublishResult result = publisher.publish(module);
+        DynamicRecordAbility ability = runtime.ability("sales.contract", "contract");
+        DynamicRecord record = runtime.newRecord("sales.contract", "contract")
+                .setValue("code", "C-PUBLISH-001")
+                .setValue("name", "Published Contract")
+                .setValue("amount", BigDecimal.valueOf(5678, 2));
+
+        String id = ability.insert(record);
+
+        assertThat(result.changed()).isTrue();
+        assertThat(result.migrations()).containsKey("contract");
+        assertThat(ability.select(id).getValue("code")).isEqualTo("C-PUBLISH-001");
+        assertThat(ability.count(Criteria.of().eq("code", "C-PUBLISH-001"))).isEqualTo(1);
     }
 
     @Test

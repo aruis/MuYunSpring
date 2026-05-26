@@ -37,10 +37,17 @@ public class DynamicSchemaService {
     }
 
     public Map<String, Boolean> ensureModule(ModuleDefinition module) {
-        validator.validate(module);
+        Map<String, MigrationResult> migrations = ensureModule(module, MigrationOptions.execute());
         Map<String, Boolean> results = new LinkedHashMap<>();
+        migrations.forEach((entityCode, migration) -> results.put(entityCode, migration.isChanged()));
+        return results;
+    }
+
+    public Map<String, MigrationResult> ensureModule(ModuleDefinition module, MigrationOptions options) {
+        validator.validate(module);
+        Map<String, MigrationResult> results = new LinkedHashMap<>();
         for (EntityDefinition entity : module.entities()) {
-            results.put(entity.code(), ensureTable(entity));
+            results.put(entity.code(), ensureTable(entity, options));
         }
         return results;
     }
