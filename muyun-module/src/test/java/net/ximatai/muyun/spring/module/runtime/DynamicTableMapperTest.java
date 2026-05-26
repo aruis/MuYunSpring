@@ -174,9 +174,29 @@ class DynamicTableMapperTest {
         TableWrapper table = mapper.toTable(entity);
 
         assertThat(entity.supports(EntityCapability.CRUD)).isTrue();
+        assertThat(entity.supports(EntityCapability.SOFT_DELETE)).isTrue();
+        assertThat(entity.supports(EntityCapability.LIFECYCLE)).isTrue();
+        assertThat(entity.supports(EntityCapability.CACHE)).isTrue();
         assertThat(entity.supports(EntityCapability.TREE)).isTrue();
         assertThat(entity.supports(EntityCapability.SORT)).isTrue();
         assertThat(columnNames(table)).contains("parent_id", "sort_order");
+    }
+
+    @Test
+    void shouldClassifyBaselineFieldAndDefinitionCapabilitiesInSameCatalog() {
+        assertThat(EntityCapability.CRUD.isBaseline()).isTrue();
+        assertThat(EntityCapability.SOFT_DELETE.isBaseline()).isTrue();
+        assertThat(EntityCapability.TREE.isDeclaredByEntityFields()).isTrue();
+        assertThat(EntityCapability.REFERENCE.isDeclaredByEntityFields()).isTrue();
+        assertThat(EntityCapability.CHILD_RELATION.isDeclaredByDefinition()).isTrue();
+        assertThat(EntityCapability.REFERENCE_DEPENDENCY.isDeclaredByDefinition()).isTrue();
+
+        EntityDefinition entity = contractEntity();
+
+        assertThat(entity.supports(EntityCapability.CRUD)).isTrue();
+        assertThat(entity.supports(EntityCapability.SOFT_DELETE)).isTrue();
+        assertThat(entity.supports(EntityCapability.CACHE)).isTrue();
+        assertThat(entity.supports(EntityCapability.TREE)).isFalse();
     }
 
     @Test

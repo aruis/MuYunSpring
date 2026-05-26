@@ -30,12 +30,22 @@ public record EntityDefinition(
 
     private static Set<EntityCapability> normalizeCapabilities(Set<EntityCapability> capabilities) {
         EnumSet<EntityCapability> normalized = capabilities == null || capabilities.isEmpty()
-                ? EnumSet.of(EntityCapability.CRUD)
+                ? baselineCapabilities()
                 : EnumSet.copyOf(capabilities);
-        normalized.add(EntityCapability.CRUD);
+        normalized.addAll(baselineCapabilities());
         if (normalized.contains(EntityCapability.TREE)) {
             normalized.add(EntityCapability.SORT);
         }
         return Set.copyOf(normalized);
+    }
+
+    private static EnumSet<EntityCapability> baselineCapabilities() {
+        EnumSet<EntityCapability> values = EnumSet.noneOf(EntityCapability.class);
+        for (EntityCapability capability : EntityCapability.values()) {
+            if (capability.isBaseline()) {
+                values.add(capability);
+            }
+        }
+        return values;
     }
 }
