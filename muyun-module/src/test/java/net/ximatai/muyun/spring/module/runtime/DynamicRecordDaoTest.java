@@ -142,6 +142,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldResolveCurrentVersionWhenUpdatingPartialRecord() {
         IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
                 "code", "C-001",
@@ -161,6 +162,26 @@ class DynamicRecordDaoTest {
                 .containsEntry("amount", BigDecimal.ONE)
                 .containsEntry("version", 8)
                 .doesNotContainKeys("created_at", "created_by", "code");
+    }
+
+    @Test
+    void shouldRejectPartialUpdateWhenOnlyDeletedRecordExists() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("amount", BigDecimal.ONE);
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> ability(operations).update(record))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not found");
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations).query(sql.capture(), anyMap());
+        assertThat(sql.getValue())
+                .contains("\"id\" =")
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL");
     }
 
     @Test
@@ -188,6 +209,15 @@ class DynamicRecordDaoTest {
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 3);
         assertThat(body.getValue()).doesNotContainKeys("id", "code", "amount", "created_at", "created_by");
+    }
+
+    @Test
+    void shouldNotExposeDynamicDeleteByIdBypass() {
+        DynamicRecordDao dao = dao(operations());
+
+        assertThatThrownBy(() -> dao.deleteById("contract-1"))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("DynamicRecordAbility");
     }
 
     @Test
@@ -246,6 +276,50 @@ class DynamicRecordDaoTest {
                 .startsWith("SELECT COUNT(*) AS total_count FROM \"public\".\"app_contract\"")
                 .contains("\"code\" =")
                 .contains("\"deleted\" =");
+    }
+
+    @Test
+    void shouldKeepDaoRawAndAbilityScoped() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.TRUE,
+                "version", 2
+        )));
+        DynamicRecordDao dao = dao(operations);
+        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
+
+        assertThat(dao.findById("contract-1").getDeleted()).isTrue();
+        assertThat(ability.select("contract-1")).isNull();
+        assertThat(ability.count(Criteria.of().eq("code", "C-001"))).isZero();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.times(2)).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues().get(0)).doesNotContain("\"deleted\"");
+        assertThat(sql.getAllValues().get(1)).doesNotContain("\"deleted\"");
+        ArgumentCaptor<String> countSql = ArgumentCaptor.forClass(String.class);
+        verify(operations).row(countSql.capture(), anyMap());
+        assertThat(countSql.getValue())
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL");
+    }
+
+    @Test
+    void shouldCreateAbilityThroughDynamicRecordRuntime() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordAbility ability = new DynamicRecordRuntime(operations).ability("contract", contractEntity());
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+
+        String id = ability.insert(record);
+
+        assertThat(id).hasSize(32);
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
     }
 
     @Test

@@ -73,7 +73,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public int deleteById(String id) {
-        return operations.patchUpdateItem(schema, entity.tableName(), id, Map.of("deleted", Boolean.TRUE));
+        throw new UnsupportedOperationException("dynamic record delete must go through DynamicRecordAbility");
     }
 
     public boolean existsById(String id) {

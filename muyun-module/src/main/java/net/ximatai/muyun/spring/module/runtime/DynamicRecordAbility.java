@@ -69,7 +69,7 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
         if (record.getVersion() != null) {
             return BaseModelLifecycle.nextVersion(record.getVersion());
         }
-        DynamicRecord current = dao.findById(record.getId());
+        DynamicRecord current = activeRaw(record.getId());
         if (current == null) {
             throw new IllegalArgumentException("dynamic record not found: " + record.getId());
         }
@@ -174,6 +174,13 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
         }
         ids.add(before ? targetIndex : targetIndex + 1, id);
         reorder(ids);
+    }
+
+    private DynamicRecord activeRaw(String id) {
+        return getDao().query(activeCriteria(Criteria.of().eq("id", id)), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private String stringValue(Object value) {

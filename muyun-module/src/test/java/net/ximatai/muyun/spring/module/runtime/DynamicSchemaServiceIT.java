@@ -92,11 +92,11 @@ class DynamicSchemaServiceIT {
         String id = ability.insert(record);
 
         assertThat(ability.select(id).getValue("code")).isEqualTo("C-IT-001");
-        assertThat(dao.query(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")))
+        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")).getRecords())
                 .hasSize(1);
-        assertThat(dao.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
+        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
                 .isEqualTo(1);
-        assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
+        assertThat(ability.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
 
         record.setValue("name", "Updated Contract");
         ability.update(record);
@@ -105,7 +105,8 @@ class DynamicSchemaServiceIT {
 
         assertThat(ability.delete(id)).isEqualTo(1);
         assertThat(ability.select(id)).isNull();
-        assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
+        assertThat(ability.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
+        assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
     }
 
     @Test
