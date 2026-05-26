@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.SortCapable;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -12,10 +13,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
-    default String getSortField() {
-        return "sortOrder";
-    }
-
     default void reorder(List<String> orderedIds) {
         if (orderedIds == null || orderedIds.isEmpty()) {
             throw new AbilityException("Cannot reorder empty records");
@@ -49,7 +46,7 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
     }
 
     default List<T> sortedList(Criteria criteria) {
-        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     default Criteria sortScope(T entity) {

@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.common.model.EntityContract;
 import net.ximatai.muyun.spring.common.model.TitledCapable;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -24,7 +25,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         }
         LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
         List<T> entities = getDao().query(
-                activeCriteria(Criteria.of().in("id", List.copyOf(normalizedIds))),
+                activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
                 new PageRequest(0, Integer.MAX_VALUE)
         );
         Map<String, String> loadedTitles = new LinkedHashMap<>();

@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
@@ -130,40 +131,40 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     }
 
     private DynamicRecord loadById(String id) {
-        return query(Criteria.of().eq("id", id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
+        return query(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
     }
 
     private Map<String, Object> toColumnMap(DynamicRecord record, boolean includeId) {
         Map<String, Object> body = new LinkedHashMap<>();
         if (includeId) {
-            body.put("id", record.getId());
+            body.put(StandardEntitySchema.ID_COLUMN, record.getId());
         }
-        body.put("version", record.getVersion());
-        body.put("deleted", record.getDeleted());
-        body.put("created_by", record.getCreatedBy());
-        body.put("created_at", record.getCreatedAt());
-        body.put("updated_by", record.getUpdatedBy());
-        body.put("updated_at", record.getUpdatedAt());
+        body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
+        body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
+        body.put(StandardEntitySchema.CREATED_BY_COLUMN, record.getCreatedBy());
+        body.put(StandardEntitySchema.CREATED_AT_COLUMN, record.getCreatedAt());
+        body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
+        body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
         for (FieldDefinition field : entity.fields()) {
             if (record.getValues().containsKey(field.code())) {
                 body.put(field.columnName(), record.getValues().get(field.code()));
             }
         }
         if (!includeId) {
-            body.put("id", record.getId());
+            body.put(StandardEntitySchema.ID_COLUMN, record.getId());
         }
         return body;
     }
 
     private Map<String, Object> toUpdateMap(DynamicRecord record) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", record.getVersion());
-        body.put("updated_at", record.getUpdatedAt());
+        body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
+        body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
         if (record.getUpdatedBy() != null) {
-            body.put("updated_by", record.getUpdatedBy());
+            body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
         }
         if (record.getDeleted() != null) {
-            body.put("deleted", record.getDeleted());
+            body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
         }
         for (FieldDefinition field : entity.fields()) {
             if (record.getValues().containsKey(field.code())) {
@@ -175,11 +176,11 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     private Map<String, Object> toDeleteMap(DynamicRecord record) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("deleted", Boolean.TRUE);
-        body.put("version", record.getVersion());
-        body.put("updated_at", record.getUpdatedAt());
+        body.put(StandardEntitySchema.DELETED_COLUMN, Boolean.TRUE);
+        body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
+        body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
         if (record.getUpdatedBy() != null) {
-            body.put("updated_by", record.getUpdatedBy());
+            body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
         }
         return body;
     }
@@ -189,13 +190,13 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
             return null;
         }
         DynamicRecord record = new DynamicRecord(entity);
-        record.setId(stringValue(row.get("id")));
-        record.setVersion(numberValue(row.get("version")));
-        record.setDeleted((Boolean) row.get("deleted"));
-        record.setCreatedBy(stringValue(row.get("created_by")));
-        record.setCreatedAt(instantValue(row.get("created_at")));
-        record.setUpdatedBy(stringValue(row.get("updated_by")));
-        record.setUpdatedAt(instantValue(row.get("updated_at")));
+        record.setId(stringValue(row.get(StandardEntitySchema.ID_COLUMN)));
+        record.setVersion(numberValue(row.get(StandardEntitySchema.VERSION_COLUMN)));
+        record.setDeleted((Boolean) row.get(StandardEntitySchema.DELETED_COLUMN));
+        record.setCreatedBy(stringValue(row.get(StandardEntitySchema.CREATED_BY_COLUMN)));
+        record.setCreatedAt(instantValue(row.get(StandardEntitySchema.CREATED_AT_COLUMN)));
+        record.setUpdatedBy(stringValue(row.get(StandardEntitySchema.UPDATED_BY_COLUMN)));
+        record.setUpdatedAt(instantValue(row.get(StandardEntitySchema.UPDATED_AT_COLUMN)));
         for (FieldDefinition field : entity.fields()) {
             record.putLoadedValue(field.code(), row.get(field.columnName()));
         }

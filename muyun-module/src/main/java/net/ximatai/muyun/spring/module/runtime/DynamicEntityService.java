@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 
 import java.util.ArrayList;
@@ -77,21 +78,21 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
         return EntityLifecycle.nextVersion(current.getVersion());
     }
 
-    public String getSortField() {
-        requireCapability(EntityCapability.SORT);
-        return PlatformAbilityFields.SORT_FIELD;
-    }
-
     public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         return getDao().query(activeCriteria(criteria), pageRequest, sorts);
     }
 
     public List<DynamicRecord> sortedList(Criteria criteria) {
-        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+        requireCapability(EntityCapability.SORT);
+        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     public void reorder(List<String> orderedIds) {
         Objects.requireNonNull(orderedIds, "orderedIds must not be null");
+        requireCapability(EntityCapability.SORT);
+        if (orderedIds.isEmpty()) {
+            throw new IllegalArgumentException("Cannot reorder empty records");
+        }
         Set<String> uniqueIds = new LinkedHashSet<>(orderedIds);
         if (uniqueIds.size() != orderedIds.size()) {
             throw new IllegalArgumentException("Cannot reorder duplicate records");
@@ -102,7 +103,7 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
             if (record == null) {
                 throw new IllegalArgumentException("Cannot reorder missing record: " + id);
             }
-            record.setValue(getSortField(), order++);
+            record.setValue(PlatformAbilityFields.SORT_FIELD, order++);
             update(record);
         }
     }
@@ -115,39 +116,43 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
         moveRelative(id, afterId, false);
     }
 
-    public String getTitleField() {
-        requireCapability(EntityCapability.REFERENCE);
-        return PlatformAbilityFields.TITLE_FIELD;
-    }
-
     public String title(String id) {
-        String titleField = getTitleField();
+        requireCapability(EntityCapability.REFERENCE);
         DynamicRecord record = getDao().findById(id);
-        return record == null || Boolean.TRUE.equals(record.getDeleted()) ? null : stringValue(record.getValue(titleField));
+        return record == null || Boolean.TRUE.equals(record.getDeleted())
+                ? null
+                : stringValue(record.getValue(PlatformAbilityFields.TITLE_FIELD));
     }
 
     public Map<String, String> titles(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return Map.of();
         }
+        requireCapability(EntityCapability.REFERENCE);
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
         List<DynamicRecord> records = getDao().query(
-                activeCriteria(Criteria.of().in("id", List.copyOf(ids))),
+                activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
                 new PageRequest(0, Integer.MAX_VALUE)
         );
-        Map<String, String> titles = new LinkedHashMap<>();
-        String titleField = getTitleField();
+        Map<String, String> loadedTitles = new LinkedHashMap<>();
         for (DynamicRecord record : records) {
-            titles.put(record.getId(), stringValue(record.getValue(titleField)));
+            loadedTitles.put(record.getId(), stringValue(record.getValue(PlatformAbilityFields.TITLE_FIELD)));
+        }
+        Map<String, String> titles = new LinkedHashMap<>();
+        for (String id : normalizedIds) {
+            if (loadedTitles.containsKey(id)) {
+                titles.put(id, loadedTitles.get(id));
+            }
         }
         return titles;
     }
 
     public PageResult<DynamicReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
+        requireCapability(EntityCapability.REFERENCE);
         PageResult<DynamicRecord> page = pageQuery(criteria, pageRequest);
-        String titleField = getTitleField();
         return PageResult.of(
                 page.getRecords().stream()
-                        .map(record -> new DynamicReferenceOption(record.getId(), stringValue(record.getValue(titleField))))
+                        .map(record -> new DynamicReferenceOption(record.getId(), stringValue(record.getValue(PlatformAbilityFields.TITLE_FIELD))))
                         .toList(),
                 page.getTotal(),
                 pageRequest
@@ -176,7 +181,7 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
     }
 
     private DynamicRecord activeRaw(String id) {
-        return getDao().query(activeCriteria(Criteria.of().eq("id", id)), new PageRequest(0, 1))
+        return getDao().query(activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
                 .stream()
                 .findFirst()
                 .orElse(null);

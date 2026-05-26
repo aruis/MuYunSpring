@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.EntityContract;
 import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.time.Instant;
 
@@ -79,7 +80,9 @@ public interface CrudAbility<T extends EntityContract> {
         if (criteria != null && !criteria.isEmpty()) {
             scoped.andGroup(criteria.getRoot());
         }
-        scoped.andGroup(group -> group.eq("deleted", Boolean.FALSE).orIsNull("deleted"));
+        scoped.andGroup(group -> group
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE)
+                .orIsNull(StandardEntitySchema.DELETED_FIELD));
         return scoped;
     }
 

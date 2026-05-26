@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -14,13 +15,13 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     String ROOT_ID = "root";
 
     default List<T> children(String parentId) {
-        Criteria criteria = activeCriteria(Criteria.of().eq("parentId", parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+        Criteria criteria = activeCriteria(Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
+        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     @Override
     default Criteria sortScope(T entity) {
-        return Criteria.of().eq("parentId", entity.getParentId());
+        return Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, entity.getParentId());
     }
 
     @Override

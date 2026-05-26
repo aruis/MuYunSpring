@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 
@@ -10,17 +11,20 @@ final class DynamicRecordMapping {
     private final Map<String, String> columns = new HashMap<>();
 
     DynamicRecordMapping(EntityDefinition entity) {
-        columns.put("id", "id");
-        columns.put("version", "version");
-        columns.put("deleted", "deleted");
-        columns.put("createdBy", "created_by");
-        columns.put("created_by", "created_by");
-        columns.put("createdAt", "created_at");
-        columns.put("created_at", "created_at");
-        columns.put("updatedBy", "updated_by");
-        columns.put("updated_by", "updated_by");
-        columns.put("updatedAt", "updated_at");
-        columns.put("updated_at", "updated_at");
+        columns.put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
+        columns.put(StandardEntitySchema.ID_COLUMN, StandardEntitySchema.ID_COLUMN);
+        columns.put(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN);
+        columns.put(StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_COLUMN);
+        columns.put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);
+        columns.put(StandardEntitySchema.DELETED_COLUMN, StandardEntitySchema.DELETED_COLUMN);
+        columns.put(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN);
+        columns.put(StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_COLUMN);
+        columns.put(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN);
+        columns.put(StandardEntitySchema.CREATED_AT_COLUMN, StandardEntitySchema.CREATED_AT_COLUMN);
+        columns.put(StandardEntitySchema.UPDATED_BY_FIELD, StandardEntitySchema.UPDATED_BY_COLUMN);
+        columns.put(StandardEntitySchema.UPDATED_BY_COLUMN, StandardEntitySchema.UPDATED_BY_COLUMN);
+        columns.put(StandardEntitySchema.UPDATED_AT_FIELD, StandardEntitySchema.UPDATED_AT_COLUMN);
+        columns.put(StandardEntitySchema.UPDATED_AT_COLUMN, StandardEntitySchema.UPDATED_AT_COLUMN);
         for (FieldDefinition field : entity.fields()) {
             columns.put(field.code(), field.columnName());
             columns.put(field.columnName(), field.columnName());
