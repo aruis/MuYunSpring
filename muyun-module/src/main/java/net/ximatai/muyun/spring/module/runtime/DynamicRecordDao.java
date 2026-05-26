@@ -9,7 +9,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.id.Ids;
+import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
@@ -51,14 +51,7 @@ public class DynamicRecordDao {
 
     public String insert(DynamicRecord record) {
         requireSameEntity(record);
-        if (record.getId() == null || record.getId().isBlank()) {
-            record.setId(Ids.newId());
-        }
-        Instant now = Instant.now();
-        record.setVersion(record.getVersion() == null ? 0 : record.getVersion());
-        record.setDeleted(Boolean.FALSE);
-        record.setCreatedAt(record.getCreatedAt() == null ? now : record.getCreatedAt());
-        record.setUpdatedAt(now);
+        BaseModelLifecycle.prepareInsert(record, Instant.now());
         lifecycle.beforeInsert(record);
         record.validateForInsert();
 
@@ -82,8 +75,7 @@ public class DynamicRecordDao {
         if (record.getId() == null || record.getId().isBlank()) {
             throw new IllegalArgumentException("dynamic record id must not be blank");
         }
-        record.setUpdatedAt(Instant.now());
-        record.setVersion(nextVersion(record));
+        BaseModelLifecycle.prepareUpdate(record, Instant.now(), nextVersion(record));
         lifecycle.beforeUpdate(record);
         return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toUpdateMap(record));
     }
@@ -94,9 +86,7 @@ public class DynamicRecordDao {
         if (record == null) {
             return 0;
         }
-        record.setDeleted(Boolean.TRUE);
-        record.setUpdatedAt(Instant.now());
-        record.setVersion(record.getVersion() == null ? 1 : record.getVersion() + 1);
+        BaseModelLifecycle.prepareDelete(record, Instant.now());
         return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toDeleteMap(record));
     }
 
@@ -274,7 +264,7 @@ public class DynamicRecordDao {
         if (current == null) {
             throw new IllegalArgumentException("dynamic record not found: " + record.getId());
         }
-        return current.getVersion() == null ? 1 : current.getVersion() + 1;
+        return BaseModelLifecycle.nextVersion(current.getVersion());
     }
 
     private Map<String, Object> toUpdateMap(DynamicRecord record) {

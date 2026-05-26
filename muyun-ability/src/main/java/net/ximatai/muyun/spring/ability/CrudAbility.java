@@ -4,7 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.id.Ids;
+import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
 import net.ximatai.muyun.spring.common.model.BaseModel;
 import net.ximatai.muyun.spring.common.model.TreeModel;
 
@@ -16,14 +16,7 @@ public interface CrudAbility<T extends BaseModel> {
     String getModuleAlias();
 
     default String insert(T entity) {
-        if (entity.getId() == null || entity.getId().isBlank()) {
-            entity.setId(Ids.newId());
-        }
-        Instant now = Instant.now();
-        entity.setVersion(entity.getVersion() == null ? 0 : entity.getVersion());
-        entity.setDeleted(Boolean.FALSE);
-        entity.setCreatedAt(entity.getCreatedAt() == null ? now : entity.getCreatedAt());
-        entity.setUpdatedAt(now);
+        BaseModelLifecycle.prepareInsert(entity, Instant.now());
         beforeInsert(entity);
         validateTreePlacementIfNeeded(entity);
         return getDao().insert(entity);
@@ -39,8 +32,7 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default int update(T entity) {
-        entity.setUpdatedAt(Instant.now());
-        entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1);
+        BaseModelLifecycle.prepareUpdate(entity, Instant.now());
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
         return getDao().updateById(entity);
@@ -52,9 +44,7 @@ public interface CrudAbility<T extends BaseModel> {
         if (entity == null || Boolean.TRUE.equals(entity.getDeleted())) {
             return 0;
         }
-        entity.setDeleted(Boolean.TRUE);
-        entity.setUpdatedAt(Instant.now());
-        entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1);
+        BaseModelLifecycle.prepareDelete(entity, Instant.now());
         return getDao().updateById(entity);
     }
 
