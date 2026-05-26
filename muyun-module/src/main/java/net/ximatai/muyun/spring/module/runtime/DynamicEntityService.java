@@ -19,18 +19,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
+public class DynamicEntityService implements CrudAbility<DynamicRecord> {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;
 
-    public DynamicRecordAbility(DynamicRecordDao dao, String moduleAlias) {
+    public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
     }
 
-    public DynamicRecordAbility(DynamicRecordDao dao, String moduleAlias, DynamicRecordLifecycle lifecycle) {
+    public DynamicEntityService(DynamicRecordDao dao, String moduleAlias, DynamicRecordLifecycle lifecycle) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
-        this.moduleAlias = Objects.requireNonNull(moduleAlias, "moduleAlias must not be null");
+        this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
     }
 
@@ -194,6 +194,14 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
         if (!dao.getEntity().supports(capability)) {
             throw new IllegalStateException("dynamic entity does not support capability: " + capability);
         }
+    }
+
+    private String requireModuleAlias(String value) {
+        Objects.requireNonNull(value, "moduleAlias must not be null");
+        if (!value.contains(".")) {
+            throw new IllegalArgumentException("dynamic moduleAlias must be a platform module alias: " + value);
+        }
+        return value;
     }
 
     private String stringValue(Object value) {

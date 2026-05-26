@@ -73,7 +73,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public int deleteById(String id) {
-        throw new UnsupportedOperationException("dynamic record delete must go through DynamicRecordAbility");
+        throw new UnsupportedOperationException("dynamic record delete must go through DynamicEntityService");
     }
 
     public boolean existsById(String id) {

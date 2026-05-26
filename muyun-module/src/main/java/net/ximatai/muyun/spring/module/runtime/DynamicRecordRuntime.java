@@ -39,12 +39,12 @@ public class DynamicRecordRuntime {
         return new DynamicRecord(registry.requireEntity(moduleAlias, entityCode));
     }
 
-    public DynamicRecordAbility ability(String moduleAlias, String entityCode) {
-        return ability(moduleAlias, entityCode, DynamicRecordLifecycle.NONE);
+    public DynamicEntityService entityService(String moduleAlias, String entityCode) {
+        return entityService(moduleAlias, entityCode, DynamicRecordLifecycle.NONE);
     }
 
-    public DynamicRecordAbility ability(String moduleAlias, String entityCode, DynamicRecordLifecycle lifecycle) {
+    public DynamicEntityService entityService(String moduleAlias, String entityCode, DynamicRecordLifecycle lifecycle) {
         EntityDefinition entity = registry.requireEntity(moduleAlias, entityCode);
-        return new DynamicRecordAbility(new DynamicRecordDao(operations, entity), moduleAlias, lifecycle);
+        return new DynamicEntityService(new DynamicRecordDao(operations, entity), moduleAlias, lifecycle);
     }
 }

@@ -83,30 +83,30 @@ class DynamicSchemaServiceIT {
         EntityDefinition entity = entity("app_contract_record_it");
         schemaService.ensureTable(entity);
         DynamicRecordDao dao = new DynamicRecordDao(operations, entity);
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
 
         DynamicRecord record = new DynamicRecord(entity)
                 .setValue("code", "C-IT-001")
                 .setValue("name", "Integration Contract")
                 .setValue("amount", BigDecimal.valueOf(1234, 2));
 
-        String id = ability.insert(record);
+        String id = entityService.insert(record);
 
-        assertThat(ability.select(id).getValue("code")).isEqualTo("C-IT-001");
-        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")).getRecords())
+        assertThat(entityService.select(id).getValue("code")).isEqualTo("C-IT-001");
+        assertThat(entityService.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")).getRecords())
                 .hasSize(1);
-        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
+        assertThat(entityService.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
                 .isEqualTo(1);
-        assertThat(ability.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
+        assertThat(entityService.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
 
         record.setValue("name", "Updated Contract");
-        ability.update(record);
-        assertThat(ability.select(id).getVersion()).isEqualTo(1);
-        assertThat(ability.select(id).getValue("name")).isEqualTo("Updated Contract");
+        entityService.update(record);
+        assertThat(entityService.select(id).getVersion()).isEqualTo(1);
+        assertThat(entityService.select(id).getValue("name")).isEqualTo("Updated Contract");
 
-        assertThat(ability.delete(id)).isEqualTo(1);
-        assertThat(ability.select(id)).isNull();
-        assertThat(ability.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
+        assertThat(entityService.delete(id)).isEqualTo(1);
+        assertThat(entityService.select(id)).isNull();
+        assertThat(entityService.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
         assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
     }
 

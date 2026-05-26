@@ -24,6 +24,21 @@ M1 先建设以下底座：
 
 动态模块进入 M1 后，应复用同一套语义，而不是另起一套动态 CRUD。
 
+## 动态运行态接入
+
+动态模块没有静态 Java Service，但运行态仍应落到同一条能力链路：
+
+```text
+DynamicRecordService
+  -> DynamicEntityService implements CrudAbility<DynamicRecord>
+  -> DynamicRecordDao implements BaseDao<DynamicRecord, String>
+  -> MuYunDatabase
+```
+
+`DynamicRecordService` 是动态记录对外门面，负责按模块别名和实体编码定位运行态服务。
+`DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD 生命周期、排序、引用等平台能力。
+`DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
+
 ## 模型定义边界
 
 静态模型和动态模型可以有不同声明入口，但进入平台底座前应编译成统一定义。
@@ -38,10 +53,12 @@ M1 先建设以下底座：
 
 平台需要支持两条建表路径：
 
-1. 静态模型：根据 Java 模型和注解创建或校验表结构。
-2. 动态模型：根据运行态元数据创建或更新表结构。
+1. 静态模型：`StaticModelTableMapper` 根据 Java 模型和注解编译成 `TableWrapper`，再由 `StaticSchemaService` 创建或校验表结构。
+2. 动态模型：`DynamicTableMapper` 根据运行态元数据编译成 `TableWrapper`，再由 `DynamicSchemaService` 创建或更新表结构。
 
 建表是平台责任，不是业务 service 责任。表名、字段名等 SQL 标识符必须走白名单校验。破坏性 DDL 必须有明确治理模式，不能作为普通保存动作的副作用。
+
+静态和动态两条路径的共同交汇点是 MuYunDatabase 的 `TableWrapper`。平台标准字段由 `PlatformTableValidator` 统一校验，避免两条路径演化出不同的基础字段、主键或生命周期列。
 
 ## 能力挂载原则
 

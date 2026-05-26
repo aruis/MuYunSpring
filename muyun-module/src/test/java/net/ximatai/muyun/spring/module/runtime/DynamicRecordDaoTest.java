@@ -40,7 +40,7 @@ class DynamicRecordDaoTest {
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
 
-        String id = ability(operations).insert(record);
+        String id = entityService(operations).insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
@@ -68,14 +68,14 @@ class DynamicRecordDaoTest {
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
         DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract", lifecycle);
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract", lifecycle);
 
         DynamicRecord inserted = new DynamicRecord(contractEntity())
                 .setValue("amount", BigDecimal.TEN);
-        ability.insert(inserted);
-        DynamicRecord selected = ability.select("contract-1");
-        ability.update(selected.setValue("amount", BigDecimal.ONE));
-        ability.delete("contract-1");
+        entityService.insert(inserted);
+        DynamicRecord selected = entityService.select("contract-1");
+        entityService.update(selected.setValue("amount", BigDecimal.ONE));
+        entityService.delete("contract-1");
 
         assertThat(lifecycle.events)
                 .containsExactly(
@@ -102,12 +102,12 @@ class DynamicRecordDaoTest {
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
         DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract", lifecycle);
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract", lifecycle);
 
         DynamicRecord partial = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
         partial.setId("contract-1");
-        ability.update(partial);
-        ability.delete("contract-1");
+        entityService.update(partial);
+        entityService.delete("contract-1");
         dao.query(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
         dao.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
         dao.count(Criteria.of().eq("code", "C-001"));
@@ -128,7 +128,7 @@ class DynamicRecordDaoTest {
         record.setId("contract-1");
         record.setVersion(3);
 
-        ability(operations).update(record);
+        entityService(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
@@ -156,7 +156,7 @@ class DynamicRecordDaoTest {
                 .setValue("amount", BigDecimal.ONE);
         record.setId("contract-1");
 
-        ability(operations).update(record);
+        entityService(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
@@ -174,7 +174,7 @@ class DynamicRecordDaoTest {
                 .setValue("amount", BigDecimal.ONE);
         record.setId("contract-1");
 
-        assertThatThrownBy(() -> ability(operations).update(record))
+        assertThatThrownBy(() -> entityService(operations).update(record))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not found");
 
@@ -197,7 +197,7 @@ class DynamicRecordDaoTest {
                 "version", 2
         )));
 
-        ability(operations).delete("contract-1");
+        entityService(operations).delete("contract-1");
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations).query(sql.capture(), anyMap());
@@ -219,7 +219,14 @@ class DynamicRecordDaoTest {
 
         assertThatThrownBy(() -> dao.deleteById("contract-1"))
                 .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("DynamicRecordAbility");
+                .hasMessageContaining("DynamicEntityService");
+    }
+
+    @Test
+    void shouldRejectDynamicEntityServiceWithoutPlatformModuleAlias() {
+        assertThatThrownBy(() -> new DynamicEntityService(dao(operations()), "contract"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform module alias");
     }
 
     @Test
@@ -251,16 +258,16 @@ class DynamicRecordDaoTest {
                 "version", 0
         )));
         DynamicRecordDao dao = dao(operations);
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
 
-        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount")).getRecords())
+        assertThat(entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount")).getRecords())
                 .hasSize(1)
                 .first()
                 .extracting(record -> record.getValue("code"))
                 .isEqualTo("C-001");
-        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)).getTotal())
+        assertThat(entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)).getTotal())
                 .isEqualTo(1);
-        assertThat(ability.count(Criteria.of().eq("code", "C-001"))).isEqualTo(1);
+        assertThat(entityService.count(Criteria.of().eq("code", "C-001"))).isEqualTo(1);
 
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.times(2)).query(querySql.capture(), anyMap());
@@ -281,7 +288,7 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldKeepDaoRawAndAbilityScoped() {
+    void shouldKeepDaoRawAndServiceScoped() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
@@ -291,11 +298,11 @@ class DynamicRecordDaoTest {
                 "version", 2
         )));
         DynamicRecordDao dao = dao(operations);
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
 
         assertThat(dao.findById("contract-1").getDeleted()).isTrue();
-        assertThat(ability.select("contract-1")).isNull();
-        assertThat(ability.count(Criteria.of().eq("code", "C-001"))).isZero();
+        assertThat(entityService.select("contract-1")).isNull();
+        assertThat(entityService.count(Criteria.of().eq("code", "C-001"))).isZero();
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.times(2)).query(sql.capture(), anyMap());
@@ -309,18 +316,18 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldCreateAbilityThroughDynamicRecordRuntime() {
+    void shouldCreateEntityServiceThroughDynamicRecordRuntime() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
-        DynamicRecordAbility ability = new DynamicRecordRuntime(operations)
+        DynamicEntityService entityService = new DynamicRecordRuntime(operations)
                 .register(new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity())))
-                .ability("sales.contract", "contract");
+                .entityService("sales.contract", "contract");
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
 
-        String id = ability.insert(record);
+        String id = entityService.insert(record);
 
         assertThat(id).hasSize(32);
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
@@ -330,12 +337,12 @@ class DynamicRecordDaoTest {
     void shouldReorderAndMoveDynamicRecordsByDeclaredSortField() {
         IDatabaseOperations<Object> operations = operations();
         stubSortableRows(operations);
-        DynamicRecordAbility ability = new DynamicRecordAbility(new DynamicRecordDao(operations, sortableEntity()), "contract");
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, sortableEntity()), "sales.contract");
 
-        assertThat(ability.sortedList(Criteria.of()).stream().map(DynamicRecord::getId))
+        assertThat(entityService.sortedList(Criteria.of()).stream().map(DynamicRecord::getId))
                 .containsExactly("first", "second", "third");
-        ability.reorder(List.of("first", "second", "third"));
-        ability.moveBefore("third", "first");
+        entityService.reorder(List.of("first", "second", "third"));
+        entityService.moveBefore("third", "first");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(6))
@@ -350,12 +357,12 @@ class DynamicRecordDaoTest {
 
     @Test
     void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
-        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), sortableEntity()), "contract")
+        assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), sortableEntity()), "sales.contract")
                 .reorder(List.of("same", "same")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate");
 
-        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+        assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .sortedList(Criteria.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not support capability: SORT");
@@ -369,13 +376,13 @@ class DynamicRecordDaoTest {
                 referenceRow("contract-1", "Contract One"),
                 referenceRow("contract-2", "Contract Two")
         ));
-        DynamicRecordAbility ability = new DynamicRecordAbility(new DynamicRecordDao(operations, referenceEntity()), "contract");
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, referenceEntity()), "sales.contract");
 
-        assertThat(ability.title("contract-1")).isEqualTo("Contract One");
-        assertThat(ability.titles(List.of("contract-1", "contract-2")))
+        assertThat(entityService.title("contract-1")).isEqualTo("Contract One");
+        assertThat(entityService.titles(List.of("contract-1", "contract-2")))
                 .containsEntry("contract-1", "Contract One")
                 .containsEntry("contract-2", "Contract Two");
-        assertThat(ability.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+        assertThat(entityService.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(
                         new DynamicReferenceOption("contract-1", "Contract One"),
                         new DynamicReferenceOption("contract-2", "Contract Two")
@@ -390,7 +397,7 @@ class DynamicRecordDaoTest {
 
     @Test
     void shouldRejectReferenceMethodsWithoutTitleField() {
-        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+        assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .title("contract-1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not support capability: REFERENCE");
@@ -398,7 +405,7 @@ class DynamicRecordDaoTest {
 
     @Test
     void shouldRejectSortMethodsWithoutSortCapability() {
-        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+        assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .sortedList(Criteria.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not support capability: SORT");
@@ -427,8 +434,8 @@ class DynamicRecordDaoTest {
         return new DynamicRecordDao(operations, contractEntity());
     }
 
-    private DynamicRecordAbility ability(IDatabaseOperations<Object> operations) {
-        return new DynamicRecordAbility(dao(operations), "contract");
+    private DynamicEntityService entityService(IDatabaseOperations<Object> operations) {
+        return new DynamicEntityService(dao(operations), "sales.contract");
     }
 
     @SuppressWarnings("unchecked")

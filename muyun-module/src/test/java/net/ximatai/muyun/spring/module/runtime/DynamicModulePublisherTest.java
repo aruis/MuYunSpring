@@ -44,7 +44,7 @@ class DynamicModulePublisherTest {
         DynamicModulePublishResult result = publisher.publish(contractModule(), MigrationOptions.dryRun());
 
         assertThat(result.migrations().get("contract").isDryRun()).isTrue();
-        assertThatThrownBy(() -> runtime.ability("sales.contract", "contract"))
+        assertThatThrownBy(() -> runtime.entityService("sales.contract", "contract"))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("unknown module alias");
     }

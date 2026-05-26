@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.builder.Column;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.common.schema.PlatformTableValidator;
 import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
@@ -9,6 +10,7 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
 
 public class DynamicTableMapper {
     private final ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+    private final PlatformTableValidator tableValidator = new PlatformTableValidator();
 
     public TableWrapper toTable(EntityDefinition entity) {
         validator.validateEntity(entity);
@@ -19,6 +21,7 @@ public class DynamicTableMapper {
         for (FieldDefinition field : entity.fields()) {
             table.addColumn(toColumn(field));
         }
+        tableValidator.requireStandardModelTable(table, entity.code());
         return table;
     }
 

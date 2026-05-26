@@ -27,22 +27,22 @@ class DynamicRecordRuntimeTest {
     private static final String TABLE = "app_contract";
 
     @Test
-    void shouldCreateRecordAbilityFromRegisteredModule() {
+    void shouldCreateEntityServiceFromRegisteredModule() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
                 .register(contractModule());
 
-        DynamicRecordAbility ability = runtime.ability("sales.contract", "contract");
+        DynamicEntityService entityService = runtime.entityService("sales.contract", "contract");
         DynamicRecord record = runtime.newRecord("sales.contract", "contract")
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
 
-        String id = ability.insert(record);
+        String id = entityService.insert(record);
 
         assertThat(id).hasSize(32);
-        assertThat(ability.getModuleAlias()).isEqualTo("sales.contract");
+        assertThat(entityService.getModuleAlias()).isEqualTo("sales.contract");
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
         assertThat(body.getValue())
@@ -54,7 +54,7 @@ class DynamicRecordRuntimeTest {
     }
 
     @Test
-    void shouldRunDynamicCrudThroughRuntimeAbilityChain() {
+    void shouldRunDynamicCrudThroughRuntimeServiceChain() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
@@ -68,18 +68,18 @@ class DynamicRecordRuntimeTest {
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
                 .register(contractModule());
-        DynamicRecordAbility ability = runtime.ability("sales.contract", "contract");
+        DynamicEntityService entityService = runtime.entityService("sales.contract", "contract");
         DynamicRecord record = runtime.newRecord("sales.contract", "contract")
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
 
-        String id = ability.insert(record);
-        DynamicRecord selected = ability.select(id);
+        String id = entityService.insert(record);
+        DynamicRecord selected = entityService.select(id);
         selected.setValue("amount", BigDecimal.ONE);
-        ability.update(selected);
-        ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
-        ability.delete(id);
+        entityService.update(selected);
+        entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
+        entityService.delete(id);
 
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
         verify(operations, org.mockito.Mockito.times(2))

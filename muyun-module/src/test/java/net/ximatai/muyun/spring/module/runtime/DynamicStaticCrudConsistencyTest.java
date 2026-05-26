@@ -41,19 +41,19 @@ class DynamicStaticCrudConsistencyTest {
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
 
         DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
-        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
+        DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
 
-        String id = ability.insert(record);
-        DynamicRecord selected = ability.select(id);
+        String id = entityService.insert(record);
+        DynamicRecord selected = entityService.select(id);
         selected.setValue("amount", BigDecimal.ONE);
-        ability.update(selected);
-        ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount"));
-        ability.count(Criteria.of().eq("code", "C-001"));
-        ability.delete(id);
+        entityService.update(selected);
+        entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount"));
+        entityService.count(Criteria.of().eq("code", "C-001"));
+        entityService.delete(id);
 
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());

@@ -22,65 +22,65 @@ public class DynamicRecordService {
     }
 
     public String create(String moduleAlias, String entityCode, DynamicRecord record) {
-        return ability(moduleAlias, entityCode).insert(record);
+        return entityService(moduleAlias, entityCode).insert(record);
     }
 
     public DynamicRecord select(String moduleAlias, String entityCode, String id) {
-        return ability(moduleAlias, entityCode).select(id);
+        return entityService(moduleAlias, entityCode).select(id);
     }
 
     public int update(String moduleAlias, String entityCode, DynamicRecord record) {
-        return ability(moduleAlias, entityCode).update(record);
+        return entityService(moduleAlias, entityCode).update(record);
     }
 
     public int delete(String moduleAlias, String entityCode, String id) {
-        return ability(moduleAlias, entityCode).delete(id);
+        return entityService(moduleAlias, entityCode).delete(id);
     }
 
     public List<DynamicRecord> list(String moduleAlias, String entityCode, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-        return ability(moduleAlias, entityCode).list(criteria, pageRequest, sorts);
+        return entityService(moduleAlias, entityCode).list(criteria, pageRequest, sorts);
     }
 
     public PageResult<DynamicRecord> page(String moduleAlias, String entityCode, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-        return ability(moduleAlias, entityCode).pageQuery(criteria, pageRequest, sorts);
+        return entityService(moduleAlias, entityCode).pageQuery(criteria, pageRequest, sorts);
     }
 
     public long count(String moduleAlias, String entityCode, Criteria criteria) {
-        return ability(moduleAlias, entityCode).count(criteria);
+        return entityService(moduleAlias, entityCode).count(criteria);
     }
 
     public List<DynamicRecord> sortedList(String moduleAlias, String entityCode, Criteria criteria) {
-        return ability(moduleAlias, entityCode).sortedList(criteria);
+        return entityService(moduleAlias, entityCode).sortedList(criteria);
     }
 
     public void reorder(String moduleAlias, String entityCode, List<String> orderedIds) {
-        ability(moduleAlias, entityCode).reorder(orderedIds);
+        entityService(moduleAlias, entityCode).reorder(orderedIds);
     }
 
     public void moveBefore(String moduleAlias, String entityCode, String id, String beforeId) {
-        ability(moduleAlias, entityCode).moveBefore(id, beforeId);
+        entityService(moduleAlias, entityCode).moveBefore(id, beforeId);
     }
 
     public void moveAfter(String moduleAlias, String entityCode, String id, String afterId) {
-        ability(moduleAlias, entityCode).moveAfter(id, afterId);
+        entityService(moduleAlias, entityCode).moveAfter(id, afterId);
     }
 
     public String title(String moduleAlias, String entityCode, String id) {
-        return ability(moduleAlias, entityCode).title(id);
+        return entityService(moduleAlias, entityCode).title(id);
     }
 
     public Map<String, String> titles(String moduleAlias, String entityCode, Collection<String> ids) {
-        return ability(moduleAlias, entityCode).titles(ids);
+        return entityService(moduleAlias, entityCode).titles(ids);
     }
 
     public PageResult<DynamicReferenceOption> referenceOptions(String moduleAlias,
                                                               String entityCode,
                                                               Criteria criteria,
                                                               PageRequest pageRequest) {
-        return ability(moduleAlias, entityCode).referenceOptions(criteria, pageRequest);
+        return entityService(moduleAlias, entityCode).referenceOptions(criteria, pageRequest);
     }
 
-    private DynamicRecordAbility ability(String moduleAlias, String entityCode) {
-        return runtime.ability(moduleAlias, entityCode);
+    private DynamicEntityService entityService(String moduleAlias, String entityCode) {
+        return runtime.entityService(moduleAlias, entityCode);
     }
 }
