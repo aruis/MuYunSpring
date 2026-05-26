@@ -78,6 +78,9 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         if (parentId.equals(id)) {
             throw new AbilityException("Tree node cannot use itself as parent: " + id);
         }
+        if (select(parentId) == null) {
+            throw new AbilityException("Tree node cannot use missing parent: " + parentId);
+        }
         if (ancestorIds(parentId).contains(id)) {
             throw new AbilityException("Tree node cannot move under its descendant: " + id);
         }

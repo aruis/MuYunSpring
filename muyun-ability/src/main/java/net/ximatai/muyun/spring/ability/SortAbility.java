@@ -25,13 +25,23 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
         if (first == null) {
             throw new AbilityException("Cannot reorder missing record: " + orderedIds.getFirst());
         }
-        int order = 1;
+        List<T> entities = new ArrayList<>();
         for (String id : orderedIds) {
             T entity = select(id);
             if (entity == null) {
                 throw new AbilityException("Cannot reorder missing record: " + id);
             }
             validateSortScope(first, entity);
+            entities.add(entity);
+        }
+        List<String> scopedIds = sortedList(sortScope(first)).stream()
+                .map(SortCapable::getId)
+                .toList();
+        if (!new LinkedHashSet<>(scopedIds).equals(uniqueIds)) {
+            throw new AbilityException("Cannot reorder partial records; orderedIds must cover complete scope");
+        }
+        int order = 1;
+        for (T entity : entities) {
             entity.setSortOrder(order++);
             update(entity);
         }

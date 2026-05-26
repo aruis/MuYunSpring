@@ -132,6 +132,21 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldResolveDynamicReferenceTitleWithoutAutoPopulatingChildren() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicEntityService invoiceService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice");
+
+        assertThat(invoiceService.title("invoice-1")).isEqualTo("I-001");
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).noneSatisfy(value -> assertThat(value).contains("\"app_invoice_line\""));
+    }
+
+    @Test
     void shouldRejectReferenceCollectionForDifferentDynamicEntity() {
         IDatabaseOperations<Object> operations = operations();
         DynamicEntityService lineService = new DynamicRecordRuntime(operations)

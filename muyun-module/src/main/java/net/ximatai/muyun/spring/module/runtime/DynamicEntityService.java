@@ -222,6 +222,12 @@ public class DynamicEntityService implements
         return ReferenceAbility.super.title(id);
     }
 
+    @Override
+    public DynamicRecord selectReferenceRaw(String id) {
+        requireCapability(EntityCapability.REFERENCE);
+        return activeRaw(id);
+    }
+
     public Map<String, String> titles(Collection<String> ids) {
         requireCapability(EntityCapability.REFERENCE);
         return ReferenceAbility.super.titles(ids);

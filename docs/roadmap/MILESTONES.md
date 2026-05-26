@@ -9,6 +9,7 @@
 - [开发原则](../DEVELOPMENT_PRINCIPLES.md)
 - [动静一体核心设计](../architecture/DYNAMIC_STATIC_UNIFIED_CORE.md)
 - [命名与边界](../architecture/NAMING_AND_BOUNDARIES.md)
+- [技术债记录](../TECHNICAL_DEBT.md)
 
 ## 里程碑总览
 

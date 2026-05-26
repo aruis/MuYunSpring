@@ -279,6 +279,15 @@ class AbilityContractTest {
     }
 
     @Test
+    void treeAbilityShouldRejectMissingParent() {
+        DemoOrganizationService service = new DemoOrganizationService();
+
+        assertThatThrownBy(() -> service.insert(new DemoOrganization("Orphan", "missing-parent")))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("missing parent");
+    }
+
+    @Test
     void treeAbilityShouldRejectCorruptDescendantCycles() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization first = new DemoOrganization("First", null);
@@ -351,6 +360,21 @@ class AbilityContractTest {
         assertThatThrownBy(() -> service.reorder(List.of(firstChild, secondChild)))
                 .isInstanceOf(AbilityException.class)
                 .hasMessageContaining("same parent");
+    }
+
+    @Test
+    void sortAbilityShouldRejectPartialReorderScope() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String first = service.insert(new DemoOrganization("First", TreeAbility.ROOT_ID));
+        String second = service.insert(new DemoOrganization("Second", TreeAbility.ROOT_ID));
+        String third = service.insert(new DemoOrganization("Third", TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> service.reorder(List.of(third, first)))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("complete scope");
+
+        assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
+                .containsExactly(first, second, third);
     }
 
     @Test
