@@ -39,7 +39,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         afterDelete(id, entity, deleted);
         if (deleted > 0) {
             afterChanged(entity);
-            clearCacheAfterChangedIfNeeded(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
         }
         return deleted;
     }
@@ -57,13 +57,4 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         return entity == null || Boolean.TRUE.equals(entity.getDeleted());
     }
 
-    private void clearCacheAfterChangedIfNeeded(T entity) {
-        if (this instanceof CacheAbility<?> cacheAbility) {
-            if (entity == null || entity.getId() == null) {
-                cacheAbility.clearCache();
-                return;
-            }
-            cacheAbility.clearItemCache(entity.getId());
-        }
-    }
 }

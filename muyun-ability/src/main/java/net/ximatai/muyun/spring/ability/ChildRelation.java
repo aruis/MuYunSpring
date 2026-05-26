@@ -15,18 +15,18 @@ import java.util.function.Function;
 public final class ChildRelation<C extends EntityContract, P extends EntityContract> {
     private final ChildAbility<C> childAbility;
     private final BiConsumer<C, String> setParentId;
-    private final String parentField;
+    private final String childForeignKeyField;
     private final Function<P, List<C>> extractChildren;
     private boolean autoDeleteWithParent;
     private BiConsumer<P, List<C>> populateChildren;
 
     public ChildRelation(ChildAbility<C> childAbility,
                          BiConsumer<C, String> setParentId,
-                         String parentField,
+                         String childForeignKeyField,
                          Function<P, List<C>> extractChildren) {
         this.childAbility = childAbility;
         this.setParentId = setParentId;
-        this.parentField = parentField;
+        this.childForeignKeyField = childForeignKeyField;
         this.extractChildren = extractChildren;
     }
 
@@ -57,7 +57,7 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
 
     public List<C> selectChildren(String parentId) {
         return childAbility.getDao().query(
-                childAbility.activeCriteria(Criteria.of().eq(parentField, parentId)),
+                childAbility.activeCriteria(Criteria.of().eq(childForeignKeyField, parentId)),
                 new PageRequest(0, Integer.MAX_VALUE)
         );
     }

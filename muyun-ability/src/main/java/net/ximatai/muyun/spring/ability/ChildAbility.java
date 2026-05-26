@@ -8,9 +8,9 @@ import java.util.function.Function;
 
 public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
     default <P extends EntityContract> ChildRelation<C, P> toChildRelation(BiConsumer<C, String> setParentId,
-                                                                           String parentField,
+                                                                           String childForeignKeyField,
                                                                            Function<P, List<C>> extractChildren) {
-        return new ChildRelation<>(this, setParentId, parentField, extractChildren);
+        return new ChildRelation<>(this, setParentId, childForeignKeyField, extractChildren);
     }
 
     default C selectIgnoreSoftDeleteIfPossible(String id) {

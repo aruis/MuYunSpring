@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,6 +81,40 @@ class DynamicRelationRuntimeTest {
         assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
         assertThat(id.getAllValues()).containsExactly("invoice-1", "line-1");
         assertThat(body.getAllValues().get(1)).containsEntry("deleted", Boolean.TRUE);
+    }
+
+    @Test
+    void shouldReloadDynamicChildrenWhenParentRecordHitsCache() {
+        IDatabaseOperations<Object> operations = operations();
+        AtomicReference<String> lineTitle = new AtomicReference<>("L-001");
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
+                return params.containsValue("invoice-1") ? List.of(lineRow(lineTitle.get())) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return params.containsValue("invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
+        DynamicEntityService invoiceService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice");
+
+        DynamicRecord first = invoiceService.select("invoice-1");
+        lineTitle.set("L-002");
+        DynamicRecord second = invoiceService.select("invoice-1");
+
+        assertThat(first.getChildren("lines"))
+                .first()
+                .extracting(child -> child.getValue("title"))
+                .isEqualTo("L-001");
+        assertThat(second.getChildren("lines"))
+                .first()
+                .extracting(child -> child.getValue("title"))
+                .isEqualTo("L-002");
     }
 
     @Test
@@ -237,10 +272,14 @@ class DynamicRelationRuntimeTest {
     }
 
     private Map<String, Object> lineRow() {
+        return lineRow("L-001");
+    }
+
+    private Map<String, Object> lineRow(String title) {
         return Map.of(
                 "id", "line-1",
                 "invoice_id", "invoice-1",
-                "title", "L-001",
+                "title", title,
                 "deleted", Boolean.FALSE,
                 "version", 1
         );

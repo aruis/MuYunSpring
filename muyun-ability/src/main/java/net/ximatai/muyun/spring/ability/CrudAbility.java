@@ -27,7 +27,7 @@ public interface CrudAbility<T extends EntityContract> {
         String id = getDao().insert(entity);
         afterInsert(id, entity);
         afterChanged(entity);
-        clearCacheAfterChangedIfNeeded(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
         return id;
     }
 
@@ -64,7 +64,7 @@ public interface CrudAbility<T extends EntityContract> {
         afterUpdate(entity, updated);
         if (updated > 0) {
             afterChanged(entity);
-            clearCacheAfterChangedIfNeeded(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
         }
         return updated;
     }
@@ -79,7 +79,7 @@ public interface CrudAbility<T extends EntityContract> {
         afterDelete(id, entity, deleted);
         if (deleted > 0) {
             afterChanged(entity);
-            clearCacheAfterChangedIfNeeded(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
         }
         return deleted;
     }
@@ -175,13 +175,4 @@ public interface CrudAbility<T extends EntityContract> {
         }
     }
 
-    private void clearCacheAfterChangedIfNeeded(T entity) {
-        if (this instanceof CacheAbility<?> cacheAbility) {
-            if (entity == null || entity.getId() == null) {
-                cacheAbility.clearCache();
-                return;
-            }
-            cacheAbility.clearItemCache(entity.getId());
-        }
-    }
 }
