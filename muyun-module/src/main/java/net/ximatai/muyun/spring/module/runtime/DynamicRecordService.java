@@ -30,12 +30,20 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityCode).select(id);
     }
 
+    public DynamicRecord selectIgnoreSoftDelete(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).selectIgnoreSoftDelete(id);
+    }
+
     public int update(String moduleAlias, String entityCode, DynamicRecord record) {
         return entityService(moduleAlias, entityCode).update(record);
     }
 
     public int delete(String moduleAlias, String entityCode, String id) {
         return entityService(moduleAlias, entityCode).delete(id);
+    }
+
+    public int deleteBatch(String moduleAlias, String entityCode, Collection<String> ids) {
+        return entityService(moduleAlias, entityCode).deleteBatch(ids);
     }
 
     public List<DynamicRecord> list(String moduleAlias, String entityCode, Criteria criteria, PageRequest pageRequest, Sort... sorts) {

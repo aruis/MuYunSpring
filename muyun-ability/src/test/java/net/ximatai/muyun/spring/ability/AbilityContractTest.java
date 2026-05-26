@@ -28,6 +28,43 @@ class AbilityContractTest {
         assertThat(service.delete(id)).isEqualTo(1);
         assertThat(organization.getVersion()).isEqualTo(1);
         assertThat(service.select(id)).isNull();
+        assertThat(service.selectIgnoreSoftDelete(id)).isSameAs(organization);
+    }
+
+    @Test
+    void crudAbilityShouldDeleteRecordAndBatchByStandardEntry() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        DemoOrganization first = new DemoOrganization("First", TreeAbility.ROOT_ID);
+        DemoOrganization second = new DemoOrganization("Second", TreeAbility.ROOT_ID);
+        DemoOrganization third = new DemoOrganization("Third", TreeAbility.ROOT_ID);
+
+        service.insert(first);
+        String secondId = service.insert(second);
+        String thirdId = service.insert(third);
+
+        assertThat(service.delete(first)).isEqualTo(1);
+        assertThat(service.deleteBatch(List.of(secondId, thirdId, "missing"))).isEqualTo(2);
+        assertThat(service.select(first.getId())).isNull();
+        assertThat(service.select(secondId)).isNull();
+        assertThat(service.select(thirdId)).isNull();
+    }
+
+    @Test
+    void crudAbilityShouldStayNeutralWithoutSoftDeleteAbility() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        DemoPlainRecord first = new DemoPlainRecord("First");
+        DemoPlainRecord second = new DemoPlainRecord("Second");
+
+        String firstId = service.insert(first);
+        String secondId = service.insert(second);
+        first.setDeleted(Boolean.TRUE);
+
+        assertThat(service.select(firstId)).isSameAs(first);
+        assertThat(service.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(first, second);
+        assertThat(service.deleteBatch(List.of(firstId, secondId))).isEqualTo(2);
+        assertThat(service.getDao().findById(firstId)).isNull();
+        assertThat(service.getDao().findById(secondId)).isNull();
     }
 
     @Test

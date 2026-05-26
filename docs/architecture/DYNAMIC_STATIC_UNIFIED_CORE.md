@@ -17,10 +17,11 @@ M1 先建设以下底座：
 
 1. `EntityContract`：统一基础字段和生命周期字段。
 2. `BaseDao`：统一静态模型的数据访问入口，默认基于 MuYunDatabase。
-3. `CrudAbility`：统一插入、查询、更新、软删、分页、计数和 hook。
-4. `SortAbility`：统一排序字段、列表排序和相邻移动。
-5. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
-6. `ReferenceAbility`：统一标题解析和引用选项读取，保留 RAW 读取入口。
+3. `CrudAbility`：统一插入、查询、更新、硬删除、分页、计数和 hook。
+4. `SoftDeleteAbility`：统一软删除过滤、软删除写入和忽略软删读取。
+5. `SortAbility`：统一排序字段、列表排序和相邻移动。
+6. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
+7. `ReferenceAbility`：统一标题解析和引用选项读取，保留 RAW 读取入口。
 
 动态模块进入 M1 后，应复用同一套语义，而不是另起一套动态 CRUD。
 
@@ -30,13 +31,13 @@ M1 先建设以下底座：
 
 ```text
 DynamicRecordService
-  -> DynamicEntityService implements CrudAbility<DynamicRecord>
+  -> DynamicEntityService implements CrudAbility<DynamicRecord>, SoftDeleteAbility<DynamicRecord>, TreeAbility<DynamicRecord>, ReferenceAbility<DynamicRecord>
   -> DynamicRecordDao implements BaseDao<DynamicRecord, String>
   -> MuYunDatabase
 ```
 
 `DynamicRecordService` 是动态记录对外门面，负责按模块别名和实体编码定位运行态服务。
-`DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD 生命周期、排序、引用等平台能力。
+`DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用等平台能力，并按元数据能力开关决定哪些入口可用。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
 
 ## 模型定义边界

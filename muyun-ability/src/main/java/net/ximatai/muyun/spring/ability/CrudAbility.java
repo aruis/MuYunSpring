@@ -8,9 +8,9 @@ import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.EntityContract;
 import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
-import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.time.Instant;
+import java.util.Collection;
 
 public interface CrudAbility<T extends EntityContract> {
     BaseDao<T, String> getDao();
@@ -27,7 +27,7 @@ public interface CrudAbility<T extends EntityContract> {
 
     default T select(String id) {
         T entity = getDao().findById(id);
-        if (entity == null || Boolean.TRUE.equals(entity.getDeleted())) {
+        if (entity == null) {
             return null;
         }
         afterSelect(entity);
@@ -44,11 +44,28 @@ public interface CrudAbility<T extends EntityContract> {
     default int delete(String id) {
         beforeDelete(id);
         T entity = getDao().findById(id);
-        if (entity == null || Boolean.TRUE.equals(entity.getDeleted())) {
+        if (entity == null) {
             return 0;
         }
-        EntityLifecycle.prepareDelete(entity, Instant.now());
-        return getDao().updateById(entity);
+        return getDao().deleteById(id);
+    }
+
+    default int delete(T entity) {
+        if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
+            return 0;
+        }
+        return delete(entity.getId());
+    }
+
+    default int deleteBatch(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (String id : ids) {
+            count += delete(id);
+        }
+        return count;
     }
 
     default PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -88,9 +105,6 @@ public interface CrudAbility<T extends EntityContract> {
         if (criteria != null && !criteria.isEmpty()) {
             scoped.andGroup(criteria.getRoot());
         }
-        scoped.andGroup(group -> group
-                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE)
-                .orIsNull(StandardEntitySchema.DELETED_FIELD));
         return scoped;
     }
 

@@ -51,9 +51,11 @@ class DynamicRecordServiceTest {
         service.page(MODULE, "contract", Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
         assertThat(service.count(MODULE, "contract", Criteria.of().eq("code", "C-001"))).isEqualTo(1);
         service.delete(MODULE, "contract", id);
+        assertThat(service.selectIgnoreSoftDelete(MODULE, "contract", id)).isNotNull();
+        service.deleteBatch(MODULE, "contract", List.of(id));
 
         verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
-        verify(operations, org.mockito.Mockito.times(2))
+        verify(operations, org.mockito.Mockito.times(3))
                 .patchUpdateItem(eq(SCHEMA), eq("app_contract"), eq(id), anyMap());
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());

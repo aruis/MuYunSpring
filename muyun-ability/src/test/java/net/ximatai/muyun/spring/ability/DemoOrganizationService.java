@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.ability;
 
 final class DemoOrganizationService implements
         CrudAbility<DemoOrganization>,
+        SoftDeleteAbility<DemoOrganization>,
         TreeAbility<DemoOrganization>,
         ReferenceAbility<DemoOrganization> {
 

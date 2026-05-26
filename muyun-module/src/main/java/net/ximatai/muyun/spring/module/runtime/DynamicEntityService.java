@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -18,7 +19,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class DynamicEntityService implements CrudAbility<DynamicRecord>, TreeAbility<DynamicRecord>, ReferenceAbility<DynamicRecord> {
+public class DynamicEntityService implements
+        CrudAbility<DynamicRecord>,
+        SoftDeleteAbility<DynamicRecord>,
+        TreeAbility<DynamicRecord>,
+        ReferenceAbility<DynamicRecord> {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;

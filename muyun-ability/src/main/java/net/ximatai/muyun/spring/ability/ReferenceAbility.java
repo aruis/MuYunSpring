@@ -42,11 +42,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
     }
 
     default T selectReferenceRaw(String id) {
-        T entity = getDao().findById(id);
-        if (entity == null || Boolean.TRUE.equals(entity.getDeleted())) {
-            return null;
-        }
-        return entity;
+        return select(id);
     }
 
     default PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
