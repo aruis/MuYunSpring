@@ -38,7 +38,7 @@ class DynamicRecordDaoTest {
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
 
-        String id = dao(operations).insert(record);
+        String id = ability(operations).insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
@@ -65,14 +65,15 @@ class DynamicRecordDaoTest {
                 "version", 2
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
-        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity(), lifecycle);
+        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
+        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract", lifecycle);
 
         DynamicRecord inserted = new DynamicRecord(contractEntity())
                 .setValue("amount", BigDecimal.TEN);
-        dao.insert(inserted);
-        DynamicRecord selected = dao.findById("contract-1");
-        dao.update(selected.setValue("amount", BigDecimal.ONE));
-        dao.delete("contract-1");
+        ability.insert(inserted);
+        DynamicRecord selected = ability.select("contract-1");
+        ability.update(selected.setValue("amount", BigDecimal.ONE));
+        ability.delete("contract-1");
 
         assertThat(lifecycle.events)
                 .containsExactly(
@@ -98,14 +99,15 @@ class DynamicRecordDaoTest {
                 "version", 2
         )));
         RecordingLifecycle lifecycle = new RecordingLifecycle();
-        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity(), lifecycle);
+        DynamicRecordDao dao = new DynamicRecordDao(operations, contractEntity());
+        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract", lifecycle);
 
         DynamicRecord partial = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
         partial.setId("contract-1");
-        dao.update(partial);
-        dao.delete("contract-1");
+        ability.update(partial);
+        ability.delete("contract-1");
         dao.query(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
-        dao.page(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
+        dao.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
         dao.count(Criteria.of().eq("code", "C-001"));
 
         assertThat(lifecycle.events)
@@ -124,7 +126,7 @@ class DynamicRecordDaoTest {
         record.setId("contract-1");
         record.setVersion(3);
 
-        dao(operations).update(record);
+        ability(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
@@ -151,7 +153,7 @@ class DynamicRecordDaoTest {
                 .setValue("amount", BigDecimal.ONE);
         record.setId("contract-1");
 
-        dao(operations).update(record);
+        ability(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
@@ -172,16 +174,13 @@ class DynamicRecordDaoTest {
                 "version", 2
         )));
 
-        dao(operations).delete("contract-1");
+        ability(operations).delete("contract-1");
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations).query(sql.capture(), anyMap());
         assertThat(sql.getValue())
                 .contains("\"id\" =")
-                .contains("\"deleted\" =")
-                .contains("\"deleted\" IS NULL")
-                .contains("OR");
-        assertThat(occurrences(sql.getValue(), "\"deleted\" =")).isEqualTo(1);
+                .doesNotContain("\"deleted\"");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
@@ -220,15 +219,16 @@ class DynamicRecordDaoTest {
                 "version", 0
         )));
         DynamicRecordDao dao = dao(operations);
+        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
 
-        assertThat(dao.query(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount")))
+        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount")).getRecords())
                 .hasSize(1)
                 .first()
                 .extracting(record -> record.getValue("code"))
                 .isEqualTo("C-001");
-        assertThat(dao.page(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)).getTotal())
+        assertThat(ability.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)).getTotal())
                 .isEqualTo(1);
-        assertThat(dao.count(Criteria.of().eq("code", "C-001"))).isEqualTo(1);
+        assertThat(ability.count(Criteria.of().eq("code", "C-001"))).isEqualTo(1);
 
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.times(2)).query(querySql.capture(), anyMap());
@@ -241,7 +241,7 @@ class DynamicRecordDaoTest {
                 .contains("LIMIT :limit OFFSET :offset");
 
         ArgumentCaptor<String> countSql = ArgumentCaptor.forClass(String.class);
-        verify(operations, org.mockito.Mockito.times(2)).row(countSql.capture(), anyMap());
+        verify(operations, org.mockito.Mockito.times(3)).row(countSql.capture(), anyMap());
         assertThat(countSql.getAllValues().getFirst())
                 .startsWith("SELECT COUNT(*) AS total_count FROM \"public\".\"app_contract\"")
                 .contains("\"code\" =")
@@ -252,12 +252,12 @@ class DynamicRecordDaoTest {
     void shouldReorderAndMoveDynamicRecordsByDeclaredSortField() {
         IDatabaseOperations<Object> operations = operations();
         stubSortableRows(operations);
-        DynamicRecordDao dao = new DynamicRecordDao(operations, sortableEntity());
+        DynamicRecordAbility ability = new DynamicRecordAbility(new DynamicRecordDao(operations, sortableEntity()), "contract");
 
-        assertThat(dao.sortedList(Criteria.of()).stream().map(DynamicRecord::getId))
+        assertThat(ability.sortedList(Criteria.of()).stream().map(DynamicRecord::getId))
                 .containsExactly("first", "second", "third");
-        dao.reorder(List.of("first", "second", "third"));
-        dao.moveBefore("third", "first");
+        ability.reorder(List.of("first", "second", "third"));
+        ability.moveBefore("third", "first");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(6))
@@ -272,11 +272,13 @@ class DynamicRecordDaoTest {
 
     @Test
     void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
-        assertThatThrownBy(() -> new DynamicRecordDao(operations(), sortableEntity()).reorder(List.of("same", "same")))
+        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), sortableEntity()), "contract")
+                .reorder(List.of("same", "same")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate");
 
-        assertThatThrownBy(() -> new DynamicRecordDao(operations(), contractEntity()).sortedList(Criteria.of()))
+        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+                .sortedList(Criteria.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("no sortable field");
     }
@@ -289,13 +291,13 @@ class DynamicRecordDaoTest {
                 referenceRow("contract-1", "Contract One"),
                 referenceRow("contract-2", "Contract Two")
         ));
-        DynamicRecordDao dao = new DynamicRecordDao(operations, referenceEntity());
+        DynamicRecordAbility ability = new DynamicRecordAbility(new DynamicRecordDao(operations, referenceEntity()), "contract");
 
-        assertThat(dao.title("contract-1")).isEqualTo("Contract One");
-        assertThat(dao.titles(List.of("contract-1", "contract-2")))
+        assertThat(ability.title("contract-1")).isEqualTo("Contract One");
+        assertThat(ability.titles(List.of("contract-1", "contract-2")))
                 .containsEntry("contract-1", "Contract One")
                 .containsEntry("contract-2", "Contract Two");
-        assertThat(dao.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+        assertThat(ability.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(
                         new DynamicReferenceOption("contract-1", "Contract One"),
                         new DynamicReferenceOption("contract-2", "Contract Two")
@@ -310,7 +312,8 @@ class DynamicRecordDaoTest {
 
     @Test
     void shouldRejectReferenceMethodsWithoutTitleField() {
-        assertThatThrownBy(() -> new DynamicRecordDao(operations(), contractEntity()).title("contract-1"))
+        assertThatThrownBy(() -> new DynamicRecordAbility(new DynamicRecordDao(operations(), contractEntity()), "contract")
+                .title("contract-1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("no title field");
     }
@@ -324,7 +327,7 @@ class DynamicRecordDaoTest {
         Criteria criteria = Criteria.of().eq("code", "C-001");
 
         dao.query(criteria, PageRequest.of(1, 10));
-        dao.page(criteria, PageRequest.of(1, 10));
+        dao.pageQuery(criteria, PageRequest.of(1, 10));
         dao.count(criteria);
 
         assertThat(criteria.getClauses())
@@ -336,6 +339,10 @@ class DynamicRecordDaoTest {
 
     private DynamicRecordDao dao(IDatabaseOperations<Object> operations) {
         return new DynamicRecordDao(operations, contractEntity());
+    }
+
+    private DynamicRecordAbility ability(IDatabaseOperations<Object> operations) {
+        return new DynamicRecordAbility(dao(operations), "contract");
     }
 
     @SuppressWarnings("unchecked")
@@ -446,10 +453,6 @@ class DynamicRecordDaoTest {
         public void afterSelect(DynamicRecord record) {
             events.add("afterSelect:" + record.getId());
         }
-    }
-
-    private int occurrences(String value, String part) {
-        return value.split(java.util.regex.Pattern.quote(part), -1).length - 1;
     }
 
     @SuppressWarnings("unchecked")

@@ -32,7 +32,7 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default int update(T entity) {
-        BaseModelLifecycle.prepareUpdate(entity, Instant.now());
+        BaseModelLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
         return getDao().updateById(entity);
@@ -66,6 +66,10 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default void afterSelect(T entity) {
+    }
+
+    default Integer nextVersionForUpdate(T entity) {
+        return BaseModelLifecycle.nextVersion(entity.getVersion());
     }
 
     default Criteria activeCriteria(Criteria criteria) {

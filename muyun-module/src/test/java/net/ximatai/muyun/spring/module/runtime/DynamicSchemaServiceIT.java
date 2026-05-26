@@ -82,28 +82,29 @@ class DynamicSchemaServiceIT {
         EntityDefinition entity = entity("app_contract_record_it");
         schemaService.ensureTable(entity);
         DynamicRecordDao dao = new DynamicRecordDao(operations, entity);
+        DynamicRecordAbility ability = new DynamicRecordAbility(dao, "contract");
 
         DynamicRecord record = new DynamicRecord(entity)
                 .setValue("code", "C-IT-001")
                 .setValue("name", "Integration Contract")
                 .setValue("amount", BigDecimal.valueOf(1234, 2));
 
-        String id = dao.insert(record);
+        String id = ability.insert(record);
 
-        assertThat(dao.findById(id).getValue("code")).isEqualTo("C-IT-001");
+        assertThat(ability.select(id).getValue("code")).isEqualTo("C-IT-001");
         assertThat(dao.query(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")))
                 .hasSize(1);
-        assertThat(dao.page(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
+        assertThat(dao.pageQuery(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
                 .isEqualTo(1);
         assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
 
         record.setValue("name", "Updated Contract");
-        dao.update(record);
-        assertThat(dao.findById(id).getVersion()).isEqualTo(1);
-        assertThat(dao.findById(id).getValue("name")).isEqualTo("Updated Contract");
+        ability.update(record);
+        assertThat(ability.select(id).getVersion()).isEqualTo(1);
+        assertThat(ability.select(id).getValue("name")).isEqualTo("Updated Contract");
 
-        assertThat(dao.delete(id)).isEqualTo(1);
-        assertThat(dao.findById(id)).isNull();
+        assertThat(ability.delete(id)).isEqualTo(1);
+        assertThat(ability.select(id)).isNull();
         assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
     }
 

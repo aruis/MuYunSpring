@@ -1,5 +1,6 @@
 dependencies {
     api(project(":muyun-common"))
+    api(project(":muyun-ability"))
     api(libs.muyun.database.core)
 
     testImplementation(platform(libs.junit.bom))

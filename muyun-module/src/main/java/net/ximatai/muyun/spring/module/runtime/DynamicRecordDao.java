@@ -9,7 +9,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
+import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
@@ -19,42 +19,34 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
-public class DynamicRecordDao {
+public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     private final IDatabaseOperations<Object> operations;
     private final EntityDefinition entity;
     private final String schema;
     private final DynamicRecordMapping mapping;
-    private final DynamicRecordLifecycle lifecycle;
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
 
     @SuppressWarnings("unchecked")
     public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity) {
-        this(operations, entity, DynamicRecordLifecycle.NONE);
-    }
-
-    @SuppressWarnings("unchecked")
-    public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity, DynamicRecordLifecycle lifecycle) {
         this.operations = (IDatabaseOperations<Object>) Objects.requireNonNull(operations, "operations must not be null");
         new ModuleDefinitionValidator().validateEntity(entity);
         this.entity = entity;
         this.schema = operations.getDefaultSchemaName();
         this.mapping = new DynamicRecordMapping(entity);
-        this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
     }
 
+    @Override
+    public boolean ensureTable() {
+        throw new UnsupportedOperationException("dynamic table schema is managed by DynamicSchemaService");
+    }
+
+    @Override
     public String insert(DynamicRecord record) {
         requireSameEntity(record);
-        BaseModelLifecycle.prepareInsert(record, Instant.now());
-        lifecycle.beforeInsert(record);
-        record.validateForInsert();
-
         Object id = operations.insertItem(schema, entity.tableName(), toColumnMap(record, false));
         if (id != null) {
             record.setId(String.valueOf(id));
@@ -62,37 +54,36 @@ public class DynamicRecordDao {
         return record.getId();
     }
 
+    @Override
     public DynamicRecord findById(String id) {
-        DynamicRecord record = loadActiveById(id);
-        if (record != null) {
-            lifecycle.afterSelect(record);
-        }
-        return record;
+        return loadById(id);
     }
 
-    public int update(DynamicRecord record) {
+    @Override
+    public int updateById(DynamicRecord record) {
         requireSameEntity(record);
         if (record.getId() == null || record.getId().isBlank()) {
             throw new IllegalArgumentException("dynamic record id must not be blank");
         }
-        BaseModelLifecycle.prepareUpdate(record, Instant.now(), nextVersion(record));
-        lifecycle.beforeUpdate(record);
+        if (Boolean.TRUE.equals(record.getDeleted())) {
+            return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toDeleteMap(record));
+        }
         return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toUpdateMap(record));
     }
 
-    public int delete(String id) {
-        lifecycle.beforeDelete(id);
-        DynamicRecord record = loadActiveById(id);
-        if (record == null) {
-            return 0;
-        }
-        BaseModelLifecycle.prepareDelete(record, Instant.now());
-        return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toDeleteMap(record));
+    @Override
+    public int deleteById(String id) {
+        return operations.patchUpdateItem(schema, entity.tableName(), id, Map.of("deleted", Boolean.TRUE));
     }
 
+    public boolean existsById(String id) {
+        return findById(id) != null;
+    }
+
+    @Override
     public List<DynamicRecord> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         Objects.requireNonNull(pageRequest, "pageRequest must not be null");
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(activeCriteria(criteria), mapping::resolveColumn, databaseType());
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveColumn, databaseType());
         StringBuilder sql = selectSql(compiled.getSql());
         appendOrderBy(sql, sorts);
         sql.append(" LIMIT :limit OFFSET :offset");
@@ -106,91 +97,24 @@ public class DynamicRecordDao {
                 .toList();
     }
 
+    @Override
     public PageResult<DynamicRecord> page(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        return pageQuery(criteria, pageRequest, sorts);
+    }
+
+    @Override
+    public PageResult<DynamicRecord> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         long total = count(criteria);
         return PageResult.of(query(criteria, pageRequest, sorts), total, pageRequest);
     }
 
-    public String getSortField() {
-        return entity.fields().stream()
-                .filter(FieldDefinition::isSortable)
-                .map(FieldDefinition::code)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("dynamic entity has no sortable field: " + entity.code()));
+    public EntityDefinition getEntity() {
+        return entity;
     }
 
-    public List<DynamicRecord> sortedList(Criteria criteria) {
-        return query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
-    }
-
-    public void reorder(List<String> orderedIds) {
-        Objects.requireNonNull(orderedIds, "orderedIds must not be null");
-        Set<String> uniqueIds = new LinkedHashSet<>(orderedIds);
-        if (uniqueIds.size() != orderedIds.size()) {
-            throw new IllegalArgumentException("Cannot reorder duplicate records");
-        }
-        int order = 1;
-        for (String id : orderedIds) {
-            DynamicRecord record = findById(id);
-            if (record == null) {
-                throw new IllegalArgumentException("Cannot reorder missing record: " + id);
-            }
-            record.setValue(getSortField(), order++);
-            update(record);
-        }
-    }
-
-    public void moveBefore(String id, String beforeId) {
-        moveRelative(id, beforeId, true);
-    }
-
-    public void moveAfter(String id, String afterId) {
-        moveRelative(id, afterId, false);
-    }
-
-    public String getTitleField() {
-        return entity.fields().stream()
-                .filter(FieldDefinition::isTitle)
-                .map(FieldDefinition::code)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("dynamic entity has no title field: " + entity.code()));
-    }
-
-    public String title(String id) {
-        String titleField = getTitleField();
-        DynamicRecord record = loadActiveById(id);
-        return record == null ? null : stringValue(record.getValue(titleField));
-    }
-
-    public Map<String, String> titles(Collection<String> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return Map.of();
-        }
-        List<DynamicRecord> records = query(Criteria.of().in("id", List.copyOf(ids)), new PageRequest(0, Integer.MAX_VALUE));
-        Map<String, String> titles = new LinkedHashMap<>();
-        String titleField = getTitleField();
-        for (DynamicRecord record : records) {
-            if (!Boolean.TRUE.equals(record.getDeleted())) {
-                titles.put(record.getId(), stringValue(record.getValue(titleField)));
-            }
-        }
-        return titles;
-    }
-
-    public PageResult<DynamicReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
-        PageResult<DynamicRecord> page = page(criteria, pageRequest);
-        String titleField = getTitleField();
-        return PageResult.of(
-                page.getRecords().stream()
-                        .map(record -> new DynamicReferenceOption(record.getId(), stringValue(record.getValue(titleField))))
-                        .toList(),
-                page.getTotal(),
-                pageRequest
-        );
-    }
-
+    @Override
     public long count(Criteria criteria) {
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(activeCriteria(criteria), mapping::resolveColumn, databaseType());
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveColumn, databaseType());
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS total_count FROM ")
                 .append(qualifiedTable());
         if (!compiled.getSql().isBlank()) {
@@ -200,37 +124,12 @@ public class DynamicRecordDao {
         return resolveCount(row);
     }
 
-    private void moveRelative(String id, String targetId, boolean before) {
-        DynamicRecord moving = findById(id);
-        DynamicRecord target = findById(targetId);
-        if (moving == null || target == null) {
-            throw new IllegalArgumentException("Cannot move missing record");
-        }
-        List<DynamicRecord> rows = sortedList(Criteria.of());
-        java.util.ArrayList<String> ids = new java.util.ArrayList<>();
-        for (DynamicRecord row : rows) {
-            if (!row.getId().equals(id)) {
-                ids.add(row.getId());
-            }
-        }
-        int targetIndex = ids.indexOf(targetId);
-        if (targetIndex < 0) {
-            throw new IllegalArgumentException("Cannot move before/after missing target: " + targetId);
-        }
-        ids.add(before ? targetIndex : targetIndex + 1, id);
-        reorder(ids);
+    @Override
+    public int upsert(DynamicRecord entity) {
+        throw new UnsupportedOperationException("dynamic record upsert is not supported yet");
     }
 
-    private Criteria activeCriteria(Criteria criteria) {
-        Criteria scoped = Criteria.of();
-        if (criteria != null && !criteria.isEmpty()) {
-            scoped.andGroup(criteria.getRoot());
-        }
-        scoped.andGroup(group -> group.eq("deleted", Boolean.FALSE).orIsNull("deleted"));
-        return scoped;
-    }
-
-    private DynamicRecord loadActiveById(String id) {
+    private DynamicRecord loadById(String id) {
         return query(Criteria.of().eq("id", id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
     }
 
@@ -254,17 +153,6 @@ public class DynamicRecordDao {
             body.put("id", record.getId());
         }
         return body;
-    }
-
-    private int nextVersion(DynamicRecord record) {
-        if (record.getVersion() != null) {
-            return record.getVersion() + 1;
-        }
-        DynamicRecord current = loadActiveById(record.getId());
-        if (current == null) {
-            throw new IllegalArgumentException("dynamic record not found: " + record.getId());
-        }
-        return BaseModelLifecycle.nextVersion(current.getVersion());
     }
 
     private Map<String, Object> toUpdateMap(DynamicRecord record) {
