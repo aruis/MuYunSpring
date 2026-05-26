@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.module.runtime;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.OrmException;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -130,14 +128,21 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldRejectRawCriteriaForDynamicRecords() {
-        DynamicRecordDao dao = dao(operations());
+    void shouldUseSharedCriteriaCompilerForRawCriteria() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordDao dao = dao(operations);
 
-        assertThatThrownBy(() -> dao.query(
+        dao.query(
                 Criteria.of().raw(SqlRawCondition.of("\"code\" = :code", Map.of("code", "C-001"))),
                 PageRequest.of(1, 10)
-        )).isInstanceOf(OrmException.class)
-                .hasMessageContaining("Unsupported criteria operator");
+        );
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> params = mapCaptor();
+        verify(operations).query(sql.capture(), params.capture());
+        assertThat(sql.getValue()).contains("\"code\" = :sq");
+        assertThat(params.getValue()).containsValue("C-001");
     }
 
     @Test

@@ -3,7 +3,9 @@ package net.ximatai.muyun.spring.module.runtime;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.builder.sql.SchemaBuildRules;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.database.core.orm.CompiledCriteria;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -26,6 +28,7 @@ public class DynamicRecordDao {
     private final EntityDefinition entity;
     private final String schema;
     private final DynamicRecordMapping mapping;
+    private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
 
     @SuppressWarnings("unchecked")
     public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity) {
@@ -82,13 +85,12 @@ public class DynamicRecordDao {
 
     public List<DynamicRecord> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         Objects.requireNonNull(pageRequest, "pageRequest must not be null");
-        DynamicCriteriaSqlCompiler.Compiled compiled = new DynamicCriteriaSqlCompiler(mapping, databaseType())
-                .compile(activeCriteria(criteria));
-        StringBuilder sql = selectSql(compiled.sql());
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(activeCriteria(criteria), mapping::resolveColumn, databaseType());
+        StringBuilder sql = selectSql(compiled.getSql());
         appendOrderBy(sql, sorts);
         sql.append(" LIMIT :limit OFFSET :offset");
 
-        Map<String, Object> params = new HashMap<>(compiled.params());
+        Map<String, Object> params = new HashMap<>(compiled.getParams());
         params.put("limit", pageRequest.getLimit());
         params.put("offset", pageRequest.getOffset());
 
@@ -103,14 +105,13 @@ public class DynamicRecordDao {
     }
 
     public long count(Criteria criteria) {
-        DynamicCriteriaSqlCompiler.Compiled compiled = new DynamicCriteriaSqlCompiler(mapping, databaseType())
-                .compile(activeCriteria(criteria));
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(activeCriteria(criteria), mapping::resolveColumn, databaseType());
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS total_count FROM ")
                 .append(qualifiedTable());
-        if (!compiled.sql().isBlank()) {
-            sql.append(" WHERE ").append(compiled.sql());
+        if (!compiled.getSql().isBlank()) {
+            sql.append(" WHERE ").append(compiled.getSql());
         }
-        Map<String, Object> row = operations.row(sql.toString(), compiled.params());
+        Map<String, Object> row = operations.row(sql.toString(), compiled.getParams());
         return resolveCount(row);
     }
 
