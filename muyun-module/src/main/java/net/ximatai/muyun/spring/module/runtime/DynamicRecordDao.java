@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -155,6 +156,47 @@ public class DynamicRecordDao {
 
     public void moveAfter(String id, String afterId) {
         moveRelative(id, afterId, false);
+    }
+
+    public String getTitleField() {
+        return entity.fields().stream()
+                .filter(FieldDefinition::title)
+                .map(FieldDefinition::code)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("dynamic entity has no title field: " + entity.code()));
+    }
+
+    public String title(String id) {
+        String titleField = getTitleField();
+        DynamicRecord record = loadActiveById(id);
+        return record == null ? null : stringValue(record.getValue(titleField));
+    }
+
+    public Map<String, String> titles(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        List<DynamicRecord> records = query(Criteria.of().in("id", List.copyOf(ids)), new PageRequest(0, Integer.MAX_VALUE));
+        Map<String, String> titles = new LinkedHashMap<>();
+        String titleField = getTitleField();
+        for (DynamicRecord record : records) {
+            if (!Boolean.TRUE.equals(record.getDeleted())) {
+                titles.put(record.getId(), stringValue(record.getValue(titleField)));
+            }
+        }
+        return titles;
+    }
+
+    public PageResult<DynamicReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
+        PageResult<DynamicRecord> page = page(criteria, pageRequest);
+        String titleField = getTitleField();
+        return PageResult.of(
+                page.getRecords().stream()
+                        .map(record -> new DynamicReferenceOption(record.getId(), stringValue(record.getValue(titleField))))
+                        .toList(),
+                page.getTotal(),
+                pageRequest
+        );
     }
 
     public long count(Criteria criteria) {

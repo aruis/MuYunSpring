@@ -121,7 +121,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount", false, false, false, false, null, 2, 10))
+                List.of(new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount", false, false, false, false, false, null, 2, 10))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("scale must not exceed precision");
 
@@ -137,7 +137,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name", false, false, false, false, null, 10, 2))
+                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name", false, false, false, false, false, null, 10, 2))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("precision and scale only apply");
     }
@@ -162,6 +162,28 @@ class DynamicTableMapperTest {
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one sortable field");
+    }
+
+    @Test
+    void shouldRejectInvalidTitleFields() {
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").asTitle())
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("title field must be a text type");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        new FieldDefinition("code", "code", FieldType.STRING, "Code").asTitle(),
+                        new FieldDefinition("name", "name", FieldType.STRING, "Name").asTitle()
+                )
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("only have one title field");
     }
 
     private EntityDefinition contractEntity() {

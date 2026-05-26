@@ -34,6 +34,7 @@ public class ModuleDefinitionValidator {
         Set<String> fieldCodes = new HashSet<>();
         Set<String> columnNames = new HashSet<>();
         int sortableFields = 0;
+        int titleFields = 0;
         for (FieldDefinition field : entity.fields()) {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
@@ -41,9 +42,15 @@ public class ModuleDefinitionValidator {
             if (field.sortable()) {
                 sortableFields++;
             }
+            if (field.title()) {
+                titleFields++;
+            }
         }
         if (sortableFields > 1) {
             throw new ModuleDefinitionException("entity can only have one sortable field: " + entity.code());
+        }
+        if (titleFields > 1) {
+            throw new ModuleDefinitionException("entity can only have one title field: " + entity.code());
         }
     }
 
@@ -83,6 +90,9 @@ public class ModuleDefinitionValidator {
         }
         if (field.sortable() && field.type() != FieldType.INTEGER && field.type() != FieldType.LONG) {
             throw new ModuleDefinitionException("sortable field must be an integer type: " + field.code());
+        }
+        if (field.title() && field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
+            throw new ModuleDefinitionException("title field must be a text type: " + field.code());
         }
     }
 

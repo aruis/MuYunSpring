@@ -283,6 +283,40 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldResolveDynamicReferenceTitlesAndOptions() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                referenceRow("contract-1", "Contract One"),
+                referenceRow("contract-2", "Contract Two")
+        ));
+        DynamicRecordDao dao = new DynamicRecordDao(operations, referenceEntity());
+
+        assertThat(dao.title("contract-1")).isEqualTo("Contract One");
+        assertThat(dao.titles(List.of("contract-1", "contract-2")))
+                .containsEntry("contract-1", "Contract One")
+                .containsEntry("contract-2", "Contract Two");
+        assertThat(dao.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(
+                        new DynamicReferenceOption("contract-1", "Contract One"),
+                        new DynamicReferenceOption("contract-2", "Contract Two")
+                );
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL"));
+    }
+
+    @Test
+    void shouldRejectReferenceMethodsWithoutTitleField() {
+        assertThatThrownBy(() -> new DynamicRecordDao(operations(), contractEntity()).title("contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no title field");
+    }
+
+    @Test
     void shouldNotMutateCallerCriteria() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -338,12 +372,36 @@ class DynamicRecordDaoTest {
         );
     }
 
+    private EntityDefinition referenceEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
+                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired().asTitle(),
+                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
+                )
+        );
+    }
+
     private Map<String, Object> row(String id, int sortOrder) {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
                 "amount", BigDecimal.TEN,
                 "sort_order", sortOrder,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> referenceRow(String id, String name) {
+        return Map.of(
+                "id", id,
+                "code", id.toUpperCase(),
+                "name", name,
+                "amount", BigDecimal.TEN,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );
