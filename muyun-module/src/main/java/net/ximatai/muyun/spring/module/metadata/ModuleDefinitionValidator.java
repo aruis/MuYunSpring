@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.module.metadata;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -9,7 +9,7 @@ import java.util.Set;
 public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
     private static final String MODULE_ALIAS_PATTERN = "[a-z][a-z0-9_]{0,62}(\\.[a-z][a-z0-9_]{0,62})+";
-    private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardModelSchema.columnNames());
+    private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardEntitySchema.columnNames());
 
     public void validate(ModuleDefinition module) {
         if (module == null) {
@@ -39,10 +39,14 @@ public class ModuleDefinitionValidator {
         int titleFields = 0;
         FieldDefinition sortableField = null;
         FieldDefinition titleField = null;
+        FieldDefinition treeParentField = null;
         for (FieldDefinition field : entity.fields()) {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
             requireUnique(columnNames, field.columnName(), "column name");
+            if (PlatformAbilityFields.TREE_PARENT_FIELD.equals(field.fieldName())) {
+                treeParentField = field;
+            }
             if (field.isSortable()) {
                 sortableFields++;
                 sortableField = field;
@@ -63,6 +67,9 @@ public class ModuleDefinitionValidator {
         }
         if (sortableFields > 0 && !entity.supports(EntityCapability.SORT)) {
             throw new ModuleDefinitionException("sortable field requires SORT capability: " + entity.code());
+        }
+        if (entity.supports(EntityCapability.TREE)) {
+            requireTreeParentField(entity, treeParentField);
         }
         if (entity.supports(EntityCapability.SORT)) {
             requireSortField(entity, sortableField);
@@ -145,6 +152,18 @@ public class ModuleDefinitionValidator {
                 || !PlatformAbilityFields.SORT_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.INTEGER) {
             throw new ModuleDefinitionException("SORT capability requires standard field sortOrder/sort_order: " + entity.code());
+        }
+    }
+
+    private void requireTreeParentField(EntityDefinition entity, FieldDefinition field) {
+        if (field == null) {
+            throw new ModuleDefinitionException("TREE capability requires standard field parentId: " + entity.code());
+        }
+        if (!PlatformAbilityFields.TREE_PARENT_FIELD.equals(field.fieldName())
+                || !PlatformAbilityFields.TREE_PARENT_COLUMN.equals(field.columnName())
+                || field.type() != FieldType.STRING
+                || !Integer.valueOf(PlatformAbilityFields.TREE_PARENT_LENGTH).equals(field.length())) {
+            throw new ModuleDefinitionException("TREE capability requires standard field parentId/parent_id: " + entity.code());
         }
     }
 

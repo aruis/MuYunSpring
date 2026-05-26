@@ -3,22 +3,31 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.TreeModel;
+import net.ximatai.muyun.spring.common.model.TreeCapable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-public interface TreeAbility<T extends TreeModel> extends CrudAbility<T> {
+public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     String ROOT_ID = "root";
 
     default List<T> children(String parentId) {
         Criteria criteria = activeCriteria(Criteria.of().eq("parentId", parentId));
-        Sort[] sorts = this instanceof SortAbility<?> sortAbility
-                ? new Sort[]{Sort.asc(sortAbility.getSortField())}
-                : new Sort[0];
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), sorts);
+        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+    }
+
+    @Override
+    default Criteria sortScope(T entity) {
+        return Criteria.of().eq("parentId", entity.getParentId());
+    }
+
+    @Override
+    default void validateSortScope(T left, T right) {
+        if (!SortAbility.sameValue(left.getParentId(), right.getParentId())) {
+            throw new AbilityException("Tree sort can only move records within the same parent");
+        }
     }
 
     default List<String> ancestorIds(String id) {
@@ -45,6 +54,9 @@ public interface TreeAbility<T extends TreeModel> extends CrudAbility<T> {
     }
 
     default List<String> ancestorIdsAndSelf(String id) {
+        if (select(id) == null) {
+            return List.of();
+        }
         List<String> ids = new ArrayList<>(ancestorIds(id));
         ids.add(id);
         return ids;

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.module.metadata;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -16,7 +17,7 @@ public record EntityDefinition(
 
     public EntityDefinition {
         fields = fields == null ? List.of() : List.copyOf(fields);
-        capabilities = capabilities == null ? Set.of(EntityCapability.CRUD) : Set.copyOf(capabilities);
+        capabilities = normalizeCapabilities(capabilities);
     }
 
     public EntityDefinition withCapabilities(EntityCapability... values) {
@@ -25,5 +26,16 @@ public record EntityDefinition(
 
     public boolean supports(EntityCapability capability) {
         return capabilities.contains(capability);
+    }
+
+    private static Set<EntityCapability> normalizeCapabilities(Set<EntityCapability> capabilities) {
+        EnumSet<EntityCapability> normalized = capabilities == null || capabilities.isEmpty()
+                ? EnumSet.of(EntityCapability.CRUD)
+                : EnumSet.copyOf(capabilities);
+        normalized.add(EntityCapability.CRUD);
+        if (normalized.contains(EntityCapability.TREE)) {
+            normalized.add(EntityCapability.SORT);
+        }
+        return Set.copyOf(normalized);
     }
 }

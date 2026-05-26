@@ -15,11 +15,11 @@
 
 M1 先建设以下底座：
 
-1. `BaseModel`：统一基础字段和生命周期字段。
+1. `EntityContract`：统一基础字段和生命周期字段。
 2. `BaseDao`：统一静态模型的数据访问入口，默认基于 MuYunDatabase。
 3. `CrudAbility`：统一插入、查询、更新、软删、分页、计数和 hook。
-4. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验。
-5. `SortAbility`：统一排序字段、列表排序和相邻移动。
+4. `SortAbility`：统一排序字段、列表排序和相邻移动。
+5. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
 6. `ReferenceAbility`：统一标题解析和引用选项读取，保留 RAW 读取入口。
 
 动态模块进入 M1 后，应复用同一套语义，而不是另起一套动态 CRUD。
@@ -53,7 +53,7 @@ DynamicRecordService
 
 平台需要支持两条建表路径：
 
-1. 静态模型：`StaticModelTableMapper` 根据 Java 模型和注解编译成 `TableWrapper`，再由 `StaticSchemaService` 创建或校验表结构。
+1. 静态模型：`StaticEntityTableMapper` 根据 Java 模型和注解编译成 `TableWrapper`，再由 `StaticSchemaService` 创建或校验表结构。
 2. 动态模型：`DynamicTableMapper` 根据运行态元数据编译成 `TableWrapper`，再由 `DynamicSchemaService` 创建或更新表结构。
 
 建表是平台责任，不是业务 service 责任。表名、字段名等 SQL 标识符必须走白名单校验。破坏性 DDL 必须有明确治理模式，不能作为普通保存动作的副作用。
@@ -70,7 +70,7 @@ DynamicRecordService
 
 如果某个能力短期只能挂到一侧，应记录为阶段限制，不能把它包装成最终形态。
 
-能力字段属于平台契约，不属于业务配置自由项。静态模型通过 Java 字段和注解声明能力字段；动态模型一旦开启能力，必须使用同一组标准字段名、列名和类型，例如排序能力统一使用 `sortOrder` / `sort_order`。后续软删除、工作流、审批等能力也按同一原则处理。
+能力字段属于平台契约，不属于业务配置自由项。静态模型通过 Java 字段和注解声明能力字段；动态模型一旦开启能力，必须使用同一组标准字段名、列名和类型。例如树能力统一使用 `parentId` / `parent_id`，并自动包含排序能力的 `sortOrder` / `sort_order`。后续软删除、工作流、审批等能力也按同一原则处理。
 
 ## 运行时边界
 

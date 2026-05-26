@@ -6,7 +6,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
+import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 
@@ -68,13 +68,13 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
     @Override
     public Integer nextVersionForUpdate(DynamicRecord record) {
         if (record.getVersion() != null) {
-            return BaseModelLifecycle.nextVersion(record.getVersion());
+            return EntityLifecycle.nextVersion(record.getVersion());
         }
         DynamicRecord current = activeRaw(record.getId());
         if (current == null) {
             throw new IllegalArgumentException("dynamic record not found: " + record.getId());
         }
-        return BaseModelLifecycle.nextVersion(current.getVersion());
+        return EntityLifecycle.nextVersion(current.getVersion());
     }
 
     public String getSortField() {

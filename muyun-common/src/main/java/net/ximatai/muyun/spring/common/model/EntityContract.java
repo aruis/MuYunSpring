@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.common.model;
 
 import java.time.Instant;
 
-public interface BaseModel {
+public interface EntityContract {
     String getId();
 
     void setId(String id);

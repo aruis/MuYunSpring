@@ -4,19 +4,21 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
-import net.ximatai.muyun.spring.common.model.BaseModel;
-import net.ximatai.muyun.spring.common.model.TreeModel;
+import net.ximatai.muyun.spring.common.model.EntityLifecycle;
+import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.TreeCapable;
 
 import java.time.Instant;
 
-public interface CrudAbility<T extends BaseModel> {
+public interface CrudAbility<T extends EntityContract> {
     BaseDao<T, String> getDao();
 
     String getModuleAlias();
 
     default String insert(T entity) {
-        BaseModelLifecycle.prepareInsert(entity, Instant.now());
+        EntityLifecycle.prepareInsert(entity, Instant.now());
+        prepareAbilityDefaults(entity);
         beforeInsert(entity);
         validateTreePlacementIfNeeded(entity);
         return getDao().insert(entity);
@@ -32,7 +34,7 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default int update(T entity) {
-        BaseModelLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
+        EntityLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
         return getDao().updateById(entity);
@@ -44,7 +46,7 @@ public interface CrudAbility<T extends BaseModel> {
         if (entity == null || Boolean.TRUE.equals(entity.getDeleted())) {
             return 0;
         }
-        BaseModelLifecycle.prepareDelete(entity, Instant.now());
+        EntityLifecycle.prepareDelete(entity, Instant.now());
         return getDao().updateById(entity);
     }
 
@@ -69,7 +71,7 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default Integer nextVersionForUpdate(T entity) {
-        return BaseModelLifecycle.nextVersion(entity.getVersion());
+        return EntityLifecycle.nextVersion(entity.getVersion());
     }
 
     default Criteria activeCriteria(Criteria criteria) {
@@ -81,10 +83,21 @@ public interface CrudAbility<T extends BaseModel> {
         return scoped;
     }
 
+    private void prepareAbilityDefaults(T entity) {
+        if (entity instanceof TreeCapable tree
+                && this instanceof TreeAbility<?>
+                && (tree.getParentId() == null || tree.getParentId().isBlank())) {
+            tree.setParentId(TreeAbility.ROOT_ID);
+        }
+        if (entity instanceof EnabledCapable enabled && enabled.getEnabled() == null) {
+            enabled.setEnabled(Boolean.TRUE);
+        }
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void validateTreePlacementIfNeeded(T entity) {
-        if (entity instanceof TreeModel && this instanceof TreeAbility treeAbility) {
-            treeAbility.validateTreePlacement((TreeModel) entity);
+        if (entity instanceof TreeCapable && this instanceof TreeAbility treeAbility) {
+            treeAbility.validateTreePlacement((TreeCapable) entity);
         }
     }
 }

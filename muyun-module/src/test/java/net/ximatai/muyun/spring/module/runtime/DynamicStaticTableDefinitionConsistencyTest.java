@@ -4,9 +4,9 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
-import net.ximatai.muyun.spring.common.model.StandardBaseModel;
-import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
-import net.ximatai.muyun.spring.common.schema.StaticModelTableMapper;
+import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldType;
@@ -21,11 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DynamicStaticTableDefinitionConsistencyTest {
     @Test
     void shouldCompileStaticAndDynamicModelsToStandardPlatformTables() {
-        TableWrapper staticTable = new StaticModelTableMapper().toTable(StaticContract.class);
+        TableWrapper staticTable = new StaticEntityTableMapper().toTable(StaticContract.class);
         TableWrapper dynamicTable = new DynamicTableMapper().toTable(dynamicContract());
 
-        assertThat(columnNames(staticTable)).containsAll(StandardModelSchema.columnNames());
-        assertThat(columnNames(dynamicTable)).containsAll(StandardModelSchema.columnNames());
+        assertThat(columnNames(staticTable)).containsAll(StandardEntitySchema.columnNames());
+        assertThat(columnNames(dynamicTable)).containsAll(StandardEntitySchema.columnNames());
         assertThat(staticTable.getPrimaryKey().getName()).isEqualTo(dynamicTable.getPrimaryKey().getName());
         assertThat(staticTable.getPrimaryKey().getType()).isEqualTo(dynamicTable.getPrimaryKey().getType());
         assertThat(staticTable.getPrimaryKey().getLength()).isEqualTo(dynamicTable.getPrimaryKey().getLength());
@@ -54,7 +54,7 @@ class DynamicStaticTableDefinitionConsistencyTest {
     }
 
     @Table(name = "demo_contract_static", comment = "Contract")
-    private static class StaticContract extends StandardBaseModel {
+    private static class StaticContract extends StandardEntity {
         @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, unique = true)
         private String code;
 

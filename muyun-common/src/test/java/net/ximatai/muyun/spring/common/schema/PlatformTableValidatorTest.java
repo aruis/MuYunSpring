@@ -14,7 +14,7 @@ class PlatformTableValidatorTest {
     void shouldRejectMissingStandardColumn() {
         TableWrapper table = baseTable();
 
-        assertThatThrownBy(() -> validator.requireStandardModelTable(table, "demo"))
+        assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("missing standard column version");
     }
@@ -23,9 +23,9 @@ class PlatformTableValidatorTest {
     void shouldRejectIdThatIsNotPrimaryKey() {
         TableWrapper table = TableWrapper.withName("demo")
                 .addColumn(Column.of("id").setType(ColumnType.VARCHAR).setLength(32).setNullable(false));
-        StandardModelSchema.auditColumns().forEach(table::addColumn);
+        StandardEntitySchema.auditColumns().forEach(table::addColumn);
 
-        assertThatThrownBy(() -> validator.requireStandardModelTable(table, "demo"))
+        assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be primary key id");
     }
@@ -34,11 +34,11 @@ class PlatformTableValidatorTest {
     void shouldRejectStandardColumnTypeMismatch() {
         TableWrapper table = baseTable()
                 .addColumn(Column.of("version").setType(ColumnType.VARCHAR));
-        StandardModelSchema.auditColumns().stream()
+        StandardEntitySchema.auditColumns().stream()
                 .filter(column -> !"version".equals(column.getName()))
                 .forEach(table::addColumn);
 
-        assertThatThrownBy(() -> validator.requireStandardModelTable(table, "demo"))
+        assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("type mismatch version");
     }
@@ -47,17 +47,17 @@ class PlatformTableValidatorTest {
     void shouldRejectStandardColumnSizeMismatch() {
         TableWrapper table = baseTable()
                 .addColumn(Column.of("version").setType(ColumnType.INT).setLength(32));
-        StandardModelSchema.auditColumns().stream()
+        StandardEntitySchema.auditColumns().stream()
                 .filter(column -> !"version".equals(column.getName()))
                 .forEach(table::addColumn);
 
-        assertThatThrownBy(() -> validator.requireStandardModelTable(table, "demo"))
+        assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("size mismatch version");
     }
 
     private TableWrapper baseTable() {
         return TableWrapper.withName("demo")
-                .setPrimaryKey(StandardModelSchema.idColumn());
+                .setPrimaryKey(StandardEntitySchema.idColumn());
     }
 }

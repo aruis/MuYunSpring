@@ -7,7 +7,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.BaseModel;
+import net.ximatai.muyun.spring.common.model.EntityContract;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-final class InMemoryBaseDao<T extends BaseModel> implements BaseDao<T, String> {
+final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, String> {
     private final Map<String, T> rows = new LinkedHashMap<>();
 
     @Override

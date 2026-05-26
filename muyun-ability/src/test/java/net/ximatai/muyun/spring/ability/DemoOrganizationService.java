@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.ability;
 final class DemoOrganizationService implements
         CrudAbility<DemoOrganization>,
         TreeAbility<DemoOrganization>,
-        SortAbility<DemoOrganization>,
         ReferenceAbility<DemoOrganization> {
 
     private final InMemoryBaseDao<DemoOrganization> dao = new InMemoryBaseDao<>();

@@ -10,7 +10,7 @@ import net.ximatai.muyun.database.core.metadata.DBIndex;
 import net.ximatai.muyun.database.core.metadata.DBColumn;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
-import net.ximatai.muyun.spring.common.model.StandardBaseModel;
+import net.ximatai.muyun.spring.common.model.StandardEntity;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Array;
@@ -22,11 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class StaticSchemaServiceTest {
     @Test
-    void shouldEnsureStaticModelTableThroughUnifiedSchemaManager() {
+    void shouldEnsureStaticEntityTableThroughUnifiedSchemaManager() {
         FakeOperations operations = new FakeOperations();
         StaticSchemaService service = new StaticSchemaService(operations);
 
-        MigrationResult result = service.ensureTable(DemoStaticModel.class, MigrationOptions.dryRun());
+        MigrationResult result = service.ensureTable(DemoStaticEntity.class, MigrationOptions.dryRun());
 
         assertThat(result.isChanged()).isTrue();
         assertThat(result.isDryRun()).isTrue();
@@ -35,7 +35,7 @@ class StaticSchemaServiceTest {
     }
 
     @Table(name = "demo_static_model", comment = "Demo static model")
-    private static class DemoStaticModel extends StandardBaseModel {
+    private static class DemoStaticEntity extends StandardEntity {
         @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false)
         private String code;
     }

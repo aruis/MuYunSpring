@@ -52,24 +52,24 @@ class OrganizationRepositoryIT {
         try (Connection connection = dataSource.getConnection()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).contains("PostgreSQL");
             assertThat(organizationColumns(connection))
-                    .contains("id", "parent_id", "code", "name", "sort_order", "enabled", "deleted", "version");
+                    .contains("id", "parent_id", "code", "title", "sort_order", "enabled", "deleted", "version");
             assertThat(organizationUniqueIndexes(connection)).anyMatch(indexName -> indexName.contains("code"));
         }
         assertThat(organizationDao.ensureTable()).isFalse();
 
         Organization root = new Organization();
         root.setCode("HQ");
-        root.setName("Headquarters");
+        root.setTitle("Headquarters");
         String rootId = organizationService.insert(root);
 
         Organization branch = new Organization();
         branch.setCode("BR-001");
-        branch.setName("Branch 001");
+        branch.setTitle("Branch 001");
         branch.setParentId(rootId);
         organizationService.insert(branch);
 
         assertThat(organizationService.select(rootId))
-                .extracting(Organization::getName, Organization::getParentId, Organization::getEnabled)
+                .extracting(Organization::getTitle, Organization::getParentId, Organization::getEnabled)
                 .containsExactly("Headquarters", TreeAbility.ROOT_ID, Boolean.TRUE);
         assertThat(organizationService.children(rootId))
                 .extracting(Organization::getCode)

@@ -4,7 +4,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
-import net.ximatai.muyun.spring.common.model.StandardBaseModel;
+import net.ximatai.muyun.spring.common.model.StandardEntity;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
@@ -13,8 +13,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class StaticModelTableMapperTest {
-    private final StaticModelTableMapper mapper = new StaticModelTableMapper();
+class StaticEntityTableMapperTest {
+    private final StaticEntityTableMapper mapper = new StaticEntityTableMapper();
 
     @Test
     void shouldMapStaticPlatformModelToTableWrapper() {
@@ -38,10 +38,10 @@ class StaticModelTableMapperTest {
     }
 
     @Test
-    void shouldRejectStaticModelOutsidePlatformBaseModel() {
+    void shouldRejectStaticEntityOutsidePlatformBaseModel() {
         assertThatThrownBy(() -> mapper.toTable(NotPlatformModel.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("StandardBaseModel");
+                .hasMessageContaining("StandardEntity");
     }
 
     private Set<String> columnNames(TableWrapper table) {
@@ -54,7 +54,7 @@ class StaticModelTableMapperTest {
     }
 
     @Table(name = "demo_organization", comment = "Demo organization")
-    private static class DemoOrganization extends StandardBaseModel {
+    private static class DemoOrganization extends StandardEntity {
         @Column(name = "parent_id", type = ColumnType.VARCHAR, length = 32)
         private String parentId;
 

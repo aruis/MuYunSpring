@@ -46,10 +46,10 @@ net.ximatai.muyun.spring
 `Model` 用于持久化领域对象契约：
 
 ```text
-BaseModel
-TreeModel
-SortModel
-TitledModel
+EntityContract
+TreeCapable
+SortCapable
+TitledCapable
 ```
 
 `Definition` 用于配置定义：

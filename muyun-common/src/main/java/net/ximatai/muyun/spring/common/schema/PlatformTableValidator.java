@@ -8,11 +8,11 @@ import java.util.Map;
 import java.util.Objects;
 
 public class PlatformTableValidator {
-    public void requireStandardModelTable(TableWrapper table, String source) {
+    public void requireStandardEntityTable(TableWrapper table, String source) {
         Objects.requireNonNull(table, "table must not be null");
         Map<String, Column> columns = columnMap(table);
-        requireColumn(columns, StandardModelSchema.idColumn(), source, true);
-        for (Column expected : StandardModelSchema.auditColumns()) {
+        requireColumn(columns, StandardEntitySchema.idColumn(), source, true);
+        for (Column expected : StandardEntitySchema.auditColumns()) {
             requireColumn(columns, expected, source, false);
         }
     }

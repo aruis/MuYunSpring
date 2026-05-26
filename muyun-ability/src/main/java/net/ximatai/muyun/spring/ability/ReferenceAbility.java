@@ -3,15 +3,16 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
-import net.ximatai.muyun.spring.common.model.BaseModel;
-import net.ximatai.muyun.spring.common.model.TitledModel;
+import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.TitledCapable;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public interface ReferenceAbility<T extends BaseModel & TitledModel> extends CrudAbility<T> {
+public interface ReferenceAbility<T extends EntityContract & TitledCapable> extends CrudAbility<T> {
     default String title(String id) {
         T entity = selectReferenceRaw(id);
         return entity == null ? null : entity.getTitle();
@@ -21,14 +22,19 @@ public interface ReferenceAbility<T extends BaseModel & TitledModel> extends Cru
         if (ids == null || ids.isEmpty()) {
             return Map.of();
         }
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
         List<T> entities = getDao().query(
-                Criteria.of().in("id", List.copyOf(ids)),
+                activeCriteria(Criteria.of().in("id", List.copyOf(normalizedIds))),
                 new PageRequest(0, Integer.MAX_VALUE)
         );
-        Map<String, String> titles = new LinkedHashMap<>();
+        Map<String, String> loadedTitles = new LinkedHashMap<>();
         for (T entity : entities) {
-            if (!Boolean.TRUE.equals(entity.getDeleted())) {
-                titles.put(entity.getId(), entity.getTitle());
+            loadedTitles.put(entity.getId(), entity.getTitle());
+        }
+        Map<String, String> titles = new LinkedHashMap<>();
+        for (String id : normalizedIds) {
+            if (loadedTitles.containsKey(id)) {
+                titles.put(id, loadedTitles.get(id));
             }
         }
         return titles;

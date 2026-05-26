@@ -9,13 +9,13 @@ import java.util.Objects;
 
 public class StaticSchemaService {
     private final IDatabaseOperations<?> operations;
-    private final StaticModelTableMapper tableMapper;
+    private final StaticEntityTableMapper tableMapper;
 
     public StaticSchemaService(IDatabaseOperations<?> operations) {
-        this(operations, new StaticModelTableMapper());
+        this(operations, new StaticEntityTableMapper());
     }
 
-    public StaticSchemaService(IDatabaseOperations<?> operations, StaticModelTableMapper tableMapper) {
+    public StaticSchemaService(IDatabaseOperations<?> operations, StaticEntityTableMapper tableMapper) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.tableMapper = Objects.requireNonNull(tableMapper, "tableMapper must not be null");
     }

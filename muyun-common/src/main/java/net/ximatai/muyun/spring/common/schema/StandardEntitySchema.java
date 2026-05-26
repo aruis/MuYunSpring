@@ -2,14 +2,14 @@ package net.ximatai.muyun.spring.common.schema;
 
 import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.builder.Column;
-import net.ximatai.muyun.spring.common.model.StandardBaseModel;
+import net.ximatai.muyun.spring.common.model.StandardEntity;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
 
-public final class StandardModelSchema {
-    private StandardModelSchema() {
+public final class StandardEntitySchema {
+    private StandardEntitySchema() {
     }
 
     public static Column idColumn() {
@@ -17,23 +17,23 @@ public final class StandardModelSchema {
     }
 
     public static List<Column> auditColumns() {
-        return Arrays.stream(StandardBaseModel.class.getDeclaredFields())
+        return Arrays.stream(StandardEntity.class.getDeclaredFields())
                 .filter(field -> field.getAnnotation(Id.class) == null)
-                .map(StandardModelSchema::columnFrom)
+                .map(StandardEntitySchema::columnFrom)
                 .toList();
     }
 
     public static List<String> columnNames() {
-        return Arrays.stream(StandardBaseModel.class.getDeclaredFields())
-                .map(StandardModelSchema::columnName)
+        return Arrays.stream(StandardEntity.class.getDeclaredFields())
+                .map(StandardEntitySchema::columnName)
                 .toList();
     }
 
     private static Field field(String name) {
         try {
-            return StandardBaseModel.class.getDeclaredField(name);
+            return StandardEntity.class.getDeclaredField(name);
         } catch (NoSuchFieldException exception) {
-            throw new IllegalStateException("standard model field missing: " + name, exception);
+            throw new IllegalStateException("standard entity field missing: " + name, exception);
         }
     }
 
@@ -41,7 +41,7 @@ public final class StandardModelSchema {
         net.ximatai.muyun.database.core.annotation.Column annotation =
                 field.getAnnotation(net.ximatai.muyun.database.core.annotation.Column.class);
         if (annotation == null) {
-            throw new IllegalStateException("standard model field has no @Column: " + field.getName());
+            throw new IllegalStateException("standard entity field has no @Column: " + field.getName());
         }
         Column column = Column.of(columnName(field))
                 .setType(annotation.type())

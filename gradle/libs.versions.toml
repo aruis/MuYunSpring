@@ -7,6 +7,7 @@ junit = "6.0.1"
 assertj = "3.27.6"
 postgresql = "42.7.8"
 testcontainers = "1.21.3"
+lombok = "1.18.42"
 
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
@@ -22,6 +23,7 @@ spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-star
 spring-context = { module = "org.springframework:spring-context", version.ref = "spring-framework" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

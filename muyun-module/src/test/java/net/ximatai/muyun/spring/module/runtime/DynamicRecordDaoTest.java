@@ -32,7 +32,7 @@ class DynamicRecordDaoTest {
     private static final String TABLE = "app_contract";
 
     @Test
-    void shouldInsertWithTableColumnsAndBaseModelDefaults() {
+    void shouldInsertWithTableColumnsAndEntityDefaults() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));

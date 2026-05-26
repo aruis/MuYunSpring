@@ -60,6 +60,7 @@ class AbilityContractTest {
         assertThat(service.ancestorIdsAndSelf(leafId)).containsExactly(regionId, leafId);
         assertThat(service.ancestorIds(subLeafId)).containsExactly(regionId, leafId);
         assertThat(service.descendantIds(regionId)).containsExactly(leafId, subLeafId);
+        assertThat(service.ancestorIdsAndSelf("missing")).isEmpty();
     }
 
     @Test
@@ -135,14 +136,50 @@ class AbilityContractTest {
     }
 
     @Test
+    void sortAbilityShouldRejectEmptyAndCrossParentReorder() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String firstParent = service.insert(new DemoOrganization("First Parent", TreeAbility.ROOT_ID));
+        String secondParent = service.insert(new DemoOrganization("Second Parent", TreeAbility.ROOT_ID));
+        String firstChild = service.insert(new DemoOrganization("First Child", firstParent));
+        String secondChild = service.insert(new DemoOrganization("Second Child", secondParent));
+
+        assertThatThrownBy(() -> service.reorder(List.of()))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("empty");
+
+        assertThatThrownBy(() -> service.reorder(List.of(firstChild, secondChild)))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("same parent");
+    }
+
+    @Test
     void referenceAbilityShouldResolveTitles() {
         DemoOrganizationService service = new DemoOrganizationService();
         String id = service.insert(new DemoOrganization("Reference Title", TreeAbility.ROOT_ID));
+        String secondId = service.insert(new DemoOrganization("Second Title", TreeAbility.ROOT_ID));
 
         assertThat(service.title(id)).isEqualTo("Reference Title");
-        assertThat(service.titles(java.util.List.of(id))).isEqualTo(Map.of(id, "Reference Title"));
+        assertThat(service.titles(java.util.List.of(secondId, id)))
+                .containsExactly(
+                        Map.entry(secondId, "Second Title"),
+                        Map.entry(id, "Reference Title")
+                );
         assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
-                .containsExactly(new ReferenceOption(id, "Reference Title"));
+                .containsExactly(
+                        new ReferenceOption(id, "Reference Title"),
+                        new ReferenceOption(secondId, "Second Title")
+                );
+    }
+
+    @Test
+    void referenceAbilityShouldHideDeletedTitlesInBatch() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String activeId = service.insert(new DemoOrganization("Active", TreeAbility.ROOT_ID));
+        String deletedId = service.insert(new DemoOrganization("Deleted", TreeAbility.ROOT_ID));
+        service.delete(deletedId);
+
+        assertThat(service.titles(List.of(deletedId, activeId)))
+                .containsExactly(Map.entry(activeId, "Active"));
     }
 
     @Test

@@ -3,23 +3,30 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.SortModel;
-import net.ximatai.muyun.spring.common.model.TreeModel;
+import net.ximatai.muyun.spring.common.model.SortCapable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
-public interface SortAbility<T extends SortModel> extends CrudAbility<T> {
+public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
     default String getSortField() {
         return "sortOrder";
     }
 
     default void reorder(List<String> orderedIds) {
+        if (orderedIds == null || orderedIds.isEmpty()) {
+            throw new AbilityException("Cannot reorder empty records");
+        }
         Set<String> uniqueIds = new LinkedHashSet<>(orderedIds);
         if (uniqueIds.size() != orderedIds.size()) {
             throw new AbilityException("Cannot reorder duplicate records");
+        }
+        T first = select(orderedIds.getFirst());
+        if (first == null) {
+            throw new AbilityException("Cannot reorder missing record: " + orderedIds.getFirst());
         }
         int order = 1;
         for (String id : orderedIds) {
@@ -27,6 +34,7 @@ public interface SortAbility<T extends SortModel> extends CrudAbility<T> {
             if (entity == null) {
                 throw new AbilityException("Cannot reorder missing record: " + id);
             }
+            validateSortScope(first, entity);
             entity.setSortOrder(order++);
             update(entity);
         }
@@ -44,19 +52,21 @@ public interface SortAbility<T extends SortModel> extends CrudAbility<T> {
         return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
     }
 
+    default Criteria sortScope(T entity) {
+        return Criteria.of();
+    }
+
+    default void validateSortScope(T left, T right) {
+    }
+
     private void moveRelative(String id, String targetId, boolean before) {
         T moving = select(id);
         T target = select(targetId);
         if (moving == null || target == null) {
             throw new AbilityException("Cannot move missing record");
         }
-        Criteria scope = Criteria.of();
-        if (moving instanceof TreeModel movingTree && target instanceof TreeModel targetTree) {
-            if (!equalsNullable(movingTree.getParentId(), targetTree.getParentId())) {
-                throw new AbilityException("Tree sort can only move records within the same parent");
-            }
-            scope.eq("parentId", movingTree.getParentId());
-        }
+        validateSortScope(moving, target);
+        Criteria scope = sortScope(moving);
         List<T> rows = sortedList(scope);
         List<String> ids = new ArrayList<>();
         for (T row : rows) {
@@ -72,7 +82,7 @@ public interface SortAbility<T extends SortModel> extends CrudAbility<T> {
         reorder(ids);
     }
 
-    private boolean equalsNullable(Object left, Object right) {
-        return left == null ? right == null : left.equals(right);
+    static boolean sameValue(Object left, Object right) {
+        return Objects.equals(left, right);
     }
 }

@@ -14,8 +14,8 @@ import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.spring.boot.sql.MuYunRepositoryFactory;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
-import net.ximatai.muyun.spring.common.schema.StaticModelTableMapper;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -51,7 +51,7 @@ class OrganizationRepositoryContractTest {
         OrganizationService service = new OrganizationService(repository(operations));
         Organization organization = new Organization();
         organization.setCode("HQ");
-        organization.setName("Headquarters");
+        organization.setTitle("Headquarters");
 
         String id = service.insert(organization);
 
@@ -64,7 +64,7 @@ class OrganizationRepositoryContractTest {
         assertThat(body.getValue())
                 .containsEntry("id", id)
                 .containsEntry("code", "HQ")
-                .containsEntry("name", "Headquarters")
+                .containsEntry("title", "Headquarters")
                 .containsEntry("parent_id", TreeAbility.ROOT_ID)
                 .containsEntry("enabled", Boolean.TRUE)
                 .containsEntry("deleted", Boolean.FALSE)
@@ -72,7 +72,7 @@ class OrganizationRepositoryContractTest {
     }
 
     @Test
-    void repositoryShouldResolveStaticModelForEnsureTable() {
+    void repositoryShouldResolveStaticEntityForEnsureTable() {
         IDatabaseOperations<Object> operations = mockedOperationsWithExistingOrganizationTable();
 
         assertThat(repository(operations).ensureTable()).isFalse();
@@ -96,14 +96,14 @@ class OrganizationRepositoryContractTest {
 
     @Test
     void staticModelMapperShouldCompileOrganizationAsPlatformTable() {
-        TableWrapper table = new StaticModelTableMapper().toTable(Organization.class);
+        TableWrapper table = new StaticEntityTableMapper().toTable(Organization.class);
 
         assertThat(table.getName()).isEqualTo(TABLE);
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
         assertThat(table.getPrimaryKey().getLength()).isEqualTo(32);
-        assertThat(columnNames(table)).containsAll(StandardModelSchema.columnNames());
+        assertThat(columnNames(table)).containsAll(StandardEntitySchema.columnNames());
         assertThat(columnNames(table))
-                .contains("parent_id", "code", "name", "sort_order", "enabled");
+                .contains("parent_id", "code", "title", "sort_order", "enabled");
         assertThat(table.getColumns().stream().filter(column -> "code".equals(column.getName())).findFirst())
                 .get()
                 .satisfies(column -> {
@@ -121,7 +121,7 @@ class OrganizationRepositoryContractTest {
         OrganizationService service = new OrganizationService(repository(operations));
 
         assertThat(service.pageQuery(Criteria.of().eq("parentId", TreeAbility.ROOT_ID), PageRequest.of(1, 10)).getRecords())
-                .extracting(Organization::getName)
+                .extracting(Organization::getTitle)
                 .containsExactly("Headquarters");
         assertThat(service.children(TreeAbility.ROOT_ID))
                 .extracting(Organization::getId)
@@ -179,11 +179,11 @@ class OrganizationRepositoryContractTest {
         return operations;
     }
 
-    private Map<String, Object> row(String id, String name, int sortOrder) {
+    private Map<String, Object> row(String id, String title, int sortOrder) {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
-                "name", name,
+                "title", title,
                 "parent_id", TreeAbility.ROOT_ID,
                 "sort_order", sortOrder,
                 "enabled", Boolean.TRUE,
@@ -203,7 +203,7 @@ class OrganizationRepositoryContractTest {
         columns.put("updated_at", column("updated_at", "TIMESTAMP", null, true, false, "Updated at"));
         columns.put("parent_id", column("parent_id", "VARCHAR", 32, true, false, "Parent organization ID"));
         columns.put("code", column("code", "VARCHAR", 64, false, false, "Organization code"));
-        columns.put("name", column("name", "VARCHAR", 128, false, false, "Organization name"));
+        columns.put("title", column("title", "VARCHAR", 128, false, false, "Organization title"));
         columns.put("sort_order", column("sort_order", "INT", null, true, false, "Sort order"));
         columns.put("enabled", column("enabled", "BOOLEAN", null, true, false, "Enabled flag"));
         return columns;

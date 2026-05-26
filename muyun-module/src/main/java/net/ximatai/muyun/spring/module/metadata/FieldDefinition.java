@@ -53,7 +53,9 @@ public record FieldDefinition(
     }
 
     public static FieldDefinition parentId() {
-        return string("parent_id", "Parent").length(32);
+        return string(PlatformAbilityFields.TREE_PARENT_FIELD, "Parent")
+                .column(PlatformAbilityFields.TREE_PARENT_COLUMN)
+                .length(PlatformAbilityFields.TREE_PARENT_LENGTH);
     }
 
     public static FieldDefinition sortOrder() {

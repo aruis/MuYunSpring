@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
-import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,7 +50,7 @@ class DynamicTableMapperTest {
     }
 
     @Test
-    void shouldKeepDynamicStandardColumnsAlignedWithStaticBaseModel() {
+    void shouldKeepDynamicStandardColumnsAlignedWithStandardEntity() {
         TableWrapper table = mapper.toTable(contractEntity());
 
         List<String> dynamicColumns = new java.util.ArrayList<>();
@@ -64,7 +64,7 @@ class DynamicTableMapperTest {
                         || name.equals("updated_at"))
                 .toList());
 
-        assertThat(dynamicColumns).containsExactlyElementsOf(StandardModelSchema.columnNames());
+        assertThat(dynamicColumns).containsExactlyElementsOf(StandardEntitySchema.columnNames());
     }
 
     @Test
@@ -160,14 +160,23 @@ class DynamicTableMapperTest {
     }
 
     @Test
-    void shouldRequireCrudCapabilityForDynamicRecordEntities() {
-        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
-                "contract",
-                "app_contract",
-                "Contract",
-                List.of(FieldDefinition.string("code", "Code"))
-        ).withCapabilities(EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("requires CRUD capability");
+    void shouldNormalizeEntityCapabilities() {
+        EntityDefinition entity = new EntityDefinition(
+                "category",
+                "app_category",
+                "Category",
+                List.of(
+                        FieldDefinition.parentId(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.TREE);
+
+        TableWrapper table = mapper.toTable(entity);
+
+        assertThat(entity.supports(EntityCapability.CRUD)).isTrue();
+        assertThat(entity.supports(EntityCapability.TREE)).isTrue();
+        assertThat(entity.supports(EntityCapability.SORT)).isTrue();
+        assertThat(columnNames(table)).contains("parent_id", "sort_order");
     }
 
     @Test
@@ -241,6 +250,28 @@ class DynamicTableMapperTest {
                 List.of(FieldDefinition.integer("rankOrder", "Rank Order").column("rank_order").sortable())
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("SORT capability requires standard field sortOrder/sort_order");
+    }
+
+    @Test
+    void shouldRejectInvalidTreeFields() {
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "category",
+                "app_category",
+                "Category",
+                List.of(FieldDefinition.sortOrder())
+        ).withCapabilities(EntityCapability.TREE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("TREE capability requires standard field parentId");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "category",
+                "app_category",
+                "Category",
+                List.of(
+                        FieldDefinition.string("parentId", "Parent").column("parent"),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.TREE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("TREE capability requires standard field parentId/parent_id");
     }
 
     @Test
