@@ -121,18 +121,18 @@ class DynamicSchemaServiceIT {
         DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
 
         DynamicModulePublishResult result = publisher.publish(module);
-        DynamicRecordAbility ability = runtime.ability("sales.contract", "contract");
-        DynamicRecord record = runtime.newRecord("sales.contract", "contract")
+        DynamicRecordService recordService = new DynamicRecordService(runtime);
+        DynamicRecord record = recordService.newRecord("sales.contract", "contract")
                 .setValue("code", "C-PUBLISH-001")
                 .setValue("name", "Published Contract")
                 .setValue("amount", BigDecimal.valueOf(5678, 2));
 
-        String id = ability.insert(record);
+        String id = recordService.create("sales.contract", "contract", record);
 
         assertThat(result.changed()).isTrue();
         assertThat(result.migrations()).containsKey("contract");
-        assertThat(ability.select(id).getValue("code")).isEqualTo("C-PUBLISH-001");
-        assertThat(ability.count(Criteria.of().eq("code", "C-PUBLISH-001"))).isEqualTo(1);
+        assertThat(recordService.select("sales.contract", "contract", id).getValue("code")).isEqualTo("C-PUBLISH-001");
+        assertThat(recordService.count("sales.contract", "contract", Criteria.of().eq("code", "C-PUBLISH-001"))).isEqualTo(1);
     }
 
     @Test

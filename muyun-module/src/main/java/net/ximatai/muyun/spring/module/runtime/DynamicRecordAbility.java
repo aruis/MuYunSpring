@@ -86,8 +86,12 @@ public class DynamicRecordAbility implements CrudAbility<DynamicRecord> {
                 .orElseThrow(() -> new IllegalStateException("dynamic entity has no sortable field: " + dao.getEntity().code()));
     }
 
+    public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        return getDao().query(activeCriteria(criteria), pageRequest, sorts);
+    }
+
     public List<DynamicRecord> sortedList(Criteria criteria) {
-        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
     }
 
     public void reorder(List<String> orderedIds) {
