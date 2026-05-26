@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -249,6 +250,39 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldReorderAndMoveDynamicRecordsByDeclaredSortField() {
+        IDatabaseOperations<Object> operations = operations();
+        stubSortableRows(operations);
+        DynamicRecordDao dao = new DynamicRecordDao(operations, sortableEntity());
+
+        assertThat(dao.sortedList(Criteria.of()).stream().map(DynamicRecord::getId))
+                .containsExactly("first", "second", "third");
+        dao.reorder(List.of("first", "second", "third"));
+        dao.moveBefore("third", "first");
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, org.mockito.Mockito.times(6))
+                .patchUpdateItem(eq(SCHEMA), eq(TABLE), anyString(), body.capture());
+        assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
+        assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
+        assertThat(body.getAllValues().get(2)).containsEntry("sort_order", 3);
+        assertThat(body.getAllValues().get(3)).containsEntry("sort_order", 1);
+        assertThat(body.getAllValues().get(4)).containsEntry("sort_order", 2);
+        assertThat(body.getAllValues().get(5)).containsEntry("sort_order", 3);
+    }
+
+    @Test
+    void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
+        assertThatThrownBy(() -> new DynamicRecordDao(operations(), sortableEntity()).reorder(List.of("same", "same")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate");
+
+        assertThatThrownBy(() -> new DynamicRecordDao(operations(), contractEntity()).sortedList(Criteria.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no sortable field");
+    }
+
+    @Test
     void shouldNotMutateCallerCriteria() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -289,6 +323,47 @@ class DynamicRecordDaoTest {
                         new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
                 )
         );
+    }
+
+    private EntityDefinition sortableEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
+                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
+                        new FieldDefinition("sort_order", "sort_order", FieldType.INTEGER, "Sort Order").asSortable()
+                )
+        );
+    }
+
+    private Map<String, Object> row(String id, int sortOrder) {
+        return Map.of(
+                "id", id,
+                "code", id.toUpperCase(),
+                "amount", BigDecimal.TEN,
+                "sort_order", sortOrder,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private void stubSortableRows(IDatabaseOperations<Object> operations) {
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("first")) {
+                return List.of(row("first", 1));
+            }
+            if (params.containsValue("second")) {
+                return List.of(row("second", 2));
+            }
+            if (params.containsValue("third")) {
+                return List.of(row("third", 3));
+            }
+            return List.of(row("first", 1), row("second", 2), row("third", 3));
+        });
     }
 
     private static class RecordingLifecycle implements DynamicRecordLifecycle {

@@ -19,9 +19,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class DynamicRecordDao {
     private final IDatabaseOperations<Object> operations;
@@ -118,6 +120,43 @@ public class DynamicRecordDao {
         return PageResult.of(query(criteria, pageRequest, sorts), total, pageRequest);
     }
 
+    public String getSortField() {
+        return entity.fields().stream()
+                .filter(FieldDefinition::sortable)
+                .map(FieldDefinition::code)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("dynamic entity has no sortable field: " + entity.code()));
+    }
+
+    public List<DynamicRecord> sortedList(Criteria criteria) {
+        return query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(getSortField()));
+    }
+
+    public void reorder(List<String> orderedIds) {
+        Objects.requireNonNull(orderedIds, "orderedIds must not be null");
+        Set<String> uniqueIds = new LinkedHashSet<>(orderedIds);
+        if (uniqueIds.size() != orderedIds.size()) {
+            throw new IllegalArgumentException("Cannot reorder duplicate records");
+        }
+        int order = 1;
+        for (String id : orderedIds) {
+            DynamicRecord record = findById(id);
+            if (record == null) {
+                throw new IllegalArgumentException("Cannot reorder missing record: " + id);
+            }
+            record.setValue(getSortField(), order++);
+            update(record);
+        }
+    }
+
+    public void moveBefore(String id, String beforeId) {
+        moveRelative(id, beforeId, true);
+    }
+
+    public void moveAfter(String id, String afterId) {
+        moveRelative(id, afterId, false);
+    }
+
     public long count(Criteria criteria) {
         CompiledCriteria compiled = criteriaSqlCompiler.compile(activeCriteria(criteria), mapping::resolveColumn, databaseType());
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS total_count FROM ")
@@ -127,6 +166,27 @@ public class DynamicRecordDao {
         }
         Map<String, Object> row = operations.row(sql.toString(), compiled.getParams());
         return resolveCount(row);
+    }
+
+    private void moveRelative(String id, String targetId, boolean before) {
+        DynamicRecord moving = findById(id);
+        DynamicRecord target = findById(targetId);
+        if (moving == null || target == null) {
+            throw new IllegalArgumentException("Cannot move missing record");
+        }
+        List<DynamicRecord> rows = sortedList(Criteria.of());
+        java.util.ArrayList<String> ids = new java.util.ArrayList<>();
+        for (DynamicRecord row : rows) {
+            if (!row.getId().equals(id)) {
+                ids.add(row.getId());
+            }
+        }
+        int targetIndex = ids.indexOf(targetId);
+        if (targetIndex < 0) {
+            throw new IllegalArgumentException("Cannot move before/after missing target: " + targetId);
+        }
+        ids.add(before ? targetIndex : targetIndex + 1, id);
+        reorder(ids);
     }
 
     private Criteria activeCriteria(Criteria criteria) {
