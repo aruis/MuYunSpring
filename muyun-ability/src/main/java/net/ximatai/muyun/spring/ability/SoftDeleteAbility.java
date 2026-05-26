@@ -10,6 +10,11 @@ import java.time.Instant;
 public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility<T> {
     @Override
     default T select(String id) {
+        if (this instanceof CacheAbility<?> cacheAbility) {
+            @SuppressWarnings("unchecked")
+            T cached = (T) cacheAbility.selectWithCache(id);
+            return cached;
+        }
         T entity = getDao().findById(id);
         if (isSoftDeleted(entity)) {
             return null;
@@ -34,6 +39,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         afterDelete(id, entity, deleted);
         if (deleted > 0) {
             afterChanged(entity);
+            clearCacheAfterChangedIfNeeded(entity);
         }
         return deleted;
     }
@@ -49,5 +55,15 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
 
     private boolean isSoftDeleted(T entity) {
         return entity == null || Boolean.TRUE.equals(entity.getDeleted());
+    }
+
+    private void clearCacheAfterChangedIfNeeded(T entity) {
+        if (this instanceof CacheAbility<?> cacheAbility) {
+            if (entity == null || entity.getId() == null) {
+                cacheAbility.clearCache();
+                return;
+            }
+            cacheAbility.clearItemCache(entity.getId());
+        }
     }
 }

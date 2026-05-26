@@ -23,6 +23,8 @@ M1 先建设以下底座：
 6. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
 7. `ReferenceAbility`：统一标题解析和引用选项读取，保留 RAW 读取入口。
 8. `ChildAbility` / `ChildrenAbility`：统一父子聚合的子表插入、更新替换、自动装配和父删联动；父子写链路必须由调用方事务包裹。
+9. `CacheAbility`：统一按 ID 和全量列表的本地缓存、写后失效和缓存对象副本隔离。
+10. `ReferencerAbility`：声明当前模型引用了哪些来源模型，为后续引用依赖失效提供稳定入口。
 
 动态模块进入 M1 后，应复用同一套语义，而不是另起一套动态 CRUD。
 
@@ -40,6 +42,8 @@ DynamicRecordService
 `DynamicRecordService` 是动态记录对外门面，负责按模块别名和实体编码定位运行态服务。
 `DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用等平台能力，并按元数据能力开关决定哪些入口可用。父子聚合能力先在静态能力层固化语义，动态侧后续按元数据关系配置接入同一套 `ChildRelation`。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
+
+缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效，避免业务覆盖 hook 时漏清缓存。默认缓存命名空间包含服务类、模块别名和 DAO 实例；多租户、多数据源或跨运行态共享缓存时，应覆盖 `cacheNamespace()` 给出更强隔离键。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
 
 ## 模型定义边界
 

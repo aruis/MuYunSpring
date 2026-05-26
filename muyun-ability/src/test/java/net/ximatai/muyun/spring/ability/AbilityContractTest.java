@@ -166,6 +166,72 @@ class AbilityContractTest {
     }
 
     @Test
+    void cacheAbilityShouldReturnCopiesAndInvalidateAfterChange() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Cached");
+        String id = service.insert(record);
+
+        DemoPlainRecord selected = service.select(id);
+        selected.setTitle("Changed outside cache");
+        service.rawDao().findById(id).setTitle("Changed behind cache");
+
+        assertThat(service.select(id).getTitle()).isEqualTo("Cached");
+
+        DemoPlainRecord updated = new DemoPlainRecord("Updated");
+        updated.setId(id);
+        service.update(updated);
+
+        assertThat(service.select(id).getTitle()).isEqualTo("Updated");
+        assertThat(service.afterChangedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void cacheAbilityShouldCacheAllAndHideSoftDeletedRows() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        DemoPlainRecord first = new DemoPlainRecord("First");
+        DemoPlainRecord second = new DemoPlainRecord("Second");
+        String firstId = service.insert(first);
+        service.insert(second);
+
+        assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
+                .containsExactly("First", "Second");
+
+        service.rawDao().findById(firstId).setTitle("Changed behind all cache");
+        assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
+                .containsExactly("First", "Second");
+
+        service.delete(firstId);
+
+        assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
+                .containsExactly("Second");
+        assertThat(service.select(firstId)).isNull();
+        assertThat(service.selectIgnoreSoftDelete(firstId)).isNotNull();
+    }
+
+    @Test
+    void cacheAbilityShouldIsolateServicesWithSameModuleAlias() {
+        DemoCachedPlainRecordService firstService = new DemoCachedPlainRecordService();
+        DemoCachedPlainRecordService secondService = new DemoCachedPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("First service only");
+        String id = firstService.insert(record);
+
+        assertThat(firstService.select(id)).isNotNull();
+
+        assertThat(secondService.select(id)).isNull();
+    }
+
+    @Test
+    void referencerAbilityShouldCollectReferenceIdsBySourceNamespace() {
+        DemoReferencingRecordService service = new DemoReferencingRecordService();
+        DemoReferencingRecord record = new DemoReferencingRecord("customer-1", "user-owner");
+        record.setCreatedBy("user-creator");
+
+        assertThat(service.collectReferenceIdsBySourceNamespace(record))
+                .containsEntry("demo.customer", java.util.Set.of("customer-1"))
+                .containsEntry("iam.user", java.util.Set.of("user-creator", "user-owner"));
+    }
+
+    @Test
     void crudAbilityShouldIncreaseVersionOnUpdate() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization organization = new DemoOrganization("Versioned", TreeAbility.ROOT_ID);
