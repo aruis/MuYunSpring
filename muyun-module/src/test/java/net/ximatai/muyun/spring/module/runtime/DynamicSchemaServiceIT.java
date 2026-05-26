@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldType;
@@ -17,6 +20,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.util.List;
 
@@ -35,11 +39,13 @@ class DynamicSchemaServiceIT {
     }
 
     private final DynamicSchemaService schemaService;
+    private final IDatabaseOperations<?> operations;
     private final DataSource dataSource;
 
     @Autowired
-    DynamicSchemaServiceIT(DynamicSchemaService schemaService, DataSource dataSource) {
+    DynamicSchemaServiceIT(DynamicSchemaService schemaService, IDatabaseOperations<?> operations, DataSource dataSource) {
         this.schemaService = schemaService;
+        this.operations = operations;
         this.dataSource = dataSource;
     }
 
@@ -67,6 +73,50 @@ class DynamicSchemaServiceIT {
             assertThat(primaryKeys(connection)).containsExactly("id");
             assertThat(uniqueIndexes(connection)).anyMatch(indexName -> indexName.contains("code"));
         }
+    }
+
+    @Test
+    void shouldRunDynamicRecordMinimalDataAccessLoopOnRealDatabase() {
+        EntityDefinition entity = entity("app_contract_record_it");
+        schemaService.ensureTable(entity);
+        DynamicRecordDao dao = new DynamicRecordDao(operations, entity);
+
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C-IT-001")
+                .setValue("name", "Integration Contract")
+                .setValue("amount", BigDecimal.valueOf(1234, 2));
+
+        String id = dao.insert(record);
+
+        assertThat(dao.findById(id).getValue("code")).isEqualTo("C-IT-001");
+        assertThat(dao.query(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10), Sort.asc("name")))
+                .hasSize(1);
+        assertThat(dao.page(Criteria.of().eq("code", "C-IT-001"), PageRequest.of(1, 10)).getTotal())
+                .isEqualTo(1);
+        assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isEqualTo(1);
+
+        record.setValue("name", "Updated Contract");
+        dao.update(record);
+        assertThat(dao.findById(id).getVersion()).isEqualTo(1);
+        assertThat(dao.findById(id).getValue("name")).isEqualTo("Updated Contract");
+
+        assertThat(dao.delete(id)).isEqualTo(1);
+        assertThat(dao.findById(id)).isNull();
+        assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
+    }
+
+    private EntityDefinition entity(String tableName) {
+        return new EntityDefinition(
+                "contract",
+                tableName,
+                "Contract",
+                List.of(
+                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired().asUnique(),
+                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired(),
+                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
+                        new FieldDefinition("signed_at", "signed_at", FieldType.TIMESTAMP, "Signed At").asIndexed()
+                )
+        );
     }
 
     private List<String> columns(Connection connection) throws Exception {
