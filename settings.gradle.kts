@@ -18,6 +18,7 @@ rootProject.name = "MuYunSpring"
 include(
     "muyun-common",
     "muyun-ability",
+    "muyun-module",
     "muyun-iam",
     "muyun-boot"
 )

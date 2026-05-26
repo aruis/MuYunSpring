@@ -1,0 +1,76 @@
+package net.ximatai.muyun.spring.module.runtime;
+
+import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.module.metadata.FieldType;
+import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class DynamicSchemaServiceTest {
+
+    @Test
+    void shouldEnsureModuleTablesInDefinitionOrder() {
+        RecordingDynamicSchemaService service = new RecordingDynamicSchemaService();
+        ModuleDefinition module = new ModuleDefinition(
+                "contract_app",
+                "Contract App",
+                List.of(
+                        entity("contract", "app_contract"),
+                        entity("invoice", "app_invoice")
+                )
+        );
+
+        assertThat(service.ensureModule(module))
+                .containsEntry("contract", true)
+                .containsEntry("invoice", false);
+        assertThat(service.ensuredEntities).containsExactly("contract", "invoice");
+    }
+
+    @Test
+    void shouldValidateModuleBeforeEnsuringTables() {
+        RecordingDynamicSchemaService service = new RecordingDynamicSchemaService();
+        ModuleDefinition module = new ModuleDefinition(
+                "contract_app",
+                "Contract App",
+                List.of(
+                        entity("contract", "app_contract"),
+                        entity("contract_copy", "app_contract")
+                )
+        );
+
+        assertThatThrownBy(() -> service.ensureModule(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("duplicate table name");
+        assertThat(service.ensuredEntities).isEmpty();
+    }
+
+    private EntityDefinition entity(String code, String tableName) {
+        return new EntityDefinition(
+                code,
+                tableName,
+                code,
+                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128))
+        );
+    }
+
+    private static class RecordingDynamicSchemaService extends DynamicSchemaService {
+        private final List<String> ensuredEntities = new ArrayList<>();
+
+        RecordingDynamicSchemaService() {
+            super(null);
+        }
+
+        @Override
+        public boolean ensureTable(EntityDefinition entity) {
+            ensuredEntities.add(entity.code());
+            return ensuredEntities.size() == 1;
+        }
+    }
+}
