@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.ReferenceOption;
 
 import java.util.Collection;
 import java.util.List;
@@ -65,6 +66,22 @@ public class DynamicRecordService {
         entityService(moduleAlias, entityCode).moveAfter(id, afterId);
     }
 
+    public List<DynamicRecord> children(String moduleAlias, String entityCode, String parentId) {
+        return entityService(moduleAlias, entityCode).children(parentId);
+    }
+
+    public List<String> ancestorIds(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).ancestorIds(id);
+    }
+
+    public List<String> ancestorIdsAndSelf(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).ancestorIdsAndSelf(id);
+    }
+
+    public List<String> descendantIds(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).descendantIds(id);
+    }
+
     public String title(String moduleAlias, String entityCode, String id) {
         return entityService(moduleAlias, entityCode).title(id);
     }
@@ -73,10 +90,10 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityCode).titles(ids);
     }
 
-    public PageResult<DynamicReferenceOption> referenceOptions(String moduleAlias,
-                                                              String entityCode,
-                                                              Criteria criteria,
-                                                              PageRequest pageRequest) {
+    public PageResult<ReferenceOption> referenceOptions(String moduleAlias,
+                                                        String entityCode,
+                                                        Criteria criteria,
+                                                        PageRequest pageRequest) {
         return entityService(moduleAlias, entityCode).referenceOptions(criteria, pageRequest);
     }
 

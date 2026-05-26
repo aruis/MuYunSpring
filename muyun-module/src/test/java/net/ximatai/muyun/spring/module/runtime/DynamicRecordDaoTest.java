@@ -6,6 +6,8 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
+import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.ability.ReferenceOption;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
@@ -359,7 +361,7 @@ class DynamicRecordDaoTest {
     void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), sortableEntity()), "sales.contract")
                 .reorder(List.of("same", "same")))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AbilityException.class)
                 .hasMessageContaining("duplicate");
 
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
@@ -384,8 +386,8 @@ class DynamicRecordDaoTest {
                 .containsEntry("contract-2", "Contract Two");
         assertThat(entityService.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(
-                        new DynamicReferenceOption("contract-1", "Contract One"),
-                        new DynamicReferenceOption("contract-2", "Contract Two")
+                        new ReferenceOption("contract-1", "Contract One"),
+                        new ReferenceOption("contract-2", "Contract Two")
                 );
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
@@ -393,6 +395,77 @@ class DynamicRecordDaoTest {
         assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL"));
+    }
+
+    @Test
+    void shouldReuseTreeAbilityForDynamicRecordsWhenMetadataEnablesTree() {
+        IDatabaseOperations<Object> operations = operations();
+        stubTreeRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
+
+        assertThat(entityService.children("root").stream().map(DynamicRecord::getId))
+                .containsExactly("A", "B");
+        assertThat(entityService.ancestorIds("A1")).containsExactly("A");
+        assertThat(entityService.descendantIds("A")).containsExactly("A1");
+        entityService.moveAfter("A", "B");
+
+        assertThatThrownBy(() -> entityService.moveBefore("A1", "B"))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("same parent");
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
+                .contains("\"parent_id\" =")
+                .contains("ORDER BY \"sort_order\" ASC"));
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, org.mockito.Mockito.times(2))
+                .patchUpdateItem(eq(SCHEMA), eq(TABLE), anyString(), body.capture());
+        assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
+        assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
+    }
+
+    @Test
+    void shouldPrepareDynamicTreeDefaultsThroughCrudAbility() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
+        DynamicRecord record = new DynamicRecord(treeEntity()).setValue("code", "C");
+        record.setId("C");
+
+        entityService.insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue()).containsEntry("parent_id", "root");
+    }
+
+    @Test
+    void shouldNotPrepareAbilityDefaultsForPlainDynamicCrudFields() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.parentId(),
+                        FieldDefinition.bool("enabled", "Enabled")
+                )
+        );
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity).setValue("code", "C");
+        record.setId("C");
+
+        entityService.insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue()).doesNotContainKeys("parent_id", "enabled");
     }
 
     @Test
@@ -484,11 +557,35 @@ class DynamicRecordDaoTest {
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
 
+    private EntityDefinition treeEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.parentId(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.TREE);
+    }
+
     private Map<String, Object> row(String id, int sortOrder) {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
                 "amount", BigDecimal.TEN,
+                "sort_order", sortOrder,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> treeRow(String id, String parentId, int sortOrder) {
+        return Map.of(
+                "id", id,
+                "code", id,
+                "parent_id", parentId,
                 "sort_order", sortOrder,
                 "deleted", Boolean.FALSE,
                 "version", 0
@@ -520,6 +617,35 @@ class DynamicRecordDaoTest {
                 return List.of(row("third", 3));
             }
             return List.of(row("first", 1), row("second", 2), row("third", 3));
+        });
+    }
+
+    private void stubTreeRows(IDatabaseOperations<Object> operations) {
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"id\" =")) {
+                if (params.containsValue("A")) {
+                    return List.of(treeRow("A", "root", 1));
+                }
+                if (params.containsValue("B")) {
+                    return List.of(treeRow("B", "root", 2));
+                }
+                if (params.containsValue("A1")) {
+                    return List.of(treeRow("A1", "A", 1));
+                }
+            }
+            if (sql.contains("\"parent_id\" =")) {
+                if (params.containsValue("root")) {
+                    return List.of(treeRow("A", "root", 1), treeRow("B", "root", 2));
+                }
+                if (params.containsValue("A")) {
+                    return List.of(treeRow("A1", "A", 1));
+                }
+                return List.of();
+            }
+            return List.of(treeRow("A", "root", 1), treeRow("B", "root", 2), treeRow("A1", "A", 1));
         });
     }
 

@@ -1,7 +1,12 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.TitledCapable;
+import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldType;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
@@ -16,7 +21,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract {
+public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable, EnabledCapable {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -61,6 +66,58 @@ public class DynamicRecord implements EntityContract {
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
+    @Override
+    public String getParentId() {
+        if (!entity.supports(EntityCapability.TREE) || !hasField(PlatformAbilityFields.TREE_PARENT_FIELD)) {
+            return null;
+        }
+        return stringValue(values.get(PlatformAbilityFields.TREE_PARENT_FIELD));
+    }
+
+    @Override
+    public void setParentId(String parentId) {
+        if (entity.supports(EntityCapability.TREE)) {
+            setAbilityValueIfPresent(PlatformAbilityFields.TREE_PARENT_FIELD, parentId);
+        }
+    }
+
+    @Override
+    public Integer getSortOrder() {
+        if (!entity.supports(EntityCapability.SORT) || !hasField(PlatformAbilityFields.SORT_FIELD)) {
+            return null;
+        }
+        return numberValue(values.get(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    @Override
+    public void setSortOrder(Integer sortOrder) {
+        if (entity.supports(EntityCapability.SORT)) {
+            setAbilityValueIfPresent(PlatformAbilityFields.SORT_FIELD, sortOrder);
+        }
+    }
+
+    @Override
+    public String getTitle() {
+        if (!entity.supports(EntityCapability.REFERENCE) || !hasField(PlatformAbilityFields.TITLE_FIELD)) {
+            return null;
+        }
+        return stringValue(values.get(PlatformAbilityFields.TITLE_FIELD));
+    }
+
+    @Override
+    public Boolean getEnabled() {
+        if (!hasField(PlatformAbilityFields.ENABLED_FIELD)) {
+            return null;
+        }
+        Object value = values.get(PlatformAbilityFields.ENABLED_FIELD);
+        return value instanceof Boolean enabled ? enabled : null;
+    }
+
+    @Override
+    public void setEnabled(Boolean enabled) {
+        setAbilityValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
+    }
+
     Set<String> fieldCodes() {
         return fields.keySet();
     }
@@ -100,6 +157,24 @@ public class DynamicRecord implements EntityContract {
         if (!matched) {
             throw new IllegalArgumentException("invalid value type for dynamic field: " + field.code());
         }
+    }
+
+    private boolean hasField(String fieldCode) {
+        return fields.containsKey(fieldCode);
+    }
+
+    private void setAbilityValueIfPresent(String fieldCode, Object value) {
+        if (hasField(fieldCode)) {
+            setValue(fieldCode, value);
+        }
+    }
+
+    private Integer numberValue(Object value) {
+        return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     @Override

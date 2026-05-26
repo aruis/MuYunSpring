@@ -75,6 +75,14 @@ public interface CrudAbility<T extends EntityContract> {
         return EntityLifecycle.nextVersion(entity.getVersion());
     }
 
+    default boolean shouldPrepareTreeDefault(T entity) {
+        return true;
+    }
+
+    default boolean shouldPrepareEnabledDefault(T entity) {
+        return true;
+    }
+
     default Criteria activeCriteria(Criteria criteria) {
         Criteria scoped = Criteria.of();
         if (criteria != null && !criteria.isEmpty()) {
@@ -89,10 +97,13 @@ public interface CrudAbility<T extends EntityContract> {
     private void prepareAbilityDefaults(T entity) {
         if (entity instanceof TreeCapable tree
                 && this instanceof TreeAbility<?>
+                && shouldPrepareTreeDefault(entity)
                 && (tree.getParentId() == null || tree.getParentId().isBlank())) {
             tree.setParentId(TreeAbility.ROOT_ID);
         }
-        if (entity instanceof EnabledCapable enabled && enabled.getEnabled() == null) {
+        if (entity instanceof EnabledCapable enabled
+                && shouldPrepareEnabledDefault(entity)
+                && enabled.getEnabled() == null) {
             enabled.setEnabled(Boolean.TRUE);
         }
     }
