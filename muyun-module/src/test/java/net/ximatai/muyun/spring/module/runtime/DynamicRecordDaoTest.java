@@ -466,7 +466,7 @@ class DynamicRecordDaoTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.integer("sort_order", "Sort Order").sortable()
+                        FieldDefinition.sortOrder()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT);
     }
@@ -478,7 +478,7 @@ class DynamicRecordDaoTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
-                        FieldDefinition.string("name", "Name").length(128).required().title(),
+                        FieldDefinition.titleField().required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
@@ -499,7 +499,7 @@ class DynamicRecordDaoTest {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
-                "name", name,
+                "title", name,
                 "amount", BigDecimal.TEN,
                 "deleted", Boolean.FALSE,
                 "version", 0

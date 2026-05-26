@@ -62,7 +62,7 @@ class DynamicSchemaServiceIT {
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
                         FieldDefinition.string("name", "Name").length(128).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.timestamp("signed_at", "Signed At").indexed()
+                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed()
                 )
         );
 
@@ -174,7 +174,7 @@ class DynamicSchemaServiceIT {
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
                         name,
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.timestamp("signed_at", "Signed At").indexed()
+                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed()
                 )
         );
     }

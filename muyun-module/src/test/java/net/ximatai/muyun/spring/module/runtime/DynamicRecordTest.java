@@ -18,11 +18,11 @@ class DynamicRecordTest {
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN)
-                .setValue("signed_at", Instant.parse("2026-01-01T00:00:00Z"));
+                .setValue("signedAt", Instant.parse("2026-01-01T00:00:00Z"));
 
         assertThat(record.getValue("code")).isEqualTo("C-001");
         assertThat(record.getValue("amount")).isEqualTo(BigDecimal.TEN);
-        assertThat(record.getValues()).containsOnlyKeys("code", "amount", "signed_at");
+        assertThat(record.getValues()).containsOnlyKeys("code", "amount", "signedAt");
     }
 
     @Test
@@ -60,7 +60,7 @@ class DynamicRecordTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.timestamp("signed_at", "Signed At")
+                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
                 )
         );
     }

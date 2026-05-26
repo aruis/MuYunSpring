@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.module.metadata;
 
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
 
 import java.util.HashSet;
@@ -36,15 +37,19 @@ public class ModuleDefinitionValidator {
         Set<String> columnNames = new HashSet<>();
         int sortableFields = 0;
         int titleFields = 0;
+        FieldDefinition sortableField = null;
+        FieldDefinition titleField = null;
         for (FieldDefinition field : entity.fields()) {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
             requireUnique(columnNames, field.columnName(), "column name");
             if (field.isSortable()) {
                 sortableFields++;
+                sortableField = field;
             }
             if (field.isTitle()) {
                 titleFields++;
+                titleField = field;
             }
         }
         if (!entity.supports(EntityCapability.CRUD)) {
@@ -59,14 +64,14 @@ public class ModuleDefinitionValidator {
         if (sortableFields > 0 && !entity.supports(EntityCapability.SORT)) {
             throw new ModuleDefinitionException("sortable field requires SORT capability: " + entity.code());
         }
-        if (entity.supports(EntityCapability.SORT) && sortableFields == 0) {
-            throw new ModuleDefinitionException("SORT capability requires a sortable field: " + entity.code());
+        if (entity.supports(EntityCapability.SORT)) {
+            requireSortField(entity, sortableField);
         }
         if (titleFields > 0 && !entity.supports(EntityCapability.REFERENCE)) {
             throw new ModuleDefinitionException("title field requires REFERENCE capability: " + entity.code());
         }
-        if (entity.supports(EntityCapability.REFERENCE) && titleFields == 0) {
-            throw new ModuleDefinitionException("REFERENCE capability requires a title field: " + entity.code());
+        if (entity.supports(EntityCapability.REFERENCE)) {
+            requireTitleField(entity, titleField);
         }
     }
 
@@ -74,7 +79,7 @@ public class ModuleDefinitionValidator {
         if (field == null) {
             throw new ModuleDefinitionException("field must not be null");
         }
-        requireIdentifier(field.fieldName(), "field name");
+        requireFieldName(field.fieldName(), "field name");
         requireIdentifier(field.columnName(), "column name");
         requireText(field.name(), "field title");
         if (field.type() == null) {
@@ -122,6 +127,35 @@ public class ModuleDefinitionValidator {
         requireText(value, name);
         if (!value.matches(IDENTIFIER_PATTERN)) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
+        }
+    }
+
+    private void requireFieldName(String value, String name) {
+        requireText(value, name);
+        if (!value.matches("[a-z][A-Za-z0-9]{0,62}")) {
+            throw new ModuleDefinitionException("invalid " + name + ": " + value);
+        }
+    }
+
+    private void requireSortField(EntityDefinition entity, FieldDefinition field) {
+        if (field == null) {
+            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder: " + entity.code());
+        }
+        if (!PlatformAbilityFields.SORT_FIELD.equals(field.fieldName())
+                || !PlatformAbilityFields.SORT_COLUMN.equals(field.columnName())
+                || field.type() != FieldType.INTEGER) {
+            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder/sort_order: " + entity.code());
+        }
+    }
+
+    private void requireTitleField(EntityDefinition entity, FieldDefinition field) {
+        if (field == null) {
+            throw new ModuleDefinitionException("REFERENCE capability requires standard field title: " + entity.code());
+        }
+        if (!PlatformAbilityFields.TITLE_FIELD.equals(field.fieldName())
+                || !PlatformAbilityFields.TITLE_COLUMN.equals(field.columnName())
+                || field.type() != FieldType.STRING) {
+            throw new ModuleDefinitionException("REFERENCE capability requires standard field title/title: " + entity.code());
         }
     }
 

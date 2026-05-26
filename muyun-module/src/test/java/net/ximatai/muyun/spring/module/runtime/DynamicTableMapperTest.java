@@ -135,7 +135,7 @@ class DynamicTableMapperTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
-                        FieldDefinition.string("name", "Name").length(128).required().title(),
+                        FieldDefinition.titleField().required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                         FieldDefinition.sortOrder()
                 )
@@ -212,8 +212,8 @@ class DynamicTableMapperTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        FieldDefinition.integer("sort_order", "Sort Order").sortable(),
-                        FieldDefinition.integer("rank_order", "Rank Order").sortable()
+                        FieldDefinition.sortOrder(),
+                        FieldDefinition.integer("rankOrder", "Rank Order").column("rank_order").sortable()
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one sortable field");
@@ -222,7 +222,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(FieldDefinition.integer("sort_order", "Sort Order").sortable())
+                List.of(FieldDefinition.sortOrder())
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("requires SORT capability");
 
@@ -232,7 +232,15 @@ class DynamicTableMapperTest {
                 "Contract",
                 List.of(FieldDefinition.string("code", "Code"))
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("SORT capability requires a sortable field");
+                .hasMessageContaining("SORT capability requires standard field sortOrder");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.integer("rankOrder", "Rank Order").column("rank_order").sortable())
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("SORT capability requires standard field sortOrder/sort_order");
     }
 
     @Test
@@ -251,7 +259,7 @@ class DynamicTableMapperTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("code", "Code").title(),
-                        FieldDefinition.string("name", "Name").title()
+                        FieldDefinition.titleField()
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one title field");
@@ -260,7 +268,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(FieldDefinition.string("name", "Name").title())
+                List.of(FieldDefinition.titleField())
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("requires REFERENCE capability");
 
@@ -270,7 +278,15 @@ class DynamicTableMapperTest {
                 "Contract",
                 List.of(FieldDefinition.string("code", "Code"))
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE))).isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("REFERENCE capability requires a title field");
+                .hasMessageContaining("REFERENCE capability requires standard field title");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("name", "Name").title())
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("REFERENCE capability requires standard field title/title");
     }
 
     private EntityDefinition contractEntity() {
@@ -282,7 +298,7 @@ class DynamicTableMapperTest {
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
                         FieldDefinition.string("name", "Name").length(128).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.timestamp("signed_at", "Signed At").indexed(),
+                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed(),
                         FieldDefinition.bool("enabled", "Enabled")
                 )
         );

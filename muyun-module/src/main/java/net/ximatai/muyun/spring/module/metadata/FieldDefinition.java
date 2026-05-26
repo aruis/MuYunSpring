@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.module.metadata;
 
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+
 public record FieldDefinition(
         String fieldName,
         String columnName,
@@ -55,7 +57,16 @@ public record FieldDefinition(
     }
 
     public static FieldDefinition sortOrder() {
-        return integer("sort_order", "Sort Order").sortable();
+        return integer(PlatformAbilityFields.SORT_FIELD, "Sort Order")
+                .column(PlatformAbilityFields.SORT_COLUMN)
+                .sortable();
+    }
+
+    public static FieldDefinition titleField() {
+        return string(PlatformAbilityFields.TITLE_FIELD, "Title")
+                .column(PlatformAbilityFields.TITLE_COLUMN)
+                .length(PlatformAbilityFields.TITLE_LENGTH)
+                .title();
     }
 
     public String code() {

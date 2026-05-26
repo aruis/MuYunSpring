@@ -134,7 +134,7 @@ class DynamicRecordServiceTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
-                        FieldDefinition.integer("sort_order", "Sort Order").sortable()
+                        FieldDefinition.sortOrder()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT);
     }
@@ -146,7 +146,7 @@ class DynamicRecordServiceTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
-                        FieldDefinition.string("name", "Name").length(128).required().title()
+                        FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
@@ -175,7 +175,7 @@ class DynamicRecordServiceTest {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
-                "name", name,
+                "title", name,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );

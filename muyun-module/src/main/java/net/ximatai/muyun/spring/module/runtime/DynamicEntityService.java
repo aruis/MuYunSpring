@@ -7,8 +7,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.BaseModelLifecycle;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
-import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -79,11 +79,7 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
 
     public String getSortField() {
         requireCapability(EntityCapability.SORT);
-        return dao.getEntity().fields().stream()
-                .filter(FieldDefinition::isSortable)
-                .map(FieldDefinition::code)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("dynamic entity has no sortable field: " + dao.getEntity().code()));
+        return PlatformAbilityFields.SORT_FIELD;
     }
 
     public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -121,11 +117,7 @@ public class DynamicEntityService implements CrudAbility<DynamicRecord> {
 
     public String getTitleField() {
         requireCapability(EntityCapability.REFERENCE);
-        return dao.getEntity().fields().stream()
-                .filter(FieldDefinition::isTitle)
-                .map(FieldDefinition::code)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("dynamic entity has no title field: " + dao.getEntity().code()));
+        return PlatformAbilityFields.TITLE_FIELD;
     }
 
     public String title(String id) {
