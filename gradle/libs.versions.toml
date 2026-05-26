@@ -1,0 +1,23 @@
+[versions]
+spring-boot = "3.5.0"
+spring-framework = "6.2.7"
+spring-dependency-management = "1.1.7"
+muyun-database = "3.26.3"
+junit = "6.0.1"
+assertj = "3.27.6"
+
+[libraries]
+muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
+muyun-database-spring-boot-starter = { module = "net.ximatai.muyun.database:muyun-database-spring-boot-starter", version.ref = "muyun-database" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-context = { module = "org.springframework:spring-context", version.ref = "spring-framework" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
