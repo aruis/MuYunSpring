@@ -14,7 +14,10 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -86,6 +89,62 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
 
     public Map<String, List<DynamicRecord>> getChildren() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(children));
+    }
+
+    public DynamicRecord copy() {
+        DynamicRecord copy = new DynamicRecord(entity);
+        values.forEach((fieldCode, value) -> copy.values.put(fieldCode, copyValue(value)));
+        children.forEach((relationCode, records) -> copy.children.put(
+                relationCode,
+                records == null ? null : records.stream().map(DynamicRecord::copy).toList()
+        ));
+        copy.id = id;
+        copy.version = version;
+        copy.deleted = deleted;
+        copy.createdBy = createdBy;
+        copy.createdAt = createdAt;
+        copy.updatedBy = updatedBy;
+        copy.updatedAt = updatedAt;
+        return copy;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object copyValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copied = new LinkedHashMap<>();
+            map.forEach((key, nestedValue) -> copied.put(key, copyValue(nestedValue)));
+            return copied;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> copied = new ArrayList<>();
+            list.forEach(item -> copied.add(copyValue(item)));
+            return copied;
+        }
+        if (value instanceof Set<?> set) {
+            Set<Object> copied = new LinkedHashSet<>();
+            set.forEach(item -> copied.add(copyValue(item)));
+            return copied;
+        }
+        if (value instanceof byte[] bytes) {
+            return bytes.clone();
+        }
+        if (value instanceof Object[] objects) {
+            Object[] copied = objects.clone();
+            for (int i = 0; i < copied.length; i++) {
+                copied[i] = copyValue(copied[i]);
+            }
+            return copied;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return new java.sql.Timestamp(timestamp.getTime());
+        }
+        if (value instanceof java.sql.Date date) {
+            return new java.sql.Date(date.getTime());
+        }
+        if (value instanceof Date date) {
+            return new Date(date.getTime());
+        }
+        return value;
     }
 
     @Override

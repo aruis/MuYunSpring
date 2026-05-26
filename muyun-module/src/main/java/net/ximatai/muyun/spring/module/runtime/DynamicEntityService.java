@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.ChildAbility;
 import net.ximatai.muyun.spring.ability.ChildRelation;
 import net.ximatai.muyun.spring.ability.ChildrenAbility;
@@ -39,12 +40,14 @@ public class DynamicEntityService implements
         ChildrenAbility<DynamicRecord>,
         TreeAbility<DynamicRecord>,
         ReferenceAbility<DynamicRecord>,
-        ReferencerAbility<DynamicRecord> {
+        ReferencerAbility<DynamicRecord>,
+        CacheAbility<DynamicRecord> {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;
     private final ModuleDefinition module;
     private final Function<String, DynamicEntityService> relationServiceResolver;
+    private final String cacheNamespace;
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
@@ -61,11 +64,21 @@ public class DynamicEntityService implements
                                 DynamicRecordLifecycle lifecycle,
                                 ModuleDefinition module,
                                 Function<String, DynamicEntityService> relationServiceResolver) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, null);
+    }
+
+    public DynamicEntityService(DynamicRecordDao dao,
+                                String moduleAlias,
+                                DynamicRecordLifecycle lifecycle,
+                                ModuleDefinition module,
+                                Function<String, DynamicEntityService> relationServiceResolver,
+                                String cacheNamespacePrefix) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
         this.module = module;
         this.relationServiceResolver = Objects.requireNonNull(relationServiceResolver, "relationServiceResolver must not be null");
+        this.cacheNamespace = resolveCacheNamespace(cacheNamespacePrefix);
     }
 
     @Override
@@ -76,6 +89,16 @@ public class DynamicEntityService implements
     @Override
     public String getModuleAlias() {
         return moduleAlias;
+    }
+
+    @Override
+    public String cacheNamespace() {
+        return cacheNamespace;
+    }
+
+    @Override
+    public DynamicRecord copyForCache(DynamicRecord entity) {
+        return entity == null ? null : entity.copy();
     }
 
     @Override
@@ -315,5 +338,13 @@ public class DynamicEntityService implements
             throw new IllegalArgumentException("dynamic moduleAlias must be a platform module alias: " + value);
         }
         return value;
+    }
+
+    private String resolveCacheNamespace(String cacheNamespacePrefix) {
+        String suffix = moduleAlias + "." + dao.getEntity().code();
+        if (cacheNamespacePrefix != null && !cacheNamespacePrefix.isBlank()) {
+            return cacheNamespacePrefix + "::" + suffix;
+        }
+        return suffix + "::" + System.identityHashCode(dao);
     }
 }

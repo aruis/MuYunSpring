@@ -34,7 +34,7 @@ M1 先建设以下底座：
 
 ```text
 DynamicRecordService
-  -> DynamicEntityService implements CrudAbility<DynamicRecord>, SoftDeleteAbility<DynamicRecord>, TreeAbility<DynamicRecord>, ReferenceAbility<DynamicRecord>
+  -> DynamicEntityService implements CrudAbility<DynamicRecord>, SoftDeleteAbility<DynamicRecord>, TreeAbility<DynamicRecord>, ReferenceAbility<DynamicRecord>, CacheAbility<DynamicRecord>
   -> DynamicRecordDao implements BaseDao<DynamicRecord, String>
   -> MuYunDatabase
 ```
@@ -43,7 +43,7 @@ DynamicRecordService
 `DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用、父子聚合和引用依赖采集等平台能力，并按元数据能力开关或关系配置决定哪些入口可用。动态父子聚合按元数据关系配置接入同一套 `ChildRelation`，不另起一套动态子表逻辑。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
 
-缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效，避免业务覆盖 hook 时漏清缓存。默认缓存命名空间包含服务类、模块别名和 DAO 实例；多租户、多数据源或跨运行态共享缓存时，应覆盖 `cacheNamespace()` 给出更强隔离键。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
+缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效，避免业务覆盖 hook 时漏清缓存。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
 
 ## 模型定义边界
 

@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -102,6 +103,32 @@ class DynamicRecordServiceTest {
                         new ReferenceOption("contract-1", "Contract One"),
                         new ReferenceOption("contract-2", "Contract Two")
                 );
+    }
+
+    @Test
+    void shouldCacheDynamicSelectAcrossRuntimeFacadeCallsAndClearAfterUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        AtomicReference<String> storedCode = new AtomicReference<>("C-001");
+        when(operations.query(anyString(), anyMap()))
+                .thenAnswer(invocation -> List.of(row("contract-1", storedCode.get(), 0, false)));
+        when(operations.patchUpdateItem(eq(SCHEMA), eq("app_contract"), eq("contract-1"), anyMap()))
+                .thenAnswer(invocation -> {
+                    storedCode.set(String.valueOf(invocation.<Map<String, Object>>getArgument(3).get("code")));
+                    return 1;
+                });
+        DynamicRecordService service = service(operations, contractEntity());
+
+        DynamicRecord first = service.select(MODULE, "contract", "contract-1");
+        first.setValue("code", "MUTATED-CALLER");
+        DynamicRecord second = service.select(MODULE, "contract", "contract-1");
+        assertThat(second.getValue("code")).isEqualTo("C-001");
+
+        second.setValue("code", "C-002");
+        service.update(MODULE, "contract", second);
+        DynamicRecord third = service.select(MODULE, "contract", "contract-1");
+
+        assertThat(third.getValue("code")).isEqualTo("C-002");
+        verify(operations, org.mockito.Mockito.times(2)).query(anyString(), anyMap());
     }
 
     @SuppressWarnings("unchecked")

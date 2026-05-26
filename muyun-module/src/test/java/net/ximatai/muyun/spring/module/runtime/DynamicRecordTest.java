@@ -2,11 +2,14 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -52,6 +55,26 @@ class DynamicRecordTest {
                 .hasMessageContaining("required dynamic field must not be null");
     }
 
+    @Test
+    void shouldDeepCopyMutableDynamicValues() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("items", new java.util.ArrayList<>(List.of("A")));
+        DynamicRecord record = new DynamicRecord(jsonEntity())
+                .setValue("payload", payload);
+
+        DynamicRecord copy = record.copy();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> copiedPayload = (Map<String, Object>) copy.getValue("payload");
+        @SuppressWarnings("unchecked")
+        List<String> copiedItems = (List<String>) copiedPayload.get("items");
+        copiedItems.add("B");
+
+        @SuppressWarnings("unchecked")
+        List<String> originalItems = (List<String>) ((Map<String, Object>) record.getValue("payload")).get("items");
+        assertThat(originalItems).containsExactly("A");
+        assertThat(copiedItems).containsExactly("A", "B");
+    }
+
     private EntityDefinition contractEntity() {
         return new EntityDefinition(
                 "contract",
@@ -62,6 +85,15 @@ class DynamicRecordTest {
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                         FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
                 )
+        );
+    }
+
+    private EntityDefinition jsonEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.of("payload", FieldType.JSON, "Payload"))
         );
     }
 }

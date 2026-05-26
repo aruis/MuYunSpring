@@ -6,10 +6,14 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DynamicRecordRuntime {
+    private static final AtomicLong CACHE_NAMESPACE_SEQUENCE = new AtomicLong();
+
     private final IDatabaseOperations<?> operations;
     private final DynamicModuleRegistry registry;
+    private final String cacheNamespacePrefix;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
@@ -18,6 +22,7 @@ public class DynamicRecordRuntime {
     public DynamicRecordRuntime(IDatabaseOperations<?> operations, DynamicModuleRegistry registry) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
+        this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
     public DynamicRecordRuntime register(ModuleDefinition module) {
@@ -51,7 +56,8 @@ public class DynamicRecordRuntime {
                 moduleAlias,
                 lifecycle,
                 module,
-                childEntityCode -> entityService(moduleAlias, childEntityCode)
+                childEntityCode -> entityService(moduleAlias, childEntityCode),
+                cacheNamespacePrefix
         );
     }
 }
