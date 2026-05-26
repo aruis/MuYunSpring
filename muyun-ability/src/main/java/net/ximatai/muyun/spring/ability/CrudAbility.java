@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.model.BaseModel;
+import net.ximatai.muyun.spring.common.model.TreeModel;
 
 import java.time.Instant;
 
@@ -24,6 +25,7 @@ public interface CrudAbility<T extends BaseModel> {
         entity.setCreatedAt(entity.getCreatedAt() == null ? now : entity.getCreatedAt());
         entity.setUpdatedAt(now);
         beforeInsert(entity);
+        validateTreePlacementIfNeeded(entity);
         return getDao().insert(entity);
     }
 
@@ -38,7 +40,9 @@ public interface CrudAbility<T extends BaseModel> {
 
     default int update(T entity) {
         entity.setUpdatedAt(Instant.now());
+        entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1);
         beforeUpdate(entity);
+        validateTreePlacementIfNeeded(entity);
         return getDao().updateById(entity);
     }
 
@@ -50,13 +54,16 @@ public interface CrudAbility<T extends BaseModel> {
         }
         entity.setDeleted(Boolean.TRUE);
         entity.setUpdatedAt(Instant.now());
+        entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1);
         return getDao().updateById(entity);
     }
 
     default PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-        Criteria scoped = criteria == null ? Criteria.of() : criteria;
-        scoped.eq("deleted", Boolean.FALSE);
-        return getDao().pageQuery(scoped, pageRequest, sorts);
+        return getDao().pageQuery(activeCriteria(criteria), pageRequest, sorts);
+    }
+
+    default long count(Criteria criteria) {
+        return getDao().count(activeCriteria(criteria));
     }
 
     default void beforeInsert(T entity) {
@@ -69,5 +76,21 @@ public interface CrudAbility<T extends BaseModel> {
     }
 
     default void afterSelect(T entity) {
+    }
+
+    default Criteria activeCriteria(Criteria criteria) {
+        Criteria scoped = Criteria.of();
+        if (criteria != null && !criteria.isEmpty()) {
+            scoped.andGroup(criteria.getRoot());
+        }
+        scoped.andGroup(group -> group.eq("deleted", Boolean.FALSE).orIsNull("deleted"));
+        return scoped;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void validateTreePlacementIfNeeded(T entity) {
+        if (entity instanceof TreeModel && this instanceof TreeAbility treeAbility) {
+            treeAbility.validateTreePlacement((TreeModel) entity);
+        }
     }
 }

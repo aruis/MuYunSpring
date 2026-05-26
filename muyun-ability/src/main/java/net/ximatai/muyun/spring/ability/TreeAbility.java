@@ -2,17 +2,23 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.TreeModel;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public interface TreeAbility<T extends TreeModel> extends CrudAbility<T> {
     String ROOT_ID = "root";
 
     default List<T> children(String parentId) {
-        return getDao().query(Criteria.of().eq("parentId", parentId), new PageRequest(0, Integer.MAX_VALUE));
+        Criteria criteria = activeCriteria(Criteria.of().eq("parentId", parentId));
+        Sort[] sorts = this instanceof SortAbility<?> sortAbility
+                ? new Sort[]{Sort.asc(sortAbility.getSortField())}
+                : new Sort[0];
+        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), sorts);
     }
 
     default List<String> ancestorIds(String id) {
@@ -22,16 +28,19 @@ public interface TreeAbility<T extends TreeModel> extends CrudAbility<T> {
         }
 
         List<String> ancestors = new ArrayList<>();
+        Set<String> visited = new LinkedHashSet<>();
         String parentId = current.getParentId();
         while (parentId != null && !parentId.isBlank() && !ROOT_ID.equals(parentId)) {
+            if (!visited.add(parentId)) {
+                throw new AbilityException("Tree cycle detected while resolving ancestors: " + id);
+            }
             T parent = select(parentId);
             if (parent == null) {
                 break;
             }
-            ancestors.add(parent.getId());
+            ancestors.add(0, parent.getId());
             parentId = parent.getParentId();
         }
-        Collections.reverse(ancestors);
         return ancestors;
     }
 
@@ -39,5 +48,39 @@ public interface TreeAbility<T extends TreeModel> extends CrudAbility<T> {
         List<String> ids = new ArrayList<>(ancestorIds(id));
         ids.add(id);
         return ids;
+    }
+
+    default List<String> descendantIds(String id) {
+        List<String> result = new ArrayList<>();
+        collectDescendantIds(id, result, new LinkedHashSet<>());
+        return result;
+    }
+
+    default void validateTreePlacement(T entity) {
+        String id = entity.getId();
+        String parentId = entity.getParentId();
+        if (parentId == null || parentId.isBlank() || ROOT_ID.equals(parentId)) {
+            return;
+        }
+        if (parentId.equals(id)) {
+            throw new AbilityException("Tree node cannot use itself as parent: " + id);
+        }
+        if (ancestorIds(parentId).contains(id)) {
+            throw new AbilityException("Tree node cannot move under its descendant: " + id);
+        }
+    }
+
+    private void collectDescendantIds(String parentId, List<String> result, Set<String> visited) {
+        if (!visited.add(parentId)) {
+            throw new AbilityException("Tree cycle detected while resolving descendants: " + parentId);
+        }
+        for (T child : children(parentId)) {
+            if (visited.contains(child.getId())) {
+                throw new AbilityException("Tree cycle detected while resolving descendants: " + parentId);
+            }
+            result.add(child.getId());
+            collectDescendantIds(child.getId(), result, visited);
+        }
+        visited.remove(parentId);
     }
 }
