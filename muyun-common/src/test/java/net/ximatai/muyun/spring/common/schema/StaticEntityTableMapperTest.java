@@ -26,7 +26,7 @@ class StaticEntityTableMapperTest {
         assertThat(table.getPrimaryKey().getType()).isEqualTo(ColumnType.VARCHAR);
         assertThat(table.getPrimaryKey().getLength()).isEqualTo(32);
         assertThat(columnNames(table))
-                .contains("version", "deleted", "created_by", "created_at", "updated_by", "updated_at")
+                .contains("tenant_id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at")
                 .contains("parent_id", "code", "name", "sort_order");
         assertThat(table.getColumns().stream().filter(column -> column.getName().equals("code")).findFirst())
                 .get()

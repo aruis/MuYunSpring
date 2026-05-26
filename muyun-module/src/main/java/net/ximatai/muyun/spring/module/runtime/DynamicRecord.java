@@ -32,6 +32,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
 
     private String id;
+    private String tenantId;
     private Integer version;
     private Boolean deleted;
     private String createdBy;
@@ -99,6 +100,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
                 records == null ? null : records.stream().map(DynamicRecord::copy).toList()
         ));
         copy.id = id;
+        copy.tenantId = tenantId;
         copy.version = version;
         copy.deleted = deleted;
         copy.createdBy = createdBy;
@@ -266,6 +268,16 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     @Override
     public void setId(String id) {
         this.id = id;
+    }
+
+    @Override
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    @Override
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.common.model;
 
 import net.ximatai.muyun.spring.common.id.Ids;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
 import java.time.Instant;
 
@@ -12,6 +13,7 @@ public final class EntityLifecycle {
         if (model.getId() == null || model.getId().isBlank()) {
             model.setId(Ids.newId());
         }
+        TenantContext.applyToNewEntity(model);
         model.setVersion(model.getVersion() == null ? 0 : model.getVersion());
         model.setDeleted(Boolean.FALSE);
         model.setCreatedAt(model.getCreatedAt() == null ? now : model.getCreatedAt());

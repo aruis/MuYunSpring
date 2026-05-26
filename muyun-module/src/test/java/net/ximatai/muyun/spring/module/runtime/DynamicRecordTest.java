@@ -61,8 +61,10 @@ class DynamicRecordTest {
         payload.put("items", new java.util.ArrayList<>(List.of("A")));
         DynamicRecord record = new DynamicRecord(jsonEntity())
                 .setValue("payload", payload);
+        record.setTenantId("tenant-a");
 
         DynamicRecord copy = record.copy();
+        assertThat(copy.getTenantId()).isEqualTo("tenant-a");
         @SuppressWarnings("unchecked")
         Map<String, Object> copiedPayload = (Map<String, Object>) copy.getValue("payload");
         @SuppressWarnings("unchecked")

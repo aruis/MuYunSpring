@@ -71,7 +71,7 @@ class DynamicSchemaServiceIT {
 
         try (Connection connection = dataSource.getConnection()) {
             assertThat(columns(connection))
-                    .contains("id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
+                    .contains("id", "tenant_id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
                             "code", "name", "amount", "signed_at");
             assertThat(primaryKeys(connection)).containsExactly("id");
             assertThat(uniqueIndexes(connection)).anyMatch(indexName -> indexName.contains("code"));

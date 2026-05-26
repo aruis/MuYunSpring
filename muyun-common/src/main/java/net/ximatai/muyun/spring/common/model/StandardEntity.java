@@ -15,6 +15,9 @@ public abstract class StandardEntity implements EntityContract {
     @Column(name = "id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "ID")
     private String id;
 
+    @Column(name = "tenant_id", type = ColumnType.VARCHAR, length = 64, comment = "Tenant id")
+    private String tenantId;
+
     @Column(name = "version", type = ColumnType.INT, comment = "Optimistic lock version")
     private Integer version;
 

@@ -13,6 +13,8 @@ final class DynamicRecordMapping {
     DynamicRecordMapping(EntityDefinition entity) {
         columns.put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
         columns.put(StandardEntitySchema.ID_COLUMN, StandardEntitySchema.ID_COLUMN);
+        columns.put(StandardEntitySchema.TENANT_ID_FIELD, StandardEntitySchema.TENANT_ID_COLUMN);
+        columns.put(StandardEntitySchema.TENANT_ID_COLUMN, StandardEntitySchema.TENANT_ID_COLUMN);
         columns.put(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN);
         columns.put(StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_COLUMN);
         columns.put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);

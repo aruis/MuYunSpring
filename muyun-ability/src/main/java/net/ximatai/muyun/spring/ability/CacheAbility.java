@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +46,10 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
             return copied;
         }
 
-        T loaded = getDao().findById(id);
+        T loaded = getDao().query(activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
         if (!isCacheVisible(loaded)) {
             return null;
         }
@@ -93,6 +98,6 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         if (this instanceof SoftDeleteAbility<?> && Boolean.TRUE.equals(entity.getDeleted())) {
             return false;
         }
-        return true;
+        return TenantContext.matchesCurrentTenant(entity);
     }
 }

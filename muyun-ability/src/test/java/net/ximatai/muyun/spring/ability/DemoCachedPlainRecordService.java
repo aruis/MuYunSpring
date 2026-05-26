@@ -24,6 +24,7 @@ final class DemoCachedPlainRecordService implements
         }
         DemoPlainRecord copy = new DemoPlainRecord(entity.getTitle());
         copy.setId(entity.getId());
+        copy.setTenantId(entity.getTenantId());
         copy.setVersion(entity.getVersion());
         copy.setDeleted(entity.getDeleted());
         copy.setCreatedBy(entity.getCreatedBy());

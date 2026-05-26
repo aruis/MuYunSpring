@@ -31,7 +31,7 @@ class DynamicTableMapperTest {
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
         assertThat(columnNames(table))
                 .containsExactly(
-                        "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
+                        "tenant_id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
                         "code", "name", "amount", "signed_at", "enabled"
                 );
         assertThat(table.getIndexes())
@@ -56,7 +56,8 @@ class DynamicTableMapperTest {
         List<String> dynamicColumns = new java.util.ArrayList<>();
         dynamicColumns.add(table.getPrimaryKey().getName());
         dynamicColumns.addAll(columnNames(table).stream()
-                .filter(name -> name.equals("version")
+                .filter(name -> name.equals("tenant_id")
+                        || name.equals("version")
                         || name.equals("deleted")
                         || name.equals("created_by")
                         || name.equals("created_at")
@@ -95,9 +96,17 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(FieldDefinition.bool("deleted", "Deleted"))
+                List.of(FieldDefinition.bool("customDeleted", "Deleted").column("deleted"))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("standard column");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("tenantId", "Tenant"))
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("standard field");
     }
 
     @Test

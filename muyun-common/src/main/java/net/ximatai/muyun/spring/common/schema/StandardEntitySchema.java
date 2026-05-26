@@ -10,6 +10,7 @@ import java.util.List;
 
 public final class StandardEntitySchema {
     public static final String ID_FIELD = "id";
+    public static final String TENANT_ID_FIELD = "tenantId";
     public static final String VERSION_FIELD = "version";
     public static final String DELETED_FIELD = "deleted";
     public static final String CREATED_BY_FIELD = "createdBy";
@@ -18,6 +19,7 @@ public final class StandardEntitySchema {
     public static final String UPDATED_AT_FIELD = "updatedAt";
 
     public static final String ID_COLUMN = columnName(field(ID_FIELD));
+    public static final String TENANT_ID_COLUMN = columnName(field(TENANT_ID_FIELD));
     public static final String VERSION_COLUMN = columnName(field(VERSION_FIELD));
     public static final String DELETED_COLUMN = columnName(field(DELETED_FIELD));
     public static final String CREATED_BY_COLUMN = columnName(field(CREATED_BY_FIELD));
@@ -42,6 +44,12 @@ public final class StandardEntitySchema {
     public static List<String> columnNames() {
         return Arrays.stream(StandardEntity.class.getDeclaredFields())
                 .map(StandardEntitySchema::columnName)
+                .toList();
+    }
+
+    public static List<String> fieldNames() {
+        return Arrays.stream(StandardEntity.class.getDeclaredFields())
+                .map(Field::getName)
                 .toList();
     }
 

@@ -13,6 +13,7 @@ public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
     private static final String MODULE_ALIAS_PATTERN = "[a-z][a-z0-9_]{0,62}(\\.[a-z][a-z0-9_]{0,62})+";
     private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardEntitySchema.columnNames());
+    private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
     public void validate(ModuleDefinition module) {
         if (module == null) {
@@ -100,6 +101,9 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("field must not be null");
         }
         requireFieldName(field.fieldName(), "field name");
+        if (STANDARD_FIELDS.contains(field.fieldName())) {
+            throw new ModuleDefinitionException("field name conflicts with standard field: " + field.fieldName());
+        }
         requireIdentifier(field.columnName(), "column name");
         requireText(field.name(), "field title");
         if (field.type() == null) {

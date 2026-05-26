@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.model.EntityContract;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -15,8 +16,8 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
             T cached = (T) cacheAbility.selectWithCache(id);
             return cached;
         }
-        T entity = getDao().findById(id);
-        if (isSoftDeleted(entity)) {
+        T entity = selectActiveRaw(id);
+        if (entity == null) {
             return null;
         }
         afterSelect(entity);
@@ -24,7 +25,13 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
     }
 
     default T selectIgnoreSoftDelete(String id) {
-        return getDao().findById(id);
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        return getDao().query(CrudAbility.super.activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     @Override

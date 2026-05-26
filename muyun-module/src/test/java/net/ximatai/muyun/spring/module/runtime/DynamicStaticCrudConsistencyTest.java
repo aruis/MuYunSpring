@@ -46,6 +46,7 @@ class DynamicStaticCrudConsistencyTest {
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
+        record.setTenantId("tenant-a");
 
         String id = entityService.insert(record);
         DynamicRecord selected = entityService.select(id);
@@ -59,6 +60,7 @@ class DynamicStaticCrudConsistencyTest {
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
         assertThat(insertBody.getValue())
                 .containsEntry("id", id)
+                .containsEntry("tenant_id", "tenant-a")
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE)
                 .containsKeys("created_at", "updated_at");

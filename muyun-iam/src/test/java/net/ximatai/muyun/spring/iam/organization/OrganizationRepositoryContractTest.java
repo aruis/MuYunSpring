@@ -195,6 +195,7 @@ class OrganizationRepositoryContractTest {
     private Map<String, DBColumn> organizationColumns() {
         Map<String, DBColumn> columns = new LinkedHashMap<>();
         columns.put("id", column("id", "VARCHAR", 32, false, true, "ID"));
+        columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
         columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
         columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));
         columns.put("created_by", column("created_by", "VARCHAR", 64, true, false, "Created by"));

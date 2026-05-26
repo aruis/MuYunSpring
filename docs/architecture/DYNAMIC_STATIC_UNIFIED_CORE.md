@@ -78,7 +78,7 @@ DynamicRecordService
 
 建表是平台责任，不是业务 service 责任。表名、字段名等 SQL 标识符必须走白名单校验。破坏性 DDL 必须有明确治理模式，不能作为普通保存动作的副作用。
 
-静态和动态两条路径的共同交汇点是 MuYunDatabase 的 `TableWrapper`。平台标准字段由 `PlatformTableValidator` 统一校验，避免两条路径演化出不同的基础字段、主键或生命周期列。
+静态和动态两条路径的共同交汇点是 MuYunDatabase 的 `TableWrapper`。平台标准字段由 `PlatformTableValidator` 统一校验，避免两条路径演化出不同的基础字段、主键、租户列或生命周期列。
 
 静态 DAO 继承的 `ensureTable()` 保留为 MuYunDatabase 提供的开箱入口，适合单个 repository 自检或轻量场景。
 平台级初始化、批量拉齐、dry-run、strict migration 和后续审计治理，应统一从 `StaticSchemaService` 进入。
@@ -90,7 +90,9 @@ DynamicRecordService
 
 如果某个能力短期只能挂到一侧，应记录为阶段限制，不能把它包装成最终形态。
 
-能力字段属于平台契约，不属于业务配置自由项。静态模型通过 Java 字段和注解声明能力字段；动态模型一旦开启字段声明能力，必须使用同一组标准字段名、列名和类型。例如树能力统一使用 `parentId` / `parent_id`，并自动包含排序能力的 `sortOrder` / `sort_order`。后续工作流等需要标准字段的能力也按同一原则处理；软删除、生命周期和缓存属于基线能力，不要求在动态元数据中重复声明。
+能力字段属于平台契约，不属于业务配置自由项。静态模型通过 Java 字段和注解声明能力字段；动态模型一旦开启字段声明能力，必须使用同一组标准字段名、列名和类型。例如树能力统一使用 `parentId` / `parent_id`，并自动包含排序能力的 `sortOrder` / `sort_order`。`tenantId` / `tenant_id` 属于所有平台实体的基础字段，不由业务元数据重复声明。后续工作流等需要标准字段的能力也按同一原则处理；软删除、生命周期和缓存属于基线能力，不要求在动态元数据中重复声明。
+
+租户过滤属于默认 Ability 作用域，不属于业务 DAO 的手写条件。运行时存在当前租户时，插入会补齐 `tenantId`，默认查询、分页、计数、按 ID 读取、更新和删除都应在同一租户作用域内执行；无租户上下文时按系统态处理。
 
 ## 运行时边界
 

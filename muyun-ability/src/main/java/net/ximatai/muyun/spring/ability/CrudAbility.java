@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.EntityContract;
 import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,7 +50,7 @@ public interface CrudAbility<T extends EntityContract> {
             T cached = (T) cacheAbility.selectWithCache(id);
             return cached;
         }
-        T entity = getDao().findById(id);
+        T entity = selectActiveRaw(id);
         if (entity == null) {
             return null;
         }
@@ -57,6 +59,13 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default int update(T entity) {
+        T existing = selectExistingForScopedMutation(entity);
+        if (TenantContext.currentTenantId().isPresent() && existing == null) {
+            return 0;
+        }
+        if (existing != null) {
+            entity.setTenantId(existing.getTenantId());
+        }
         EntityLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
@@ -71,7 +80,7 @@ public interface CrudAbility<T extends EntityContract> {
 
     default int delete(String id) {
         beforeDelete(id);
-        T entity = getDao().findById(id);
+        T entity = selectActiveRaw(id);
         if (entity == null) {
             return 0;
         }
@@ -151,7 +160,26 @@ public interface CrudAbility<T extends EntityContract> {
         if (criteria != null && !criteria.isEmpty()) {
             scoped.andGroup(criteria.getRoot());
         }
+        TenantContext.currentTenantId()
+                .ifPresent(tenantId -> scoped.eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId));
         return scoped;
+    }
+
+    default T selectActiveRaw(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        return getDao().query(activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private T selectExistingForScopedMutation(T entity) {
+        if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
+            return null;
+        }
+        return TenantContext.currentTenantId().isPresent() ? selectActiveRaw(entity.getId()) : null;
     }
 
     private void prepareAbilityDefaults(T entity) {

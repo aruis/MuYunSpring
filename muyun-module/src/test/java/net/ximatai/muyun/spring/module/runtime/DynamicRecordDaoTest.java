@@ -41,6 +41,7 @@ class DynamicRecordDaoTest {
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
+        record.setTenantId("tenant-a");
 
         String id = entityService(operations).insert(record);
 
@@ -49,6 +50,7 @@ class DynamicRecordDaoTest {
         assertThat(id).hasSize(32);
         assertThat(body.getValue())
                 .containsEntry("id", id)
+                .containsEntry("tenant_id", "tenant-a")
                 .containsEntry("code", "C-001")
                 .containsEntry("amount", BigDecimal.TEN)
                 .containsEntry("version", 0)
@@ -128,6 +130,7 @@ class DynamicRecordDaoTest {
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
+        record.setTenantId("tenant-a");
         record.setVersion(3);
 
         entityService(operations).update(record);
@@ -140,7 +143,7 @@ class DynamicRecordDaoTest {
                 .containsEntry("version", 4);
         assertThat(body.getValue())
                 .containsKey("updated_at")
-                .doesNotContainKeys("id", "created_at", "created_by");
+                .doesNotContainKeys("id", "tenant_id", "created_at", "created_by");
     }
 
     @Test
@@ -262,7 +265,9 @@ class DynamicRecordDaoTest {
         DynamicRecordDao dao = dao(operations);
         DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
 
-        assertThat(entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount")).getRecords())
+        assertThat(entityService.pageQuery(Criteria.of().eq("tenantId", "tenant-a").eq("code", "C-001"),
+                        PageRequest.of(1, 10),
+                        Sort.desc("amount")).getRecords())
                 .hasSize(1)
                 .first()
                 .extracting(record -> record.getValue("code"))
@@ -275,6 +280,7 @@ class DynamicRecordDaoTest {
         verify(operations, org.mockito.Mockito.times(2)).query(querySql.capture(), anyMap());
         assertThat(querySql.getAllValues().getFirst())
                 .contains("FROM \"public\".\"app_contract\"")
+                .contains("\"tenant_id\" =")
                 .contains("\"code\" =")
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL")
@@ -294,6 +300,7 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
+                "tenant_id", "tenant-a",
                 "code", "C-001",
                 "amount", BigDecimal.TEN,
                 "deleted", Boolean.TRUE,
@@ -302,14 +309,16 @@ class DynamicRecordDaoTest {
         DynamicRecordDao dao = dao(operations);
         DynamicEntityService entityService = new DynamicEntityService(dao, "sales.contract");
 
-        assertThat(dao.findById("contract-1").getDeleted()).isTrue();
+        DynamicRecord raw = dao.findById("contract-1");
+        assertThat(raw.getDeleted()).isTrue();
+        assertThat(raw.getTenantId()).isEqualTo("tenant-a");
         assertThat(entityService.select("contract-1")).isNull();
         assertThat(entityService.count(Criteria.of().eq("code", "C-001"))).isZero();
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.times(2)).query(sql.capture(), anyMap());
         assertThat(sql.getAllValues().get(0)).doesNotContain("\"deleted\"");
-        assertThat(sql.getAllValues().get(1)).doesNotContain("\"deleted\"");
+        assertThat(sql.getAllValues().get(1)).contains("\"deleted\"");
         ArgumentCaptor<String> countSql = ArgumentCaptor.forClass(String.class);
         verify(operations).row(countSql.capture(), anyMap());
         assertThat(countSql.getValue())

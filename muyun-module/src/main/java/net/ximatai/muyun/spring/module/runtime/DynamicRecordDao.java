@@ -139,6 +139,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         if (includeId) {
             body.put(StandardEntitySchema.ID_COLUMN, record.getId());
         }
+        body.put(StandardEntitySchema.TENANT_ID_COLUMN, record.getTenantId());
         body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
         body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
         body.put(StandardEntitySchema.CREATED_BY_COLUMN, record.getCreatedBy());
@@ -191,6 +192,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         }
         DynamicRecord record = new DynamicRecord(entity);
         record.setId(stringValue(row.get(StandardEntitySchema.ID_COLUMN)));
+        record.setTenantId(stringValue(row.get(StandardEntitySchema.TENANT_ID_COLUMN)));
         record.setVersion(numberValue(row.get(StandardEntitySchema.VERSION_COLUMN)));
         record.setDeleted((Boolean) row.get(StandardEntitySchema.DELETED_COLUMN));
         record.setCreatedBy(stringValue(row.get(StandardEntitySchema.CREATED_BY_COLUMN)));

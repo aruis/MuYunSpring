@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -29,6 +30,32 @@ class AbilityContractTest {
         assertThat(organization.getVersion()).isEqualTo(1);
         assertThat(service.select(id)).isNull();
         assertThat(service.selectIgnoreSoftDelete(id)).isSameAs(organization);
+    }
+
+    @Test
+    void crudAbilityShouldApplyTenantContextAcrossDefaultEntrypoints() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            id = service.insert(new DemoPlainRecord("Tenant A"));
+            assertThat(service.rawDao().findById(id).getTenantId()).isEqualTo("tenant-a");
+            assertThat(service.select(id)).isNotNull();
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.select(id)).isNull();
+            assertThat(service.selectIgnoreSoftDelete(id)).isNull();
+            assertThat(service.count(Criteria.of())).isZero();
+            DemoPlainRecord update = new DemoPlainRecord("Tenant B overwrite");
+            update.setId(id);
+            assertThat(service.update(update)).isZero();
+            assertThat(service.delete(id)).isZero();
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select(id).getTitle()).isEqualTo("Tenant A");
+            assertThat(service.count(Criteria.of())).isEqualTo(1);
+        }
     }
 
     @Test

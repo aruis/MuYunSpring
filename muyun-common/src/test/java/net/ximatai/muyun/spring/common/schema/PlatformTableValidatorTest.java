@@ -16,7 +16,7 @@ class PlatformTableValidatorTest {
 
         assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("missing standard column version");
+                .hasMessageContaining("missing standard column tenant_id");
     }
 
     @Test

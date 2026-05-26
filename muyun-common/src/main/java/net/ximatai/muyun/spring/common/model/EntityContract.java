@@ -7,6 +7,10 @@ public interface EntityContract {
 
     void setId(String id);
 
+    String getTenantId();
+
+    void setTenantId(String tenantId);
+
     Integer getVersion();
 
     void setVersion(Integer version);
