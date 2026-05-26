@@ -123,7 +123,7 @@ public class DynamicRecordDao {
 
     public String getSortField() {
         return entity.fields().stream()
-                .filter(FieldDefinition::sortable)
+                .filter(FieldDefinition::isSortable)
                 .map(FieldDefinition::code)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("dynamic entity has no sortable field: " + entity.code()));
@@ -160,7 +160,7 @@ public class DynamicRecordDao {
 
     public String getTitleField() {
         return entity.fields().stream()
-                .filter(FieldDefinition::title)
+                .filter(FieldDefinition::isTitle)
                 .map(FieldDefinition::code)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("dynamic entity has no title field: " + entity.code()));

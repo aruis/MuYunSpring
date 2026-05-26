@@ -7,7 +7,6 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -97,8 +96,8 @@ class DynamicStaticCrudConsistencyTest {
                 TABLE,
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
     }

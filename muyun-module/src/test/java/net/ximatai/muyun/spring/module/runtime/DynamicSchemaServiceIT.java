@@ -1,12 +1,13 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.MigrationOptions;
+import net.ximatai.muyun.database.core.orm.OrmException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -25,6 +26,7 @@ import java.sql.Connection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = DynamicSchemaServiceIT.TestApplication.class)
@@ -56,10 +58,10 @@ class DynamicSchemaServiceIT {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired().asUnique(),
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
-                        new FieldDefinition("signed_at", "signed_at", FieldType.TIMESTAMP, "Signed At").asIndexed()
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.string("name", "Name").length(128).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.timestamp("signed_at", "Signed At").indexed()
                 )
         );
 
@@ -105,16 +107,46 @@ class DynamicSchemaServiceIT {
         assertThat(dao.count(Criteria.of().eq("code", "C-IT-001"))).isZero();
     }
 
+    @Test
+    void shouldSupportDryRunAndStrictDynamicSchemaMigration() throws Exception {
+        EntityDefinition dryRunEntity = entity("app_contract_dry_run_it");
+
+        var dryRun = schemaService.ensureTable(dryRunEntity, MigrationOptions.dryRun());
+
+        assertThat(dryRun.isDryRun()).isTrue();
+        assertThat(dryRun.isChanged()).isTrue();
+        try (Connection connection = dataSource.getConnection()) {
+            assertThat(tableExists(connection, "app_contract_dry_run_it")).isFalse();
+        }
+
+        EntityDefinition looseEntity = entity("app_contract_strict_it", false);
+        EntityDefinition strictEntity = entity("app_contract_strict_it", true);
+        schemaService.ensureTable(looseEntity);
+
+        assertThatThrownBy(() -> schemaService.ensureTable(strictEntity, MigrationOptions.strict()))
+                .isInstanceOf(OrmException.class)
+                .extracting("code")
+                .isEqualTo(OrmException.Code.STRICT_MIGRATION_REJECTED);
+    }
+
     private EntityDefinition entity(String tableName) {
+        return entity(tableName, true);
+    }
+
+    private EntityDefinition entity(String tableName, boolean nameRequired) {
+        FieldDefinition name = FieldDefinition.string("name", "Name").length(128);
+        if (nameRequired) {
+            name = name.required();
+        }
         return new EntityDefinition(
                 "contract",
                 tableName,
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired().asUnique(),
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
-                        new FieldDefinition("signed_at", "signed_at", FieldType.TIMESTAMP, "Signed At").asIndexed()
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        name,
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.timestamp("signed_at", "Signed At").indexed()
                 )
         );
     }
@@ -149,6 +181,12 @@ class DynamicSchemaServiceIT {
                 }
             }
             return names;
+        }
+    }
+
+    private boolean tableExists(Connection connection, String tableName) throws Exception {
+        try (var tables = connection.getMetaData().getTables(null, "public", tableName, null)) {
+            return tables.next();
         }
     }
 

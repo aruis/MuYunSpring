@@ -2,16 +2,15 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.builder.Column;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
-import net.ximatai.muyun.spring.common.model.StandardBaseModel;
+import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,7 +64,7 @@ class DynamicTableMapperTest {
                         || name.equals("updated_at"))
                 .toList());
 
-        assertThat(dynamicColumns).containsExactlyElementsOf(staticBaseModelColumns());
+        assertThat(dynamicColumns).containsExactlyElementsOf(StandardModelSchema.columnNames());
     }
 
     @Test
@@ -83,8 +82,8 @@ class DynamicTableMapperTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name"),
-                        new FieldDefinition("title", "name", FieldType.STRING, "Title")
+                        FieldDefinition.string("name", "Name"),
+                        FieldDefinition.string("title", "Title").column("name")
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("duplicate column name");
@@ -96,7 +95,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("deleted", "deleted", FieldType.BOOLEAN, "Deleted"))
+                List.of(FieldDefinition.bool("deleted", "Deleted"))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("standard column");
     }
@@ -105,7 +104,7 @@ class DynamicTableMapperTest {
     void shouldValidateModuleEntityUniqueness() {
         EntityDefinition entity = contractEntity();
         ModuleDefinition module = new ModuleDefinition(
-                "contract_app",
+                "contract.app",
                 "Contract App",
                 List.of(entity, new EntityDefinition("contract_copy", "app_contract", "Contract Copy", List.of()))
         );
@@ -116,12 +115,57 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldRequireDottedModuleAlias() {
+        ModuleDefinition module = new ModuleDefinition(
+                "contract_app",
+                "Contract App",
+                List.of(contractEntity())
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid module alias");
+    }
+
+    @Test
+    void shouldSupportConciseFieldFactoriesAndEntityCapabilities() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.string("name", "Name").length(128).required().title(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(
+                EntityCapability.CRUD,
+                EntityCapability.SORT,
+                EntityCapability.REFERENCE
+        );
+
+        TableWrapper table = mapper.toTable(entity);
+
+        assertThat(entity.supports(EntityCapability.SORT)).isTrue();
+        assertThat(table.getIndexes())
+                .anySatisfy(index -> {
+                    assertThat(index.isUnique()).isTrue();
+                    assertThat(index.getColumns()).containsExactly("code");
+                })
+                .anySatisfy(index -> {
+                    assertThat(index.isUnique()).isFalse();
+                    assertThat(index.getColumns()).containsExactly("sort_order");
+                });
+    }
+
+    @Test
     void shouldRejectInvalidFieldTypeOptionsBeforeDdl() {
         assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount", false, false, false, false, false, null, 2, 10))
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(2, 10))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("scale must not exceed precision");
 
@@ -129,7 +173,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("enabled", "enabled", FieldType.BOOLEAN, "Enabled").length(8))
+                List.of(FieldDefinition.bool("enabled", "Enabled").length(8))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("length only applies");
 
@@ -137,7 +181,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name", false, false, false, false, false, null, 10, 2))
+                List.of(FieldDefinition.string("name", "Name").precision(10, 2))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("precision and scale only apply");
     }
@@ -148,7 +192,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name").asSortable())
+                List.of(FieldDefinition.string("name", "Name").sortable())
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("sortable field must be an integer type");
 
@@ -157,8 +201,8 @@ class DynamicTableMapperTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("sort_order", "sort_order", FieldType.INTEGER, "Sort Order").asSortable(),
-                        new FieldDefinition("rank_order", "rank_order", FieldType.INTEGER, "Rank Order").asSortable()
+                        FieldDefinition.integer("sort_order", "Sort Order").sortable(),
+                        FieldDefinition.integer("rank_order", "Rank Order").sortable()
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one sortable field");
@@ -170,7 +214,7 @@ class DynamicTableMapperTest {
                 "contract",
                 "app_contract",
                 "Contract",
-                List.of(new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").asTitle())
+                List.of(FieldDefinition.decimal("amount", "Amount").title())
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("title field must be a text type");
 
@@ -179,8 +223,8 @@ class DynamicTableMapperTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").asTitle(),
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name").asTitle()
+                        FieldDefinition.string("code", "Code").title(),
+                        FieldDefinition.string("name", "Name").title()
                 )
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("only have one title field");
@@ -192,29 +236,17 @@ class DynamicTableMapperTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired().asUnique(),
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
-                        new FieldDefinition("signed_at", "signed_at", FieldType.TIMESTAMP, "Signed At").asIndexed(),
-                        new FieldDefinition("enabled", "enabled", FieldType.BOOLEAN, "Enabled")
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.string("name", "Name").length(128).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.timestamp("signed_at", "Signed At").indexed(),
+                        FieldDefinition.bool("enabled", "Enabled")
                 )
         );
     }
 
     private List<String> columnNames(TableWrapper table) {
         return table.getColumns().stream().map(Column::getName).toList();
-    }
-
-    private List<String> staticBaseModelColumns() {
-        return java.util.Arrays.stream(StandardBaseModel.class.getDeclaredFields())
-                .map(this::columnName)
-                .toList();
-    }
-
-    private String columnName(Field field) {
-        net.ximatai.muyun.database.core.annotation.Column column =
-                field.getAnnotation(net.ximatai.muyun.database.core.annotation.Column.class);
-        return column.name();
     }
 
     private Column column(TableWrapper table, String name) {

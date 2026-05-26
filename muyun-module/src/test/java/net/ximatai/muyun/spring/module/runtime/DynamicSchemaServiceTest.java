@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,7 @@ class DynamicSchemaServiceTest {
     void shouldEnsureModuleTablesInDefinitionOrder() {
         RecordingDynamicSchemaService service = new RecordingDynamicSchemaService();
         ModuleDefinition module = new ModuleDefinition(
-                "contract_app",
+                "contract.app",
                 "Contract App",
                 List.of(
                         entity("contract", "app_contract"),
@@ -37,7 +36,7 @@ class DynamicSchemaServiceTest {
     void shouldValidateModuleBeforeEnsuringTables() {
         RecordingDynamicSchemaService service = new RecordingDynamicSchemaService();
         ModuleDefinition module = new ModuleDefinition(
-                "contract_app",
+                "contract.app",
                 "Contract App",
                 List.of(
                         entity("contract", "app_contract"),
@@ -56,7 +55,7 @@ class DynamicSchemaServiceTest {
                 code,
                 tableName,
                 code,
-                List.of(new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128))
+                List.of(FieldDefinition.string("name", "Name").length(128))
         );
     }
 

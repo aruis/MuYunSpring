@@ -1,19 +1,20 @@
 package net.ximatai.muyun.spring.module.metadata;
 
+import net.ximatai.muyun.spring.common.schema.StandardModelSchema;
+
 import java.util.HashSet;
 import java.util.Set;
 
 public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
-    private static final Set<String> STANDARD_COLUMNS = Set.of(
-            "id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at"
-    );
+    private static final String MODULE_ALIAS_PATTERN = "[a-z][a-z0-9_]{0,62}(\\.[a-z][a-z0-9_]{0,62})+";
+    private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardModelSchema.columnNames());
 
     public void validate(ModuleDefinition module) {
         if (module == null) {
             throw new ModuleDefinitionException("module must not be null");
         }
-        requireIdentifier(module.code(), "module code");
+        requireModuleAlias(module.moduleAlias(), "module alias");
         requireText(module.name(), "module name");
         Set<String> entityCodes = new HashSet<>();
         Set<String> tableNames = new HashSet<>();
@@ -39,10 +40,10 @@ public class ModuleDefinitionValidator {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
             requireUnique(columnNames, field.columnName(), "column name");
-            if (field.sortable()) {
+            if (field.isSortable()) {
                 sortableFields++;
             }
-            if (field.title()) {
+            if (field.isTitle()) {
                 titleFields++;
             }
         }
@@ -58,9 +59,9 @@ public class ModuleDefinitionValidator {
         if (field == null) {
             throw new ModuleDefinitionException("field must not be null");
         }
-        requireIdentifier(field.code(), "field code");
+        requireIdentifier(field.fieldName(), "field name");
         requireIdentifier(field.columnName(), "column name");
-        requireText(field.name(), "field name");
+        requireText(field.name(), "field title");
         if (field.type() == null) {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
@@ -88,10 +89,10 @@ public class ModuleDefinitionValidator {
         if (field.scale() != null && field.scale() > field.precision()) {
             throw new ModuleDefinitionException("field scale must not exceed precision: " + field.code());
         }
-        if (field.sortable() && field.type() != FieldType.INTEGER && field.type() != FieldType.LONG) {
+        if (field.isSortable() && field.type() != FieldType.INTEGER && field.type() != FieldType.LONG) {
             throw new ModuleDefinitionException("sortable field must be an integer type: " + field.code());
         }
-        if (field.title() && field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
+        if (field.isTitle() && field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
             throw new ModuleDefinitionException("title field must be a text type: " + field.code());
         }
     }
@@ -105,6 +106,13 @@ public class ModuleDefinitionValidator {
     private void requireIdentifier(String value, String name) {
         requireText(value, name);
         if (!value.matches(IDENTIFIER_PATTERN)) {
+            throw new ModuleDefinitionException("invalid " + name + ": " + value);
+        }
+    }
+
+    private void requireModuleAlias(String value, String name) {
+        requireText(value, name);
+        if (!value.matches(MODULE_ALIAS_PATTERN)) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }
     }

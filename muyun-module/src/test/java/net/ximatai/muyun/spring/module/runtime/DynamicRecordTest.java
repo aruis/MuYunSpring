@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -59,9 +58,9 @@ class DynamicRecordTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
-                        new FieldDefinition("signed_at", "signed_at", FieldType.TIMESTAMP, "Signed At")
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.timestamp("signed_at", "Signed At")
                 )
         );
     }

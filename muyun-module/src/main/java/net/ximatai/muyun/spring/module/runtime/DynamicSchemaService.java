@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
-import net.ximatai.muyun.database.core.builder.TableBuilder;
+import net.ximatai.muyun.database.core.orm.MigrationOptions;
+import net.ximatai.muyun.database.core.orm.MigrationResult;
+import net.ximatai.muyun.database.core.orm.SchemaManager;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
@@ -27,7 +29,11 @@ public class DynamicSchemaService {
     }
 
     public boolean ensureTable(EntityDefinition entity) {
-        return new TableBuilder(operations).build(tableMapper.toTable(entity));
+        return ensureTable(entity, MigrationOptions.execute()).isChanged();
+    }
+
+    public MigrationResult ensureTable(EntityDefinition entity, MigrationOptions options) {
+        return new SchemaManager(operations).ensureTable(tableMapper.toTable(entity), options);
     }
 
     public Map<String, Boolean> ensureModule(ModuleDefinition module) {

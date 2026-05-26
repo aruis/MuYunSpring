@@ -73,7 +73,7 @@ public class DynamicRecord implements BaseModel {
 
     void validateForInsert() {
         for (FieldDefinition field : fields.values()) {
-            if (field.required() && values.get(field.code()) == null) {
+            if (field.isRequired() && values.get(field.code()) == null) {
                 throw new IllegalArgumentException("required dynamic field is missing: " + field.code());
             }
         }
@@ -81,7 +81,7 @@ public class DynamicRecord implements BaseModel {
 
     private void validateValue(FieldDefinition field, Object value) {
         if (value == null) {
-            if (field.required()) {
+            if (field.isRequired()) {
                 throw new IllegalArgumentException("required dynamic field must not be null: " + field.code());
             }
             return;

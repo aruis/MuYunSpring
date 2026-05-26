@@ -8,7 +8,6 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -353,8 +352,8 @@ class DynamicRecordDaoTest {
                 TABLE,
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
     }
@@ -365,9 +364,9 @@ class DynamicRecordDaoTest {
                 TABLE,
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2),
-                        new FieldDefinition("sort_order", "sort_order", FieldType.INTEGER, "Sort Order").asSortable()
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.integer("sort_order", "Sort Order").sortable()
                 )
         );
     }
@@ -378,9 +377,9 @@ class DynamicRecordDaoTest {
                 TABLE,
                 "Contract",
                 List.of(
-                        new FieldDefinition("code", "code", FieldType.STRING, "Code").length(64).asRequired(),
-                        new FieldDefinition("name", "name", FieldType.STRING, "Name").length(128).asRequired().asTitle(),
-                        new FieldDefinition("amount", "amount", FieldType.DECIMAL, "Amount").precision(18, 2)
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("name", "Name").length(128).required().title(),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
     }
