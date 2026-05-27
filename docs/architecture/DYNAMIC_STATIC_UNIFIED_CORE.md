@@ -55,7 +55,7 @@ DynamicRecordService
 `DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用、父子聚合和引用依赖采集等平台能力，并按元数据能力开关或关系配置决定哪些入口可用。动态父子聚合按元数据关系配置接入同一套 `ChildRelation`，不另起一套动态子表逻辑。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
 
-生命周期分为平台内部链和业务扩展 hook。CRUD 标准入口先调度平台内部链，再调用业务 hook；父子聚合等平台能力挂在内部链上，业务覆盖 `afterInsert`、`afterUpdate`、`afterDelete`、`afterSelect` 时不需要手动调用 `super` 来维持平台能力正确性。
+生命周期分为平台内部链和业务扩展 hook。CRUD 标准入口先调度平台内部链，再调用业务 hook；父子聚合等平台能力挂在内部链上，业务覆盖 `afterInsert`、`afterUpdate`、`afterDelete`、`afterSelect` 时不需要手动调用 `super` 来维持平台能力正确性。业务 `after*` hook 是平台能力完成后的扩展点，不用于观察或拦截平台内部链执行前的 RAW 对象状态。
 
 缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
 

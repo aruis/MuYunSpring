@@ -199,6 +199,29 @@ class AbilityContractTest {
     }
 
     @Test
+    void platformSelectShouldLoadChildrenWhenParentRecordComesFromCache() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoice.setLines(null);
+        DemoInvoice firstSelected = invoiceService.select(invoiceId);
+        assertThat(firstSelected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line");
+
+        invoice.setTitle("Changed behind cache");
+        DemoInvoice secondSelected = invoiceService.select(invoiceId);
+
+        assertThat(secondSelected.getTitle()).isEqualTo("Invoice");
+        assertThat(secondSelected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line");
+        assertThat(invoiceService.businessHookCount()).isEqualTo(3);
+    }
+
+    @Test
     void childrenAbilityShouldRejectDuplicateAndForeignChildIds() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoice firstInvoice = new DemoInvoice("First invoice", List.of(new DemoInvoiceLine("First line")));

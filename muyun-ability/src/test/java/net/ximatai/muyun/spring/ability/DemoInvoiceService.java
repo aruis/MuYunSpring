@@ -5,7 +5,8 @@ import java.util.List;
 final class DemoInvoiceService implements
         CrudAbility<DemoInvoice>,
         SoftDeleteAbility<DemoInvoice>,
-        ChildrenAbility<DemoInvoice> {
+        ChildrenAbility<DemoInvoice>,
+        CacheAbility<DemoInvoice> {
     private final InMemoryBaseDao<DemoInvoice> dao = new InMemoryBaseDao<>();
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
     private int businessHookCount;
@@ -30,6 +31,23 @@ final class DemoInvoiceService implements
 
     DemoInvoiceLineService lineService() {
         return lineService;
+    }
+
+    @Override
+    public DemoInvoice copyForCache(DemoInvoice entity) {
+        if (entity == null) {
+            return null;
+        }
+        DemoInvoice copy = new DemoInvoice(entity.getTitle(), null);
+        copy.setId(entity.getId());
+        copy.setTenantId(entity.getTenantId());
+        copy.setVersion(entity.getVersion());
+        copy.setDeleted(entity.getDeleted());
+        copy.setCreatedBy(entity.getCreatedBy());
+        copy.setCreatedAt(entity.getCreatedAt());
+        copy.setUpdatedBy(entity.getUpdatedBy());
+        copy.setUpdatedAt(entity.getUpdatedAt());
+        return copy;
     }
 
     @Override
