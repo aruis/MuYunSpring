@@ -8,6 +8,7 @@ final class DemoInvoiceService implements
         ChildrenAbility<DemoInvoice> {
     private final InMemoryBaseDao<DemoInvoice> dao = new InMemoryBaseDao<>();
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
+    private int businessHookCount;
 
     @Override
     public BaseDao<DemoInvoice, String> getDao() {
@@ -29,5 +30,29 @@ final class DemoInvoiceService implements
 
     DemoInvoiceLineService lineService() {
         return lineService;
+    }
+
+    @Override
+    public void afterInsert(String id, DemoInvoice entity) {
+        businessHookCount++;
+    }
+
+    @Override
+    public void afterUpdate(DemoInvoice entity, int updated) {
+        businessHookCount++;
+    }
+
+    @Override
+    public void afterDelete(String id, DemoInvoice entity, int deleted) {
+        businessHookCount++;
+    }
+
+    @Override
+    public void afterSelect(DemoInvoice entity) {
+        businessHookCount++;
+    }
+
+    int businessHookCount() {
+        return businessHookCount;
     }
 }

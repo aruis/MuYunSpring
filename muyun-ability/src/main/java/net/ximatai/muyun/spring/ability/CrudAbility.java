@@ -27,6 +27,7 @@ public interface CrudAbility<T extends EntityContract> {
         beforeInsert(entity);
         validateTreePlacementIfNeeded(entity);
         String id = getDao().insert(entity);
+        afterPlatformInsert(id, entity);
         afterInsert(id, entity);
         afterChanged(entity);
         CacheInvalidationSupport.clearAfterChanged(this, entity);
@@ -54,6 +55,7 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null) {
             return null;
         }
+        afterPlatformSelect(entity);
         afterSelect(entity);
         return entity;
     }
@@ -70,6 +72,7 @@ public interface CrudAbility<T extends EntityContract> {
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
         int updated = getDao().updateById(entity);
+        afterPlatformUpdate(entity, updated);
         afterUpdate(entity, updated);
         if (updated > 0) {
             afterChanged(entity);
@@ -85,6 +88,7 @@ public interface CrudAbility<T extends EntityContract> {
             return 0;
         }
         int deleted = getDao().deleteById(id);
+        afterPlatformDelete(id, entity, deleted);
         afterDelete(id, entity, deleted);
         if (deleted > 0) {
             afterChanged(entity);
@@ -126,6 +130,18 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default void beforeDelete(String id) {
+    }
+
+    default void afterPlatformInsert(String id, T entity) {
+    }
+
+    default void afterPlatformUpdate(T entity, int updated) {
+    }
+
+    default void afterPlatformDelete(String id, T entity, int deleted) {
+    }
+
+    default void afterPlatformSelect(T entity) {
     }
 
     default void afterInsert(String id, T entity) {

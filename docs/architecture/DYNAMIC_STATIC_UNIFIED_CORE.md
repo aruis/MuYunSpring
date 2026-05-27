@@ -29,7 +29,7 @@ M1 先建设以下底座：
 
 1. `EntityContract`：统一基础字段和生命周期字段。
 2. `BaseDao`：统一静态模型的数据访问入口，默认基于 MuYunDatabase。
-3. `CrudAbility`：统一插入、查询、更新、硬删除、分页、计数和 hook。
+3. `CrudAbility`：统一插入、查询、更新、硬删除、分页、计数、平台内部链和业务扩展 hook。
 4. `SoftDeleteAbility`：统一软删除过滤、软删除写入和忽略软删读取。
 5. `SortAbility`：统一排序字段、列表排序和相邻移动。
 6. `TreeAbility`：统一父子关系、祖先、后代、环保护和树位置校验；树天然具备同级排序语义。
@@ -55,7 +55,9 @@ DynamicRecordService
 `DynamicEntityService` 是单个动态实体的运行态服务，承接 CRUD、软删除、树、排序、引用、父子聚合和引用依赖采集等平台能力，并按元数据能力开关或关系配置决定哪些入口可用。动态父子聚合按元数据关系配置接入同一套 `ChildRelation`，不另起一套动态子表逻辑。
 `DynamicRecordDao` 只负责动态表 SQL 映射和数据访问，不承接生命周期、权限或业务编排。
 
-缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效，避免业务覆盖 hook 时漏清缓存。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
+生命周期分为平台内部链和业务扩展 hook。CRUD 标准入口先调度平台内部链，再调用业务 hook；父子聚合等平台能力挂在内部链上，业务覆盖 `afterInsert`、`afterUpdate`、`afterDelete`、`afterSelect` 时不需要手动调用 `super` 来维持平台能力正确性。
+
+缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
 
 父子聚合与缓存的关系采用“缓存父记录、按次装配子记录”的策略。父记录命中缓存后仍会重新按关系读取 children，不把装配后的 children 写回父缓存；这样子表变更不需要反向清理父缓存，也避免父缓存被聚合状态污染。聚合装配出的 child 是否继续执行 child service 的完整 `afterSelect` 语义，需要单独设计递归边界，不能在无深度控制的情况下隐式递归。
 

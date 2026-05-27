@@ -122,7 +122,6 @@ public class DynamicEntityService implements
     @Override
     public void afterSelect(DynamicRecord record) {
         lifecycle.afterSelect(record);
-        ChildrenAbility.super.afterSelect(record);
     }
 
     @Override

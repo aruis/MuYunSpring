@@ -177,6 +177,28 @@ class AbilityContractTest {
     }
 
     @Test
+    void platformLifecycleShouldNotDependOnBusinessHooksCallingSuper() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+
+        String invoiceId = invoiceService.insert(invoice);
+        assertThat(firstLine.getInvoiceId()).isEqualTo(invoiceId);
+
+        invoice.setLines(null);
+        assertThat(invoiceService.select(invoiceId).getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line");
+
+        invoice.setLines(List.of());
+        invoiceService.update(invoice);
+        assertThat(invoiceService.lineService().select(firstLine.getId())).isNull();
+
+        invoiceService.delete(invoiceId);
+        assertThat(invoiceService.businessHookCount()).isEqualTo(4);
+    }
+
+    @Test
     void childrenAbilityShouldRejectDuplicateAndForeignChildIds() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoice firstInvoice = new DemoInvoice("First invoice", List.of(new DemoInvoiceLine("First line")));

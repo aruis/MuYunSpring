@@ -10,14 +10,14 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     @Override
-    default void afterInsert(String id, P parent) {
+    default void afterPlatformInsert(String id, P parent) {
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
             relation.insertChildren(id, parent);
         }
     }
 
     @Override
-    default void afterUpdate(P parent, int updated) {
+    default void afterPlatformUpdate(P parent, int updated) {
         if (updated <= 0) {
             return;
         }
@@ -27,7 +27,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     @Override
-    default void afterDelete(String id, P parent, int deleted) {
+    default void afterPlatformDelete(String id, P parent, int deleted) {
         if (deleted <= 0) {
             return;
         }
@@ -39,7 +39,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     @Override
-    default void afterSelect(P parent) {
+    default void afterPlatformSelect(P parent) {
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
             relation.loadChildren(parent);
         }

@@ -42,6 +42,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
                 return null;
             }
             T copied = copyForCache(cached);
+            afterPlatformSelect(copied);
             afterSelect(copied);
             return copied;
         }
@@ -55,6 +56,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         }
         itemCache.put(id, copyForCache(loaded));
         T copied = copyForCache(loaded);
+        afterPlatformSelect(copied);
         afterSelect(copied);
         return copied;
     }
@@ -70,6 +72,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         }
         return cached.stream()
                 .map(this::copyForCache)
+                .peek(this::afterPlatformSelect)
                 .peek(this::afterSelect)
                 .toList();
     }

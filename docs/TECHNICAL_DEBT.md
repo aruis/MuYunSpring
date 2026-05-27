@@ -6,7 +6,6 @@
 
 | 编号 | 问题 | 风险 | 回收条件 |
 | --- | --- | --- | --- |
-| TD-001 | `ChildrenAbility` 依赖 `afterInsert/afterUpdate/afterDelete/afterSelect` 默认 hook 组合；业务服务覆盖 hook 时需要手动调用 super | 父子聚合可能因覆写纪律不足而静默失效 | 进入生命周期边界重构时，拆出平台内部 hook 链和业务扩展 hook |
 | TD-002 | 聚合装配出的 child 当前按 RAW 查询读取，不执行 child service 完整 `afterSelect` / nested relation 语义 | 单独读取子实体和父聚合带出子实体的语义可能不一致 | 设计带深度控制的 RAW/HYDRATED 聚合读取策略 |
 | TD-003 | `DynamicRecord` 无条件实现 `TreeCapable`、`TitledCapable`、`EnabledCapable`，能力事实由元数据二次判断 | marker interface 在动态侧更像适配器入口，外部泛型可能误读 | 引入动态能力适配层，或限制动态 marker 只在运行态内部使用 |
 | TD-004 | `enabled` 字段边界未最终确定 | 接手方不清楚它是树附属字段、可启用能力字段，还是未来 UI/权限状态字段 | 设计可启用能力或从平台能力字段中移除 |
