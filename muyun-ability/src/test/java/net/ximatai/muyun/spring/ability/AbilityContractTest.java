@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +17,7 @@ class AbilityContractTest {
     @AfterEach
     void clearGlobalState() {
         CacheRegistry.clearAll();
+        CacheRegistry.resetPolicy();
         TenantContext.clear();
     }
 
@@ -441,13 +443,13 @@ class AbilityContractTest {
 
     @Test
     void cacheRegistryShouldClearNamespacePrefixBySegmentBoundary() {
-        CacheRegistry.itemCache("dynamic-runtime-1::sales.contract").put("first", new DemoPlainRecord("First"));
-        CacheRegistry.itemCache("dynamic-runtime-10::sales.contract").put("second", new DemoPlainRecord("Second"));
+        CacheRegistry.putItem("dynamic-runtime-1::sales.contract", "first", new DemoPlainRecord("First"));
+        CacheRegistry.putItem("dynamic-runtime-10::sales.contract", "second", new DemoPlainRecord("Second"));
 
         CacheRegistry.clearNamespacePrefix("dynamic-runtime-1");
 
         assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
-        assertThat(CacheRegistry.itemCache("dynamic-runtime-10::sales.contract")).containsKey("second");
+        assertThat(CacheRegistry.itemIds("dynamic-runtime-10::sales.contract")).containsExactly("second");
     }
 
     @Test
@@ -464,6 +466,37 @@ class AbilityContractTest {
         service.update(update);
 
         assertThat(CacheRegistry.namespaceCount()).isZero();
+    }
+
+    @Test
+    void cacheRegistryShouldLimitItemCachePerNamespace() {
+        CacheRegistry.configure(new CacheRegistry.CachePolicy(2, Duration.ofMinutes(10)));
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        String first = service.insert(new DemoPlainRecord("First"));
+        String second = service.insert(new DemoPlainRecord("Second"));
+        String third = service.insert(new DemoPlainRecord("Third"));
+
+        service.select(first);
+        service.select(second);
+        service.select(third);
+
+        assertThat(CacheRegistry.itemIds(service.cacheNamespace()))
+                .containsExactlyInAnyOrder(second, third);
+    }
+
+    @Test
+    void cacheRegistryShouldExpireAllCacheByPolicy() throws InterruptedException {
+        CacheRegistry.configure(new CacheRegistry.CachePolicy(1024, Duration.ofMillis(20)));
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        String id = service.insert(new DemoPlainRecord("Before ttl"));
+        assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
+                .containsExactly("Before ttl");
+
+        service.rawDao().findById(id).setTitle("After ttl");
+        Thread.sleep(50);
+
+        assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
+                .containsExactly("After ttl");
     }
 
     @Test

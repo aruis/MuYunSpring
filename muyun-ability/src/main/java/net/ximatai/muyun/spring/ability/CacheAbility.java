@@ -7,7 +7,6 @@ import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
 import java.util.List;
-import java.util.Map;
 
 public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
     String ALL_CACHE_KEY = "__all__";
@@ -25,11 +24,10 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         if (id == null || id.isBlank()) {
             return null;
         }
-        Map<String, EntityContract> itemCache = CacheRegistry.itemCache(cacheNamespace());
-        T cached = (T) itemCache.get(id);
+        T cached = (T) CacheRegistry.item(cacheNamespace(), id);
         if (cached != null) {
             if (!isCacheVisible(cached)) {
-                itemCache.remove(id);
+                CacheRegistry.removeItem(cacheNamespace(), id);
                 return null;
             }
             T copied = copyForCache(cached);
@@ -45,7 +43,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         if (!isCacheVisible(loaded)) {
             return null;
         }
-        itemCache.put(id, copyForCache(loaded));
+        CacheRegistry.putItem(cacheNamespace(), id, copyForCache(loaded));
         T copied = copyForCache(loaded);
         afterPlatformSelect(copied);
         afterSelect(copied);
