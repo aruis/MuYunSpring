@@ -515,14 +515,22 @@ class AbilityContractTest {
     }
 
     @Test
-    void referencerAbilityShouldCollectReferenceIdsBySourceNamespace() {
+    void referencerAbilityShouldCollectReferenceIdsByStaticAnnotations() {
         DemoReferencingRecordService service = new DemoReferencingRecordService();
         DemoReferencingRecord record = new DemoReferencingRecord("customer-1", "user-owner");
-        record.setCreatedBy("user-creator");
+        record.setWatcherIds("user-watcher-1, user-watcher-2, user-owner");
 
         assertThat(service.collectReferenceIdsByTarget(record))
                 .containsEntry(ReferenceTarget.of("demo", "customer"), java.util.Set.of("customer-1"))
-                .containsEntry(ReferenceTarget.of("iam", "user"), java.util.Set.of("user-creator", "user-owner"));
+                .containsEntry(ReferenceTarget.of("iam", "user"),
+                        java.util.Set.of("user-owner", "user-watcher-1", "user-watcher-2"));
+        assertThat(StaticReferenceResolver.rules(DemoReferencingRecord.class))
+                .extracting(StaticReferenceResolver.ReferenceRule::target)
+                .containsExactly(
+                        ReferenceTarget.of("demo", "customer"),
+                        ReferenceTarget.of("iam", "user"),
+                        ReferenceTarget.of("iam", "user")
+                );
     }
 
     @Test

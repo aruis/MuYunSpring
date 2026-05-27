@@ -9,7 +9,7 @@
 | TD-002 | 聚合装配出的 child 当前按 RAW 查询读取，不执行 child service 完整 `afterSelect` / nested relation 语义 | 单独读取子实体和父聚合带出子实体的语义可能不一致 | 设计带深度控制的 RAW/HYDRATED 聚合读取策略 |
 | TD-003 | `DynamicRecord` 无条件实现 `TreeCapable`、`TitledCapable`、`EnabledCapable`，能力事实由元数据二次判断 | marker interface 在动态侧更像适配器入口，外部泛型可能误读 | 引入动态能力适配层，或限制动态 marker 只在运行态内部使用 |
 | TD-004 | `enabled` 字段边界未最终确定 | 接手方不清楚它是树附属字段、可启用能力字段，还是未来 UI/权限状态字段 | 设计可启用能力或从平台能力字段中移除 |
-| TD-005 | `ReferencerAbility` 和引用依赖字段命名仍带有 namespace/source/target 混淆 | 引用缓存失效和服务定位可能各用一套字符串约定 | 改成显式目标模块/目标实体命名或引入目标引用标识 value object |
+| TD-005 | 引用能力已有 `ReferenceTarget` 和静态注解采集入口，但跨引用缓存失效仍未接入统一依赖图 | 被引用对象变更后，下游缓存和投影刷新仍需后续能力承接 | 建设引用依赖索引和失效入口 |
 | TD-006 | `CacheAbility` 仍使用进程级本地缓存 | 当前已有默认容量、全量列表 TTL 和 runtime namespace 清理，但还不是可观测、可替换的缓存管理器 | 当缓存需要监控、跨节点一致性或业务级策略时，引入运行态缓存管理器 |
 | TD-007 | `muyun-module` 的 `runtime` 包同时包含运行态、发布、注册、建表和映射职责 | 包结构继续扩大后会降低可读性 | 动态运行态进入 M3 前拆出 `schema`、`publish`、`runtime` 等边界 |
 | TD-008 | 租户上下文来源尚未接入身份体系 | 基础实体已有 `tenantId`，Ability 默认入口已按当前租户作用域过滤，`TenantContext.system()` 已显式表达系统态；但登录态、租户切换、系统态授权审计，以及无上下文是否继续临时等价于系统态还未最终封口 | 在身份与权限能力成型时统一接入上下文来源，并明确哪些后台任务允许系统态、无上下文业务入口是否直接拒绝 |

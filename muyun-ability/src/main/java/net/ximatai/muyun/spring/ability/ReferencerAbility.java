@@ -6,7 +6,12 @@ import java.util.Map;
 import java.util.Set;
 
 public interface ReferencerAbility<T extends EntityContract> extends CrudAbility<T> {
+    default Class<?> referencingModelClass() {
+        return null;
+    }
+
     default Map<ReferenceTarget, Set<String>> collectReferenceIdsByTarget(T entity) {
-        return Map.of();
+        Class<?> modelClass = referencingModelClass();
+        return modelClass == null ? Map.of() : StaticReferenceResolver.collect(modelClass, entity);
     }
 }
