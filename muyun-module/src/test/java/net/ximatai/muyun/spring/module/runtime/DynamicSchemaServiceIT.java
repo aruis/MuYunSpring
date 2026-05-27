@@ -292,6 +292,115 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
+    void shouldPreviewAndPublishDynamicModuleSchemaEvolutionOnRealDatabase() throws Exception {
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String tableName = "app_contract_evolve_" + suffix;
+        String moduleAlias = "sales.evolve_" + suffix;
+        ModuleDefinition initialModule = new ModuleDefinition(
+                moduleAlias,
+                "Contract",
+                List.of(new EntityDefinition(
+                        "contract",
+                        tableName,
+                        "Contract",
+                        List.of(FieldDefinition.string("code", "Code").length(64).required().unique())
+                ))
+        );
+        ModuleDefinition evolvedModule = new ModuleDefinition(
+                moduleAlias,
+                "Contract",
+                List.of(new EntityDefinition(
+                        "contract",
+                        tableName,
+                        "Contract",
+                        List.of(
+                                FieldDefinition.string("code", "Code").length(64).required().unique(),
+                                FieldDefinition.string("name", "Name").length(128),
+                                FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                        )
+                ))
+        );
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicRecordService recordService = new DynamicRecordService(runtime);
+
+        publisher.publish(initialModule);
+        String firstId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                .setValue("code", "C-EVOLVE-001"));
+
+        DynamicModulePublishResult dryRun = publisher.publish(evolvedModule, MigrationOptions.dryRun());
+
+        assertThat(dryRun.changed()).isTrue();
+        assertThat(dryRun.migrations().get("contract").isDryRun()).isTrue();
+        assertThat(dryRun.migrations().get("contract").getStatements())
+                .anyMatch(sql -> sql.contains(" add ") && sql.contains("\"name\""))
+                .anyMatch(sql -> sql.contains(" add ") && sql.contains("\"amount\""));
+        assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code");
+        try (Connection connection = dataSource.getConnection()) {
+            assertThat(columns(connection, tableName)).doesNotContain("name", "amount");
+        }
+
+        DynamicModulePublishResult published = publisher.publish(evolvedModule);
+
+        assertThat(published.changed()).isTrue();
+        assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "name", "amount");
+        String secondId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                .setValue("code", "C-EVOLVE-002")
+                .setValue("name", "Evolved Contract")
+                .setValue("amount", BigDecimal.valueOf(4567, 2)));
+        assertThat(recordService.select(moduleAlias, "contract", firstId).getValue("name")).isNull();
+        assertThat((BigDecimal) recordService.select(moduleAlias, "contract", secondId).getValue("amount"))
+                .isEqualByComparingTo(BigDecimal.valueOf(4567, 2));
+        try (Connection connection = dataSource.getConnection()) {
+            assertThat(columns(connection, tableName)).contains("name", "amount");
+        }
+
+        ModuleDefinition removedFieldModule = new ModuleDefinition(
+                moduleAlias,
+                "Contract",
+                List.of(new EntityDefinition(
+                        "contract",
+                        tableName,
+                        "Contract",
+                        List.of(
+                                FieldDefinition.string("code", "Code").length(64).required().unique(),
+                                FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                        )
+                ))
+        );
+
+        DynamicModulePublishResult dropDryRun = publisher.publish(removedFieldModule, MigrationOptions.dryRun());
+
+        assertThat(dropDryRun.migrations().get("contract").hasNonAdditiveChanges()).isTrue();
+        assertThat(dropDryRun.migrations().get("contract").getStatements())
+                .anyMatch(sql -> sql.contains("drop column \"name\""));
+        assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "name", "amount");
+        assertThatThrownBy(() -> publisher.publish(removedFieldModule, MigrationOptions.strict()))
+                .isInstanceOf(OrmException.class)
+                .extracting("code")
+                .isEqualTo(OrmException.Code.STRICT_MIGRATION_REJECTED);
+        assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "name", "amount");
+
+        DynamicModulePublishResult dropPublished = publisher.publish(removedFieldModule);
+
+        assertThat(dropPublished.migrations().get("contract").hasNonAdditiveChanges()).isTrue();
+        assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "amount");
+        try (Connection connection = dataSource.getConnection()) {
+            assertThat(columns(connection, tableName)).doesNotContain("name");
+        }
+    }
+
+    @Test
     void shouldSupportDryRunAndStrictDynamicSchemaMigration() throws Exception {
         EntityDefinition dryRunEntity = entity("app_contract_dry_run_it");
 
@@ -352,7 +461,11 @@ class DynamicSchemaServiceIT {
     }
 
     private List<String> columns(Connection connection) throws Exception {
-        try (var columns = connection.getMetaData().getColumns(null, "public", "app_contract", null)) {
+        return columns(connection, "app_contract");
+    }
+
+    private List<String> columns(Connection connection, String tableName) throws Exception {
+        try (var columns = connection.getMetaData().getColumns(null, "public", tableName, null)) {
             java.util.ArrayList<String> names = new java.util.ArrayList<>();
             while (columns.next()) {
                 names.add(columns.getString("COLUMN_NAME"));

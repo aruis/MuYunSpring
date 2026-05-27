@@ -30,6 +30,11 @@ public class DynamicRecordRuntime {
         return this;
     }
 
+    public DynamicRecordRuntime publish(ModuleDefinition module) {
+        registry.publish(module);
+        return this;
+    }
+
     public void requireNotRegistered(String moduleAlias) {
         if (registry.containsModule(moduleAlias)) {
             throw new ModuleDefinitionException("duplicate module alias: " + moduleAlias);

@@ -31,6 +31,11 @@ public class DynamicModuleRegistry {
         modules.put(module.moduleAlias(), module);
     }
 
+    public void publish(ModuleDefinition module) {
+        validator.validate(module);
+        modules.put(module.moduleAlias(), module);
+    }
+
     public Optional<ModuleDefinition> findModule(String moduleAlias) {
         return Optional.ofNullable(modules.get(moduleAlias));
     }

@@ -21,10 +21,10 @@ public class DynamicModulePublisher {
     }
 
     public DynamicModulePublishResult publish(ModuleDefinition module, MigrationOptions options) {
-        runtime.requireNotRegistered(module.moduleAlias());
-        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, options);
+        ModuleDefinition previousModule = runtime.registry().findModule(module.moduleAlias()).orElse(null);
+        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, options);
         if (migrations.values().stream().noneMatch(MigrationResult::isDryRun)) {
-            runtime.register(module);
+            runtime.publish(module);
         }
         return new DynamicModulePublishResult(module, migrations);
     }

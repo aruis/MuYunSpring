@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class DynamicSchemaService {
     private final IDatabaseOperations<?> operations;
@@ -36,6 +38,10 @@ public class DynamicSchemaService {
         return new SchemaManager(operations).ensureTable(tableMapper.toTable(entity), options);
     }
 
+    public MigrationResult ensureTable(EntityDefinition entity, EntityDefinition previousEntity, MigrationOptions options) {
+        return new SchemaManager(operations).ensureTable(tableMapper.toTable(entity, previousEntity), options);
+    }
+
     public Map<String, Boolean> ensureModule(ModuleDefinition module) {
         Map<String, MigrationResult> migrations = ensureModule(module, MigrationOptions.execute());
         Map<String, Boolean> results = new LinkedHashMap<>();
@@ -44,10 +50,22 @@ public class DynamicSchemaService {
     }
 
     public Map<String, MigrationResult> ensureModule(ModuleDefinition module, MigrationOptions options) {
+        return ensureModule(module, null, options);
+    }
+
+    public Map<String, MigrationResult> ensureModule(ModuleDefinition module,
+                                                     ModuleDefinition previousModule,
+                                                     MigrationOptions options) {
         validator.validate(module);
+        if (previousModule != null) {
+            validator.validate(previousModule);
+        }
+        Map<String, EntityDefinition> previousEntities = previousModule == null
+                ? Map.of()
+                : previousModule.entities().stream().collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
         Map<String, MigrationResult> results = new LinkedHashMap<>();
         for (EntityDefinition entity : module.entities()) {
-            results.put(entity.code(), ensureTable(entity, options));
+            results.put(entity.code(), ensureTable(entity, previousEntities.get(entity.code()), options));
         }
         return results;
     }

@@ -9,6 +9,9 @@ import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 public class DynamicTableMapper {
     private final ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
     private final PlatformTableValidator tableValidator = new PlatformTableValidator();
@@ -26,6 +29,22 @@ public class DynamicTableMapper {
             }
         }
         tableValidator.requireStandardEntityTable(table, entity.code());
+        return table;
+    }
+
+    public TableWrapper toTable(EntityDefinition entity, EntityDefinition previousEntity) {
+        TableWrapper table = toTable(entity);
+        if (previousEntity == null || !entity.tableName().equals(previousEntity.tableName())) {
+            return table;
+        }
+        validator.validateEntity(previousEntity);
+        Set<String> targetColumns = entity.fields().stream()
+                .map(FieldDefinition::columnName)
+                .collect(Collectors.toSet());
+        previousEntity.fields().stream()
+                .map(FieldDefinition::columnName)
+                .filter(column -> !targetColumns.contains(column))
+                .forEach(table::dropColumn);
         return table;
     }
 

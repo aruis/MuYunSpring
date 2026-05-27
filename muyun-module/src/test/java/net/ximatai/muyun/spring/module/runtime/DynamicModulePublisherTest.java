@@ -50,6 +50,53 @@ class DynamicModulePublisherTest {
     }
 
     @Test
+    void shouldKeepExistingRuntimeDefinitionWhenDryRunPublishingEvolution() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(true);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
+                .register(contractModule());
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        DynamicModulePublishResult result = publisher.publish(evolvedContractModule(), MigrationOptions.dryRun());
+
+        assertThat(result.migrations().get("contract").isDryRun()).isTrue();
+        assertThat(schemaService.previousModules.get("sales.contract")).isEqualTo(contractModule());
+        assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "amount");
+    }
+
+    @Test
+    void shouldReplaceRuntimeDefinitionAfterSchemaEvolutionSucceeds() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(false);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
+                .register(contractModule());
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        publisher.publish(evolvedContractModule());
+
+        assertThat(schemaService.ensuredEntities).containsExactly("contract");
+        assertThat(schemaService.previousModules.get("sales.contract")).isEqualTo(contractModule());
+        assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "amount", "title");
+    }
+
+    @Test
+    void shouldKeepExistingRuntimeDefinitionWhenSchemaEvolutionFails() {
+        FailingSchemaService schemaService = new FailingSchemaService();
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
+                .register(contractModule());
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        assertThatThrownBy(() -> publisher.publish(evolvedContractModule()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("schema failed");
+        assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("code", "amount");
+    }
+
+    @Test
     void shouldValidateBeforeRegisteringModule() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
@@ -71,16 +118,15 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldRejectDuplicatePublicationBeforeEnsuringSchema() {
+    void shouldRegisterFirstPublicationThroughPublisher() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
-                .register(contractModule());
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
         DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
 
-        assertThatThrownBy(() -> publisher.publish(contractModule()))
-                .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("duplicate module alias");
-        assertThat(schemaService.ensuredEntities).isEmpty();
+        publisher.publish(contractModule());
+
+        assertThat(runtime.registry().findModule("sales.contract")).isPresent();
+        assertThat(schemaService.ensuredEntities).containsExactly("contract");
     }
 
     @SuppressWarnings("unchecked")
@@ -93,6 +139,24 @@ class DynamicModulePublisherTest {
 
     private ModuleDefinition contractModule() {
         return new ModuleDefinition("sales.contract", "Contract", List.of(entity("contract", "app_contract")));
+    }
+
+    private ModuleDefinition evolvedContractModule() {
+        return new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition(
+                        "contract",
+                        "app_contract",
+                        "Contract",
+                        List.of(
+                                FieldDefinition.string("code", "Code").length(64).required(),
+                                FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                                FieldDefinition.titleField()
+                        )
+                ).withCapabilities(net.ximatai.muyun.spring.module.metadata.EntityCapability.CRUD,
+                        net.ximatai.muyun.spring.module.metadata.EntityCapability.REFERENCE))
+        );
     }
 
     private EntityDefinition entity(String code, String tableName) {
@@ -110,6 +174,7 @@ class DynamicModulePublisherTest {
     private static class RecordingSchemaService extends DynamicSchemaService {
         private final boolean dryRun;
         private final List<String> ensuredEntities = new java.util.ArrayList<>();
+        private final Map<String, ModuleDefinition> previousModules = new LinkedHashMap<>();
 
         RecordingSchemaService(boolean dryRun) {
             super(null);
@@ -117,14 +182,32 @@ class DynamicModulePublisherTest {
         }
 
         @Override
-        public Map<String, MigrationResult> ensureModule(ModuleDefinition module, MigrationOptions options) {
+        public Map<String, MigrationResult> ensureModule(ModuleDefinition module,
+                                                         ModuleDefinition previousModule,
+                                                         MigrationOptions options) {
             new net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator().validate(module);
+            if (previousModule != null) {
+                previousModules.put(module.moduleAlias(), previousModule);
+            }
             Map<String, MigrationResult> results = new LinkedHashMap<>();
             for (EntityDefinition entity : module.entities()) {
                 ensuredEntities.add(entity.code());
                 results.put(entity.code(), new MigrationResult(true, dryRun, false, List.of()));
             }
             return results;
+        }
+    }
+
+    private static class FailingSchemaService extends DynamicSchemaService {
+        FailingSchemaService() {
+            super(null);
+        }
+
+        @Override
+        public Map<String, MigrationResult> ensureModule(ModuleDefinition module,
+                                                         ModuleDefinition previousModule,
+                                                         MigrationOptions options) {
+            throw new IllegalStateException("schema failed");
         }
     }
 }

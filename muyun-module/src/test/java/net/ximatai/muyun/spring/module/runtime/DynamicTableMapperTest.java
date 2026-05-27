@@ -70,6 +70,29 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldMapRemovedDynamicFieldsToExplicitDroppedColumns() {
+        EntityDefinition previous = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("removedName", "Removed Name").column("removed_name").length(128)
+                )
+        );
+        EntityDefinition next = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code").length(64))
+        );
+
+        TableWrapper table = mapper.toTable(next, previous);
+
+        assertThat(table.getDroppedColumns()).containsExactly("removed_name");
+    }
+
+    @Test
     void shouldRejectUnsafeIdentifiersAndDuplicateColumns() {
         assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
                 "contract",
