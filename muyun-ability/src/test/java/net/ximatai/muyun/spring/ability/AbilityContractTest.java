@@ -469,7 +469,7 @@ class AbilityContractTest {
     }
 
     @Test
-    void cacheRegistryShouldLimitItemCachePerNamespace() {
+    void cacheRegistryShouldKeepItemCacheBoundedPerNamespace() {
         CacheRegistry.configure(new CacheRegistry.CachePolicy(2, Duration.ofMinutes(10)));
         DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
         String first = service.insert(new DemoPlainRecord("First"));
@@ -481,7 +481,8 @@ class AbilityContractTest {
         service.select(third);
 
         assertThat(CacheRegistry.itemIds(service.cacheNamespace()))
-                .containsExactlyInAnyOrder(second, third);
+                .hasSizeLessThanOrEqualTo(2)
+                .isSubsetOf(first, second, third);
     }
 
     @Test
@@ -497,6 +498,20 @@ class AbilityContractTest {
 
         assertThat(service.selectAllWithCache()).extracting(DemoPlainRecord::getTitle)
                 .containsExactly("After ttl");
+    }
+
+    @Test
+    void cacheRegistryShouldClearAllCacheNamespaceByPrefix() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        service.insert(new DemoPlainRecord("All cache prefix"));
+        service.selectAllWithCache();
+
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
+        assertThat(CacheRegistry.itemIds(service.cacheNamespace())).isEmpty();
+
+        CacheRegistry.clearNamespacePrefix(service.cacheNamespace());
+
+        assertThat(CacheRegistry.namespaceCount()).isZero();
     }
 
     @Test

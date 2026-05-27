@@ -8,6 +8,7 @@ assertj = "3.27.6"
 postgresql = "42.7.8"
 testcontainers = "1.21.3"
 lombok = "1.18.42"
+caffeine = "3.2.4"
 
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
@@ -24,6 +25,7 @@ spring-context = { module = "org.springframework:spring-context", version.ref = 
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
