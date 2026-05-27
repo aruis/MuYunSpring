@@ -119,6 +119,19 @@ class AbilityContractTest {
     }
 
     @Test
+    void crudAbilityShouldUseCurrentVersionForHardDelete() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Versioned hard delete");
+        String id = service.insert(record);
+        service.update(record);
+
+        assertThat(service.delete(id)).isEqualTo(1);
+
+        assertThat(service.rawDao().lastDeleteConditions()).containsEntry("version", 1);
+        assertThat(service.getDao().findById(id)).isNull();
+    }
+
+    @Test
     void childrenAbilityShouldInsertLoadReplaceAndCascadeDeleteChildren() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");

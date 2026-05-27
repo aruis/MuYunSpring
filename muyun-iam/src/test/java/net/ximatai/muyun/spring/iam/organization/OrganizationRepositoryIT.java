@@ -5,7 +5,10 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import org.junit.jupiter.api.Test;
@@ -26,8 +29,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = OrganizationRepositoryIT.TestApplication.class)
@@ -90,6 +95,64 @@ class OrganizationRepositoryIT {
         assertThat(organizationService.count(Criteria.of())).isEqualTo(1);
     }
 
+    @Test
+    void springRepositoryShouldEnforceOptimisticLockOnRealDatabase() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Organization organization = new Organization();
+        organization.setCode("CAS-" + suffix);
+        organization.setTitle("CAS Organization");
+        String id = organizationService.insert(organization);
+
+        organization.setTitle("CAS Updated");
+        organizationService.update(organization);
+        assertThat(organizationService.select(id).getVersion()).isEqualTo(1);
+
+        Organization staleUpdate = new Organization();
+        staleUpdate.setId(id);
+        staleUpdate.setCode("CAS-" + suffix);
+        staleUpdate.setTitle("Stale Update");
+        staleUpdate.setVersion(0);
+
+        assertThatThrownBy(() -> organizationService.update(staleUpdate))
+                .isInstanceOf(OptimisticLockException.class);
+        assertThat(organizationService.select(id).getTitle()).isEqualTo("CAS Updated");
+
+        Organization staleDelete = new Organization();
+        staleDelete.setId(id);
+        staleDelete.setVersion(0);
+
+        assertThatThrownBy(() -> organizationService.delete(staleDelete))
+                .isInstanceOf(OptimisticLockException.class);
+        assertThat(organizationService.select(id)).isNotNull();
+
+        assertThat(organizationService.delete(id)).isEqualTo(1);
+        assertThat(organizationService.select(id)).isNull();
+    }
+
+    @Test
+    void springRepositoryShouldEnforceOptimisticLockForHardDeleteOnRealDatabase() {
+        HardDeleteOrganizationService hardDeleteService = new HardDeleteOrganizationService(organizationDao);
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Organization organization = new Organization();
+        organization.setCode("HARD-CAS-" + suffix);
+        organization.setTitle("Hard CAS Organization");
+        String id = hardDeleteService.insert(organization);
+
+        organization.setTitle("Hard CAS Updated");
+        hardDeleteService.update(organization);
+
+        Organization staleDelete = new Organization();
+        staleDelete.setId(id);
+        staleDelete.setVersion(0);
+
+        assertThatThrownBy(() -> hardDeleteService.delete(staleDelete))
+                .isInstanceOf(OptimisticLockException.class);
+        assertThat(hardDeleteService.select(id)).isNotNull();
+
+        assertThat(hardDeleteService.delete(id)).isEqualTo(1);
+        assertThat(organizationDao.findById(id)).isNull();
+    }
+
     private List<String> organizationColumns(Connection connection) throws Exception {
         try (var columns = connection.getMetaData().getColumns(null, "public", "iam_organization", null)) {
             java.util.ArrayList<String> names = new java.util.ArrayList<>();
@@ -142,6 +205,24 @@ class OrganizationRepositoryIT {
         @Bean
         SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations, EntityMetaResolver entityMetaResolver) {
             return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver);
+        }
+    }
+
+    private static final class HardDeleteOrganizationService implements CrudAbility<Organization> {
+        private final OrganizationDao organizationDao;
+
+        private HardDeleteOrganizationService(OrganizationDao organizationDao) {
+            this.organizationDao = organizationDao;
+        }
+
+        @Override
+        public BaseDao<Organization, String> getDao() {
+            return organizationDao;
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return "iam.organization.hardDelete";
         }
     }
 }

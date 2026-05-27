@@ -19,6 +19,7 @@ import java.util.Map;
 final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, String> {
     private final Map<String, T> rows = new LinkedHashMap<>();
     private final Map<String, Integer> versions = new LinkedHashMap<>();
+    private Map<String, Object> lastDeleteConditions = Map.of();
 
     @Override
     public boolean ensureTable() {
@@ -69,6 +70,7 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
 
     @Override
     public int deleteByIdAndCondition(String id, Map<String, Object> conditions) {
+        lastDeleteConditions = conditions == null ? Map.of() : new LinkedHashMap<>(conditions);
         Object expectedVersion = conditions == null ? null : conditions.get("version");
         if (expectedVersion != null && !expectedVersion.equals(versions.get(id))) {
             return 0;
@@ -118,6 +120,10 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
         rows.put(entity.getId(), entity);
         versions.put(entity.getId(), entity.getVersion());
         return 1;
+    }
+
+    Map<String, Object> lastDeleteConditions() {
+        return lastDeleteConditions;
     }
 
     private boolean matches(T row, Criteria criteria) {

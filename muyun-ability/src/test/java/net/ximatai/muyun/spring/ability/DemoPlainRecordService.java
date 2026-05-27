@@ -8,6 +8,10 @@ final class DemoPlainRecordService implements CrudAbility<DemoPlainRecord> {
         return dao;
     }
 
+    InMemoryBaseDao<DemoPlainRecord> rawDao() {
+        return dao;
+    }
+
     @Override
     public String getModuleAlias() {
         return "demo.plainRecord";

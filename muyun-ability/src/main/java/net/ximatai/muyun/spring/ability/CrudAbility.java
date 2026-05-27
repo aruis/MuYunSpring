@@ -84,19 +84,7 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default int delete(String id) {
-        beforeDelete(id);
-        T entity = selectActiveRaw(id);
-        if (entity == null) {
-            return 0;
-        }
-        int deleted = getDao().deleteById(id);
-        afterPlatformDelete(id, entity, deleted);
-        afterDelete(id, entity, deleted);
-        if (deleted > 0) {
-            afterChanged(entity);
-            CacheInvalidationSupport.clearAfterChanged(this, entity);
-        }
-        return deleted;
+        return delete(id, null);
     }
 
     default int delete(T entity) {
@@ -112,7 +100,8 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null) {
             return 0;
         }
-        int deleted = getDao().deleteByIdAndVersion(id, expectedVersion);
+        Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+        int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
         if (deleted <= 0) {
             throw new OptimisticLockException("record version conflict: " + id);
         }
