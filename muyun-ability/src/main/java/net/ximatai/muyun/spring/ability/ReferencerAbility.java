@@ -28,16 +28,20 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
             return;
         }
         for (ReferencePlan plan : StaticReferenceResolver.plans(modelClass)) {
-            if (!plan.autoTitle()) {
+            if (!plan.autoTitle() && plan.projections().isEmpty()) {
                 continue;
             }
             List<String> ids = referenceSourceValues(entity, plan);
             if (ids.isEmpty()) {
                 StaticReferenceResolver.writeTitleValue(entity, plan.titleOutputField(), null);
+                clearProjectionValues(entity, plan);
                 continue;
             }
-            Object titleValue = referenceTitleValue(ids, referenceTitles(plan.target(), ids), plan);
-            StaticReferenceResolver.writeTitleValue(entity, plan.titleOutputField(), titleValue);
+            if (plan.autoTitle()) {
+                Object titleValue = referenceTitleValue(ids, referenceTitles(plan.target(), ids), plan);
+                StaticReferenceResolver.writeTitleValue(entity, plan.titleOutputField(), titleValue);
+            }
+            populateProjectionValues(entity, plan, ids);
         }
     }
 
@@ -47,6 +51,12 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
 
     default Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
         throw new AbilityException("reference title resolver is not configured: " + target.qualifiedName());
+    }
+
+    default Map<String, Map<String, Object>> referenceProjections(ReferenceTarget target,
+                                                                  Collection<String> ids,
+                                                                  Collection<String> sourceFields) {
+        throw new AbilityException("reference projection resolver is not configured: " + target.qualifiedName());
     }
 
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
@@ -63,5 +73,51 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
                     .toList();
         }
         return titles.get(ids.getFirst());
+    }
+
+    private void populateProjectionValues(T entity, ReferencePlan plan, List<String> ids) {
+        if (plan.projections().isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, Object>> loaded = referenceProjections(plan.target(), ids, projectionSourceFields(plan));
+        for (ReferenceProjection projection : plan.projections()) {
+            StaticReferenceResolver.writeTitleValue(entity, projection.outputField(),
+                    referenceProjectionValue(ids, loaded, plan, projection.targetField()));
+        }
+    }
+
+    private void clearProjectionValues(T entity, ReferencePlan plan) {
+        for (ReferenceProjection projection : plan.projections()) {
+            StaticReferenceResolver.writeTitleValue(entity, projection.outputField(), null);
+        }
+    }
+
+    private List<String> projectionSourceFields(ReferencePlan plan) {
+        return plan.projections().stream()
+                .map(ReferenceProjection::targetField)
+                .distinct()
+                .toList();
+    }
+
+    private Object referenceProjectionValue(List<String> ids,
+                                            Map<String, Map<String, Object>> loaded,
+                                            ReferencePlan plan,
+                                            String sourceField) {
+        if (loaded == null) {
+            loaded = Map.of();
+        }
+        Map<String, Map<String, Object>> loadedValues = loaded;
+        if (plan.cardinality() == ReferenceCardinality.MANY) {
+            return ids.stream()
+                    .map(id -> fieldValue(loadedValues, id, sourceField))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        return fieldValue(loadedValues, ids.getFirst(), sourceField);
+    }
+
+    private Object fieldValue(Map<String, Map<String, Object>> loaded, String id, String sourceField) {
+        Map<String, Object> fields = loaded.get(id);
+        return fields == null ? null : fields.get(sourceField);
     }
 }

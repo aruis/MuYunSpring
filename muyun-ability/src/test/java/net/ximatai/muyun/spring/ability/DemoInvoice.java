@@ -10,9 +10,16 @@ import java.util.List;
 @Setter
 final class DemoInvoice extends StandardEntity {
     private String title;
-    @ReferenceTo(moduleAlias = "demo", entityCode = "customer", autoTitle = true, titleOutputField = "customerTitle")
+    @ReferenceTo(
+            moduleAlias = "demo",
+            entityCode = "customer",
+            autoTitle = true,
+            titleOutputField = "customerTitle",
+            projections = @ReferenceProject(targetField = "status", outputField = "customerStatus")
+    )
     private String customerId;
     private transient String customerTitle;
+    private transient String customerStatus;
     @ChildRef(
             parentEntity = "invoice",
             childModel = DemoInvoiceLine.class,

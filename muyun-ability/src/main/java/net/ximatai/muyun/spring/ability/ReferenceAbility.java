@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.model.TitledCapable;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +41,33 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
             }
         }
         return titles;
+    }
+
+    default Map<String, Map<String, Object>> projections(Collection<String> ids, Collection<String> fieldNames) {
+        if (ids == null || ids.isEmpty() || fieldNames == null || fieldNames.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
+        LinkedHashSet<String> normalizedFields = new LinkedHashSet<>(fieldNames);
+        List<T> entities = getDao().query(
+                activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
+                new PageRequest(0, Integer.MAX_VALUE)
+        );
+        Map<String, Map<String, Object>> loaded = new LinkedHashMap<>();
+        for (T entity : entities) {
+            Map<String, Object> values = new LinkedHashMap<>();
+            for (String fieldName : normalizedFields) {
+                values.put(fieldName, ReferenceFieldResolver.read(entity, fieldName));
+            }
+            loaded.put(entity.getId(), Collections.unmodifiableMap(new LinkedHashMap<>(values)));
+        }
+        Map<String, Map<String, Object>> ordered = new LinkedHashMap<>();
+        for (String id : normalizedIds) {
+            if (loaded.containsKey(id)) {
+                ordered.put(id, loaded.get(id));
+            }
+        }
+        return Collections.unmodifiableMap(new LinkedHashMap<>(ordered));
     }
 
     default T selectReferenceRaw(String id) {

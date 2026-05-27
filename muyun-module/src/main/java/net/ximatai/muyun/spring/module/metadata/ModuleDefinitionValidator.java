@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.metadata;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.ability.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.ReferenceTarget;
 
 import java.util.HashSet;
@@ -178,15 +179,33 @@ public class ModuleDefinitionValidator {
         if (moduleAlias != null && moduleAlias.equals(target.moduleAlias())) {
             requireEntity(entities, target.entityCode(), "reference target entity");
         }
+        Set<String> outputFields = new HashSet<>();
+        if (!reference.projections().isEmpty()) {
+            if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
+                throw new ModuleDefinitionException("reference projection requires same module target: " + target.qualifiedName());
+            }
+            EntityDefinition targetEntity = requireEntity(entities, target.entityCode(), "reference target entity");
+            for (ReferenceProjection projection : reference.projections()) {
+                requireField(targetEntity, projection.targetField(), "reference projection target field");
+                requireFieldName(projection.outputField(), "reference projection output field");
+                requireReferenceOutputField(source, projection.outputField(), "reference projection output field");
+                requireUnique(outputFields, projection.outputField(), "reference output field");
+            }
+        }
         if (reference.autoTitle()) {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
             }
             String outputField = reference.plan().titleOutputField();
             requireFieldName(outputField, "reference title output field");
-            if (STANDARD_FIELDS.contains(outputField) || source.fields().stream().anyMatch(field -> field.fieldName().equals(outputField))) {
-                throw new ModuleDefinitionException("reference title output field conflicts with entity field: " + source.code() + "." + outputField);
-            }
+            requireReferenceOutputField(source, outputField, "reference title output field");
+            requireUnique(outputFields, outputField, "reference output field");
+        }
+    }
+
+    private void requireReferenceOutputField(EntityDefinition source, String outputField, String name) {
+        if (STANDARD_FIELDS.contains(outputField) || source.fields().stream().anyMatch(field -> field.fieldName().equals(outputField))) {
+            throw new ModuleDefinitionException(name + " conflicts with entity field: " + source.code() + "." + outputField);
         }
     }
 

@@ -10,7 +10,8 @@ public record ReferencePlan(
         ReferenceTarget target,
         ReferenceCardinality cardinality,
         boolean autoTitle,
-        String titleOutputField
+        String titleOutputField,
+        List<ReferenceProjection> projections
 ) {
     public ReferencePlan {
         if (sourceField == null || sourceField.isBlank()) {
@@ -28,6 +29,15 @@ public record ReferencePlan(
         if (autoTitle && titleOutputField.isBlank()) {
             titleOutputField = sourceField + "Title";
         }
+        projections = projections == null ? List.of() : List.copyOf(projections);
+    }
+
+    public ReferencePlan(String sourceField,
+                         ReferenceTarget target,
+                         ReferenceCardinality cardinality,
+                         boolean autoTitle,
+                         String titleOutputField) {
+        this(sourceField, target, cardinality, autoTitle, titleOutputField, List.of());
     }
 
     public static ReferencePlan of(String sourceField, ReferenceTarget target, ReferenceCardinality cardinality) {
@@ -35,7 +45,12 @@ public record ReferencePlan(
     }
 
     public ReferencePlan withAutoTitle(String titleOutputField) {
-        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField);
+        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField, projections);
+    }
+
+    public ReferencePlan withProjection(String targetField, String outputField) {
+        return new ReferencePlan(sourceField(), target, cardinality, autoTitle, titleOutputField,
+                appendProjection(new ReferenceProjection(targetField, outputField)));
     }
 
     public List<String> normalizeValues(Object value) {
@@ -80,5 +95,11 @@ public record ReferencePlan(
         if (!text.isBlank()) {
             values.add(text);
         }
+    }
+
+    private List<ReferenceProjection> appendProjection(ReferenceProjection projection) {
+        LinkedHashSet<ReferenceProjection> next = new LinkedHashSet<>(projections);
+        next.add(projection);
+        return List.copyOf(next);
     }
 }

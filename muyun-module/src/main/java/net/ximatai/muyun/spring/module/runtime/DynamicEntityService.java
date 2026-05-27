@@ -247,6 +247,34 @@ public class DynamicEntityService implements
         return ReferenceAbility.super.titles(ids);
     }
 
+    public Map<String, Map<String, Object>> projections(Collection<String> ids, Collection<String> fieldNames) {
+        requireCapability(EntityCapability.REFERENCE);
+        if (ids == null || ids.isEmpty() || fieldNames == null || fieldNames.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
+        LinkedHashSet<String> normalizedFields = new LinkedHashSet<>(fieldNames);
+        List<DynamicRecord> records = getDao().query(
+                activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
+                new PageRequest(0, Integer.MAX_VALUE)
+        );
+        Map<String, Map<String, Object>> loaded = new LinkedHashMap<>();
+        for (DynamicRecord record : records) {
+            Map<String, Object> values = new LinkedHashMap<>();
+            for (String fieldName : normalizedFields) {
+                values.put(fieldName, record.getValue(fieldName));
+            }
+            loaded.put(record.getId(), Collections.unmodifiableMap(new LinkedHashMap<>(values)));
+        }
+        Map<String, Map<String, Object>> ordered = new LinkedHashMap<>();
+        for (String id : normalizedIds) {
+            if (loaded.containsKey(id)) {
+                ordered.put(id, loaded.get(id));
+            }
+        }
+        return Collections.unmodifiableMap(new LinkedHashMap<>(ordered));
+    }
+
     public PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
         requireCapability(EntityCapability.REFERENCE);
         return ReferenceAbility.super.referenceOptions(criteria, pageRequest);
@@ -292,17 +320,23 @@ public class DynamicEntityService implements
         }
         requireSameEntity(record);
         for (ReferencePlan plan : referencePlans()) {
-            if (!plan.autoTitle()) {
+            if (!plan.autoTitle() && plan.projections().isEmpty()) {
                 continue;
             }
             List<String> ids = plan.normalizeValues(record.getValue(plan.sourceField()));
             if (ids.isEmpty()) {
-                record.putVirtualValue(plan.titleOutputField(), null);
+                if (plan.autoTitle()) {
+                    record.putVirtualValue(plan.titleOutputField(), null);
+                }
+                clearReferenceProjectionValues(record, plan);
                 continue;
             }
             DynamicEntityService targetService = referenceService(plan.target());
-            Map<String, String> titles = targetService.titles(ids);
-            record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, titles, plan));
+            if (plan.autoTitle()) {
+                Map<String, String> titles = targetService.titles(ids);
+                record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, titles, plan));
+            }
+            populateReferenceProjectionValues(record, targetService, ids, plan);
         }
     }
 
@@ -331,6 +365,50 @@ public class DynamicEntityService implements
                     .toList();
         }
         return titles.get(ids.getFirst());
+    }
+
+    private void populateReferenceProjectionValues(DynamicRecord record,
+                                                   DynamicEntityService targetService,
+                                                   List<String> ids,
+                                                   ReferencePlan plan) {
+        if (plan.projections().isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, Object>> loaded = targetService.projections(ids, projectionSourceFields(plan));
+        for (net.ximatai.muyun.spring.ability.ReferenceProjection projection : plan.projections()) {
+            record.putVirtualValue(projection.outputField(), referenceProjectionValue(ids, loaded, plan, projection.targetField()));
+        }
+    }
+
+    private void clearReferenceProjectionValues(DynamicRecord record, ReferencePlan plan) {
+        for (net.ximatai.muyun.spring.ability.ReferenceProjection projection : plan.projections()) {
+            record.putVirtualValue(projection.outputField(), null);
+        }
+    }
+
+    private List<String> projectionSourceFields(ReferencePlan plan) {
+        return plan.projections().stream()
+                .map(net.ximatai.muyun.spring.ability.ReferenceProjection::targetField)
+                .distinct()
+                .toList();
+    }
+
+    private Object referenceProjectionValue(List<String> ids,
+                                            Map<String, Map<String, Object>> loaded,
+                                            ReferencePlan plan,
+                                            String sourceField) {
+        if (plan.cardinality() == ReferenceCardinality.MANY) {
+            return ids.stream()
+                    .map(id -> fieldValue(loaded, id, sourceField))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        return fieldValue(loaded, ids.getFirst(), sourceField);
+    }
+
+    private Object fieldValue(Map<String, Map<String, Object>> loaded, String id, String sourceField) {
+        Map<String, Object> fields = loaded.get(id);
+        return fields == null ? null : fields.get(sourceField);
     }
 
     private DynamicRecord activeRaw(String id) {

@@ -17,4 +17,6 @@ public @interface ReferenceTo {
     boolean autoTitle() default false;
 
     String titleOutputField() default "";
+
+    ReferenceProject[] projections() default {};
 }

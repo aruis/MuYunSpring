@@ -269,6 +269,7 @@ class AbilityContractTest {
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
         assertThat(selected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(selected.getCustomerStatus()).isEqualTo("ACTIVE");
 
         invoice.setLines(List.of());
         invoiceService.update(invoice);
@@ -292,9 +293,11 @@ class AbilityContractTest {
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
         assertThat(firstSelected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(firstSelected.getCustomerStatus()).isEqualTo("ACTIVE");
 
         invoice.setTitle("Changed behind cache");
         invoice.setCustomerTitle(null);
+        invoice.setCustomerStatus(null);
         DemoInvoice secondSelected = invoiceService.select(invoiceId);
 
         assertThat(secondSelected.getTitle()).isEqualTo("Invoice");
@@ -302,6 +305,7 @@ class AbilityContractTest {
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
         assertThat(secondSelected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(secondSelected.getCustomerStatus()).isEqualTo("ACTIVE");
         assertThat(invoiceService.businessHookCount()).isEqualTo(3);
     }
 
@@ -540,7 +544,9 @@ class AbilityContractTest {
                 );
 
         String id = service.insert(record);
-        assertThat(service.select(id).getCustomerTitle()).isEqualTo("Customer One");
+        DemoReferencingRecord selected = service.select(id);
+        assertThat(selected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(selected.getCustomerStatus()).isEqualTo("ACTIVE");
     }
 
     @Test
@@ -782,8 +788,19 @@ class AbilityContractTest {
         String id = service.insert(new DemoCustomTitleRecord("Raw title", "Display title"));
 
         assertThat(service.title(id)).isEqualTo("Display title");
+        assertThat(service.projections(java.util.List.of(id), java.util.List.of("title", "displayName")))
+                .containsEntry(id, Map.of("title", "Raw title", "displayName", "Display title"));
         assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(new ReferenceOption(id, "Display title"));
+    }
+
+    @Test
+    void referenceAbilityShouldAllowNullProjectionValues() {
+        DemoCustomTitleRecordService service = new DemoCustomTitleRecordService();
+        String id = service.insert(new DemoCustomTitleRecord("Raw title", null));
+
+        assertThat(service.projections(java.util.List.of(id), java.util.List.of("displayName")).get(id))
+                .containsEntry("displayName", null);
     }
 
     @Test

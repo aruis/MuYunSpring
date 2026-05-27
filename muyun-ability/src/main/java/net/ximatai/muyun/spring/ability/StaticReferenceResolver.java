@@ -97,13 +97,20 @@ public final class StaticReferenceResolver {
                                 ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityCode()),
                                 referenceTo.cardinality(),
                                 referenceTo.autoTitle(),
-                                referenceTo.titleOutputField()
+                                referenceTo.titleOutputField(),
+                                projections(referenceTo)
                         )
                 ));
             }
             current = current.getSuperclass();
         }
         return List.copyOf(rules.values());
+    }
+
+    private static List<ReferenceProjection> projections(ReferenceTo referenceTo) {
+        return java.util.Arrays.stream(referenceTo.projections())
+                .map(projection -> new ReferenceProjection(projection.targetField(), projection.outputField()))
+                .toList();
     }
 
     public record ReferenceRule(Field field, ReferencePlan plan) {

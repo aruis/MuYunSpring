@@ -30,4 +30,16 @@ final class DemoReferencingRecordService implements
         }
         return Map.of();
     }
+
+    @Override
+    public Map<String, Map<String, Object>> referenceProjections(ReferenceTarget target,
+                                                                 Collection<String> ids,
+                                                                 Collection<String> sourceFields) {
+        if (ReferenceTarget.of("demo", "customer").equals(target)
+                && ids.contains("customer-1")
+                && sourceFields.contains("status")) {
+            return Map.of("customer-1", Map.of("status", "ACTIVE"));
+        }
+        return Map.of();
+    }
 }

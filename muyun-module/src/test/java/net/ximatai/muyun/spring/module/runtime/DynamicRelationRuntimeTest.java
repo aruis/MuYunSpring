@@ -192,6 +192,30 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldCompressManyDynamicReferenceProjectionValuesToExistingNonNullTargets() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" IN")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(manyProjectionInvoiceModule())
+                .entityService(MODULE, "invoice_line");
+        DynamicRecord line = new DynamicRecord(invoiceLineEntity())
+                .setValue("invoiceId", "invoice-1, missing-invoice")
+                .setValue("title", "L-001");
+
+        lineService.afterReferenceSelect(line);
+
+        assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo(List.of("I-001"));
+    }
+
+    @Test
     void shouldCompileDynamicChildRelationToPlan() {
         assertThat(invoiceModule().relations())
                 .extracting(EntityRelationDefinition::plan)
@@ -231,7 +255,48 @@ class DynamicRelationRuntimeTest {
         DynamicRecord line = lineService.select("line-1");
 
         assertThat(line.getValue("invoiceTitle")).isEqualTo("I-001");
+        assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
         assertThat(line.getValues()).doesNotContainKey("invoiceTitle");
+        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
+    }
+
+    @Test
+    void shouldPopulateDynamicReferenceProjectionWithoutAutoTitle() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(projectionOnlyInvoiceModule())
+                .entityService(MODULE, "invoice_line");
+
+        DynamicRecord line = lineService.select("line-1");
+
+        assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
+        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
+    }
+
+    @Test
+    void shouldAllowNullDynamicReferenceProjectionValues() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"id\" =")) {
+                return params.containsValue("line-1") ? List.of(lineRow()) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" IN")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRowWithNullTitle()) : List.of();
+            }
+            return List.of();
+        });
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(projectionOnlyInvoiceModule())
+                .entityService(MODULE, "invoice_line");
+
+        DynamicRecord line = lineService.select("line-1");
+
+        assertThat(line.getValue("invoiceDisplayTitle")).isNull();
+        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
     }
 
     @Test
@@ -397,6 +462,55 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldRejectDynamicReferenceProjectionAcrossModules() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
+                        .withProjection("title", "invoiceDisplayTitle"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("projection requires same module target");
+    }
+
+    @Test
+    void shouldRejectDynamicReferenceProjectionFieldConflicts() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withProjection("title", "title"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("projection output field conflicts");
+    }
+
+    @Test
+    void shouldRejectDuplicateDynamicReferenceOutputFields() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("invoiceDisplay")
+                        .withProjection("title", "invoiceDisplay"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("reference output field");
+    }
+
+    @Test
     void shouldAllowSameRelationCodeOnDifferentDynamicParentEntities() {
         EntityDefinition payment = new EntityDefinition(
                 "payment",
@@ -471,7 +585,8 @@ class DynamicRelationRuntimeTest {
                         .withAutoPopulate()
                         .withAutoDeleteWithParent()),
                 List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
-                        .withAutoTitle("invoiceTitle"))
+                        .withAutoTitle("invoiceTitle")
+                        .withProjection("title", "invoiceDisplayTitle"))
         );
     }
 
@@ -484,6 +599,31 @@ class DynamicRelationRuntimeTest {
                         .withAutoPopulate()
                         .withAutoDeleteWithParent()),
                 List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")).many())
+        );
+    }
+
+    private ModuleDefinition projectionOnlyInvoiceModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent()),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withProjection("title", "invoiceDisplayTitle"))
+        );
+    }
+
+    private ModuleDefinition manyProjectionInvoiceModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .many()
+                        .withProjection("title", "invoiceDisplayTitle"))
         );
     }
 
@@ -516,6 +656,16 @@ class DynamicRelationRuntimeTest {
                 "deleted", Boolean.FALSE,
                 "version", 1
         );
+    }
+
+    private Map<String, Object> invoiceRowWithNullTitle() {
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("id", "invoice-1");
+        row.put("tenant_id", "tenant-a");
+        row.put("title", null);
+        row.put("deleted", Boolean.FALSE);
+        row.put("version", 1);
+        return row;
     }
 
     private Map<String, Object> lineRow() {
