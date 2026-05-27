@@ -227,6 +227,12 @@ public class DynamicEntityService implements
         return activeRaw(id);
     }
 
+    @Override
+    public String referenceTitle(DynamicRecord entity) {
+        requireCapability(EntityCapability.REFERENCE);
+        return entity == null ? null : entity.getTitle();
+    }
+
     public Map<String, String> titles(Collection<String> ids) {
         requireCapability(EntityCapability.REFERENCE);
         return ReferenceAbility.super.titles(ids);

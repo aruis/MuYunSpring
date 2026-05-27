@@ -767,6 +767,26 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceAbilityShouldPreferDeclaredTitleField() {
+        DemoCustomTitleRecordService service = new DemoCustomTitleRecordService();
+        String id = service.insert(new DemoCustomTitleRecord("Raw title", "Display title"));
+
+        assertThat(service.title(id)).isEqualTo("Display title");
+        assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(new ReferenceOption(id, "Display title"));
+    }
+
+    @Test
+    void referenceAbilityShouldRejectEntityWithoutDeclaredTitleField() {
+        DemoUndeclaredTitleRecordService service = new DemoUndeclaredTitleRecordService();
+        String id = service.insert(new DemoUndeclaredTitleRecord("Undeclared title"));
+
+        assertThatThrownBy(() -> service.title(id))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("requires @TitleField");
+    }
+
+    @Test
     void referenceAbilityShouldKeepTitlesAndOptionsInsideCurrentTenant() {
         DemoOrganizationService service = new DemoOrganizationService();
         String tenantAId;

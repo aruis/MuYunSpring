@@ -5,18 +5,16 @@ import lombok.Setter;
 import net.ximatai.muyun.spring.common.model.StandardEntity;
 import net.ximatai.muyun.spring.common.model.TitleField;
 import net.ximatai.muyun.spring.common.model.TitledCapable;
-import net.ximatai.muyun.spring.common.model.TreeCapable;
 
 @Getter
 @Setter
-final class DemoOrganization extends StandardEntity implements TreeCapable, TitledCapable {
-    private String parentId;
-    @TitleField
+final class DemoCustomTitleRecord extends StandardEntity implements TitledCapable {
     private String title;
-    private Integer sortOrder;
+    @TitleField
+    private String displayName;
 
-    DemoOrganization(String title, String parentId) {
+    DemoCustomTitleRecord(String title, String displayName) {
         this.title = title;
-        this.parentId = parentId;
+        this.displayName = displayName;
     }
 }

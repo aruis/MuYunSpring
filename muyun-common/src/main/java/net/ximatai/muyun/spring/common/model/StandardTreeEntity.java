@@ -12,6 +12,7 @@ public abstract class StandardTreeEntity extends StandardEntity implements TreeC
     @Column(name = PlatformAbilityFields.TREE_PARENT_COLUMN, type = ColumnType.VARCHAR, length = PlatformAbilityFields.TREE_PARENT_LENGTH, comment = "Parent ID")
     private String parentId;
 
+    @TitleField
     @Column(name = PlatformAbilityFields.TITLE_COLUMN, type = ColumnType.VARCHAR, length = PlatformAbilityFields.TITLE_LENGTH, nullable = false, comment = "Title")
     private String title;
 
