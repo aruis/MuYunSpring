@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -367,6 +368,21 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldApplyTenantScopeWhenReorderingDynamicRecords() {
+        IDatabaseOperations<Object> operations = operations();
+        stubSortableRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, sortableEntity()), "sales.contract");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            entityService.reorder(List.of("first", "second", "third"));
+        }
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).allSatisfy(statement -> assertThat(statement).contains("\"tenant_id\" ="));
+    }
+
+    @Test
     void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), sortableEntity()), "sales.contract")
                 .reorder(List.of("same", "same")))
@@ -582,6 +598,7 @@ class DynamicRecordDaoTest {
     private Map<String, Object> row(String id, int sortOrder) {
         return Map.of(
                 "id", id,
+                "tenant_id", "tenant-a",
                 "code", id.toUpperCase(),
                 "amount", BigDecimal.TEN,
                 "sort_order", sortOrder,
@@ -616,13 +633,14 @@ class DynamicRecordDaoTest {
         when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             Map<String, Object> params = invocation.getArgument(1);
-            if (params.containsValue("first")) {
+            String paramText = params.toString();
+            if (paramText.contains("first")) {
                 return List.of(row("first", 1));
             }
-            if (params.containsValue("second")) {
+            if (paramText.contains("second")) {
                 return List.of(row("second", 2));
             }
-            if (params.containsValue("third")) {
+            if (paramText.contains("third")) {
                 return List.of(row("third", 3));
             }
             return List.of(row("first", 1), row("second", 2), row("third", 3));

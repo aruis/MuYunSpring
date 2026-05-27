@@ -350,6 +350,40 @@ class AbilityContractTest {
     }
 
     @Test
+    void sortAbilityShouldKeepReorderScopeInsideCurrentTenant() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String tenantAFirst;
+        String tenantASecond;
+        String tenantBFirst;
+        String tenantBSecond;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAFirst = service.insert(new DemoOrganization("Tenant A First", TreeAbility.ROOT_ID));
+            tenantASecond = service.insert(new DemoOrganization("Tenant A Second", TreeAbility.ROOT_ID));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            tenantBFirst = service.insert(new DemoOrganization("Tenant B First", TreeAbility.ROOT_ID));
+            tenantBSecond = service.insert(new DemoOrganization("Tenant B Second", TreeAbility.ROOT_ID));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            service.reorder(List.of(tenantASecond, tenantAFirst));
+            assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
+                    .containsExactly(tenantASecond, tenantAFirst);
+            assertThatThrownBy(() -> service.reorder(List.of(tenantAFirst, tenantBFirst)))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("missing record");
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
+                    .containsExactly(tenantBFirst, tenantBSecond);
+            service.moveAfter(tenantBFirst, tenantBSecond);
+            assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
+                    .containsExactly(tenantBSecond, tenantBFirst);
+        }
+    }
+
+    @Test
     void sortAbilityShouldRejectCrossParentTreeMove() {
         DemoOrganizationService service = new DemoOrganizationService();
         String firstParent = service.insert(new DemoOrganization("First Parent", TreeAbility.ROOT_ID));
