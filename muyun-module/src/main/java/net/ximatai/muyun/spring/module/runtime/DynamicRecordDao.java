@@ -171,6 +171,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         body.put(StandardEntitySchema.TENANT_ID_COLUMN, record.getTenantId());
         body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
         body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
+        body.put(StandardEntitySchema.DELETED_AT_COLUMN, record.getDeletedAt());
         body.put(StandardEntitySchema.CREATED_BY_COLUMN, record.getCreatedBy());
         body.put(StandardEntitySchema.CREATED_AT_COLUMN, record.getCreatedAt());
         body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
@@ -207,6 +208,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     private Map<String, Object> toDeleteMap(DynamicRecord record) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put(StandardEntitySchema.DELETED_COLUMN, Boolean.TRUE);
+        body.put(StandardEntitySchema.DELETED_AT_COLUMN, record.getDeletedAt());
         body.put(StandardEntitySchema.VERSION_COLUMN, record.getVersion());
         body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
         if (record.getUpdatedBy() != null) {
@@ -230,6 +232,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         record.setTenantId(stringValue(row.get(StandardEntitySchema.TENANT_ID_COLUMN)));
         record.setVersion(numberValue(row.get(StandardEntitySchema.VERSION_COLUMN)));
         record.setDeleted((Boolean) row.get(StandardEntitySchema.DELETED_COLUMN));
+        record.setDeletedAt(instantValue(row.get(StandardEntitySchema.DELETED_AT_COLUMN)));
         record.setCreatedBy(stringValue(row.get(StandardEntitySchema.CREATED_BY_COLUMN)));
         record.setCreatedAt(instantValue(row.get(StandardEntitySchema.CREATED_AT_COLUMN)));
         record.setUpdatedBy(stringValue(row.get(StandardEntitySchema.UPDATED_BY_COLUMN)));

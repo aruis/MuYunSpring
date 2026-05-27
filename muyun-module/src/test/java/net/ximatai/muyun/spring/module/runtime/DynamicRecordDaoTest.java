@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,7 @@ class DynamicRecordDaoTest {
                 .containsEntry("amount", BigDecimal.TEN)
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE);
+        assertThat(body.getValue()).containsEntry("deleted_at", null);
         assertThat(body.getValue()).containsKeys("created_at", "updated_at");
     }
 
@@ -258,6 +260,7 @@ class DynamicRecordDaoTest {
         assertThat(body.getValue())
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 3);
+        assertThat(body.getValue()).containsKey("deleted_at");
         assertThat(where.getValue()).containsEntry("version", 2);
         assertThat(body.getValue()).doesNotContainKeys("code", "amount", "created_at", "created_by");
     }
@@ -337,6 +340,19 @@ class DynamicRecordDaoTest {
                 .startsWith("SELECT COUNT(*) AS total_count FROM \"public\".\"app_contract\"")
                 .contains("\"code\" =")
                 .contains("\"deleted\" =");
+    }
+
+    @Test
+    void shouldResolveDeletedAtAsDynamicStandardField() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordDao dao = dao(operations);
+
+        dao.query(Criteria.of().eq("deletedAt", Instant.parse("2026-01-02T00:00:00Z")), PageRequest.of(1, 10));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations).query(sql.capture(), anyMap());
+        assertThat(sql.getValue()).contains("\"deleted_at\" =");
     }
 
     @Test

@@ -19,6 +19,8 @@ final class DynamicRecordMapping {
         columns.put(StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_COLUMN);
         columns.put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);
         columns.put(StandardEntitySchema.DELETED_COLUMN, StandardEntitySchema.DELETED_COLUMN);
+        columns.put(StandardEntitySchema.DELETED_AT_FIELD, StandardEntitySchema.DELETED_AT_COLUMN);
+        columns.put(StandardEntitySchema.DELETED_AT_COLUMN, StandardEntitySchema.DELETED_AT_COLUMN);
         columns.put(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN);
         columns.put(StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_COLUMN);
         columns.put(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN);

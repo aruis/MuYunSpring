@@ -20,6 +20,18 @@ class PlatformTableValidatorTest {
     }
 
     @Test
+    void shouldRejectMissingDeletedAtColumn() {
+        TableWrapper table = baseTable();
+        StandardEntitySchema.auditColumns().stream()
+                .filter(column -> !"deleted_at".equals(column.getName()))
+                .forEach(table::addColumn);
+
+        assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("missing standard column deleted_at");
+    }
+
+    @Test
     void shouldRejectIdThatIsNotPrimaryKey() {
         TableWrapper table = TableWrapper.withName("demo")
                 .addColumn(Column.of("id").setType(ColumnType.VARCHAR).setLength(32).setNullable(false));

@@ -63,6 +63,7 @@ class DynamicStaticCrudConsistencyTest {
                 .containsEntry("tenant_id", "tenant-a")
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE)
+                .containsEntry("deleted_at", null)
                 .containsKeys("created_at", "updated_at");
 
         ArgumentCaptor<Map<String, Object>> patchBody = mapCaptor();
@@ -75,7 +76,7 @@ class DynamicStaticCrudConsistencyTest {
         assertThat(patchBody.getAllValues().get(1))
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 1)
-                .containsKey("updated_at");
+                .containsKeys("deleted_at", "updated_at");
 
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(querySql.capture(), anyMap());

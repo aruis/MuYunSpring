@@ -35,6 +35,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     private String tenantId;
     private Integer version;
     private Boolean deleted;
+    private Instant deletedAt;
     private String createdBy;
     private Instant createdAt;
     private String updatedBy;
@@ -103,6 +104,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
         copy.tenantId = tenantId;
         copy.version = version;
         copy.deleted = deleted;
+        copy.deletedAt = deletedAt;
         copy.createdBy = createdBy;
         copy.createdAt = createdAt;
         copy.updatedBy = updatedBy;
@@ -298,6 +300,16 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     @Override
     public void setDeleted(Boolean deleted) {
         this.deleted = deleted;
+    }
+
+    @Override
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    @Override
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 
     @Override

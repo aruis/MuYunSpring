@@ -235,6 +235,7 @@ class OrganizationRepositoryContractTest {
         columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
         columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
         columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));
+        columns.put("deleted_at", column("deleted_at", "TIMESTAMP", null, true, false, "Deleted at"));
         columns.put("created_by", column("created_by", "VARCHAR", 64, true, false, "Created by"));
         columns.put("created_at", column("created_at", "TIMESTAMP", null, true, false, "Created at"));
         columns.put("updated_by", column("updated_by", "VARCHAR", 64, true, false, "Updated by"));
@@ -272,6 +273,7 @@ class OrganizationRepositoryContractTest {
         columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
         columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
         columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));
+        columns.put("deleted_at", column("deleted_at", "TIMESTAMP", null, true, false, "Deleted at"));
         columns.put("created_by", column("created_by", "VARCHAR", 64, true, false, "Created by"));
         columns.put("created_at", column("created_at", "TIMESTAMP", null, true, false, "Created at"));
         columns.put("updated_by", column("updated_by", "VARCHAR", 64, true, false, "Updated by"));

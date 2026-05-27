@@ -62,9 +62,11 @@ class DynamicRecordTest {
         DynamicRecord record = new DynamicRecord(jsonEntity())
                 .setValue("payload", payload);
         record.setTenantId("tenant-a");
+        record.setDeletedAt(Instant.parse("2026-01-02T00:00:00Z"));
 
         DynamicRecord copy = record.copy();
         assertThat(copy.getTenantId()).isEqualTo("tenant-a");
+        assertThat(copy.getDeletedAt()).isEqualTo(Instant.parse("2026-01-02T00:00:00Z"));
         @SuppressWarnings("unchecked")
         Map<String, Object> copiedPayload = (Map<String, Object>) copy.getValue("payload");
         @SuppressWarnings("unchecked")

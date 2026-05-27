@@ -24,6 +24,9 @@ public abstract class StandardEntity implements EntityContract {
     @Column(name = "deleted", type = ColumnType.BOOLEAN, comment = "Soft delete flag")
     private Boolean deleted;
 
+    @Column(name = "deleted_at", type = ColumnType.TIMESTAMP, comment = "Deleted at")
+    private Instant deletedAt;
+
     @Column(name = "created_by", type = ColumnType.VARCHAR, length = 64, comment = "Created by")
     private String createdBy;
 

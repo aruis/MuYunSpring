@@ -19,6 +19,10 @@ public interface EntityContract {
 
     void setDeleted(Boolean deleted);
 
+    Instant getDeletedAt();
+
+    void setDeletedAt(Instant deletedAt);
+
     String getCreatedBy();
 
     void setCreatedBy(String createdBy);

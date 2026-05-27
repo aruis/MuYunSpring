@@ -16,6 +16,7 @@ public final class EntityLifecycle {
         TenantContext.applyToNewEntity(model);
         model.setVersion(model.getVersion() == null ? 0 : model.getVersion());
         model.setDeleted(Boolean.FALSE);
+        model.setDeletedAt(null);
         model.setCreatedAt(model.getCreatedAt() == null ? now : model.getCreatedAt());
         model.setUpdatedAt(now);
     }
@@ -31,6 +32,7 @@ public final class EntityLifecycle {
 
     public static void prepareDelete(EntityContract model, Instant now) {
         model.setDeleted(Boolean.TRUE);
+        model.setDeletedAt(now);
         prepareUpdate(model, now);
     }
 

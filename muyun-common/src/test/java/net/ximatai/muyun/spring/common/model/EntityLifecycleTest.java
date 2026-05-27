@@ -19,6 +19,7 @@ class EntityLifecycleTest {
         assertThat(model.getId()).hasSize(32);
         assertThat(model.getVersion()).isZero();
         assertThat(model.getDeleted()).isFalse();
+        assertThat(model.getDeletedAt()).isNull();
         assertThat(model.getCreatedAt()).isEqualTo(createdAt);
         assertThat(model.getUpdatedAt()).isEqualTo(now);
     }
@@ -37,6 +38,7 @@ class EntityLifecycleTest {
         EntityLifecycle.prepareDelete(model, now.plusSeconds(1));
 
         assertThat(model.getDeleted()).isTrue();
+        assertThat(model.getDeletedAt()).isEqualTo(now.plusSeconds(1));
         assertThat(model.getVersion()).isEqualTo(5);
         assertThat(model.getUpdatedAt()).isEqualTo(now.plusSeconds(1));
     }
