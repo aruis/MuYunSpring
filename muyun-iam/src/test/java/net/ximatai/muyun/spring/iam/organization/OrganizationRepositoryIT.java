@@ -1,9 +1,13 @@
 package net.ximatai.muyun.spring.iam.organization;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
 import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -124,6 +128,16 @@ class OrganizationRepositoryIT {
         @Bean
         OrganizationService organizationService(OrganizationDao organizationDao) {
             return new OrganizationService(organizationDao);
+        }
+
+        @Bean
+        EntityMetaResolver entityMetaResolver() {
+            return PlatformEntityManagers.entityMetaResolver();
+        }
+
+        @Bean
+        SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations, EntityMetaResolver entityMetaResolver) {
+            return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver);
         }
     }
 }

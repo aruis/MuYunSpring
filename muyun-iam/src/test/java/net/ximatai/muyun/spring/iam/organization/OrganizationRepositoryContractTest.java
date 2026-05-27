@@ -2,18 +2,26 @@ package net.ximatai.muyun.spring.iam.organization;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.IMetaDataLoader;
+import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.metadata.DBColumn;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.metadata.DBIndex;
 import net.ximatai.muyun.database.core.metadata.DBSchema;
 import net.ximatai.muyun.database.core.metadata.DBTable;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.spring.boot.sql.MuYunRepositoryFactory;
+import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
@@ -41,6 +49,7 @@ import static org.mockito.Mockito.when;
 class OrganizationRepositoryContractTest {
     private static final String SCHEMA = "public";
     private static final String TABLE = "iam_organization";
+    private static final String DEMO_TABLE = "demo_static_repository_entity";
 
     @Test
     void abilityServiceShouldUseMuYunRepositoryProxyForInsert() {
@@ -97,6 +106,17 @@ class OrganizationRepositoryContractTest {
     }
 
     @Test
+    void repositoryEnsureTableShouldUsePlatformStaticMapperForColumnUnique() {
+        IDatabaseOperations<Object> operations = mockedOperationsWithExistingDemoStaticTable();
+
+        repository(operations, DemoStaticRepositoryDao.class).ensureTable();
+
+        verify(operations).execute(contains("drop index"));
+        verify(operations).execute(contains("\"tenant_id\",\"code\""));
+        verify(operations, never()).execute(contains("unique (\"code\")"));
+    }
+
+    @Test
     void staticModelMapperShouldCompileOrganizationAsPlatformTable() {
         TableWrapper table = new StaticEntityTableMapper().toTable(Organization.class);
 
@@ -147,7 +167,17 @@ class OrganizationRepositoryContractTest {
     }
 
     private OrganizationDao repository(IDatabaseOperations<Object> operations) {
-        return new MuYunRepositoryFactory(operations, new MockEnvironment()).create(OrganizationDao.class);
+        return repository(operations, OrganizationDao.class);
+    }
+
+    private <T> T repository(IDatabaseOperations<Object> operations, Class<T> daoType) {
+        EntityMetaResolver entityMetaResolver = PlatformEntityManagers.entityMetaResolver();
+        return new MuYunRepositoryFactory(
+                operations,
+                new MockEnvironment(),
+                null,
+                PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver)
+        ).create(daoType);
     }
 
     private Set<String> columnNames(TableWrapper table) {
@@ -217,6 +247,39 @@ class OrganizationRepositoryContractTest {
         return columns;
     }
 
+    @SuppressWarnings("unchecked")
+    private IDatabaseOperations<Object> mockedOperationsWithExistingDemoStaticTable() {
+        IMetaDataLoader loader = mock(IMetaDataLoader.class);
+        DBInfo dbInfo = new DBInfo("POSTGRESQL").setName("muyun_test");
+        DBSchema schema = new DBSchema(SCHEMA);
+        schema.addTable(new DBTable(loader).setName(DEMO_TABLE).setSchema(SCHEMA));
+        dbInfo.addSchema(schema);
+
+        when(loader.getDBInfo()).thenReturn(dbInfo);
+        when(loader.getColumnMap(SCHEMA, DEMO_TABLE)).thenReturn(demoStaticColumns());
+        when(loader.getIndexList(SCHEMA, DEMO_TABLE)).thenReturn(List.of(index("demo_static_code_uindex", true, "code")));
+
+        IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+        when(operations.getMetaDataLoader()).thenReturn(loader);
+        when(operations.getDBInfo()).thenReturn(dbInfo);
+        when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        return operations;
+    }
+
+    private Map<String, DBColumn> demoStaticColumns() {
+        Map<String, DBColumn> columns = new LinkedHashMap<>();
+        columns.put("id", column("id", "VARCHAR", 32, false, true, "ID"));
+        columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
+        columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
+        columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));
+        columns.put("created_by", column("created_by", "VARCHAR", 64, true, false, "Created by"));
+        columns.put("created_at", column("created_at", "TIMESTAMP", null, true, false, "Created at"));
+        columns.put("updated_by", column("updated_by", "VARCHAR", 64, true, false, "Updated by"));
+        columns.put("updated_at", column("updated_at", "TIMESTAMP", null, true, false, "Updated at"));
+        columns.put("code", column("code", "VARCHAR", 64, false, false, "Code"));
+        return columns;
+    }
+
     private DBColumn column(String name, String type, Integer length, boolean nullable, boolean primaryKey, String description) {
         DBColumn column = new DBColumn();
         column.setName(name);
@@ -241,5 +304,15 @@ class OrganizationRepositoryContractTest {
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<Map<String, Object>> mapCaptor() {
         return ArgumentCaptor.forClass(Map.class);
+    }
+
+    @Table(name = DEMO_TABLE, comment = "Demo static repository entity")
+    private static class DemoStaticRepositoryEntity extends StandardEntity {
+        @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, unique = true)
+        private String code;
+    }
+
+    @MuYunRepository
+    private interface DemoStaticRepositoryDao extends BaseDao<DemoStaticRepositoryEntity, String> {
     }
 }
