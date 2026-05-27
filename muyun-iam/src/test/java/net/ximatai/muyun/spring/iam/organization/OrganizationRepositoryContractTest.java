@@ -110,6 +110,11 @@ class OrganizationRepositoryContractTest {
                     assertThat(column.getLength()).isEqualTo(64);
                     assertThat(column.isNullable()).isFalse();
                 });
+        assertThat(table.getIndexes())
+                .anySatisfy(index -> {
+                    assertThat(index.isUnique()).isTrue();
+                    assertThat(index.getColumns()).containsExactly("tenant_id", "code");
+                });
     }
 
     @Test
@@ -170,7 +175,7 @@ class OrganizationRepositoryContractTest {
 
         when(loader.getDBInfo()).thenReturn(dbInfo);
         when(loader.getColumnMap(SCHEMA, TABLE)).thenReturn(organizationColumns());
-        when(loader.getIndexList(SCHEMA, TABLE)).thenReturn(List.of(index("iam_organization_code_uindex", true, "code")));
+        when(loader.getIndexList(SCHEMA, TABLE)).thenReturn(List.of(index("iam_organization_tenant_code_uindex", true, "tenant_id", "code")));
 
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getMetaDataLoader()).thenReturn(loader);
@@ -223,8 +228,12 @@ class OrganizationRepositoryContractTest {
         return column;
     }
 
-    private DBIndex index(String name, boolean unique, String column) {
-        return new DBIndex().setName(name).setUnique(unique).addColumn(column);
+    private DBIndex index(String name, boolean unique, String... columns) {
+        DBIndex index = new DBIndex().setName(name).setUnique(unique);
+        for (String column : columns) {
+            index.addColumn(column);
+        }
+        return index;
     }
 
     @SuppressWarnings("unchecked")

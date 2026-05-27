@@ -37,7 +37,7 @@ class DynamicTableMapperTest {
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isTrue();
-                    assertThat(index.getColumns()).containsExactly("code");
+                    assertThat(index.getColumns()).containsExactly("tenant_id", "code");
                 })
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isFalse();
@@ -160,7 +160,7 @@ class DynamicTableMapperTest {
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isTrue();
-                    assertThat(index.getColumns()).containsExactly("code");
+                    assertThat(index.getColumns()).containsExactly("tenant_id", "code");
                 })
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isFalse();

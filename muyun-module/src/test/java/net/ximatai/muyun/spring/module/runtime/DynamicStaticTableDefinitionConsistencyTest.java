@@ -29,6 +29,8 @@ class DynamicStaticTableDefinitionConsistencyTest {
         assertThat(staticTable.getPrimaryKey().getName()).isEqualTo(dynamicTable.getPrimaryKey().getName());
         assertThat(staticTable.getPrimaryKey().getType()).isEqualTo(dynamicTable.getPrimaryKey().getType());
         assertThat(staticTable.getPrimaryKey().getLength()).isEqualTo(dynamicTable.getPrimaryKey().getLength());
+        assertThat(uniqueIndexes(staticTable)).contains(List.of("tenant_id", "code"));
+        assertThat(uniqueIndexes(dynamicTable)).contains(List.of("tenant_id", "code"));
     }
 
     private Set<String> columnNames(TableWrapper table) {
@@ -38,6 +40,13 @@ class DynamicStaticTableDefinitionConsistencyTest {
         }
         table.getColumns().forEach(column -> names.add(column.getName()));
         return names;
+    }
+
+    private List<List<String>> uniqueIndexes(TableWrapper table) {
+        return table.getIndexes().stream()
+                .filter(index -> index.isUnique())
+                .map(index -> List.copyOf(index.getColumns()))
+                .toList();
     }
 
     private EntityDefinition dynamicContract() {

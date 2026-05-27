@@ -35,6 +35,11 @@ class StaticEntityTableMapperTest {
                     assertThat(column.getLength()).isEqualTo(64);
                     assertThat(column.isNullable()).isFalse();
                 });
+        assertThat(table.getIndexes())
+                .anySatisfy(index -> {
+                    assertThat(index.isUnique()).isTrue();
+                    assertThat(index.getColumns()).containsExactly("tenant_id", "code");
+                });
     }
 
     @Test
@@ -58,7 +63,7 @@ class StaticEntityTableMapperTest {
         @Column(name = "parent_id", type = ColumnType.VARCHAR, length = 32)
         private String parentId;
 
-        @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false)
+        @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, unique = true)
         private String code;
 
         @Column(name = "name", type = ColumnType.VARCHAR, length = 128, nullable = false)
