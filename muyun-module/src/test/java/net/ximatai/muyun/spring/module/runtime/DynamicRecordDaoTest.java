@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -127,6 +128,13 @@ class DynamicRecordDaoTest {
     @Test
     void shouldUpdateByTableColumnsAndIncrementVersion() {
         IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-000",
+                "amount", BigDecimal.ONE,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
@@ -180,9 +188,7 @@ class DynamicRecordDaoTest {
                 .setValue("amount", BigDecimal.ONE);
         record.setId("contract-1");
 
-        assertThatThrownBy(() -> entityService(operations).update(record))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not found");
+        assertThat(entityService(operations).update(record)).isZero();
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations).query(sql.capture(), anyMap());
@@ -190,6 +196,7 @@ class DynamicRecordDaoTest {
                 .contains("\"id\" =")
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL");
+        verify(operations, never()).patchUpdateItem(anyString(), anyString(), anyString(), anyMap());
     }
 
     @Test

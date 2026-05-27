@@ -77,6 +77,30 @@ class AbilityContractTest {
     }
 
     @Test
+    void softDeleteAbilityShouldUpdateActiveRecordsOnly() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String id = service.insert(new DemoOrganization("Active", TreeAbility.ROOT_ID));
+
+        DemoOrganization maliciousSoftDelete = new DemoOrganization("Updated", TreeAbility.ROOT_ID);
+        maliciousSoftDelete.setId(id);
+        maliciousSoftDelete.setDeleted(Boolean.TRUE);
+
+        assertThat(service.update(maliciousSoftDelete)).isEqualTo(1);
+        assertThat(service.select(id).getTitle()).isEqualTo("Updated");
+        assertThat(service.select(id).getDeleted()).isFalse();
+
+        assertThat(service.delete(id)).isEqualTo(1);
+        DemoOrganization resurrect = new DemoOrganization("Resurrect", TreeAbility.ROOT_ID);
+        resurrect.setId(id);
+        resurrect.setDeleted(Boolean.FALSE);
+
+        assertThat(service.update(resurrect)).isZero();
+        assertThat(service.select(id)).isNull();
+        assertThat(service.selectIgnoreSoftDelete(id).getTitle()).isEqualTo("Updated");
+        assertThat(service.selectIgnoreSoftDelete(id).getDeleted()).isTrue();
+    }
+
+    @Test
     void crudAbilityShouldStayNeutralWithoutSoftDeleteAbility() {
         DemoPlainRecordService service = new DemoPlainRecordService();
         DemoPlainRecord first = new DemoPlainRecord("First");

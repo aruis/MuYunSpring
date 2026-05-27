@@ -128,7 +128,7 @@ class DynamicRecordServiceTest {
         DynamicRecord third = service.select(MODULE, "contract", "contract-1");
 
         assertThat(third.getValue("code")).isEqualTo("C-002");
-        verify(operations, org.mockito.Mockito.times(2)).query(anyString(), anyMap());
+        verify(operations, org.mockito.Mockito.times(3)).query(anyString(), anyMap());
     }
 
     @SuppressWarnings("unchecked")

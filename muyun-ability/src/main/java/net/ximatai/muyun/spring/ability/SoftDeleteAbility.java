@@ -35,6 +35,20 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
     }
 
     @Override
+    default int update(T entity) {
+        if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
+            return 0;
+        }
+        T active = selectActiveRaw(entity.getId());
+        if (active == null) {
+            return 0;
+        }
+        entity.setTenantId(active.getTenantId());
+        entity.setDeleted(Boolean.FALSE);
+        return CrudAbility.super.update(entity);
+    }
+
+    @Override
     default int delete(String id) {
         beforeDelete(id);
         T entity = selectIgnoreSoftDelete(id);
