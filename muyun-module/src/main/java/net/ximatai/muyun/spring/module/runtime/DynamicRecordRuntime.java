@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
@@ -8,7 +9,7 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class DynamicRecordRuntime {
+public class DynamicRecordRuntime implements AutoCloseable {
     private static final AtomicLong CACHE_NAMESPACE_SEQUENCE = new AtomicLong();
 
     private final IDatabaseOperations<?> operations;
@@ -64,5 +65,14 @@ public class DynamicRecordRuntime {
                 childEntityCode -> entityService(moduleAlias, childEntityCode),
                 cacheNamespacePrefix
         );
+    }
+
+    public void clearCache() {
+        CacheRegistry.clearNamespacePrefix(cacheNamespacePrefix);
+    }
+
+    @Override
+    public void close() {
+        clearCache();
     }
 }

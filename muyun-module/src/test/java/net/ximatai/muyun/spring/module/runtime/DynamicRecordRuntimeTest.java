@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
@@ -89,6 +90,29 @@ class DynamicRecordRuntimeTest {
         assertThat(querySql.getAllValues()).anySatisfy(sql -> assertThat(sql)
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL"));
+    }
+
+    @Test
+    void shouldClearRuntimeCacheByNamespacePrefix() {
+        CacheRegistry.clearAll();
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
+                .register(contractModule());
+        DynamicEntityService entityService = runtime.entityService("sales.contract", "contract");
+
+        assertThat(entityService.select("contract-1")).isNotNull();
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
+
+        runtime.close();
+
+        assertThat(CacheRegistry.namespaceCount()).isZero();
     }
 
     @SuppressWarnings("unchecked")

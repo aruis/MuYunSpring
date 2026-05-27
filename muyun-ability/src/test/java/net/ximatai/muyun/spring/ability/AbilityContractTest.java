@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,6 +13,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AbilityContractTest {
+    @AfterEach
+    void clearGlobalState() {
+        CacheRegistry.clearAll();
+        TenantContext.clear();
+    }
+
     @Test
     void crudAbilityShouldFillStandardFieldsAndSoftDelete() {
         DemoOrganizationService service = new DemoOrganizationService();
@@ -412,6 +419,51 @@ class AbilityContractTest {
         assertThat(firstService.select(id)).isNotNull();
 
         assertThat(secondService.select(id)).isNull();
+    }
+
+    @Test
+    void cacheRegistryShouldClearNamespacesByPrefix() {
+        DemoCachedPlainRecordService firstService = new DemoCachedPlainRecordService();
+        DemoCachedPlainRecordService secondService = new DemoCachedPlainRecordService();
+        String firstId = firstService.insert(new DemoPlainRecord("First namespace"));
+        String secondId = secondService.insert(new DemoPlainRecord("Second namespace"));
+        firstService.select(firstId);
+        secondService.select(secondId);
+
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(2);
+
+        CacheRegistry.clearNamespacePrefix(firstService.cacheNamespace());
+
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
+        assertThat(firstService.select(firstId)).isNotNull();
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(2);
+    }
+
+    @Test
+    void cacheRegistryShouldClearNamespacePrefixBySegmentBoundary() {
+        CacheRegistry.itemCache("dynamic-runtime-1::sales.contract").put("first", new DemoPlainRecord("First"));
+        CacheRegistry.itemCache("dynamic-runtime-10::sales.contract").put("second", new DemoPlainRecord("Second"));
+
+        CacheRegistry.clearNamespacePrefix("dynamic-runtime-1");
+
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
+        assertThat(CacheRegistry.itemCache("dynamic-runtime-10::sales.contract")).containsKey("second");
+    }
+
+    @Test
+    void cacheInvalidationShouldNotCreateEmptyItemNamespaceWhenOnlyAllCacheExists() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("All cache only");
+        String id = service.insert(record);
+        service.selectAllWithCache();
+
+        assertThat(CacheRegistry.namespaceCount()).isEqualTo(1);
+
+        DemoPlainRecord update = new DemoPlainRecord("Updated");
+        update.setId(id);
+        service.update(update);
+
+        assertThat(CacheRegistry.namespaceCount()).isZero();
     }
 
     @Test
