@@ -458,6 +458,28 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceAbilityShouldKeepTitlesAndOptionsInsideCurrentTenant() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String tenantAId;
+        String tenantBId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAId = service.insert(new DemoOrganization("Tenant A", TreeAbility.ROOT_ID));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            tenantBId = service.insert(new DemoOrganization("Tenant B", TreeAbility.ROOT_ID));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.title(tenantAId)).isEqualTo("Tenant A");
+            assertThat(service.title(tenantBId)).isNull();
+            assertThat(service.titles(List.of(tenantBId, tenantAId)))
+                    .containsExactly(Map.entry(tenantAId, "Tenant A"));
+            assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                    .containsExactly(new ReferenceOption(tenantAId, "Tenant A"));
+        }
+    }
+
+    @Test
     void referenceAbilityShouldHideDeletedTitlesInBatch() {
         DemoOrganizationService service = new DemoOrganizationService();
         String activeId = service.insert(new DemoOrganization("Active", TreeAbility.ROOT_ID));

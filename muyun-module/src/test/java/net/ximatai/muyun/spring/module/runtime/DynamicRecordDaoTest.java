@@ -423,6 +423,27 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldApplyTenantScopeWhenResolvingDynamicReferences() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                referenceRow("contract-1", "Contract One"),
+                referenceRow("contract-2", "Contract Two")
+        ));
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, referenceEntity()), "sales.contract");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            entityService.title("contract-1");
+            entityService.titles(List.of("contract-1", "contract-2"));
+            entityService.referenceOptions(Criteria.of(), PageRequest.of(1, 10));
+        }
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).allSatisfy(statement -> assertThat(statement).contains("\"tenant_id\" ="));
+    }
+
+    @Test
     void shouldReuseTreeAbilityForDynamicRecordsWhenMetadataEnablesTree() {
         IDatabaseOperations<Object> operations = operations();
         stubTreeRows(operations);
@@ -449,6 +470,23 @@ class DynamicRecordDaoTest {
                 .patchUpdateItem(eq(SCHEMA), eq(TABLE), anyString(), body.capture());
         assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
         assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
+    }
+
+    @Test
+    void shouldApplyTenantScopeWhenResolvingDynamicTree() {
+        IDatabaseOperations<Object> operations = operations();
+        stubTreeRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            entityService.children("root");
+            entityService.ancestorIds("A1");
+            entityService.descendantIds("A");
+        }
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).allSatisfy(statement -> assertThat(statement).contains("\"tenant_id\" ="));
     }
 
     @Test
@@ -610,6 +648,7 @@ class DynamicRecordDaoTest {
     private Map<String, Object> treeRow(String id, String parentId, int sortOrder) {
         return Map.of(
                 "id", id,
+                "tenant_id", "tenant-a",
                 "code", id,
                 "parent_id", parentId,
                 "sort_order", sortOrder,
@@ -621,6 +660,7 @@ class DynamicRecordDaoTest {
     private Map<String, Object> referenceRow(String id, String name) {
         return Map.of(
                 "id", id,
+                "tenant_id", "tenant-a",
                 "code", id.toUpperCase(),
                 "title", name,
                 "amount", BigDecimal.TEN,
