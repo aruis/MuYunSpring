@@ -20,12 +20,17 @@ public class DynamicModulePublisher {
         return publish(module, MigrationOptions.execute());
     }
 
+    public DynamicModulePublishResult preview(ModuleDefinition module) {
+        return publish(module, MigrationOptions.dryRun());
+    }
+
     public DynamicModulePublishResult publish(ModuleDefinition module, MigrationOptions options) {
+        MigrationOptions safeOptions = options == null ? MigrationOptions.execute() : options;
         ModuleDefinition previousModule = runtime.registry().findModule(module.moduleAlias()).orElse(null);
-        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, options);
-        if (migrations.values().stream().noneMatch(MigrationResult::isDryRun)) {
+        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, safeOptions);
+        if (!safeOptions.isDryRun()) {
             runtime.publish(module);
         }
-        return new DynamicModulePublishResult(module, migrations);
+        return new DynamicModulePublishResult(module, migrations, safeOptions.isDryRun());
     }
 }

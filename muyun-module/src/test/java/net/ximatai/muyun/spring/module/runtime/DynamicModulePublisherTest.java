@@ -41,8 +41,9 @@ class DynamicModulePublisherTest {
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
         DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.publish(contractModule(), MigrationOptions.dryRun());
+        DynamicModulePublishResult result = publisher.preview(contractModule());
 
+        assertThat(result.dryRun()).isTrue();
         assertThat(result.migrations().get("contract").isDryRun()).isTrue();
         assertThatThrownBy(() -> runtime.entityService("sales.contract", "contract"))
                 .isInstanceOf(ModuleDefinitionException.class)
@@ -56,8 +57,9 @@ class DynamicModulePublisherTest {
                 .register(contractModule());
         DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.publish(evolvedContractModule(), MigrationOptions.dryRun());
+        DynamicModulePublishResult result = publisher.preview(evolvedContractModule());
 
+        assertThat(result.dryRun()).isTrue();
         assertThat(result.migrations().get("contract").isDryRun()).isTrue();
         assertThat(schemaService.previousModules.get("sales.contract")).isEqualTo(contractModule());
         assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
@@ -94,6 +96,34 @@ class DynamicModulePublisherTest {
         assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "amount");
+    }
+
+    @Test
+    void shouldExposePublishResultSummaryWithoutTraversingMigrations() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(true, true);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        DynamicModulePublishResult result = publisher.preview(contractModule());
+
+        assertThat(result.changed()).isTrue();
+        assertThat(result.dryRun()).isTrue();
+        assertThat(result.hasNonAdditiveChanges()).isTrue();
+        assertThat(result.statementsByEntity()).containsEntry("contract", List.of("alter table app_contract drop column name"));
+    }
+
+    @Test
+    void shouldKeepPreviewSideEffectFreeEvenWhenSchemaReturnsNoMigrations() {
+        EmptySchemaService schemaService = new EmptySchemaService();
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        DynamicModulePublishResult result = publisher.preview(emptyModule());
+
+        assertThat(result.dryRun()).isTrue();
+        assertThat(result.changed()).isFalse();
+        assertThat(schemaService.lastOptions.isDryRun()).isTrue();
+        assertThat(runtime.registry().findModule("sales.empty")).isEmpty();
     }
 
     @Test
@@ -141,6 +171,10 @@ class DynamicModulePublisherTest {
         return new ModuleDefinition("sales.contract", "Contract", List.of(entity("contract", "app_contract")));
     }
 
+    private ModuleDefinition emptyModule() {
+        return new ModuleDefinition("sales.empty", "Empty", List.of());
+    }
+
     private ModuleDefinition evolvedContractModule() {
         return new ModuleDefinition(
                 "sales.contract",
@@ -175,24 +209,38 @@ class DynamicModulePublisherTest {
         private final boolean dryRun;
         private final List<String> ensuredEntities = new java.util.ArrayList<>();
         private final Map<String, ModuleDefinition> previousModules = new LinkedHashMap<>();
+        private MigrationOptions lastOptions;
 
         RecordingSchemaService(boolean dryRun) {
+            this(dryRun, false);
+        }
+
+        RecordingSchemaService(boolean dryRun, boolean nonAdditive) {
             super(null);
             this.dryRun = dryRun;
+            this.nonAdditive = nonAdditive;
         }
+
+        private final boolean nonAdditive;
 
         @Override
         public Map<String, MigrationResult> ensureModule(ModuleDefinition module,
                                                          ModuleDefinition previousModule,
                                                          MigrationOptions options) {
             new net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator().validate(module);
+            lastOptions = options;
             if (previousModule != null) {
                 previousModules.put(module.moduleAlias(), previousModule);
             }
             Map<String, MigrationResult> results = new LinkedHashMap<>();
             for (EntityDefinition entity : module.entities()) {
                 ensuredEntities.add(entity.code());
-                results.put(entity.code(), new MigrationResult(true, dryRun, false, List.of()));
+                results.put(entity.code(), new MigrationResult(
+                        true,
+                        dryRun,
+                        nonAdditive,
+                        nonAdditive ? List.of("alter table app_contract drop column name") : List.of()
+                ));
             }
             return results;
         }
@@ -208,6 +256,22 @@ class DynamicModulePublisherTest {
                                                          ModuleDefinition previousModule,
                                                          MigrationOptions options) {
             throw new IllegalStateException("schema failed");
+        }
+    }
+
+    private static class EmptySchemaService extends DynamicSchemaService {
+        private MigrationOptions lastOptions;
+
+        EmptySchemaService() {
+            super(null);
+        }
+
+        @Override
+        public Map<String, MigrationResult> ensureModule(ModuleDefinition module,
+                                                         ModuleDefinition previousModule,
+                                                         MigrationOptions options) {
+            lastOptions = options;
+            return Map.of();
         }
     }
 }

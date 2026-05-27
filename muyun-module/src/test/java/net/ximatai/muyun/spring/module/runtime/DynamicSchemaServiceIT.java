@@ -328,11 +328,11 @@ class DynamicSchemaServiceIT {
         String firstId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
                 .setValue("code", "C-EVOLVE-001"));
 
-        DynamicModulePublishResult dryRun = publisher.publish(evolvedModule, MigrationOptions.dryRun());
+        DynamicModulePublishResult dryRun = publisher.preview(evolvedModule);
 
         assertThat(dryRun.changed()).isTrue();
-        assertThat(dryRun.migrations().get("contract").isDryRun()).isTrue();
-        assertThat(dryRun.migrations().get("contract").getStatements())
+        assertThat(dryRun.dryRun()).isTrue();
+        assertThat(dryRun.statementsByEntity().get("contract"))
                 .anyMatch(sql -> sql.contains(" add ") && sql.contains("\"name\""))
                 .anyMatch(sql -> sql.contains(" add ") && sql.contains("\"amount\""));
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
@@ -373,10 +373,11 @@ class DynamicSchemaServiceIT {
                 ))
         );
 
-        DynamicModulePublishResult dropDryRun = publisher.publish(removedFieldModule, MigrationOptions.dryRun());
+        DynamicModulePublishResult dropDryRun = publisher.preview(removedFieldModule);
 
-        assertThat(dropDryRun.migrations().get("contract").hasNonAdditiveChanges()).isTrue();
-        assertThat(dropDryRun.migrations().get("contract").getStatements())
+        assertThat(dropDryRun.dryRun()).isTrue();
+        assertThat(dropDryRun.hasNonAdditiveChanges()).isTrue();
+        assertThat(dropDryRun.statementsByEntity().get("contract"))
                 .anyMatch(sql -> sql.contains("drop column \"name\""));
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
                 .extracting(FieldDefinition::fieldName)
