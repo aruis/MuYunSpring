@@ -113,7 +113,7 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
             if (existingIds.contains(childId)) {
                 continue;
             }
-            C loaded = childAbility.selectIgnoreSoftDeleteIfPossible(childId);
+            C loaded = childAbility.getDao().findById(childId);
             if (loaded != null) {
                 throw new AbilityException("Child record does not belong to parent " + parentId + ": " + childId);
             }

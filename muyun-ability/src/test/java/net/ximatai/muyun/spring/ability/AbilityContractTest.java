@@ -174,6 +174,36 @@ class AbilityContractTest {
     }
 
     @Test
+    void childrenAbilityShouldKeepAggregationInsideCurrentTenant() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        String tenantAInvoiceId;
+        DemoInvoiceLine tenantBLine;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAInvoiceId = invoiceService.insert(new DemoInvoice("Tenant A invoice", List.of(new DemoInvoiceLine("Tenant A line"))));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            DemoInvoice tenantBInvoice = new DemoInvoice("Tenant B invoice", List.of(new DemoInvoiceLine("Tenant B line")));
+            invoiceService.insert(tenantBInvoice);
+            tenantBLine = tenantBInvoice.getLines().getFirst();
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoInvoice selected = invoiceService.select(tenantAInvoiceId);
+            assertThat(selected.getLines())
+                    .extracting(DemoInvoiceLine::getTitle)
+                    .containsExactly("Tenant A line");
+            selected.setLines(List.of(tenantBLine));
+            assertThatThrownBy(() -> invoiceService.update(selected))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("does not belong to parent");
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(invoiceService.lineService().select(tenantBLine.getId()).getTitle()).isEqualTo("Tenant B line");
+        }
+    }
+
+    @Test
     void childrenAbilityShouldRejectInvalidChildIdsOnParentInsert() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine duplicateLine = new DemoInvoiceLine("Duplicate line");

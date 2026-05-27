@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionValidator;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -57,6 +58,26 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldInsertDynamicChildrenWithCurrentTenant() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        DynamicRecord line = runtime.newRecord(MODULE, "invoice_line").setValue("title", "L-001");
+        invoice.setChildren("lines", List.of(line));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            runtime.entityService(MODULE, "invoice").insert(invoice);
+        }
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        assertThat(body.getAllValues().get(0)).containsEntry("tenant_id", "tenant-a");
+        assertThat(body.getAllValues().get(1)).containsEntry("tenant_id", "tenant-a");
+    }
+
+    @Test
     void shouldAutoPopulateAndCascadeDeleteDynamicChildren() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);
@@ -81,6 +102,25 @@ class DynamicRelationRuntimeTest {
         assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
         assertThat(id.getAllValues()).containsExactly("invoice-1", "line-1");
         assertThat(body.getAllValues().get(1)).containsEntry("deleted", Boolean.TRUE);
+    }
+
+    @Test
+    void shouldApplyTenantScopeWhenPopulatingAndCascadingDynamicChildren() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        when(operations.patchUpdateItem(eq(SCHEMA), anyString(), anyString(), anyMap())).thenReturn(1);
+        DynamicEntityService invoiceService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            invoiceService.select("invoice-1");
+            invoiceService.delete("invoice-1");
+        }
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).allSatisfy(statement -> assertThat(statement).contains("\"tenant_id\" ="));
     }
 
     @Test
@@ -280,6 +320,7 @@ class DynamicRelationRuntimeTest {
     private Map<String, Object> invoiceRow() {
         return Map.of(
                 "id", "invoice-1",
+                "tenant_id", "tenant-a",
                 "title", "I-001",
                 "deleted", Boolean.FALSE,
                 "version", 1
@@ -293,6 +334,7 @@ class DynamicRelationRuntimeTest {
     private Map<String, Object> lineRow(String title) {
         return Map.of(
                 "id", "line-1",
+                "tenant_id", "tenant-a",
                 "invoice_id", "invoice-1",
                 "title", title,
                 "deleted", Boolean.FALSE,
