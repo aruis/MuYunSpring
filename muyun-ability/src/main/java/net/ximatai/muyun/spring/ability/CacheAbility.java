@@ -52,12 +52,12 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
 
     @SuppressWarnings("unchecked")
     default List<T> selectAllWithCache() {
-        List<T> cached = CacheRegistry.allCache(cacheNamespace());
+        List<T> cached = CacheRegistry.allCache(allCacheNamespace());
         if (cached == null) {
             cached = getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE)).stream()
                     .map(this::copyForCache)
                     .toList();
-            CacheRegistry.putAllCache(cacheNamespace(), cached);
+            CacheRegistry.putAllCache(allCacheNamespace(), cached);
         }
         return cached.stream()
                 .map(this::copyForCache)
@@ -72,11 +72,11 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
     }
 
     default void clearAllCache() {
-        CacheRegistry.clearAllCache(cacheNamespace());
+        CacheRegistry.clearAllCachePrefix(allCachePrefix());
     }
 
     default void clearCache() {
-        CacheRegistry.clearNamespace(cacheNamespace());
+        CacheRegistry.clearNamespacePrefix(cacheNamespace());
     }
 
     private boolean isCacheVisible(T entity) {
@@ -87,5 +87,19 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
             return false;
         }
         return TenantContext.matchesCurrentTenant(entity);
+    }
+
+    private String allCacheNamespace() {
+        return allCachePrefix() + "::" + tenantScopeKey();
+    }
+
+    private String allCachePrefix() {
+        return cacheNamespace() + "::" + ALL_CACHE_KEY;
+    }
+
+    private String tenantScopeKey() {
+        return TenantContext.currentTenantId()
+                .map(tenantId -> "tenant:" + tenantId)
+                .orElseGet(() -> TenantContext.isSystem() ? "system" : "none");
     }
 }

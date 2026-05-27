@@ -54,7 +54,7 @@ public final class ReferenceDependencyRegistry {
         }
         for (ReferrerKey referrer : referrers) {
             CacheRegistry.removeItem(referrer.namespace(), referrer.id());
-            CacheRegistry.clearAllCache(referrer.namespace());
+            CacheRegistry.clearAllCachePrefix(referrer.namespace() + "::" + CacheAbility.ALL_CACHE_KEY);
             removeReferrer(referrer);
         }
     }

@@ -358,6 +358,100 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceTargetChangeShouldInvalidateReferrerAllCache() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
+        customer.setId("customer-1");
+        customerService.insert(customer);
+        DemoInvoiceService invoiceService = new DemoInvoiceService(customerService);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        invoice.setCustomerId("customer-1");
+        invoiceService.insert(invoice);
+
+        assertThat(invoiceService.selectAllWithCache())
+                .extracting(DemoInvoice::getTitle)
+                .containsExactly("Invoice");
+
+        invoice.setTitle("Changed behind all cache");
+        customer.setTitle("Customer Updated");
+        customer.setStatus("SUSPENDED");
+        customerService.update(customer);
+
+        DemoInvoice selected = invoiceService.selectAllWithCache().getFirst();
+        assertThat(selected.getTitle()).isEqualTo("Changed behind all cache");
+        assertThat(selected.getCustomerTitle()).isEqualTo("Customer Updated");
+        assertThat(selected.getCustomerStatus()).isEqualTo("SUSPENDED");
+    }
+
+    @Test
+    void referenceDependencyRegistryShouldMoveReferrerWhenReferenceValueChanges() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        DemoCustomer firstCustomer = new DemoCustomer("First Customer", "ACTIVE");
+        firstCustomer.setId("customer-1");
+        customerService.insert(firstCustomer);
+        DemoCustomer secondCustomer = new DemoCustomer("Second Customer", "ACTIVE");
+        secondCustomer.setId("customer-2");
+        customerService.insert(secondCustomer);
+        DemoInvoiceService invoiceService = new DemoInvoiceService(customerService);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoiceService.select(invoiceId);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .containsExactly(invoiceId);
+
+        invoice.setCustomerId("customer-2");
+        invoiceService.update(invoice);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .isEmpty();
+
+        invoiceService.select(invoiceId);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-2"))
+                .containsExactly(invoiceId);
+
+        invoice.setTitle("Changed behind cache");
+        firstCustomer.setTitle("First Customer Updated");
+        customerService.update(firstCustomer);
+        assertThat(invoiceService.select(invoiceId).getTitle()).isEqualTo("Invoice");
+
+        secondCustomer.setTitle("Second Customer Updated");
+        customerService.update(secondCustomer);
+        assertThat(invoiceService.select(invoiceId).getTitle()).isEqualTo("Changed behind cache");
+    }
+
+    @Test
+    void referenceDependencyRegistryShouldRemoveReferrerWhenReferenceIsClearedOrDeleted() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        DemoCustomer customer = new DemoCustomer("Customer", "ACTIVE");
+        customer.setId("customer-1");
+        customerService.insert(customer);
+        DemoInvoiceService invoiceService = new DemoInvoiceService(customerService);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoiceService.select(invoiceId);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .containsExactly(invoiceId);
+
+        invoice.setCustomerId(null);
+        invoiceService.update(invoice);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .isEmpty();
+
+        invoice.setCustomerId("customer-1");
+        invoiceService.update(invoice);
+        invoiceService.select(invoiceId);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .containsExactly(invoiceId);
+
+        invoiceService.delete(invoiceId);
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .isEmpty();
+    }
+
+    @Test
     void childrenAbilityShouldRejectDuplicateAndForeignChildIds() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoice firstInvoice = new DemoInvoice("First invoice", List.of(new DemoInvoiceLine("First line")));
@@ -485,6 +579,61 @@ class AbilityContractTest {
                 .containsExactly("Second");
         assertThat(service.select(firstId)).isNull();
         assertThat(service.selectIgnoreSoftDelete(firstId)).isNotNull();
+    }
+
+    @Test
+    void cacheAbilityShouldKeepAllCacheInsideCurrentTenantScope() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        String tenantAId;
+        String tenantBId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAId = service.insert(new DemoPlainRecord("Tenant A"));
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A");
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            tenantBId = service.insert(new DemoPlainRecord("Tenant B"));
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant B");
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A");
+            service.rawDao().findById(tenantAId).setTitle("Tenant A behind cache");
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A");
+        }
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A behind cache", "Tenant B");
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            DemoPlainRecord update = new DemoPlainRecord("Tenant B updated");
+            update.setId(tenantBId);
+            service.update(update);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A behind cache");
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant B updated");
+        }
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            assertThat(service.selectAllWithCache())
+                    .extracting(DemoPlainRecord::getTitle)
+                    .containsExactly("Tenant A behind cache", "Tenant B updated");
+        }
     }
 
     @Test

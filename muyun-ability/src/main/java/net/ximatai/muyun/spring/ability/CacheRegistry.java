@@ -70,6 +70,13 @@ public final class CacheRegistry {
         allCache.invalidate(namespace);
     }
 
+    static void clearAllCachePrefix(String prefix) {
+        if (prefix == null || prefix.isBlank()) {
+            return;
+        }
+        allCache.asMap().keySet().removeIf(namespace -> matchesPrefix(namespace, prefix));
+    }
+
     public static void clearNamespacePrefix(String prefix) {
         if (prefix == null || prefix.isBlank()) {
             return;
