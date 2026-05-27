@@ -95,15 +95,13 @@ class DynamicRelationRuntimeTest {
                 .isEqualTo("L-001");
         assertThat(deleted).isEqualTo(1);
 
-        ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> id = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        ArgumentCaptor<String> updateSql = ArgumentCaptor.forClass(String.class);
-        verify(operations, times(2)).update(updateSql.capture(), body.capture());
-        assertThat(updateSql.getAllValues().get(0)).contains("\"app_invoice\"");
-        assertThat(updateSql.getAllValues().get(1)).contains("\"app_invoice_line\"");
-        assertThat(body.getAllValues().get(0)).containsEntry("id", "invoice-1");
-        assertThat(body.getAllValues().get(1)).containsEntry("id", "line-1");
+        ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> where = mapCaptor();
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture());
+        assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
+        assertThat(where.getAllValues().get(0)).containsEntry("id", "invoice-1");
+        assertThat(where.getAllValues().get(1)).containsEntry("id", "line-1");
         assertThat(body.getAllValues().get(1)).containsEntry("deleted", Boolean.TRUE);
     }
 
@@ -350,7 +348,7 @@ class DynamicRelationRuntimeTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.update(anyString(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
         return operations;
     }
 

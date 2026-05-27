@@ -74,19 +74,35 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public int updateByIdAndVersion(DynamicRecord record, Integer expectedVersion) {
+        return updateByIdAndCondition(record, expectedVersion == null ? Map.of() : Map.of(StandardEntitySchema.VERSION_FIELD, expectedVersion));
+    }
+
+    @Override
+    public int updateByIdAndCondition(DynamicRecord record, Map<String, Object> conditions) {
         requireSameEntity(record);
         if (record.getId() == null || record.getId().isBlank()) {
             throw new IllegalArgumentException("dynamic record id must not be blank");
         }
-        if (expectedVersion == null) {
+        if (conditions == null || conditions.isEmpty()) {
             return updateById(record);
         }
         Map<String, Object> body = Boolean.TRUE.equals(record.getDeleted()) ? toDeleteMap(record) : toUpdateMap(record);
-        return patchUpdateByIdAndVersion(record.getId(), record.getTenantId(), expectedVersion, body);
+        Map<String, Object> where = new LinkedHashMap<>();
+        where.putAll(toConditionColumnMap(conditions));
+        if (record.getTenantId() != null && !record.getTenantId().isBlank()) {
+            where.put(StandardEntitySchema.TENANT_ID_COLUMN, record.getTenantId());
+        }
+        where.put(StandardEntitySchema.ID_COLUMN, record.getId());
+        return operations.patchUpdateItemWhere(schema, entity.tableName(), body, where);
     }
 
     @Override
     public int deleteById(String id) {
+        throw new UnsupportedOperationException("dynamic record delete must go through DynamicEntityService");
+    }
+
+    @Override
+    public int deleteByIdAndCondition(String id, Map<String, Object> conditions) {
         throw new UnsupportedOperationException("dynamic record delete must go through DynamicEntityService");
     }
 
@@ -199,35 +215,10 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         return body;
     }
 
-    private int patchUpdateByIdAndVersion(String id, String tenantId, Integer expectedVersion, Map<String, Object> body) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        StringBuilder sql = new StringBuilder("UPDATE ")
-                .append(qualifiedTable())
-                .append(" SET ");
-        int index = 0;
-        for (Map.Entry<String, Object> entry : body.entrySet()) {
-            if (index > 0) {
-                sql.append(", ");
-            }
-            String paramName = entry.getKey();
-            sql.append(quote(entry.getKey())).append(" = :").append(paramName);
-            params.put(paramName, entry.getValue());
-            index++;
-        }
-        params.put("id", id);
-        params.put("expectedVersion", expectedVersion);
-        sql.append(" WHERE ")
-                .append(quote(StandardEntitySchema.ID_COLUMN))
-                .append(" = :id AND ")
-                .append(quote(StandardEntitySchema.VERSION_COLUMN))
-                .append(" = :expectedVersion");
-        if (tenantId != null && !tenantId.isBlank()) {
-            params.put("tenantId", tenantId);
-            sql.append(" AND ")
-                    .append(quote(StandardEntitySchema.TENANT_ID_COLUMN))
-                    .append(" = :tenantId");
-        }
-        return operations.update(sql.toString(), params);
+    private Map<String, Object> toConditionColumnMap(Map<String, Object> conditions) {
+        Map<String, Object> columns = new LinkedHashMap<>();
+        conditions.forEach((field, value) -> columns.put(mapping.resolveColumn(field), value));
+        return columns;
     }
 
     private DynamicRecord fromColumnMap(Map<String, Object> row) {
