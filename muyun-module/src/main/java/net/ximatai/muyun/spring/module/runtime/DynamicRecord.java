@@ -29,6 +29,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
+    private final Map<String, Object> loadedValues = new LinkedHashMap<>();
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
 
     private String id;
@@ -64,6 +65,9 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
 
     public Object getValue(String fieldCode) {
         if (!fields.containsKey(fieldCode)) {
+            if (loadedValues.containsKey(fieldCode)) {
+                return loadedValues.get(fieldCode);
+            }
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
         }
         return values.get(fieldCode);
@@ -96,6 +100,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     public DynamicRecord copy() {
         DynamicRecord copy = new DynamicRecord(entity);
         values.forEach((fieldCode, value) -> copy.values.put(fieldCode, copyValue(value)));
+        loadedValues.forEach((fieldCode, value) -> copy.loadedValues.put(fieldCode, copyValue(value)));
         children.forEach((relationCode, records) -> copy.children.put(
                 relationCode,
                 records == null ? null : records.stream().map(DynamicRecord::copy).toList()
@@ -210,7 +215,13 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
     void putLoadedValue(String fieldCode, Object value) {
         if (fields.containsKey(fieldCode)) {
             values.put(fieldCode, value);
+        } else {
+            loadedValues.put(fieldCode, value);
         }
+    }
+
+    void putVirtualValue(String fieldCode, Object value) {
+        loadedValues.put(fieldCode, value);
     }
 
     void validateForInsert() {

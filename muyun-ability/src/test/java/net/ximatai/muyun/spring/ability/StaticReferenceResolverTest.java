@@ -16,6 +16,13 @@ class StaticReferenceResolverTest {
         assertThat(StaticReferenceResolver.collect(record))
                 .containsEntry(ReferenceTarget.of("demo", "customer"), java.util.Set.of("customer-1"))
                 .containsEntry(ReferenceTarget.of("iam", "user"), java.util.Set.of("user-owner", "user-1", "user-2"));
+        assertThat(StaticReferenceResolver.plans(DemoReferencingRecord.class))
+                .first()
+                .satisfies(plan -> {
+                    assertThat(plan.sourceField()).isEqualTo("customerId");
+                    assertThat(plan.autoTitle()).isTrue();
+                    assertThat(plan.titleOutputField()).isEqualTo("customerTitle");
+                });
     }
 
     @Test

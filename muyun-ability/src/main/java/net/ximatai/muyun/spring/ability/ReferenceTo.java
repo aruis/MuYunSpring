@@ -13,4 +13,8 @@ public @interface ReferenceTo {
     String entityCode();
 
     ReferenceCardinality cardinality() default ReferenceCardinality.ONE;
+
+    boolean autoTitle() default false;
+
+    String titleOutputField() default "";
 }

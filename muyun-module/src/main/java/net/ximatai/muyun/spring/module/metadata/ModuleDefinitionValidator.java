@@ -37,7 +37,7 @@ public class ModuleDefinitionValidator {
             requireUnique(relationCodes, relation.parentEntity() + "." + relation.code(), "relation code");
         }
         for (EntityReferenceDefinition reference : module.references()) {
-            validateReference(reference, entities);
+            validateReference(reference, entities, module.moduleAlias());
         }
     }
 
@@ -157,6 +157,10 @@ public class ModuleDefinitionValidator {
     }
 
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities) {
+        validateReference(reference, entities, null);
+    }
+
+    public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities, String moduleAlias) {
         if (reference == null) {
             throw new ModuleDefinitionException("reference must not be null");
         }
@@ -171,6 +175,16 @@ public class ModuleDefinitionValidator {
         requireModuleAlias(target.moduleAlias(), "reference target module alias");
         requireIdentifier(target.entityCode(), "reference target entity code");
         requireField(source, reference.sourceField(), "reference source field");
+        if (reference.autoTitle()) {
+            if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
+                throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
+            }
+            String outputField = reference.plan().titleOutputField();
+            requireFieldName(outputField, "reference title output field");
+            if (STANDARD_FIELDS.contains(outputField) || source.fields().stream().anyMatch(field -> field.fieldName().equals(outputField))) {
+                throw new ModuleDefinitionException("reference title output field conflicts with entity field: " + source.code() + "." + outputField);
+            }
+        }
     }
 
     private void requireText(String value, String name) {

@@ -1,8 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -49,6 +47,12 @@ public final class StaticReferenceResolver {
         return RULES.computeIfAbsent(modelClass, StaticReferenceResolver::loadRules);
     }
 
+    public static List<ReferencePlan> plans(Class<?> modelClass) {
+        return rules(modelClass).stream()
+                .map(ReferenceRule::plan)
+                .toList();
+    }
+
     static void clearCacheForTests() {
         RULES.clear();
     }
@@ -70,8 +74,13 @@ public final class StaticReferenceResolver {
                 }
                 rules.putIfAbsent(field.getName(), new ReferenceRule(
                         field,
-                        ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityCode()),
-                        referenceTo.cardinality()
+                        new ReferencePlan(
+                                field.getName(),
+                                ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityCode()),
+                                referenceTo.cardinality(),
+                                referenceTo.autoTitle(),
+                                referenceTo.titleOutputField()
+                        )
                 ));
             }
             current = current.getSuperclass();
@@ -79,57 +88,21 @@ public final class StaticReferenceResolver {
         return List.copyOf(rules.values());
     }
 
-    public record ReferenceRule(Field field, ReferenceTarget target, ReferenceCardinality cardinality) {
+    public record ReferenceRule(Field field, ReferencePlan plan) {
+        public ReferenceTarget target() {
+            return plan.target();
+        }
+
+        public ReferenceCardinality cardinality() {
+            return plan.cardinality();
+        }
+
         private List<String> values(Object record) {
             try {
-                return normalize(field.get(record), cardinality);
+                return plan.normalizeValues(field.get(record));
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Cannot read reference field: " + field.getName(), e);
             }
-        }
-    }
-
-    private static List<String> normalize(Object value, ReferenceCardinality cardinality) {
-        if (value == null) {
-            return List.of();
-        }
-        LinkedHashSet<String> values = new LinkedHashSet<>();
-        if (cardinality == ReferenceCardinality.MANY) {
-            appendMany(values, value);
-        } else {
-            appendOne(values, value);
-        }
-        return List.copyOf(values);
-    }
-
-    private static void appendMany(LinkedHashSet<String> values, Object value) {
-        if (value instanceof Collection<?> collection) {
-            collection.forEach(item -> appendOne(values, item));
-            return;
-        }
-        if (value.getClass().isArray()) {
-            int length = Array.getLength(value);
-            for (int i = 0; i < length; i++) {
-                appendOne(values, Array.get(value, i));
-            }
-            return;
-        }
-        if (value instanceof String text) {
-            for (String item : text.split(",")) {
-                appendOne(values, item);
-            }
-            return;
-        }
-        appendOne(values, value);
-    }
-
-    private static void appendOne(LinkedHashSet<String> values, Object value) {
-        if (value == null) {
-            return;
-        }
-        String text = String.valueOf(value).trim();
-        if (!text.isBlank()) {
-            values.add(text);
         }
     }
 }

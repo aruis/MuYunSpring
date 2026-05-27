@@ -7,7 +7,9 @@ import net.ximatai.muyun.spring.ability.ChildRelation;
 import net.ximatai.muyun.spring.ability.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.ReferencePlan;
 import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -25,6 +27,7 @@ import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 
 import java.util.Collection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -122,6 +125,12 @@ public class DynamicEntityService implements
     @Override
     public void afterSelect(DynamicRecord record) {
         lifecycle.afterSelect(record);
+    }
+
+    @Override
+    public void afterPlatformSelect(DynamicRecord record) {
+        ChildrenAbility.super.afterPlatformSelect(record);
+        populateReferenceTitles(record);
     }
 
     @Override
@@ -264,19 +273,64 @@ public class DynamicEntityService implements
         }
         requireSameEntity(record);
         Map<ReferenceTarget, Set<String>> ids = new LinkedHashMap<>();
-        for (EntityReferenceDefinition reference : module.references()) {
-            if (!dao.getEntity().code().equals(reference.sourceEntity())) {
-                continue;
-            }
-            Object value = record.getValue(reference.sourceField());
-            if (value != null) {
-                ids.computeIfAbsent(reference.target(), ignored -> new LinkedHashSet<>())
-                        .add(String.valueOf(value));
+        for (ReferencePlan plan : referencePlans()) {
+            Object value = record.getValue(plan.sourceField());
+            List<String> values = plan.normalizeValues(value);
+            if (!values.isEmpty()) {
+                ids.computeIfAbsent(plan.target(), ignored -> new LinkedHashSet<>())
+                        .addAll(values);
             }
         }
         Map<ReferenceTarget, Set<String>> copy = new LinkedHashMap<>();
-        ids.forEach((target, values) -> copy.put(target, Set.copyOf(values)));
-        return Map.copyOf(copy);
+        ids.forEach((target, values) -> copy.put(target, Collections.unmodifiableSet(new LinkedHashSet<>(values))));
+        return Collections.unmodifiableMap(copy);
+    }
+
+    private void populateReferenceTitles(DynamicRecord record) {
+        if (record == null || module == null) {
+            return;
+        }
+        requireSameEntity(record);
+        for (ReferencePlan plan : referencePlans()) {
+            if (!plan.autoTitle()) {
+                continue;
+            }
+            List<String> ids = plan.normalizeValues(record.getValue(plan.sourceField()));
+            if (ids.isEmpty()) {
+                record.putVirtualValue(plan.titleOutputField(), null);
+                continue;
+            }
+            DynamicEntityService targetService = referenceService(plan.target());
+            Map<String, String> titles = targetService.titles(ids);
+            record.putVirtualValue(plan.titleOutputField(), referenceTitleValue(ids, titles, plan));
+        }
+    }
+
+    private List<ReferencePlan> referencePlans() {
+        if (module == null) {
+            return List.of();
+        }
+        return module.references().stream()
+                .filter(reference -> dao.getEntity().code().equals(reference.sourceEntity()))
+                .map(EntityReferenceDefinition::plan)
+                .toList();
+    }
+
+    private DynamicEntityService referenceService(ReferenceTarget target) {
+        if (!moduleAlias.equals(target.moduleAlias())) {
+            throw new IllegalArgumentException("cross module dynamic reference title is not supported: " + target.qualifiedName());
+        }
+        return relationServiceResolver.apply(target.entityCode());
+    }
+
+    private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
+        if (plan.cardinality() == ReferenceCardinality.MANY) {
+            return ids.stream()
+                    .map(titles::get)
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        return titles.get(ids.getFirst());
     }
 
     private DynamicRecord activeRaw(String id) {

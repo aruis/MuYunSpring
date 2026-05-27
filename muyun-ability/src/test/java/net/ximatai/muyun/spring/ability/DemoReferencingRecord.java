@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.common.model.StandardEntity;
 @Getter
 @Setter
 final class DemoReferencingRecord extends StandardEntity {
-    @ReferenceTo(moduleAlias = "demo", entityCode = "customer")
+    @ReferenceTo(moduleAlias = "demo", entityCode = "customer", autoTitle = true, titleOutputField = "customerTitle")
     private String customerId;
     @ReferenceTo(moduleAlias = "iam", entityCode = "user")
     private String ownerId;

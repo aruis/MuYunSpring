@@ -174,6 +174,40 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldAutoPopulateDynamicReferenceTitleByMetadata() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice_line");
+
+        DynamicRecord line = lineService.select("line-1");
+
+        assertThat(line.getValue("invoiceTitle")).isEqualTo("I-001");
+        assertThat(line.getValues()).doesNotContainKey("invoiceTitle");
+    }
+
+    @Test
+    void shouldPopulateDynamicReferenceTitleBeforeLifecycleAfterSelect() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        AtomicReference<Object> lifecycleTitle = new AtomicReference<>();
+        DynamicRecordLifecycle lifecycle = new DynamicRecordLifecycle() {
+            @Override
+            public void afterSelect(DynamicRecord record) {
+                lifecycleTitle.set(record.getValue("invoiceTitle"));
+            }
+        };
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice_line", lifecycle);
+
+        lineService.select("line-1");
+
+        assertThat(lifecycleTitle).hasValue("I-001");
+    }
+
+    @Test
     void shouldResolveDynamicReferenceTitleWithoutAutoPopulatingChildren() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);
@@ -269,6 +303,38 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldRejectDynamicReferenceAutoTitleAcrossModules() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("other.invoice", "invoice"))
+                        .withAutoTitle("invoiceTitle"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("same module target");
+    }
+
+    @Test
+    void shouldRejectDynamicReferenceAutoTitleFieldConflicts() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("title"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("title output field conflicts");
+    }
+
+    @Test
     void shouldAllowSameRelationCodeOnDifferentDynamicParentEntities() {
         EntityDefinition payment = new EntityDefinition(
                 "payment",
@@ -307,13 +373,31 @@ class DynamicRelationRuntimeTest {
                 return params.containsValue("line-1") ? List.of(lineRow()) : List.of();
             }
             if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
-                return params.containsValue("invoice-1") ? List.of(lineRow()) : List.of();
+                return containsParam(params, "invoice-1") ? List.of(lineRow()) : List.of();
             }
             if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
-                return params.containsValue("invoice-1") ? List.of(invoiceRow()) : List.of();
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" IN")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
             }
             return List.of();
         });
+    }
+
+    private boolean containsParam(Map<String, Object> params, Object expected) {
+        return params.values().stream().anyMatch(value -> value instanceof Iterable<?> values
+                ? containsIterable(values, expected)
+                : expected.equals(value));
+    }
+
+    private boolean containsIterable(Iterable<?> values, Object expected) {
+        for (Object value : values) {
+            if (expected.equals(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ModuleDefinition invoiceModule() {
@@ -324,7 +408,8 @@ class DynamicRelationRuntimeTest {
                 List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
                         .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")))
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("invoiceTitle"))
         );
     }
 
