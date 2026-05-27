@@ -78,6 +78,8 @@ class OrganizationRepositoryContractTest {
         assertThat(repository(operations).ensureTable()).isFalse();
 
         verify(operations).execute(contains("comment on table \"public\".\"iam_organization\""));
+        verify(operations).execute(contains("drop index"));
+        verify(operations).execute(contains("\"tenant_id\",\"code\""));
         verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
     }
 
@@ -175,7 +177,7 @@ class OrganizationRepositoryContractTest {
 
         when(loader.getDBInfo()).thenReturn(dbInfo);
         when(loader.getColumnMap(SCHEMA, TABLE)).thenReturn(organizationColumns());
-        when(loader.getIndexList(SCHEMA, TABLE)).thenReturn(List.of(index("iam_organization_tenant_code_uindex", true, "tenant_id", "code")));
+        when(loader.getIndexList(SCHEMA, TABLE)).thenReturn(List.of(index("iam_organization_code_uindex", true, "code")));
 
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getMetaDataLoader()).thenReturn(loader);
