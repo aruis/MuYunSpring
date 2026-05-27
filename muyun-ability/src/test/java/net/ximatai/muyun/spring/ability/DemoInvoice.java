@@ -10,6 +10,14 @@ import java.util.List;
 @Setter
 final class DemoInvoice extends StandardEntity {
     private String title;
+    @ChildRef(
+            parentEntity = "invoice",
+            childModel = DemoInvoiceLine.class,
+            childEntity = "invoiceLine",
+            childForeignKeyField = "invoiceId",
+            autoPopulate = true,
+            autoDeleteWithParent = true
+    )
     private List<DemoInvoiceLine> lines;
 
     DemoInvoice(String title, List<DemoInvoiceLine> lines) {

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.module.metadata;
 
+import net.ximatai.muyun.spring.ability.ChildPlan;
+
 public record EntityRelationDefinition(
         String code,
         String parentEntity,
@@ -21,5 +23,9 @@ public record EntityRelationDefinition(
 
     public EntityRelationDefinition withAutoDeleteWithParent() {
         return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, autoPopulate, true);
+    }
+
+    public ChildPlan plan() {
+        return new ChildPlan(code, parentEntity, childEntity, childForeignKeyField, autoPopulate, autoDeleteWithParent);
     }
 }

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.ChildPlan;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.ChildAbility;
 import net.ximatai.muyun.spring.ability.ChildRelation;
@@ -260,7 +261,7 @@ public class DynamicEntityService implements
         List<ChildRelation<? extends EntityContract, DynamicRecord>> relations = new ArrayList<>();
         for (EntityRelationDefinition relation : module.relations()) {
             if (dao.getEntity().code().equals(relation.parentEntity())) {
-                relations.add(toChildRelation(relation));
+                relations.add(toChildRelation(relation.plan()));
             }
         }
         return List.copyOf(relations);
@@ -346,18 +347,18 @@ public class DynamicEntityService implements
         }
     }
 
-    private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(EntityRelationDefinition relation) {
-        DynamicEntityService childService = relationServiceResolver.apply(relation.childEntity());
+    private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(ChildPlan plan) {
+        DynamicEntityService childService = relationServiceResolver.apply(plan.childEntity());
         ChildRelation<DynamicRecord, DynamicRecord> childRelation = new ChildRelation<>(
                 childService,
-                (child, parentId) -> child.setValue(relation.childForeignKeyField(), parentId),
-                relation.childForeignKeyField(),
-                parent -> parent.getChildren(relation.code())
+                (child, parentId) -> child.setValue(plan.childForeignKeyField(), parentId),
+                plan.childForeignKeyField(),
+                parent -> parent.getChildren(plan.relationCode())
         );
-        if (relation.autoPopulate()) {
-            childRelation.autoPopulate((parent, children) -> parent.setChildren(relation.code(), children));
+        if (plan.autoPopulate()) {
+            childRelation.autoPopulate((parent, children) -> parent.setChildren(plan.relationCode(), children));
         }
-        if (relation.autoDeleteWithParent()) {
+        if (plan.autoDeleteWithParent()) {
             childRelation.autoDeleteWithParent();
         }
         return childRelation;

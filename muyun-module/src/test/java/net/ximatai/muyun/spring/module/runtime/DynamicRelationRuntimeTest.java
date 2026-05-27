@@ -174,6 +174,20 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldCompileDynamicChildRelationToPlan() {
+        assertThat(invoiceModule().relations())
+                .extracting(EntityRelationDefinition::plan)
+                .containsExactly(new net.ximatai.muyun.spring.ability.ChildPlan(
+                        "lines",
+                        "invoice",
+                        "invoice_line",
+                        "invoiceId",
+                        true,
+                        true
+                ));
+    }
+
+    @Test
     void shouldAutoPopulateDynamicReferenceTitleByMetadata() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);

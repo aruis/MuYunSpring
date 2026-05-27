@@ -24,9 +24,12 @@ final class DemoInvoiceService implements
     @Override
     public List<ChildRelation<? extends net.ximatai.muyun.spring.common.model.EntityContract, DemoInvoice>> childRelations() {
         return List.of(lineService
-                .toChildRelation(DemoInvoiceLine::setInvoiceId, "invoiceId", DemoInvoice::getLines)
-                .autoPopulate(DemoInvoice::setLines)
-                .autoDeleteWithParent());
+                .toChildRelation(
+                        StaticChildResolver.plans(DemoInvoice.class).getFirst(),
+                        DemoInvoiceLine::setInvoiceId,
+                        DemoInvoice::getLines,
+                        DemoInvoice::setLines
+                ));
     }
 
     DemoInvoiceLineService lineService() {
