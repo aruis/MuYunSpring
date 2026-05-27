@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -357,6 +358,44 @@ class DynamicRelationRuntimeTest {
         lineService.select("line-1");
 
         assertThat(lifecycleTitle).hasValue("I-001");
+    }
+
+    @Test
+    void shouldResolveDynamicReferenceByRawTargetRecord() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        AtomicInteger invoiceAfterSelectCount = new AtomicInteger();
+        AtomicReference<DynamicEntityService> invoiceService = new AtomicReference<>();
+        AtomicReference<DynamicEntityService> lineService = new AtomicReference<>();
+        ModuleDefinition module = invoiceModule();
+        invoiceService.set(new DynamicEntityService(
+                new DynamicRecordDao(operations, invoiceEntity()),
+                MODULE,
+                new DynamicRecordLifecycle() {
+                    @Override
+                    public void afterSelect(DynamicRecord record) {
+                        invoiceAfterSelectCount.incrementAndGet();
+                    }
+                },
+                module,
+                entityCode -> "invoice_line".equals(entityCode) ? lineService.get() : invoiceService.get()
+        ));
+        lineService.set(new DynamicEntityService(
+                new DynamicRecordDao(operations, invoiceLineEntity()),
+                MODULE,
+                DynamicRecordLifecycle.NONE,
+                module,
+                entityCode -> "invoice".equals(entityCode) ? invoiceService.get() : lineService.get()
+        ));
+
+        DynamicRecord line = lineService.get().select("line-1");
+
+        assertThat(line.getValue("invoiceTitle")).isEqualTo("I-001");
+        assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
+        assertThat(invoiceAfterSelectCount).hasValue(0);
+
+        invoiceService.get().select("invoice-1");
+        assertThat(invoiceAfterSelectCount).hasValue(1);
     }
 
     @Test

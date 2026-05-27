@@ -311,6 +311,25 @@ class AbilityContractTest {
     }
 
     @Test
+    void childrenAggregationShouldLoadChildRecordsAsRawData() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoice.setLines(null);
+        DemoInvoice selected = invoiceService.select(invoiceId);
+
+        assertThat(selected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line");
+        assertThat(invoiceService.lineService().afterSelectCount()).isZero();
+
+        invoiceService.lineService().select(firstLine.getId());
+        assertThat(invoiceService.lineService().afterSelectCount()).isEqualTo(1);
+    }
+
+    @Test
     void referenceTargetChangeShouldInvalidateReferrerCache() {
         DemoCustomerService customerService = new DemoCustomerService();
         DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
@@ -809,6 +828,24 @@ class AbilityContractTest {
                         new ReferenceOption(id, "Reference Title"),
                         new ReferenceOption(secondId, "Second Title")
                 );
+    }
+
+    @Test
+    void referenceTitleShouldLoadTargetRecordAsRawData() {
+        DemoCustomerService service = new DemoCustomerService();
+        DemoCustomer customer = new DemoCustomer("Reference Title", "ACTIVE");
+        String id = service.insert(customer);
+
+        assertThat(service.title(id)).isEqualTo("Reference Title");
+        assertThat(service.titles(List.of(id))).containsExactly(Map.entry(id, "Reference Title"));
+        assertThat(service.projections(List.of(id), List.of("status")))
+                .containsEntry(id, Map.of("status", "ACTIVE"));
+        assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(new ReferenceOption(id, "Reference Title"));
+        assertThat(service.afterSelectCount()).isZero();
+
+        service.select(id);
+        assertThat(service.afterSelectCount()).isEqualTo(1);
     }
 
     @Test

@@ -84,7 +84,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
     }
 
     default T selectReferenceRaw(String id) {
-        return select(id);
+        return selectActiveRaw(id);
     }
 
     default PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {

@@ -5,6 +5,7 @@ final class DemoCustomerService implements
         ReferenceAbility<DemoCustomer>,
         CacheAbility<DemoCustomer> {
     private final InMemoryBaseDao<DemoCustomer> dao = new InMemoryBaseDao<>();
+    private int afterSelectCount;
 
     @Override
     public BaseDao<DemoCustomer, String> getDao() {
@@ -31,5 +32,14 @@ final class DemoCustomerService implements
         copy.setUpdatedBy(entity.getUpdatedBy());
         copy.setUpdatedAt(entity.getUpdatedAt());
         return copy;
+    }
+
+    @Override
+    public void afterSelect(DemoCustomer entity) {
+        afterSelectCount++;
+    }
+
+    int afterSelectCount() {
+        return afterSelectCount;
     }
 }
