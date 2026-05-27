@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.OrmException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
@@ -29,6 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -217,6 +219,54 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
+    void shouldRunComplexCriteriaContractOnRealDatabase() {
+        EntityDefinition entity = entity("app_contract_criteria_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8));
+        schemaService.ensureTable(entity);
+        DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract.criteria");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-criteria")) {
+            insertContract(service, entity, "C-CR-001", "Alpha", "2026-01-01T00:00:00Z", "10.00");
+            insertContract(service, entity, "C-CR-002", "Beta", "2026-01-02T00:00:00Z", "20.00");
+            insertContract(service, entity, "C-CR-003", "Gamma", "2026-01-03T00:00:00Z", "15.00");
+            String deletedId = insertContract(service, entity, "C-CR-004", "Deleted", "2026-01-04T00:00:00Z", "15.00");
+            insertContract(service, entity, "C-CR-005", "Blocked", "2026-01-05T00:00:00Z", "15.00");
+            insertContract(service, entity, "C-CR-006", "Out of Range", "2026-01-06T00:00:00Z", "99.00");
+            insertContract(service, entity, "C-CR-007", "No Signed At", null, "15.00");
+            service.delete(deletedId);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-other")) {
+            insertContract(service, entity, "C-CR-008", "Other Tenant", "2026-01-08T00:00:00Z", "15.00");
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-criteria")) {
+            Criteria criteria = Criteria.of()
+                    .in("code", List.of("C-CR-001", "C-CR-002", "C-CR-003", "C-CR-004", "C-CR-005", "C-CR-006", "C-CR-007", "C-CR-008"))
+                    .notIn("code", List.of("C-CR-003"))
+                    .between("amount", new BigDecimal("10.00"), new BigDecimal("30.00"))
+                    .isNotNull("signedAt")
+                    .raw(SqlRawCondition.of("\"name\" <> :blocked", Map.of("blocked", "Blocked")));
+
+            assertThat(service.pageQuery(criteria, PageRequest.of(1, 1), Sort.desc("amount")).getRecords())
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-CR-002");
+            assertThat(service.count(criteria)).isEqualTo(2);
+            assertThat(service.pageQuery(Criteria.of().in("code", List.of()), PageRequest.of(1, 10)).getRecords())
+                    .isEmpty();
+            assertThat(service.pageQuery(Criteria.of().notIn("code", List.of()), PageRequest.of(1, 10)).getTotal())
+                    .isEqualTo(6);
+
+            assertThatThrownBy(() -> service.count(Criteria.of().eq("missingField", "x")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("unknown dynamic field or column");
+            assertThatThrownBy(() -> service.count(Criteria.of().raw(SqlRawCondition.of("\"name\" = ?", Map.of()))))
+                    .isInstanceOf(OrmException.class)
+                    .extracting("code")
+                    .isEqualTo(OrmException.Code.INVALID_CRITERIA);
+        }
+    }
+
+    @Test
     void shouldPublishModuleThenRunDynamicRecordOnRealDatabase() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.contract",
@@ -283,6 +333,22 @@ class DynamicSchemaServiceIT {
                         FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed()
                 )
         );
+    }
+
+    private String insertContract(DynamicEntityService service,
+                                  EntityDefinition entity,
+                                  String code,
+                                  String name,
+                                  String signedAt,
+                                  String amount) {
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", code)
+                .setValue("name", name)
+                .setValue("amount", new BigDecimal(amount));
+        if (signedAt != null) {
+            record.setValue("signedAt", Instant.parse(signedAt));
+        }
+        return service.insert(record);
     }
 
     private List<String> columns(Connection connection) throws Exception {
