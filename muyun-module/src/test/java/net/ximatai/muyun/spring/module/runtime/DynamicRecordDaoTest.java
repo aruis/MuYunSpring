@@ -7,7 +7,9 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
@@ -609,19 +611,13 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
-        EntityDefinition entity = new EntityDefinition(
-                "contract",
-                TABLE,
-                "Contract",
-                List.of(
-                        FieldDefinition.string("code", "Code").length(64).required(),
-                        FieldDefinition.enabled()
-                )
-        ).withCapabilities(EntityCapability.ENABLE);
+        EntityDefinition entity = enabledEntity();
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
         DynamicRecord record = new DynamicRecord(entity).setValue("code", "C");
         record.setId("C");
 
+        assertThat(record).isNotInstanceOf(EnabledCapable.class);
+        assertThat(entityService).isNotInstanceOf(EnableAbility.class);
         entityService.insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
@@ -630,9 +626,60 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldRejectDynamicEnableCriteriaWithoutCapability() {
+    void shouldPreserveExplicitDynamicEnabledValueOnInsert() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        EntityDefinition entity = enabledEntity();
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C")
+                .setValue("enabled", Boolean.FALSE);
+        record.setId("C");
+
+        entityService.insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue()).containsEntry("enabled", Boolean.FALSE);
+    }
+
+    @Test
+    void shouldToggleDynamicEnabledWithoutMarkerInterface() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "enabled", Boolean.FALSE,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, enabledEntity()), "sales.contract");
+
+        assertThat(entityService.enable("contract-1")).isEqualTo(1);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        ArgumentCaptor<Map<String, Object>> where = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        assertThat(body.getValue())
+                .containsEntry("enabled", Boolean.TRUE)
+                .containsEntry("version", 3);
+        assertThat(where.getValue()).containsEntry("version", 2);
+    }
+
+    @Test
+    void shouldRejectDynamicEnableMethodsWithoutCapability() {
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract");
 
+        assertThatThrownBy(() -> entityService.enable("contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not support capability: ENABLE");
+        assertThatThrownBy(() -> entityService.disable("contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not support capability: ENABLE");
+        assertThatThrownBy(() -> entityService.isEnabled("contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not support capability: ENABLE");
         assertThatThrownBy(() -> entityService.enabledCriteria(Criteria.of()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not support capability: ENABLE");
@@ -700,6 +747,18 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
+    }
+
+    private EntityDefinition enabledEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.enabled()
+                )
+        ).withCapabilities(EntityCapability.ENABLE);
     }
 
     private EntityDefinition sortableEntity() {

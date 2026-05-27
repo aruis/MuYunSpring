@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.common.model.EntityContract;
-import net.ximatai.muyun.spring.common.model.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.TitledCapable;
 import net.ximatai.muyun.spring.common.model.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -25,7 +24,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable, EnabledCapable {
+public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -194,8 +193,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
         return stringValue(values.get(PlatformAbilityFields.TITLE_FIELD));
     }
 
-    @Override
-    public Boolean getEnabled() {
+    Boolean enabled() {
         if (!hasField(PlatformAbilityFields.ENABLED_FIELD)) {
             return null;
         }
@@ -203,8 +201,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
         return value instanceof Boolean enabled ? enabled : null;
     }
 
-    @Override
-    public void setEnabled(Boolean enabled) {
+    void enabled(Boolean enabled) {
         setAbilityValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
     }
 

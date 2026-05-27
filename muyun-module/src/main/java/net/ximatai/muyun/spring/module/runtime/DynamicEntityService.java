@@ -7,7 +7,6 @@ import net.ximatai.muyun.spring.ability.ChildAbility;
 import net.ximatai.muyun.spring.ability.ChildRelation;
 import net.ximatai.muyun.spring.ability.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
-import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
@@ -21,6 +20,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityReferenceDefinition;
@@ -41,7 +41,6 @@ import java.util.function.Function;
 public class DynamicEntityService implements
         CrudAbility<DynamicRecord>,
         SoftDeleteAbility<DynamicRecord>,
-        EnableAbility<DynamicRecord>,
         ChildAbility<DynamicRecord>,
         ChildrenAbility<DynamicRecord>,
         TreeAbility<DynamicRecord>,
@@ -158,32 +157,36 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public boolean shouldPrepareEnabledDefault(DynamicRecord record) {
-        return dao.getEntity().supports(EntityCapability.ENABLE);
+    public void prepareAdditionalAbilityDefaults(DynamicRecord record) {
+        if (dao.getEntity().supports(EntityCapability.ENABLE) && record.enabled() == null) {
+            record.enabled(Boolean.TRUE);
+        }
     }
 
-    @Override
     public int enable(String id) {
         requireCapability(EntityCapability.ENABLE);
-        return EnableAbility.super.enable(id);
+        return updateEnabled(id, Boolean.TRUE);
     }
 
-    @Override
     public int disable(String id) {
         requireCapability(EntityCapability.ENABLE);
-        return EnableAbility.super.disable(id);
+        return updateEnabled(id, Boolean.FALSE);
     }
 
-    @Override
     public boolean isEnabled(String id) {
         requireCapability(EntityCapability.ENABLE);
-        return EnableAbility.super.isEnabled(id);
+        DynamicRecord entity = selectActiveRaw(id);
+        return entity != null && Boolean.TRUE.equals(entity.enabled());
     }
 
-    @Override
     public Criteria enabledCriteria(Criteria criteria) {
         requireCapability(EntityCapability.ENABLE);
-        return EnableAbility.super.enabledCriteria(criteria);
+        Criteria scoped = Criteria.of();
+        if (criteria != null && !criteria.isEmpty()) {
+            scoped.andGroup(criteria.getRoot());
+        }
+        scoped.eq(PlatformAbilityFields.ENABLED_FIELD, Boolean.TRUE);
+        return scoped;
     }
 
     public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -453,6 +456,15 @@ public class DynamicEntityService implements
         if (!dao.getEntity().supports(capability)) {
             throw new IllegalStateException("dynamic entity does not support capability: " + capability);
         }
+    }
+
+    private int updateEnabled(String id, Boolean enabled) {
+        DynamicRecord entity = selectActiveRaw(id);
+        if (entity == null) {
+            return 0;
+        }
+        entity.enabled(enabled);
+        return update(entity);
     }
 
     private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(ChildPlan plan) {
