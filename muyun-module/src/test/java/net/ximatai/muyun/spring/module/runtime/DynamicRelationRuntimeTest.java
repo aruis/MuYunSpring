@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityReferenceDefinition;
@@ -168,8 +169,8 @@ class DynamicRelationRuntimeTest {
                 .setValue("invoiceId", "invoice-1")
                 .setValue("title", "L-001");
 
-        assertThat(lineService.collectReferenceIdsBySourceNamespace(line))
-                .containsEntry("sales.invoice.invoice", Set.of("invoice-1"));
+        assertThat(lineService.collectReferenceIdsByTarget(line))
+                .containsEntry(ReferenceTarget.of("sales.invoice", "invoice"), Set.of("invoice-1"));
     }
 
     @Test
@@ -194,7 +195,7 @@ class DynamicRelationRuntimeTest {
                 .register(invoiceModule())
                 .entityService(MODULE, "invoice_line");
 
-        assertThatThrownBy(() -> lineService.collectReferenceIdsBySourceNamespace(new DynamicRecord(invoiceEntity())))
+        assertThatThrownBy(() -> lineService.collectReferenceIdsByTarget(new DynamicRecord(invoiceEntity())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("entity mismatch");
     }
@@ -235,6 +236,36 @@ class DynamicRelationRuntimeTest {
         assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("invoice_line.missingField");
+    }
+
+    @Test
+    void shouldRejectInvalidDynamicReferenceTargetMetadata() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales.invoice"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("reference target module alias");
+    }
+
+    @Test
+    void shouldRejectUnparseableDynamicReferenceTargetMetadata() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", "sales"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid reference target qualified name");
     }
 
     @Test
@@ -293,7 +324,7 @@ class DynamicRelationRuntimeTest {
                 List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
                         .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.from("invoice_line", "invoiceId", "sales.invoice.invoice"))
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")))
         );
     }
 

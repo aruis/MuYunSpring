@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
@@ -143,8 +144,8 @@ class DynamicSchemaServiceIT {
             assertThat(loadedLine)
                     .extracting(child -> child.getValue("title"), child -> child.getValue("invoiceId"))
                     .containsExactly("Line 001", invoiceWithLineId);
-            assertThat(lineService.collectReferenceIdsBySourceNamespace(loadedLine))
-                    .containsEntry("sales.invoice.invoice", java.util.Set.of(invoiceWithLineId));
+            assertThat(lineService.collectReferenceIdsByTarget(loadedLine))
+                    .containsEntry(ReferenceTarget.of("sales.invoice", "invoice"), java.util.Set.of(invoiceWithLineId));
             assertThat(lineService.select(lineId))
                     .extracting(child -> child.getValue("invoiceId"))
                     .isEqualTo(invoiceWithLineId);
@@ -513,7 +514,7 @@ class DynamicSchemaServiceIT {
                 List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
                         .withAutoPopulate()
                         .withAutoDeleteWithParent()),
-                List.of(EntityReferenceDefinition.from("invoice_line", "invoiceId", "sales.invoice.invoice"))
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")))
         );
     }
 

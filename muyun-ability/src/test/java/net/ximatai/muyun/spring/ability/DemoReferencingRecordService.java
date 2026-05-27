@@ -21,10 +21,10 @@ final class DemoReferencingRecordService implements
     }
 
     @Override
-    public Map<String, Set<String>> collectReferenceIdsBySourceNamespace(DemoReferencingRecord entity) {
-        Map<String, Set<String>> ids = new LinkedHashMap<>();
+    public Map<ReferenceTarget, Set<String>> collectReferenceIdsByTarget(DemoReferencingRecord entity) {
+        Map<ReferenceTarget, Set<String>> ids = new LinkedHashMap<>();
         if (entity.getCustomerId() != null) {
-            ids.put("demo.customer", Set.of(entity.getCustomerId()));
+            ids.put(ReferenceTarget.of("demo", "customer"), Set.of(entity.getCustomerId()));
         }
         LinkedHashSet<String> users = new LinkedHashSet<>();
         if (entity.getCreatedBy() != null) {
@@ -34,7 +34,7 @@ final class DemoReferencingRecordService implements
             users.add(entity.getOwnerId());
         }
         if (!users.isEmpty()) {
-            ids.put("iam.user", users);
+            ids.put(ReferenceTarget.of("iam", "user"), users);
         }
         return ids;
     }

@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
@@ -251,24 +252,24 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public Map<String, Set<String>> collectReferenceIdsBySourceNamespace(DynamicRecord record) {
+    public Map<ReferenceTarget, Set<String>> collectReferenceIdsByTarget(DynamicRecord record) {
         if (record == null || module == null) {
             return Map.of();
         }
         requireSameEntity(record);
-        Map<String, Set<String>> ids = new LinkedHashMap<>();
+        Map<ReferenceTarget, Set<String>> ids = new LinkedHashMap<>();
         for (EntityReferenceDefinition reference : module.references()) {
             if (!dao.getEntity().code().equals(reference.sourceEntity())) {
                 continue;
             }
             Object value = record.getValue(reference.sourceField());
             if (value != null) {
-                ids.computeIfAbsent(reference.targetReferenceNamespace(), ignored -> new LinkedHashSet<>())
+                ids.computeIfAbsent(reference.target(), ignored -> new LinkedHashSet<>())
                         .add(String.valueOf(value));
             }
         }
-        Map<String, Set<String>> copy = new LinkedHashMap<>();
-        ids.forEach((namespace, values) -> copy.put(namespace, Set.copyOf(values)));
+        Map<ReferenceTarget, Set<String>> copy = new LinkedHashMap<>();
+        ids.forEach((target, values) -> copy.put(target, Set.copyOf(values)));
         return Map.copyOf(copy);
     }
 

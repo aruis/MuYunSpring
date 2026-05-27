@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.metadata;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.ability.ReferenceTarget;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -161,7 +162,14 @@ public class ModuleDefinitionValidator {
         }
         EntityDefinition source = requireEntity(entities, reference.sourceEntity(), "reference source entity");
         requireFieldName(reference.sourceField(), "reference source field");
-        requireModuleAlias(reference.targetReferenceNamespace(), "reference target namespace");
+        ReferenceTarget target;
+        try {
+            target = reference.target();
+        } catch (RuntimeException e) {
+            throw new ModuleDefinitionException("invalid reference target qualified name: " + reference.targetQualifiedName());
+        }
+        requireModuleAlias(target.moduleAlias(), "reference target module alias");
+        requireIdentifier(target.entityCode(), "reference target entity code");
         requireField(source, reference.sourceField(), "reference source field");
     }
 

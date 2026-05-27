@@ -520,9 +520,9 @@ class AbilityContractTest {
         DemoReferencingRecord record = new DemoReferencingRecord("customer-1", "user-owner");
         record.setCreatedBy("user-creator");
 
-        assertThat(service.collectReferenceIdsBySourceNamespace(record))
-                .containsEntry("demo.customer", java.util.Set.of("customer-1"))
-                .containsEntry("iam.user", java.util.Set.of("user-creator", "user-owner"));
+        assertThat(service.collectReferenceIdsByTarget(record))
+                .containsEntry(ReferenceTarget.of("demo", "customer"), java.util.Set.of("customer-1"))
+                .containsEntry(ReferenceTarget.of("iam", "user"), java.util.Set.of("user-creator", "user-owner"));
     }
 
     @Test
