@@ -145,14 +145,20 @@ class DynamicRecordDaoTest {
         entityService(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
+        ArgumentCaptor<String> updateSql = ArgumentCaptor.forClass(String.class);
+        verify(operations).update(updateSql.capture(), body.capture());
+        assertThat(updateSql.getValue())
+                .contains("WHERE \"id\" = :id")
+                .contains("\"version\" = :expectedVersion");
         assertThat(body.getValue())
                 .containsEntry("code", "C-001")
                 .containsEntry("amount", BigDecimal.TEN)
-                .containsEntry("version", 4);
+                .containsEntry("version", 4)
+                .containsEntry("id", "contract-1")
+                .containsEntry("expectedVersion", 3);
         assertThat(body.getValue())
                 .containsKey("updated_at")
-                .doesNotContainKeys("id", "tenant_id", "created_at", "created_by");
+                .doesNotContainKeys("tenant_id", "created_at", "created_by");
     }
 
     @Test
@@ -173,11 +179,42 @@ class DynamicRecordDaoTest {
         entityService(operations).update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
+        verify(operations).update(anyString(), body.capture());
         assertThat(body.getValue())
                 .containsEntry("amount", BigDecimal.ONE)
                 .containsEntry("version", 8)
+                .containsEntry("id", "contract-1")
+                .containsEntry("expectedVersion", 7)
                 .doesNotContainKeys("created_at", "created_by", "code");
+    }
+
+    @Test
+    void shouldRejectDynamicUpdateWhenExpectedVersionDoesNotMatch() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.update(anyString(), anyMap())).thenReturn(0);
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("amount", BigDecimal.ONE);
+        record.setId("contract-1");
+        record.setVersion(1);
+
+        assertThatThrownBy(() -> entityService(operations).update(record))
+                .isInstanceOf(net.ximatai.muyun.spring.ability.OptimisticLockException.class)
+                .hasMessageContaining("version conflict");
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).update(sql.capture(), body.capture());
+        assertThat(sql.getValue())
+                .contains("WHERE \"id\" = :id")
+                .contains("\"version\" = :expectedVersion");
+        assertThat(body.getValue()).containsEntry("expectedVersion", 1);
     }
 
     @Test
@@ -196,7 +233,7 @@ class DynamicRecordDaoTest {
                 .contains("\"id\" =")
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL");
-        verify(operations, never()).patchUpdateItem(anyString(), anyString(), anyString(), anyMap());
+        verify(operations, never()).update(anyString(), anyMap());
     }
 
     @Test
@@ -219,11 +256,16 @@ class DynamicRecordDaoTest {
                 .doesNotContain("\"deleted\"");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItem(eq(SCHEMA), eq(TABLE), eq("contract-1"), body.capture());
+        ArgumentCaptor<String> updateSql = ArgumentCaptor.forClass(String.class);
+        verify(operations).update(updateSql.capture(), body.capture());
+        assertThat(updateSql.getValue())
+                .contains("WHERE \"id\" = :id")
+                .contains("\"version\" = :expectedVersion");
         assertThat(body.getValue())
                 .containsEntry("deleted", Boolean.TRUE)
-                .containsEntry("version", 3);
-        assertThat(body.getValue()).doesNotContainKeys("id", "code", "amount", "created_at", "created_by");
+                .containsEntry("version", 3)
+                .containsEntry("expectedVersion", 2);
+        assertThat(body.getValue()).doesNotContainKeys("code", "amount", "created_at", "created_by");
     }
 
     @Test
@@ -365,7 +407,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(6))
-                .patchUpdateItem(eq(SCHEMA), eq(TABLE), anyString(), body.capture());
+                .update(anyString(), body.capture());
         assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
         assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
         assertThat(body.getAllValues().get(2)).containsEntry("sort_order", 3);
@@ -474,7 +516,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItem(eq(SCHEMA), eq(TABLE), anyString(), body.capture());
+                .update(anyString(), body.capture());
         assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
         assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
     }
@@ -586,6 +628,7 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        when(operations.update(anyString(), anyMap())).thenReturn(1);
         return operations;
     }
 

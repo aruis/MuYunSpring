@@ -16,7 +16,6 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityContract;
-import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityReferenceDefinition;
@@ -125,15 +124,15 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public Integer nextVersionForUpdate(DynamicRecord record) {
+    public Integer expectedVersionForUpdate(DynamicRecord record) {
         if (record.getVersion() != null) {
-            return EntityLifecycle.nextVersion(record.getVersion());
+            return record.getVersion();
         }
         DynamicRecord current = activeRaw(record.getId());
         if (current == null) {
             throw new IllegalArgumentException("dynamic record not found: " + record.getId());
         }
-        return EntityLifecycle.nextVersion(current.getVersion());
+        return current.getVersion();
     }
 
     @Override

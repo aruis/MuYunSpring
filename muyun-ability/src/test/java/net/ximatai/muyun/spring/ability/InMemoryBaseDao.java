@@ -18,6 +18,7 @@ import java.util.Map;
 
 final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, String> {
     private final Map<String, T> rows = new LinkedHashMap<>();
+    private final Map<String, Integer> versions = new LinkedHashMap<>();
 
     @Override
     public boolean ensureTable() {
@@ -27,6 +28,7 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
     @Override
     public String insert(T entity) {
         rows.put(entity.getId(), entity);
+        versions.put(entity.getId(), entity.getVersion());
         return entity.getId();
     }
 
@@ -36,12 +38,30 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
             return 0;
         }
         rows.put(entity.getId(), entity);
+        versions.put(entity.getId(), entity.getVersion());
         return 1;
     }
 
     @Override
+    public int updateByIdAndVersion(T entity, Integer expectedVersion) {
+        if (expectedVersion != null && !expectedVersion.equals(versions.get(entity.getId()))) {
+            return 0;
+        }
+        return updateById(entity);
+    }
+
+    @Override
     public int deleteById(String id) {
+        versions.remove(id);
         return rows.remove(id) == null ? 0 : 1;
+    }
+
+    @Override
+    public int deleteByIdAndVersion(String id, Integer expectedVersion) {
+        if (expectedVersion != null && !expectedVersion.equals(versions.get(id))) {
+            return 0;
+        }
+        return deleteById(id);
     }
 
     @Override
@@ -84,6 +104,7 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
     @Override
     public int upsert(T entity) {
         rows.put(entity.getId(), entity);
+        versions.put(entity.getId(), entity.getVersion());
         return 1;
     }
 

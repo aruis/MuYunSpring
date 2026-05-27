@@ -68,16 +68,18 @@ public interface CrudAbility<T extends EntityContract> {
         if (existing != null) {
             entity.setTenantId(existing.getTenantId());
         }
-        EntityLifecycle.prepareUpdate(entity, Instant.now(), nextVersionForUpdate(entity));
+        Integer expectedVersion = expectedVersionForUpdate(entity);
+        EntityLifecycle.prepareUpdate(entity, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
         beforeUpdate(entity);
         validateTreePlacementIfNeeded(entity);
-        int updated = getDao().updateById(entity);
+        int updated = getDao().updateByIdAndVersion(entity, expectedVersion);
+        if (updated <= 0) {
+            throw new OptimisticLockException("record version conflict: " + entity.getId());
+        }
         afterPlatformUpdate(entity, updated);
         afterUpdate(entity, updated);
-        if (updated > 0) {
-            afterChanged(entity);
-            CacheInvalidationSupport.clearAfterChanged(this, entity);
-        }
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
         return updated;
     }
 
@@ -101,7 +103,24 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
             return 0;
         }
-        return delete(entity.getId());
+        return delete(entity.getId(), entity.getVersion());
+    }
+
+    default int delete(String id, Integer expectedVersion) {
+        beforeDelete(id);
+        T entity = selectActiveRaw(id);
+        if (entity == null) {
+            return 0;
+        }
+        int deleted = getDao().deleteByIdAndVersion(id, expectedVersion);
+        if (deleted <= 0) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
+        afterPlatformDelete(id, entity, deleted);
+        afterDelete(id, entity, deleted);
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
+        return deleted;
     }
 
     default int deleteBatch(Collection<String> ids) {
@@ -161,6 +180,17 @@ public interface CrudAbility<T extends EntityContract> {
 
     default Integer nextVersionForUpdate(T entity) {
         return EntityLifecycle.nextVersion(entity.getVersion());
+    }
+
+    default Integer expectedVersionForUpdate(T entity) {
+        if (entity.getVersion() != null) {
+            return entity.getVersion();
+        }
+        T current = selectActiveRaw(entity.getId());
+        if (current == null) {
+            throw new IllegalArgumentException("record not found: " + entity.getId());
+        }
+        return current.getVersion();
     }
 
     default boolean shouldPrepareTreeDefault(T entity) {

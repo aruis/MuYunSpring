@@ -51,19 +51,37 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
 
     @Override
     default int delete(String id) {
+        return delete(id, null);
+    }
+
+    @Override
+    default int delete(T entity) {
+        if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
+            return 0;
+        }
+        return delete(entity.getId(), entity.getVersion());
+    }
+
+    @Override
+    default int delete(String id, Integer expectedVersion) {
         beforeDelete(id);
         T entity = selectIgnoreSoftDelete(id);
         if (isSoftDeleted(entity)) {
             return 0;
         }
+        if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
+        Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
         EntityLifecycle.prepareDelete(entity, Instant.now());
-        int deleted = getDao().updateById(entity);
+        int deleted = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+        if (deleted <= 0) {
+            throw new OptimisticLockException("record version conflict: " + id);
+        }
         afterPlatformDelete(id, entity, deleted);
         afterDelete(id, entity, deleted);
-        if (deleted > 0) {
-            afterChanged(entity);
-            CacheInvalidationSupport.clearAfterChanged(this, entity);
-        }
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
         return deleted;
     }
 

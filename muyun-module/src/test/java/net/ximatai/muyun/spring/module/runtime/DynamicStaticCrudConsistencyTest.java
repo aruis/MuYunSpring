@@ -67,7 +67,7 @@ class DynamicStaticCrudConsistencyTest {
 
         ArgumentCaptor<Map<String, Object>> patchBody = mapCaptor();
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItem(eq(SCHEMA), eq(TABLE), eq(id), patchBody.capture());
+                .update(anyString(), patchBody.capture());
         assertThat(patchBody.getAllValues().get(0))
                 .containsEntry("version", 1)
                 .containsKey("updated_at")
@@ -90,6 +90,7 @@ class DynamicStaticCrudConsistencyTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        when(operations.update(anyString(), anyMap())).thenReturn(1);
         return operations;
     }
 

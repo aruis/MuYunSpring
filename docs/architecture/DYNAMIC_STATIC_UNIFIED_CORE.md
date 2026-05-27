@@ -57,6 +57,8 @@ DynamicRecordService
 
 生命周期分为平台内部链和业务扩展 hook。CRUD 标准入口先调度平台内部链，再调用业务 hook；父子聚合等平台能力挂在内部链上，业务覆盖 `afterInsert`、`afterUpdate`、`afterDelete`、`afterSelect` 时不需要手动调用 `super` 来维持平台能力正确性。业务 `after*` hook 是平台能力完成后的扩展点，不用于观察或拦截平台内部链执行前的 RAW 对象状态。
 
+乐观锁由 Ability 层统一表达：更新和带实体删除以当前记录 `version` 作为 expected version，写入时递增到下一版本；冲突时抛出 `OptimisticLockException`。动态 DAO 使用 `WHERE id = ? AND version = ?` 执行原子更新。静态 DAO 通过同一 `BaseDao` 契约接入，真实数据库原子 CAS 后续随 MuYunDatabase 条件更新能力下沉。
+
 缓存能力先作为显式能力挂载：服务实现 `CacheAbility` 后，标准 `select(id)` 可复用缓存，写链路在 `afterChanged` 之后由 CRUD 内部统一失效。静态服务默认缓存命名空间包含服务类、模块别名和 DAO 实例；动态运行态缓存命名空间在同一 `DynamicRecordRuntime` 内按模块和实体稳定，在不同运行态之间隔离。缓存对象必须通过 `copyForCache` 进出，避免调用方修改返回对象污染缓存内容。跨能力、跨模型的引用缓存失效后续基于 `ReferencerAbility` 增量建设。
 
 父子聚合与缓存的关系采用“缓存父记录、按次装配子记录”的策略。父记录命中缓存后仍会重新按关系读取 children，不把装配后的 children 写回父缓存；这样子表变更不需要反向清理父缓存，也避免父缓存被聚合状态污染。聚合装配出的 child 是否继续执行 child service 的完整 `afterSelect` 语义，需要单独设计递归边界，不能在无深度控制的情况下隐式递归。

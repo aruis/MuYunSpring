@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.OrmException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
@@ -195,6 +196,19 @@ class DynamicSchemaServiceIT {
         entityService.update(record);
         assertThat(entityService.select(id).getVersion()).isEqualTo(1);
         assertThat(entityService.select(id).getValue("name")).isEqualTo("Updated Contract");
+
+        DynamicRecord staleUpdate = new DynamicRecord(entity)
+                .setValue("name", "Stale Contract");
+        staleUpdate.setId(id);
+        staleUpdate.setVersion(0);
+        assertThatThrownBy(() -> entityService.update(staleUpdate))
+                .isInstanceOf(OptimisticLockException.class);
+
+        DynamicRecord staleDelete = new DynamicRecord(entity);
+        staleDelete.setId(id);
+        staleDelete.setVersion(0);
+        assertThatThrownBy(() -> entityService.delete(staleDelete))
+                .isInstanceOf(OptimisticLockException.class);
 
         assertThat(entityService.delete(id)).isEqualTo(1);
         assertThat(entityService.select(id)).isNull();

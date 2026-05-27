@@ -98,9 +98,12 @@ class DynamicRelationRuntimeTest {
         ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> id = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).patchUpdateItem(eq(SCHEMA), table.capture(), id.capture(), body.capture());
-        assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
-        assertThat(id.getAllValues()).containsExactly("invoice-1", "line-1");
+        ArgumentCaptor<String> updateSql = ArgumentCaptor.forClass(String.class);
+        verify(operations, times(2)).update(updateSql.capture(), body.capture());
+        assertThat(updateSql.getAllValues().get(0)).contains("\"app_invoice\"");
+        assertThat(updateSql.getAllValues().get(1)).contains("\"app_invoice_line\"");
+        assertThat(body.getAllValues().get(0)).containsEntry("id", "invoice-1");
+        assertThat(body.getAllValues().get(1)).containsEntry("id", "line-1");
         assertThat(body.getAllValues().get(1)).containsEntry("deleted", Boolean.TRUE);
     }
 
@@ -347,6 +350,7 @@ class DynamicRelationRuntimeTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        when(operations.update(anyString(), anyMap())).thenReturn(1);
         return operations;
     }
 

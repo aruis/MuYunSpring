@@ -83,7 +83,7 @@ class DynamicRecordRuntimeTest {
 
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItem(eq(SCHEMA), eq(TABLE), eq(id), anyMap());
+                .update(anyString(), anyMap());
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(querySql.capture(), anyMap());
         assertThat(querySql.getAllValues()).anySatisfy(sql -> assertThat(sql)
@@ -96,6 +96,7 @@ class DynamicRecordRuntimeTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        when(operations.update(anyString(), anyMap())).thenReturn(1);
         return operations;
     }
 

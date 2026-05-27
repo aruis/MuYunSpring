@@ -57,7 +57,7 @@ class DynamicRecordServiceTest {
 
         verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
         verify(operations, org.mockito.Mockito.times(3))
-                .patchUpdateItem(eq(SCHEMA), eq("app_contract"), eq(id), anyMap());
+                .update(anyString(), anyMap());
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
         assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
@@ -78,7 +78,7 @@ class DynamicRecordServiceTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(3))
-                .patchUpdateItem(eq(SCHEMA), eq("app_contract"), anyString(), body.capture());
+                .update(anyString(), body.capture());
         assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
         assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
         assertThat(body.getAllValues().get(2)).containsEntry("sort_order", 3);
@@ -111,9 +111,9 @@ class DynamicRecordServiceTest {
         AtomicReference<String> storedCode = new AtomicReference<>("C-001");
         when(operations.query(anyString(), anyMap()))
                 .thenAnswer(invocation -> List.of(row("contract-1", storedCode.get(), 0, false)));
-        when(operations.patchUpdateItem(eq(SCHEMA), eq("app_contract"), eq("contract-1"), anyMap()))
+        when(operations.update(anyString(), anyMap()))
                 .thenAnswer(invocation -> {
-                    storedCode.set(String.valueOf(invocation.<Map<String, Object>>getArgument(3).get("code")));
+                    storedCode.set(String.valueOf(invocation.<Map<String, Object>>getArgument(1).get("code")));
                     return 1;
                 });
         DynamicRecordService service = service(operations, contractEntity());
@@ -136,6 +136,7 @@ class DynamicRecordServiceTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
+        when(operations.update(anyString(), anyMap())).thenReturn(1);
         return operations;
     }
 

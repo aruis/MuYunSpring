@@ -370,6 +370,40 @@ class AbilityContractTest {
     }
 
     @Test
+    void crudAbilityShouldRejectStaleVersionUpdate() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Versioned");
+        String id = service.insert(record);
+        service.update(record);
+
+        DemoPlainRecord stale = new DemoPlainRecord("Stale");
+        stale.setId(id);
+        stale.setVersion(0);
+
+        assertThatThrownBy(() -> service.update(stale))
+                .isInstanceOf(OptimisticLockException.class)
+                .hasMessageContaining("version conflict");
+        assertThat(service.select(id).getTitle()).isEqualTo("Versioned");
+    }
+
+    @Test
+    void softDeleteAbilityShouldRejectStaleVersionDelete() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Versioned");
+        String id = service.insert(record);
+        service.update(record);
+
+        DemoPlainRecord stale = new DemoPlainRecord("Stale");
+        stale.setId(id);
+        stale.setVersion(0);
+
+        assertThatThrownBy(() -> service.delete(stale))
+                .isInstanceOf(OptimisticLockException.class)
+                .hasMessageContaining("version conflict");
+        assertThat(service.select(id)).isNotNull();
+    }
+
+    @Test
     void treeAbilityShouldResolveChildrenAndAncestors() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization rootChild = new DemoOrganization("Region", TreeAbility.ROOT_ID);
