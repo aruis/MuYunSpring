@@ -132,6 +132,20 @@ class AbilityContractTest {
     }
 
     @Test
+    void baseDaoVersionMethodsShouldRequireExpectedVersion() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Versioned DAO");
+        service.insert(record);
+
+        assertThatThrownBy(() -> service.rawDao().updateByIdAndVersion(record, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+        assertThatThrownBy(() -> service.rawDao().deleteByIdAndVersion(record.getId(), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+    }
+
+    @Test
     void childrenAbilityShouldInsertLoadReplaceAndCascadeDeleteChildren() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");

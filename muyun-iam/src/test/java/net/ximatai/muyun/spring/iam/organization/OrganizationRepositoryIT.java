@@ -153,6 +153,19 @@ class OrganizationRepositoryIT {
         assertThat(organizationDao.findById(id)).isNull();
     }
 
+    @Test
+    void springRepositoryVersionMethodsShouldRequireExpectedVersion() {
+        Organization organization = new Organization();
+        organization.setId("org-null-version");
+
+        assertThatThrownBy(() -> organizationDao.updateByIdAndVersion(organization, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+        assertThatThrownBy(() -> organizationDao.deleteByIdAndVersion("org-null-version", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+    }
+
     private List<String> organizationColumns(Connection connection) throws Exception {
         try (var columns = connection.getMetaData().getColumns(null, "public", "iam_organization", null)) {
             java.util.ArrayList<String> names = new java.util.ArrayList<>();

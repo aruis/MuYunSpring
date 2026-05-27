@@ -45,7 +45,10 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
 
     @Override
     public int updateByIdAndVersion(T entity, Integer expectedVersion) {
-        return updateByIdAndCondition(entity, expectedVersion == null ? Map.of() : Map.of("version", expectedVersion));
+        if (expectedVersion == null) {
+            throw new IllegalArgumentException("expectedVersion must not be null");
+        }
+        return updateByIdAndCondition(entity, Map.of("version", expectedVersion));
     }
 
     @Override
@@ -65,7 +68,10 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
 
     @Override
     public int deleteByIdAndVersion(String id, Integer expectedVersion) {
-        return deleteByIdAndCondition(id, expectedVersion == null ? Map.of() : Map.of("version", expectedVersion));
+        if (expectedVersion == null) {
+            throw new IllegalArgumentException("expectedVersion must not be null");
+        }
+        return deleteByIdAndCondition(id, Map.of("version", expectedVersion));
     }
 
     @Override

@@ -74,7 +74,10 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public int updateByIdAndVersion(DynamicRecord record, Integer expectedVersion) {
-        return updateByIdAndCondition(record, expectedVersion == null ? Map.of() : Map.of(StandardEntitySchema.VERSION_FIELD, expectedVersion));
+        if (expectedVersion == null) {
+            throw new IllegalArgumentException("expectedVersion must not be null");
+        }
+        return updateByIdAndCondition(record, Map.of(StandardEntitySchema.VERSION_FIELD, expectedVersion));
     }
 
     @Override

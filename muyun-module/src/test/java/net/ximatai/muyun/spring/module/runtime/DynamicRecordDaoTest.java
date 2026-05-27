@@ -217,6 +217,20 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldRequireExpectedVersionForDynamicVersionUpdate() {
+        DynamicRecordDao dao = new DynamicRecordDao(operations(), contractEntity());
+        DynamicRecord record = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> dao.updateByIdAndVersion(record, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+        assertThatThrownBy(() -> dao.deleteByIdAndVersion("contract-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedVersion");
+    }
+
+    @Test
     void shouldRejectPartialUpdateWhenOnlyDeletedRecordExists() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
