@@ -7,9 +7,9 @@ import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.model.StandardEntity;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
-import net.ximatai.muyun.spring.module.metadata.FieldType;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
@@ -57,9 +57,9 @@ class DynamicStaticTableDefinitionConsistencyTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.of("enabled", FieldType.BOOLEAN, "Enabled")
+                        FieldDefinition.enabled()
                 )
-        );
+        ).withCapabilities(EntityCapability.ENABLE);
     }
 
     @Table(name = "demo_contract_static", comment = "Contract")

@@ -71,6 +71,11 @@ public record FieldDefinition(
                 .title();
     }
 
+    public static FieldDefinition enabled() {
+        return bool(PlatformAbilityFields.ENABLED_FIELD, "Enabled")
+                .column(PlatformAbilityFields.ENABLED_COLUMN);
+    }
+
     public String code() {
         return fieldName;
     }

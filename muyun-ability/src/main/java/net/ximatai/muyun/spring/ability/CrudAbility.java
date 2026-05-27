@@ -187,7 +187,7 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default boolean shouldPrepareEnabledDefault(T entity) {
-        return true;
+        return this instanceof EnableAbility<?>;
     }
 
     default Criteria activeCriteria(Criteria criteria) {

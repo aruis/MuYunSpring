@@ -170,6 +170,27 @@ class AbilityContractTest {
     }
 
     @Test
+    void enableAbilityShouldBeExplicitAndNotAffectDefaultFiltering() {
+        DemoEnabledRecordService service = new DemoEnabledRecordService();
+        String enabledId = service.insert(new DemoEnabledRecord("Enabled"));
+        String disabledId = service.insert(new DemoEnabledRecord("Disabled"));
+
+        assertThat(service.isEnabled(enabledId)).isTrue();
+        assertThat(service.disable(disabledId)).isEqualTo(1);
+        assertThat(service.isEnabled(disabledId)).isFalse();
+        assertThat(service.select(disabledId)).isNotNull();
+        assertThat(service.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .extracting(DemoEnabledRecord::getTitle)
+                .containsExactly("Enabled", "Disabled");
+        assertThat(service.pageQuery(service.enabledCriteria(Criteria.of()), PageRequest.of(1, 10)).getRecords())
+                .extracting(DemoEnabledRecord::getTitle)
+                .containsExactly("Enabled");
+
+        assertThat(service.enable(disabledId)).isEqualTo(1);
+        assertThat(service.isEnabled(disabledId)).isTrue();
+    }
+
+    @Test
     void crudAbilityShouldUseCurrentVersionForHardDelete() {
         DemoPlainRecordService service = new DemoPlainRecordService();
         DemoPlainRecord record = new DemoPlainRecord("Versioned hard delete");

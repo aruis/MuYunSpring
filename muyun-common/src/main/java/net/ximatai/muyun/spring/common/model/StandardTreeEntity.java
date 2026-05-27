@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 @Getter
 @Setter
-public abstract class StandardTreeEntity extends StandardEntity implements TreeCapable, EnabledCapable, TitledCapable {
+public abstract class StandardTreeEntity extends StandardEntity implements TreeCapable, TitledCapable {
     @Column(name = PlatformAbilityFields.TREE_PARENT_COLUMN, type = ColumnType.VARCHAR, length = PlatformAbilityFields.TREE_PARENT_LENGTH, comment = "Parent ID")
     private String parentId;
 
@@ -19,6 +19,4 @@ public abstract class StandardTreeEntity extends StandardEntity implements TreeC
     @Column(name = PlatformAbilityFields.SORT_COLUMN, type = ColumnType.INT, comment = "Sort order")
     private Integer sortOrder;
 
-    @Column(name = PlatformAbilityFields.ENABLED_COLUMN, type = ColumnType.BOOLEAN, comment = "Enabled flag")
-    private Boolean enabled;
 }

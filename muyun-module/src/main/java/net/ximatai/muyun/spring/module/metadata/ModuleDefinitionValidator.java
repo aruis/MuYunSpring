@@ -56,12 +56,17 @@ public class ModuleDefinitionValidator {
         FieldDefinition sortableField = null;
         FieldDefinition titleField = null;
         FieldDefinition treeParentField = null;
+        FieldDefinition enabledField = null;
         for (FieldDefinition field : entity.fields()) {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
             requireUnique(columnNames, field.columnName(), "column name");
             if (PlatformAbilityFields.TREE_PARENT_FIELD.equals(field.fieldName())) {
                 treeParentField = field;
+            }
+            if (PlatformAbilityFields.ENABLED_FIELD.equals(field.fieldName())
+                    || PlatformAbilityFields.ENABLED_COLUMN.equals(field.columnName())) {
+                enabledField = field;
             }
             if (field.isSortable()) {
                 sortableFields++;
@@ -93,8 +98,14 @@ public class ModuleDefinitionValidator {
         if (titleFields > 0 && !entity.supports(EntityCapability.REFERENCE)) {
             throw new ModuleDefinitionException("title field requires REFERENCE capability: " + entity.code());
         }
+        if (enabledField != null && !entity.supports(EntityCapability.ENABLE)) {
+            throw new ModuleDefinitionException("enabled field requires ENABLE capability: " + entity.code());
+        }
         if (entity.supports(EntityCapability.REFERENCE)) {
             requireTitleField(entity, titleField);
+        }
+        if (entity.supports(EntityCapability.ENABLE)) {
+            requireEnabledField(entity, enabledField);
         }
     }
 
@@ -260,6 +271,17 @@ public class ModuleDefinitionValidator {
                 || !PlatformAbilityFields.TITLE_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.STRING) {
             throw new ModuleDefinitionException("REFERENCE capability requires standard field title/title: " + entity.code());
+        }
+    }
+
+    private void requireEnabledField(EntityDefinition entity, FieldDefinition field) {
+        if (field == null) {
+            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled: " + entity.code());
+        }
+        if (!PlatformAbilityFields.ENABLED_FIELD.equals(field.fieldName())
+                || !PlatformAbilityFields.ENABLED_COLUMN.equals(field.columnName())
+                || field.type() != FieldType.BOOLEAN) {
+            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled/enabled: " + entity.code());
         }
     }
 

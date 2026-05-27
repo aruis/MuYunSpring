@@ -590,7 +590,7 @@ class DynamicRecordDaoTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.parentId(),
-                        FieldDefinition.bool("enabled", "Enabled")
+                        FieldDefinition.bool("active", "Active")
                 )
         );
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
@@ -601,7 +601,41 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
-        assertThat(body.getValue()).doesNotContainKeys("parent_id", "enabled");
+        assertThat(body.getValue()).doesNotContainKeys("parent_id", "active");
+    }
+
+    @Test
+    void shouldPrepareDynamicEnableDefaultsOnlyWhenCapabilityDeclared() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.enabled()
+                )
+        ).withCapabilities(EntityCapability.ENABLE);
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity).setValue("code", "C");
+        record.setId("C");
+
+        entityService.insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
+    }
+
+    @Test
+    void shouldRejectDynamicEnableCriteriaWithoutCapability() {
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract");
+
+        assertThatThrownBy(() -> entityService.enabledCriteria(Criteria.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not support capability: ENABLE");
     }
 
     @Test

@@ -32,7 +32,7 @@ class DynamicTableMapperTest {
         assertThat(columnNames(table))
                 .containsExactly(
                         "tenant_id", "version", "deleted", "deleted_at", "created_by", "created_at", "updated_by", "updated_at",
-                        "code", "name", "amount", "signed_at", "enabled"
+                        "code", "name", "amount", "signed_at"
                 );
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
@@ -221,6 +221,7 @@ class DynamicTableMapperTest {
         assertThat(EntityCapability.SOFT_DELETE.isBaseline()).isTrue();
         assertThat(EntityCapability.TREE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.REFERENCE.isDeclaredByEntityFields()).isTrue();
+        assertThat(EntityCapability.ENABLE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.CHILD_RELATION.isDeclaredByDefinition()).isTrue();
         assertThat(EntityCapability.REFERENCE_DEPENDENCY.isDeclaredByDefinition()).isTrue();
 
@@ -230,6 +231,7 @@ class DynamicTableMapperTest {
         assertThat(entity.supports(EntityCapability.SOFT_DELETE)).isTrue();
         assertThat(entity.supports(EntityCapability.CACHE)).isTrue();
         assertThat(entity.supports(EntityCapability.TREE)).isFalse();
+        assertThat(entity.supports(EntityCapability.ENABLE)).isFalse();
     }
 
     @Test
@@ -328,6 +330,53 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldRequireExplicitEnableCapabilityForEnabledField() {
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.enabled())
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("enabled field requires ENABLE capability");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.bool("active", "Active").column("enabled"))
+        ))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("enabled field requires ENABLE capability");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code"))
+        ).withCapabilities(EntityCapability.ENABLE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("ENABLE capability requires standard field enabled");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.bool("active", "Active").column("enabled"))
+        ).withCapabilities(EntityCapability.ENABLE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("ENABLE capability requires standard field enabled");
+
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.enabled())
+        ).withCapabilities(EntityCapability.ENABLE);
+
+        TableWrapper table = mapper.toTable(entity);
+
+        assertThat(entity.supports(EntityCapability.ENABLE)).isTrue();
+        assertThat(columnNames(table)).contains("enabled");
+    }
+
+    @Test
     void shouldRejectInvalidTitleFields() {
         assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
                 "contract",
@@ -382,8 +431,7 @@ class DynamicTableMapperTest {
                         FieldDefinition.string("code", "Code").length(64).required().unique(),
                         FieldDefinition.string("name", "Name").length(128).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
-                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed(),
-                        FieldDefinition.bool("enabled", "Enabled")
+                        FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at").indexed()
                 )
         );
     }

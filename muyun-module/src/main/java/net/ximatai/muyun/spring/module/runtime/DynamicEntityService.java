@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.ChildAbility;
 import net.ximatai.muyun.spring.ability.ChildRelation;
 import net.ximatai.muyun.spring.ability.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
@@ -40,6 +41,7 @@ import java.util.function.Function;
 public class DynamicEntityService implements
         CrudAbility<DynamicRecord>,
         SoftDeleteAbility<DynamicRecord>,
+        EnableAbility<DynamicRecord>,
         ChildAbility<DynamicRecord>,
         ChildrenAbility<DynamicRecord>,
         TreeAbility<DynamicRecord>,
@@ -157,7 +159,31 @@ public class DynamicEntityService implements
 
     @Override
     public boolean shouldPrepareEnabledDefault(DynamicRecord record) {
-        return dao.getEntity().supports(EntityCapability.TREE);
+        return dao.getEntity().supports(EntityCapability.ENABLE);
+    }
+
+    @Override
+    public int enable(String id) {
+        requireCapability(EntityCapability.ENABLE);
+        return EnableAbility.super.enable(id);
+    }
+
+    @Override
+    public int disable(String id) {
+        requireCapability(EntityCapability.ENABLE);
+        return EnableAbility.super.disable(id);
+    }
+
+    @Override
+    public boolean isEnabled(String id) {
+        requireCapability(EntityCapability.ENABLE);
+        return EnableAbility.super.isEnabled(id);
+    }
+
+    @Override
+    public Criteria enabledCriteria(Criteria criteria) {
+        requireCapability(EntityCapability.ENABLE);
+        return EnableAbility.super.enabledCriteria(criteria);
     }
 
     public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
