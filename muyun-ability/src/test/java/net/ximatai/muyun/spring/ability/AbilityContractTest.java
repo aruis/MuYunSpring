@@ -409,6 +409,23 @@ class AbilityContractTest {
     }
 
     @Test
+    void childrenAggregationShouldHideSoftDeletedChildRecords() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine activeLine = new DemoInvoiceLine("Active line");
+        DemoInvoiceLine deletedLine = new DemoInvoiceLine("Deleted line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(activeLine, deletedLine));
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoiceService.lineService().delete(deletedLine.getId());
+
+        DemoInvoice selected = invoiceService.select(invoiceId);
+        assertThat(selected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("Active line");
+        assertThat(invoiceService.lineService().selectIgnoreSoftDelete(deletedLine.getId())).isNotNull();
+    }
+
+    @Test
     void childrenAbilityShouldRejectInvalidChildIdsOnParentInsert() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine duplicateLine = new DemoInvoiceLine("Duplicate line");
@@ -665,6 +682,24 @@ class AbilityContractTest {
     }
 
     @Test
+    void treeAbilityShouldHideSoftDeletedChildrenAndDescendants() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String parentId = service.insert(new DemoOrganization("Parent", TreeAbility.ROOT_ID));
+        String activeChildId = service.insert(new DemoOrganization("Active child", parentId));
+        String deletedChildId = service.insert(new DemoOrganization("Deleted child", parentId));
+        String activeGrandchildId = service.insert(new DemoOrganization("Active grandchild", deletedChildId));
+        service.delete(deletedChildId);
+
+        assertThat(service.children(parentId))
+                .extracting(DemoOrganization::getId)
+                .containsExactly(activeChildId);
+        assertThat(service.descendantIds(parentId)).containsExactly(activeChildId);
+        assertThat(service.children(deletedChildId)).isEmpty();
+        assertThat(service.descendantIds(deletedChildId)).isEmpty();
+        assertThat(service.select(activeGrandchildId)).isNotNull();
+    }
+
+    @Test
     void treeAbilityShouldRejectCycles() {
         DemoOrganizationService service = new DemoOrganizationService();
         String parentId = service.insert(new DemoOrganization("Parent", TreeAbility.ROOT_ID));
@@ -754,6 +789,23 @@ class AbilityContractTest {
             assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
                     .containsExactly(tenantBSecond, tenantBFirst);
         }
+    }
+
+    @Test
+    void sortAbilityShouldKeepReorderScopeInsideActiveRows() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String first = service.insert(new DemoOrganization("First", TreeAbility.ROOT_ID));
+        String second = service.insert(new DemoOrganization("Second", TreeAbility.ROOT_ID));
+        String third = service.insert(new DemoOrganization("Third", TreeAbility.ROOT_ID));
+        service.delete(second);
+
+        service.reorder(List.of(third, first));
+
+        assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
+                .containsExactly(third, first);
+        assertThatThrownBy(() -> service.moveBefore(second, first))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("missing record");
     }
 
     @Test
@@ -910,6 +962,22 @@ class AbilityContractTest {
 
         assertThat(service.titles(List.of(deletedId, activeId)))
                 .containsExactly(Map.entry(activeId, "Active"));
+    }
+
+    @Test
+    void referenceAbilityShouldHideSoftDeletedRowsAcrossReadShapes() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String activeId = service.insert(new DemoOrganization("Active", TreeAbility.ROOT_ID));
+        String deletedId = service.insert(new DemoOrganization("Deleted", TreeAbility.ROOT_ID));
+        service.delete(deletedId);
+
+        assertThat(service.title(deletedId)).isNull();
+        assertThat(service.titles(List.of(deletedId, activeId)))
+                .containsExactly(Map.entry(activeId, "Active"));
+        assertThat(service.projections(List.of(deletedId, activeId), List.of("title")))
+                .containsExactly(Map.entry(activeId, Map.of("title", "Active")));
+        assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(new ReferenceOption(activeId, "Active"));
     }
 
     @Test

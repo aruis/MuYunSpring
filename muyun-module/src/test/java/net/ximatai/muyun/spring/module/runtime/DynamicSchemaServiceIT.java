@@ -130,6 +130,19 @@ class DynamicSchemaServiceIT {
             assertThat(invoiceService.referenceOptions(Criteria.of().eq("parentId", rootId), PageRequest.of(1, 10)).getRecords())
                     .extracting("id")
                     .containsExactlyInAnyOrder(secondChildId, firstChildId);
+            assertThat(invoiceService.delete(secondChildId)).isEqualTo(1);
+            assertThat(invoiceService.select(secondChildId)).isNull();
+            assertThat(invoiceService.selectIgnoreSoftDelete(secondChildId)).isNotNull();
+            assertThat(invoiceService.sortedList(Criteria.of().eq("parentId", rootId)).stream().map(DynamicRecord::getId))
+                    .containsExactly(firstChildId);
+            assertThat(invoiceService.children(rootId).stream().map(DynamicRecord::getId))
+                    .containsExactly(firstChildId);
+            assertThat(invoiceService.children(secondChildId)).isEmpty();
+            assertThat(invoiceService.descendantIds(secondChildId)).isEmpty();
+            assertThat(invoiceService.title(secondChildId)).isNull();
+            assertThat(invoiceService.referenceOptions(Criteria.of().eq("parentId", rootId), PageRequest.of(1, 10)).getRecords())
+                    .extracting("id")
+                    .containsExactly(firstChildId);
 
             DynamicRecord invoiceWithLine = runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-LINE")

@@ -15,6 +15,12 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     String ROOT_ID = "root";
 
     default List<T> children(String parentId) {
+        if (parentId == null || parentId.isBlank()) {
+            return List.of();
+        }
+        if (!ROOT_ID.equals(parentId) && selectActiveRaw(parentId) == null) {
+            return List.of();
+        }
         Criteria criteria = activeCriteria(Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
         return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
