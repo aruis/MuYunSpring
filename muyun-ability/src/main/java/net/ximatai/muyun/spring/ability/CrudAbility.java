@@ -27,7 +27,7 @@ public interface CrudAbility<T extends EntityContract> {
         beforeInsert(entity);
         validateTreePlacementIfNeeded(entity);
         String id = getDao().insert(entity);
-        afterPlatformInsert(id, entity);
+        PlatformAbilityDispatcher.afterInsert(this, id, entity);
         afterInsert(id, entity);
         afterChanged(entity);
         CacheInvalidationSupport.clearAfterChanged(this, entity);
@@ -55,7 +55,7 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null) {
             return null;
         }
-        afterPlatformSelect(entity);
+        PlatformAbilityDispatcher.afterSelect(this, entity);
         afterSelect(entity);
         return entity;
     }
@@ -76,7 +76,7 @@ public interface CrudAbility<T extends EntityContract> {
         if (updated <= 0) {
             throw new OptimisticLockException("record version conflict: " + entity.getId());
         }
-        afterPlatformUpdate(entity, updated);
+        PlatformAbilityDispatcher.afterUpdate(this, entity, updated);
         afterUpdate(entity, updated);
         afterChanged(entity);
         CacheInvalidationSupport.clearAfterChanged(this, entity);
@@ -105,7 +105,7 @@ public interface CrudAbility<T extends EntityContract> {
         if (deleted <= 0) {
             throw new OptimisticLockException("record version conflict: " + id);
         }
-        afterPlatformDelete(id, entity, deleted);
+        PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
         afterDelete(id, entity, deleted);
         afterChanged(entity);
         CacheInvalidationSupport.clearAfterChanged(this, entity);

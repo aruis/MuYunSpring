@@ -18,8 +18,7 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
         return modelClass == null ? Map.of() : StaticReferenceResolver.collect(modelClass, entity);
     }
 
-    @Override
-    default void afterPlatformSelect(T entity) {
+    default void afterReferenceSelect(T entity) {
         populateStaticReferenceTitles(entity);
     }
 

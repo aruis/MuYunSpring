@@ -20,7 +20,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (entity == null) {
             return null;
         }
-        afterPlatformSelect(entity);
+        PlatformAbilityDispatcher.afterSelect(this, entity);
         afterSelect(entity);
         return entity;
     }
@@ -79,7 +79,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (deleted <= 0) {
             throw new OptimisticLockException("record version conflict: " + id);
         }
-        afterPlatformDelete(id, entity, deleted);
+        PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
         afterDelete(id, entity, deleted);
         afterChanged(entity);
         CacheInvalidationSupport.clearAfterChanged(this, entity);

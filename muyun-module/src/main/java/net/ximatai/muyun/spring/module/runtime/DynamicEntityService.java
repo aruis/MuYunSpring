@@ -129,8 +129,7 @@ public class DynamicEntityService implements
     }
 
     @Override
-    public void afterPlatformSelect(DynamicRecord record) {
-        ChildrenAbility.super.afterPlatformSelect(record);
+    public void afterReferenceSelect(DynamicRecord record) {
         populateReferenceTitles(record);
     }
 

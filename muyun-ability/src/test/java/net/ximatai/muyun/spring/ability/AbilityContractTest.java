@@ -258,14 +258,17 @@ class AbilityContractTest {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
         DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+        invoice.setCustomerId("customer-1");
 
         String invoiceId = invoiceService.insert(invoice);
         assertThat(firstLine.getInvoiceId()).isEqualTo(invoiceId);
 
         invoice.setLines(null);
-        assertThat(invoiceService.select(invoiceId).getLines())
+        DemoInvoice selected = invoiceService.select(invoiceId);
+        assertThat(selected.getLines())
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
+        assertThat(selected.getCustomerTitle()).isEqualTo("Customer One");
 
         invoice.setLines(List.of());
         invoiceService.update(invoice);
@@ -280,6 +283,7 @@ class AbilityContractTest {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
         DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+        invoice.setCustomerId("customer-1");
         String invoiceId = invoiceService.insert(invoice);
 
         invoice.setLines(null);
@@ -287,14 +291,17 @@ class AbilityContractTest {
         assertThat(firstSelected.getLines())
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
+        assertThat(firstSelected.getCustomerTitle()).isEqualTo("Customer One");
 
         invoice.setTitle("Changed behind cache");
+        invoice.setCustomerTitle(null);
         DemoInvoice secondSelected = invoiceService.select(invoiceId);
 
         assertThat(secondSelected.getTitle()).isEqualTo("Invoice");
         assertThat(secondSelected.getLines())
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line");
+        assertThat(secondSelected.getCustomerTitle()).isEqualTo("Customer One");
         assertThat(invoiceService.businessHookCount()).isEqualTo(3);
     }
 

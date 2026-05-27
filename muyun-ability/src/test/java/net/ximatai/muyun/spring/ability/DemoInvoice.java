@@ -10,6 +10,9 @@ import java.util.List;
 @Setter
 final class DemoInvoice extends StandardEntity {
     private String title;
+    @ReferenceTo(moduleAlias = "demo", entityCode = "customer", autoTitle = true, titleOutputField = "customerTitle")
+    private String customerId;
+    private transient String customerTitle;
     @ChildRef(
             parentEntity = "invoice",
             childModel = DemoInvoiceLine.class,
