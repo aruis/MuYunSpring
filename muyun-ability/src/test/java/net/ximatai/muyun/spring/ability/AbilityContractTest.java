@@ -531,6 +531,9 @@ class AbilityContractTest {
                         ReferenceTarget.of("iam", "user"),
                         ReferenceTarget.of("iam", "user")
                 );
+
+        String id = service.insert(record);
+        assertThat(service.select(id).getCustomerTitle()).isEqualTo("Customer One");
     }
 
     @Test

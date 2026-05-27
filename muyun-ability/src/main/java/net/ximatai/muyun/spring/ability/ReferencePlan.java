@@ -34,8 +34,8 @@ public record ReferencePlan(
         return new ReferencePlan(sourceField, target, cardinality, false, "");
     }
 
-    public ReferencePlan withAutoTitle(String targetField) {
-        return new ReferencePlan(sourceField, target, cardinality, true, targetField);
+    public ReferencePlan withAutoTitle(String titleOutputField) {
+        return new ReferencePlan(sourceField, target, cardinality, true, titleOutputField);
     }
 
     public List<String> normalizeValues(Object value) {

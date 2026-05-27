@@ -64,8 +64,23 @@ class StaticReferenceResolverTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void writeTitleValueShouldWrapFieldTypeMismatch() {
+        WrongTitleTypeRecord record = new WrongTitleTypeRecord();
+
+        assertThatThrownBy(() -> StaticReferenceResolver.writeTitleValue(record, "userTitle", List.of("User One")))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("Cannot write reference title field")
+                .hasMessageContaining("WrongTitleTypeRecord.userTitle")
+                .hasMessageContaining("java.util");
+    }
+
     private static final class CollectionReferenceRecord {
         @ReferenceTo(moduleAlias = "iam", entityCode = "user", cardinality = ReferenceCardinality.MANY)
         private List<String> userIds;
+    }
+
+    private static final class WrongTitleTypeRecord {
+        private String userTitle;
     }
 }

@@ -53,6 +53,24 @@ public final class StaticReferenceResolver {
                 .toList();
     }
 
+    public static List<String> values(Object record, ReferencePlan plan) {
+        if (record == null || plan == null) {
+            return List.of();
+        }
+        return rules(record.getClass()).stream()
+                .filter(rule -> rule.plan().equals(plan))
+                .findFirst()
+                .map(rule -> rule.values(record))
+                .orElseGet(() -> plan.normalizeValues(readByFieldName(record, plan.sourceField())));
+    }
+
+    public static void writeTitleValue(Object record, String titleOutputField, Object titleValue) {
+        if (record == null || titleOutputField == null || titleOutputField.isBlank()) {
+            return;
+        }
+        writeByFieldName(record, titleOutputField, titleValue);
+    }
+
     static void clearCacheForTests() {
         RULES.clear();
     }
@@ -104,5 +122,46 @@ public final class StaticReferenceResolver {
                 throw new IllegalStateException("Cannot read reference field: " + field.getName(), e);
             }
         }
+    }
+
+    private static Object readByFieldName(Object record, String fieldName) {
+        Class<?> current = record.getClass();
+        while (current != null && !Object.class.equals(current)) {
+            try {
+                Field field = current.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(record);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            } catch (IllegalAccessException e) {
+                throw new AbilityException("Cannot read reference field: " + fieldName, e);
+            }
+        }
+        throw new AbilityException("Cannot find reference field: " + record.getClass().getName() + "." + fieldName);
+    }
+
+    private static void writeByFieldName(Object record, String fieldName, Object value) {
+        Class<?> current = record.getClass();
+        while (current != null && !Object.class.equals(current)) {
+            try {
+                Field field = current.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                field.set(record, value);
+                return;
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            } catch (IllegalAccessException e) {
+                throw new AbilityException("Cannot write reference title field: " + fieldName, e);
+            } catch (IllegalArgumentException e) {
+                throw new AbilityException("Cannot write reference title field: "
+                        + record.getClass().getName() + "." + fieldName
+                        + ", value type: " + valueType(value), e);
+            }
+        }
+        throw new AbilityException("Cannot find reference title field: " + record.getClass().getName() + "." + fieldName);
+    }
+
+    private static String valueType(Object value) {
+        return value == null ? "null" : value.getClass().getName();
     }
 }

@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.model.StandardEntity;
 final class DemoReferencingRecord extends StandardEntity {
     @ReferenceTo(moduleAlias = "demo", entityCode = "customer", autoTitle = true, titleOutputField = "customerTitle")
     private String customerId;
+    private transient String customerTitle;
     @ReferenceTo(moduleAlias = "iam", entityCode = "user")
     private String ownerId;
     @ReferenceTo(moduleAlias = "iam", entityCode = "user", cardinality = ReferenceCardinality.MANY)

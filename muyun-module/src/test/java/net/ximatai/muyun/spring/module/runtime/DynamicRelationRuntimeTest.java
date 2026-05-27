@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
@@ -174,6 +175,23 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldCollectDynamicManyReferenceIdsByMetadata() {
+        IDatabaseOperations<Object> operations = operations();
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(manyReferenceInvoiceModule())
+                .entityService(MODULE, "invoice_line");
+        DynamicRecord line = new DynamicRecord(invoiceLineEntity())
+                .setValue("invoiceId", "invoice-1, invoice-2, invoice-1")
+                .setValue("title", "L-001");
+
+        assertThat(lineService.collectReferenceIdsByTarget(line))
+                .containsEntry(ReferenceTarget.of("sales.invoice", "invoice"), Set.of("invoice-1", "invoice-2"));
+        assertThat(manyReferenceInvoiceModule().references())
+                .extracting(reference -> reference.plan().cardinality())
+                .containsExactly(ReferenceCardinality.MANY);
+    }
+
+    @Test
     void shouldCompileDynamicChildRelationToPlan() {
         assertThat(invoiceModule().relations())
                 .extracting(EntityRelationDefinition::plan)
@@ -185,6 +203,21 @@ class DynamicRelationRuntimeTest {
                         true,
                         true
                 ));
+    }
+
+    @Test
+    void shouldNormalizeDynamicReferenceDefinitionDefaults() {
+        EntityReferenceDefinition reference = new EntityReferenceDefinition(
+                "invoice_line",
+                "invoiceId",
+                ReferenceTarget.of("sales.invoice", "invoice").qualifiedName(),
+                null,
+                false,
+                null
+        );
+
+        assertThat(reference.cardinality()).isEqualTo(ReferenceCardinality.ONE);
+        assertThat(reference.titleOutputField()).isEmpty();
     }
 
     @Test
@@ -333,6 +366,21 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldRejectUnknownSameModuleDynamicReferenceTarget() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "missing_invoice")))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("reference target entity");
+    }
+
+    @Test
     void shouldRejectDynamicReferenceAutoTitleFieldConflicts() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
@@ -424,6 +472,18 @@ class DynamicRelationRuntimeTest {
                         .withAutoDeleteWithParent()),
                 List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceTitle"))
+        );
+    }
+
+    private ModuleDefinition manyReferenceInvoiceModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent()),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice")).many())
         );
     }
 

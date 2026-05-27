@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.ability;
 
+import java.util.Collection;
+import java.util.Map;
+
 final class DemoReferencingRecordService implements
         CrudAbility<DemoReferencingRecord>,
         ReferencerAbility<DemoReferencingRecord> {
@@ -18,5 +21,13 @@ final class DemoReferencingRecordService implements
     @Override
     public Class<?> referencingModelClass() {
         return DemoReferencingRecord.class;
+    }
+
+    @Override
+    public Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
+        if (ReferenceTarget.of("demo", "customer").equals(target) && ids.contains("customer-1")) {
+            return Map.of("customer-1", "Customer One");
+        }
+        return Map.of();
     }
 }

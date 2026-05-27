@@ -175,6 +175,9 @@ public class ModuleDefinitionValidator {
         requireModuleAlias(target.moduleAlias(), "reference target module alias");
         requireIdentifier(target.entityCode(), "reference target entity code");
         requireField(source, reference.sourceField(), "reference source field");
+        if (moduleAlias != null && moduleAlias.equals(target.moduleAlias())) {
+            requireEntity(entities, target.entityCode(), "reference target entity");
+        }
         if (reference.autoTitle()) {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
