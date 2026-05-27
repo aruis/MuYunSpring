@@ -2,7 +2,7 @@
 spring-boot = "3.5.0"
 spring-framework = "6.2.7"
 spring-dependency-management = "1.1.7"
-muyun-database = "3.26.3"
+muyun-database = "3.26.4"
 junit = "6.0.1"
 assertj = "3.27.6"
 postgresql = "42.7.8"

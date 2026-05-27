@@ -6,7 +6,11 @@ import net.ximatai.muyun.database.core.orm.OrmException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.module.metadata.EntityReferenceDefinition;
+import net.ximatai.muyun.spring.module.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import org.junit.jupiter.api.Test;
@@ -24,7 +28,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,7 +81,92 @@ class DynamicSchemaServiceIT {
                     .contains("id", "tenant_id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
                             "code", "name", "amount", "signed_at");
             assertThat(primaryKeys(connection)).containsExactly("id");
-            assertThat(uniqueIndexes(connection)).anyMatch(indexName -> indexName.contains("code"));
+            assertThat(uniqueIndexColumns(connection, "app_contract")).contains(List.of("tenant_id", "code"));
+        }
+    }
+
+    @Test
+    void shouldRunDynamicAbilitiesOnRealDatabase() {
+        ModuleDefinition module = invoiceModule();
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        publisher.publish(module);
+
+        DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
+        DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
+        String rootId;
+        String firstChildId;
+        String secondChildId;
+        String lineId;
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DynamicRecord root = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-ROOT")
+                    .setValue("title", "Root invoice");
+            rootId = invoiceService.insert(root);
+
+            DynamicRecord firstChild = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-CHILD-1")
+                    .setValue("title", "First child");
+            firstChild.setParentId(rootId);
+            firstChildId = invoiceService.insert(firstChild);
+
+            DynamicRecord secondChild = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-CHILD-2")
+                    .setValue("title", "Second child");
+            secondChild.setParentId(rootId);
+            secondChildId = invoiceService.insert(secondChild);
+
+            invoiceService.reorder(List.of(secondChildId, firstChildId));
+            assertThat(invoiceService.sortedList(Criteria.of().eq("parentId", rootId)).stream().map(DynamicRecord::getId))
+                    .containsExactly(secondChildId, firstChildId);
+            assertThat(invoiceService.children(rootId).stream().map(record -> record.getValue("title")))
+                    .containsExactly("Second child", "First child");
+            assertThat(invoiceService.title(firstChildId)).isEqualTo("First child");
+            assertThat(invoiceService.referenceOptions(Criteria.of().eq("parentId", rootId), PageRequest.of(1, 10)).getRecords())
+                    .extracting("id")
+                    .containsExactlyInAnyOrder(secondChildId, firstChildId);
+
+            DynamicRecord invoiceWithLine = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-LINE")
+                    .setValue("title", "Invoice with line");
+            DynamicRecord line = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Line 001");
+            invoiceWithLine.setChildren("lines", List.of(line));
+            String invoiceWithLineId = invoiceService.insert(invoiceWithLine);
+            lineId = line.getId();
+
+            DynamicRecord loadedLine = invoiceService.select(invoiceWithLineId).getChildren("lines").getFirst();
+            assertThat(loadedLine)
+                    .extracting(child -> child.getValue("title"), child -> child.getValue("invoiceId"))
+                    .containsExactly("Line 001", invoiceWithLineId);
+            assertThat(lineService.collectReferenceIdsBySourceNamespace(loadedLine))
+                    .containsEntry("sales.invoice.invoice", java.util.Set.of(invoiceWithLineId));
+            assertThat(lineService.select(lineId))
+                    .extracting(child -> child.getValue("invoiceId"))
+                    .isEqualTo(invoiceWithLineId);
+            assertThat(invoiceService.select(invoiceWithLineId).getChildren("lines"))
+                    .hasSize(1)
+                    .first()
+                    .extracting(child -> child.getValue("title"))
+                    .isEqualTo("Line 001");
+
+            assertThatThrownBy(() -> invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-ROOT")
+                    .setValue("title", "Duplicate in tenant A")))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("duplicate key");
+
+            assertThat(invoiceService.delete(invoiceWithLineId)).isEqualTo(1);
+            assertThat(lineService.select(lineId)).isNull();
+            assertThat(lineService.selectIgnoreSoftDelete(lineId)).isNotNull();
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(invoiceService.select(rootId)).isNull();
+            assertThat(invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-ROOT")
+                    .setValue("title", "Same code in tenant B"))).hasSize(32);
         }
     }
 
@@ -199,16 +291,17 @@ class DynamicSchemaServiceIT {
         }
     }
 
-    private List<String> uniqueIndexes(Connection connection) throws Exception {
-        try (var indexes = connection.getMetaData().getIndexInfo(null, "public", "app_contract", true, false)) {
-            java.util.ArrayList<String> names = new java.util.ArrayList<>();
+    private List<List<String>> uniqueIndexColumns(Connection connection, String tableName) throws Exception {
+        try (var indexes = connection.getMetaData().getIndexInfo(null, "public", tableName, true, false)) {
+            Map<String, List<String>> columnsByIndex = new LinkedHashMap<>();
             while (indexes.next()) {
                 String name = indexes.getString("INDEX_NAME");
-                if (name != null) {
-                    names.add(name);
+                String column = indexes.getString("COLUMN_NAME");
+                if (name != null && column != null) {
+                    columnsByIndex.computeIfAbsent(name, ignored -> new ArrayList<>()).add(column);
                 }
             }
-            return names;
+            return new ArrayList<>(columnsByIndex.values());
         }
     }
 
@@ -216,6 +309,44 @@ class DynamicSchemaServiceIT {
         try (var tables = connection.getMetaData().getTables(null, "public", tableName, null)) {
             return tables.next();
         }
+    }
+
+    private ModuleDefinition invoiceModule() {
+        return new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent()),
+                List.of(EntityReferenceDefinition.from("invoice_line", "invoiceId", "sales.invoice.invoice"))
+        );
+    }
+
+    private EntityDefinition invoiceEntity() {
+        return new EntityDefinition(
+                "invoice",
+                "app_invoice_ability_it",
+                "Invoice",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.titleField().required(),
+                        FieldDefinition.parentId(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.TREE, EntityCapability.SORT, EntityCapability.REFERENCE);
+    }
+
+    private EntityDefinition invoiceLineEntity() {
+        return new EntityDefinition(
+                "invoice_line",
+                "app_invoice_line_ability_it",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.string("invoiceId", "Invoice").column("invoice_id").length(64).required().indexed(),
+                        FieldDefinition.titleField().required()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
 
     @SpringBootConfiguration

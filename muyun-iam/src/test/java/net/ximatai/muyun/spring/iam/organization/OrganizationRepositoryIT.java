@@ -22,7 +22,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,7 +60,7 @@ class OrganizationRepositoryIT {
             assertThat(connection.getMetaData().getDatabaseProductName()).contains("PostgreSQL");
             assertThat(organizationColumns(connection))
                     .contains("id", "parent_id", "code", "title", "sort_order", "enabled", "deleted", "version");
-            assertThat(organizationUniqueIndexes(connection)).anyMatch(indexName -> indexName.contains("code"));
+            assertThat(organizationUniqueIndexColumns(connection)).contains(List.of("tenant_id", "code"));
         }
         assertThat(organizationDao.ensureTable()).isFalse();
 
@@ -97,16 +100,17 @@ class OrganizationRepositoryIT {
         }
     }
 
-    private List<String> organizationUniqueIndexes(Connection connection) throws Exception {
+    private List<List<String>> organizationUniqueIndexColumns(Connection connection) throws Exception {
         try (var indexes = connection.getMetaData().getIndexInfo(null, "public", "iam_organization", true, false)) {
-            java.util.ArrayList<String> names = new java.util.ArrayList<>();
+            Map<String, List<String>> columnsByIndex = new LinkedHashMap<>();
             while (indexes.next()) {
                 String name = indexes.getString("INDEX_NAME");
-                if (name != null) {
-                    names.add(name);
+                String column = indexes.getString("COLUMN_NAME");
+                if (name != null && column != null) {
+                    columnsByIndex.computeIfAbsent(name, ignored -> new ArrayList<>()).add(column);
                 }
             }
-            return names;
+            return new ArrayList<>(columnsByIndex.values());
         }
     }
 
