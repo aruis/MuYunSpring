@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
+import net.ximatai.muyun.spring.ability.ReferenceDependencyRegistry;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.module.metadata.ModuleDefinitionException;
@@ -69,6 +70,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
     public void clearCache() {
         CacheRegistry.clearNamespacePrefix(cacheNamespacePrefix);
+        ReferenceDependencyRegistry.clearNamespacePrefix(cacheNamespacePrefix);
     }
 
     @Override

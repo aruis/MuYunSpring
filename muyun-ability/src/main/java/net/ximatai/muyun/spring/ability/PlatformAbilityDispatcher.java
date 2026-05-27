@@ -25,6 +25,7 @@ final class PlatformAbilityDispatcher {
         runChildrenAfterSelect(ability, entity);
         runReferenceAfterSelect(ability, entity);
         ability.afterPlatformSelect(entity);
+        ReferenceDependencyRegistry.refresh(ability, entity);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

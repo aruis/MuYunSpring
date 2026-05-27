@@ -161,6 +161,46 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldInvalidateDynamicReferrerCacheWhenReferenceTargetChanges() {
+        IDatabaseOperations<Object> operations = operations();
+        AtomicReference<String> lineTitle = new AtomicReference<>("L-001");
+        AtomicReference<String> invoiceTitle = new AtomicReference<>("I-001");
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"id\" =")) {
+                return params.containsValue("line-1") ? List.of(lineRow(lineTitle.get())) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow(invoiceTitle.get())) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" IN")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow(invoiceTitle.get())) : List.of();
+            }
+            return List.of();
+        });
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), anyString(), anyMap(), anyMap())).thenReturn(1);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
+        DynamicEntityService lineService = runtime.entityService(MODULE, "invoice_line");
+
+        DynamicRecord first = lineService.select("line-1");
+        lineTitle.set("L-002");
+        invoiceTitle.set("I-002");
+        DynamicRecord invoice = new DynamicRecord(invoiceEntity()).setValue("title", "I-002");
+        invoice.setId("invoice-1");
+        invoice.setVersion(1);
+        invoiceService.update(invoice);
+        DynamicRecord second = lineService.select("line-1");
+
+        assertThat(first.getValue("title")).isEqualTo("L-001");
+        assertThat(first.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
+        assertThat(second.getValue("title")).isEqualTo("L-002");
+        assertThat(second.getValue("invoiceDisplayTitle")).isEqualTo("I-002");
+    }
+
+    @Test
     void shouldCollectDynamicReferenceIdsByMetadata() {
         IDatabaseOperations<Object> operations = operations();
         DynamicEntityService lineService = new DynamicRecordRuntime(operations)
@@ -649,10 +689,14 @@ class DynamicRelationRuntimeTest {
     }
 
     private Map<String, Object> invoiceRow() {
+        return invoiceRow("I-001");
+    }
+
+    private Map<String, Object> invoiceRow(String title) {
         return Map.of(
                 "id", "invoice-1",
                 "tenant_id", "tenant-a",
-                "title", "I-001",
+                "title", title,
                 "deleted", Boolean.FALSE,
                 "version", 1
         );

@@ -12,7 +12,19 @@ final class DemoInvoiceService implements
         CacheAbility<DemoInvoice> {
     private final InMemoryBaseDao<DemoInvoice> dao = new InMemoryBaseDao<>();
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
+    private final DemoCustomerService customerService;
     private int businessHookCount;
+
+    DemoInvoiceService() {
+        this(new DemoCustomerService());
+        DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
+        customer.setId("customer-1");
+        customerService.insert(customer);
+    }
+
+    DemoInvoiceService(DemoCustomerService customerService) {
+        this.customerService = customerService;
+    }
 
     @Override
     public BaseDao<DemoInvoice, String> getDao() {
@@ -37,6 +49,10 @@ final class DemoInvoiceService implements
 
     DemoInvoiceLineService lineService() {
         return lineService;
+    }
+
+    DemoCustomerService customerService() {
+        return customerService;
     }
 
     @Override
@@ -66,8 +82,8 @@ final class DemoInvoiceService implements
 
     @Override
     public Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
-        if (ReferenceTarget.of("demo", "customer").equals(target) && ids.contains("customer-1")) {
-            return Map.of("customer-1", "Customer One");
+        if (ReferenceTarget.of("demo", "customer").equals(target)) {
+            return customerService.titles(ids);
         }
         return Map.of();
     }
@@ -77,9 +93,8 @@ final class DemoInvoiceService implements
                                                                  Collection<String> ids,
                                                                  Collection<String> sourceFields) {
         if (ReferenceTarget.of("demo", "customer").equals(target)
-                && ids.contains("customer-1")
                 && sourceFields.contains("status")) {
-            return Map.of("customer-1", Map.of("status", "ACTIVE"));
+            return customerService.projections(ids, sourceFields);
         }
         return Map.of();
     }

@@ -96,6 +96,11 @@ public class DynamicEntityService implements
     }
 
     @Override
+    public ReferenceTarget referenceTarget() {
+        return ReferenceTarget.of(moduleAlias, dao.getEntity().code());
+    }
+
+    @Override
     public String cacheNamespace() {
         return cacheNamespace;
     }

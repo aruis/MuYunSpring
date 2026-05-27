@@ -17,6 +17,7 @@ class AbilityContractTest {
     @AfterEach
     void clearGlobalState() {
         CacheRegistry.clearAll();
+        ReferenceDependencyRegistry.clearAll();
         CacheRegistry.resetPolicy();
         TenantContext.clear();
     }
@@ -307,6 +308,34 @@ class AbilityContractTest {
         assertThat(secondSelected.getCustomerTitle()).isEqualTo("Customer One");
         assertThat(secondSelected.getCustomerStatus()).isEqualTo("ACTIVE");
         assertThat(invoiceService.businessHookCount()).isEqualTo(3);
+    }
+
+    @Test
+    void referenceTargetChangeShouldInvalidateReferrerCache() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
+        customer.setId("customer-1");
+        customerService.insert(customer);
+        DemoInvoiceService invoiceService = new DemoInvoiceService(customerService);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(new DemoInvoiceLine("First line")));
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        DemoInvoice firstSelected = invoiceService.select(invoiceId);
+        assertThat(firstSelected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(firstSelected.getCustomerStatus()).isEqualTo("ACTIVE");
+        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .contains(invoiceId);
+
+        invoice.setTitle("Changed behind cache");
+        customer.setTitle("Customer Updated");
+        customer.setStatus("SUSPENDED");
+        customerService.update(customer);
+
+        DemoInvoice secondSelected = invoiceService.select(invoiceId);
+        assertThat(secondSelected.getTitle()).isEqualTo("Changed behind cache");
+        assertThat(secondSelected.getCustomerTitle()).isEqualTo("Customer Updated");
+        assertThat(secondSelected.getCustomerStatus()).isEqualTo("SUSPENDED");
     }
 
     @Test

@@ -12,7 +12,11 @@ final class CacheInvalidationSupport {
                 cacheAbility.clearCache();
                 return;
             }
+            ReferenceDependencyRegistry.removeReferrer(cacheAbility.cacheNamespace(), entity.getId());
             cacheAbility.clearItemCache(entity.getId());
+        }
+        if (ability instanceof ReferenceAbility<?> referenceAbility && entity != null && entity.getId() != null) {
+            referenceAbility.clearReferenceReferrers(entity.getId());
         }
     }
 }

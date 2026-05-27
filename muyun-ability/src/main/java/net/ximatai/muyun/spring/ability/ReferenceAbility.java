@@ -16,6 +16,19 @@ import java.util.List;
 import java.util.Map;
 
 public interface ReferenceAbility<T extends EntityContract & TitledCapable> extends CrudAbility<T> {
+    default ReferenceTarget referenceTarget() {
+        String moduleAlias = getModuleAlias();
+        int separatorIndex = moduleAlias.lastIndexOf('.');
+        if (separatorIndex <= 0 || separatorIndex == moduleAlias.length() - 1) {
+            throw new AbilityException("reference target requires '<moduleAlias>.<entityCode>': " + moduleAlias);
+        }
+        return ReferenceTarget.of(moduleAlias.substring(0, separatorIndex), moduleAlias.substring(separatorIndex + 1));
+    }
+
+    default void clearReferenceReferrers(String id) {
+        ReferenceDependencyRegistry.clearReferrers(referenceTarget(), id);
+    }
+
     default String title(String id) {
         T entity = selectReferenceRaw(id);
         return entity == null ? null : referenceTitle(entity);
