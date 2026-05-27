@@ -5,31 +5,58 @@ import net.ximatai.muyun.spring.common.model.EntityContract;
 import java.util.Optional;
 
 public final class TenantContext {
-    private static final ThreadLocal<String> CURRENT_TENANT = new ThreadLocal<>();
+    private enum Mode {
+        NONE,
+        TENANT,
+        SYSTEM
+    }
+
+    private record State(Mode mode, String tenantId) {
+        private static State none() {
+            return new State(Mode.NONE, null);
+        }
+    }
+
+    private static final ThreadLocal<State> CURRENT = ThreadLocal.withInitial(State::none);
 
     private TenantContext() {
     }
 
     public static Optional<String> currentTenantId() {
-        return Optional.ofNullable(CURRENT_TENANT.get());
+        State state = CURRENT.get();
+        return state.mode() == Mode.TENANT ? Optional.of(state.tenantId()) : Optional.empty();
+    }
+
+    public static boolean isSystem() {
+        return CURRENT.get().mode() == Mode.SYSTEM;
+    }
+
+    public static boolean hasContext() {
+        return CURRENT.get().mode() != Mode.NONE;
     }
 
     public static void setTenantId(String tenantId) {
         if (tenantId == null || tenantId.isBlank()) {
-            CURRENT_TENANT.remove();
+            CURRENT.set(State.none());
             return;
         }
-        CURRENT_TENANT.set(tenantId);
+        CURRENT.set(new State(Mode.TENANT, tenantId));
     }
 
     public static Scope use(String tenantId) {
-        String previous = CURRENT_TENANT.get();
+        State previous = CURRENT.get();
         setTenantId(tenantId);
         return new Scope(previous);
     }
 
+    public static Scope system() {
+        State previous = CURRENT.get();
+        CURRENT.set(new State(Mode.SYSTEM, null));
+        return new Scope(previous);
+    }
+
     public static void clear() {
-        CURRENT_TENANT.remove();
+        CURRENT.set(State.none());
     }
 
     public static void applyToNewEntity(EntityContract entity) {
@@ -49,15 +76,15 @@ public final class TenantContext {
     }
 
     public static final class Scope implements AutoCloseable {
-        private final String previousTenantId;
+        private final State previous;
 
-        private Scope(String previousTenantId) {
-            this.previousTenantId = previousTenantId;
+        private Scope(State previous) {
+            this.previous = previous;
         }
 
         @Override
         public void close() {
-            setTenantId(previousTenantId);
+            CURRENT.set(previous);
         }
     }
 }

@@ -59,6 +59,47 @@ class AbilityContractTest {
     }
 
     @Test
+    void systemTenantContextShouldUseExplicitUnscopedAccess() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        String tenantAId;
+        String tenantBId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAId = service.insert(new DemoPlainRecord("Tenant A"));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            tenantBId = service.insert(new DemoPlainRecord("Tenant B"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            assertThat(TenantContext.isSystem()).isTrue();
+            assertThat(TenantContext.currentTenantId()).isEmpty();
+            assertThat(service.count(Criteria.of())).isEqualTo(2);
+            assertThat(service.select(tenantAId)).isNotNull();
+            assertThat(service.select(tenantBId)).isNotNull();
+        }
+    }
+
+    @Test
+    void systemTenantContextShouldPreserveTenantWhenUpdatingUnscopedRecord() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        String tenantAId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAId = service.insert(new DemoPlainRecord("Tenant A"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            DemoPlainRecord update = new DemoPlainRecord("System Updated");
+            update.setId(tenantAId);
+            service.update(update);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select(tenantAId).getTitle()).isEqualTo("System Updated");
+            assertThat(service.select(tenantAId).getTenantId()).isEqualTo("tenant-a");
+        }
+    }
+
+    @Test
     void crudAbilityShouldDeleteRecordAndBatchByStandardEntry() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization first = new DemoOrganization("First", TreeAbility.ROOT_ID);

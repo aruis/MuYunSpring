@@ -214,7 +214,9 @@ public interface CrudAbility<T extends EntityContract> {
         if (entity == null || entity.getId() == null || entity.getId().isBlank()) {
             return null;
         }
-        return TenantContext.currentTenantId().isPresent() ? selectActiveRaw(entity.getId()) : null;
+        return TenantContext.currentTenantId().isPresent() || TenantContext.isSystem()
+                ? selectActiveRaw(entity.getId())
+                : null;
     }
 
     private void prepareAbilityDefaults(T entity) {
