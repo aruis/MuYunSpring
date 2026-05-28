@@ -9,6 +9,10 @@ final class CacheInvalidationSupport {
     }
 
     static void clearAfterChanged(Object ability, EntityContract entity) {
+        TransactionScopeSupport.afterCommitOrNow(() -> clearAfterChangedNow(ability, entity));
+    }
+
+    private static void clearAfterChangedNow(Object ability, EntityContract entity) {
         if (ability instanceof CacheAbility<?> cacheAbility) {
             if (entity == null || entity.getId() == null) {
                 cacheAbility.clearCache();

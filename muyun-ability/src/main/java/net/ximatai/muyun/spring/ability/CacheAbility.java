@@ -26,6 +26,9 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         if (id == null || id.isBlank()) {
             return null;
         }
+        if (TransactionScopeSupport.isTransactionActive()) {
+            return selectWithoutCache(id);
+        }
         T cached = (T) CacheRegistry.item(cacheNamespace(), id);
         if (cached != null) {
             if (!isCacheVisible(cached)) {
@@ -54,6 +57,9 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
 
     @SuppressWarnings("unchecked")
     default List<T> selectAllWithCache() {
+        if (TransactionScopeSupport.isTransactionActive()) {
+            return selectAllWithoutCache();
+        }
         List<T> cached = CacheRegistry.allCache(allCacheNamespace());
         if (cached == null) {
             cached = getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE)).stream()
@@ -89,6 +95,28 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
             return false;
         }
         return TenantContext.matchesCurrentTenant(entity);
+    }
+
+    private T selectWithoutCache(String id) {
+        T loaded = getDao().query(activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
+        if (!isCacheVisible(loaded)) {
+            return null;
+        }
+        T copied = copyForCache(loaded);
+        PlatformAbilityDispatcher.afterSelect(this, copied);
+        afterSelect(copied);
+        return copied;
+    }
+
+    private List<T> selectAllWithoutCache() {
+        return getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE)).stream()
+                .map(this::copyForCache)
+                .peek(record -> PlatformAbilityDispatcher.afterSelect(this, record))
+                .peek(this::afterSelect)
+                .toList();
     }
 
     private String allCacheNamespace() {

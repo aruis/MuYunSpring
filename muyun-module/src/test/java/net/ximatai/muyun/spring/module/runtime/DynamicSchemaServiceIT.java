@@ -25,6 +25,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -56,12 +58,17 @@ class DynamicSchemaServiceIT {
     private final DynamicSchemaService schemaService;
     private final IDatabaseOperations<?> operations;
     private final DataSource dataSource;
+    private final DynamicTransactionProbe transactionProbe;
 
     @Autowired
-    DynamicSchemaServiceIT(DynamicSchemaService schemaService, IDatabaseOperations<?> operations, DataSource dataSource) {
+    DynamicSchemaServiceIT(DynamicSchemaService schemaService,
+                           IDatabaseOperations<?> operations,
+                           DataSource dataSource,
+                           DynamicTransactionProbe transactionProbe) {
         this.schemaService = schemaService;
         this.operations = operations;
         this.dataSource = dataSource;
+        this.transactionProbe = transactionProbe;
     }
 
     @Test
@@ -225,6 +232,90 @@ class DynamicSchemaServiceIT {
             assertThat(invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-ROOT")
                     .setValue("title", "Same code in tenant B"))).hasSize(32);
+        }
+    }
+
+    @Test
+    void shouldRollbackDynamicParentChildInsertWhenTransactionFails() {
+        DynamicRecordRuntime runtime = publishedInvoiceRuntime();
+        DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
+        DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
+        String code = "INV-TX-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String lineTitle = "Line TX " + code;
+        String tenantId = "tenant-tx-" + code;
+
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
+            invoiceService.selectAllWithCache();
+            lineService.selectAllWithCache();
+
+            assertThatThrownBy(() -> transactionProbe.insertInvoiceWithLineThenFail(invoiceService, lineService, runtime, code, lineTitle))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("rollback dynamic insert");
+
+            assertThat(invoiceService.count(Criteria.of().eq("code", code))).isZero();
+            assertThat(lineService.count(Criteria.of().eq("title", lineTitle))).isZero();
+            assertThat(invoiceService.selectAllWithCache())
+                    .extracting(record -> record.getValue("code"))
+                    .doesNotContain(code);
+            assertThat(lineService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .doesNotContain(lineTitle);
+        }
+    }
+
+    @Test
+    void shouldRollbackDynamicParentChildReplaceWhenTransactionFails() {
+        DynamicRecordRuntime runtime = publishedInvoiceRuntime();
+        DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
+        DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
+        String code = "INV-TX-REPLACE-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String tenantId = "tenant-tx-" + code;
+
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
+            DynamicRecord invoice = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", code)
+                    .setValue("title", "Before replace");
+            DynamicRecord retainedLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Retained before " + code);
+            DynamicRecord removedLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Removed before " + code);
+            invoice.setChildren("lines", List.of(retainedLine, removedLine));
+            String invoiceId = invoiceService.insert(invoice);
+            String retainedLineId = retainedLine.getId();
+            String removedLineId = removedLine.getId();
+            invoiceService.select(invoiceId);
+            invoiceService.selectAllWithCache();
+            lineService.select(retainedLineId);
+            lineService.select(removedLineId);
+            lineService.selectAllWithCache();
+
+            assertThatThrownBy(() -> transactionProbe.replaceInvoiceLinesThenFail(
+                    invoiceService,
+                    lineService,
+                    runtime,
+                    invoiceId,
+                    retainedLineId,
+                    removedLineId,
+                    code
+            ))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("rollback dynamic replace");
+
+            DynamicRecord loaded = invoiceService.select(invoiceId);
+            assertThat(loaded.getValue("title")).isEqualTo("Before replace");
+            assertThat(loaded.getChildren("lines"))
+                    .extracting(child -> child.getValue("title"))
+                    .containsExactlyInAnyOrder("Retained before " + code, "Removed before " + code);
+            assertThat(lineService.select(retainedLineId).getValue("title")).isEqualTo("Retained before " + code);
+            assertThat(lineService.select(removedLineId)).isNotNull();
+            assertThat(lineService.count(Criteria.of().eq("title", "New after " + code))).isZero();
+            assertThat(invoiceService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .doesNotContain("After replace");
+            assertThat(lineService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .contains("Retained before " + code, "Removed before " + code)
+                    .doesNotContain("Retained after " + code, "New after " + code);
         }
     }
 
@@ -516,6 +607,13 @@ class DynamicSchemaServiceIT {
         return service.insert(record);
     }
 
+    private DynamicRecordRuntime publishedInvoiceRuntime() {
+        ModuleDefinition module = invoiceModule();
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        new DynamicModulePublisher(schemaService, runtime).publish(module);
+        return runtime;
+    }
+
     private List<String> columns(Connection connection) throws Exception {
         return columns(connection, "app_contract");
     }
@@ -615,6 +713,7 @@ class DynamicSchemaServiceIT {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
+    @EnableTransactionManagement
     static class TestApplication {
 
         @Bean
@@ -630,6 +729,82 @@ class DynamicSchemaServiceIT {
         @Bean
         DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
             return new DynamicSchemaService(operations);
+        }
+
+        @Bean
+        DynamicTransactionProbe dynamicTransactionProbe() {
+            return new DynamicTransactionProbe();
+        }
+    }
+
+    static class DynamicTransactionProbe {
+
+        @Transactional
+        public void insertInvoiceWithLineThenFail(DynamicEntityService invoiceService,
+                                                  DynamicEntityService lineService,
+                                                  DynamicRecordRuntime runtime,
+                                                  String code,
+                                                  String lineTitle) {
+            DynamicRecord invoice = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", code)
+                    .setValue("title", "Rollback insert");
+            DynamicRecord line = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", lineTitle);
+            invoice.setChildren("lines", List.of(line));
+            String invoiceId = invoiceService.insert(invoice);
+
+            DynamicRecord loadedInvoice = invoiceService.select(invoiceId);
+            DynamicRecord loadedLine = lineService.select(line.getId());
+            assertThat(loadedInvoice).isNotNull();
+            assertThat(loadedLine).isNotNull();
+            assertThat(loadedLine.getValue("invoiceId")).isEqualTo(invoiceId);
+            assertThat(invoiceService.selectAllWithCache())
+                    .extracting(record -> record.getValue("code"))
+                    .contains(code);
+            assertThat(lineService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .contains(lineTitle);
+            throw new RuntimeException("rollback dynamic insert");
+        }
+
+        @Transactional
+        public void replaceInvoiceLinesThenFail(DynamicEntityService invoiceService,
+                                                DynamicEntityService lineService,
+                                                DynamicRecordRuntime runtime,
+                                                String invoiceId,
+                                                String retainedLineId,
+                                                String removedLineId,
+                                                String code) {
+            DynamicRecord currentInvoice = invoiceService.select(invoiceId);
+            DynamicRecord currentRetainedLine = lineService.select(retainedLineId);
+
+            DynamicRecord retainedLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Retained after " + code);
+            retainedLine.setId(retainedLineId);
+            retainedLine.setVersion(currentRetainedLine.getVersion());
+            DynamicRecord newLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "New after " + code);
+            DynamicRecord invoice = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", code)
+                    .setValue("title", "After replace");
+            invoice.setId(invoiceId);
+            invoice.setVersion(currentInvoice.getVersion());
+            invoice.setChildren("lines", List.of(retainedLine, newLine));
+            invoiceService.update(invoice);
+
+            assertThat(invoiceService.select(invoiceId).getValue("title")).isEqualTo("After replace");
+            assertThat(lineService.select(retainedLineId).getValue("title")).isEqualTo("Retained after " + code);
+            assertThat(lineService.select(newLine.getId())).isNotNull();
+            assertThat(lineService.select(removedLineId)).isNull();
+            assertThat(lineService.selectIgnoreSoftDelete(removedLineId)).isNotNull();
+            assertThat(invoiceService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .contains("After replace");
+            assertThat(lineService.selectAllWithCache())
+                    .extracting(record -> record.getValue("title"))
+                    .contains("Retained after " + code, "New after " + code)
+                    .doesNotContain("Removed before " + code);
+            throw new RuntimeException("rollback dynamic replace");
         }
     }
 }
