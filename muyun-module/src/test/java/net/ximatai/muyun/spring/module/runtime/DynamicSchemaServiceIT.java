@@ -438,6 +438,76 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
+    void shouldRunDynamicStableFacadeAbilitiesOnRealDatabase() {
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String moduleAlias = "sales.facade_" + suffix;
+        ModuleDefinition module = new ModuleDefinition(
+                moduleAlias,
+                "Facade Contract",
+                List.of(facadeContractEntity("app_contract_facade_" + suffix))
+        );
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        new DynamicModulePublisher(schemaService, runtime).publish(module);
+        DynamicRecordService recordService = new DynamicRecordService(runtime);
+
+        String activeId;
+        String disabledId;
+        String deletedId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-facade-a")) {
+            activeId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                    .setValue("code", "C-FACADE-001")
+                    .setValue("title", "Active Contract"));
+            disabledId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                    .setValue("code", "C-FACADE-002")
+                    .setValue("title", "Disabled Contract"));
+            deletedId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                    .setValue("code", "C-FACADE-003")
+                    .setValue("title", "Deleted Contract"));
+
+            assertThat(recordService.isEnabled(moduleAlias, "contract", activeId)).isTrue();
+            assertThat(recordService.disable(moduleAlias, "contract", disabledId)).isEqualTo(1);
+            assertThat(recordService.isEnabled(moduleAlias, "contract", disabledId)).isFalse();
+            assertThat(recordService.enable(moduleAlias, "contract", disabledId)).isEqualTo(1);
+            assertThat(recordService.disable(moduleAlias, "contract", disabledId)).isEqualTo(1);
+            assertThat(recordService.delete(moduleAlias, "contract", deletedId)).isEqualTo(1);
+        }
+
+        String tenantBId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-facade-b")) {
+            tenantBId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
+                    .setValue("code", "C-FACADE-004")
+                    .setValue("title", "Other Tenant Contract"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-facade-a")) {
+            Criteria enabledActive = recordService.enabledCriteria(moduleAlias, "contract", Criteria.of().eq("code", "C-FACADE-001"));
+            assertThat(recordService.list(moduleAlias, "contract", enabledActive, PageRequest.of(1, 10)))
+                    .extracting(record -> record.getValue("title"))
+                    .containsExactly("Active Contract");
+
+            Criteria enabledAll = recordService.enabledCriteria(moduleAlias, "contract", Criteria.of());
+            assertThat(recordService.list(moduleAlias, "contract", enabledAll, PageRequest.of(1, 10), Sort.asc("code")))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-FACADE-001");
+            assertThat(recordService.isEnabled(moduleAlias, "contract", deletedId)).isFalse();
+            assertThat(recordService.enable(moduleAlias, "contract", deletedId)).isZero();
+            assertThat(recordService.disable(moduleAlias, "contract", tenantBId)).isZero();
+            assertThat(recordService.isEnabled(moduleAlias, "contract", tenantBId)).isFalse();
+
+            assertThat(recordService.projections(
+                    moduleAlias,
+                    "contract",
+                    List.of(disabledId, activeId, deletedId, tenantBId),
+                    List.of("code", "title")
+            ))
+                    .containsExactly(
+                            Map.entry(disabledId, Map.of("code", "C-FACADE-002", "title", "Disabled Contract")),
+                            Map.entry(activeId, Map.of("code", "C-FACADE-001", "title", "Active Contract"))
+                    );
+        }
+    }
+
+    @Test
     void shouldPreviewAndPublishDynamicModuleSchemaEvolutionOnRealDatabase() throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String tableName = "app_contract_evolve_" + suffix;
@@ -709,6 +779,19 @@ class DynamicSchemaServiceIT {
                         FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
+    }
+
+    private EntityDefinition facadeContractEntity(String tableName) {
+        return new EntityDefinition(
+                "contract",
+                tableName,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required().unique(),
+                        FieldDefinition.titleField().required(),
+                        FieldDefinition.enabled()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE, EntityCapability.ENABLE);
     }
 
     @SpringBootConfiguration
