@@ -213,6 +213,8 @@ class AbilityContractTest {
         first.setDeleted(Boolean.TRUE);
 
         assertThat(service.select(firstId)).isSameAs(first);
+        assertThat(service.list(Criteria.of(), PageRequest.of(1, 10)))
+                .containsExactly(first, second);
         assertThat(service.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(first, second);
         assertThat(service.deleteBatch(List.of(firstId, secondId))).isEqualTo(2);

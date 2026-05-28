@@ -147,6 +147,9 @@ class OrganizationRepositoryContractTest {
 
         OrganizationService service = new OrganizationService(repository(operations));
 
+        assertThat(service.list(Criteria.of().eq("parentId", TreeAbility.ROOT_ID), PageRequest.of(1, 10)))
+                .extracting(Organization::getTitle)
+                .containsExactly("Headquarters");
         assertThat(service.pageQuery(Criteria.of().eq("parentId", TreeAbility.ROOT_ID), PageRequest.of(1, 10)).getRecords())
                 .extracting(Organization::getTitle)
                 .containsExactly("Headquarters");
@@ -155,7 +158,7 @@ class OrganizationRepositoryContractTest {
                 .containsExactly("org-1");
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(operations, times(2)).query(sql.capture(), anyMap());
+        verify(operations, times(3)).query(sql.capture(), anyMap());
 
         assertThat(sql.getAllValues().get(0))
                 .contains("\"parent_id\" =")
@@ -163,6 +166,11 @@ class OrganizationRepositoryContractTest {
                 .contains("\"deleted\" IS NULL")
                 .contains("OR");
         assertThat(sql.getAllValues().get(1))
+                .contains("\"parent_id\" =")
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL")
+                .contains("OR");
+        assertThat(sql.getAllValues().get(2))
                 .contains("ORDER BY \"sort_order\" ASC");
     }
 
