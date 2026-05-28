@@ -164,9 +164,12 @@ class DynamicSchemaServiceIT {
                     .setValue("title", "Invoice with line");
             DynamicRecord line = runtime.newRecord("sales.invoice", "invoice_line")
                     .setValue("title", "Line 001");
-            invoiceWithLine.setChildren("lines", List.of(line));
+            DynamicRecord removedLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Line 002");
+            invoiceWithLine.setChildren("lines", List.of(line, removedLine));
             String invoiceWithLineId = invoiceService.insert(invoiceWithLine);
             lineId = line.getId();
+            String removedLineId = removedLine.getId();
 
             DynamicRecord loadedLine = invoiceService.select(invoiceWithLineId).getChildren("lines").getFirst();
             assertThat(loadedLine)
@@ -177,11 +180,27 @@ class DynamicSchemaServiceIT {
             assertThat(lineService.select(lineId))
                     .extracting(child -> child.getValue("invoiceId"))
                     .isEqualTo(invoiceWithLineId);
+
+            DynamicRecord retainedLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Line 001 updated");
+            retainedLine.setId(lineId);
+            retainedLine.setVersion(1);
+            DynamicRecord newLine = runtime.newRecord("sales.invoice", "invoice_line")
+                    .setValue("title", "Line 003");
+            DynamicRecord invoiceUpdate = runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-LINE")
+                    .setValue("title", "Invoice with line updated");
+            invoiceUpdate.setId(invoiceWithLineId);
+            invoiceUpdate.setVersion(1);
+            invoiceUpdate.setChildren("lines", List.of(retainedLine, newLine));
+            assertThat(invoiceService.update(invoiceUpdate)).isEqualTo(1);
+
             assertThat(invoiceService.select(invoiceWithLineId).getChildren("lines"))
-                    .hasSize(1)
-                    .first()
                     .extracting(child -> child.getValue("title"))
-                    .isEqualTo("Line 001");
+                    .containsExactlyInAnyOrder("Line 001 updated", "Line 003");
+            assertThat(lineService.select(lineId).getValue("title")).isEqualTo("Line 001 updated");
+            assertThat(lineService.select(removedLineId)).isNull();
+            assertThat(lineService.selectIgnoreSoftDelete(removedLineId)).isNotNull();
 
             assertThatThrownBy(() -> invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-ROOT")
