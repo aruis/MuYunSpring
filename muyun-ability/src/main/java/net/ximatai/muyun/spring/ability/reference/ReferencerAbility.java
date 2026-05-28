@@ -16,9 +16,19 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
         return null;
     }
 
+    default List<ReferenceLookup> referenceLookups() {
+        return List.of();
+    }
+
+    default ReferenceLookup referenceLookup(ReferenceAbility<?> ability) {
+        return ReferenceLookup.of(ability);
+    }
+
     default Map<ReferenceTarget, Set<String>> collectReferenceIdsByTarget(T entity) {
         Class<?> modelClass = referencingModelClass();
-        return modelClass == null ? Map.of() : StaticReferenceResolver.collect(modelClass, entity);
+        return modelClass == null
+                ? StaticReferenceResolver.collect(entity)
+                : StaticReferenceResolver.collect(modelClass, entity);
     }
 
     default void afterReferenceSelect(T entity) {
@@ -38,7 +48,10 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
     default void populateStaticReferenceTitles(T entity) {
         Class<?> modelClass = referencingModelClass();
         if (modelClass == null || entity == null) {
-            return;
+            if (entity == null) {
+                return;
+            }
+            modelClass = entity.getClass();
         }
         for (ReferencePlan plan : StaticReferenceResolver.plans(modelClass)) {
             if (!plan.autoTitle() && plan.projections().isEmpty()) {
@@ -63,13 +76,33 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
     }
 
     default Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
+        ReferenceLookup lookup = referenceLookupFor(target);
+        if (lookup != null) {
+            return lookup.titles(ids);
+        }
         throw new AbilityException("reference title resolver is not configured: " + target.qualifiedName());
     }
 
     default Map<String, Map<String, Object>> referenceProjections(ReferenceTarget target,
                                                                   Collection<String> ids,
                                                                   Collection<String> sourceFields) {
+        ReferenceLookup lookup = referenceLookupFor(target);
+        if (lookup != null) {
+            return lookup.projections(ids, sourceFields);
+        }
         throw new AbilityException("reference projection resolver is not configured: " + target.qualifiedName());
+    }
+
+    private ReferenceLookup referenceLookupFor(ReferenceTarget target) {
+        if (target == null) {
+            return null;
+        }
+        for (ReferenceLookup lookup : referenceLookups()) {
+            if (target.equals(lookup.target())) {
+                return lookup;
+            }
+        }
+        return null;
     }
 
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {

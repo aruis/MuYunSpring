@@ -2,13 +2,11 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> implements
         SoftDeleteAbility<DemoInvoice>,
@@ -71,27 +69,8 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     }
 
     @Override
-    public Class<?> referencingModelClass() {
-        return DemoInvoice.class;
-    }
-
-    @Override
-    public Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
-        if (ReferenceTarget.of("demo", "customer").equals(target)) {
-            return customerService.titles(ids);
-        }
-        return Map.of();
-    }
-
-    @Override
-    public Map<String, Map<String, Object>> referenceProjections(ReferenceTarget target,
-                                                                 Collection<String> ids,
-                                                                 Collection<String> sourceFields) {
-        if (ReferenceTarget.of("demo", "customer").equals(target)
-                && sourceFields.contains("status")) {
-            return customerService.projections(ids, sourceFields);
-        }
-        return Map.of();
+    public List<ReferenceLookup> referenceLookups() {
+        return List.of(referenceLookup(customerService));
     }
 
     @Override
