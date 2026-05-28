@@ -210,6 +210,34 @@ class AbilityContractTest {
     }
 
     @Test
+    void enableAbilityShouldRespectTenantScopeAndSoftDelete() {
+        DemoEnabledRecordService service = new DemoEnabledRecordService();
+        String tenantAId;
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantAId = service.insert(new DemoEnabledRecord("Tenant A"));
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.disable(tenantAId)).isZero();
+            assertThat(service.isEnabled(tenantAId)).isFalse();
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.isEnabled(tenantAId)).isTrue();
+        }
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            assertThat(service.disable(tenantAId)).isEqualTo(1);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.isEnabled(tenantAId)).isFalse();
+            assertThat(service.enable(tenantAId)).isEqualTo(1);
+            assertThat(service.delete(tenantAId)).isEqualTo(1);
+            assertThat(service.disable(tenantAId)).isZero();
+            assertThat(service.enable(tenantAId)).isZero();
+            assertThat(service.isEnabled(tenantAId)).isFalse();
+        }
+    }
+
+    @Test
     void crudAbilityShouldUseCurrentVersionForHardDelete() {
         DemoPlainRecordService service = new DemoPlainRecordService();
         DemoPlainRecord record = new DemoPlainRecord("Versioned hard delete");
@@ -386,6 +414,25 @@ class AbilityContractTest {
                 .hasMessageContaining("notes")
                 .hasMessageContaining(DemoInvoiceNote.class.getName())
                 .hasMessageContaining(DemoInvoiceLine.class.getName());
+    }
+
+    @Test
+    void childrenAbilitySinglePlanExplicitLambdaShouldRejectMismatchedChildAbility() {
+        SingleChildInvoiceService service = new SingleChildInvoiceService();
+
+        assertThatThrownBy(() -> service.childRelation(
+                SingleChildInvoice.class,
+                new DemoInvoiceNoteService(),
+                DemoInvoiceNote::setInvoiceId,
+                invoice -> List.of(new DemoInvoiceNote("Wrong child")),
+                (invoice, notes) -> {
+                }
+        ))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("child relation model mismatch")
+                .hasMessageContaining("lines")
+                .hasMessageContaining(DemoInvoiceLine.class.getName())
+                .hasMessageContaining(DemoInvoiceNote.class.getName());
     }
 
     @Test

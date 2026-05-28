@@ -78,8 +78,10 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                                                                          BiConsumer<C, String> setParentId,
                                                                          Function<P, List<C>> extractChildren,
                                                                          BiConsumer<P, List<C>> populateChildren) {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(parentModelClass);
+        validateChildModel(rule, childAbility);
         return childAbility.toChildRelation(
-                StaticChildResolver.singlePlan(parentModelClass),
+                rule.plan(),
                 setParentId,
                 extractChildren,
                 populateChildren
