@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.util.List;
@@ -39,6 +40,7 @@ class AbilityContractTest {
         ReferenceDependencyRegistryTestAccess.clearAll();
         CacheRegistry.resetPolicy();
         TenantContext.clear();
+        clearTransactionState();
     }
 
     @Test
@@ -772,6 +774,28 @@ class AbilityContractTest {
 
         assertThat(service.select(id).getTitle()).isEqualTo("Updated");
         assertThat(service.afterChangedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void cacheAbilityShouldBypassItemAndAllCacheInsideTransaction() {
+        DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
+        DemoPlainRecord record = new DemoPlainRecord("Cached");
+        String id = service.insert(record);
+        service.select(id);
+        service.selectAllWithCache();
+        service.rawDao().findById(id).setTitle("Changed in transaction");
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        assertThat(service.select(id).getTitle()).isEqualTo("Changed in transaction");
+        assertThat(service.selectAllWithCache())
+                .extracting(DemoPlainRecord::getTitle)
+                .containsExactly("Changed in transaction");
+
+        TransactionSynchronizationManager.setActualTransactionActive(false);
+        assertThat(service.select(id).getTitle()).isEqualTo("Cached");
+        assertThat(service.selectAllWithCache())
+                .extracting(DemoPlainRecord::getTitle)
+                .containsExactly("Cached");
     }
 
     @Test
@@ -1586,5 +1610,12 @@ class AbilityContractTest {
         public List<ReferenceLookup> referenceLookups() {
             return List.of(referenceLookup(customerService));
         }
+    }
+
+    private void clearTransactionState() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 }
