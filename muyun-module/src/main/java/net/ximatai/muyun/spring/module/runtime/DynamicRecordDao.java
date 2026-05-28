@@ -62,14 +62,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public int updateById(DynamicRecord record) {
-        requireSameEntity(record);
-        if (record.getId() == null || record.getId().isBlank()) {
-            throw new IllegalArgumentException("dynamic record id must not be blank");
-        }
-        if (Boolean.TRUE.equals(record.getDeleted())) {
-            return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toDeleteMap(record));
-        }
-        return operations.patchUpdateItem(schema, entity.tableName(), record.getId(), toUpdateMap(record));
+        throw new UnsupportedOperationException("dynamic record update must go through conditional update");
     }
 
     @Override
@@ -87,7 +80,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
             throw new IllegalArgumentException("dynamic record id must not be blank");
         }
         if (conditions == null || conditions.isEmpty()) {
-            return updateById(record);
+            throw new IllegalArgumentException("dynamic record update conditions must not be empty");
         }
         Map<String, Object> body = Boolean.TRUE.equals(record.getDeleted()) ? toDeleteMap(record) : toUpdateMap(record);
         Map<String, Object> where = new LinkedHashMap<>();

@@ -239,6 +239,20 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldRejectUnconditionalDynamicDaoUpdate() {
+        DynamicRecordDao dao = new DynamicRecordDao(operations(), contractEntity());
+        DynamicRecord record = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> dao.updateById(record))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("conditional update");
+        assertThatThrownBy(() -> dao.updateByIdAndCondition(record, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("conditions");
+    }
+
+    @Test
     void shouldRejectPartialUpdateWhenOnlyDeletedRecordExists() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
