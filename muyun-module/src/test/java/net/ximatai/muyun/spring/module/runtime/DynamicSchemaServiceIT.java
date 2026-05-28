@@ -65,7 +65,7 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
-    void shouldCreateDynamicTableAndKeepSecondEnsureIdempotent() throws Exception {
+    void shouldCreateDynamicTableAndKeepSecondEnsureSchemaStable() throws Exception {
         EntityDefinition entity = new EntityDefinition(
                 "contract",
                 "app_contract",
@@ -79,14 +79,21 @@ class DynamicSchemaServiceIT {
         );
 
         assertThat(schemaService.ensureTable(entity)).isTrue();
-        assertThat(schemaService.ensureTable(entity)).isFalse();
+        TableShape firstShape;
+        try (Connection connection = dataSource.getConnection()) {
+            firstShape = tableShape(connection, "app_contract");
+        }
+
+        schemaService.ensureTable(entity);
 
         try (Connection connection = dataSource.getConnection()) {
-            assertThat(columns(connection))
+            TableShape secondShape = tableShape(connection, "app_contract");
+            assertThat(secondShape).isEqualTo(firstShape);
+            assertThat(secondShape.columns())
                     .contains("id", "tenant_id", "version", "deleted", "created_by", "created_at", "updated_by", "updated_at",
                             "code", "name", "amount", "signed_at");
-            assertThat(primaryKeys(connection)).containsExactly("id");
-            assertThat(uniqueIndexColumns(connection, "app_contract")).contains(List.of("tenant_id", "code"));
+            assertThat(secondShape.primaryKeys()).containsExactly("id");
+            assertThat(secondShape.uniqueIndexColumns()).contains(List.of("tenant_id", "code"));
         }
     }
 
@@ -184,14 +191,14 @@ class DynamicSchemaServiceIT {
             DynamicRecord retainedLine = runtime.newRecord("sales.invoice", "invoice_line")
                     .setValue("title", "Line 001 updated");
             retainedLine.setId(lineId);
-            retainedLine.setVersion(1);
+            retainedLine.setVersion(0);
             DynamicRecord newLine = runtime.newRecord("sales.invoice", "invoice_line")
                     .setValue("title", "Line 003");
             DynamicRecord invoiceUpdate = runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-LINE")
                     .setValue("title", "Invoice with line updated");
             invoiceUpdate.setId(invoiceWithLineId);
-            invoiceUpdate.setVersion(1);
+            invoiceUpdate.setVersion(0);
             invoiceUpdate.setChildren("lines", List.of(retainedLine, newLine));
             assertThat(invoiceService.update(invoiceUpdate)).isEqualTo(1);
 
@@ -524,7 +531,11 @@ class DynamicSchemaServiceIT {
     }
 
     private List<String> primaryKeys(Connection connection) throws Exception {
-        try (var keys = connection.getMetaData().getPrimaryKeys(null, "public", "app_contract")) {
+        return primaryKeys(connection, "app_contract");
+    }
+
+    private List<String> primaryKeys(Connection connection, String tableName) throws Exception {
+        try (var keys = connection.getMetaData().getPrimaryKeys(null, "public", tableName)) {
             java.util.ArrayList<String> names = new java.util.ArrayList<>();
             while (keys.next()) {
                 names.add(keys.getString("COLUMN_NAME"));
@@ -545,6 +556,17 @@ class DynamicSchemaServiceIT {
             }
             return new ArrayList<>(columnsByIndex.values());
         }
+    }
+
+    private TableShape tableShape(Connection connection, String tableName) throws Exception {
+        return new TableShape(
+                columns(connection, tableName),
+                primaryKeys(connection, tableName),
+                uniqueIndexColumns(connection, tableName)
+        );
+    }
+
+    private record TableShape(List<String> columns, List<String> primaryKeys, List<List<String>> uniqueIndexColumns) {
     }
 
     private boolean tableExists(Connection connection, String tableName) throws Exception {

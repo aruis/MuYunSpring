@@ -8,6 +8,7 @@ dependencies {
     testImplementation(libs.assertj.core)
     testImplementation(libs.muyun.database.spring.boot.starter)
     testImplementation(libs.postgresql)
+    testImplementation(libs.spring.boot.starter.jdbc)
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
