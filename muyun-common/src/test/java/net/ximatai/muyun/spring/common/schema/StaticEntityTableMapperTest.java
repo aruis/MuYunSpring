@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardTreeEntity;
 import org.junit.jupiter.api.Test;
@@ -58,6 +60,15 @@ class StaticEntityTableMapperTest {
                 .contains("title", "sort_order", "parent_id");
     }
 
+    @Test
+    void shouldMapStandardEnabledTreeEntityInheritedAbilityColumns() {
+        TableWrapper table = mapper.toTable(DemoStandardEnabledTree.class);
+
+        assertThat(EnabledCapable.class).isAssignableFrom(DemoStandardEnabledTree.class);
+        assertThat(columnNames(table))
+                .contains("title", "sort_order", "parent_id", "enabled");
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -84,6 +95,10 @@ class StaticEntityTableMapperTest {
 
     @Table(name = "demo_standard_tree")
     private static class DemoStandardTree extends StandardTreeEntity {
+    }
+
+    @Table(name = "demo_standard_enabled_tree")
+    private static class DemoStandardEnabledTree extends StandardEnabledTreeEntity {
     }
 
     @Table(name = "not_platform_model")
