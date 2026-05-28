@@ -1,5 +1,6 @@
 dependencies {
     api(project(":muyun-ability"))
+    api(project(":muyun-dynamic"))
 
     compileOnly(libs.muyun.database.spring.boot.starter)
     compileOnly(libs.spring.context)

@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.platform;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
+import net.ximatai.muyun.spring.platform.metadata.Metadata;
+import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +41,18 @@ class PlatformModelSchemaTest {
         assertThat(table.getColumns().stream().filter(column -> "module_kind".equals(column.getName())).findFirst())
                 .get()
                 .satisfies(column -> assertThat(column.getLength()).isEqualTo(32));
+    }
+
+    @Test
+    void shouldMapMetadataModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(Metadata.class)))
+                .contains("id", "application_alias", "alias", "schema_name", "table_name", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(MetadataField.class)))
+                .contains("id", "metadata_id", "field_name", "column_name", "field_type", "required",
+                        "unique_field", "indexed", "sortable_field", "title_field", "field_length");
+        assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
+                .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
+                        "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");
     }
 
     private Set<String> columnNames(TableWrapper table) {

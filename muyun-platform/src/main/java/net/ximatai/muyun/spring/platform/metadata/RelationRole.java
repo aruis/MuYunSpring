@@ -1,15 +1,15 @@
-package net.ximatai.muyun.spring.platform.module;
+package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
-public enum ModuleKind implements CodeTitleEnum {
-    STATIC("static", "静态模块"),
-    DYNAMIC("dynamic", "动态模块");
+public enum RelationRole implements CodeTitleEnum {
+    MAIN("main", "主元数据"),
+    CHILD("child", "子元数据");
 
     private final String code;
     private final String title;
 
-    ModuleKind(String code, String title) {
+    RelationRole(String code, String title) {
         this.code = code;
         this.title = title;
     }
