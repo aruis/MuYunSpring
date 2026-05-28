@@ -167,7 +167,11 @@ public class ModuleDefinitionValidator {
         if (parent.code().equals(child.code())) {
             throw new ModuleDefinitionException("child relation must use different parent and child entities: " + relation.code());
         }
-        requireField(child, relation.childForeignKeyField(), "relation child foreign key field");
+        FieldDefinition childForeignKeyField = requireField(child, relation.childForeignKeyField(), "relation child foreign key field");
+        if (childForeignKeyField.type() != FieldType.STRING) {
+            throw new ModuleDefinitionException("relation child foreign key field must be STRING: "
+                    + child.code() + "." + relation.childForeignKeyField());
+        }
     }
 
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities) {

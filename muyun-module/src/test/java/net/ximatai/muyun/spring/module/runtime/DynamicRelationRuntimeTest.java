@@ -562,6 +562,30 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldRejectNonStringDynamicRelationForeignKeyMetadata() {
+        EntityDefinition invalidLine = new EntityDefinition(
+                "invoice_line",
+                "app_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.integer("invoiceId", "Invoice").column("invoice_id").required().indexed(),
+                        FieldDefinition.titleField().required()
+                )
+        ).withCapabilities(EntityCapability.REFERENCE);
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), invalidLine),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("relation child foreign key field must be STRING")
+                .hasMessageContaining("invoice_line.invoiceId");
+    }
+
+    @Test
     void shouldRejectInvalidDynamicReferenceTargetMetadata() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
