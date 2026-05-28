@@ -190,9 +190,6 @@ public interface CrudAbility<T extends EntityContract> {
         return this instanceof EnableAbility<?>;
     }
 
-    default void prepareAdditionalAbilityDefaults(T entity) {
-    }
-
     default Criteria activeCriteria(Criteria criteria) {
         Criteria scoped = Criteria.of();
         if (criteria != null && !criteria.isEmpty()) {
@@ -234,7 +231,6 @@ public interface CrudAbility<T extends EntityContract> {
                 && enabled.getEnabled() == null) {
             enabled.setEnabled(Boolean.TRUE);
         }
-        prepareAdditionalAbilityDefaults(entity);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

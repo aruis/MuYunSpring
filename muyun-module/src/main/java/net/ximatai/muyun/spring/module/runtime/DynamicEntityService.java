@@ -112,6 +112,7 @@ public class DynamicEntityService implements
 
     @Override
     public void beforeInsert(DynamicRecord record) {
+        prepareDynamicAbilityDefaults(record);
         lifecycle.beforeInsert(record);
         validateChildPayload(record);
         record.validateForInsert();
@@ -159,13 +160,7 @@ public class DynamicEntityService implements
         return current.getVersion();
     }
 
-    @Override
-    public boolean shouldPrepareTreeDefault(DynamicRecord record) {
-        return dao.getEntity().supports(EntityCapability.TREE);
-    }
-
-    @Override
-    public void prepareAdditionalAbilityDefaults(DynamicRecord record) {
+    private void prepareDynamicAbilityDefaults(DynamicRecord record) {
         if (dao.getEntity().supports(EntityCapability.TREE)
                 && (record.parentId() == null || record.parentId().isBlank())) {
             record.parentId(DynamicTreeRuntime.ROOT_ID);
