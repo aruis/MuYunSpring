@@ -131,6 +131,36 @@ class AbilityContractTest {
     }
 
     @Test
+    void systemTenantContextShouldStillRespectOptimisticLock() {
+        DemoPlainRecordService service = new DemoPlainRecordService();
+        String tenantAId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoPlainRecord record = new DemoPlainRecord("Tenant A");
+            tenantAId = service.insert(record);
+            service.update(record);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            DemoPlainRecord staleUpdate = new DemoPlainRecord("Stale system update");
+            staleUpdate.setId(tenantAId);
+            staleUpdate.setVersion(0);
+            assertThatThrownBy(() -> service.update(staleUpdate))
+                    .isInstanceOf(OptimisticLockException.class);
+
+            DemoPlainRecord staleDelete = new DemoPlainRecord("Stale system delete");
+            staleDelete.setId(tenantAId);
+            staleDelete.setVersion(0);
+            assertThatThrownBy(() -> service.delete(staleDelete))
+                    .isInstanceOf(OptimisticLockException.class);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select(tenantAId).getTitle()).isEqualTo("Tenant A");
+            assertThat(service.select(tenantAId).getVersion()).isEqualTo(1);
+        }
+    }
+
+    @Test
     void crudAbilityShouldDeleteRecordAndBatchByStandardEntry() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization first = new DemoOrganization("First", TreeAbility.ROOT_ID);
