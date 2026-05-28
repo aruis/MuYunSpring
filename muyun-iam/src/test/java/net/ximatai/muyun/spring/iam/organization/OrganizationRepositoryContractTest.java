@@ -166,6 +166,27 @@ class OrganizationRepositoryContractTest {
                 .contains("ORDER BY \"sort_order\" ASC");
     }
 
+    @Test
+    void abilityServiceShouldUseVersionConditionForStaticWrites() {
+        IDatabaseOperations<Object> operations = mockedOperations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("org-1", "Headquarters", 10, 2)));
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap())).thenReturn(1);
+        OrganizationService service = new OrganizationService(repository(operations));
+        Organization update = new Organization();
+        update.setId("org-1");
+        update.setCode("HQ");
+        update.setTitle("Headquarters Updated");
+        update.setVersion(2);
+
+        assertThat(service.update(update)).isEqualTo(1);
+        assertThat(service.delete("org-1")).isEqualTo(1);
+
+        ArgumentCaptor<Map<String, Object>> where = mapCaptor();
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), where.capture());
+        assertThat(where.getAllValues())
+                .allSatisfy(conditions -> assertThat(conditions).containsEntry("version", 2));
+    }
+
     private OrganizationDao repository(IDatabaseOperations<Object> operations) {
         return repository(operations, OrganizationDao.class);
     }
@@ -217,6 +238,10 @@ class OrganizationRepositoryContractTest {
     }
 
     private Map<String, Object> row(String id, String title, int sortOrder) {
+        return row(id, title, sortOrder, 0);
+    }
+
+    private Map<String, Object> row(String id, String title, int sortOrder, int version) {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
@@ -225,7 +250,7 @@ class OrganizationRepositoryContractTest {
                 "sort_order", sortOrder,
                 "enabled", Boolean.TRUE,
                 "deleted", Boolean.FALSE,
-                "version", 0
+                "version", version
         );
     }
 
