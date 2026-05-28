@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.common.model.EntityContract;
-import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 
 import java.time.Instant;
 
@@ -17,10 +16,6 @@ abstract class DynamicRecordView implements EntityContract {
 
     DynamicRecord record() {
         return record;
-    }
-
-    EntityDefinition entity() {
-        return record.getEntity();
     }
 
     @Override
