@@ -7,14 +7,12 @@ import net.ximatai.muyun.spring.ability.ChildAbility;
 import net.ximatai.muyun.spring.ability.ChildRelation;
 import net.ximatai.muyun.spring.ability.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
-import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
 import net.ximatai.muyun.spring.ability.ReferencePlan;
 import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
-import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -43,8 +41,6 @@ public class DynamicEntityService implements
         SoftDeleteAbility<DynamicRecord>,
         ChildAbility<DynamicRecord>,
         ChildrenAbility<DynamicRecord>,
-        TreeAbility<DynamicRecord>,
-        ReferenceAbility<DynamicRecord>,
         ReferencerAbility<DynamicRecord>,
         CacheAbility<DynamicRecord> {
     private final DynamicRecordDao dao;
@@ -91,12 +87,15 @@ public class DynamicEntityService implements
         return dao;
     }
 
+    DynamicRecordDao dynamicDao() {
+        return dao;
+    }
+
     @Override
     public String getModuleAlias() {
         return moduleAlias;
     }
 
-    @Override
     public ReferenceTarget referenceTarget() {
         return ReferenceTarget.of(moduleAlias, dao.getEntity().code());
     }
@@ -116,12 +115,14 @@ public class DynamicEntityService implements
         lifecycle.beforeInsert(record);
         validateChildPayload(record);
         record.validateForInsert();
+        validateTreePlacement(record);
     }
 
     @Override
     public void beforeUpdate(DynamicRecord record) {
         lifecycle.beforeUpdate(record);
         validateChildPayload(record);
+        validateTreePlacement(record);
     }
 
     @Override
@@ -137,6 +138,13 @@ public class DynamicEntityService implements
     @Override
     public void afterReferenceSelect(DynamicRecord record) {
         populateReferenceTitles(record);
+    }
+
+    @Override
+    public void afterChanged(DynamicRecord record) {
+        if (dao.getEntity().supports(EntityCapability.REFERENCE) && record != null && record.getId() != null) {
+            referenceRuntime().clearReferenceReferrers(record.getId());
+        }
     }
 
     @Override
@@ -158,6 +166,10 @@ public class DynamicEntityService implements
 
     @Override
     public void prepareAdditionalAbilityDefaults(DynamicRecord record) {
+        if (dao.getEntity().supports(EntityCapability.TREE)
+                && (record.parentId() == null || record.parentId().isBlank())) {
+            record.parentId(DynamicTreeRuntime.ROOT_ID);
+        }
         if (dao.getEntity().supports(EntityCapability.ENABLE) && record.enabled() == null) {
             record.enabled(Boolean.TRUE);
         }
@@ -195,90 +207,91 @@ public class DynamicEntityService implements
 
     public List<DynamicRecord> sortedList(Criteria criteria) {
         requireCapability(EntityCapability.SORT);
-        return TreeAbility.super.sortedList(criteria);
+        if (dao.getEntity().supports(EntityCapability.TREE)) {
+            return treeRuntime().sortedList(criteria).stream().map(DynamicTreeRecord::record).toList();
+        }
+        return sortRuntime().sortedList(criteria).stream().map(DynamicSortRecord::record).toList();
     }
 
     public void reorder(List<String> orderedIds) {
         requireCapability(EntityCapability.SORT);
-        TreeAbility.super.reorder(orderedIds);
+        if (dao.getEntity().supports(EntityCapability.TREE)) {
+            treeRuntime().reorder(orderedIds);
+            return;
+        }
+        sortRuntime().reorder(orderedIds);
     }
 
     public void moveBefore(String id, String beforeId) {
         requireCapability(EntityCapability.SORT);
-        TreeAbility.super.moveBefore(id, beforeId);
+        if (dao.getEntity().supports(EntityCapability.TREE)) {
+            treeRuntime().moveBefore(id, beforeId);
+            return;
+        }
+        sortRuntime().moveBefore(id, beforeId);
     }
 
     public void moveAfter(String id, String afterId) {
         requireCapability(EntityCapability.SORT);
-        TreeAbility.super.moveAfter(id, afterId);
+        if (dao.getEntity().supports(EntityCapability.TREE)) {
+            treeRuntime().moveAfter(id, afterId);
+            return;
+        }
+        sortRuntime().moveAfter(id, afterId);
     }
 
-    @Override
     public List<DynamicRecord> children(String parentId) {
         requireCapability(EntityCapability.TREE);
-        return TreeAbility.super.children(parentId);
+        return treeRuntime().children(parentId).stream().map(DynamicTreeRecord::record).toList();
     }
 
-    @Override
     public List<String> ancestorIds(String id) {
         requireCapability(EntityCapability.TREE);
-        return TreeAbility.super.ancestorIds(id);
+        return treeRuntime().ancestorIds(id);
     }
 
-    @Override
     public List<String> ancestorIdsAndSelf(String id) {
         requireCapability(EntityCapability.TREE);
-        return TreeAbility.super.ancestorIdsAndSelf(id);
+        return treeRuntime().ancestorIdsAndSelf(id);
     }
 
-    @Override
     public List<String> descendantIds(String id) {
         requireCapability(EntityCapability.TREE);
-        return TreeAbility.super.descendantIds(id);
+        return treeRuntime().descendantIds(id);
     }
 
-    @Override
     public void validateTreePlacement(DynamicRecord record) {
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            TreeAbility.super.validateTreePlacement(record);
+            treeRuntime().validateTreePlacement(new DynamicTreeRecord(record));
         }
     }
 
-    @Override
     public Criteria sortScope(DynamicRecord record) {
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            return TreeAbility.super.sortScope(record);
+            return treeRuntime().sortScope(new DynamicTreeRecord(record));
         }
         return Criteria.of();
     }
 
-    @Override
     public void validateSortScope(DynamicRecord left, DynamicRecord right) {
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            TreeAbility.super.validateSortScope(left, right);
+            treeRuntime().validateSortScope(new DynamicTreeRecord(left), new DynamicTreeRecord(right));
         }
     }
 
     public String title(String id) {
         requireCapability(EntityCapability.REFERENCE);
-        return ReferenceAbility.super.title(id);
+        return referenceRuntime().title(id);
     }
 
-    @Override
-    public DynamicRecord selectReferenceRaw(String id) {
-        requireCapability(EntityCapability.REFERENCE);
-        return activeRaw(id);
-    }
-
-    @Override
     public String referenceTitle(DynamicRecord entity) {
         requireCapability(EntityCapability.REFERENCE);
-        return entity == null ? null : entity.getTitle();
+        return entity == null ? null : entity.title();
     }
 
     public Map<String, String> titles(Collection<String> ids) {
         requireCapability(EntityCapability.REFERENCE);
-        return ReferenceAbility.super.titles(ids);
+        return referenceRuntime().titles(ids);
     }
 
     public Map<String, Map<String, Object>> projections(Collection<String> ids, Collection<String> fieldNames) {
@@ -311,7 +324,7 @@ public class DynamicEntityService implements
 
     public PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
         requireCapability(EntityCapability.REFERENCE);
-        return ReferenceAbility.super.referenceOptions(criteria, pageRequest);
+        return referenceRuntime().referenceOptions(criteria, pageRequest);
     }
 
     @Override
@@ -445,11 +458,23 @@ public class DynamicEntityService implements
         return fields == null ? null : fields.get(sourceField);
     }
 
-    private DynamicRecord activeRaw(String id) {
+    DynamicRecord activeRaw(String id) {
         return getDao().query(activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
                 .stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    private DynamicTreeRuntime treeRuntime() {
+        return new DynamicTreeRuntime(this);
+    }
+
+    private DynamicSortRuntime sortRuntime() {
+        return new DynamicSortRuntime(this);
+    }
+
+    private DynamicReferenceRuntime referenceRuntime() {
+        return new DynamicReferenceRuntime(this);
     }
 
     private void requireCapability(EntityCapability capability) {

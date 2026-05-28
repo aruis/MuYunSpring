@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
+import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.ability.ReferenceTarget;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -111,15 +112,29 @@ class DynamicSchemaServiceIT {
 
             DynamicRecord firstChild = runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-CHILD-1")
-                    .setValue("title", "First child");
-            firstChild.setParentId(rootId);
+                    .setValue("title", "First child")
+                    .setValue("parentId", rootId);
             firstChildId = invoiceService.insert(firstChild);
 
             DynamicRecord secondChild = runtime.newRecord("sales.invoice", "invoice")
                     .setValue("code", "INV-CHILD-2")
-                    .setValue("title", "Second child");
-            secondChild.setParentId(rootId);
+                    .setValue("title", "Second child")
+                    .setValue("parentId", rootId);
             secondChildId = invoiceService.insert(secondChild);
+
+            String anotherRootId = invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-OTHER-ROOT")
+                    .setValue("title", "Other root"));
+            String anotherChildId = invoiceService.insert(runtime.newRecord("sales.invoice", "invoice")
+                    .setValue("code", "INV-OTHER-CHILD")
+                    .setValue("title", "Other child")
+                    .setValue("parentId", anotherRootId));
+            assertThatThrownBy(() -> invoiceService.moveBefore(firstChildId, anotherChildId))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("same parent");
+            assertThatThrownBy(() -> invoiceService.reorder(List.of(firstChildId)))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("complete scope");
 
             invoiceService.reorder(List.of(secondChildId, firstChildId));
             assertThat(invoiceService.sortedList(Criteria.of().eq("parentId", rootId)).stream().map(DynamicRecord::getId))

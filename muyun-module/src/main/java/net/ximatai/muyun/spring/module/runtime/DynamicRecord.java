@@ -1,8 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.common.model.EntityContract;
-import net.ximatai.muyun.spring.common.model.TitledCapable;
-import net.ximatai.muyun.spring.common.model.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
@@ -24,7 +22,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable {
+public class DynamicRecord implements EntityContract {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -155,38 +153,33 @@ public class DynamicRecord implements EntityContract, TreeCapable, TitledCapable
         return value;
     }
 
-    @Override
-    public String getParentId() {
+    String parentId() {
         if (!entity.supports(EntityCapability.TREE) || !hasField(PlatformAbilityFields.TREE_PARENT_FIELD)) {
             return null;
         }
         return stringValue(values.get(PlatformAbilityFields.TREE_PARENT_FIELD));
     }
 
-    @Override
-    public void setParentId(String parentId) {
+    void parentId(String parentId) {
         if (entity.supports(EntityCapability.TREE)) {
             setAbilityValueIfPresent(PlatformAbilityFields.TREE_PARENT_FIELD, parentId);
         }
     }
 
-    @Override
-    public Integer getSortOrder() {
+    Integer sortOrder() {
         if (!entity.supports(EntityCapability.SORT) || !hasField(PlatformAbilityFields.SORT_FIELD)) {
             return null;
         }
         return numberValue(values.get(PlatformAbilityFields.SORT_FIELD));
     }
 
-    @Override
-    public void setSortOrder(Integer sortOrder) {
+    void sortOrder(Integer sortOrder) {
         if (entity.supports(EntityCapability.SORT)) {
             setAbilityValueIfPresent(PlatformAbilityFields.SORT_FIELD, sortOrder);
         }
     }
 
-    @Override
-    public String getTitle() {
+    String title() {
         if (!entity.supports(EntityCapability.REFERENCE) || !hasField(PlatformAbilityFields.TITLE_FIELD)) {
             return null;
         }

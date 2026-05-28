@@ -8,8 +8,12 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.TitledCapable;
+import net.ximatai.muyun.spring.common.model.TreeCapable;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;
@@ -479,7 +483,10 @@ class DynamicRecordDaoTest {
                 referenceRow("contract-2", "Contract Two")
         ));
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, referenceEntity()), "sales.contract");
+        DynamicRecord record = new DynamicRecord(referenceEntity()).setValue("title", "Contract");
 
+        assertThat(record).isNotInstanceOf(TitledCapable.class);
+        assertThat(entityService).isNotInstanceOf(ReferenceAbility.class);
         assertThat(entityService.title("contract-1")).isEqualTo("Contract One");
         assertThat(entityService.titles(List.of("contract-1", "contract-2")))
                 .containsEntry("contract-1", "Contract One")
@@ -523,7 +530,10 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = operations();
         stubTreeRows(operations);
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
+        DynamicRecord record = new DynamicRecord(treeEntity()).setValue("code", "C");
 
+        assertThat(record).isNotInstanceOf(TreeCapable.class);
+        assertThat(entityService).isNotInstanceOf(TreeAbility.class);
         assertThat(entityService.children("root").stream().map(DynamicRecord::getId))
                 .containsExactly("A", "B");
         assertThat(entityService.ancestorIds("A1")).containsExactly("A");
@@ -578,6 +588,39 @@ class DynamicRecordDaoTest {
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
         assertThat(body.getValue()).containsEntry("parent_id", "root");
+    }
+
+    @Test
+    void shouldRejectInvalidDynamicTreePlacementThroughAdapter() {
+        IDatabaseOperations<Object> operations = operations();
+        stubTreeRows(operations);
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
+        DynamicRecord missingParent = new DynamicRecord(treeEntity())
+                .setValue("code", "C")
+                .setValue("parentId", "missing");
+        missingParent.setId("C");
+
+        assertThatThrownBy(() -> entityService.insert(missingParent))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("missing parent");
+
+        DynamicRecord selfParent = new DynamicRecord(treeEntity())
+                .setValue("code", "A")
+                .setValue("parentId", "A");
+        selfParent.setId("A");
+
+        assertThatThrownBy(() -> entityService.insert(selfParent))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("itself as parent");
+
+        DynamicRecord moveUnderDescendant = new DynamicRecord(treeEntity())
+                .setValue("code", "A")
+                .setValue("parentId", "A1");
+        moveUnderDescendant.setId("A");
+
+        assertThatThrownBy(() -> entityService.update(moveUnderDescendant))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("under its descendant");
     }
 
     @Test
@@ -869,6 +912,7 @@ class DynamicRecordDaoTest {
                 if (params.containsValue("A1")) {
                     return List.of(treeRow("A1", "A", 1));
                 }
+                return List.of();
             }
             if (sql.contains("\"parent_id\" =")) {
                 if (params.containsValue("root")) {
