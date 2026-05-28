@@ -17,6 +17,7 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     private final DemoInvoiceNoteService noteService = new DemoInvoiceNoteService();
     private final DemoCustomerService customerService;
     private int businessHookCount;
+    private String lastAfterSelectCustomerTitle;
 
     DemoInvoiceService() {
         this(new DemoCustomerService());
@@ -72,10 +73,15 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
 
     @Override
     public void afterSelect(DemoInvoice entity) {
+        lastAfterSelectCustomerTitle = entity.getCustomerTitle();
         businessHookCount++;
     }
 
     int businessHookCount() {
         return businessHookCount;
+    }
+
+    String lastAfterSelectCustomerTitle() {
+        return lastAfterSelectCustomerTitle;
     }
 }

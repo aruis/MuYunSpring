@@ -506,6 +506,19 @@ class AbilityContractTest {
     }
 
     @Test
+    void cachedSelectShouldRunPlatformLifecycleBeforeBusinessAfterSelect() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoiceService.select(invoiceId);
+        invoiceService.select(invoiceId);
+
+        assertThat(invoiceService.lastAfterSelectCustomerTitle()).isEqualTo("Customer One");
+    }
+
+    @Test
     void childrenAggregationShouldLoadChildRecordsAsRawData() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
