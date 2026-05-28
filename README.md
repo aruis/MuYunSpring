@@ -14,7 +14,7 @@ Initial Gradle subprojects:
 ```text
 muyun-common
 muyun-ability
-muyun-module
+muyun-dynamic
 muyun-iam
 muyun-boot
 ```
