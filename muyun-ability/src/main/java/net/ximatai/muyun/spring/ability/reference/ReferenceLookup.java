@@ -8,6 +8,11 @@ public record ReferenceLookup(ReferenceTarget target, ReferenceAbility<?> abilit
     public ReferenceLookup {
         target = Objects.requireNonNull(target, "target must not be null");
         ability = Objects.requireNonNull(ability, "ability must not be null");
+        ReferenceTarget abilityTarget = ability.referenceTarget();
+        if (!target.equals(abilityTarget)) {
+            throw new IllegalArgumentException("reference lookup target mismatch: expected "
+                    + target.qualifiedName() + ", actual " + abilityTarget.qualifiedName());
+        }
     }
 
     public static ReferenceLookup of(ReferenceAbility<?> ability) {

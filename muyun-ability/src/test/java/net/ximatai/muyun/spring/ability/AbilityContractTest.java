@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.model.title.TitleField;
 
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
+import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
@@ -879,6 +880,18 @@ class AbilityContractTest {
         DemoReferencingRecord selected = service.select(id);
         assertThat(selected.getCustomerTitle()).isEqualTo("Customer One");
         assertThat(selected.getCustomerStatus()).isEqualTo("ACTIVE");
+        assertThat(selected.getOwnerTitle()).isEqualTo("Owner One");
+    }
+
+    @Test
+    void referenceLookupShouldRejectMismatchedTargetAndAbility() {
+        DemoCustomerService customerService = new DemoCustomerService();
+
+        assertThatThrownBy(() -> new ReferenceLookup(ReferenceTarget.of("iam", "user"), customerService))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reference lookup target mismatch")
+                .hasMessageContaining("iam.user")
+                .hasMessageContaining("demo.customer");
     }
 
     @Test

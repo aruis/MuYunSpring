@@ -11,11 +11,15 @@ final class DemoReferencingRecordService implements
         ReferencerAbility<DemoReferencingRecord> {
     private final InMemoryBaseDao<DemoReferencingRecord> dao = new InMemoryBaseDao<>();
     private final DemoCustomerService customerService = new DemoCustomerService();
+    private final DemoUserService userService = new DemoUserService();
 
     DemoReferencingRecordService() {
         DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
         customer.setId("customer-1");
         customerService.insert(customer);
+        DemoUser owner = new DemoUser("Owner One");
+        owner.setId("user-owner");
+        userService.insert(owner);
     }
 
     @Override
@@ -30,6 +34,6 @@ final class DemoReferencingRecordService implements
 
     @Override
     public List<ReferenceLookup> referenceLookups() {
-        return List.of(referenceLookup(customerService));
+        return List.of(referenceLookup(customerService), referenceLookup(userService));
     }
 }
