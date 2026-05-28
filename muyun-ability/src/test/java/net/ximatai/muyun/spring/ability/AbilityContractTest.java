@@ -1360,6 +1360,21 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceAbilityShouldHideSoftDeletedTargets() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String activeId = service.insert(new DemoOrganization("Active Reference", TreeAbility.ROOT_ID));
+        String deletedId = service.insert(new DemoOrganization("Deleted Reference", TreeAbility.ROOT_ID));
+
+        service.delete(deletedId);
+
+        assertThat(service.title(deletedId)).isNull();
+        assertThat(service.titles(List.of(deletedId, activeId)))
+                .containsExactly(Map.entry(activeId, "Active Reference"));
+        assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(new ReferenceOption(activeId, "Active Reference"));
+    }
+
+    @Test
     void referenceTitleShouldLoadTargetRecordAsRawData() {
         DemoCustomerService service = new DemoCustomerService();
         DemoCustomer customer = new DemoCustomer("Reference Title", "ACTIVE");
