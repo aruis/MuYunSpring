@@ -7,6 +7,6 @@ final class DemoCustomTitleRecordService extends AbstractAbilityService<DemoCust
         ReferenceAbility<DemoCustomTitleRecord> {
 
     DemoCustomTitleRecordService() {
-        super("demo.customTitleRecord", new InMemoryBaseDao<>());
+        super("demo.customTitleRecord", DemoCustomTitleRecord.class, new InMemoryBaseDao<>());
     }
 }

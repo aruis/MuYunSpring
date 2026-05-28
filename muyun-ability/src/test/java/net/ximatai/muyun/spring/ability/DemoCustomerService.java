@@ -9,7 +9,7 @@ final class DemoCustomerService extends AbstractAbilityService<DemoCustomer> imp
     private int afterSelectCount;
 
     DemoCustomerService() {
-        super("demo.customer", new InMemoryBaseDao<>());
+        super("demo.customer", DemoCustomer.class, new InMemoryBaseDao<>());
     }
 
     @Override

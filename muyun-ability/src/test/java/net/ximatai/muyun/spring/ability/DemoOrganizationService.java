@@ -9,6 +9,6 @@ final class DemoOrganizationService extends AbstractAbilityService<DemoOrganizat
         ReferenceAbility<DemoOrganization> {
 
     DemoOrganizationService() {
-        super("iam.organization", new InMemoryBaseDao<>());
+        super("iam.organization", DemoOrganization.class, new InMemoryBaseDao<>());
     }
 }

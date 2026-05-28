@@ -17,6 +17,6 @@ public class OrganizationService extends AbstractAbilityService<Organization> im
     public static final String MODULE_ALIAS = "iam.organization";
 
     public OrganizationService(OrganizationDao organizationDao) {
-        super(MODULE_ALIAS, organizationDao);
+        super(MODULE_ALIAS, Organization.class, organizationDao);
     }
 }

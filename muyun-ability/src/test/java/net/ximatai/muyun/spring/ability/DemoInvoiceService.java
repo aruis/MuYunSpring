@@ -25,14 +25,13 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     }
 
     DemoInvoiceService(DemoCustomerService customerService) {
-        super("demo.invoice", new InMemoryBaseDao<>());
+        super("demo.invoice", DemoInvoice.class, new InMemoryBaseDao<>());
         this.customerService = customerService;
     }
 
     @Override
     public List<ChildRelation<? extends EntityContract, DemoInvoice>> childRelations() {
         return List.of(childRelation(
-                DemoInvoice.class,
                 lineService,
                 DemoInvoiceLine::setInvoiceId,
                 DemoInvoice::getLines,

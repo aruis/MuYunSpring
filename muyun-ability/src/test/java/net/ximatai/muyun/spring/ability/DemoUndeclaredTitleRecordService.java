@@ -7,6 +7,6 @@ final class DemoUndeclaredTitleRecordService extends AbstractAbilityService<Demo
         ReferenceAbility<DemoUndeclaredTitleRecord> {
 
     DemoUndeclaredTitleRecordService() {
-        super("demo.undeclaredTitleRecord", new InMemoryBaseDao<>());
+        super("demo.undeclaredTitleRecord", DemoUndeclaredTitleRecord.class, new InMemoryBaseDao<>());
     }
 }

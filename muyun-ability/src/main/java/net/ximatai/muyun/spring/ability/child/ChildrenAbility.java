@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability.child;
 
+import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -10,6 +11,26 @@ import java.util.function.Function;
 public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P> {
     default List<ChildRelation<? extends EntityContract, P>> childRelations() {
         return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(ChildAbility<C> childAbility,
+                                                                         BiConsumer<C, String> setParentId,
+                                                                         Function<P, List<C>> extractChildren,
+                                                                         BiConsumer<P, List<C>> populateChildren) {
+        Class<?> modelClass = modelClass();
+        if (modelClass == null) {
+            throw new AbilityException("child relation requires modelClass: "
+                    + getModuleAlias()
+                    + ", extend AbstractAbilityService or use childRelation(Class, ...)");
+        }
+        return childRelation(
+                (Class<P>) modelClass,
+                childAbility,
+                setParentId,
+                extractChildren,
+                populateChildren
+        );
     }
 
     default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,

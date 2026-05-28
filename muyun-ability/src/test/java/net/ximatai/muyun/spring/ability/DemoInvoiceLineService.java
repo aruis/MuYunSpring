@@ -10,7 +10,7 @@ final class DemoInvoiceLineService extends AbstractAbilityService<DemoInvoiceLin
     private int afterSelectCount;
 
     DemoInvoiceLineService() {
-        super("demo.invoiceLine", new InMemoryBaseDao<>());
+        super("demo.invoiceLine", DemoInvoiceLine.class, new InMemoryBaseDao<>());
     }
 
     @Override

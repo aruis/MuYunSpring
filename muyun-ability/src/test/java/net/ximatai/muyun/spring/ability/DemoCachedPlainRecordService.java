@@ -7,7 +7,7 @@ final class DemoCachedPlainRecordService extends AbstractAbilityService<DemoPlai
     private int afterChangedCount;
 
     DemoCachedPlainRecordService() {
-        super("demo.cachedPlainRecord", new InMemoryBaseDao<>());
+        super("demo.cachedPlainRecord", DemoPlainRecord.class, new InMemoryBaseDao<>());
     }
 
     @SuppressWarnings("unchecked")

@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.ability;
 
 final class DemoPlainRecordService extends AbstractAbilityService<DemoPlainRecord> {
     DemoPlainRecordService() {
-        super("demo.plainRecord", new InMemoryBaseDao<>());
+        super("demo.plainRecord", DemoPlainRecord.class, new InMemoryBaseDao<>());
     }
 
     @SuppressWarnings("unchecked")

@@ -21,6 +21,10 @@ public interface CrudAbility<T extends EntityContract> {
 
     String getModuleAlias();
 
+    default Class<?> modelClass() {
+        return null;
+    }
+
     default String insert(T entity) {
         EntityLifecycle.prepareInsert(entity, Instant.now());
         prepareAbilityDefaults(entity);

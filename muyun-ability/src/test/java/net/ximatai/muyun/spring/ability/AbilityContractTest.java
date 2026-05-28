@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
+import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
@@ -282,6 +283,22 @@ class AbilityContractTest {
         assertThat(invoiceService.lineService().select(firstLine.getId())).isNull();
         assertThat(invoiceService.lineService().select(secondLine.getId())).isNull();
         assertThat(invoiceService.select(invoiceId).getLines()).isEmpty();
+    }
+
+    @Test
+    void childrenAbilityShortcutShouldRequireModelClass() {
+        NoModelChildrenService service = new NoModelChildrenService();
+
+        assertThatThrownBy(() -> service.childRelation(
+                new DemoInvoiceLineService(),
+                DemoInvoiceLine::setInvoiceId,
+                DemoInvoice::getLines,
+                DemoInvoice::setLines
+        ))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("demo.noModelChildren")
+                .hasMessageContaining("AbstractAbilityService")
+                .hasMessageContaining("childRelation(Class");
     }
 
     @Test
@@ -1236,7 +1253,21 @@ class AbilityContractTest {
     private static final class NoNoArgCachedRecordService extends AbstractAbilityService<NoNoArgCachedRecord> implements
             CacheAbility<NoNoArgCachedRecord> {
         private NoNoArgCachedRecordService() {
-            super("demo.noNoArgCachedRecord", new InMemoryBaseDao<>());
+            super("demo.noNoArgCachedRecord", NoNoArgCachedRecord.class, new InMemoryBaseDao<>());
+        }
+    }
+
+    private static final class NoModelChildrenService implements CrudAbility<DemoInvoice>, ChildrenAbility<DemoInvoice> {
+        private final InMemoryBaseDao<DemoInvoice> dao = new InMemoryBaseDao<>();
+
+        @Override
+        public BaseDao<DemoInvoice, String> getDao() {
+            return dao;
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return "demo.noModelChildren";
         }
     }
 }

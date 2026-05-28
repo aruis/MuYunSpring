@@ -6,6 +6,6 @@ final class DemoEnabledRecordService extends AbstractAbilityService<DemoEnabledR
         EnableAbility<DemoEnabledRecord> {
 
     DemoEnabledRecordService() {
-        super("demo.enabledRecord", new InMemoryBaseDao<>());
+        super("demo.enabledRecord", DemoEnabledRecord.class, new InMemoryBaseDao<>());
     }
 }
