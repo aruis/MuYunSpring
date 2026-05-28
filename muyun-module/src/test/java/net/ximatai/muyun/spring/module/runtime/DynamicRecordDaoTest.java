@@ -239,7 +239,7 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldRejectUnconditionalDynamicDaoUpdate() {
+    void shouldRejectUngovernedDynamicDaoWrites() {
         DynamicRecordDao dao = new DynamicRecordDao(operations(), contractEntity());
         DynamicRecord record = new DynamicRecord(contractEntity()).setValue("amount", BigDecimal.ONE);
         record.setId("contract-1");
@@ -250,6 +250,9 @@ class DynamicRecordDaoTest {
         assertThatThrownBy(() -> dao.updateByIdAndCondition(record, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("conditions");
+        assertThatThrownBy(() -> dao.upsert(record))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("upsert");
     }
 
     @Test
