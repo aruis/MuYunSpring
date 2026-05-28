@@ -12,10 +12,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public interface ReferencerAbility<T extends EntityContract> extends CrudAbility<T> {
-    default Class<?> referencingModelClass() {
-        return null;
-    }
-
     default List<ReferenceLookup> referenceLookups() {
         return List.of();
     }
@@ -25,9 +21,9 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
     }
 
     default Map<ReferenceTarget, Set<String>> collectReferenceIdsByTarget(T entity) {
-        Class<?> modelClass = referencingModelClass();
+        Class<?> modelClass = referenceModelClass(entity);
         return modelClass == null
-                ? StaticReferenceResolver.collect(entity)
+                ? Map.of()
                 : StaticReferenceResolver.collect(modelClass, entity);
     }
 
@@ -46,12 +42,9 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
     }
 
     default void populateStaticReferenceTitles(T entity) {
-        Class<?> modelClass = referencingModelClass();
-        if (modelClass == null || entity == null) {
-            if (entity == null) {
-                return;
-            }
-            modelClass = entity.getClass();
+        Class<?> modelClass = referenceModelClass(entity);
+        if (modelClass == null) {
+            return;
         }
         for (ReferencePlan plan : StaticReferenceResolver.plans(modelClass)) {
             if (!plan.autoTitle() && plan.projections().isEmpty()) {
@@ -103,6 +96,14 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
             }
         }
         return null;
+    }
+
+    private Class<?> referenceModelClass(T entity) {
+        Class<?> modelClass = modelClass();
+        if (modelClass != null) {
+            return modelClass;
+        }
+        return entity == null ? null : entity.getClass();
     }
 
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {

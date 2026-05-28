@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
+import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 
 
@@ -844,6 +846,14 @@ class AbilityContractTest {
     }
 
     @Test
+    void referencerAbilityShouldUseServiceModelClassWhenPresent() {
+        StaticReferenceBaseService service = new StaticReferenceBaseService();
+        StaticReferenceProxyRecord proxyRecord = new StaticReferenceProxyRecord("customer-1");
+
+        assertThat(service.collectReferenceIdsByTarget(proxyRecord)).isEmpty();
+    }
+
+    @Test
     void crudAbilityShouldIncreaseVersionOnUpdate() {
         DemoOrganizationService service = new DemoOrganizationService();
         DemoOrganization organization = new DemoOrganization("Versioned", TreeAbility.ROOT_ID);
@@ -1268,6 +1278,25 @@ class AbilityContractTest {
         @Override
         public String getModuleAlias() {
             return "demo.noModelChildren";
+        }
+    }
+
+    private static class StaticReferenceBaseRecord extends net.ximatai.muyun.spring.common.model.standard.StandardEntity {
+    }
+
+    private static final class StaticReferenceProxyRecord extends StaticReferenceBaseRecord {
+        @ReferenceTo(moduleAlias = "demo", entityCode = "customer")
+        private final String customerId;
+
+        private StaticReferenceProxyRecord(String customerId) {
+            this.customerId = customerId;
+        }
+    }
+
+    private static final class StaticReferenceBaseService extends AbstractAbilityService<StaticReferenceBaseRecord> implements
+            ReferencerAbility<StaticReferenceBaseRecord> {
+        private StaticReferenceBaseService() {
+            super("demo.staticReferenceBase", StaticReferenceBaseRecord.class, new InMemoryBaseDao<>());
         }
     }
 }
