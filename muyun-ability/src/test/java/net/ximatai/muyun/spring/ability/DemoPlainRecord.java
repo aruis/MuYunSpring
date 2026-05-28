@@ -12,6 +12,9 @@ final class DemoPlainRecord extends StandardEntity {
     @TitleField
     private String title;
 
+    DemoPlainRecord() {
+    }
+
     DemoPlainRecord(String title) {
         this.title = title;
     }

@@ -49,26 +49,6 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     }
 
     @Override
-    public DemoInvoice copyForCache(DemoInvoice entity) {
-        if (entity == null) {
-            return null;
-        }
-        DemoInvoice copy = new DemoInvoice(entity.getTitle(), null);
-        copy.setCustomerId(entity.getCustomerId());
-        copy.setCustomerTitle(entity.getCustomerTitle());
-        copy.setCustomerStatus(entity.getCustomerStatus());
-        copy.setId(entity.getId());
-        copy.setTenantId(entity.getTenantId());
-        copy.setVersion(entity.getVersion());
-        copy.setDeleted(entity.getDeleted());
-        copy.setCreatedBy(entity.getCreatedBy());
-        copy.setCreatedAt(entity.getCreatedAt());
-        copy.setUpdatedBy(entity.getUpdatedBy());
-        copy.setUpdatedAt(entity.getUpdatedAt());
-        return copy;
-    }
-
-    @Override
     public List<ReferenceLookup> referenceLookups() {
         return List.of(referenceLookup(customerService));
     }

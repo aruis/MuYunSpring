@@ -589,6 +589,39 @@ class AbilityContractTest {
     }
 
     @Test
+    void cacheAbilityDefaultCopyShouldSkipChildRefsAndTransientFields() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine));
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        DemoInvoice selected = invoiceService.select(invoiceId);
+
+        DemoInvoice cached = (DemoInvoice) CacheRegistry.item(invoiceService.cacheNamespace(), invoiceId);
+        assertThat(cached.getLines()).isNull();
+        assertThat(cached.getCustomerTitle()).isNull();
+        assertThat(cached.getCustomerStatus()).isNull();
+        assertThat(selected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("First line");
+        assertThat(selected.getCustomerTitle()).isEqualTo("Customer One");
+        assertThat(selected.getCustomerStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void cacheAbilityDefaultCopyShouldExplainMissingNoArgConstructor() {
+        NoNoArgCachedRecordService service = new NoNoArgCachedRecordService();
+        String id = service.insert(new NoNoArgCachedRecord("No arg required"));
+
+        assertThatThrownBy(() -> service.select(id))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("no-arg constructor")
+                .hasMessageContaining("custom copyForCache")
+                .hasMessageContaining(NoNoArgCachedRecord.class.getName());
+    }
+
+    @Test
     void cacheAbilityShouldCacheAllAndHideSoftDeletedRows() {
         DemoCachedPlainRecordService service = new DemoCachedPlainRecordService();
         DemoPlainRecord first = new DemoPlainRecord("First");
@@ -1186,5 +1219,24 @@ class AbilityContractTest {
         assertThat(criteria.getClauses())
                 .extracting(clause -> clause.getField() + ":" + clause.getOperator())
                 .containsExactly("parentId:EQ");
+    }
+
+    private static final class NoNoArgCachedRecord extends net.ximatai.muyun.spring.common.model.standard.StandardEntity {
+        private final String title;
+
+        private NoNoArgCachedRecord(String title) {
+            this.title = title;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+    }
+
+    private static final class NoNoArgCachedRecordService extends AbstractAbilityService<NoNoArgCachedRecord> implements
+            CacheAbility<NoNoArgCachedRecord> {
+        private NoNoArgCachedRecordService() {
+            super("demo.noNoArgCachedRecord", new InMemoryBaseDao<>());
+        }
     }
 }

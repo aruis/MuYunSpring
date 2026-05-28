@@ -14,6 +14,9 @@ final class DemoCustomer extends StandardEntity implements TitledCapable {
     private String title;
     private String status;
 
+    DemoCustomer() {
+    }
+
     DemoCustomer(String title, String status) {
         this.title = title;
         this.status = status;

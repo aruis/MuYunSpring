@@ -17,7 +17,9 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
                 + "::" + System.identityHashCode(getDao());
     }
 
-    T copyForCache(T entity);
+    default T copyForCache(T entity) {
+        return EntityCacheCopies.shallowCopy(entity);
+    }
 
     @SuppressWarnings("unchecked")
     default T selectWithCache(String id) {

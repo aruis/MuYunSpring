@@ -35,6 +35,9 @@ final class DemoInvoice extends StandardEntity {
     )
     private List<DemoInvoiceLine> lines;
 
+    DemoInvoice() {
+    }
+
     DemoInvoice(String title, List<DemoInvoiceLine> lines) {
         this.title = title;
         this.lines = lines;
