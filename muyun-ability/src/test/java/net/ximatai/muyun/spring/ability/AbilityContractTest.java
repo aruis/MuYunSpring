@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
+import net.ximatai.muyun.spring.ability.child.ChildAbility;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
@@ -337,6 +338,18 @@ class AbilityContractTest {
                 .hasMessageContaining("notes")
                 .hasMessageContaining(DemoInvoiceNote.class.getName())
                 .hasMessageContaining(DemoInvoiceLine.class.getName());
+    }
+
+    @Test
+    void childrenAbilityShortcutShouldRejectChildAbilityWithoutModelClass() {
+        DemoInvoiceService service = new DemoInvoiceService();
+
+        assertThatThrownBy(() -> service.childRelation("lines", new NoModelLineService()))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("child relation model mismatch")
+                .hasMessageContaining("lines")
+                .hasMessageContaining(DemoInvoiceLine.class.getName())
+                .hasMessageContaining("actual null");
     }
 
     @Test
@@ -1348,6 +1361,20 @@ class AbilityContractTest {
         @Override
         public String getModuleAlias() {
             return "demo.noModelChildren";
+        }
+    }
+
+    private static final class NoModelLineService implements ChildAbility<DemoInvoiceLine> {
+        private final InMemoryBaseDao<DemoInvoiceLine> dao = new InMemoryBaseDao<>();
+
+        @Override
+        public BaseDao<DemoInvoiceLine, String> getDao() {
+            return dao;
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return "demo.noModelLine";
         }
     }
 

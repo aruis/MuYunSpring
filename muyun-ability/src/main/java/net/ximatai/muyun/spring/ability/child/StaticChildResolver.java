@@ -85,6 +85,12 @@ public final class StaticChildResolver {
                 String childEntity = childRef.childEntity().isBlank()
                         ? defaultEntityCode(childRef.childModel())
                         : childRef.childEntity();
+                Field childForeignKeyField = validateChildForeignKeyField(
+                        parentModelClass,
+                        field,
+                        childRef.childModel(),
+                        childRef.childForeignKeyField()
+                );
                 ChildPlan plan = new ChildPlan(
                         relationCode,
                         childRef.parentEntity(),
@@ -98,7 +104,7 @@ public final class StaticChildResolver {
                     throw new AbilityException("duplicate child relationCode: "
                             + parentModelClass.getName() + "." + plan.relationCode());
                 }
-                rules.putIfAbsent(field.getName(), new ChildRule(field, plan, childRef.childModel()));
+                rules.putIfAbsent(field.getName(), new ChildRule(field, plan, childRef.childModel(), childForeignKeyField));
             }
             current = current.getSuperclass();
         }
@@ -121,6 +127,41 @@ public final class StaticChildResolver {
         }
     }
 
+    private static Field validateChildForeignKeyField(Class<?> parentModelClass,
+                                                      Field relationField,
+                                                      Class<? extends EntityContract> childModel,
+                                                      String childForeignKeyField) {
+        if (childForeignKeyField == null || childForeignKeyField.isBlank()) {
+            throw new AbilityException("@ChildRef childForeignKeyField must not be blank: "
+                    + parentModelClass.getName() + "." + relationField.getName());
+        }
+        Field field = childField(childModel, childForeignKeyField);
+        if (!String.class.equals(field.getType())) {
+            throw new AbilityException("@ChildRef childForeignKeyField must be String: "
+                    + childModel.getName() + "." + childForeignKeyField);
+        }
+        try {
+            field.setAccessible(true);
+        } catch (RuntimeException e) {
+            throw new AbilityException("cannot access child foreign key field: "
+                    + childModel.getName() + "." + childForeignKeyField, e);
+        }
+        return field;
+    }
+
+    private static Field childField(Class<?> childClass, String fieldName) {
+        Class<?> current = childClass;
+        while (current != null && !Object.class.equals(current)) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new AbilityException("cannot find child foreign key field: "
+                + childClass.getName() + "." + fieldName);
+    }
+
     private static String defaultEntityCode(Class<? extends EntityContract> childModel) {
         String simpleName = childModel.getSimpleName();
         if (simpleName.isBlank()) {
@@ -129,6 +170,51 @@ public final class StaticChildResolver {
         return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }
 
-    public record ChildRule(Field field, ChildPlan plan, Class<? extends EntityContract> childModel) {
+    public record ChildRule(Field field,
+                            ChildPlan plan,
+                            Class<? extends EntityContract> childModel,
+                            Field childForeignKeyField) {
+        @SuppressWarnings("unchecked")
+        public <P extends EntityContract, C extends EntityContract> List<C> children(P parent) {
+            if (parent == null) {
+                return null;
+            }
+            try {
+                return (List<C>) field.get(parent);
+            } catch (IllegalAccessException e) {
+                throw new AbilityException("cannot read child relation field: "
+                        + parent.getClass().getName() + "." + field.getName(), e);
+            }
+        }
+
+        public <P extends EntityContract, C extends EntityContract> void populate(P parent, List<C> children) {
+            if (parent == null) {
+                return;
+            }
+            try {
+                field.set(parent, children);
+            } catch (IllegalAccessException e) {
+                throw new AbilityException("cannot write child relation field: "
+                        + parent.getClass().getName() + "." + field.getName(), e);
+            } catch (IllegalArgumentException e) {
+                throw new AbilityException("cannot write child relation field: "
+                        + parent.getClass().getName() + "." + field.getName(), e);
+            }
+        }
+
+        public <C extends EntityContract> void setParentId(C child, String parentId) {
+            if (child == null) {
+                return;
+            }
+            try {
+                childForeignKeyField.set(child, parentId);
+            } catch (IllegalAccessException e) {
+                throw new AbilityException("cannot write child foreign key field: "
+                        + child.getClass().getName() + "." + plan.childForeignKeyField(), e);
+            } catch (IllegalArgumentException e) {
+                throw new AbilityException("cannot write child foreign key field: "
+                        + child.getClass().getName() + "." + plan.childForeignKeyField(), e);
+            }
+        }
     }
 }

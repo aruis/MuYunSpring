@@ -33,6 +33,20 @@ class StaticChildResolverTest {
     }
 
     @Test
+    void ruleShouldReadPopulateAndWriteDeclaredChildFields() {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.rule(DemoInvoice.class, "lines");
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        DemoInvoiceLine line = new DemoInvoiceLine("First line");
+
+        rule.setParentId(line, "invoice-1");
+        rule.populate(invoice, List.of(line));
+
+        assertThat(line.getInvoiceId()).isEqualTo("invoice-1");
+        assertThat(rule.<DemoInvoice, DemoInvoiceLine>children(invoice))
+                .containsExactly(line);
+    }
+
+    @Test
     void singlePlanShouldRejectMultipleChildRelations() {
         assertThatThrownBy(() -> StaticChildResolver.singlePlan(DemoInvoice.class))
                 .isInstanceOf(AbilityException.class)
@@ -77,6 +91,24 @@ class StaticChildResolverTest {
                 .hasMessageContaining("duplicate child relationCode");
     }
 
+    @Test
+    void rulesShouldRejectMissingChildForeignKeyField() {
+        assertThatThrownBy(() -> StaticChildResolver.plans(MissingForeignKeyRecord.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("cannot find child foreign key field")
+                .hasMessageContaining(MissingForeignKeyChild.class.getName())
+                .hasMessageContaining("invoiceId");
+    }
+
+    @Test
+    void rulesShouldRejectNonStringChildForeignKeyField() {
+        assertThatThrownBy(() -> StaticChildResolver.plans(NonStringForeignKeyRecord.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("childForeignKeyField must be String")
+                .hasMessageContaining(NonStringForeignKeyChild.class.getName())
+                .hasMessageContaining("invoiceId");
+    }
+
     private static final class InvalidChildFieldRecord extends StandardEntity {
         @ChildRef(parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private DemoInvoiceLine line;
@@ -93,5 +125,22 @@ class StaticChildResolverTest {
 
         @ChildRef(relationCode = "lines", parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private List<DemoInvoiceLine> secondLines;
+    }
+
+    private static final class MissingForeignKeyRecord extends StandardEntity {
+        @ChildRef(parentEntity = "invoice", childModel = MissingForeignKeyChild.class, childForeignKeyField = "invoiceId")
+        private List<MissingForeignKeyChild> lines;
+    }
+
+    private static final class MissingForeignKeyChild extends StandardEntity {
+    }
+
+    private static final class NonStringForeignKeyRecord extends StandardEntity {
+        @ChildRef(parentEntity = "invoice", childModel = NonStringForeignKeyChild.class, childForeignKeyField = "invoiceId")
+        private List<NonStringForeignKeyChild> lines;
+    }
+
+    private static final class NonStringForeignKeyChild extends StandardEntity {
+        private Integer invoiceId;
     }
 }

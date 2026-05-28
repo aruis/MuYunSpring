@@ -33,20 +33,8 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
     @Override
     public List<ChildRelation<? extends EntityContract, DemoInvoice>> childRelations() {
         return List.of(
-                childRelation(
-                        "lines",
-                        lineService,
-                        DemoInvoiceLine::setInvoiceId,
-                        DemoInvoice::getLines,
-                        DemoInvoice::setLines
-                ),
-                childRelation(
-                        "notes",
-                        noteService,
-                        DemoInvoiceNote::setInvoiceId,
-                        DemoInvoice::getNotes,
-                        DemoInvoice::setNotes
-                )
+                childRelation("lines", lineService),
+                childRelation("notes", noteService)
         );
     }
 

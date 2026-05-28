@@ -27,6 +27,22 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         );
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
+                                                                         ChildAbility<C> childAbility) {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.rule(
+                requireModelClass("childRelation(Class, String, ...)"),
+                relationCode
+        );
+        validateShortcutChildModel(rule, childAbility);
+        return childAbility.toChildRelation(
+                rule.plan(),
+                rule::setParentId,
+                rule::children,
+                rule::populate
+        );
+    }
+
     @SuppressWarnings("unchecked")
     default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
                                                                          ChildAbility<C> childAbility,
@@ -123,5 +139,17 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                 + rule.plan().relationCode()
                 + ", expected " + rule.childModel().getName()
                 + ", actual " + actualChildModel.getName());
+    }
+
+    private void validateShortcutChildModel(StaticChildResolver.ChildRule rule, ChildAbility<?> childAbility) {
+        Class<?> actualChildModel = childAbility.modelClass();
+        if (rule.childModel().equals(actualChildModel)) {
+            return;
+        }
+        String actual = actualChildModel == null ? "null" : actualChildModel.getName();
+        throw new AbilityException("child relation model mismatch: "
+                + rule.plan().relationCode()
+                + ", expected " + rule.childModel().getName()
+                + ", actual " + actual);
     }
 }
