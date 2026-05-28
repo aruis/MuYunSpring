@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -28,7 +27,6 @@ final class PlatformAbilityDispatcher {
         runChildrenAfterSelect(ability, entity);
         runReferenceAfterSelect(ability, entity);
         ability.afterPlatformSelect(entity);
-        ReferenceDependencyRegistry.refresh(ability, entity);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -63,6 +61,7 @@ final class PlatformAbilityDispatcher {
     private static <T extends EntityContract> void runReferenceAfterSelect(CrudAbility<T> ability, T entity) {
         if (ability instanceof ReferencerAbility referencerAbility) {
             referencerAbility.afterReferenceSelect(entity);
+            referencerAbility.refreshReferenceDependencies(entity);
         }
     }
 }

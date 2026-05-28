@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability.reference;
 
 import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -22,6 +23,16 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
 
     default void afterReferenceSelect(T entity) {
         populateStaticReferenceTitles(entity);
+    }
+
+    default void refreshReferenceDependencies(T entity) {
+        ReferenceDependencyRegistry.refresh(this, entity);
+    }
+
+    default void clearReferenceDependency(String id) {
+        if (this instanceof CacheAbility<?> cacheAbility) {
+            ReferenceDependencyRegistry.removeReferrer(cacheAbility.cacheNamespace(), id);
+        }
     }
 
     default void populateStaticReferenceTitles(T entity) {

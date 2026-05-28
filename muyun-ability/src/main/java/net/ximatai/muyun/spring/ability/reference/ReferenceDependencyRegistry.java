@@ -17,7 +17,7 @@ public final class ReferenceDependencyRegistry {
     private ReferenceDependencyRegistry() {
     }
 
-    public static void refresh(Object ability, EntityContract entity) {
+    static void refresh(Object ability, EntityContract entity) {
         if (!(ability instanceof CacheAbility<?> cacheAbility)
                 || !(ability instanceof ReferencerAbility<?> referencerAbility)
                 || entity == null
@@ -39,7 +39,7 @@ public final class ReferenceDependencyRegistry {
         }
     }
 
-    public static void removeReferrer(String namespace, String id) {
+    static void removeReferrer(String namespace, String id) {
         if (namespace == null || namespace.isBlank() || id == null || id.isBlank()) {
             return;
         }
@@ -61,7 +61,7 @@ public final class ReferenceDependencyRegistry {
         }
     }
 
-    public static void clearAll() {
+    static void clearAll() {
         REFERRERS.clear();
         TARGETS_BY_REFERRER.clear();
     }
@@ -76,7 +76,7 @@ public final class ReferenceDependencyRegistry {
                 .forEach(ReferenceDependencyRegistry::removeReferrer);
     }
 
-    public static Set<String> referrerIds(ReferenceTarget target, String id) {
+    static Set<String> referrerIds(ReferenceTarget target, String id) {
         Set<ReferrerKey> referrers = REFERRERS.get(new TargetKey(target, id));
         if (referrers == null) {
             return Set.of();

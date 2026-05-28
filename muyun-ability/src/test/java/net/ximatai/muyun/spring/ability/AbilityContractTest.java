@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
-import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
@@ -26,7 +26,7 @@ class AbilityContractTest {
     @AfterEach
     void clearGlobalState() {
         CacheRegistry.clearAll();
-        ReferenceDependencyRegistry.clearAll();
+        ReferenceDependencyRegistryTestAccess.clearAll();
         CacheRegistry.resetPolicy();
         TenantContext.clear();
     }
@@ -373,7 +373,7 @@ class AbilityContractTest {
         DemoInvoice firstSelected = invoiceService.select(invoiceId);
         assertThat(firstSelected.getCustomerTitle()).isEqualTo("Customer One");
         assertThat(firstSelected.getCustomerStatus()).isEqualTo("ACTIVE");
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .contains(invoiceId);
 
         invoice.setTitle("Changed behind cache");
@@ -428,16 +428,16 @@ class AbilityContractTest {
         String invoiceId = invoiceService.insert(invoice);
 
         invoiceService.select(invoiceId);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .containsExactly(invoiceId);
 
         invoice.setCustomerId("customer-2");
         invoiceService.update(invoice);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .isEmpty();
 
         invoiceService.select(invoiceId);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-2"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-2"))
                 .containsExactly(invoiceId);
 
         invoice.setTitle("Changed behind cache");
@@ -462,22 +462,22 @@ class AbilityContractTest {
         String invoiceId = invoiceService.insert(invoice);
 
         invoiceService.select(invoiceId);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .containsExactly(invoiceId);
 
         invoice.setCustomerId(null);
         invoiceService.update(invoice);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .isEmpty();
 
         invoice.setCustomerId("customer-1");
         invoiceService.update(invoice);
         invoiceService.select(invoiceId);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .containsExactly(invoiceId);
 
         invoiceService.delete(invoiceId);
-        assertThat(ReferenceDependencyRegistry.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
                 .isEmpty();
     }
 

@@ -30,7 +30,7 @@ public final class StaticChildResolver {
         return RULES.computeIfAbsent(parentModelClass, StaticChildResolver::loadRules);
     }
 
-    public static void clearCacheForTests() {
+    static void clearCacheForTests() {
         RULES.clear();
     }
 

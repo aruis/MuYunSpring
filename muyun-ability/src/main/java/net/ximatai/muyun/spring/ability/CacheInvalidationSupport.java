@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
-import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 final class CacheInvalidationSupport {
@@ -14,7 +14,9 @@ final class CacheInvalidationSupport {
                 cacheAbility.clearCache();
                 return;
             }
-            ReferenceDependencyRegistry.removeReferrer(cacheAbility.cacheNamespace(), entity.getId());
+            if (ability instanceof ReferencerAbility<?> referencerAbility) {
+                referencerAbility.clearReferenceDependency(entity.getId());
+            }
             cacheAbility.clearItemCache(entity.getId());
         }
         if (ability instanceof ReferenceAbility<?> referenceAbility && entity != null && entity.getId() != null) {
