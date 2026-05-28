@@ -8,9 +8,11 @@ import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -19,6 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -47,16 +51,22 @@ class OrganizationRepositoryIT {
     }
 
     private final OrganizationService organizationService;
+    private final CachedOrganizationService cachedOrganizationService;
     private final OrganizationDao organizationDao;
     private final DataSource dataSource;
+    private final OrganizationTransactionProbe transactionProbe;
 
     @Autowired
     OrganizationRepositoryIT(OrganizationService organizationService,
+                             CachedOrganizationService cachedOrganizationService,
                              OrganizationDao organizationDao,
-                             DataSource dataSource) {
+                             DataSource dataSource,
+                             OrganizationTransactionProbe transactionProbe) {
         this.organizationService = organizationService;
+        this.cachedOrganizationService = cachedOrganizationService;
         this.organizationDao = organizationDao;
         this.dataSource = dataSource;
+        this.transactionProbe = transactionProbe;
     }
 
     @Test
@@ -154,6 +164,54 @@ class OrganizationRepositoryIT {
     }
 
     @Test
+    void springRepositoryShouldKeepStaticCacheCleanWhenTransactionRollsBack() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String tenantId = "tenant-static-tx-" + suffix;
+        Organization organization = new Organization();
+        organization.setCode("TX-CACHE-" + suffix);
+        organization.setTitle("Before transaction");
+
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
+            String id = cachedOrganizationService.insert(organization);
+            cachedOrganizationService.select(id);
+            cachedOrganizationService.selectAllWithCache();
+
+            assertThatThrownBy(() -> transactionProbe.updateOrganizationThenFail(cachedOrganizationService, id))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("rollback static cache");
+
+            assertThat(cachedOrganizationService.select(id).getTitle()).isEqualTo("Before transaction");
+            assertThat(cachedOrganizationService.selectAllWithCache())
+                    .extracting(Organization::getTitle)
+                    .contains("Before transaction")
+                    .doesNotContain("Inside transaction");
+        }
+    }
+
+    @Test
+    void springRepositoryShouldInvalidateStaticCacheAfterTransactionCommits() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String tenantId = "tenant-static-commit-" + suffix;
+        Organization organization = new Organization();
+        organization.setCode("TX-COMMIT-" + suffix);
+        organization.setTitle("Before commit");
+
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
+            String id = cachedOrganizationService.insert(organization);
+            cachedOrganizationService.select(id);
+            cachedOrganizationService.selectAllWithCache();
+
+            transactionProbe.updateOrganizationAndCommit(cachedOrganizationService, id);
+
+            assertThat(cachedOrganizationService.select(id).getTitle()).isEqualTo("After commit");
+            assertThat(cachedOrganizationService.selectAllWithCache())
+                    .extracting(Organization::getTitle)
+                    .contains("After commit")
+                    .doesNotContain("Before commit");
+        }
+    }
+
+    @Test
     void springRepositoryVersionMethodsShouldRequireExpectedVersion() {
         Organization organization = new Organization();
         organization.setId("org-null-version");
@@ -192,6 +250,7 @@ class OrganizationRepositoryIT {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
+    @EnableTransactionManagement
     @EnableMuYunRepositories(basePackageClasses = OrganizationDao.class)
     static class TestApplication {
 
@@ -206,8 +265,13 @@ class OrganizationRepositoryIT {
         }
 
         @Bean
-        OrganizationService organizationService(OrganizationDao organizationDao) {
-            return new OrganizationService(organizationDao);
+        CachedOrganizationService organizationService(OrganizationDao organizationDao) {
+            return new CachedOrganizationService(organizationDao);
+        }
+
+        @Bean
+        OrganizationTransactionProbe organizationTransactionProbe() {
+            return new OrganizationTransactionProbe();
         }
 
         @Bean
@@ -218,6 +282,40 @@ class OrganizationRepositoryIT {
         @Bean
         SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations, EntityMetaResolver entityMetaResolver) {
             return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver);
+        }
+    }
+
+    private static final class CachedOrganizationService extends OrganizationService implements CacheAbility<Organization> {
+        private CachedOrganizationService(OrganizationDao organizationDao) {
+            super(organizationDao);
+        }
+    }
+
+    static class OrganizationTransactionProbe {
+
+        @Transactional
+        public void updateOrganizationThenFail(CachedOrganizationService service, String id) {
+            Organization update = service.select(id);
+            update.setTitle("Inside transaction");
+            service.update(update);
+
+            assertThat(service.select(id).getTitle()).isEqualTo("Inside transaction");
+            assertThat(service.selectAllWithCache())
+                    .extracting(Organization::getTitle)
+                    .contains("Inside transaction");
+            throw new RuntimeException("rollback static cache");
+        }
+
+        @Transactional
+        public void updateOrganizationAndCommit(CachedOrganizationService service, String id) {
+            Organization update = service.select(id);
+            update.setTitle("After commit");
+            service.update(update);
+
+            assertThat(service.select(id).getTitle()).isEqualTo("After commit");
+            assertThat(service.selectAllWithCache())
+                    .extracting(Organization::getTitle)
+                    .contains("After commit");
         }
     }
 

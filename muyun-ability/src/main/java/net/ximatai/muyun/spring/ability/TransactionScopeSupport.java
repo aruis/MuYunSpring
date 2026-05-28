@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
-final class TransactionScopeSupport {
+public final class TransactionScopeSupport {
     private static final String SPRING_TRANSACTION_SYNCHRONIZATION_MANAGER =
             "org.springframework.transaction.support.TransactionSynchronizationManager";
     private static final String SPRING_TRANSACTION_SYNCHRONIZATION =
@@ -12,11 +12,11 @@ final class TransactionScopeSupport {
     private TransactionScopeSupport() {
     }
 
-    static boolean isTransactionActive() {
+    public static boolean isTransactionActive() {
         return springBoolean("isActualTransactionActive");
     }
 
-    static void afterCommitOrNow(Runnable action) {
+    public static void afterCommitOrNow(Runnable action) {
         if (!isTransactionActive() || !springBoolean("isSynchronizationActive")) {
             action.run();
             return;

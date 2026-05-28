@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.ability.reference;
 
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.Collections;
@@ -18,6 +19,10 @@ public final class ReferenceDependencyRegistry {
     }
 
     static void refresh(Object ability, EntityContract entity) {
+        TransactionScopeSupport.afterCommitOrNow(() -> refreshNow(ability, entity));
+    }
+
+    private static void refreshNow(Object ability, EntityContract entity) {
         if (!(ability instanceof CacheAbility<?> cacheAbility)
                 || !(ability instanceof ReferencerAbility<?> referencerAbility)
                 || entity == null
@@ -43,13 +48,17 @@ public final class ReferenceDependencyRegistry {
         if (namespace == null || namespace.isBlank() || id == null || id.isBlank()) {
             return;
         }
-        removeReferrer(new ReferrerKey(namespace, id));
+        TransactionScopeSupport.afterCommitOrNow(() -> removeReferrer(new ReferrerKey(namespace, id)));
     }
 
     static void clearReferrers(ReferenceTarget target, String id) {
         if (target == null || id == null || id.isBlank()) {
             return;
         }
+        TransactionScopeSupport.afterCommitOrNow(() -> clearReferrersNow(target, id));
+    }
+
+    private static void clearReferrersNow(ReferenceTarget target, String id) {
         Set<ReferrerKey> referrers = REFERRERS.remove(new TargetKey(target, id));
         if (referrers == null || referrers.isEmpty()) {
             return;
