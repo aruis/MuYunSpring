@@ -10,6 +10,10 @@ public final class ReferenceDependencyRegistryTestAccess {
         return ReferenceDependencyRegistry.referrerIds(target, id);
     }
 
+    public static void clearNamespacePrefix(String prefix) {
+        ReferenceDependencyRegistry.clearNamespacePrefix(prefix);
+    }
+
     public static void clearAll() {
         ReferenceDependencyRegistry.clearAll();
     }

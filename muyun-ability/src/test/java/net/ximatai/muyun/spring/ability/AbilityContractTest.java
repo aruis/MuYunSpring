@@ -567,6 +567,29 @@ class AbilityContractTest {
     }
 
     @Test
+    void referenceDependencyRegistryShouldClearReferrersByNamespacePrefix() {
+        DemoCustomerService customerService = new DemoCustomerService();
+        DemoCustomer customer = new DemoCustomer("Customer", "ACTIVE");
+        customer.setId("customer-1");
+        customerService.insert(customer);
+        DemoInvoiceService invoiceService = new DemoInvoiceService(customerService);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
+        invoice.setCustomerId("customer-1");
+        String invoiceId = invoiceService.insert(invoice);
+
+        invoiceService.select(invoiceId);
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .containsExactly(invoiceId);
+
+        String namespacePrefix = invoiceService.cacheNamespace()
+                .substring(0, invoiceService.cacheNamespace().lastIndexOf("::"));
+        ReferenceDependencyRegistryTestAccess.clearNamespacePrefix(namespacePrefix);
+
+        assertThat(ReferenceDependencyRegistryTestAccess.referrerIds(ReferenceTarget.of("demo", "customer"), "customer-1"))
+                .isEmpty();
+    }
+
+    @Test
     void childrenAbilityShouldRejectDuplicateAndForeignChildIds() {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoice firstInvoice = new DemoInvoice("First invoice", List.of(new DemoInvoiceLine("First line")));
