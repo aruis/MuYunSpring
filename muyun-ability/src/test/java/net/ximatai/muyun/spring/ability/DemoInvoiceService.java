@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
-import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -34,13 +33,13 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
 
     @Override
     public List<ChildRelation<? extends EntityContract, DemoInvoice>> childRelations() {
-        return List.of(lineService
-                .toChildRelation(
-                        StaticChildResolver.plans(DemoInvoice.class).getFirst(),
-                        DemoInvoiceLine::setInvoiceId,
-                        DemoInvoice::getLines,
-                        DemoInvoice::setLines
-                ));
+        return List.of(childRelation(
+                DemoInvoice.class,
+                lineService,
+                DemoInvoiceLine::setInvoiceId,
+                DemoInvoice::getLines,
+                DemoInvoice::setLines
+        ));
     }
 
     DemoInvoiceLineService lineService() {

@@ -23,6 +23,14 @@ public final class StaticChildResolver {
                 .toList();
     }
 
+    public static ChildPlan singlePlan(Class<?> parentModelClass) {
+        List<ChildPlan> plans = plans(parentModelClass);
+        if (plans.size() != 1) {
+            throw new AbilityException("expected exactly one child relation plan: " + parentModelClass.getName());
+        }
+        return plans.getFirst();
+    }
+
     public static List<ChildRule> rules(Class<?> parentModelClass) {
         if (parentModelClass == null) {
             return List.of();

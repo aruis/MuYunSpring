@@ -4,10 +4,25 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P> {
     default List<ChildRelation<? extends EntityContract, P>> childRelations() {
         return List.of();
+    }
+
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
+                                                                         ChildAbility<C> childAbility,
+                                                                         BiConsumer<C, String> setParentId,
+                                                                         Function<P, List<C>> extractChildren,
+                                                                         BiConsumer<P, List<C>> populateChildren) {
+        return childAbility.toChildRelation(
+                StaticChildResolver.singlePlan(parentModelClass),
+                setParentId,
+                extractChildren,
+                populateChildren
+        );
     }
 
     default void afterChildrenInsert(String id, P parent) {

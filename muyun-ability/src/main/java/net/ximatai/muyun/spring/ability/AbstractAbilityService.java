@@ -9,7 +9,7 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
     private final BaseDao<T, String> dao;
 
     protected AbstractAbilityService(String moduleAlias, BaseDao<T, String> dao) {
-        this.moduleAlias = requireText(moduleAlias, "moduleAlias");
+        this.moduleAlias = AbilityPreconditions.requireText(moduleAlias, "moduleAlias");
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
     }
 
@@ -21,13 +21,5 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
     @Override
     public final String getModuleAlias() {
         return moduleAlias;
-    }
-
-    private static String requireText(String value, String name) {
-        String text = Objects.requireNonNull(value, name + " must not be null").trim();
-        if (text.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
-        }
-        return text;
     }
 }
