@@ -90,12 +90,35 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityCode).descendantIds(id);
     }
 
+    public int enable(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).enable(id);
+    }
+
+    public int disable(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).disable(id);
+    }
+
+    public boolean isEnabled(String moduleAlias, String entityCode, String id) {
+        return entityService(moduleAlias, entityCode).isEnabled(id);
+    }
+
+    public Criteria enabledCriteria(String moduleAlias, String entityCode, Criteria criteria) {
+        return entityService(moduleAlias, entityCode).enabledCriteria(criteria);
+    }
+
     public String title(String moduleAlias, String entityCode, String id) {
         return entityService(moduleAlias, entityCode).title(id);
     }
 
     public Map<String, String> titles(String moduleAlias, String entityCode, Collection<String> ids) {
         return entityService(moduleAlias, entityCode).titles(ids);
+    }
+
+    public Map<String, Map<String, Object>> projections(String moduleAlias,
+                                                        String entityCode,
+                                                        Collection<String> ids,
+                                                        Collection<String> fieldNames) {
+        return entityService(moduleAlias, entityCode).projections(ids, fieldNames);
     }
 
     public PageResult<ReferenceOption> referenceOptions(String moduleAlias,

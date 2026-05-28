@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -98,11 +99,71 @@ class DynamicRecordServiceTest {
         assertThat(service.titles(MODULE, "contract", List.of("contract-1", "contract-2")))
                 .containsEntry("contract-1", "Contract One")
                 .containsEntry("contract-2", "Contract Two");
+        assertThat(service.projections(MODULE, "contract", List.of("contract-2", "contract-1"), List.of("code", "title")))
+                .containsExactly(
+                        Map.entry("contract-2", Map.of("code", "CONTRACT-2", "title", "Contract Two")),
+                        Map.entry("contract-1", Map.of("code", "CONTRACT-1", "title", "Contract One"))
+                );
         assertThat(service.referenceOptions(MODULE, "contract", Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(
                         new ReferenceOption("contract-1", "Contract One"),
                         new ReferenceOption("contract-2", "Contract Two")
                 );
+    }
+
+    @Test
+    void shouldExposeEnableOperationsThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        AtomicReference<Boolean> enabled = new AtomicReference<>(Boolean.FALSE);
+        when(operations.query(anyString(), anyMap()))
+                .thenAnswer(invocation -> List.of(enabledRow("contract-1", enabled.get())));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap()))
+                .thenAnswer(invocation -> {
+                    enabled.set((Boolean) invocation.<Map<String, Object>>getArgument(2).get("enabled"));
+                    return 1;
+                });
+        DynamicRecordService service = service(operations, enabledEntity());
+
+        assertThat(service.isEnabled(MODULE, "contract", "contract-1")).isFalse();
+        assertThat(service.enable(MODULE, "contract", "contract-1")).isEqualTo(1);
+        assertThat(service.isEnabled(MODULE, "contract", "contract-1")).isTrue();
+        assertThat(service.disable(MODULE, "contract", "contract-1")).isEqualTo(1);
+        assertThat(service.isEnabled(MODULE, "contract", "contract-1")).isFalse();
+        Criteria activeContracts = service.enabledCriteria(MODULE, "contract", Criteria.of().eq("code", "CONTRACT-1"));
+        service.list(MODULE, "contract", activeContracts, PageRequest.of(1, 10));
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, org.mockito.Mockito.times(2))
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        assertThat(body.getAllValues().get(0)).containsEntry("enabled", Boolean.TRUE);
+        assertThat(body.getAllValues().get(1)).containsEntry("enabled", Boolean.FALSE);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"enabled\" =")
+                .contains("\"code\" ="));
+    }
+
+    @Test
+    void shouldRejectUnsupportedStableServiceAbilityApi() {
+        DynamicRecordService service = service(operations(), contractEntity());
+
+        assertThatThrownBy(() -> service.enable(MODULE, "contract", "contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENABLE");
+        assertThatThrownBy(() -> service.disable(MODULE, "contract", "contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENABLE");
+        assertThatThrownBy(() -> service.isEnabled(MODULE, "contract", "contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENABLE");
+        assertThatThrownBy(() -> service.enabledCriteria(MODULE, "contract", Criteria.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENABLE");
+        assertThatThrownBy(() -> service.projections(MODULE, "contract", List.of("contract-1"), List.of("code")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("REFERENCE");
     }
 
     @Test
@@ -182,6 +243,18 @@ class DynamicRecordServiceTest {
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
 
+    private EntityDefinition enabledEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.enabled()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.ENABLE);
+    }
+
     private Map<String, Object> row(String id, String code, int version, boolean deleted) {
         return Map.of(
                 "id", id,
@@ -207,6 +280,16 @@ class DynamicRecordServiceTest {
                 "id", id,
                 "code", id.toUpperCase(),
                 "title", name,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> enabledRow(String id, boolean enabled) {
+        return Map.of(
+                "id", id,
+                "code", id.toUpperCase(),
+                "enabled", enabled,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );
