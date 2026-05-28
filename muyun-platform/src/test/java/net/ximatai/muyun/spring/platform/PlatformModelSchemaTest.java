@@ -30,11 +30,14 @@ class PlatformModelSchemaTest {
 
         assertThat(table.getName()).isEqualTo("platform_module");
         assertThat(columnNames(table))
-                .contains("id", "application_alias", "title", "parent_id", "sort_order", "enabled", "module_kind");
+                .contains("id", "application_alias", "title", "parent_id", "sort_order", "enabled", "module_type");
         assertThat(table.getPrimaryKey().getLength()).isEqualTo(128);
         assertThat(table.getColumns().stream().filter(column -> "parent_id".equals(column.getName())).findFirst())
                 .get()
                 .satisfies(column -> assertThat(column.getLength()).isEqualTo(128));
+        assertThat(table.getColumns().stream().filter(column -> "module_type".equals(column.getName())).findFirst())
+                .get()
+                .satisfies(column -> assertThat(column.getLength()).isEqualTo(32));
     }
 
     private Set<String> columnNames(TableWrapper table) {

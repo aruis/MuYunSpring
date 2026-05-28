@@ -27,7 +27,7 @@ class StaticEntityTableMapperTest {
         assertThat(table.getComment()).isEqualTo("Demo organization");
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
         assertThat(table.getPrimaryKey().getType()).isEqualTo(ColumnType.VARCHAR);
-        assertThat(table.getPrimaryKey().getLength()).isEqualTo(128);
+        assertThat(table.getPrimaryKey().getLength()).isEqualTo(32);
         assertThat(columnNames(table))
                 .contains("tenant_id", "version", "deleted", "deleted_at", "created_by", "created_at", "updated_by", "updated_at")
                 .contains("parent_id", "code", "name", "sort_order");
@@ -80,7 +80,7 @@ class StaticEntityTableMapperTest {
 
     @Table(name = "demo_organization", comment = "Demo organization")
     private static class DemoOrganization extends StandardEntity {
-        @Column(name = "parent_id", type = ColumnType.VARCHAR, length = 128)
+        @Column(name = "parent_id", type = ColumnType.VARCHAR, length = 32)
         private String parentId;
 
         @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, unique = true)

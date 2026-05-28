@@ -34,7 +34,7 @@ public class PlatformTableValidator {
                     "platform table standard column type mismatch %s: %s".formatted(expected.getName(), source)
             );
         }
-        if (!Objects.equals(actual.getLength(), expected.getLength())
+        if (!columnSizeMatches(actual, expected, primaryKey)
                 || !Objects.equals(actual.getPrecision(), expected.getPrecision())
                 || !Objects.equals(actual.getScale(), expected.getScale())) {
             throw new IllegalArgumentException(
@@ -46,6 +46,18 @@ public class PlatformTableValidator {
                     "platform table standard column nullable mismatch %s: %s".formatted(expected.getName(), source)
             );
         }
+    }
+
+    private boolean columnSizeMatches(Column actual, Column expected, boolean primaryKey) {
+        if (!primaryKey) {
+            return Objects.equals(actual.getLength(), expected.getLength());
+        }
+        if (Objects.equals(actual.getLength(), expected.getLength())) {
+            return true;
+        }
+        return actual.getLength() != null
+                && expected.getLength() != null
+                && actual.getLength() >= expected.getLength();
     }
 
     private Map<String, Column> columnMap(TableWrapper table) {
