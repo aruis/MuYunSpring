@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,33 +70,39 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
     }
 
     default Map<String, String> referenceTitles(ReferenceTarget target, Collection<String> ids) {
-        ReferenceLookup lookup = referenceLookupFor(target);
-        if (lookup != null) {
-            return lookup.titles(ids);
-        }
-        throw new AbilityException("reference title resolver is not configured: " + target.qualifiedName());
+        return requireReferenceLookup(target, "title").titles(ids);
     }
 
     default Map<String, Map<String, Object>> referenceProjections(ReferenceTarget target,
                                                                   Collection<String> ids,
                                                                   Collection<String> sourceFields) {
-        ReferenceLookup lookup = referenceLookupFor(target);
-        if (lookup != null) {
-            return lookup.projections(ids, sourceFields);
-        }
-        throw new AbilityException("reference projection resolver is not configured: " + target.qualifiedName());
+        return requireReferenceLookup(target, "projection").projections(ids, sourceFields);
     }
 
-    private ReferenceLookup referenceLookupFor(ReferenceTarget target) {
+    private ReferenceLookup requireReferenceLookup(ReferenceTarget target, String purpose) {
         if (target == null) {
-            return null;
+            throw new AbilityException("reference " + purpose + " resolver target must not be null");
         }
+        Map<ReferenceTarget, ReferenceLookup> lookups = referenceLookupsByTarget();
+        ReferenceLookup lookup = lookups.get(target);
+        if (lookup != null) {
+            return lookup;
+        }
+        throw new AbilityException("reference " + purpose + " resolver is not configured: "
+                + target.qualifiedName()
+                + ", configured targets: "
+                + lookups.keySet().stream().map(ReferenceTarget::qualifiedName).toList());
+    }
+
+    private Map<ReferenceTarget, ReferenceLookup> referenceLookupsByTarget() {
+        Map<ReferenceTarget, ReferenceLookup> lookups = new LinkedHashMap<>();
         for (ReferenceLookup lookup : referenceLookups()) {
-            if (target.equals(lookup.target())) {
-                return lookup;
+            ReferenceLookup previous = lookups.putIfAbsent(lookup.target(), lookup);
+            if (previous != null) {
+                throw new AbilityException("duplicate reference lookup target: " + lookup.target().qualifiedName());
             }
         }
-        return null;
+        return lookups;
     }
 
     private Class<?> referenceModelClass(T entity) {

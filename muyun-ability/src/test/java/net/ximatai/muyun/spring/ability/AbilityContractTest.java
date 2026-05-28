@@ -895,6 +895,27 @@ class AbilityContractTest {
     }
 
     @Test
+    void referencerAbilityShouldRejectDuplicateLookupTargets() {
+        DuplicateReferenceLookupService service = new DuplicateReferenceLookupService();
+
+        assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("duplicate reference lookup target")
+                .hasMessageContaining("demo.customer");
+    }
+
+    @Test
+    void referencerAbilityShouldReportConfiguredTargetsWhenLookupIsMissing() {
+        MissingUserReferenceLookupService service = new MissingUserReferenceLookupService();
+
+        assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("reference title resolver is not configured")
+                .hasMessageContaining("iam.user")
+                .hasMessageContaining("demo.customer");
+    }
+
+    @Test
     void referencerAbilityShouldUseServiceModelClassWhenPresent() {
         StaticReferenceBaseService service = new StaticReferenceBaseService();
         StaticReferenceProxyRecord proxyRecord = new StaticReferenceProxyRecord("customer-1");
@@ -1346,6 +1367,44 @@ class AbilityContractTest {
             ReferencerAbility<StaticReferenceBaseRecord> {
         private StaticReferenceBaseService() {
             super("demo.staticReferenceBase", StaticReferenceBaseRecord.class, new InMemoryBaseDao<>());
+        }
+    }
+
+    private static final class DuplicateReferenceLookupService extends AbstractAbilityService<DemoReferencingRecord> implements
+            ReferencerAbility<DemoReferencingRecord> {
+        private final DemoCustomerService customerService = new DemoCustomerService();
+
+        private DuplicateReferenceLookupService() {
+            super("demo.duplicateReferenceLookup", DemoReferencingRecord.class, new InMemoryBaseDao<>());
+            seedCustomer();
+        }
+
+        @Override
+        public List<ReferenceLookup> referenceLookups() {
+            return List.of(referenceLookup(customerService), referenceLookup(customerService));
+        }
+
+        private void seedCustomer() {
+            DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
+            customer.setId("customer-1");
+            customerService.insert(customer);
+        }
+    }
+
+    private static final class MissingUserReferenceLookupService extends AbstractAbilityService<DemoReferencingRecord> implements
+            ReferencerAbility<DemoReferencingRecord> {
+        private final DemoCustomerService customerService = new DemoCustomerService();
+
+        private MissingUserReferenceLookupService() {
+            super("demo.missingUserReferenceLookup", DemoReferencingRecord.class, new InMemoryBaseDao<>());
+            DemoCustomer customer = new DemoCustomer("Customer One", "ACTIVE");
+            customer.setId("customer-1");
+            customerService.insert(customer);
+        }
+
+        @Override
+        public List<ReferenceLookup> referenceLookups() {
+            return List.of(referenceLookup(customerService));
         }
     }
 }
