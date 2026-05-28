@@ -3,15 +3,14 @@ package net.ximatai.muyun.spring.ability;
 
 import lombok.Getter;
 import lombok.Setter;
-import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 
 @Getter
 @Setter
-final class DemoInvoiceLine extends StandardEntity {
+final class DemoInvoiceLine extends StandardSortableEntity {
     private String invoiceId;
-    private String title;
 
     DemoInvoiceLine(String title) {
-        this.title = title;
+        setTitle(title);
     }
 }

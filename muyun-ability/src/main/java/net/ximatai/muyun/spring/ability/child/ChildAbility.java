@@ -3,6 +3,9 @@ package net.ximatai.muyun.spring.ability.child;
 import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.List;
@@ -33,6 +36,13 @@ public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
         return relation;
     }
 
+    default List<C> selectChildRows(Criteria criteria) {
+        if (this instanceof SortAbility<?> sortAbility) {
+            return sortedChildRows(sortAbility, criteria);
+        }
+        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE));
+    }
+
     default C selectIgnoreSoftDeleteIfPossible(String id) {
         if (this instanceof SoftDeleteAbility<?> softDeleteAbility) {
             @SuppressWarnings("unchecked")
@@ -40,5 +50,10 @@ public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
             return selected;
         }
         return select(id);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<C> sortedChildRows(SortAbility<?> sortAbility, Criteria criteria) {
+        return ((SortAbility) sortAbility).sortedList(criteria);
     }
 }

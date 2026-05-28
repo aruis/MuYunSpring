@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.child.ChildAbility;
 
 final class DemoInvoiceLineService extends AbstractAbilityService<DemoInvoiceLine> implements
         SoftDeleteAbility<DemoInvoiceLine>,
+        SortAbility<DemoInvoiceLine>,
         CascadeDeleteChildAbility<DemoInvoiceLine> {
     private int afterSelectCount;
 

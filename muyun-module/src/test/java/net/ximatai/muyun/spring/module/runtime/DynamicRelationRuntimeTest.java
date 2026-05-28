@@ -111,6 +111,40 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldAutoPopulateDynamicChildrenWithSortCapabilityOrderSql() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
+                return containsParam(params, "invoice-1")
+                        ? List.of(lineRow("line-1", "L-001", 1), lineRow("line-2", "L-002", 2))
+                        : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
+        DynamicEntityService invoiceService = new DynamicRecordRuntime(operations)
+                .register(sortableInvoiceModule())
+                .entityService(MODULE, "invoice");
+
+        DynamicRecord selected = invoiceService.select("invoice-1");
+
+        assertThat(selected.getChildren("lines"))
+                .extracting(child -> child.getValue("title"))
+                .containsExactly("L-001", "L-002");
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"app_invoice_line\"")
+                .contains("\"invoice_id\" =")
+                .contains("ORDER BY \"sort_order\" ASC"));
+    }
+
+    @Test
     void shouldApplyTenantScopeWhenPopulatingAndCascadingDynamicChildren() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);
@@ -671,6 +705,17 @@ class DynamicRelationRuntimeTest {
         );
     }
 
+    private ModuleDefinition sortableInvoiceModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), sortableInvoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent())
+        );
+    }
+
     private ModuleDefinition manyReferenceInvoiceModule() {
         return new ModuleDefinition(
                 MODULE,
@@ -729,6 +774,19 @@ class DynamicRelationRuntimeTest {
         ).withCapabilities(EntityCapability.REFERENCE);
     }
 
+    private EntityDefinition sortableInvoiceLineEntity() {
+        return new EntityDefinition(
+                "invoice_line",
+                "app_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.string("invoiceId", "Invoice").column("invoice_id").length(64).required().indexed(),
+                        FieldDefinition.titleField().required(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.REFERENCE, EntityCapability.SORT);
+    }
+
     private Map<String, Object> invoiceRow() {
         return invoiceRow("I-001");
     }
@@ -763,6 +821,18 @@ class DynamicRelationRuntimeTest {
                 "tenant_id", "tenant-a",
                 "invoice_id", "invoice-1",
                 "title", title,
+                "deleted", Boolean.FALSE,
+                "version", 1
+        );
+    }
+
+    private Map<String, Object> lineRow(String id, String title, Integer sortOrder) {
+        return Map.of(
+                "id", id,
+                "tenant_id", "tenant-a",
+                "invoice_id", "invoice-1",
+                "title", title,
+                "sort_order", sortOrder,
                 "deleted", Boolean.FALSE,
                 "version", 1
         );

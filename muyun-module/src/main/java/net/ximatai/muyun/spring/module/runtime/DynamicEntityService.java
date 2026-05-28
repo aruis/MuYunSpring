@@ -240,6 +240,14 @@ public class DynamicEntityService implements
         return treeRuntime().children(parentId).stream().map(DynamicTreeRecord::record).toList();
     }
 
+    @Override
+    public List<DynamicRecord> selectChildRows(Criteria criteria) {
+        if (dao.getEntity().supports(EntityCapability.SORT)) {
+            return sortedList(criteria);
+        }
+        return ChildAbility.super.selectChildRows(criteria);
+    }
+
     public List<String> ancestorIds(String id) {
         requireCapability(EntityCapability.TREE);
         return treeRuntime().ancestorIds(id);

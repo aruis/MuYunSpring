@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability.child;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -57,10 +56,7 @@ public final class ChildRelation<C extends EntityContract, P extends EntityContr
     }
 
     public List<C> selectChildren(String parentId) {
-        return childAbility.getDao().query(
-                childAbility.activeCriteria(Criteria.of().eq(childForeignKeyField, parentId)),
-                new PageRequest(0, Integer.MAX_VALUE)
-        );
+        return childAbility.selectChildRows(Criteria.of().eq(childForeignKeyField, parentId));
     }
 
     public void insertChildren(String parentId, P parent) {

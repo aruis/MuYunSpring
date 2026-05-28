@@ -307,6 +307,23 @@ class AbilityContractTest {
     }
 
     @Test
+    void childrenAggregationShouldUseChildSortAbilityWhenAvailable() {
+        DemoInvoiceService invoiceService = new DemoInvoiceService();
+        DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
+        firstLine.setSortOrder(20);
+        DemoInvoiceLine secondLine = new DemoInvoiceLine("Second line");
+        secondLine.setSortOrder(10);
+        DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine, secondLine));
+
+        String invoiceId = invoiceService.insert(invoice);
+
+        DemoInvoice selected = invoiceService.select(invoiceId);
+        assertThat(selected.getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("Second line", "First line");
+    }
+
+    @Test
     void childrenAbilityShortcutShouldRequireModelClass() {
         NoModelChildrenService service = new NoModelChildrenService();
 
