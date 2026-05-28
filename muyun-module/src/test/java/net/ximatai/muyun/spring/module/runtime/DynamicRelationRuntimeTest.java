@@ -111,6 +111,68 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldReplaceDynamicChildrenThroughSharedChildRelationAbility() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
+                return containsParam(params, "invoice-1")
+                        ? List.of(lineRow("line-1", "L-001", 1), lineRow("line-2", "L-002", 2))
+                        : List.of();
+            }
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"id\" =")) {
+                if (containsParam(params, "line-1")) {
+                    return List.of(lineRow("line-1", "L-001", 1));
+                }
+                if (containsParam(params, "line-2")) {
+                    return List.of(lineRow("line-2", "L-002", 2));
+                }
+                return List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
+        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
+        DynamicRecord retainedLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "L-001-updated");
+        retainedLine.setId("line-1");
+        retainedLine.setVersion(1);
+        DynamicRecord newLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "L-003");
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001-updated");
+        invoice.setId("invoice-1");
+        invoice.setVersion(1);
+        invoice.setChildren("lines", List.of(retainedLine, newLine));
+
+        int updated = invoiceService.update(invoice);
+
+        assertThat(updated).isEqualTo(1);
+        ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        ArgumentCaptor<Map<String, Object>> where = mapCaptor();
+        verify(operations, times(3)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture());
+        assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line", "app_invoice_line");
+        assertThat(body.getAllValues().get(1))
+                .containsEntry("title", "L-001-updated")
+                .containsEntry("invoice_id", "invoice-1");
+        assertThat(body.getAllValues().get(2))
+                .containsEntry("deleted", Boolean.TRUE);
+        assertThat(where.getAllValues().get(2)).containsEntry("id", "line-2");
+
+        ArgumentCaptor<Map<String, Object>> inserted = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq("app_invoice_line"), inserted.capture());
+        assertThat(inserted.getValue())
+                .containsEntry("title", "L-003")
+                .containsEntry("invoice_id", "invoice-1")
+                .containsEntry("deleted", Boolean.FALSE);
+    }
+
+    @Test
     void shouldAutoPopulateDynamicChildrenWithSortCapabilityOrderSql() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
