@@ -24,15 +24,27 @@ public final class StaticChildResolver {
     }
 
     public static ChildPlan singlePlan(Class<?> parentModelClass) {
-        List<ChildPlan> plans = plans(parentModelClass);
-        if (plans.size() != 1) {
+        return singleRule(parentModelClass).plan();
+    }
+
+    public static ChildRule singleRule(Class<?> parentModelClass) {
+        if (parentModelClass == null) {
+            throw new AbilityException("child parentModelClass must not be null");
+        }
+        List<ChildRule> rules = rules(parentModelClass);
+        if (rules.isEmpty()) {
+            throw new AbilityException("expected exactly one child relation plan: "
+                    + parentModelClass.getName()
+                    + ", actual relationCodes: [], add @ChildRef or use explicit childRelation(...)");
+        }
+        if (rules.size() != 1) {
             throw new AbilityException("expected exactly one child relation plan: "
                     + parentModelClass.getName()
                     + ", actual relationCodes: "
-                    + plans.stream().map(ChildPlan::relationCode).toList()
+                    + rules.stream().map(rule -> rule.plan().relationCode()).toList()
                     + ", use childRelation(relationCode, ...) or childRelation(Class, relationCode, ...)");
         }
-        return plans.getFirst();
+        return rules.getFirst();
     }
 
     public static ChildPlan plan(Class<?> parentModelClass, String relationCode) {
@@ -91,9 +103,12 @@ public final class StaticChildResolver {
                         childRef.childModel(),
                         childRef.childForeignKeyField()
                 );
+                String parentEntity = childRef.parentEntity().isBlank()
+                        ? defaultEntityCode(parentModelClass)
+                        : childRef.parentEntity();
                 ChildPlan plan = new ChildPlan(
                         relationCode,
-                        childRef.parentEntity(),
+                        parentEntity,
                         childEntity,
                         childRef.childForeignKeyField(),
                         childRef.autoPopulate(),
@@ -162,10 +177,10 @@ public final class StaticChildResolver {
                 + childClass.getName() + "." + fieldName);
     }
 
-    private static String defaultEntityCode(Class<? extends EntityContract> childModel) {
-        String simpleName = childModel.getSimpleName();
+    private static String defaultEntityCode(Class<?> modelClass) {
+        String simpleName = modelClass.getSimpleName();
         if (simpleName.isBlank()) {
-            throw new AbilityException("child model simple name must not be blank");
+            throw new AbilityException("model simple name must not be blank");
         }
         return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }

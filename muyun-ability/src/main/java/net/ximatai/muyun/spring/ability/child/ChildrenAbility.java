@@ -28,6 +28,20 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(ChildAbility<C> childAbility) {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.singleRule(
+                requireModelClass("childRelation(Class, ...)")
+        );
+        validateShortcutChildModel(rule, childAbility);
+        return childAbility.toChildRelation(
+                rule.plan(),
+                rule::setParentId,
+                rule::children,
+                rule::populate
+        );
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
     default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
                                                                          ChildAbility<C> childAbility) {
         StaticChildResolver.ChildRule rule = StaticChildResolver.rule(

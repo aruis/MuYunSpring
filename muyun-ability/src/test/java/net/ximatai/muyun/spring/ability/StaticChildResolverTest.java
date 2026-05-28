@@ -33,6 +33,19 @@ class StaticChildResolverTest {
     }
 
     @Test
+    void plansShouldDefaultEntityCodesWhenAnnotationOmitsThem() {
+        assertThat(StaticChildResolver.plans(DefaultChildParent.class))
+                .containsExactly(new ChildPlan(
+                        "items",
+                        "defaultChildParent",
+                        "defaultChildItem",
+                        "parentId",
+                        true,
+                        false
+                ));
+    }
+
+    @Test
     void ruleShouldReadPopulateAndWriteDeclaredChildFields() {
         StaticChildResolver.ChildRule rule = StaticChildResolver.rule(DemoInvoice.class, "lines");
         DemoInvoice invoice = new DemoInvoice("Invoice", List.of());
@@ -54,6 +67,22 @@ class StaticChildResolverTest {
                 .hasMessageContaining("lines")
                 .hasMessageContaining("notes")
                 .hasMessageContaining("childRelation(relationCode");
+    }
+
+    @Test
+    void singlePlanShouldRejectMissingChildRelations() {
+        assertThatThrownBy(() -> StaticChildResolver.singlePlan(NoChildRecord.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("expected exactly one child relation plan")
+                .hasMessageContaining("actual relationCodes: []")
+                .hasMessageContaining("@ChildRef");
+    }
+
+    @Test
+    void singlePlanShouldRejectMissingParentModelClass() {
+        assertThatThrownBy(() -> StaticChildResolver.singlePlan(null))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("parentModelClass");
     }
 
     @Test
@@ -110,25 +139,25 @@ class StaticChildResolverTest {
     }
 
     private static final class InvalidChildFieldRecord extends StandardEntity {
-        @ChildRef(parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
+        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private DemoInvoiceLine line;
     }
 
     private static final class MismatchedChildFieldRecord extends StandardEntity {
-        @ChildRef(parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
+        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private List<DemoPlainRecord> lines;
     }
 
     private static final class DuplicateRelationCodeRecord extends StandardEntity {
-        @ChildRef(relationCode = "lines", parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
+        @ChildRef(relationCode = "lines", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private List<DemoInvoiceLine> firstLines;
 
-        @ChildRef(relationCode = "lines", parentEntity = "invoice", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
+        @ChildRef(relationCode = "lines", childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
         private List<DemoInvoiceLine> secondLines;
     }
 
     private static final class MissingForeignKeyRecord extends StandardEntity {
-        @ChildRef(parentEntity = "invoice", childModel = MissingForeignKeyChild.class, childForeignKeyField = "invoiceId")
+        @ChildRef(childModel = MissingForeignKeyChild.class, childForeignKeyField = "invoiceId")
         private List<MissingForeignKeyChild> lines;
     }
 
@@ -136,11 +165,23 @@ class StaticChildResolverTest {
     }
 
     private static final class NonStringForeignKeyRecord extends StandardEntity {
-        @ChildRef(parentEntity = "invoice", childModel = NonStringForeignKeyChild.class, childForeignKeyField = "invoiceId")
+        @ChildRef(childModel = NonStringForeignKeyChild.class, childForeignKeyField = "invoiceId")
         private List<NonStringForeignKeyChild> lines;
     }
 
     private static final class NonStringForeignKeyChild extends StandardEntity {
         private Integer invoiceId;
+    }
+
+    private static final class NoChildRecord extends StandardEntity {
+    }
+
+    private static final class DefaultChildParent extends StandardEntity {
+        @ChildRef(childModel = DefaultChildItem.class, childForeignKeyField = "parentId")
+        private List<DefaultChildItem> items;
+    }
+
+    private static final class DefaultChildItem extends StandardEntity {
+        private String parentId;
     }
 }

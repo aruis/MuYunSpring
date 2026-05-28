@@ -4,6 +4,8 @@ import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
 import net.ximatai.muyun.spring.ability.child.ChildAbility;
+import net.ximatai.muyun.spring.ability.child.ChildRef;
+import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistryTestAccess;
 import net.ximatai.muyun.spring.ability.reference.ReferenceLookup;
@@ -16,6 +18,8 @@ import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -322,6 +326,32 @@ class AbilityContractTest {
         assertThat(selected.getLines())
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("Second line", "First line");
+    }
+
+    @Test
+    void childrenAbilitySingleRelationShortcutShouldUseStaticChildRef() {
+        SingleChildInvoiceService invoiceService = new SingleChildInvoiceService();
+        DemoInvoiceLine line = new DemoInvoiceLine("Single line");
+        SingleChildInvoice invoice = new SingleChildInvoice("Invoice", List.of(line));
+
+        String invoiceId = invoiceService.insert(invoice);
+
+        assertThat(line.getInvoiceId()).isEqualTo(invoiceId);
+        invoice.setLines(null);
+        assertThat(invoiceService.select(invoiceId).getLines())
+                .extracting(DemoInvoiceLine::getTitle)
+                .containsExactly("Single line");
+    }
+
+    @Test
+    void childrenAbilitySingleRelationShortcutShouldRejectAmbiguousRelations() {
+        DemoInvoiceService service = new DemoInvoiceService();
+
+        assertThatThrownBy(() -> service.childRelation(service.lineService()))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("expected exactly one child relation plan")
+                .hasMessageContaining("lines")
+                .hasMessageContaining("notes");
     }
 
     @Test
@@ -1417,6 +1447,40 @@ class AbilityContractTest {
         @Override
         public String getModuleAlias() {
             return "demo.noModelLine";
+        }
+    }
+
+    private static final class SingleChildInvoice extends StandardEntity {
+        private String title;
+        @ChildRef(childModel = DemoInvoiceLine.class, childForeignKeyField = "invoiceId")
+        private List<DemoInvoiceLine> lines;
+
+        private SingleChildInvoice(String title, List<DemoInvoiceLine> lines) {
+            this.title = title;
+            this.lines = lines;
+        }
+
+        public List<DemoInvoiceLine> getLines() {
+            return lines;
+        }
+
+        public void setLines(List<DemoInvoiceLine> lines) {
+            this.lines = lines;
+        }
+    }
+
+    private static final class SingleChildInvoiceService extends AbstractAbilityService<SingleChildInvoice> implements
+            SoftDeleteAbility<SingleChildInvoice>,
+            ChildrenAbility<SingleChildInvoice> {
+        private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
+
+        private SingleChildInvoiceService() {
+            super("demo.singleChildInvoice", SingleChildInvoice.class, new InMemoryBaseDao<>());
+        }
+
+        @Override
+        public List<ChildRelation<? extends EntityContract, SingleChildInvoice>> childRelations() {
+            return List.of(childRelation(lineService));
         }
     }
 
