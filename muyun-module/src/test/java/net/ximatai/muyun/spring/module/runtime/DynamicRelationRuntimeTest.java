@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.model.title.TitleField;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
@@ -170,6 +171,58 @@ class DynamicRelationRuntimeTest {
                 .containsEntry("title", "L-003")
                 .containsEntry("invoice_id", "invoice-1")
                 .containsEntry("deleted", Boolean.FALSE);
+    }
+
+    @Test
+    void shouldRejectDuplicateAndForeignDynamicChildIdsOnReplace() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceAndLineRows(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
+        DynamicRecord retainedLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "L-001");
+        retainedLine.setId("line-1");
+        retainedLine.setVersion(1);
+        DynamicRecord foreignLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "Foreign");
+        foreignLine.setId("line-foreign");
+        foreignLine.setVersion(1);
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        invoice.setId("invoice-1");
+        invoice.setVersion(1);
+
+        invoice.setChildren("lines", List.of(retainedLine, retainedLine));
+        assertThatThrownBy(() -> invoiceService.update(invoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("Duplicate child id");
+
+        invoice.setChildren("lines", List.of(foreignLine));
+        assertThatThrownBy(() -> invoiceService.update(invoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("does not belong to parent");
+    }
+
+    @Test
+    void shouldRejectDuplicateAndForeignDynamicChildIdsOnInsert() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceAndLineRows(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
+        DynamicRecord duplicateLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "Duplicate");
+        duplicateLine.setId("line-new");
+        duplicateLine.setVersion(1);
+        DynamicRecord foreignLine = runtime.newRecord(MODULE, "invoice_line").setValue("title", "Existing");
+        foreignLine.setId("line-foreign");
+        foreignLine.setVersion(1);
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+
+        invoice.setChildren("lines", List.of(duplicateLine, duplicateLine));
+        assertThatThrownBy(() -> invoiceService.insert(invoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("Duplicate child id");
+
+        invoice.setChildren("lines", List.of(foreignLine));
+        assertThatThrownBy(() -> invoiceService.insert(invoice))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("does not belong to parent");
     }
 
     @Test
@@ -922,6 +975,35 @@ class DynamicRelationRuntimeTest {
                 "deleted", Boolean.FALSE,
                 "version", 1
         );
+    }
+
+    private void stubInvoiceAndLineRows(IDatabaseOperations<Object> operations) {
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
+                return containsParam(params, "invoice-1")
+                        ? List.of(lineRow("line-1", "L-001", 1), lineRow("line-2", "L-002", 2))
+                        : List.of();
+            }
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"id\" =")) {
+                if (containsParam(params, "line-1")) {
+                    return List.of(lineRow("line-1", "L-001", 1));
+                }
+                if (containsParam(params, "line-2")) {
+                    return List.of(lineRow("line-2", "L-002", 2));
+                }
+                if (containsParam(params, "line-foreign")) {
+                    return List.of(lineRow("line-foreign", "Foreign", 1));
+                }
+                return List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
     }
 
     @SuppressWarnings("unchecked")
