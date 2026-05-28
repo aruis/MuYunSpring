@@ -1,5 +1,14 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+
+import net.ximatai.muyun.spring.ability.child.ChildRelation;
+import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +46,7 @@ final class DemoInvoiceService implements
     }
 
     @Override
-    public List<ChildRelation<? extends net.ximatai.muyun.spring.common.model.EntityContract, DemoInvoice>> childRelations() {
+    public List<ChildRelation<? extends net.ximatai.muyun.spring.common.model.contract.EntityContract, DemoInvoice>> childRelations() {
         return List.of(lineService
                 .toChildRelation(
                         StaticChildResolver.plans(DemoInvoice.class).getFirst(),

@@ -1,11 +1,16 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.ability.child.ChildPlan;
+import net.ximatai.muyun.spring.ability.child.ChildRef;
+import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
+
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 
-import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

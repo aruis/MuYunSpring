@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+
 final class DemoPlainRecordService implements CrudAbility<DemoPlainRecord> {
     private final InMemoryBaseDao<DemoPlainRecord> dao = new InMemoryBaseDao<>();
 

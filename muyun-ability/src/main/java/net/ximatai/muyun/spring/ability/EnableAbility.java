@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.spring.common.model.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> {

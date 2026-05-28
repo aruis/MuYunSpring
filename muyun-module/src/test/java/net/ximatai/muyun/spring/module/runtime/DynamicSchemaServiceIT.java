@@ -9,7 +9,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;

@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.module.runtime;
 
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.title.TitleField;
+
 import net.ximatai.muyun.database.core.builder.Column;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;

@@ -5,7 +5,7 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;

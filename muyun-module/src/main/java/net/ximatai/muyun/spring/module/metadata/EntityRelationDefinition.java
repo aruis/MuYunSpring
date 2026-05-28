@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.module.metadata;
 
-import net.ximatai.muyun.spring.ability.ChildPlan;
+import net.ximatai.muyun.spring.ability.child.ChildPlan;
 
 public record EntityRelationDefinition(
         String code,

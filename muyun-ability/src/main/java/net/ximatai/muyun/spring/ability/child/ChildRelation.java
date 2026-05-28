@@ -1,0 +1,134 @@
+package net.ximatai.muyun.spring.ability.child;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+public final class ChildRelation<C extends EntityContract, P extends EntityContract> {
+    private final ChildAbility<C> childAbility;
+    private final BiConsumer<C, String> setParentId;
+    private final String childForeignKeyField;
+    private final Function<P, List<C>> extractChildren;
+    private boolean autoDeleteWithParent;
+    private BiConsumer<P, List<C>> populateChildren;
+
+    public ChildRelation(ChildAbility<C> childAbility,
+                         BiConsumer<C, String> setParentId,
+                         String childForeignKeyField,
+                         Function<P, List<C>> extractChildren) {
+        this.childAbility = childAbility;
+        this.setParentId = setParentId;
+        this.childForeignKeyField = childForeignKeyField;
+        this.extractChildren = extractChildren;
+    }
+
+    public ChildRelation<C, P> autoPopulate(BiConsumer<P, List<C>> value) {
+        this.populateChildren = value;
+        return this;
+    }
+
+    public ChildRelation<C, P> autoDeleteWithParent() {
+        this.autoDeleteWithParent = true;
+        return this;
+    }
+
+    public boolean isAutoDeleteWithParent() {
+        return autoDeleteWithParent;
+    }
+
+    public boolean isAutoPopulate() {
+        return populateChildren != null;
+    }
+
+    public void loadChildren(P parent) {
+        if (!isAutoPopulate() || parent == null || parent.getId() == null) {
+            return;
+        }
+        populateChildren.accept(parent, selectChildren(parent.getId()));
+    }
+
+    public List<C> selectChildren(String parentId) {
+        return childAbility.getDao().query(
+                childAbility.activeCriteria(Criteria.of().eq(childForeignKeyField, parentId)),
+                new PageRequest(0, Integer.MAX_VALUE)
+        );
+    }
+
+    public void insertChildren(String parentId, P parent) {
+        List<C> children = extractChildren.apply(parent);
+        if (children == null || children.isEmpty()) {
+            return;
+        }
+        validateIncomingChildren(parentId, children, List.of());
+        for (C child : children) {
+            setParentId.accept(child, parentId);
+        }
+        childAbility.insertBatch(children);
+    }
+
+    public void replaceChildren(String parentId, P parent) {
+        List<C> children = extractChildren.apply(parent);
+        if (children == null) {
+            return;
+        }
+        List<C> existing = selectChildren(parentId);
+        validateIncomingChildren(parentId, children, existing);
+        List<String> remainingIds = new ArrayList<>(existing.stream().map(EntityContract::getId).toList());
+        for (C child : children) {
+            setParentId.accept(child, parentId);
+            if (child.getId() == null || child.getId().isBlank()) {
+                childAbility.insert(child);
+            } else if (remainingIds.remove(child.getId())) {
+                childAbility.update(child);
+            } else {
+                childAbility.insert(child);
+            }
+        }
+        deleteChildren(remainingIds);
+    }
+
+    public void clearChildren(String parentId) {
+        deleteChildren(selectChildren(parentId).stream().map(EntityContract::getId).toList());
+    }
+
+    private void validateIncomingChildren(String parentId, List<C> children, List<C> existing) {
+        Set<String> existingIds = new HashSet<>(existing.stream().map(EntityContract::getId).toList());
+        Set<String> incomingIds = new LinkedHashSet<>();
+        for (C child : children) {
+            String childId = child.getId();
+            if (childId == null || childId.isBlank()) {
+                continue;
+            }
+            if (!incomingIds.add(childId)) {
+                throw new AbilityException("Duplicate child id in relation payload: " + childId);
+            }
+            if (existingIds.contains(childId)) {
+                continue;
+            }
+            C loaded = childAbility.getDao().findById(childId);
+            if (loaded != null) {
+                throw new AbilityException("Child record does not belong to parent " + parentId + ": " + childId);
+            }
+        }
+    }
+
+    private void deleteChildren(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        if (childAbility instanceof CascadeDeleteChildAbility<?> cascadeDeleteChildAbility) {
+            cascadeDeleteChildAbility.deleteBatchFromParentCascade(ids);
+            return;
+        }
+        childAbility.deleteBatch(ids);
+    }
+}

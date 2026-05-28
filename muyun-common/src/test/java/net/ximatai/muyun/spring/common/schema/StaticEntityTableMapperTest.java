@@ -4,7 +4,8 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
-import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardTreeEntity;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
@@ -49,6 +50,14 @@ class StaticEntityTableMapperTest {
                 .hasMessageContaining("StandardEntity");
     }
 
+    @Test
+    void shouldMapStandardTreeEntityInheritedAbilityColumns() {
+        TableWrapper table = mapper.toTable(DemoStandardTree.class);
+
+        assertThat(columnNames(table))
+                .contains("title", "sort_order", "parent_id");
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -71,6 +80,10 @@ class StaticEntityTableMapperTest {
 
         @Column(name = "sort_order", type = ColumnType.INT)
         private Integer sortOrder;
+    }
+
+    @Table(name = "demo_standard_tree")
+    private static class DemoStandardTree extends StandardTreeEntity {
     }
 
     @Table(name = "not_platform_model")

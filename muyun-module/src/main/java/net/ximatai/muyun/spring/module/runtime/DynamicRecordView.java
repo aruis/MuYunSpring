@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.time.Instant;
 

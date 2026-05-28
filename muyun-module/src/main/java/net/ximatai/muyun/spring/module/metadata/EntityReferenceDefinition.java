@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.module.metadata;
 
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
-import net.ximatai.muyun.spring.ability.ReferenceCardinality;
-import net.ximatai.muyun.spring.ability.ReferencePlan;
-import net.ximatai.muyun.spring.ability.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 
 import java.util.LinkedHashSet;
 import java.util.List;

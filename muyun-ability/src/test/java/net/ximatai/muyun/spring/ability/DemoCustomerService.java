@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+
+
 final class DemoCustomerService implements
         CrudAbility<DemoCustomer>,
         ReferenceAbility<DemoCustomer>,

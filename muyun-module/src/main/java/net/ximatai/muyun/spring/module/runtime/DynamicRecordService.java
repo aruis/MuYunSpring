@@ -4,7 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 
 import java.util.Collection;
 import java.util.List;

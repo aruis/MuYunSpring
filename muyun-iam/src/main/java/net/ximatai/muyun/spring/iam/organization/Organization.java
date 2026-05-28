@@ -6,8 +6,8 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
-import net.ximatai.muyun.spring.common.model.EnabledCapable;
-import net.ximatai.muyun.spring.common.model.StandardTreeEntity;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.standard.StandardTreeEntity;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 @Getter

@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.common.tenant;
 
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.Optional;
 

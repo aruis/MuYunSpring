@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.common.schema;
 import net.ximatai.muyun.database.core.annotation.AnnotationProcessor;
 import net.ximatai.muyun.database.core.annotation.Indexed;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
-import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
 import java.lang.reflect.Field;
 import java.util.Objects;

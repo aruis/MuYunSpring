@@ -20,7 +20,7 @@ import net.ximatai.muyun.database.spring.boot.sql.MuYunRepositoryFactory;
 import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.BaseDao;
-import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;

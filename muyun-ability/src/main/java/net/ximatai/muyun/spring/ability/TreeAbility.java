@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 import java.util.ArrayList;

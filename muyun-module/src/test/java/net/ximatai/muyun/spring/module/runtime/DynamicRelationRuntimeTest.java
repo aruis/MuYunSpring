@@ -1,9 +1,11 @@
 package net.ximatai.muyun.spring.module.runtime;
 
+import net.ximatai.muyun.spring.common.model.title.TitleField;
+
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
-import net.ximatai.muyun.spring.ability.ReferenceCardinality;
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityReferenceDefinition;
@@ -260,7 +262,7 @@ class DynamicRelationRuntimeTest {
     void shouldCompileDynamicChildRelationToPlan() {
         assertThat(invoiceModule().relations())
                 .extracting(EntityRelationDefinition::plan)
-                .containsExactly(new net.ximatai.muyun.spring.ability.ChildPlan(
+                .containsExactly(new net.ximatai.muyun.spring.ability.child.ChildPlan(
                         "lines",
                         "invoice",
                         "invoice_line",

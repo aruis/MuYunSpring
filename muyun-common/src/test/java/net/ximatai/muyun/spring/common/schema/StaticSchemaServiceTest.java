@@ -10,7 +10,7 @@ import net.ximatai.muyun.database.core.metadata.DBIndex;
 import net.ximatai.muyun.database.core.metadata.DBColumn;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
-import net.ximatai.muyun.spring.common.model.StandardEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Array;

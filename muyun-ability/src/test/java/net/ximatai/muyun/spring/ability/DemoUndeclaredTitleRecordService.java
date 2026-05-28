@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+
+
 final class DemoUndeclaredTitleRecordService implements
         CrudAbility<DemoUndeclaredTitleRecord>,
         ReferenceAbility<DemoUndeclaredTitleRecord> {

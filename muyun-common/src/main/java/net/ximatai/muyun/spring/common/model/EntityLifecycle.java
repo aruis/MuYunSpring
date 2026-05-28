@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.common.model;
 
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 

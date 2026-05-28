@@ -1,5 +1,11 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
+
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

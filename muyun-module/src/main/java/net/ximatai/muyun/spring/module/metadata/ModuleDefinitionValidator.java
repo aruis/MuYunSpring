@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.module.metadata;
 
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
-import net.ximatai.muyun.spring.ability.ReferenceProjection;
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 
 import java.util.HashSet;
 import java.util.Map;

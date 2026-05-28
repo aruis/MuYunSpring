@@ -5,9 +5,9 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
-import net.ximatai.muyun.spring.common.model.EntityContract;
-import net.ximatai.muyun.spring.common.model.EnabledCapable;
-import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 

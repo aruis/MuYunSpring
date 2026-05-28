@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.common.model;
 
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

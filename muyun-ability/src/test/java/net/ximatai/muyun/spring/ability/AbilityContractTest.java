@@ -1,5 +1,14 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.model.contract.Versioned;
+import net.ximatai.muyun.spring.common.model.title.TitleField;
+
+import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
+
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;

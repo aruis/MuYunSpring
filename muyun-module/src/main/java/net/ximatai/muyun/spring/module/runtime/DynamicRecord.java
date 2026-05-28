@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;

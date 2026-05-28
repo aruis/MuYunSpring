@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -7,7 +8,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.common.schema;
 
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+
 import net.ximatai.muyun.database.core.builder.Column;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+
 final class DemoCachedPlainRecordService implements
         CrudAbility<DemoPlainRecord>,
         SoftDeleteAbility<DemoPlainRecord>,

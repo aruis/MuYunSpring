@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.ability;
 
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 final class CacheInvalidationSupport {
     private CacheInvalidationSupport() {

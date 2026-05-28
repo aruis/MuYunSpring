@@ -1,4 +1,6 @@
-package net.ximatai.muyun.spring.common.model;
+package net.ximatai.muyun.spring.common.model.title;
+
+import net.ximatai.muyun.spring.common.model.standard.StandardTitledEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +41,15 @@ class TitleFieldResolverTest {
     }
 
     @Test
+    void resolveShouldReadStandardTitledEntityFieldFromHierarchy() {
+        DemoStandardTitleRecord record = new DemoStandardTitleRecord();
+        record.setTitle("Standard title");
+
+        assertThat(TitleFieldResolver.resolveFieldName(DemoStandardTitleRecord.class)).contains("title");
+        assertThat(TitleFieldResolver.readAsString(record)).isEqualTo("Standard title");
+    }
+
+    @Test
     void resolveShouldRejectMultipleTitleFieldsOnSameClass() {
         assertThatThrownBy(() -> TitleFieldResolver.resolveFieldName(DemoInvalidTitleRecord.class))
                 .isInstanceOf(IllegalStateException.class)
@@ -65,6 +76,9 @@ class TitleFieldResolverTest {
     }
 
     private static final class DemoRecordWithoutTitle {
+    }
+
+    private static final class DemoStandardTitleRecord extends StandardTitledEntity {
     }
 
     private static final class DemoInvalidTitleRecord {

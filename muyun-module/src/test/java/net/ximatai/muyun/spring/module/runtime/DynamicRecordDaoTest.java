@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.module.runtime;
 
+import net.ximatai.muyun.spring.common.model.title.TitleField;
+
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -8,12 +10,12 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.AbilityException;
 import net.ximatai.muyun.spring.ability.EnableAbility;
-import net.ximatai.muyun.spring.ability.ReferenceAbility;
-import net.ximatai.muyun.spring.ability.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.model.EnabledCapable;
-import net.ximatai.muyun.spring.common.model.TitledCapable;
-import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
 import net.ximatai.muyun.spring.module.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.module.metadata.FieldDefinition;

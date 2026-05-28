@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.ability;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -35,7 +35,7 @@ public final class CacheRegistry {
         itemCache(namespace).put(id, entity);
     }
 
-    static void removeItem(String namespace, String id) {
+    public static void removeItem(String namespace, String id) {
         Cache<String, EntityContract> itemCache = ITEM_CACHE.get(namespace);
         if (itemCache != null) {
             itemCache.invalidate(id);
@@ -70,7 +70,7 @@ public final class CacheRegistry {
         allCache.invalidate(namespace);
     }
 
-    static void clearAllCachePrefix(String prefix) {
+    public static void clearAllCachePrefix(String prefix) {
         if (prefix == null || prefix.isBlank()) {
             return;
         }

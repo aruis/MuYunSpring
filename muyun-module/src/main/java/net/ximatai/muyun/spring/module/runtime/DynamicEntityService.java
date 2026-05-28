@@ -1,23 +1,23 @@
 package net.ximatai.muyun.spring.module.runtime;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
-import net.ximatai.muyun.spring.ability.ChildPlan;
+import net.ximatai.muyun.spring.ability.child.ChildPlan;
 import net.ximatai.muyun.spring.ability.CacheAbility;
-import net.ximatai.muyun.spring.ability.ChildAbility;
-import net.ximatai.muyun.spring.ability.ChildRelation;
-import net.ximatai.muyun.spring.ability.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.child.ChildAbility;
+import net.ximatai.muyun.spring.ability.child.ChildRelation;
+import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
-import net.ximatai.muyun.spring.ability.ReferenceCardinality;
-import net.ximatai.muyun.spring.ability.ReferenceOption;
-import net.ximatai.muyun.spring.ability.ReferencePlan;
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
-import net.ximatai.muyun.spring.ability.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.module.metadata.EntityCapability;
@@ -417,20 +417,20 @@ public class DynamicEntityService implements
             return;
         }
         Map<String, Map<String, Object>> loaded = targetService.projections(ids, projectionSourceFields(plan));
-        for (net.ximatai.muyun.spring.ability.ReferenceProjection projection : plan.projections()) {
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceProjection projection : plan.projections()) {
             record.putVirtualValue(projection.outputField(), referenceProjectionValue(ids, loaded, plan, projection.targetField()));
         }
     }
 
     private void clearReferenceProjectionValues(DynamicRecord record, ReferencePlan plan) {
-        for (net.ximatai.muyun.spring.ability.ReferenceProjection projection : plan.projections()) {
+        for (net.ximatai.muyun.spring.ability.reference.ReferenceProjection projection : plan.projections()) {
             record.putVirtualValue(projection.outputField(), null);
         }
     }
 
     private List<String> projectionSourceFields(ReferencePlan plan) {
         return plan.projections().stream()
-                .map(net.ximatai.muyun.spring.ability.ReferenceProjection::targetField)
+                .map(net.ximatai.muyun.spring.ability.reference.ReferenceProjection::targetField)
                 .distinct()
                 .toList();
     }

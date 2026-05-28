@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.module.runtime;
 
-import net.ximatai.muyun.spring.ability.ReferenceAbility;
-import net.ximatai.muyun.spring.ability.ReferenceTarget;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 
 final class DynamicReferenceRuntime extends DynamicAbilityRuntime<DynamicTitledRecord> implements ReferenceAbility<DynamicTitledRecord> {
     DynamicReferenceRuntime(DynamicEntityService owner) {

@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
-import net.ximatai.muyun.spring.common.model.TreeCapable;
+import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 
 final class DynamicTreeRecord extends DynamicRecordView implements TreeCapable {
     DynamicTreeRecord(DynamicRecord record) {

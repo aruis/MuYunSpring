@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.module.runtime;
 
-import net.ximatai.muyun.spring.common.model.SortCapable;
+import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 
 final class DynamicSortRecord extends DynamicRecordView implements SortCapable {
     DynamicSortRecord(DynamicRecord record) {

@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.spring.common.model.EntityContract;
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
