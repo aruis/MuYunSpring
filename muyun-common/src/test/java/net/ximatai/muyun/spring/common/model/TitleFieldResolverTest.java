@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.common.model.title;
 
 import net.ximatai.muyun.spring.common.model.standard.StandardTitledEntity;
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +49,13 @@ class TitleFieldResolverTest {
 
         assertThat(TitleFieldResolver.resolveFieldName(DemoStandardTitleRecord.class)).contains("title");
         assertThat(TitleFieldResolver.readAsString(record)).isEqualTo("Standard title");
+        assertThat(TitleFieldResolver.isTitledCapableWithoutTitleField(DemoStandardTitleRecord.class)).isFalse();
+    }
+
+    @Test
+    void diagnosticsShouldRevealTitledCapableFallback() {
+        assertThat(TitleFieldResolver.isTitledCapableWithoutTitleField(DemoTitledRecordWithoutAnnotation.class)).isTrue();
+        assertThat(TitleFieldResolver.isTitledCapableWithoutTitleField(DemoRecordWithoutTitle.class)).isFalse();
     }
 
     @Test
@@ -79,6 +88,13 @@ class TitleFieldResolverTest {
     }
 
     private static final class DemoStandardTitleRecord extends StandardTitledEntity {
+    }
+
+    private static final class DemoTitledRecordWithoutAnnotation extends StandardEntity implements TitledCapable {
+        @Override
+        public String getTitle() {
+            return "Fallback title";
+        }
     }
 
     private static final class DemoInvalidTitleRecord {

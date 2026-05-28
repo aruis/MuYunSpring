@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -1288,6 +1289,7 @@ class AbilityContractTest {
         DemoUndeclaredTitleRecordService service = new DemoUndeclaredTitleRecordService();
         String id = service.insert(new DemoUndeclaredTitleRecord("Undeclared title"));
 
+        assertThat(TitleFieldResolver.isTitledCapableWithoutTitleField(DemoUndeclaredTitleRecord.class)).isTrue();
         assertThat(service.title(id)).isEqualTo("Undeclared title");
         assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .containsExactly(new ReferenceOption(id, "Undeclared title"));

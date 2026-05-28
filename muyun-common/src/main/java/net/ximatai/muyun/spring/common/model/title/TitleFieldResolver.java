@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.common.model.title;
 
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +20,12 @@ public final class TitleFieldResolver {
 
     public static Optional<String> resolveFieldName(Class<?> modelClass) {
         return resolve(modelClass).map(Field::getName);
+    }
+
+    public static boolean isTitledCapableWithoutTitleField(Class<?> modelClass) {
+        return modelClass != null
+                && TitledCapable.class.isAssignableFrom(modelClass)
+                && resolve(modelClass).isEmpty();
     }
 
     public static Object read(Object record) {
