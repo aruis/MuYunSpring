@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 import net.ximatai.muyun.spring.ability.reference.StaticReferenceResolver;
@@ -81,6 +82,22 @@ class StaticReferenceResolverTest {
                 .hasMessageContaining("java.util");
     }
 
+    @Test
+    void plansShouldRejectTitleOutputWithoutAutoTitle() {
+        assertThatThrownBy(() -> StaticReferenceResolver.plans(TitleOutputWithoutAutoTitleRecord.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("titleOutputField requires autoTitle")
+                .hasMessageContaining("customerId");
+    }
+
+    @Test
+    void plansShouldRejectDuplicateOutputFields() {
+        assertThatThrownBy(() -> StaticReferenceResolver.plans(DuplicateOutputFieldRecord.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("duplicate reference outputField")
+                .hasMessageContaining("customerId.customerTitle");
+    }
+
     private static final class CollectionReferenceRecord {
         @ReferenceTo(moduleAlias = "iam", entityCode = "user", cardinality = ReferenceCardinality.MANY)
         private List<String> userIds;
@@ -88,5 +105,21 @@ class StaticReferenceResolverTest {
 
     private static final class WrongTitleTypeRecord {
         private String userTitle;
+    }
+
+    private static final class TitleOutputWithoutAutoTitleRecord {
+        @ReferenceTo(moduleAlias = "demo", entityCode = "customer", titleOutputField = "customerTitle")
+        private String customerId;
+    }
+
+    private static final class DuplicateOutputFieldRecord {
+        @ReferenceTo(
+                moduleAlias = "demo",
+                entityCode = "customer",
+                autoTitle = true,
+                titleOutputField = "customerTitle",
+                projections = @ReferenceProject(targetField = "status", outputField = "customerTitle")
+        )
+        private String customerId;
     }
 }

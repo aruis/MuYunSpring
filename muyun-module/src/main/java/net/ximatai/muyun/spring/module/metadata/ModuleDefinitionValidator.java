@@ -1,15 +1,17 @@
 package net.ximatai.muyun.spring.module.metadata;
 
-import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.Set;
 
 public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
@@ -191,6 +193,7 @@ public class ModuleDefinitionValidator {
             requireEntity(entities, target.entityCode(), "reference target entity");
         }
         Set<String> outputFields = new HashSet<>();
+        ReferencePlan plan = referencePlan(reference);
         if (!reference.projections().isEmpty()) {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference projection requires same module target: " + target.qualifiedName());
@@ -207,10 +210,18 @@ public class ModuleDefinitionValidator {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
             }
-            String outputField = reference.plan().titleOutputField();
+            String outputField = plan.titleOutputField();
             requireFieldName(outputField, "reference title output field");
             requireReferenceOutputField(source, outputField, "reference title output field");
             requireUnique(outputFields, outputField, "reference output field");
+        }
+    }
+
+    private ReferencePlan referencePlan(EntityReferenceDefinition reference) {
+        try {
+            return reference.plan();
+        } catch (AbilityException e) {
+            throw new ModuleDefinitionException("reference output field invalid: " + e.getMessage());
         }
     }
 

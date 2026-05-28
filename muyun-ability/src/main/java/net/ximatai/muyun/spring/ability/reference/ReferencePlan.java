@@ -31,7 +31,11 @@ public record ReferencePlan(
         if (autoTitle && titleOutputField.isBlank()) {
             titleOutputField = sourceField + "Title";
         }
+        if (!autoTitle && !titleOutputField.isBlank()) {
+            throw new AbilityException("reference titleOutputField requires autoTitle: " + sourceField);
+        }
         projections = projections == null ? List.of() : List.copyOf(projections);
+        validateOutputFields(sourceField, titleOutputField, projections);
     }
 
     public ReferencePlan(String sourceField,
@@ -103,5 +107,20 @@ public record ReferencePlan(
         LinkedHashSet<ReferenceProjection> next = new LinkedHashSet<>(projections);
         next.add(projection);
         return List.copyOf(next);
+    }
+
+    private static void validateOutputFields(String sourceField,
+                                             String titleOutputField,
+                                             List<ReferenceProjection> projections) {
+        LinkedHashSet<String> outputFields = new LinkedHashSet<>();
+        if (!titleOutputField.isBlank()) {
+            outputFields.add(titleOutputField);
+        }
+        for (ReferenceProjection projection : projections) {
+            if (!outputFields.add(projection.outputField())) {
+                throw new AbilityException("duplicate reference outputField: "
+                        + sourceField + "." + projection.outputField());
+            }
+        }
     }
 }
