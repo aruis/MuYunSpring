@@ -6,7 +6,7 @@
 | --- | --- | --- | --- |
 | Gradle 子项目 | 构建和依赖边界 | `muyun-ability` | 只有存在真实代码、测试和稳定依赖边界时才创建 |
 | Java 包 | 源码命名空间 | `net.ximatai.muyun.spring.ability` | 按代码职责组织 |
-| 平台模块别名 | 运行时业务边界 | `iam.organization` | 用于权限、审计、菜单、OpenAPI 等运行时语义 |
+| 平台模块别名 | 运行时业务边界 | `platform.metadata` | 用于权限、审计、菜单、OpenAPI 等运行时语义 |
 
 三者不能混用。一个 Gradle 子项目可以包含多个平台模块。
 
@@ -25,21 +25,22 @@ net.ximatai.muyun.spring
 平台模块别名格式：
 
 ```text
-<namespace>.<name>
+<applicationAlias>.<moduleName>
 ```
 
-建议命名空间：
+应用、模块、元数据和配置对象统一使用 alias 语义：
 
-| 命名空间 | 范围 |
-| --- | --- |
-| `iam.*` | 用户、组织、部门、角色、身份等 |
-| `nav.*` | 菜单、导航 |
-| `platform.*` | 元数据、模块、动作、字典、附件、审计等 |
-| `workflow.*` | 工作流配置和运行时 |
-| `rule.*` | 编码、生成、回写等规则 |
-| `exchange.*` | 导入导出 |
+| 对象 | 语义字段 | 参数名 | 唯一范围 |
+| --- | --- | --- | --- |
+| 应用 | `alias` | `applicationAlias` | 全局 |
+| 模块 | `alias` | `moduleAlias` | 全局，且必须以 `applicationAlias.` 开头 |
+| 元数据 | `alias` | `metadataAlias` | 应用内 |
+| 菜单 | `alias` | `menuAlias` | 应用内 |
+| 数据字典 | `alias` | `dictionaryAlias` | 应用内 |
 
-别名是稳定运行时标识，不是 URL，也不是 Java 包名。`admin.*` 不作为平台模块命名空间；管理端可以管理多个命名空间，但不拥有它们的业务语义。
+别名是稳定运行时标识，不是 URL，也不是 Java 包名。模块身份在业务字段、参数、DTO 和关系表列中统一叫 `moduleAlias` / `module_alias`，不使用 `moduleId` / `module_id` 表达同一件事。即使 `Module.id` 与 `Module.alias` 使用相同值，模块下属业务仍按 `moduleAlias` 命名。
+
+元数据身份不等于物理表名。`Metadata.id` 是平台生成的稳定 ID；`metadataAlias` 是应用内业务别名；`schemaName + tableName` 才是物理表定位。
 
 ## 模型命名
 

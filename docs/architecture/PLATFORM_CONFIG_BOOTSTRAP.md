@@ -1,0 +1,158 @@
+# 平台配置与元数据自举
+
+## 目标
+
+M2 的目标是让平台先能管理自身配置态：应用、模块、元数据、菜单和数据字典。它不是完整管理后台，也不展开用户、组织、角色、工作流等后续业务。
+
+这一阶段要证明：
+
+1. 平台配置业务本身可以复用 M1/M1.5 的能力体系。
+2. 动态模块不再只靠代码或测试构造元数据，而能从持久化配置发布到运行态。
+3. 模块、元数据、菜单、字典使用统一命名和关系边界，避免后续业务接入时重新发明规则。
+
+## 标识规则
+
+| 对象 | 字段 | 规则 |
+| --- | --- | --- |
+| 应用 | `applicationAlias` | 全局唯一，创建后不允许手动修改 |
+| 模块 | `moduleAlias` | 全局唯一，必须满足 `applicationAlias.xxx`，创建后不允许手动修改 |
+| 元数据 | `metadataAlias` | 在应用下唯一，不能作为物理表身份 |
+| 菜单 | `menuAlias` | 建议在应用下唯一；菜单路由和权限挂载时仍以 `moduleAlias` 为模块身份 |
+| 数据字典 | `dictionaryAlias` | 建议在应用下唯一；字典项归属字典 |
+
+`Module.id` 可以等于 `moduleAlias`，但业务字段、参数、DTO 和关系表列统一使用 `moduleAlias` / `module_alias`，不使用 `moduleId` / `module_id` 表达模块身份。
+
+元数据 `id` 是平台稳定 ID，由平台生成；物理表定位至少包含 `schemaName + tableName`。表名是存储属性，不作为元数据身份。默认场景下 `schemaName` 和 `tableName` 可由平台生成，发布建表后不允许作为普通配置随意修改。
+
+## 核心模型
+
+### Application
+
+应用是平台配置的顶层归属。模块、元数据、菜单和字典都应能归属到应用。
+
+建议字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `id` | 与 `applicationAlias` 保持一致或由模型适配为同一值 |
+| `alias` | 应用别名，对外参数使用 `applicationAlias` |
+| `title` | 应用名称 |
+| `enabled` | 是否启用 |
+| `sortOrder` | 排序 |
+
+### Module
+
+模块是运行入口、菜单挂载、动作权限和动态运行时定位的业务边界。
+
+建议字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `id` | 与 `moduleAlias` 保持一致 |
+| `applicationAlias` | 所属应用 |
+| `alias` | 完整模块别名，对外参数使用 `moduleAlias` |
+| `title` | 模块名称 |
+| `moduleKind` | `STATIC` / `DYNAMIC`，后续可扩展 `HYBRID` |
+| `enabled` | 是否启用 |
+| `sortOrder` | 排序 |
+
+模块 alias 创建后不允许手动修改。静态模块可以没有元数据；动态模块必须有一个主元数据。
+
+### Metadata
+
+元数据是应用内业务实体定义，不等同于模块，也不等同于物理表。
+
+建议字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `id` | 平台稳定 ID，自动生成 |
+| `applicationAlias` | 所属应用 |
+| `alias` | 元数据别名，对外参数使用 `metadataAlias` |
+| `title` | 元数据名称 |
+| `schemaName` | 物理 schema，可默认 |
+| `tableName` | 物理表名，可默认生成 |
+| `enabled` | 是否启用 |
+
+`metadataAlias` 在同一应用下唯一。`schemaName + tableName` 是物理表定位，不参与元数据语义身份。
+
+### ModuleMetadataRelation
+
+模块与元数据通过关系绑定。关系表达“某个模块如何使用某个元数据”，而不是把元数据强绑定到单一模块。
+
+建议字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `moduleAlias` | 当前运行模块 |
+| `metadataId` | 被使用的元数据 |
+| `relationRole` | `MAIN` / `CHILD` / `RELATED` |
+| `parentMetadataId` | 父级元数据，可为空 |
+| `foreignKey` | 子表指向父表的字段 |
+| `relationAlias` | 关系别名，在模块下唯一 |
+| `autoPopulate` | 读取主记录时是否装配子记录 |
+| `cascadeDelete` | 删除父记录时是否联动删除子记录 |
+| `sortOrder` | 关系排序 |
+
+约束：
+
+1. 一个模块最多一个 `MAIN` 关系。
+2. 静态模块可以没有元数据关系。
+3. 动态模块必须有一个 `MAIN` 关系。
+4. 关系模型允许父、子、孙结构；M2 实现可先锁定主链路，不能把模型设计成只能一层。
+5. A 应用或模块下定义的元数据在 B 模块体现时，对外运行口径统一是 B 的 `moduleAlias`。
+
+## 跨模块体现
+
+当一个模块使用另一个模块或应用内已有元数据时：
+
+1. 菜单、入口、动作、查询、权限、运行时 URL 和审计口径都使用当前模块的 `moduleAlias`。
+2. 元数据结构、物理表和字段定义来自被绑定的 `metadataId`。
+3. 对外 API 不暴露“当前记录其实来自另一个模块”的额外切换语义。
+
+这条规则可以降低运行态心智负担：模块负责呈现和运行入口，元数据负责结构和存储。
+
+## 菜单
+
+菜单是应用导航树，不等于模块，但可以挂载模块。
+
+建议字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `applicationAlias` | 所属应用 |
+| `moduleAlias` | 可选，挂载的模块 |
+| `alias` | 菜单别名，对外参数使用 `menuAlias` |
+| `title` | 菜单名称 |
+| `parentId` | 父菜单 |
+| `enabled` | 是否启用 |
+| `sortOrder` | 排序 |
+
+M2 只要求菜单树、排序、启停和模块挂载，不展开权限菜单过滤。
+
+## 数据字典
+
+数据字典为元数据字段、表单显示和查询条件提供稳定枚举来源。
+
+建议拆成：
+
+1. `Dictionary`：字典类型，应用内唯一 `dictionaryAlias`。
+2. `DictionaryItem`：字典项，归属字典，支持排序、启停和标题。
+
+M2 只建设字典类型和字典项的基础维护能力；字段如何引用字典进入元数据字段行为配置，不塞进最小元数据字段模型。
+
+## M2 验收闭环
+
+M2 至少需要跑通一条配置到运行时闭环：
+
+```text
+Application
+  -> Module
+  -> Metadata + Field
+  -> ModuleMetadataRelation
+  -> Publish
+  -> DynamicRecordService.entity(moduleAlias, metadataAlias)
+  -> CRUD / query
+```
+
+验收重点不是 UI 完整度，而是模型边界、发布边界和运行口径稳定。
