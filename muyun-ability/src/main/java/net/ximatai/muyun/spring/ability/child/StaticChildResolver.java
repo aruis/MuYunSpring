@@ -26,9 +26,31 @@ public final class StaticChildResolver {
     public static ChildPlan singlePlan(Class<?> parentModelClass) {
         List<ChildPlan> plans = plans(parentModelClass);
         if (plans.size() != 1) {
-            throw new AbilityException("expected exactly one child relation plan: " + parentModelClass.getName());
+            throw new AbilityException("expected exactly one child relation plan: "
+                    + parentModelClass.getName()
+                    + ", actual relationCodes: "
+                    + plans.stream().map(ChildPlan::relationCode).toList()
+                    + ", use childRelation(relationCode, ...) or childRelation(Class, relationCode, ...)");
         }
         return plans.getFirst();
+    }
+
+    public static ChildPlan plan(Class<?> parentModelClass, String relationCode) {
+        return rule(parentModelClass, relationCode).plan();
+    }
+
+    public static ChildRule rule(Class<?> parentModelClass, String relationCode) {
+        if (parentModelClass == null) {
+            throw new AbilityException("child parentModelClass must not be null");
+        }
+        if (relationCode == null || relationCode.isBlank()) {
+            throw new AbilityException("child relationCode must not be blank");
+        }
+        return rules(parentModelClass).stream()
+                .filter(rule -> relationCode.equals(rule.plan().relationCode()))
+                .findFirst()
+                .orElseThrow(() -> new AbilityException("unknown child relationCode: "
+                        + parentModelClass.getName() + "." + relationCode));
     }
 
     public static List<ChildRule> rules(Class<?> parentModelClass) {

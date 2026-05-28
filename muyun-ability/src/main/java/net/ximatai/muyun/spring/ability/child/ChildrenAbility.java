@@ -18,14 +18,24 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                                                                          BiConsumer<C, String> setParentId,
                                                                          Function<P, List<C>> extractChildren,
                                                                          BiConsumer<P, List<C>> populateChildren) {
-        Class<?> modelClass = modelClass();
-        if (modelClass == null) {
-            throw new AbilityException("child relation requires modelClass: "
-                    + getModuleAlias()
-                    + ", extend AbstractAbilityService or use childRelation(Class, ...)");
-        }
         return childRelation(
-                (Class<P>) modelClass,
+                (Class<P>) requireModelClass("childRelation(Class, ...)"),
+                childAbility,
+                setParentId,
+                extractChildren,
+                populateChildren
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(String relationCode,
+                                                                         ChildAbility<C> childAbility,
+                                                                         BiConsumer<C, String> setParentId,
+                                                                         Function<P, List<C>> extractChildren,
+                                                                         BiConsumer<P, List<C>> populateChildren) {
+        return childRelation(
+                (Class<P>) requireModelClass("childRelation(Class, String, ...)"),
+                relationCode,
                 childAbility,
                 setParentId,
                 extractChildren,
@@ -40,6 +50,22 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
                                                                          BiConsumer<P, List<C>> populateChildren) {
         return childAbility.toChildRelation(
                 StaticChildResolver.singlePlan(parentModelClass),
+                setParentId,
+                extractChildren,
+                populateChildren
+        );
+    }
+
+    default <C extends EntityContract> ChildRelation<C, P> childRelation(Class<P> parentModelClass,
+                                                                         String relationCode,
+                                                                         ChildAbility<C> childAbility,
+                                                                         BiConsumer<C, String> setParentId,
+                                                                         Function<P, List<C>> extractChildren,
+                                                                         BiConsumer<P, List<C>> populateChildren) {
+        StaticChildResolver.ChildRule rule = StaticChildResolver.rule(parentModelClass, relationCode);
+        validateChildModel(rule, childAbility);
+        return childAbility.toChildRelation(
+                rule.plan(),
                 setParentId,
                 extractChildren,
                 populateChildren
@@ -76,5 +102,26 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         for (ChildRelation<? extends EntityContract, P> relation : childRelations()) {
             relation.loadChildren(parent);
         }
+    }
+
+    private Class<?> requireModelClass(String explicitFallback) {
+        Class<?> modelClass = modelClass();
+        if (modelClass == null) {
+            throw new AbilityException("child relation requires modelClass: "
+                    + getModuleAlias()
+                    + ", extend AbstractAbilityService or use " + explicitFallback);
+        }
+        return modelClass;
+    }
+
+    private void validateChildModel(StaticChildResolver.ChildRule rule, ChildAbility<?> childAbility) {
+        Class<?> actualChildModel = childAbility.modelClass();
+        if (actualChildModel == null || rule.childModel().equals(actualChildModel)) {
+            return;
+        }
+        throw new AbilityException("child relation model mismatch: "
+                + rule.plan().relationCode()
+                + ", expected " + rule.childModel().getName()
+                + ", actual " + actualChildModel.getName());
     }
 }

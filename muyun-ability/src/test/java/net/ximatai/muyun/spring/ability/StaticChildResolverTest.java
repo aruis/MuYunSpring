@@ -24,7 +24,36 @@ class StaticChildResolverTest {
     @Test
     void plansShouldCompileChildRefAnnotation() {
         assertThat(StaticChildResolver.plans(DemoInvoice.class))
-                .containsExactly(new ChildPlan("lines", "invoice", "invoiceLine", "invoiceId", true, true));
+                .containsExactly(
+                        new ChildPlan("lines", "invoice", "invoiceLine", "invoiceId", true, true),
+                        new ChildPlan("notes", "invoice", "invoiceNote", "invoiceId", true, true)
+                );
+        assertThat(StaticChildResolver.plan(DemoInvoice.class, "notes"))
+                .isEqualTo(new ChildPlan("notes", "invoice", "invoiceNote", "invoiceId", true, true));
+    }
+
+    @Test
+    void singlePlanShouldRejectMultipleChildRelations() {
+        assertThatThrownBy(() -> StaticChildResolver.singlePlan(DemoInvoice.class))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("expected exactly one child relation plan")
+                .hasMessageContaining("lines")
+                .hasMessageContaining("notes")
+                .hasMessageContaining("childRelation(relationCode");
+    }
+
+    @Test
+    void planShouldRejectUnknownRelationCode() {
+        assertThatThrownBy(() -> StaticChildResolver.plan(DemoInvoice.class, "missing"))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("unknown child relationCode");
+    }
+
+    @Test
+    void planShouldRejectMissingParentModelClass() {
+        assertThatThrownBy(() -> StaticChildResolver.plan(null, "lines"))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("parentModelClass");
     }
 
     @Test

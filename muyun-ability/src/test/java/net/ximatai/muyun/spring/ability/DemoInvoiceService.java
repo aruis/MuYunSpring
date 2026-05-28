@@ -14,6 +14,7 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
         ReferencerAbility<DemoInvoice>,
         CacheAbility<DemoInvoice> {
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
+    private final DemoInvoiceNoteService noteService = new DemoInvoiceNoteService();
     private final DemoCustomerService customerService;
     private int businessHookCount;
 
@@ -31,16 +32,30 @@ final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> imple
 
     @Override
     public List<ChildRelation<? extends EntityContract, DemoInvoice>> childRelations() {
-        return List.of(childRelation(
-                lineService,
-                DemoInvoiceLine::setInvoiceId,
-                DemoInvoice::getLines,
-                DemoInvoice::setLines
-        ));
+        return List.of(
+                childRelation(
+                        "lines",
+                        lineService,
+                        DemoInvoiceLine::setInvoiceId,
+                        DemoInvoice::getLines,
+                        DemoInvoice::setLines
+                ),
+                childRelation(
+                        "notes",
+                        noteService,
+                        DemoInvoiceNote::setInvoiceId,
+                        DemoInvoice::getNotes,
+                        DemoInvoice::setNotes
+                )
+        );
     }
 
     DemoInvoiceLineService lineService() {
         return lineService;
+    }
+
+    DemoInvoiceNoteService noteService() {
+        return noteService;
     }
 
     DemoCustomerService customerService() {

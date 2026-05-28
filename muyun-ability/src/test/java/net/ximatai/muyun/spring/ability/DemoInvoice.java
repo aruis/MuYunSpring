@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.ability.child.ChildRef;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTo;
 
-
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
@@ -34,6 +33,15 @@ final class DemoInvoice extends StandardEntity {
             autoDeleteWithParent = true
     )
     private List<DemoInvoiceLine> lines;
+    @ChildRef(
+            parentEntity = "invoice",
+            childModel = DemoInvoiceNote.class,
+            childEntity = "invoiceNote",
+            childForeignKeyField = "invoiceId",
+            autoPopulate = true,
+            autoDeleteWithParent = true
+    )
+    private List<DemoInvoiceNote> notes;
 
     DemoInvoice() {
     }

@@ -234,34 +234,51 @@ class AbilityContractTest {
         DemoInvoiceService invoiceService = new DemoInvoiceService();
         DemoInvoiceLine firstLine = new DemoInvoiceLine("First line");
         DemoInvoiceLine secondLine = new DemoInvoiceLine("Second line");
+        DemoInvoiceNote firstNote = new DemoInvoiceNote("First note");
         DemoInvoice invoice = new DemoInvoice("Invoice", List.of(firstLine, secondLine));
+        invoice.setNotes(List.of(firstNote));
 
         String invoiceId = invoiceService.insert(invoice);
 
         assertThat(firstLine.getInvoiceId()).isEqualTo(invoiceId);
         assertThat(secondLine.getInvoiceId()).isEqualTo(invoiceId);
+        assertThat(firstNote.getInvoiceId()).isEqualTo(invoiceId);
 
         invoice.setLines(null);
-        assertThat(invoiceService.select(invoiceId).getLines())
+        invoice.setNotes(null);
+        DemoInvoice selected = invoiceService.select(invoiceId);
+        assertThat(selected.getLines())
                 .extracting(DemoInvoiceLine::getTitle)
                 .containsExactly("First line", "Second line");
+        assertThat(selected.getNotes())
+                .extracting(DemoInvoiceNote::getContent)
+                .containsExactly("First note");
 
         firstLine.setTitle("First line updated");
         DemoInvoiceLine thirdLine = new DemoInvoiceLine("Third line");
         invoice.setLines(List.of(firstLine, thirdLine));
+        firstNote.setContent("First note updated");
+        DemoInvoiceNote secondNote = new DemoInvoiceNote("Second note");
+        invoice.setNotes(List.of(firstNote, secondNote));
         invoiceService.update(invoice);
 
         assertThat(invoiceService.lineService().select(firstLine.getId()).getTitle()).isEqualTo("First line updated");
         assertThat(invoiceService.lineService().select(secondLine.getId())).isNull();
         assertThat(invoiceService.lineService().select(thirdLine.getId())).isNotNull();
+        assertThat(invoiceService.noteService().select(firstNote.getId()).getContent()).isEqualTo("First note updated");
+        assertThat(invoiceService.noteService().select(secondNote.getId())).isNotNull();
 
         invoiceService.delete(invoiceId);
 
         assertThat(invoiceService.select(invoiceId)).isNull();
         assertThat(invoiceService.lineService().select(firstLine.getId())).isNull();
         assertThat(invoiceService.lineService().select(thirdLine.getId())).isNull();
+        assertThat(invoiceService.noteService().select(firstNote.getId())).isNull();
+        assertThat(invoiceService.noteService().select(secondNote.getId())).isNull();
         assertThat(invoiceService.lineService().selectIgnoreSoftDelete(firstLine.getId())).isNotNull();
         assertThat(invoiceService.lineService().selectIgnoreSoftDelete(thirdLine.getId())).isNotNull();
+        assertThat(invoiceService.noteService().selectIgnoreSoftDelete(firstNote.getId())).isNotNull();
+        assertThat(invoiceService.noteService().selectIgnoreSoftDelete(secondNote.getId())).isNotNull();
     }
 
     @Test
@@ -301,6 +318,24 @@ class AbilityContractTest {
                 .hasMessageContaining("demo.noModelChildren")
                 .hasMessageContaining("AbstractAbilityService")
                 .hasMessageContaining("childRelation(Class");
+    }
+
+    @Test
+    void childrenAbilityShouldRejectMismatchedRelationCodeAndChildAbility() {
+        DemoInvoiceService service = new DemoInvoiceService();
+
+        assertThatThrownBy(() -> service.childRelation(
+                "notes",
+                service.lineService(),
+                DemoInvoiceLine::setInvoiceId,
+                DemoInvoice::getLines,
+                DemoInvoice::setLines
+        ))
+                .isInstanceOf(AbilityException.class)
+                .hasMessageContaining("child relation model mismatch")
+                .hasMessageContaining("notes")
+                .hasMessageContaining(DemoInvoiceNote.class.getName())
+                .hasMessageContaining(DemoInvoiceLine.class.getName());
     }
 
     @Test
@@ -619,6 +654,7 @@ class AbilityContractTest {
 
         DemoInvoice cached = (DemoInvoice) CacheRegistry.item(invoiceService.cacheNamespace(), invoiceId);
         assertThat(cached.getLines()).isNull();
+        assertThat(cached.getNotes()).isNull();
         assertThat(cached.getCustomerTitle()).isNull();
         assertThat(cached.getCustomerStatus()).isNull();
         assertThat(selected.getLines())
