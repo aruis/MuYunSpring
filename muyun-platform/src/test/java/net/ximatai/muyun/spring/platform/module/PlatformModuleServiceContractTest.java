@@ -46,7 +46,7 @@ class PlatformModuleServiceContractTest {
         assertThat(module.getId()).isEqualTo("crm.customer");
         assertThat(module.getParentId()).isEqualTo(TreeAbility.ROOT_ID);
         assertThat(module.getEnabled()).isTrue();
-        assertThat(module.getModuleType()).isEqualTo(ModuleType.STANDARD);
+        assertThat(module.getModuleKind()).isEqualTo(ModuleKind.STATIC);
     }
 
     @Test

@@ -91,8 +91,8 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
         String moduleAlias = requireModuleAlias(module.getAlias(), applicationAlias);
         module.setApplicationAlias(applicationAlias);
         module.setAlias(moduleAlias);
-        if (module.getModuleType() == null) {
-            module.setModuleType(ModuleType.STANDARD);
+        if (module.getModuleKind() == null) {
+            module.setModuleKind(ModuleKind.STATIC);
         }
         validateParentApplication(module);
     }

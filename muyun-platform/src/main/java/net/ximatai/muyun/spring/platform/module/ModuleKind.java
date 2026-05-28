@@ -1,16 +1,13 @@
 package net.ximatai.muyun.spring.platform.module;
 
-public enum ModuleType {
-    STANDARD("standard", "标准页面"),
-    CUSTOMIZED("customized", "自定义页面"),
-    BUILT_IN_PAGE("built_in_page", "内置界面"),
-    REPORT("report", "报表页面"),
-    DASHBOARD("dashboard", "仪表板");
+public enum ModuleKind {
+    STATIC("static", "静态模块"),
+    DYNAMIC("dynamic", "动态模块");
 
     private final String code;
     private final String title;
 
-    ModuleType(String code, String title) {
+    ModuleKind(String code, String title) {
         this.code = code;
         this.title = title;
     }
