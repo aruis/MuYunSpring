@@ -30,7 +30,7 @@ public class ModuleDefinitionValidator {
         for (EntityDefinition entity : module.entities()) {
             validateEntity(entity);
             requireUnique(entityCodes, entity.code(), "entity code");
-            requireUnique(tableNames, entity.tableName(), "table name");
+            requireUnique(tableNames, physicalTableKey(entity), "table name");
         }
         Map<String, EntityDefinition> entities = module.entities().stream()
                 .collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
@@ -49,6 +49,9 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("entity must not be null");
         }
         requireIdentifier(entity.code(), "entity code");
+        if (entity.schemaName() != null && !entity.schemaName().isBlank()) {
+            requireIdentifier(entity.schemaName(), "schema name");
+        }
         requireIdentifier(entity.tableName(), "table name");
         requireText(entity.name(), "entity name");
         Set<String> fieldCodes = new HashSet<>();
@@ -253,6 +256,11 @@ public class ModuleDefinitionValidator {
         if (!value.matches("[a-z][A-Za-z0-9]{0,62}")) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }
+    }
+
+    private String physicalTableKey(EntityDefinition entity) {
+        String schemaName = entity.schemaName() == null || entity.schemaName().isBlank() ? "" : entity.schemaName();
+        return schemaName + "." + entity.tableName();
     }
 
     private void requireSortField(EntityDefinition entity, FieldDefinition field) {

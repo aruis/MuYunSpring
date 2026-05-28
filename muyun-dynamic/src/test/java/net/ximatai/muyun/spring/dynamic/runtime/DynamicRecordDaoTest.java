@@ -71,6 +71,26 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldUseEntitySchemaWhenWritingDynamicRecords() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "tenant_a",
+                TABLE,
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code")),
+                java.util.Set.of(EntityCapability.CRUD)
+        );
+        when(operations.insertItem(eq("tenant_a"), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecord record = new DynamicRecord(entity).setValue("code", "C-001");
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
+
+        verify(operations).insertItem(eq("tenant_a"), eq(TABLE), anyMap());
+    }
+
+    @Test
     void shouldRunLifecycleHooksAroundCrudOperations() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))

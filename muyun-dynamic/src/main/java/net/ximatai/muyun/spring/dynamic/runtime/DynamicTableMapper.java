@@ -19,6 +19,7 @@ public class DynamicTableMapper {
     public TableWrapper toTable(EntityDefinition entity) {
         validator.validateEntity(entity);
         TableWrapper table = TableWrapper.withName(entity.tableName())
+                .setSchema(entity.schemaName())
                 .setComment(entity.name())
                 .setPrimaryKey(StandardEntitySchema.idColumn());
         StandardEntitySchema.auditColumns().forEach(table::addColumn);
@@ -34,7 +35,9 @@ public class DynamicTableMapper {
 
     public TableWrapper toTable(EntityDefinition entity, EntityDefinition previousEntity) {
         TableWrapper table = toTable(entity);
-        if (previousEntity == null || !entity.tableName().equals(previousEntity.tableName())) {
+        if (previousEntity == null
+                || !java.util.Objects.equals(entity.schemaName(), previousEntity.schemaName())
+                || !entity.tableName().equals(previousEntity.tableName())) {
             return table;
         }
         validator.validateEntity(previousEntity);

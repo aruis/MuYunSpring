@@ -36,7 +36,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         this.operations = (IDatabaseOperations<Object>) Objects.requireNonNull(operations, "operations must not be null");
         new ModuleDefinitionValidator().validateEntity(entity);
         this.entity = entity;
-        this.schema = operations.getDefaultSchemaName();
+        this.schema = entity.schemaName();
         this.mapping = new DynamicRecordMapping(entity);
     }
 

@@ -29,6 +29,7 @@ class DynamicTableMapperTest {
 
         TableWrapper table = mapper.toTable(entity);
 
+        assertThat(table.getSchema()).isEqualTo(EntityDefinition.DEFAULT_SCHEMA_NAME);
         assertThat(table.getName()).isEqualTo("app_contract");
         assertThat(table.getComment()).isEqualTo("Contract");
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
@@ -50,6 +51,37 @@ class DynamicTableMapperTest {
         assertThat(column(table, "name").getLength()).isEqualTo(128);
         assertThat(column(table, "amount").getPrecision()).isEqualTo(18);
         assertThat(column(table, "amount").getScale()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldNormalizeBlankEntitySchemaToDefaultSchema() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code")),
+                java.util.Set.of(EntityCapability.CRUD)
+        );
+
+        assertThat(entity.schemaName()).isEqualTo(EntityDefinition.DEFAULT_SCHEMA_NAME);
+        assertThat(mapper.toTable(entity).getSchema()).isEqualTo(EntityDefinition.DEFAULT_SCHEMA_NAME);
+    }
+
+    @Test
+    void shouldMapEntitySchemaToTableSchema() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "tenant_a",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code")),
+                java.util.Set.of(EntityCapability.CRUD)
+        );
+
+        TableWrapper table = mapper.toTable(entity);
+
+        assertThat(table.getSchema()).isEqualTo("tenant_a");
     }
 
     @Test
