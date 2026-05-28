@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.util.Preconditions;
 
 import java.util.Objects;
 
@@ -9,7 +10,7 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
     private final BaseDao<T, String> dao;
 
     protected AbstractAbilityService(String moduleAlias, BaseDao<T, String> dao) {
-        this.moduleAlias = AbilityPreconditions.requireText(moduleAlias, "moduleAlias");
+        this.moduleAlias = Preconditions.requireText(moduleAlias, "moduleAlias");
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
     }
 

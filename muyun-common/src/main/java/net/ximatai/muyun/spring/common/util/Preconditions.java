@@ -1,9 +1,9 @@
-package net.ximatai.muyun.spring.ability;
+package net.ximatai.muyun.spring.common.util;
 
 import java.util.Objects;
 
-public final class AbilityPreconditions {
-    private AbilityPreconditions() {
+public final class Preconditions {
+    private Preconditions() {
     }
 
     public static String requireText(String value, String name) {

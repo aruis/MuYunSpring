@@ -1,13 +1,13 @@
 package net.ximatai.muyun.spring.ability.reference;
 
-import net.ximatai.muyun.spring.ability.AbilityPreconditions;
+import net.ximatai.muyun.spring.common.util.Preconditions;
 
 public record ReferenceTarget(String moduleAlias, String entityCode) {
     private static final String SEPARATOR = ".";
 
     public ReferenceTarget {
-        moduleAlias = AbilityPreconditions.requireText(moduleAlias, "moduleAlias");
-        entityCode = AbilityPreconditions.requireText(entityCode, "entityCode");
+        moduleAlias = Preconditions.requireText(moduleAlias, "moduleAlias");
+        entityCode = Preconditions.requireText(entityCode, "entityCode");
     }
 
     public static ReferenceTarget of(String moduleAlias, String entityCode) {
@@ -15,7 +15,7 @@ public record ReferenceTarget(String moduleAlias, String entityCode) {
     }
 
     public static ReferenceTarget parse(String value) {
-        String normalized = AbilityPreconditions.requireText(value, "value");
+        String normalized = Preconditions.requireText(value, "value");
         int separatorIndex = normalized.lastIndexOf(SEPARATOR);
         if (separatorIndex <= 0 || separatorIndex == normalized.length() - 1) {
             throw new IllegalArgumentException("reference target must use '<moduleAlias>.<entityCode>': " + value);
