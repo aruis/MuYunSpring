@@ -4,21 +4,13 @@ import net.ximatai.muyun.spring.ability.child.CascadeDeleteChildAbility;
 import net.ximatai.muyun.spring.ability.child.ChildAbility;
 
 
-final class DemoInvoiceLineService implements
-        CrudAbility<DemoInvoiceLine>,
+final class DemoInvoiceLineService extends AbstractAbilityService<DemoInvoiceLine> implements
         SoftDeleteAbility<DemoInvoiceLine>,
         CascadeDeleteChildAbility<DemoInvoiceLine> {
-    private final InMemoryBaseDao<DemoInvoiceLine> dao = new InMemoryBaseDao<>();
     private int afterSelectCount;
 
-    @Override
-    public BaseDao<DemoInvoiceLine, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "demo.invoiceLine";
+    DemoInvoiceLineService() {
+        super("demo.invoiceLine", new InMemoryBaseDao<>());
     }
 
     @Override

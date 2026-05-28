@@ -3,21 +3,12 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 
 
-final class DemoOrganizationService implements
-        CrudAbility<DemoOrganization>,
+final class DemoOrganizationService extends AbstractAbilityService<DemoOrganization> implements
         SoftDeleteAbility<DemoOrganization>,
         TreeAbility<DemoOrganization>,
         ReferenceAbility<DemoOrganization> {
 
-    private final InMemoryBaseDao<DemoOrganization> dao = new InMemoryBaseDao<>();
-
-    @Override
-    public BaseDao<DemoOrganization, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "iam.organization";
+    DemoOrganizationService() {
+        super("iam.organization", new InMemoryBaseDao<>());
     }
 }

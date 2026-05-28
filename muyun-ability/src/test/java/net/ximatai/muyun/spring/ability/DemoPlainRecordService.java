@@ -1,20 +1,14 @@
 package net.ximatai.muyun.spring.ability;
 
 
-final class DemoPlainRecordService implements CrudAbility<DemoPlainRecord> {
-    private final InMemoryBaseDao<DemoPlainRecord> dao = new InMemoryBaseDao<>();
-
-    @Override
-    public BaseDao<DemoPlainRecord, String> getDao() {
-        return dao;
+final class DemoPlainRecordService extends AbstractAbilityService<DemoPlainRecord> {
+    DemoPlainRecordService() {
+        super("demo.plainRecord", new InMemoryBaseDao<>());
     }
 
+    @SuppressWarnings("unchecked")
     InMemoryBaseDao<DemoPlainRecord> rawDao() {
-        return dao;
+        return (InMemoryBaseDao<DemoPlainRecord>) getDao();
     }
 
-    @Override
-    public String getModuleAlias() {
-        return "demo.plainRecord";
-    }
 }

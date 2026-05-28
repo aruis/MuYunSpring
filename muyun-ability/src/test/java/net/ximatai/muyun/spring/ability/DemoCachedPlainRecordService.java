@@ -1,21 +1,13 @@
 package net.ximatai.muyun.spring.ability;
 
 
-final class DemoCachedPlainRecordService implements
-        CrudAbility<DemoPlainRecord>,
+final class DemoCachedPlainRecordService extends AbstractAbilityService<DemoPlainRecord> implements
         SoftDeleteAbility<DemoPlainRecord>,
         CacheAbility<DemoPlainRecord> {
-    private final InMemoryBaseDao<DemoPlainRecord> dao = new InMemoryBaseDao<>();
     private int afterChangedCount;
 
-    @Override
-    public BaseDao<DemoPlainRecord, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "demo.cachedPlainRecord";
+    DemoCachedPlainRecordService() {
+        super("demo.cachedPlainRecord", new InMemoryBaseDao<>());
     }
 
     @Override
@@ -35,8 +27,9 @@ final class DemoCachedPlainRecordService implements
         return copy;
     }
 
+    @SuppressWarnings("unchecked")
     InMemoryBaseDao<DemoPlainRecord> rawDao() {
-        return dao;
+        return (InMemoryBaseDao<DemoPlainRecord>) getDao();
     }
 
     @Override

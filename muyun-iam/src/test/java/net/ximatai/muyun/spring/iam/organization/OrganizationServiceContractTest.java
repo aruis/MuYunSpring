@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 class OrganizationServiceContractTest {
     @Test
     void shouldExposeStableModuleAlias() {
-        OrganizationService service = new OrganizationService(null);
+        OrganizationService service = new OrganizationService(mock(OrganizationDao.class));
 
         assertThat(service.getModuleAlias()).isEqualTo("iam.organization");
     }

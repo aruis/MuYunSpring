@@ -1,19 +1,11 @@
 package net.ximatai.muyun.spring.ability;
 
 
-final class DemoEnabledRecordService implements
-        CrudAbility<DemoEnabledRecord>,
+final class DemoEnabledRecordService extends AbstractAbilityService<DemoEnabledRecord> implements
         SoftDeleteAbility<DemoEnabledRecord>,
         EnableAbility<DemoEnabledRecord> {
-    private final InMemoryBaseDao<DemoEnabledRecord> dao = new InMemoryBaseDao<>();
 
-    @Override
-    public BaseDao<DemoEnabledRecord, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "demo.enabledRecord";
+    DemoEnabledRecordService() {
+        super("demo.enabledRecord", new InMemoryBaseDao<>());
     }
 }

@@ -3,21 +3,13 @@ package net.ximatai.muyun.spring.ability;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 
 
-final class DemoCustomerService implements
-        CrudAbility<DemoCustomer>,
+final class DemoCustomerService extends AbstractAbilityService<DemoCustomer> implements
         ReferenceAbility<DemoCustomer>,
         CacheAbility<DemoCustomer> {
-    private final InMemoryBaseDao<DemoCustomer> dao = new InMemoryBaseDao<>();
     private int afterSelectCount;
 
-    @Override
-    public BaseDao<DemoCustomer, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "demo.customer";
+    DemoCustomerService() {
+        super("demo.customer", new InMemoryBaseDao<>());
     }
 
     @Override

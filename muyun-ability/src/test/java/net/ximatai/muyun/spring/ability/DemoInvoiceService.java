@@ -1,25 +1,21 @@
 package net.ximatai.muyun.spring.ability;
 
-import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-
 import net.ximatai.muyun.spring.ability.child.ChildRelation;
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
 import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
-
+import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-final class DemoInvoiceService implements
-        CrudAbility<DemoInvoice>,
+final class DemoInvoiceService extends AbstractAbilityService<DemoInvoice> implements
         SoftDeleteAbility<DemoInvoice>,
         ChildrenAbility<DemoInvoice>,
         ReferencerAbility<DemoInvoice>,
         CacheAbility<DemoInvoice> {
-    private final InMemoryBaseDao<DemoInvoice> dao = new InMemoryBaseDao<>();
     private final DemoInvoiceLineService lineService = new DemoInvoiceLineService();
     private final DemoCustomerService customerService;
     private int businessHookCount;
@@ -32,21 +28,12 @@ final class DemoInvoiceService implements
     }
 
     DemoInvoiceService(DemoCustomerService customerService) {
+        super("demo.invoice", new InMemoryBaseDao<>());
         this.customerService = customerService;
     }
 
     @Override
-    public BaseDao<DemoInvoice, String> getDao() {
-        return dao;
-    }
-
-    @Override
-    public String getModuleAlias() {
-        return "demo.invoice";
-    }
-
-    @Override
-    public List<ChildRelation<? extends net.ximatai.muyun.spring.common.model.contract.EntityContract, DemoInvoice>> childRelations() {
+    public List<ChildRelation<? extends EntityContract, DemoInvoice>> childRelations() {
         return List.of(lineService
                 .toChildRelation(
                         StaticChildResolver.plans(DemoInvoice.class).getFirst(),
