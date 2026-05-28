@@ -195,20 +195,26 @@ class AbilityContractTest {
         DemoEnabledRecordService service = new DemoEnabledRecordService();
         String enabledId = service.insert(new DemoEnabledRecord("Enabled"));
         String disabledId = service.insert(new DemoEnabledRecord("Disabled"));
+        DemoEnabledRecord explicitlyDisabled = new DemoEnabledRecord("Explicitly Disabled");
+        explicitlyDisabled.setEnabled(Boolean.FALSE);
+        String explicitlyDisabledId = service.insert(explicitlyDisabled);
 
         assertThat(service.isEnabled(enabledId)).isTrue();
+        assertThat(service.isEnabled(explicitlyDisabledId)).isFalse();
         assertThat(service.disable(disabledId)).isEqualTo(1);
         assertThat(service.isEnabled(disabledId)).isFalse();
+        assertThat(service.selectIgnoreSoftDelete(disabledId).getVersion()).isEqualTo(1);
         assertThat(service.select(disabledId)).isNotNull();
         assertThat(service.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords())
                 .extracting(DemoEnabledRecord::getTitle)
-                .containsExactly("Enabled", "Disabled");
+                .containsExactly("Enabled", "Disabled", "Explicitly Disabled");
         assertThat(service.pageQuery(service.enabledCriteria(Criteria.of()), PageRequest.of(1, 10)).getRecords())
                 .extracting(DemoEnabledRecord::getTitle)
                 .containsExactly("Enabled");
 
         assertThat(service.enable(disabledId)).isEqualTo(1);
         assertThat(service.isEnabled(disabledId)).isTrue();
+        assertThat(service.selectIgnoreSoftDelete(disabledId).getVersion()).isEqualTo(2);
     }
 
     @Test
