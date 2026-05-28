@@ -68,6 +68,37 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldBindEntityOperationsForBusinessScopedCalls() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        DynamicRecordService service = service(operations, contractEntity());
+        DynamicRecordService.EntityOperations contracts = service.entity(MODULE, "contract");
+        DynamicRecord record = contracts.newRecord()
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+        record.setId("contract-1");
+
+        assertThat(contracts.create(record)).isEqualTo("contract-1");
+        assertThat(contracts.select("contract-1").getValue("code")).isEqualTo("C-001");
+        contracts.delete("contract-1");
+
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldKeepCapabilityGatesThroughBoundEntityOperations() {
+        DynamicRecordService service = service(operations(), contractEntity());
+        DynamicRecordService.EntityOperations contracts = service.entity(MODULE, "contract");
+
+        assertThatThrownBy(() -> contracts.enable("contract-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ENABLE");
+    }
+
+    @Test
     void shouldExposeSortOperationsThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
         stubSortableRows(operations);

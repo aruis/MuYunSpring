@@ -22,6 +22,10 @@ public class DynamicRecordService {
         return runtime.newRecord(moduleAlias, entityCode);
     }
 
+    public EntityOperations entity(String moduleAlias, String entityCode) {
+        return new EntityOperations(this, moduleAlias, entityCode);
+    }
+
     public String create(String moduleAlias, String entityCode, DynamicRecord record) {
         return entityService(moduleAlias, entityCode).insert(record);
     }
@@ -130,5 +134,121 @@ public class DynamicRecordService {
 
     private DynamicEntityService entityService(String moduleAlias, String entityCode) {
         return runtime.entityService(moduleAlias, entityCode);
+    }
+
+    public static final class EntityOperations {
+        private final DynamicRecordService service;
+        private final String moduleAlias;
+        private final String entityCode;
+
+        private EntityOperations(DynamicRecordService service, String moduleAlias, String entityCode) {
+            this.service = service;
+            this.moduleAlias = moduleAlias;
+            this.entityCode = entityCode;
+        }
+
+        public DynamicRecord newRecord() {
+            return service.newRecord(moduleAlias, entityCode);
+        }
+
+        public String create(DynamicRecord record) {
+            return service.create(moduleAlias, entityCode, record);
+        }
+
+        public DynamicRecord select(String id) {
+            return service.select(moduleAlias, entityCode, id);
+        }
+
+        public DynamicRecord selectIgnoreSoftDelete(String id) {
+            return service.selectIgnoreSoftDelete(moduleAlias, entityCode, id);
+        }
+
+        public int update(DynamicRecord record) {
+            return service.update(moduleAlias, entityCode, record);
+        }
+
+        public int delete(String id) {
+            return service.delete(moduleAlias, entityCode, id);
+        }
+
+        public int deleteBatch(Collection<String> ids) {
+            return service.deleteBatch(moduleAlias, entityCode, ids);
+        }
+
+        public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+            return service.list(moduleAlias, entityCode, criteria, pageRequest, sorts);
+        }
+
+        public PageResult<DynamicRecord> page(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+            return service.page(moduleAlias, entityCode, criteria, pageRequest, sorts);
+        }
+
+        public long count(Criteria criteria) {
+            return service.count(moduleAlias, entityCode, criteria);
+        }
+
+        public List<DynamicRecord> sortedList(Criteria criteria) {
+            return service.sortedList(moduleAlias, entityCode, criteria);
+        }
+
+        public void reorder(List<String> orderedIds) {
+            service.reorder(moduleAlias, entityCode, orderedIds);
+        }
+
+        public void moveBefore(String id, String beforeId) {
+            service.moveBefore(moduleAlias, entityCode, id, beforeId);
+        }
+
+        public void moveAfter(String id, String afterId) {
+            service.moveAfter(moduleAlias, entityCode, id, afterId);
+        }
+
+        public List<DynamicRecord> children(String parentId) {
+            return service.children(moduleAlias, entityCode, parentId);
+        }
+
+        public List<String> ancestorIds(String id) {
+            return service.ancestorIds(moduleAlias, entityCode, id);
+        }
+
+        public List<String> ancestorIdsAndSelf(String id) {
+            return service.ancestorIdsAndSelf(moduleAlias, entityCode, id);
+        }
+
+        public List<String> descendantIds(String id) {
+            return service.descendantIds(moduleAlias, entityCode, id);
+        }
+
+        public int enable(String id) {
+            return service.enable(moduleAlias, entityCode, id);
+        }
+
+        public int disable(String id) {
+            return service.disable(moduleAlias, entityCode, id);
+        }
+
+        public boolean isEnabled(String id) {
+            return service.isEnabled(moduleAlias, entityCode, id);
+        }
+
+        public Criteria enabledCriteria(Criteria criteria) {
+            return service.enabledCriteria(moduleAlias, entityCode, criteria);
+        }
+
+        public String title(String id) {
+            return service.title(moduleAlias, entityCode, id);
+        }
+
+        public Map<String, String> titles(Collection<String> ids) {
+            return service.titles(moduleAlias, entityCode, ids);
+        }
+
+        public Map<String, Map<String, Object>> projections(Collection<String> ids, Collection<String> fieldNames) {
+            return service.projections(moduleAlias, entityCode, ids, fieldNames);
+        }
+
+        public PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
+            return service.referenceOptions(moduleAlias, entityCode, criteria, pageRequest);
+        }
     }
 }
