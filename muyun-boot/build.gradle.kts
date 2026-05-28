@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":muyun-platform"))
     implementation(project(":muyun-iam"))
     implementation(libs.spring.boot.starter.web)
     implementation(libs.muyun.database.spring.boot.starter)

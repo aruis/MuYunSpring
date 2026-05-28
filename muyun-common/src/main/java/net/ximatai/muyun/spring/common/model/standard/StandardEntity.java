@@ -16,7 +16,7 @@ import java.time.Instant;
 @Setter
 public abstract class StandardEntity implements EntityContract {
     @Id
-    @Column(name = "id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "ID")
+    @Column(name = "id", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "ID")
     private String id;
 
     @Column(name = "tenant_id", type = ColumnType.VARCHAR, length = 64, comment = "Tenant id")

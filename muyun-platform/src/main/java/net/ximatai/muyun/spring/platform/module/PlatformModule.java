@@ -1,0 +1,27 @@
+package net.ximatai.muyun.spring.platform.module;
+
+import lombok.Getter;
+import lombok.Setter;
+import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
+
+@Getter
+@Setter
+@Table(name = "platform_module", comment = "Platform module")
+public class PlatformModule extends StandardEnabledTreeEntity {
+    @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Application alias")
+    private String applicationAlias;
+
+    @Column(name = "module_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module kind")
+    private ModuleKind moduleKind;
+
+    public String getAlias() {
+        return getId();
+    }
+
+    public void setAlias(String alias) {
+        setId(alias);
+    }
+}

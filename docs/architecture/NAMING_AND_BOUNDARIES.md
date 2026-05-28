@@ -28,6 +28,8 @@ net.ximatai.muyun.spring
 <applicationAlias>.<moduleName>
 ```
 
+`applicationAlias` 使用单段小写标识，`moduleAlias` 使用至少两段点分小写标识，分段只允许小写字母、数字和下划线，且必须以字母开头。模块 alias 总长度不超过标准实体 ID 长度。
+
 应用、模块、元数据和配置对象统一使用 alias 语义：
 
 | 对象 | 语义字段 | 参数名 | 唯一范围 |

@@ -26,6 +26,7 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default String insert(T entity) {
+        beforePrepareInsert(entity);
         EntityLifecycle.prepareInsert(entity, Instant.now());
         prepareAbilityDefaults(entity);
         beforeInsert(entity);
@@ -140,6 +141,13 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default void beforeInsert(T entity) {
+    }
+
+    /**
+     * Runs before the platform fills insert lifecycle fields. Use only for checks or normalization
+     * that must happen before an empty id would be auto-generated.
+     */
+    default void beforePrepareInsert(T entity) {
     }
 
     default void beforeUpdate(T entity) {

@@ -6,7 +6,7 @@ public final class PlatformAbilityFields {
     public static final String TREE_PARENT_FIELD = "parentId";
     public static final String TREE_PARENT_COLUMN = "parent_id";
     public static final ColumnType TREE_PARENT_COLUMN_TYPE = ColumnType.VARCHAR;
-    public static final int TREE_PARENT_LENGTH = 32;
+    public static final int TREE_PARENT_LENGTH = 128;
 
     public static final String SORT_FIELD = "sortOrder";
     public static final String SORT_COLUMN = "sort_order";

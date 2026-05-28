@@ -164,6 +164,19 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldRejectModuleAliasIncompatibleWithPlatformAliasRule() {
+        ModuleDefinition module = new ModuleDefinition(
+                "contract.app-profile",
+                "Contract App",
+                List.of(contractEntity())
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid module alias");
+    }
+
+    @Test
     void shouldSupportConciseFieldFactoriesAndEntityCapabilities() {
         EntityDefinition entity = new EntityDefinition(
                 "contract",

@@ -122,7 +122,7 @@ class OrganizationRepositoryContractTest {
 
         assertThat(table.getName()).isEqualTo(TABLE);
         assertThat(table.getPrimaryKey().getName()).isEqualTo("id");
-        assertThat(table.getPrimaryKey().getLength()).isEqualTo(32);
+        assertThat(table.getPrimaryKey().getLength()).isEqualTo(128);
         assertThat(columnNames(table)).containsAll(StandardEntitySchema.columnNames());
         assertThat(columnNames(table))
                 .contains("parent_id", "code", "title", "sort_order", "enabled");
@@ -264,7 +264,7 @@ class OrganizationRepositoryContractTest {
 
     private Map<String, DBColumn> organizationColumns() {
         Map<String, DBColumn> columns = new LinkedHashMap<>();
-        columns.put("id", column("id", "VARCHAR", 32, false, true, "ID"));
+        columns.put("id", column("id", "VARCHAR", 128, false, true, "ID"));
         columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
         columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
         columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));
@@ -273,7 +273,7 @@ class OrganizationRepositoryContractTest {
         columns.put("created_at", column("created_at", "TIMESTAMP", null, true, false, "Created at"));
         columns.put("updated_by", column("updated_by", "VARCHAR", 64, true, false, "Updated by"));
         columns.put("updated_at", column("updated_at", "TIMESTAMP", null, true, false, "Updated at"));
-        columns.put("parent_id", column("parent_id", "VARCHAR", 32, true, false, "Parent organization ID"));
+        columns.put("parent_id", column("parent_id", "VARCHAR", 128, true, false, "Parent organization ID"));
         columns.put("code", column("code", "VARCHAR", 64, false, false, "Organization code"));
         columns.put("title", column("title", "VARCHAR", 128, false, false, "Organization title"));
         columns.put("sort_order", column("sort_order", "INT", null, true, false, "Sort order"));
@@ -302,7 +302,7 @@ class OrganizationRepositoryContractTest {
 
     private Map<String, DBColumn> demoStaticColumns() {
         Map<String, DBColumn> columns = new LinkedHashMap<>();
-        columns.put("id", column("id", "VARCHAR", 32, false, true, "ID"));
+        columns.put("id", column("id", "VARCHAR", 128, false, true, "ID"));
         columns.put("tenant_id", column("tenant_id", "VARCHAR", 64, true, false, "Tenant id"));
         columns.put("version", column("version", "INT", null, true, false, "Optimistic lock version"));
         columns.put("deleted", column("deleted", "BOOLEAN", null, true, false, "Soft delete flag"));

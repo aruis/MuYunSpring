@@ -15,6 +15,7 @@ Initial Gradle subprojects:
 muyun-common
 muyun-ability
 muyun-dynamic
+muyun-platform
 muyun-iam
 muyun-boot
 ```

@@ -36,7 +36,7 @@ class PlatformTableValidatorTest {
     @Test
     void shouldRejectIdThatIsNotPrimaryKey() {
         TableWrapper table = TableWrapper.withName("demo")
-                .addColumn(Column.of("id").setType(ColumnType.VARCHAR).setLength(32).setNullable(false));
+                .addColumn(Column.of("id").setType(ColumnType.VARCHAR).setLength(128).setNullable(false));
         StandardEntitySchema.auditColumns().forEach(table::addColumn);
 
         assertThatThrownBy(() -> validator.requireStandardEntityTable(table, "demo"))

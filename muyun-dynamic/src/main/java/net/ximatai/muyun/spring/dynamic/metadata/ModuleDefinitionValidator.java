@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -15,7 +16,6 @@ import java.util.stream.Collectors;
 
 public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
-    private static final String MODULE_ALIAS_PATTERN = "[a-z][a-z0-9_]{0,62}(\\.[a-z][a-z0-9_]{0,62})+";
     private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardEntitySchema.columnNames());
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
@@ -301,8 +301,9 @@ public class ModuleDefinitionValidator {
     }
 
     private void requireModuleAlias(String value, String name) {
-        requireText(value, name);
-        if (!value.matches(MODULE_ALIAS_PATTERN)) {
+        try {
+            PlatformAliasRules.requireModuleAlias(value);
+        } catch (RuntimeException e) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }
     }
