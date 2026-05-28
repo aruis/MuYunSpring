@@ -102,9 +102,14 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
 
     default String referenceTitle(T entity) {
         String title = TitleFieldResolver.readAsString(entity);
-        if (title == null) {
-            throw new AbilityException("reference entity requires @TitleField: " + entity.getClass().getName());
+        if (title != null) {
+            return title;
         }
-        return title;
+        title = entity.getTitle();
+        if (title != null) {
+            return title;
+        }
+        throw new AbilityException("reference entity requires @TitleField or non-null TitledCapable title: "
+                + entity.getClass().getName());
     }
 }

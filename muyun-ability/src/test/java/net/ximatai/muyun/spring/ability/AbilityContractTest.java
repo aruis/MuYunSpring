@@ -1261,13 +1261,13 @@ class AbilityContractTest {
     }
 
     @Test
-    void referenceAbilityShouldRejectEntityWithoutDeclaredTitleField() {
+    void referenceAbilityShouldFallbackToTitledCapableWhenTitleFieldIsUndeclared() {
         DemoUndeclaredTitleRecordService service = new DemoUndeclaredTitleRecordService();
         String id = service.insert(new DemoUndeclaredTitleRecord("Undeclared title"));
 
-        assertThatThrownBy(() -> service.title(id))
-                .isInstanceOf(AbilityException.class)
-                .hasMessageContaining("requires @TitleField");
+        assertThat(service.title(id)).isEqualTo("Undeclared title");
+        assertThat(service.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords())
+                .containsExactly(new ReferenceOption(id, "Undeclared title"));
     }
 
     @Test
