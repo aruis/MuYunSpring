@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -66,6 +67,9 @@ class PlatformModelSchemaTest {
                 .contains("id", "metadata_field_id", "dictionary_application_alias", "dictionary_category_alias",
                         "field_length", "precision", "scale", "queryable", "default_query_operator", "query_operators")
                 .doesNotContain("verify_regex", "default_value");
+        assertThat(columnNames(mapper.toTable(MetadataFieldReferenceConfig.class)))
+                .contains("id", "metadata_field_id", "target_module_alias", "target_metadata_id",
+                        "cardinality", "auto_title", "title_output_field", "projection_mappings");
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");

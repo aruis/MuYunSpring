@@ -1,0 +1,60 @@
+package net.ximatai.muyun.spring.platform.metadata;
+
+import lombok.Getter;
+import lombok.Setter;
+import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.CompositeIndex;
+import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+
+import java.util.Arrays;
+import java.util.List;
+
+@Getter
+@Setter
+@Table(name = "platform_metadata_field_reference_config", comment = "Metadata field reference config")
+@CompositeIndex(columns = {"metadata_field_id"}, unique = true)
+public class MetadataFieldReferenceConfig extends StandardEntity {
+    @Column(name = "metadata_field_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata field id")
+    private String metadataFieldId;
+
+    @Column(name = "target_module_alias", type = ColumnType.VARCHAR, length = 128, comment = "Target module alias")
+    private String targetModuleAlias;
+
+    @Column(name = "target_metadata_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Target metadata id")
+    private String targetMetadataId;
+
+    @Column(name = "cardinality", type = ColumnType.VARCHAR, length = 16, nullable = false, comment = "Reference cardinality")
+    private ReferenceCardinality cardinality;
+
+    @Column(name = "auto_title", type = ColumnType.BOOLEAN, comment = "Auto populate title")
+    private Boolean autoTitle;
+
+    @Column(name = "title_output_field", type = ColumnType.VARCHAR, length = 64, comment = "Title output field")
+    private String titleOutputField;
+
+    @Column(name = "projection_mappings", type = ColumnType.VARCHAR, length = 512, comment = "Projection mappings")
+    private String projectionMappings;
+
+    public List<ReferenceProjection> projections() {
+        if (projectionMappings == null || projectionMappings.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(projectionMappings.split("[,;]"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(MetadataFieldReferenceConfig::projection)
+                .toList();
+    }
+
+    private static ReferenceProjection projection(String value) {
+        String[] parts = value.split(":", 2);
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("reference projection mapping must use 'targetField:outputField': " + value);
+        }
+        return new ReferenceProjection(parts[0].trim(), parts[1].trim());
+    }
+}

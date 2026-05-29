@@ -716,6 +716,28 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldRejectDynamicReferenceDisplayWhenTargetHasNoReferenceCapability() {
+        EntityDefinition invoiceWithoutTitle = new EntityDefinition(
+                "invoice",
+                "app_invoice",
+                "Invoice",
+                List.of(FieldDefinition.string("code", "Code"))
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceWithoutTitle, invoiceLineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
+                        .withAutoTitle("invoiceTitle"))
+        );
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("target requires REFERENCE capability");
+    }
+
+    @Test
     void shouldRejectDynamicReferenceProjectionAcrossModules() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,

@@ -28,6 +28,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -98,7 +100,13 @@ class PlatformDynamicModulePublisherIT {
         statusConfig.setDictionaryCategoryAlias("customer_status");
         services.fieldConfigService.insert(statusConfig);
         services.fieldService.insert(titleField(contactMetadataId));
-        services.fieldService.insert(field(contactMetadataId, "customerId", "customer_id", FieldType.STRING));
+        MetadataField customerIdField = field(contactMetadataId, "customerId", "customer_id", FieldType.STRING);
+        services.fieldService.insert(customerIdField);
+        MetadataFieldReferenceConfig customerReference = referenceConfig(customerIdField.getId(), customerMetadataId);
+        customerReference.setAutoTitle(true);
+        customerReference.setTitleOutputField("customerTitle");
+        customerReference.setProjectionMappings("code:customerCode");
+        services.referenceConfigService.insert(customerReference);
         services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
         services.relationService.insert(childRelation("crm.customer", contactMetadataId, customerMetadataId));
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
@@ -115,6 +123,7 @@ class PlatformDynamicModulePublisherIT {
                         services.metadataService,
                         services.fieldService,
                         services.fieldDefinitionCompiler,
+                        services.referenceConfigService,
                         services.relationService
                 ),
                 new DynamicModulePublisher(schemaService, runtime)
@@ -142,6 +151,8 @@ class PlatformDynamicModulePublisherIT {
                 .first()
                 .extracting(child -> child.getValue("title"))
                 .isEqualTo("张三");
+        assertThat(selected.getChildren("contacts").getFirst().getValue("customerTitle")).isEqualTo("客户A");
+        assertThat(selected.getChildren("contacts").getFirst().getValue("customerCode")).isEqualTo("C-001");
         assertThat(customer.list(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)))
                 .extracting(item -> item.getValue("title"))
                 .containsExactly("客户A");
@@ -162,6 +173,7 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
         TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
+        TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
@@ -180,12 +192,16 @@ class PlatformDynamicModulePublisherIT {
                 new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
         MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
                 new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
+        MetadataFieldReferenceConfigService referenceConfigService =
+                new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
+                        fieldTypeService, moduleService);
         ModuleMetadataRelationService relationService =
                 new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,
-                fieldDefinitionCompiler, relationService, schemeService, menuService, categoryService, itemService);
+                referenceConfigService, fieldDefinitionCompiler, relationService, schemeService, menuService,
+                categoryService, itemService);
     }
 
     private Application application(String alias) {
@@ -241,6 +257,13 @@ class PlatformDynamicModulePublisherIT {
     private MetadataFieldConfig fieldConfig(String fieldId) {
         MetadataFieldConfig config = new MetadataFieldConfig();
         config.setMetadataFieldId(fieldId);
+        return config;
+    }
+
+    private MetadataFieldReferenceConfig referenceConfig(String fieldId, String targetMetadataId) {
+        MetadataFieldReferenceConfig config = new MetadataFieldReferenceConfig();
+        config.setMetadataFieldId(fieldId);
+        config.setTargetMetadataId(targetMetadataId);
         return config;
     }
 
@@ -308,6 +331,7 @@ class PlatformDynamicModulePublisherIT {
                                     MetadataService metadataService,
                                     MetadataFieldService fieldService,
                                     MetadataFieldConfigService fieldConfigService,
+                                    MetadataFieldReferenceConfigService referenceConfigService,
                                     MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                     ModuleMetadataRelationService relationService,
                                     MenuSchemeService schemeService,

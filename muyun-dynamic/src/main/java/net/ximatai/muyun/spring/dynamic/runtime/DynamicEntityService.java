@@ -256,10 +256,15 @@ public class DynamicEntityService implements
 
     @Override
     public List<DynamicRecord> selectChildRows(Criteria criteria) {
+        List<DynamicRecord> rows;
         if (dao.getEntity().supports(EntityCapability.SORT)) {
-            return sortedList(criteria);
+            rows = sortedList(criteria);
+        } else {
+            rows = ChildAbility.super.selectChildRows(criteria);
         }
-        return ChildAbility.super.selectChildRows(criteria);
+        rows.forEach(this::afterReferenceSelect);
+        rows.forEach(this::refreshReferenceDependencies);
+        return rows;
     }
 
     public List<String> ancestorIds(String id) {

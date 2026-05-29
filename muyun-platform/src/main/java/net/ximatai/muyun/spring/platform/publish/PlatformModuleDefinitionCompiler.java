@@ -3,10 +3,12 @@ package net.ximatai.muyun.spring.platform.publish;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -14,6 +16,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -28,6 +32,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class PlatformModuleDefinitionCompiler {
@@ -37,6 +42,7 @@ public class PlatformModuleDefinitionCompiler {
     private final MetadataService metadataService;
     private final MetadataFieldService fieldService;
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler;
+    private final MetadataFieldReferenceConfigService referenceConfigService;
     private final ModuleMetadataRelationService relationService;
     private final ModuleDefinitionValidator validator;
 
@@ -44,8 +50,9 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataService metadataService,
                                             MetadataFieldService fieldService,
                                             MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
+                                            MetadataFieldReferenceConfigService referenceConfigService,
                                             ModuleMetadataRelationService relationService) {
-        this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, relationService,
+        this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
                 new ModuleDefinitionValidator());
     }
 
@@ -53,12 +60,14 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataService metadataService,
                                             MetadataFieldService fieldService,
                                             MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
+                                            MetadataFieldReferenceConfigService referenceConfigService,
                                             ModuleMetadataRelationService relationService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.fieldService = fieldService;
         this.fieldDefinitionCompiler = fieldDefinitionCompiler;
+        this.referenceConfigService = referenceConfigService;
         this.relationService = relationService;
         this.validator = validator;
     }
@@ -75,7 +84,8 @@ public class PlatformModuleDefinitionCompiler {
                 .filter(relation -> relation.getRelationRole() == RelationRole.CHILD)
                 .map(relation -> childRelation(relation, metadataById))
                 .toList();
-        ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations);
+        List<EntityReferenceDefinition> references = references(module.getAlias(), metadataById);
+        ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations, references);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -138,14 +148,17 @@ public class PlatformModuleDefinitionCompiler {
     }
 
     private List<FieldDefinition> fields(String metadataId) {
+        return metadataFields(metadataId).stream()
+                .map(fieldDefinitionCompiler::compile)
+                .toList();
+    }
+
+    private List<MetadataField> metadataFields(String metadataId) {
         return fieldService.list(
                         Criteria.of().eq("metadataId", metadataId),
                         ALL,
                         Sort.asc(PlatformAbilityFields.SORT_FIELD)
-                )
-                .stream()
-                .map(fieldDefinitionCompiler::compile)
-                .toList();
+                );
     }
 
     private EnumSet<EntityCapability> capabilities(List<FieldDefinition> fields) {
@@ -186,6 +199,53 @@ public class PlatformModuleDefinitionCompiler {
         }
         if (Boolean.TRUE.equals(relation.getCascadeDelete())) {
             definition = definition.withAutoDeleteWithParent();
+        }
+        return definition;
+    }
+
+    private List<EntityReferenceDefinition> references(String moduleAlias, Map<String, Metadata> metadataById) {
+        return metadataById.values().stream()
+                .flatMap(metadata -> references(moduleAlias, metadata, metadataById).stream())
+                .toList();
+    }
+
+    private List<EntityReferenceDefinition> references(String moduleAlias,
+                                                       Metadata sourceMetadata,
+                                                       Map<String, Metadata> metadataById) {
+        return metadataFields(sourceMetadata.getId()).stream()
+                .map(field -> reference(moduleAlias, sourceMetadata, field, metadataById))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private EntityReferenceDefinition reference(String moduleAlias,
+                                                Metadata sourceMetadata,
+                                                MetadataField sourceField,
+                                                Map<String, Metadata> metadataById) {
+        MetadataFieldReferenceConfig config = referenceConfigService.findByMetadataFieldId(sourceField.getId());
+        if (config == null) {
+            return null;
+        }
+        Metadata targetMetadata = metadataById.get(config.getTargetMetadataId());
+        if (targetMetadata == null) {
+            targetMetadata = metadataService.select(config.getTargetMetadataId());
+        }
+        if (targetMetadata == null) {
+            throw new PlatformException("Reference config points to missing metadata: " + config.getTargetMetadataId());
+        }
+        String targetModuleAlias = config.getTargetModuleAlias() == null || config.getTargetModuleAlias().isBlank()
+                ? moduleAlias
+                : config.getTargetModuleAlias();
+        EntityReferenceDefinition definition = new EntityReferenceDefinition(
+                sourceMetadata.getAlias(),
+                sourceField.getFieldName(),
+                targetModuleAlias + "." + targetMetadata.getAlias(),
+                config.getCardinality(),
+                Boolean.TRUE.equals(config.getAutoTitle()),
+                config.getTitleOutputField()
+        );
+        for (ReferenceProjection projection : config.projections()) {
+            definition = definition.withProjection(projection.targetField(), projection.outputField());
         }
         return definition;
     }

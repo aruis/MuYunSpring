@@ -1,0 +1,127 @@
+package net.ximatai.muyun.spring.platform.metadata;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.ability.AbstractAbilityService;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
+        SoftDeleteAbility<MetadataFieldReferenceConfig> {
+    public static final String MODULE_ALIAS = "platform.metadataFieldReferenceConfig";
+
+    private final MetadataFieldService fieldService;
+    private final MetadataService metadataService;
+    private final PlatformFieldTypeService fieldTypeService;
+    private final PlatformModuleService moduleService;
+
+    public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
+                                               MetadataFieldService fieldService,
+                                               MetadataService metadataService,
+                                               PlatformFieldTypeService fieldTypeService,
+                                               PlatformModuleService moduleService) {
+        super(MODULE_ALIAS, MetadataFieldReferenceConfig.class, referenceConfigDao);
+        this.fieldService = fieldService;
+        this.metadataService = metadataService;
+        this.fieldTypeService = fieldTypeService;
+        this.moduleService = moduleService;
+    }
+
+    @Override
+    public void beforeInsert(MetadataFieldReferenceConfig config) {
+        normalizeAndValidate(config);
+    }
+
+    @Override
+    public void beforeUpdate(MetadataFieldReferenceConfig config) {
+        normalizeAndValidate(config);
+    }
+
+    public MetadataFieldReferenceConfig findByMetadataFieldId(String metadataFieldId) {
+        if (metadataFieldId == null || metadataFieldId.isBlank()) {
+            return null;
+        }
+        return findOne(Criteria.of().eq("metadataFieldId", metadataFieldId));
+    }
+
+    private void normalizeAndValidate(MetadataFieldReferenceConfig config) {
+        MetadataField sourceField = requireField(config.getMetadataFieldId(), "source metadata field");
+        PlatformFieldType sourceType = fieldTypeService.requireFieldType(sourceField.getFieldTypeAlias());
+        if (sourceType.getFieldType() != FieldType.STRING && sourceType.getFieldType() != FieldType.TEXT) {
+            throw new IllegalArgumentException("reference source field must be string/text: " + sourceField.getFieldName());
+        }
+        Metadata targetMetadata = metadataService.select(config.getTargetMetadataId());
+        if (targetMetadata == null) {
+            throw new PlatformException("Reference config requires existing target metadata: " + config.getTargetMetadataId());
+        }
+        if (config.getTargetModuleAlias() != null && !config.getTargetModuleAlias().isBlank()) {
+            String targetModuleAlias = PlatformNameRules.requireModuleAlias(config.getTargetModuleAlias());
+            if (moduleService.select(targetModuleAlias) == null) {
+                throw new PlatformException("Reference config requires existing target module: " + targetModuleAlias);
+            }
+            config.setTargetModuleAlias(targetModuleAlias);
+        } else {
+            config.setTargetModuleAlias(null);
+        }
+        if (config.getCardinality() == null) {
+            config.setCardinality(ReferenceCardinality.ONE);
+        }
+        normalizeAutoTitle(config);
+        validateProjections(config);
+        if (config.getTargetModuleAlias() != null
+                && (Boolean.TRUE.equals(config.getAutoTitle()) || !config.projections().isEmpty())) {
+            throw new PlatformException("Cross-module reference display is not supported yet: " + config.getTargetModuleAlias());
+        }
+        rejectDuplicate(config, Criteria.of().eq("metadataFieldId", config.getMetadataFieldId()),
+                "metadata field reference config must be unique: " + config.getMetadataFieldId());
+    }
+
+    private void normalizeAutoTitle(MetadataFieldReferenceConfig config) {
+        if (config.getAutoTitle() == null) {
+            config.setAutoTitle(Boolean.FALSE);
+        }
+        if (!config.getAutoTitle()) {
+            config.setTitleOutputField(null);
+            return;
+        }
+        if (config.getTitleOutputField() == null || config.getTitleOutputField().isBlank()) {
+            config.setTitleOutputField(sourceFieldName(config) + "Title");
+        }
+        config.setTitleOutputField(PlatformNameRules.requireFieldName(config.getTitleOutputField(), "titleOutputField"));
+    }
+
+    private void validateProjections(MetadataFieldReferenceConfig config) {
+        for (ReferenceProjection projection : config.projections()) {
+            PlatformNameRules.requireFieldName(projection.targetField(), "projection.targetField");
+            PlatformNameRules.requireFieldName(projection.outputField(), "projection.outputField");
+            requireTargetField(config.getTargetMetadataId(), projection.targetField());
+        }
+    }
+
+    private void requireTargetField(String targetMetadataId, String targetFieldName) {
+        if (fieldService.count(Criteria.of()
+                .eq("metadataId", targetMetadataId)
+                .eq("fieldName", targetFieldName)) <= 0) {
+            throw new PlatformException("Reference projection requires existing target field: " + targetFieldName);
+        }
+    }
+
+    private MetadataField requireField(String metadataFieldId, String name) {
+        MetadataField field = metadataFieldId == null || metadataFieldId.isBlank() ? null : fieldService.select(metadataFieldId);
+        if (field == null) {
+            throw new PlatformException("Reference config requires existing " + name + ": " + metadataFieldId);
+        }
+        return field;
+    }
+
+    private String sourceFieldName(MetadataFieldReferenceConfig config) {
+        return requireField(config.getMetadataFieldId(), "source metadata field").getFieldName();
+    }
+}

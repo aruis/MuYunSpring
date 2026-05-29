@@ -38,6 +38,7 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
     private final MemoryDao<PlatformFieldType> fieldTypeDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
+    private final MemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
     private final MemoryDao<DictionaryCategory> categoryDao = new MemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
@@ -49,6 +50,9 @@ class PlatformMetadataServiceContractTest {
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
+    private final MetadataFieldReferenceConfigService referenceConfigService =
+            new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
+                    fieldTypeService, moduleService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
 
@@ -206,6 +210,56 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldCreateMetadataFieldReferenceConfig() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(titleField(customerId));
+        fieldService.insert(field(customerId, "code", "code", FieldType.STRING));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setAutoTitle(true);
+        config.setProjectionMappings("code:customerCode");
+
+        String id = referenceConfigService.insert(config);
+
+        MetadataFieldReferenceConfig saved = referenceConfigService.select(id);
+        assertThat(saved.getCardinality()).isEqualTo(net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE);
+        assertThat(saved.getTitleOutputField()).isEqualTo("customerIdTitle");
+        assertThat(saved.projections()).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectReferenceConfigForNonStringSourceField() {
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.INTEGER);
+        fieldService.insert(customerField);
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("source field must be string");
+    }
+
+    @Test
+    void shouldRejectCrossModuleReferenceDisplayConfig() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setTargetModuleAlias("crm.customer");
+        config.setAutoTitle(true);
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Cross-module reference display");
+    }
+
+    @Test
     void shouldRejectFieldWithoutExistingMetadata() {
         MetadataField field = field("missing", "code", "code", FieldType.STRING);
 
@@ -308,6 +362,12 @@ class PlatformMetadataServiceContractTest {
         return field;
     }
 
+    private MetadataField titleField(String metadataId) {
+        MetadataField field = field(metadataId, "title", "title", FieldType.STRING);
+        field.setTitleField(true);
+        return field;
+    }
+
     private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
         PlatformFieldType type = new PlatformFieldType();
         type.setAlias(alias);
@@ -322,6 +382,13 @@ class PlatformMetadataServiceContractTest {
     private MetadataFieldConfig fieldConfig(String fieldId) {
         MetadataFieldConfig config = new MetadataFieldConfig();
         config.setMetadataFieldId(fieldId);
+        return config;
+    }
+
+    private MetadataFieldReferenceConfig referenceConfig(String fieldId, String targetMetadataId) {
+        MetadataFieldReferenceConfig config = new MetadataFieldReferenceConfig();
+        config.setMetadataFieldId(fieldId);
+        config.setTargetMetadataId(targetMetadataId);
         return config;
     }
 

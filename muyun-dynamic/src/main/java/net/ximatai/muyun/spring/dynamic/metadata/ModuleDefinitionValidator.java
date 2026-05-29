@@ -211,6 +211,7 @@ public class ModuleDefinitionValidator {
                 throw new ModuleDefinitionException("reference projection requires same module target: " + target.qualifiedName());
             }
             EntityDefinition targetEntity = requireEntity(entities, target.entityCode(), "reference target entity");
+            requireReferenceTargetCapability(targetEntity, target);
             for (ReferenceProjection projection : reference.projections()) {
                 requireField(targetEntity, projection.targetField(), "reference projection target field");
                 requireFieldName(projection.outputField(), "reference projection output field");
@@ -222,6 +223,8 @@ public class ModuleDefinitionValidator {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
             }
+            EntityDefinition targetEntity = requireEntity(entities, target.entityCode(), "reference target entity");
+            requireReferenceTargetCapability(targetEntity, target);
             String outputField = plan.titleOutputField();
             requireFieldName(outputField, "reference title output field");
             requireReferenceOutputField(source, outputField, "reference title output field");
@@ -234,6 +237,13 @@ public class ModuleDefinitionValidator {
             return reference.plan();
         } catch (PlatformException e) {
             throw new ModuleDefinitionException("reference output field invalid: " + e.getMessage());
+        }
+    }
+
+    private void requireReferenceTargetCapability(EntityDefinition targetEntity, ReferenceTarget target) {
+        if (!targetEntity.supports(EntityCapability.REFERENCE)) {
+            throw new ModuleDefinitionException("reference display target requires REFERENCE capability: "
+                    + target.qualifiedName());
         }
     }
 

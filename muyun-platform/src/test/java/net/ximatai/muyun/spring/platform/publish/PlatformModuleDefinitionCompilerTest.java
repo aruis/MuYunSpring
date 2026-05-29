@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.platform.publish;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -14,6 +16,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -38,6 +42,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
+    private final TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
@@ -49,10 +54,13 @@ class PlatformModuleDefinitionCompilerTest {
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
+    private final MetadataFieldReferenceConfigService referenceConfigService =
+            new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService, fieldTypeService, moduleService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final PlatformModuleDefinitionCompiler compiler =
-            new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler, relationService);
+            new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
+                    referenceConfigService, relationService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -120,6 +128,39 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(relation.childForeignKeyField()).isEqualTo("invoiceId");
         assertThat(relation.autoPopulate()).isTrue();
         assertThat(relation.autoDeleteWithParent()).isTrue();
+    }
+
+    @Test
+    void shouldCompileFieldReferenceConfigIntoModuleDefinition() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(field(invoiceId, "code", "code", FieldType.STRING));
+        fieldService.insert(titleField(lineId));
+        MetadataField invoiceField = field(lineId, "invoiceId", "invoice_id", FieldType.STRING);
+        fieldService.insert(invoiceField);
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+        MetadataFieldReferenceConfig referenceConfig = referenceConfig(invoiceField.getId(), invoiceId);
+        referenceConfig.setAutoTitle(true);
+        referenceConfig.setTitleOutputField("invoiceTitle");
+        referenceConfig.setProjectionMappings("code:invoiceCode");
+        referenceConfigService.insert(referenceConfig);
+
+        ModuleDefinition definition = compiler.compile("sales.invoice");
+
+        assertThat(definition.references()).hasSize(1);
+        EntityReferenceDefinition reference = definition.references().getFirst();
+        assertThat(reference.sourceEntity()).isEqualTo("invoice_line");
+        assertThat(reference.sourceField()).isEqualTo("invoiceId");
+        assertThat(reference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
+        assertThat(reference.autoTitle()).isTrue();
+        assertThat(reference.titleOutputField()).isEqualTo("invoiceTitle");
+        assertThat(reference.projections()).hasSize(1);
+        assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
+        assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
+        assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityCode()).isEqualTo("invoice");
     }
 
     @Test
@@ -205,6 +246,13 @@ class PlatformModuleDefinitionCompilerTest {
     private MetadataFieldConfig fieldConfig(String fieldId) {
         MetadataFieldConfig config = new MetadataFieldConfig();
         config.setMetadataFieldId(fieldId);
+        return config;
+    }
+
+    private MetadataFieldReferenceConfig referenceConfig(String fieldId, String targetMetadataId) {
+        MetadataFieldReferenceConfig config = new MetadataFieldReferenceConfig();
+        config.setMetadataFieldId(fieldId);
+        config.setTargetMetadataId(targetMetadataId);
         return config;
     }
 
