@@ -129,12 +129,18 @@ public class TestMemoryDao<T extends EntityContract> implements BaseDao<T, Strin
     }
 
     private boolean matchesClause(T row, CriteriaClause clause) {
-        if (clause.getOperator() != CriteriaOperator.EQ) {
-            return true;
-        }
-        Object expected = clause.getValues().getFirst();
         Object actual = value(row, clause.getField());
-        return expected == null ? actual == null : expected.equals(actual);
+        if (clause.getOperator() == CriteriaOperator.IS_NULL) {
+            return actual == null;
+        }
+        if (clause.getOperator() == CriteriaOperator.IS_NOT_NULL) {
+            return actual != null;
+        }
+        if (clause.getOperator() == CriteriaOperator.EQ) {
+            Object expected = clause.getValues().getFirst();
+            return expected == null ? actual == null : expected.equals(actual);
+        }
+        return true;
     }
 
     private Object value(T row, String field) {

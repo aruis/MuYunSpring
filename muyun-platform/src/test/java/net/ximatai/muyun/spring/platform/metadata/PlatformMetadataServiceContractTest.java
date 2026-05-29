@@ -46,15 +46,16 @@ class PlatformMetadataServiceContractTest {
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
     private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+    private final ModuleMetadataRelationService relationService =
+            new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final MetadataFieldConfigService fieldConfigService =
-            new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
+            new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
+                    categoryService, relationService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
-                    fieldTypeService, moduleService);
-    private final ModuleMetadataRelationService relationService =
-            new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+                    fieldTypeService, moduleService, relationService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -162,6 +163,45 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.type()).isEqualTo(FieldType.STRING);
         assertThat(definition.length()).isEqualTo(32);
         assertThat(definition.queryDefinition().queryable()).isTrue();
+    }
+
+    @Test
+    void shouldOverrideFieldBehaviorInRelationScope() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "status", "status", FieldType.STRING);
+        fieldService.insert(field);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        MetadataFieldConfig defaultConfig = fieldConfig(field.getId());
+        defaultConfig.setFieldLength(64);
+        fieldConfigService.insert(defaultConfig);
+        MetadataFieldConfig override = fieldConfig(field.getId());
+        override.setRelationId(relationId);
+        override.setQueryable(false);
+        fieldConfigService.insert(override);
+
+        FieldDefinition defaultDefinition = fieldDefinitionCompiler.compile(field);
+        FieldDefinition scopedDefinition = fieldDefinitionCompiler.compile(field, relationId);
+
+        assertThat(defaultDefinition.queryDefinition().queryable()).isTrue();
+        assertThat(scopedDefinition.queryDefinition().queryable()).isFalse();
+        assertThat(scopedDefinition.length()).isEqualTo(64);
+    }
+
+    @Test
+    void shouldRejectRelationScopedPhysicalShapeOverride() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "shortCode", "short_code", FieldType.STRING);
+        fieldService.insert(field);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setRelationId(relationId);
+        config.setFieldLength(32);
+
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("physical field shape");
     }
 
     @Test
@@ -542,12 +582,18 @@ class PlatformMetadataServiceContractTest {
         }
 
         private boolean matchesClause(T row, CriteriaClause clause) {
-            if (clause.getOperator() != CriteriaOperator.EQ) {
-                return true;
-            }
-            Object expected = clause.getValues().getFirst();
             Object actual = value(row, clause.getField());
-            return expected == null ? actual == null : expected.equals(actual);
+            if (clause.getOperator() == CriteriaOperator.IS_NULL) {
+                return actual == null;
+            }
+            if (clause.getOperator() == CriteriaOperator.IS_NOT_NULL) {
+                return actual != null;
+            }
+            if (clause.getOperator() == CriteriaOperator.EQ) {
+                Object expected = clause.getValues().getFirst();
+                return expected == null ? actual == null : expected.equals(actual);
+            }
+            return true;
         }
 
         private Object value(T row, String field) {

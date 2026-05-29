@@ -50,14 +50,16 @@ class PlatformModuleDefinitionCompilerTest {
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
     private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+    private final ModuleMetadataRelationService relationService =
+            new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final MetadataFieldConfigService fieldConfigService =
-            new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
+            new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
+                    categoryService, relationService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
     private final MetadataFieldReferenceConfigService referenceConfigService =
-            new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService, fieldTypeService, moduleService);
-    private final ModuleMetadataRelationService relationService =
-            new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+            new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
+                    fieldTypeService, moduleService, relationService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
                     referenceConfigService, relationService);
@@ -164,6 +166,32 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
+    void shouldCompileRelationScopedFieldConfigForSameMetadataInDifferentModules() {
+        moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
+        moduleService.insert(module("sales.customer", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        fieldService.insert(titleField(metadataId));
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        fieldService.insert(status);
+        String crmRelationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        String salesRelationId = relationService.insert(mainRelation("sales.customer", metadataId));
+        MetadataFieldConfig crmConfig = fieldConfig(status.getId());
+        crmConfig.setRelationId(crmRelationId);
+        crmConfig.setQueryable(true);
+        fieldConfigService.insert(crmConfig);
+        MetadataFieldConfig salesConfig = fieldConfig(status.getId());
+        salesConfig.setRelationId(salesRelationId);
+        salesConfig.setQueryable(false);
+        fieldConfigService.insert(salesConfig);
+
+        ModuleDefinition crmDefinition = compiler.compile("crm.customer");
+        ModuleDefinition salesDefinition = compiler.compile("sales.customer");
+
+        assertThat(field(crmDefinition, "status").queryDefinition().queryable()).isTrue();
+        assertThat(field(salesDefinition, "status").queryDefinition().queryable()).isFalse();
+    }
+
+    @Test
     void shouldRejectStaticModuleAndDynamicModuleWithoutMainMetadata() {
         moduleService.insert(module("crm.report", ModuleKind.STATIC));
         moduleService.insert(module("crm.empty", ModuleKind.DYNAMIC));
@@ -254,6 +282,13 @@ class PlatformModuleDefinitionCompilerTest {
         config.setMetadataFieldId(fieldId);
         config.setTargetMetadataId(targetMetadataId);
         return config;
+    }
+
+    private FieldDefinition field(ModuleDefinition definition, String fieldName) {
+        return definition.entities().getFirst().fields().stream()
+                .filter(field -> field.fieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow();
     }
 
     private ModuleMetadataRelation mainRelation(String moduleAlias, String metadataId) {

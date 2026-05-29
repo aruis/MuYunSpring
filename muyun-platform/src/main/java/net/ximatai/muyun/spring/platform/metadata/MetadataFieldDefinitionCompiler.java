@@ -16,14 +16,26 @@ public class MetadataFieldDefinitionCompiler {
     }
 
     public FieldDefinition compile(MetadataField field) {
+        return compile(field, null);
+    }
+
+    public FieldDefinition compile(MetadataField field, String relationId) {
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
-        MetadataFieldConfig config = configService.findByMetadataFieldId(field.getId());
-        FieldQueryDefinition queryDefinition = config == null
+        MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
+        MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
+        MetadataFieldConfig queryConfig = relationConfig != null && relationConfig.getQueryable() != null
+                ? relationConfig
+                : defaultConfig;
+        MetadataFieldConfig shapeConfig = defaultConfig;
+        MetadataFieldConfig dictionaryConfig = relationConfig != null && relationConfig.hasDictionaryBinding()
+                ? relationConfig
+                : defaultConfig;
+        FieldQueryDefinition queryDefinition = queryConfig == null
                 ? fieldType.queryDefinition()
-                : config.queryDefinition(fieldType);
-        Integer length = config == null ? fieldType.getDefaultLength() : config.effectiveLength(fieldType);
-        Integer precision = config == null ? fieldType.getDefaultPrecision() : config.effectivePrecision(fieldType);
-        Integer scale = config == null ? fieldType.getDefaultScale() : config.effectiveScale(fieldType);
+                : queryConfig.queryDefinition(fieldType);
+        Integer length = shapeConfig == null ? fieldType.getDefaultLength() : shapeConfig.effectiveLength(fieldType);
+        Integer precision = shapeConfig == null ? fieldType.getDefaultPrecision() : shapeConfig.effectivePrecision(fieldType);
+        Integer scale = shapeConfig == null ? fieldType.getDefaultScale() : shapeConfig.effectiveScale(fieldType);
         FieldDefinition definition = new FieldDefinition(
                 field.getFieldName(),
                 field.getColumnName(),
@@ -40,8 +52,9 @@ public class MetadataFieldDefinitionCompiler {
                 null,
                 queryDefinition
         );
-        if (config != null && config.hasDictionaryBinding()) {
-            definition = definition.dictionary(config.getDictionaryApplicationAlias(), config.getDictionaryCategoryAlias());
+        if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
+            definition = definition.dictionary(dictionaryConfig.getDictionaryApplicationAlias(),
+                    dictionaryConfig.getDictionaryCategoryAlias());
         }
         return definition;
     }

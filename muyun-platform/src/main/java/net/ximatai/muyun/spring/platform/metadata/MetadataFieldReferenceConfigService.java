@@ -21,17 +21,20 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     private final MetadataService metadataService;
     private final PlatformFieldTypeService fieldTypeService;
     private final PlatformModuleService moduleService;
+    private final ModuleMetadataRelationService relationService;
 
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,
                                                MetadataService metadataService,
                                                PlatformFieldTypeService fieldTypeService,
-                                               PlatformModuleService moduleService) {
+                                               PlatformModuleService moduleService,
+                                               ModuleMetadataRelationService relationService) {
         super(MODULE_ALIAS, MetadataFieldReferenceConfig.class, referenceConfigDao);
         this.fieldService = fieldService;
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
         this.moduleService = moduleService;
+        this.relationService = relationService;
     }
 
     @Override
@@ -48,11 +51,29 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         if (metadataFieldId == null || metadataFieldId.isBlank()) {
             return null;
         }
-        return findOne(Criteria.of().eq("metadataFieldId", metadataFieldId));
+        return findOne(Criteria.of()
+                .eq("metadataFieldId", metadataFieldId)
+                .isNull("relationId"));
+    }
+
+    public MetadataFieldReferenceConfig findForRelation(String metadataFieldId, String relationId) {
+        if (metadataFieldId == null || metadataFieldId.isBlank()) {
+            return null;
+        }
+        if (relationId != null && !relationId.isBlank()) {
+            MetadataFieldReferenceConfig override = findOne(Criteria.of()
+                    .eq("metadataFieldId", metadataFieldId)
+                    .eq("relationId", relationId));
+            if (override != null) {
+                return override;
+            }
+        }
+        return findByMetadataFieldId(metadataFieldId);
     }
 
     private void normalizeAndValidate(MetadataFieldReferenceConfig config) {
         MetadataField sourceField = requireField(config.getMetadataFieldId(), "source metadata field");
+        normalizeRelation(config, sourceField);
         PlatformFieldType sourceType = fieldTypeService.requireFieldType(sourceField.getFieldTypeAlias());
         if (sourceType.getFieldType() != FieldType.STRING && sourceType.getFieldType() != FieldType.TEXT) {
             throw new IllegalArgumentException("reference source field must be string/text: " + sourceField.getFieldName());
@@ -79,8 +100,30 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
                 && (Boolean.TRUE.equals(config.getAutoTitle()) || !config.projections().isEmpty())) {
             throw new PlatformException("Cross-module reference display is not supported yet: " + config.getTargetModuleAlias());
         }
-        rejectDuplicate(config, Criteria.of().eq("metadataFieldId", config.getMetadataFieldId()),
-                "metadata field reference config must be unique: " + config.getMetadataFieldId());
+        rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
+                "metadata field reference config must be unique in scope: " + config.getMetadataFieldId());
+    }
+
+    private Criteria scopeCriteria(String metadataFieldId, String relationId) {
+        Criteria criteria = Criteria.of().eq("metadataFieldId", metadataFieldId);
+        if (relationId == null || relationId.isBlank()) {
+            return criteria.isNull("relationId");
+        }
+        return criteria.eq("relationId", relationId);
+    }
+
+    private void normalizeRelation(MetadataFieldReferenceConfig config, MetadataField field) {
+        if (config.getRelationId() == null || config.getRelationId().isBlank()) {
+            config.setRelationId(null);
+            return;
+        }
+        ModuleMetadataRelation relation = relationService.select(config.getRelationId());
+        if (relation == null) {
+            throw new PlatformException("Reference config requires existing relation: " + config.getRelationId());
+        }
+        if (!field.getMetadataId().equals(relation.getMetadataId())) {
+            throw new PlatformException("Reference config relation metadata mismatch: " + config.getRelationId());
+        }
     }
 
     private void normalizeAutoTitle(MetadataFieldReferenceConfig config) {

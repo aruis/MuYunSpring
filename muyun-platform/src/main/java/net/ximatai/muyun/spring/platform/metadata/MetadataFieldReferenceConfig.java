@@ -16,10 +16,13 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "platform_metadata_field_reference_config", comment = "Metadata field reference config")
-@CompositeIndex(columns = {"metadata_field_id"}, unique = true)
+@CompositeIndex(columns = {"metadata_field_id", "relation_id"}, unique = true)
 public class MetadataFieldReferenceConfig extends StandardEntity {
     @Column(name = "metadata_field_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata field id")
     private String metadataFieldId;
+
+    @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, comment = "Module metadata relation id")
+    private String relationId;
 
     @Column(name = "target_module_alias", type = ColumnType.VARCHAR, length = 128, comment = "Target module alias")
     private String targetModuleAlias;

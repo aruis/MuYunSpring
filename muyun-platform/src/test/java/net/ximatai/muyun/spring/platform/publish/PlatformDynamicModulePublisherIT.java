@@ -188,15 +188,16 @@ class PlatformDynamicModulePublisherIT {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("id", FieldType.STRING, 32));
         MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+        ModuleMetadataRelationService relationService =
+                new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
         MetadataFieldConfigService fieldConfigService =
-                new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
+                new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
+                        categoryService, relationService);
         MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
                 new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
         MetadataFieldReferenceConfigService referenceConfigService =
                 new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
-                        fieldTypeService, moduleService);
-        ModuleMetadataRelationService relationService =
-                new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+                        fieldTypeService, moduleService, relationService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,

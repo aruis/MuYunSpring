@@ -17,10 +17,13 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 @Table(name = "platform_metadata_field_config", comment = "Metadata field config")
-@CompositeIndex(columns = {"metadata_field_id"}, unique = true)
+@CompositeIndex(columns = {"metadata_field_id", "relation_id"}, unique = true)
 public class MetadataFieldConfig extends StandardEntity {
     @Column(name = "metadata_field_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata field id")
     private String metadataFieldId;
+
+    @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, comment = "Module metadata relation id")
+    private String relationId;
 
     @Column(name = "dictionary_application_alias", type = ColumnType.VARCHAR, length = 64, comment = "Dictionary application alias")
     private String dictionaryApplicationAlias;

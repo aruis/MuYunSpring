@@ -64,11 +64,11 @@ class PlatformModelSchemaTest {
                         "default_scale", "default_query_operator", "query_operators")
                 .doesNotContain("verify_regex");
         assertThat(columnNames(mapper.toTable(MetadataFieldConfig.class)))
-                .contains("id", "metadata_field_id", "dictionary_application_alias", "dictionary_category_alias",
+                .contains("id", "metadata_field_id", "relation_id", "dictionary_application_alias", "dictionary_category_alias",
                         "field_length", "precision", "scale", "queryable", "default_query_operator", "query_operators")
                 .doesNotContain("verify_regex", "default_value");
         assertThat(columnNames(mapper.toTable(MetadataFieldReferenceConfig.class)))
-                .contains("id", "metadata_field_id", "target_module_alias", "target_metadata_id",
+                .contains("id", "metadata_field_id", "relation_id", "target_module_alias", "target_metadata_id",
                         "cardinality", "auto_title", "title_output_field", "projection_mappings");
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",

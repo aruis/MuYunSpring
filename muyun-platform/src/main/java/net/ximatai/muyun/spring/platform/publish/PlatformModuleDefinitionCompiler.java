@@ -84,7 +84,7 @@ public class PlatformModuleDefinitionCompiler {
                 .filter(relation -> relation.getRelationRole() == RelationRole.CHILD)
                 .map(relation -> childRelation(relation, metadataById))
                 .toList();
-        List<EntityReferenceDefinition> references = references(module.getAlias(), metadataById);
+        List<EntityReferenceDefinition> references = references(module.getAlias(), relations, metadataById);
         ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations, references);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
@@ -134,7 +134,7 @@ public class PlatformModuleDefinitionCompiler {
     private EntityDefinition entity(ModuleMetadataRelation relation,
                                     Metadata metadata,
                                     List<ModuleMetadataRelation> relations) {
-        List<FieldDefinition> fields = fields(metadata.getId());
+        List<FieldDefinition> fields = fields(metadata.getId(), relation.getId());
         EnumSet<EntityCapability> capabilities = capabilities(fields);
         if (relations.stream().anyMatch(child -> metadata.getId().equals(child.getParentMetadataId()))) {
             capabilities.add(EntityCapability.CHILD_RELATION);
@@ -147,9 +147,9 @@ public class PlatformModuleDefinitionCompiler {
                 capabilities);
     }
 
-    private List<FieldDefinition> fields(String metadataId) {
+    private List<FieldDefinition> fields(String metadataId, String relationId) {
         return metadataFields(metadataId).stream()
-                .map(fieldDefinitionCompiler::compile)
+                .map(field -> fieldDefinitionCompiler.compile(field, relationId))
                 .toList();
     }
 
@@ -203,26 +203,30 @@ public class PlatformModuleDefinitionCompiler {
         return definition;
     }
 
-    private List<EntityReferenceDefinition> references(String moduleAlias, Map<String, Metadata> metadataById) {
-        return metadataById.values().stream()
-                .flatMap(metadata -> references(moduleAlias, metadata, metadataById).stream())
+    private List<EntityReferenceDefinition> references(String moduleAlias,
+                                                       List<ModuleMetadataRelation> relations,
+                                                       Map<String, Metadata> metadataById) {
+        return relations.stream()
+                .flatMap(relation -> references(moduleAlias, relation, metadataById).stream())
                 .toList();
     }
 
     private List<EntityReferenceDefinition> references(String moduleAlias,
-                                                       Metadata sourceMetadata,
+                                                       ModuleMetadataRelation relation,
                                                        Map<String, Metadata> metadataById) {
+        Metadata sourceMetadata = metadataById.get(relation.getMetadataId());
         return metadataFields(sourceMetadata.getId()).stream()
-                .map(field -> reference(moduleAlias, sourceMetadata, field, metadataById))
+                .map(field -> reference(moduleAlias, relation, sourceMetadata, field, metadataById))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private EntityReferenceDefinition reference(String moduleAlias,
+                                                ModuleMetadataRelation relation,
                                                 Metadata sourceMetadata,
                                                 MetadataField sourceField,
                                                 Map<String, Metadata> metadataById) {
-        MetadataFieldReferenceConfig config = referenceConfigService.findByMetadataFieldId(sourceField.getId());
+        MetadataFieldReferenceConfig config = referenceConfigService.findForRelation(sourceField.getId(), relation.getId());
         if (config == null) {
             return null;
         }
