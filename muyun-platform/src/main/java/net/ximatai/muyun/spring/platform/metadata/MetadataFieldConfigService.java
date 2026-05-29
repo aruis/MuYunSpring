@@ -55,11 +55,6 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                 .isNull("relationId"));
     }
 
-    public MetadataFieldConfig findForRelation(String metadataFieldId, String relationId) {
-        MetadataFieldConfig override = findRelationOverride(metadataFieldId, relationId);
-        return override == null ? findByMetadataFieldId(metadataFieldId) : override;
-    }
-
     public MetadataFieldConfig findRelationOverride(String metadataFieldId, String relationId) {
         if (metadataFieldId == null || metadataFieldId.isBlank()) {
             return null;

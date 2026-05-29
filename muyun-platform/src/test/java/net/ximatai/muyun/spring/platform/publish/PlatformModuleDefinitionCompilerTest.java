@@ -192,6 +192,49 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
+    void shouldCompileRelationScopedReferenceConfigForSameSourceMetadataInDifferentModules() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        moduleService.insert(module("support.ticket", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String ticketId = metadataService.insert(metadata("support", "ticket"));
+        String lineId = metadataService.insert(metadata("sales", "work_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(field(invoiceId, "code", "code", FieldType.STRING));
+        fieldService.insert(titleField(ticketId));
+        fieldService.insert(field(ticketId, "code", "code", FieldType.STRING));
+        fieldService.insert(titleField(lineId));
+        MetadataField ownerField = field(lineId, "ownerId", "owner_id", FieldType.STRING);
+        fieldService.insert(ownerField);
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId, "ownerId"));
+        relationService.insert(mainRelation("support.ticket", ticketId));
+        String supportLineRelationId = relationService.insert(childRelation("support.ticket", lineId, ticketId, "ownerId"));
+        MetadataFieldReferenceConfig defaultReference = referenceConfig(ownerField.getId(), invoiceId);
+        defaultReference.setAutoTitle(true);
+        defaultReference.setTitleOutputField("invoiceTitle");
+        defaultReference.setProjectionMappings("code:invoiceCode");
+        referenceConfigService.insert(defaultReference);
+        MetadataFieldReferenceConfig supportReference = referenceConfig(ownerField.getId(), ticketId);
+        supportReference.setRelationId(supportLineRelationId);
+        supportReference.setAutoTitle(true);
+        supportReference.setTitleOutputField("ticketTitle");
+        supportReference.setProjectionMappings("code:ticketCode");
+        referenceConfigService.insert(supportReference);
+
+        ModuleDefinition salesDefinition = compiler.compile("sales.invoice");
+        ModuleDefinition supportDefinition = compiler.compile("support.ticket");
+
+        EntityReferenceDefinition salesReference = salesDefinition.references().getFirst();
+        assertThat(salesReference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
+        assertThat(salesReference.titleOutputField()).isEqualTo("invoiceTitle");
+        assertThat(salesReference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
+        EntityReferenceDefinition supportReferenceDefinition = supportDefinition.references().getFirst();
+        assertThat(supportReferenceDefinition.targetQualifiedName()).isEqualTo("support.ticket.ticket");
+        assertThat(supportReferenceDefinition.titleOutputField()).isEqualTo("ticketTitle");
+        assertThat(supportReferenceDefinition.projections().getFirst().outputField()).isEqualTo("ticketCode");
+    }
+
+    @Test
     void shouldRejectStaticModuleAndDynamicModuleWithoutMainMetadata() {
         moduleService.insert(module("crm.report", ModuleKind.STATIC));
         moduleService.insert(module("crm.empty", ModuleKind.DYNAMIC));
@@ -301,12 +344,19 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     private ModuleMetadataRelation childRelation(String moduleAlias, String metadataId, String parentMetadataId) {
+        return childRelation(moduleAlias, metadataId, parentMetadataId, "invoiceId");
+    }
+
+    private ModuleMetadataRelation childRelation(String moduleAlias,
+                                                 String metadataId,
+                                                 String parentMetadataId,
+                                                 String foreignKey) {
         ModuleMetadataRelation relation = new ModuleMetadataRelation();
         relation.setModuleAlias(moduleAlias);
         relation.setMetadataId(metadataId);
         relation.setParentMetadataId(parentMetadataId);
         relation.setRelationRole(RelationRole.CHILD);
-        relation.setForeignKey("invoiceId");
+        relation.setForeignKey(foreignKey);
         relation.setRelationAlias("lines");
         relation.setTitle("lines");
         return relation;
