@@ -16,7 +16,8 @@ public record DynamicFieldDescriptor(
         Integer length,
         Integer precision,
         Integer scale,
-        OptionBinding optionBinding
+        OptionBinding optionBinding,
+        DynamicFieldQueryDescriptor query
 ) {
     public static DynamicFieldDescriptor from(FieldDefinition field) {
         return new DynamicFieldDescriptor(
@@ -31,7 +32,8 @@ public record DynamicFieldDescriptor(
                 field.length(),
                 field.precision(),
                 field.scale(),
-                field.optionBinding()
+                field.optionBinding(),
+                DynamicFieldQueryDescriptor.from(field.queryDefinition())
         );
     }
 }

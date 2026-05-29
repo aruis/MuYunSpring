@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.dynamic.metadata;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
+import java.util.Set;
+
 public record FieldDefinition(
         String fieldName,
         String columnName,
@@ -16,10 +18,15 @@ public record FieldDefinition(
         Integer length,
         Integer precision,
         Integer scale,
-        FieldDictionaryBinding dictionaryBinding
+        FieldDictionaryBinding dictionaryBinding,
+        FieldQueryDefinition queryDefinition
 ) {
     public FieldDefinition(String fieldName, String columnName, FieldType type, String name) {
-        this(fieldName, columnName, type, name, false, false, false, false, false, null, null, null, null);
+        this(fieldName, columnName, type, name, false, false, false, false, false, null, null, null, null, null);
+    }
+
+    public FieldDefinition {
+        queryDefinition = queryDefinition == null ? FieldQueryDefinition.disabled() : queryDefinition;
     }
 
     public static FieldDefinition of(String fieldName, FieldType type, String name) {
@@ -84,47 +91,60 @@ public record FieldDefinition(
 
     public FieldDefinition column(String value) {
         return new FieldDefinition(fieldName, value, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition required() {
         return new FieldDefinition(fieldName, columnName, type, name, true, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition unique() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, true, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition indexed() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, true, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition sortable() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, true, isTitle,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition title() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, true,
-                length, precision, scale, dictionaryBinding);
+                length, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition length(int value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                value, precision, scale, dictionaryBinding);
+                value, precision, scale, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition precision(int value, int scaleValue) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, value, scaleValue, dictionaryBinding);
+                length, value, scaleValue, dictionaryBinding, queryDefinition);
     }
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias));
+                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias), queryDefinition);
+    }
+
+    public FieldDefinition queryable() {
+        return queryable(FieldQueryDefinition.enabled(type));
+    }
+
+    public FieldDefinition queryable(DynamicQueryOperator defaultOperator, Set<DynamicQueryOperator> operators) {
+        return queryable(FieldQueryDefinition.enabled(type, defaultOperator, operators));
+    }
+
+    public FieldDefinition queryable(FieldQueryDefinition value) {
+        return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, value);
     }
 
     public OptionBinding optionBinding() {

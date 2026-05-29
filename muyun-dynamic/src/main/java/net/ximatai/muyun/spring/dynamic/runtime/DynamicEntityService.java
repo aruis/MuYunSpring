@@ -210,6 +210,10 @@ public class DynamicEntityService implements
         return scoped;
     }
 
+    public Criteria queryCriteria(Collection<DynamicQueryCondition> conditions) {
+        return new DynamicQueryCriteriaBuilder(dao.getEntity()).build(conditions);
+    }
+
     public List<DynamicRecord> sortedList(Criteria criteria) {
         requireCapability(EntityCapability.SORT);
         if (dao.getEntity().supports(EntityCapability.TREE)) {

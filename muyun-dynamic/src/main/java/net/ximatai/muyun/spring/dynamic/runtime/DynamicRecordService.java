@@ -110,6 +110,10 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityCode).enabledCriteria(criteria);
     }
 
+    public Criteria queryCriteria(String moduleAlias, String entityCode, Collection<DynamicQueryCondition> conditions) {
+        return entityService(moduleAlias, entityCode).queryCriteria(conditions);
+    }
+
     public String title(String moduleAlias, String entityCode, String id) {
         return entityService(moduleAlias, entityCode).title(id);
     }
@@ -233,6 +237,10 @@ public class DynamicRecordService {
 
         public Criteria enabledCriteria(Criteria criteria) {
             return service.enabledCriteria(moduleAlias, entityCode, criteria);
+        }
+
+        public Criteria queryCriteria(Collection<DynamicQueryCondition> conditions) {
+            return service.queryCriteria(moduleAlias, entityCode, conditions);
         }
 
         public String title(String id) {

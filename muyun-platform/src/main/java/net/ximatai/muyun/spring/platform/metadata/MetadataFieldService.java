@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         PlatformNameRules.requireFieldName(field.getFieldName(), "fieldName");
         PlatformNameRules.requireDatabaseName(field.getColumnName(), "columnName");
         normalizeDictionaryBinding(field);
+        normalizeQueryDefinition(field);
         if (field.getFieldType() == null) {
             field.setFieldType(FieldType.STRING);
         }
@@ -91,6 +93,29 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         }
         rejectDuplicateField(field);
         rejectDuplicateSingleFlag(field);
+    }
+
+    private void normalizeQueryDefinition(MetadataField field) {
+        if (field.getFieldType() == null) {
+            field.setFieldType(FieldType.STRING);
+        }
+        if (!Boolean.TRUE.equals(field.getQueryable())) {
+            field.setQueryable(Boolean.FALSE);
+            field.setDefaultQueryOperator(null);
+            field.setQueryOperators(null);
+            return;
+        }
+        if (field.getDefaultQueryOperator() == null) {
+            field.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(field.getFieldType()));
+        }
+        if (field.getQueryOperators() == null || field.getQueryOperators().isBlank()) {
+            field.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(field.getFieldType())));
+        }
+        try {
+            field.toDefinition().queryDefinition();
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("invalid field query definition: " + field.getFieldName(), e);
+        }
     }
 
     private void normalizeDictionaryBinding(MetadataField field) {

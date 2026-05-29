@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
@@ -101,6 +102,21 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.isRequired()).isTrue();
         assertThat(definition.isTitle()).isTrue();
         assertThat(definition.length()).isEqualTo(128);
+    }
+
+    @Test
+    void shouldCompileFieldQueryDefinition() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+        field.setQueryable(true);
+
+        fieldService.insert(field);
+
+        FieldDefinition definition = field.toDefinition();
+        assertThat(field.getDefaultQueryOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+        assertThat(field.getQueryOperators()).contains("EQ", "LIKE", "IN");
+        assertThat(definition.queryDefinition().queryable()).isTrue();
+        assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
     }
 
     @Test

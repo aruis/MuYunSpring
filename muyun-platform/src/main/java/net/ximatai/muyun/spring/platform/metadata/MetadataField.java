@@ -6,8 +6,14 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -55,6 +61,15 @@ public class MetadataField extends StandardEnabledSortableEntity {
     @Column(name = "dictionary_category_alias", type = ColumnType.VARCHAR, length = 64, comment = "Dictionary category alias")
     private String dictionaryCategoryAlias;
 
+    @Column(name = "queryable", type = ColumnType.BOOLEAN, comment = "Queryable flag")
+    private Boolean queryable;
+
+    @Column(name = "default_query_operator", type = ColumnType.VARCHAR, length = 32, comment = "Default query operator")
+    private DynamicQueryOperator defaultQueryOperator;
+
+    @Column(name = "query_operators", type = ColumnType.VARCHAR, length = 256, comment = "Allowed query operators")
+    private String queryOperators;
+
     public FieldDefinition toDefinition() {
         FieldDefinition definition = new FieldDefinition(fieldName, columnName, fieldType, getTitle(),
                 Boolean.TRUE.equals(required),
@@ -65,11 +80,29 @@ public class MetadataField extends StandardEnabledSortableEntity {
                 fieldLength,
                 precision,
                 scale,
-                null);
+                null,
+                queryDefinition());
         if (dictionaryApplicationAlias != null && !dictionaryApplicationAlias.isBlank()
                 && dictionaryCategoryAlias != null && !dictionaryCategoryAlias.isBlank()) {
             definition = definition.dictionary(dictionaryApplicationAlias, dictionaryCategoryAlias);
         }
         return definition;
+    }
+
+    private FieldQueryDefinition queryDefinition() {
+        if (!Boolean.TRUE.equals(queryable)) {
+            return FieldQueryDefinition.disabled();
+        }
+        Set<DynamicQueryOperator> operators = queryOperators == null || queryOperators.isBlank()
+                ? DynamicQueryOperator.defaultOperators(fieldType)
+                : Arrays.stream(queryOperators.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(DynamicQueryOperator::valueOf)
+                .collect(Collectors.toUnmodifiableSet());
+        DynamicQueryOperator operator = defaultQueryOperator == null
+                ? DynamicQueryOperator.defaultOperator(fieldType)
+                : defaultQueryOperator;
+        return FieldQueryDefinition.enabled(fieldType, operator, operators);
     }
 }

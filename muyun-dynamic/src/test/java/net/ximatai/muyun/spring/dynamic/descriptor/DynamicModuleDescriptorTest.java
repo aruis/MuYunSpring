@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -22,7 +23,7 @@ class DynamicModuleDescriptorTest {
                 "Customer",
                 List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
-                                FieldDefinition.titleField(),
+                                FieldDefinition.titleField().queryable(),
                                 FieldDefinition.string("status", "Status").dictionary("crm", "customer_status")
                         ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)),
                         new EntityDefinition("contact", "crm_contact", "Contact", List.of(
@@ -46,6 +47,10 @@ class DynamicModuleDescriptorTest {
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
+        assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
+                .isEqualTo(DynamicQueryOperator.LIKE.name());
+        assertThat(descriptor.entities().getFirst().fields().getFirst().query().operators())
+                .containsExactly("EQ", "LIKE", "IN");
         assertThat(descriptor.relations().getFirst().code()).isEqualTo("contacts");
         assertThat(descriptor.relations().getFirst().autoPopulate()).isTrue();
         DynamicReferenceDescriptor reference = descriptor.references().getFirst();
