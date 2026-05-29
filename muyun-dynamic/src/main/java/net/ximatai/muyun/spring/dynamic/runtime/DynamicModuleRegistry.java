@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -58,5 +59,9 @@ public class DynamicModuleRegistry {
 
     public List<ModuleDefinition> modules() {
         return List.copyOf(modules.values());
+    }
+
+    public DynamicModuleDescriptor describe(String moduleAlias) {
+        return DynamicModuleDescriptor.from(requireModule(moduleAlias));
     }
 }

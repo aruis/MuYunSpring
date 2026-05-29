@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
@@ -61,6 +62,10 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
     public DynamicRecord newRecord(String moduleAlias, String entityCode) {
         return new DynamicRecord(registry.requireEntity(moduleAlias, entityCode));
+    }
+
+    public DynamicModuleDescriptor describe(String moduleAlias) {
+        return registry.describe(moduleAlias);
     }
 
     public DynamicEntityService entityService(String moduleAlias, String entityCode) {
