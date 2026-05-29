@@ -7,9 +7,10 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -47,6 +48,32 @@ class PlatformModuleServiceContractTest {
         assertThat(module.getParentId()).isEqualTo(TreeAbility.ROOT_ID);
         assertThat(module.getEnabled()).isTrue();
         assertThat(module.getModuleKind()).isEqualTo(ModuleKind.STATIC);
+    }
+
+    @Test
+    void shouldResolveGlobalModuleFromTenantContext() {
+        PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            service.insert(module("crm.customer", "crm"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select("crm.customer")).isNull();
+            assertThat(service.resolveVisibleModule("crm.customer")).isNotNull();
+        }
+    }
+
+    @Test
+    void shouldResolveTenantPrivateModuleWithoutLeakingToOtherTenants() {
+        PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            service.insert(module("crm.tenant_customer", "crm"));
+            assertThat(service.resolveVisibleModule("crm.tenant_customer")).isNotNull();
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(service.resolveVisibleModule("crm.tenant_customer")).isNull();
+        }
     }
 
     @Test
@@ -91,7 +118,7 @@ class PlatformModuleServiceContractTest {
         PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
 
         assertThatThrownBy(() -> service.children(TreeAbility.ROOT_ID))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("rootModules");
     }
 
@@ -119,7 +146,7 @@ class PlatformModuleServiceContractTest {
         child.setParentId("crm.customer");
 
         assertThatThrownBy(() -> service.insert(child))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same application");
     }
 
@@ -148,10 +175,10 @@ class PlatformModuleServiceContractTest {
         service.insert(child);
 
         assertThatThrownBy(() -> service.reorder(List.of("crm.customer", "sales.contract")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same application");
         assertThatThrownBy(() -> service.reorder(List.of("crm.customer", "crm.customer.profile")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
     }
 
@@ -276,6 +303,7 @@ class PlatformModuleServiceContractTest {
             Object expected = clause.getValues().getFirst();
             Object actual = switch (clause.getField()) {
                 case "id" -> row.getId();
+                case "tenantId" -> row.getTenantId();
                 case "applicationAlias" -> row.getApplicationAlias();
                 case "parentId" -> row.getParentId();
                 case "deleted" -> row.getDeleted();

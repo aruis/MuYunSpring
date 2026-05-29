@@ -4,13 +4,14 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,10 +25,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     public static final String MODULE_ALIAS = "platform.menu";
 
     private final MenuSchemeService schemeService;
+    private final PlatformModuleService moduleService;
 
-    public MenuService(BaseDao<Menu, String> menuDao, MenuSchemeService schemeService) {
+    public MenuService(BaseDao<Menu, String> menuDao, MenuSchemeService schemeService, PlatformModuleService moduleService) {
         super(MODULE_ALIAS, Menu.class, menuDao);
         this.schemeService = schemeService;
+        this.moduleService = moduleService;
     }
 
     @Override
@@ -51,7 +54,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     @Override
     public void validateSortScope(Menu left, Menu right) {
         if (!Objects.equals(left.getSchemeId(), right.getSchemeId())) {
-            throw new AbilityException("Menu sort can only move records within the same scheme");
+            throw new PlatformException("Menu sort can only move records within the same scheme");
         }
         TreeAbility.super.validateSortScope(left, right);
     }
@@ -59,7 +62,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     @Override
     public List<Menu> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new AbilityException("Use rootMenus(schemeId) to resolve scheme-scoped root menus");
+            throw new PlatformException("Use rootMenus(schemeId) to resolve scheme-scoped root menus");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -96,11 +99,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private MenuScheme requireScheme(String schemeId) {
         if (schemeId == null || schemeId.isBlank()) {
-            throw new AbilityException("Menu requires schemeId");
+            throw new PlatformException("Menu requires schemeId");
         }
         MenuScheme scheme = schemeService.select(schemeId);
         if (scheme == null) {
-            throw new AbilityException("Menu requires existing scheme: " + schemeId);
+            throw new PlatformException("Menu requires existing scheme: " + schemeId);
         }
         return scheme;
     }
@@ -113,7 +116,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
             }
             case MODULE -> {
-                PlatformAliasRules.requireModuleAlias(menu.getModuleAlias());
+                String moduleAlias = PlatformAliasRules.requireModuleAlias(menu.getModuleAlias());
+                if (moduleService.resolveVisibleModule(moduleAlias) == null) {
+                    throw new PlatformException("MODULE menu requires existing module: " + moduleAlias);
+                }
+                menu.setModuleAlias(moduleAlias);
                 requireBlank(menu.getRoute(), "MODULE menu cannot have route");
                 requireBlank(menu.getExternalUrl(), "MODULE menu cannot have externalUrl");
             }
@@ -140,26 +147,26 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             return;
         }
         if (!menu.getSchemeId().equals(parent.getSchemeId())) {
-            throw new AbilityException("Menu parent must belong to the same scheme");
+            throw new PlatformException("Menu parent must belong to the same scheme");
         }
     }
 
     private void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
-            throw new AbilityException(message);
+            throw new PlatformException(message);
         }
     }
 
     private void requireBlank(String value, String message) {
         if (value != null && !value.isBlank()) {
-            throw new AbilityException(message);
+            throw new PlatformException(message);
         }
     }
 
     private void validateImmutableScheme(Menu menu) {
         Menu existing = selectIgnoreSoftDelete(menu.getId());
-        if (existing != null && !Objects.equals(existing.getSchemeId(), menu.getSchemeId())) {
-            throw new AbilityException("Menu scheme cannot be changed");
+        if (existing != null) {
+            rejectChanged("Menu scheme", existing.getSchemeId(), menu.getSchemeId());
         }
     }
 }

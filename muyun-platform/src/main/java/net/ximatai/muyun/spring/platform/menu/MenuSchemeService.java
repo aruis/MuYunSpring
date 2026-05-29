@@ -1,9 +1,8 @@
 package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -51,7 +50,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         if (!Objects.equals(left.getTenantId(), right.getTenantId())
                 || left.getScopeType() != right.getScopeType()
                 || !Objects.equals(left.getScopeId(), right.getScopeId())) {
-            throw new AbilityException("Menu scheme sort can only move records within the same scope");
+            throw new PlatformException("Menu scheme sort can only move records within the same scope");
         }
     }
 
@@ -75,14 +74,14 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         switch (scheme.getScopeType()) {
             case SYSTEM -> {
                 if (!TenantContext.isSystem()) {
-                    throw new AbilityException("System menu scheme requires system context");
+                    throw new PlatformException("System menu scheme requires system context");
                 }
                 scheme.setTenantId(null);
                 scheme.setScopeId(SYSTEM_SCOPE_ID);
             }
             case TENANT -> {
                 if (scheme.getTenantId() == null || scheme.getTenantId().isBlank()) {
-                    throw new AbilityException("Tenant menu scheme requires tenantId");
+                    throw new PlatformException("Tenant menu scheme requires tenantId");
                 }
                 if (scheme.getScopeId() == null || scheme.getScopeId().isBlank()) {
                     scheme.setScopeId(scheme.getTenantId());
@@ -90,26 +89,22 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
             }
             case ORGANIZATION -> {
                 if (scheme.getTenantId() == null || scheme.getTenantId().isBlank()) {
-                    throw new AbilityException("Organization menu scheme requires tenantId");
+                    throw new PlatformException("Organization menu scheme requires tenantId");
                 }
                 if (scheme.getScopeId() == null || scheme.getScopeId().isBlank()) {
-                    throw new AbilityException("Organization menu scheme requires scopeId");
+                    throw new PlatformException("Organization menu scheme requires scopeId");
                 }
             }
         }
     }
 
     private void rejectDuplicateAlias(MenuScheme scheme) {
-        boolean duplicate = list(Criteria.of()
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
-                .eq("scopeType", scheme.getScopeType())
-                .eq("scopeId", scheme.getScopeId())
-                .eq("alias", scheme.getAlias()), PageRequest.of(1, Integer.MAX_VALUE))
-                .stream()
-                .anyMatch(existing -> !Objects.equals(existing.getId(), scheme.getId()));
-        if (duplicate) {
-            throw new AbilityException("menuSchemeAlias must be unique within scope: " + scheme.getAlias());
-        }
+        rejectDuplicate(scheme, Criteria.of()
+                        .eq(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
+                        .eq("scopeType", scheme.getScopeType())
+                        .eq("scopeId", scheme.getScopeId())
+                        .eq("alias", scheme.getAlias()),
+                "menuSchemeAlias must be unique within scope: " + scheme.getAlias());
     }
 
     private void validateImmutableIdentity(MenuScheme scheme) {
@@ -117,11 +112,12 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         if (existing == null) {
             return;
         }
-        if (!Objects.equals(existing.getAlias(), scheme.getAlias())
+        boolean changed = !Objects.equals(existing.getAlias(), scheme.getAlias())
                 || existing.getScopeType() != scheme.getScopeType()
                 || !Objects.equals(existing.getScopeId(), effectiveScopeId(scheme))
-                || !Objects.equals(existing.getTenantId(), scheme.getTenantId())) {
-            throw new AbilityException("Menu scheme identity cannot be changed");
+                || !Objects.equals(existing.getTenantId(), scheme.getTenantId());
+        if (changed) {
+            throw new PlatformException("Menu scheme identity cannot be changed");
         }
     }
 

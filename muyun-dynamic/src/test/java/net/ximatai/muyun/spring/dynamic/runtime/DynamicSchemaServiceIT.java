@@ -7,7 +7,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -144,10 +144,10 @@ class DynamicSchemaServiceIT {
                     .setValue("title", "Other child")
                     .setValue("parentId", anotherRootId));
             assertThatThrownBy(() -> invoiceService.moveBefore(firstChildId, anotherChildId))
-                    .isInstanceOf(AbilityException.class)
+                    .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("same parent");
             assertThatThrownBy(() -> invoiceService.reorder(List.of(firstChildId)))
-                    .isInstanceOf(AbilityException.class)
+                    .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("complete scope");
 
             invoiceService.reorder(List.of(secondChildId, firstChildId));

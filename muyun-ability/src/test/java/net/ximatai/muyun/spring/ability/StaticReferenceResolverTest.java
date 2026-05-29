@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProject;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
@@ -45,7 +46,7 @@ class StaticReferenceResolverTest {
         DemoPlainRecord record = new DemoPlainRecord("plain");
 
         assertThatThrownBy(() -> StaticReferenceResolver.collect(DemoReferencingRecord.class, record))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("reference source type mismatch")
                 .hasMessageContaining(DemoReferencingRecord.class.getName())
                 .hasMessageContaining(DemoPlainRecord.class.getName());
@@ -76,7 +77,7 @@ class StaticReferenceResolverTest {
         WrongTitleTypeRecord record = new WrongTitleTypeRecord();
 
         assertThatThrownBy(() -> StaticReferenceResolver.writeTitleValue(record, "userTitle", List.of("User One")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Cannot write reference title field")
                 .hasMessageContaining("WrongTitleTypeRecord.userTitle")
                 .hasMessageContaining("java.util");
@@ -85,7 +86,7 @@ class StaticReferenceResolverTest {
     @Test
     void plansShouldRejectTitleOutputWithoutAutoTitle() {
         assertThatThrownBy(() -> StaticReferenceResolver.plans(TitleOutputWithoutAutoTitleRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("titleOutputField requires autoTitle")
                 .hasMessageContaining("customerId");
     }
@@ -93,7 +94,7 @@ class StaticReferenceResolverTest {
     @Test
     void plansShouldRejectDuplicateOutputFields() {
         assertThatThrownBy(() -> StaticReferenceResolver.plans(DuplicateOutputFieldRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("duplicate reference outputField")
                 .hasMessageContaining("customerId.customerTitle");
     }

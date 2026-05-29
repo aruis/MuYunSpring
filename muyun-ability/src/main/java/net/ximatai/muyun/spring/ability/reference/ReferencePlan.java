@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability.reference;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
-
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -17,10 +16,10 @@ public record ReferencePlan(
 ) {
     public ReferencePlan {
         if (sourceField == null || sourceField.isBlank()) {
-            throw new AbilityException("reference sourceField must not be blank");
+            throw new PlatformException("reference sourceField must not be blank");
         }
         if (target == null) {
-            throw new AbilityException("reference target must not be null");
+            throw new PlatformException("reference target must not be null");
         }
         if (cardinality == null) {
             cardinality = ReferenceCardinality.ONE;
@@ -32,7 +31,7 @@ public record ReferencePlan(
             titleOutputField = sourceField + "Title";
         }
         if (!autoTitle && !titleOutputField.isBlank()) {
-            throw new AbilityException("reference titleOutputField requires autoTitle: " + sourceField);
+            throw new PlatformException("reference titleOutputField requires autoTitle: " + sourceField);
         }
         projections = projections == null ? List.of() : List.copyOf(projections);
         validateOutputFields(sourceField, titleOutputField, projections);
@@ -118,7 +117,7 @@ public record ReferencePlan(
         }
         for (ReferenceProjection projection : projections) {
             if (!outputFields.add(projection.outputField())) {
-                throw new AbilityException("duplicate reference outputField: "
+                throw new PlatformException("duplicate reference outputField: "
                         + sourceField + "." + projection.outputField());
             }
         }

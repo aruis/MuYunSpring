@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability.reference;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
-
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -26,7 +25,7 @@ public final class StaticReferenceResolver {
             return Map.of();
         }
         if (!modelClass.isInstance(record)) {
-            throw new AbilityException("reference source type mismatch: expected "
+            throw new PlatformException("reference source type mismatch: expected "
                     + modelClass.getName() + ", actual " + record.getClass().getName());
         }
         Map<ReferenceTarget, Set<String>> ids = new LinkedHashMap<>();
@@ -89,7 +88,7 @@ public final class StaticReferenceResolver {
                 try {
                     field.setAccessible(true);
                 } catch (RuntimeException e) {
-                    throw new AbilityException("cannot access reference field: "
+                    throw new PlatformException("cannot access reference field: "
                             + modelClass.getName() + "." + field.getName(), e);
                 }
                 rules.putIfAbsent(field.getName(), new ReferenceRule(
@@ -143,10 +142,10 @@ public final class StaticReferenceResolver {
             } catch (NoSuchFieldException ignored) {
                 current = current.getSuperclass();
             } catch (IllegalAccessException e) {
-                throw new AbilityException("Cannot read reference field: " + fieldName, e);
+                throw new PlatformException("Cannot read reference field: " + fieldName, e);
             }
         }
-        throw new AbilityException("Cannot find reference field: " + record.getClass().getName() + "." + fieldName);
+        throw new PlatformException("Cannot find reference field: " + record.getClass().getName() + "." + fieldName);
     }
 
     private static void writeByFieldName(Object record, String fieldName, Object value) {
@@ -160,14 +159,14 @@ public final class StaticReferenceResolver {
             } catch (NoSuchFieldException ignored) {
                 current = current.getSuperclass();
             } catch (IllegalAccessException e) {
-                throw new AbilityException("Cannot write reference title field: " + fieldName, e);
+                throw new PlatformException("Cannot write reference title field: " + fieldName, e);
             } catch (IllegalArgumentException e) {
-                throw new AbilityException("Cannot write reference title field: "
+                throw new PlatformException("Cannot write reference title field: "
                         + record.getClass().getName() + "." + fieldName
                         + ", value type: " + valueType(value), e);
             }
         }
-        throw new AbilityException("Cannot find reference title field: " + record.getClass().getName() + "." + fieldName);
+        throw new PlatformException("Cannot find reference title field: " + record.getClass().getName() + "." + fieldName);
     }
 
     private static String valueType(Object value) {

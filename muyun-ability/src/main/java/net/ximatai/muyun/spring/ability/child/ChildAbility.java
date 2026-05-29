@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.ability.child;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
@@ -26,7 +26,7 @@ public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
         ChildRelation<C, P> relation = toChildRelation(setParentId, plan.childForeignKeyField(), extractChildren);
         if (plan.autoPopulate()) {
             if (populateChildren == null) {
-                throw new AbilityException("auto populate child relation requires populateChildren: " + plan.relationCode());
+                throw new PlatformException("auto populate child relation requires populateChildren: " + plan.relationCode());
             }
             relation.autoPopulate(populateChildren);
         }

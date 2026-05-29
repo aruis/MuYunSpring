@@ -8,7 +8,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
@@ -504,7 +504,7 @@ class DynamicRecordDaoTest {
     void shouldRejectDuplicateDynamicReorderIdsAndMissingSortField() {
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), sortableEntity()), "sales.contract")
                 .reorder(List.of("same", "same")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("duplicate");
 
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
@@ -580,7 +580,7 @@ class DynamicRecordDaoTest {
         entityService.moveAfter("A", "B");
 
         assertThatThrownBy(() -> entityService.moveBefore("A1", "B"))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
@@ -640,7 +640,7 @@ class DynamicRecordDaoTest {
         missingParent.setId("C");
 
         assertThatThrownBy(() -> entityService.insert(missingParent))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("missing parent");
 
         DynamicRecord selfParent = new DynamicRecord(treeEntity())
@@ -649,7 +649,7 @@ class DynamicRecordDaoTest {
         selfParent.setId("A");
 
         assertThatThrownBy(() -> entityService.insert(selfParent))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("itself as parent");
 
         DynamicRecord moveUnderDescendant = new DynamicRecord(treeEntity())
@@ -658,7 +658,7 @@ class DynamicRecordDaoTest {
         moveUnderDescendant.setId("A");
 
         assertThatThrownBy(() -> entityService.update(moveUnderDescendant))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("under its descendant");
     }
 

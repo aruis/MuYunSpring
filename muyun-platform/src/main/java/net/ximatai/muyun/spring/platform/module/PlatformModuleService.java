@@ -4,12 +4,13 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +53,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     @Override
     public void validateSortScope(PlatformModule left, PlatformModule right) {
         if (!java.util.Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
-            throw new AbilityException("Module sort can only move records within the same application");
+            throw new PlatformException("Module sort can only move records within the same application");
         }
         TreeAbility.super.validateSortScope(left, right);
     }
@@ -60,7 +61,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     @Override
     public List<PlatformModule> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new AbilityException("Use rootModules(applicationAlias) to resolve application-scoped root modules");
+            throw new PlatformException("Use rootModules(applicationAlias) to resolve application-scoped root modules");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -84,6 +85,29 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
                 .eq("applicationAlias", applicationAlias)
                 .eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
         return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    public PlatformModule resolveVisibleModule(String moduleAlias) {
+        String validAlias = PlatformAliasRules.requireModuleAlias(moduleAlias);
+        if (TenantContext.currentTenantId().isPresent()) {
+            PlatformModule scoped = select(validAlias);
+            if (scoped != null) {
+                return scoped;
+            }
+        }
+        return selectGlobalModule(validAlias);
+    }
+
+    private PlatformModule selectGlobalModule(String moduleAlias) {
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            return getDao().query(activeCriteria(Criteria.of()
+                            .eq("id", moduleAlias)),
+                    new PageRequest(0, 1))
+                    .stream()
+                    .filter(module -> module.getTenantId() == null || module.getTenantId().isBlank())
+                    .findFirst()
+                    .orElse(null);
+        }
     }
 
     private void normalizeAndValidate(PlatformModule module) {
@@ -115,7 +139,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
             return;
         }
         if (!module.getApplicationAlias().equals(parent.getApplicationAlias())) {
-            throw new AbilityException("Module parent must belong to the same application");
+            throw new PlatformException("Module parent must belong to the same application");
         }
     }
 }

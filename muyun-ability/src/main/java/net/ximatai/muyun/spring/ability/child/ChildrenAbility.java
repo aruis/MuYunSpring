@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.ability.child;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -139,7 +139,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
     private Class<?> requireModelClass(String explicitFallback) {
         Class<?> modelClass = modelClass();
         if (modelClass == null) {
-            throw new AbilityException("child relation requires modelClass: "
+            throw new PlatformException("child relation requires modelClass: "
                     + getModuleAlias()
                     + ", extend AbstractAbilityService or use " + explicitFallback);
         }
@@ -151,7 +151,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
         if (actualChildModel == null || rule.childModel().equals(actualChildModel)) {
             return;
         }
-        throw new AbilityException("child relation model mismatch: "
+        throw new PlatformException("child relation model mismatch: "
                 + rule.plan().relationCode()
                 + ", expected " + rule.childModel().getName()
                 + ", actual " + actualChildModel.getName());
@@ -163,7 +163,7 @@ public interface ChildrenAbility<P extends EntityContract> extends CrudAbility<P
             return;
         }
         String actual = actualChildModel == null ? "null" : actualChildModel.getName();
-        throw new AbilityException("child relation model mismatch: "
+        throw new PlatformException("child relation model mismatch: "
                 + rule.plan().relationCode()
                 + ", expected " + rule.childModel().getName()
                 + ", actual " + actual);

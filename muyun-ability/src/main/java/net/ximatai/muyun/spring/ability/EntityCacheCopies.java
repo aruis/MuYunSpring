@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.child.ChildRef;
 
 import java.lang.reflect.Constructor;
@@ -30,7 +31,7 @@ final class EntityCacheCopies {
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (ReflectiveOperationException e) {
-            throw new AbilityException("cache copy requires a no-arg constructor or custom copyForCache: "
+            throw new PlatformException("cache copy requires a no-arg constructor or custom copyForCache: "
                     + entity.getClass().getName(), e);
         }
     }
@@ -44,7 +45,7 @@ final class EntityCacheCopies {
                 field.setAccessible(true);
                 field.set(target, field.get(source));
             } catch (IllegalAccessException e) {
-                throw new AbilityException("cannot copy cache field: "
+                throw new PlatformException("cannot copy cache field: "
                         + owner.getName() + "." + field.getName(), e);
             }
         }

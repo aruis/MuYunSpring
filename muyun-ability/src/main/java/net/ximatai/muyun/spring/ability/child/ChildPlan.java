@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability.child;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
-
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 public record ChildPlan(
         String relationCode,
         String parentEntity,
@@ -16,7 +15,7 @@ public record ChildPlan(
         requireText(childEntity, "child childEntity");
         requireText(childForeignKeyField, "child childForeignKeyField");
         if (parentEntity.equals(childEntity)) {
-            throw new AbilityException("child relation requires different parent and child entity: " + relationCode);
+            throw new PlatformException("child relation requires different parent and child entity: " + relationCode);
         }
     }
 
@@ -37,7 +36,7 @@ public record ChildPlan(
 
     private static void requireText(String value, String name) {
         if (value == null || value.isBlank()) {
-            throw new AbilityException(name + " must not be blank");
+            throw new PlatformException(name + " must not be blank");
         }
     }
 }

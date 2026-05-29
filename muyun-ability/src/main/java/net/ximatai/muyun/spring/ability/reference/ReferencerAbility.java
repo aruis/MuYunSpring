@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.ability.reference;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -81,14 +81,14 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
 
     private ReferenceLookup requireReferenceLookup(ReferenceTarget target, String purpose) {
         if (target == null) {
-            throw new AbilityException("reference " + purpose + " resolver target must not be null");
+            throw new PlatformException("reference " + purpose + " resolver target must not be null");
         }
         Map<ReferenceTarget, ReferenceLookup> lookups = referenceLookupsByTarget();
         ReferenceLookup lookup = lookups.get(target);
         if (lookup != null) {
             return lookup;
         }
-        throw new AbilityException("reference " + purpose + " resolver is not configured: "
+        throw new PlatformException("reference " + purpose + " resolver is not configured: "
                 + target.qualifiedName()
                 + ", configured targets: "
                 + lookups.keySet().stream().map(ReferenceTarget::qualifiedName).toList());
@@ -99,7 +99,7 @@ public interface ReferencerAbility<T extends EntityContract> extends CrudAbility
         for (ReferenceLookup lookup : referenceLookups()) {
             ReferenceLookup previous = lookups.putIfAbsent(lookup.target(), lookup);
             if (previous != null) {
-                throw new AbilityException("duplicate reference lookup target: " + lookup.target().qualifiedName());
+                throw new PlatformException("duplicate reference lookup target: " + lookup.target().qualifiedName());
             }
         }
         return lookups;

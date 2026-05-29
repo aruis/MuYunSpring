@@ -4,7 +4,7 @@ import net.ximatai.muyun.spring.common.model.title.TitleField;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -191,12 +191,12 @@ class DynamicRelationRuntimeTest {
 
         invoice.setChildren("lines", List.of(retainedLine, retainedLine));
         assertThatThrownBy(() -> invoiceService.update(invoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Duplicate child id");
 
         invoice.setChildren("lines", List.of(foreignLine));
         assertThatThrownBy(() -> invoiceService.update(invoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not belong to parent");
     }
 
@@ -216,12 +216,12 @@ class DynamicRelationRuntimeTest {
 
         invoice.setChildren("lines", List.of(duplicateLine, duplicateLine));
         assertThatThrownBy(() -> invoiceService.insert(invoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Duplicate child id");
 
         invoice.setChildren("lines", List.of(foreignLine));
         assertThatThrownBy(() -> invoiceService.insert(invoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not belong to parent");
     }
 

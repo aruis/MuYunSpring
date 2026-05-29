@@ -1,9 +1,8 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -41,7 +40,7 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     @Override
     public void validateSortScope(Metadata left, Metadata right) {
         if (!java.util.Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
-            throw new net.ximatai.muyun.spring.ability.AbilityException("Metadata sort can only move records within the same application");
+            throw new PlatformException("Metadata sort can only move records within the same application");
         }
     }
 
@@ -63,26 +62,17 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     }
 
     private void rejectDuplicateMetadataAlias(Metadata metadata) {
-        boolean duplicate = list(Criteria.of()
+        rejectDuplicate(metadata, Criteria.of()
                 .eq("applicationAlias", metadata.getApplicationAlias())
-                .eq("alias", metadata.getAlias()), PageRequest.of(1, Integer.MAX_VALUE))
-                .stream()
-                .anyMatch(existing -> !java.util.Objects.equals(existing.getId(), metadata.getId()));
-        if (duplicate) {
-            throw new AbilityException("metadataAlias must be unique within application: " + metadata.getAlias());
-        }
+                .eq("alias", metadata.getAlias()),
+                "metadataAlias must be unique within application: " + metadata.getAlias());
     }
 
     private void rejectDuplicatePhysicalTable(Metadata metadata) {
-        boolean duplicate = list(Criteria.of()
+        rejectDuplicate(metadata, Criteria.of()
                 .eq("schemaName", metadata.getSchemaName())
-                .eq("tableName", metadata.getTableName()), PageRequest.of(1, Integer.MAX_VALUE))
-                .stream()
-                .anyMatch(existing -> !java.util.Objects.equals(existing.getId(), metadata.getId()));
-        if (duplicate) {
-            throw new AbilityException("metadata physical table must be unique: "
-                    + metadata.getSchemaName() + "." + metadata.getTableName());
-        }
+                .eq("tableName", metadata.getTableName()),
+                "metadata physical table must be unique: " + metadata.getSchemaName() + "." + metadata.getTableName());
     }
 
     static String requireIdentifier(String value, String name) {

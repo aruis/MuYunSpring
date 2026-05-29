@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.Versioned;
 import net.ximatai.muyun.spring.common.model.title.TitleField;
 
@@ -416,7 +417,7 @@ class AbilityContractTest {
         DemoInvoiceService service = new DemoInvoiceService();
 
         assertThatThrownBy(() -> service.childRelation(service.lineService()))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("expected exactly one child relation plan")
                 .hasMessageContaining("lines")
                 .hasMessageContaining("notes");
@@ -432,7 +433,7 @@ class AbilityContractTest {
                 DemoInvoice::getLines,
                 DemoInvoice::setLines
         ))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("demo.noModelChildren")
                 .hasMessageContaining("AbstractAbilityService")
                 .hasMessageContaining("childRelation(Class");
@@ -449,7 +450,7 @@ class AbilityContractTest {
                 DemoInvoice::getLines,
                 DemoInvoice::setLines
         ))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("notes")
                 .hasMessageContaining(DemoInvoiceNote.class.getName())
@@ -468,7 +469,7 @@ class AbilityContractTest {
                 (invoice, notes) -> {
                 }
         ))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("lines")
                 .hasMessageContaining(DemoInvoiceLine.class.getName())
@@ -480,7 +481,7 @@ class AbilityContractTest {
         DemoInvoiceService service = new DemoInvoiceService();
 
         assertThatThrownBy(() -> service.childRelation("lines", new NoModelLineService()))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("child relation model mismatch")
                 .hasMessageContaining("lines")
                 .hasMessageContaining(DemoInvoiceLine.class.getName())
@@ -732,12 +733,12 @@ class AbilityContractTest {
 
         firstInvoice.setLines(List.of(firstLine, firstLine));
         assertThatThrownBy(() -> invoiceService.update(firstInvoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Duplicate child id");
 
         firstInvoice.setLines(List.of(secondLine));
         assertThatThrownBy(() -> invoiceService.update(firstInvoice))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not belong to parent");
     }
 
@@ -762,7 +763,7 @@ class AbilityContractTest {
                     .containsExactly("Tenant A line");
             selected.setLines(List.of(tenantBLine));
             assertThatThrownBy(() -> invoiceService.update(selected))
-                    .isInstanceOf(AbilityException.class)
+                    .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("does not belong to parent");
         }
 
@@ -795,7 +796,7 @@ class AbilityContractTest {
         duplicateLine.setId("same-line");
 
         assertThatThrownBy(() -> invoiceService.insert(new DemoInvoice("Duplicate invoice", List.of(duplicateLine, duplicateLine))))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Duplicate child id");
 
         DemoInvoice existingInvoice = new DemoInvoice("Existing invoice", List.of(new DemoInvoiceLine("Existing line")));
@@ -803,7 +804,7 @@ class AbilityContractTest {
         DemoInvoiceLine existingLine = existingInvoice.getLines().getFirst();
 
         assertThatThrownBy(() -> invoiceService.insert(new DemoInvoice("Foreign invoice", List.of(existingLine))))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not belong to parent");
     }
 
@@ -877,7 +878,7 @@ class AbilityContractTest {
         String id = service.insert(new NoNoArgCachedRecord("No arg required"));
 
         assertThatThrownBy(() -> service.select(id))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("no-arg constructor")
                 .hasMessageContaining("custom copyForCache")
                 .hasMessageContaining(NoNoArgCachedRecord.class.getName());
@@ -1105,7 +1106,7 @@ class AbilityContractTest {
         DuplicateReferenceLookupService service = new DuplicateReferenceLookupService();
 
         assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("duplicate reference lookup target")
                 .hasMessageContaining("demo.customer");
     }
@@ -1115,7 +1116,7 @@ class AbilityContractTest {
         MissingUserReferenceLookupService service = new MissingUserReferenceLookupService();
 
         assertThatThrownBy(() -> service.select(service.insert(new DemoReferencingRecord("customer-1", "user-owner"))))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("reference title resolver is not configured")
                 .hasMessageContaining("iam.user")
                 .hasMessageContaining("demo.customer");
@@ -1225,7 +1226,7 @@ class AbilityContractTest {
         parent.setParentId(childId);
 
         assertThatThrownBy(() -> service.update(parent))
-                .isInstanceOf(AbilityException.class);
+                .isInstanceOf(PlatformException.class);
     }
 
     @Test
@@ -1233,7 +1234,7 @@ class AbilityContractTest {
         DemoOrganizationService service = new DemoOrganizationService();
 
         assertThatThrownBy(() -> service.insert(new DemoOrganization("Orphan", "missing-parent")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("missing parent");
     }
 
@@ -1249,7 +1250,7 @@ class AbilityContractTest {
         first.setParentId(secondId);
 
         assertThatThrownBy(() -> service.descendantIds(firstId))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("Tree cycle");
     }
 
@@ -1293,7 +1294,7 @@ class AbilityContractTest {
             assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
                     .containsExactly(tenantASecond, tenantAFirst);
             assertThatThrownBy(() -> service.reorder(List.of(tenantAFirst, tenantBFirst)))
-                    .isInstanceOf(AbilityException.class)
+                    .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("missing record");
         }
 
@@ -1319,7 +1320,7 @@ class AbilityContractTest {
         assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
                 .containsExactly(third, first);
         assertThatThrownBy(() -> service.moveBefore(second, first))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("missing record");
     }
 
@@ -1332,7 +1333,7 @@ class AbilityContractTest {
         String secondChild = service.insert(new DemoOrganization("Second Child", secondParent));
 
         assertThatThrownBy(() -> service.moveBefore(firstChild, secondChild))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
     }
 
@@ -1342,7 +1343,7 @@ class AbilityContractTest {
         String id = service.insert(new DemoOrganization("Duplicate", TreeAbility.ROOT_ID));
 
         assertThatThrownBy(() -> service.reorder(List.of(id, id)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("duplicate");
     }
 
@@ -1355,11 +1356,11 @@ class AbilityContractTest {
         String secondChild = service.insert(new DemoOrganization("Second Child", secondParent));
 
         assertThatThrownBy(() -> service.reorder(List.of()))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("empty");
 
         assertThatThrownBy(() -> service.reorder(List.of(firstChild, secondChild)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
     }
 
@@ -1371,7 +1372,7 @@ class AbilityContractTest {
         String third = service.insert(new DemoOrganization("Third", TreeAbility.ROOT_ID));
 
         assertThatThrownBy(() -> service.reorder(List.of(third, first)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("complete scope");
 
         assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))

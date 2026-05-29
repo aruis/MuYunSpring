@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -15,21 +16,21 @@ import java.util.Set;
 public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
     default void reorder(List<String> orderedIds) {
         if (orderedIds == null || orderedIds.isEmpty()) {
-            throw new AbilityException("Cannot reorder empty records");
+            throw new PlatformException("Cannot reorder empty records");
         }
         Set<String> uniqueIds = new LinkedHashSet<>(orderedIds);
         if (uniqueIds.size() != orderedIds.size()) {
-            throw new AbilityException("Cannot reorder duplicate records");
+            throw new PlatformException("Cannot reorder duplicate records");
         }
         T first = select(orderedIds.getFirst());
         if (first == null) {
-            throw new AbilityException("Cannot reorder missing record: " + orderedIds.getFirst());
+            throw new PlatformException("Cannot reorder missing record: " + orderedIds.getFirst());
         }
         List<T> entities = new ArrayList<>();
         for (String id : orderedIds) {
             T entity = select(id);
             if (entity == null) {
-                throw new AbilityException("Cannot reorder missing record: " + id);
+                throw new PlatformException("Cannot reorder missing record: " + id);
             }
             validateSortScope(first, entity);
             entities.add(entity);
@@ -38,7 +39,7 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
                 .map(SortCapable::getId)
                 .toList();
         if (!new LinkedHashSet<>(scopedIds).equals(uniqueIds)) {
-            throw new AbilityException("Cannot reorder partial records; orderedIds must cover complete scope");
+            throw new PlatformException("Cannot reorder partial records; orderedIds must cover complete scope");
         }
         int order = 1;
         for (T entity : entities) {
@@ -70,7 +71,7 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
         T moving = select(id);
         T target = select(targetId);
         if (moving == null || target == null) {
-            throw new AbilityException("Cannot move missing record");
+            throw new PlatformException("Cannot move missing record");
         }
         validateSortScope(moving, target);
         Criteria scope = sortScope(moving);
@@ -83,7 +84,7 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
         }
         int targetIndex = ids.indexOf(targetId);
         if (targetIndex < 0) {
-            throw new AbilityException("Cannot move before/after missing target: " + targetId);
+            throw new PlatformException("Cannot move before/after missing target: " + targetId);
         }
         ids.add(before ? targetIndex : targetIndex + 1, id);
         reorder(ids);

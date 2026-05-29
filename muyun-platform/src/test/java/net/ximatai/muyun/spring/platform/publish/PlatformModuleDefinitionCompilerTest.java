@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.platform.publish;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -96,10 +96,10 @@ class PlatformModuleDefinitionCompilerTest {
         moduleService.insert(module("crm.empty", ModuleKind.DYNAMIC));
 
         assertThatThrownBy(() -> compiler.compile("crm.report"))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("DYNAMIC module");
         assertThatThrownBy(() -> compiler.compile("crm.empty"))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("MAIN metadata");
     }
 

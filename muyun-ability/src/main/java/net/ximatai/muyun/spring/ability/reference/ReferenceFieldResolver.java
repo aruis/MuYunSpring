@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.ability.reference;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
-
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import java.lang.reflect.Field;
 
 final class ReferenceFieldResolver {
@@ -21,11 +20,11 @@ final class ReferenceFieldResolver {
             } catch (NoSuchFieldException ignored) {
                 current = current.getSuperclass();
             } catch (IllegalAccessException e) {
-                throw new AbilityException("Cannot read reference projection field: "
+                throw new PlatformException("Cannot read reference projection field: "
                         + record.getClass().getName() + "." + fieldName, e);
             }
         }
-        throw new AbilityException("Cannot find reference projection field: "
+        throw new PlatformException("Cannot find reference projection field: "
                 + record.getClass().getName() + "." + fieldName);
     }
 }

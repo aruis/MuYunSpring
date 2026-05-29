@@ -7,7 +7,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -67,14 +67,14 @@ class PlatformMetadataServiceContractTest {
         metadataService.insert(metadata("crm", "customer"));
 
         assertThatThrownBy(() -> metadataService.insert(metadata("crm", "customer")))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("metadataAlias");
 
         Metadata duplicateTable = metadata("sales", "customer");
         duplicateTable.setSchemaName(MetadataService.DEFAULT_SCHEMA);
         duplicateTable.setTableName("crm_customer");
         assertThatThrownBy(() -> metadataService.insert(duplicateTable))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("physical table");
     }
 
@@ -103,7 +103,7 @@ class PlatformMetadataServiceContractTest {
         MetadataField field = field("missing", "code", "code", FieldType.STRING);
 
         assertThatThrownBy(() -> fieldService.insert(field))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("existing metadata");
     }
 
@@ -115,16 +115,16 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(code);
 
         assertThatThrownBy(() -> fieldService.insert(field(metadataId, "code", "customer_code", FieldType.STRING)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("fieldName");
         assertThatThrownBy(() -> fieldService.insert(field(metadataId, "customerCode", "code", FieldType.STRING)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("columnName");
 
         MetadataField name = field(metadataId, "name", "name", FieldType.STRING);
         name.setTitleField(true);
         assertThatThrownBy(() -> fieldService.insert(name))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("title field");
     }
 
@@ -137,7 +137,7 @@ class PlatformMetadataServiceContractTest {
         relationService.insert(mainRelation("crm.customer", customerMetadataId));
 
         assertThatThrownBy(() -> relationService.insert(mainRelation("crm.customer", profileMetadataId)))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("one MAIN");
     }
 
@@ -152,7 +152,7 @@ class PlatformMetadataServiceContractTest {
         ModuleMetadataRelation duplicateAlias = childRelation("crm.customer", noteMetadataId, customerMetadataId);
 
         assertThatThrownBy(() -> relationService.insert(duplicateAlias))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("relationAlias");
     }
 
@@ -164,7 +164,7 @@ class PlatformMetadataServiceContractTest {
         ModuleMetadataRelation child = childRelation("crm.customer", profileMetadataId, customerMetadataId);
 
         assertThatThrownBy(() -> relationService.insert(child))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("parent metadata relation");
     }
 

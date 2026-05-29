@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
@@ -227,7 +227,7 @@ public class ModuleDefinitionValidator {
     private ReferencePlan referencePlan(EntityReferenceDefinition reference) {
         try {
             return reference.plan();
-        } catch (AbilityException e) {
+        } catch (PlatformException e) {
             throw new ModuleDefinitionException("reference output field invalid: " + e.getMessage());
         }
     }

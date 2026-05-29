@@ -1,9 +1,8 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -43,7 +42,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     @Override
     public void validateSortScope(MetadataField left, MetadataField right) {
         if (!java.util.Objects.equals(left.getMetadataId(), right.getMetadataId())) {
-            throw new AbilityException("Metadata field sort can only move records within the same metadata");
+            throw new PlatformException("Metadata field sort can only move records within the same metadata");
         }
     }
 
@@ -86,41 +85,32 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     }
 
     private void rejectDuplicateField(MetadataField field) {
-        boolean duplicateFieldName = hasOther(field, Criteria.of()
-                .eq("metadataId", field.getMetadataId())
-                .eq("fieldName", field.getFieldName()));
-        if (duplicateFieldName) {
-            throw new AbilityException("metadata fieldName must be unique: " + field.getFieldName());
-        }
-        boolean duplicateColumnName = hasOther(field, Criteria.of()
-                .eq("metadataId", field.getMetadataId())
-                .eq("columnName", field.getColumnName()));
-        if (duplicateColumnName) {
-            throw new AbilityException("metadata columnName must be unique: " + field.getColumnName());
-        }
+        rejectDuplicate(field, Criteria.of()
+                        .eq("metadataId", field.getMetadataId())
+                        .eq("fieldName", field.getFieldName()),
+                "metadata fieldName must be unique: " + field.getFieldName());
+        rejectDuplicate(field, Criteria.of()
+                        .eq("metadataId", field.getMetadataId())
+                        .eq("columnName", field.getColumnName()),
+                "metadata columnName must be unique: " + field.getColumnName());
     }
 
     private void rejectDuplicateSingleFlag(MetadataField field) {
-        if (Boolean.TRUE.equals(field.getTitleField()) && hasOther(field, Criteria.of()
+        if (Boolean.TRUE.equals(field.getTitleField()) && existsOtherInCurrentScope(field, Criteria.of()
                 .eq("metadataId", field.getMetadataId())
                 .eq("titleField", Boolean.TRUE))) {
-            throw new AbilityException("metadata can only have one title field: " + field.getMetadataId());
+            throw new PlatformException("metadata can only have one title field: " + field.getMetadataId());
         }
-        if (Boolean.TRUE.equals(field.getSortableField()) && hasOther(field, Criteria.of()
+        if (Boolean.TRUE.equals(field.getSortableField()) && existsOtherInCurrentScope(field, Criteria.of()
                 .eq("metadataId", field.getMetadataId())
                 .eq("sortableField", Boolean.TRUE))) {
-            throw new AbilityException("metadata can only have one sortable field: " + field.getMetadataId());
+            throw new PlatformException("metadata can only have one sortable field: " + field.getMetadataId());
         }
-    }
-
-    private boolean hasOther(MetadataField field, Criteria criteria) {
-        return list(criteria, PageRequest.of(1, Integer.MAX_VALUE)).stream()
-                .anyMatch(existing -> !java.util.Objects.equals(existing.getId(), field.getId()));
     }
 
     private void requireMetadata(String metadataId) {
         if (metadataId == null || metadataId.isBlank() || metadataService.select(metadataId) == null) {
-            throw new AbilityException("Metadata field requires existing metadata: " + metadataId);
+            throw new PlatformException("Metadata field requires existing metadata: " + metadataId);
         }
     }
 }

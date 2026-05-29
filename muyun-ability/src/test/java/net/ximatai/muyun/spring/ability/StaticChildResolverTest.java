@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.child.ChildPlan;
 import net.ximatai.muyun.spring.ability.child.ChildRef;
 import net.ximatai.muyun.spring.ability.child.StaticChildResolver;
@@ -62,7 +63,7 @@ class StaticChildResolverTest {
     @Test
     void singlePlanShouldRejectMultipleChildRelations() {
         assertThatThrownBy(() -> StaticChildResolver.singlePlan(DemoInvoice.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("expected exactly one child relation plan")
                 .hasMessageContaining("lines")
                 .hasMessageContaining("notes")
@@ -72,7 +73,7 @@ class StaticChildResolverTest {
     @Test
     void singlePlanShouldRejectMissingChildRelations() {
         assertThatThrownBy(() -> StaticChildResolver.singlePlan(NoChildRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("expected exactly one child relation plan")
                 .hasMessageContaining("actual relationCodes: []")
                 .hasMessageContaining("@ChildRef");
@@ -81,49 +82,49 @@ class StaticChildResolverTest {
     @Test
     void singlePlanShouldRejectMissingParentModelClass() {
         assertThatThrownBy(() -> StaticChildResolver.singlePlan(null))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("parentModelClass");
     }
 
     @Test
     void planShouldRejectUnknownRelationCode() {
         assertThatThrownBy(() -> StaticChildResolver.plan(DemoInvoice.class, "missing"))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("unknown child relationCode");
     }
 
     @Test
     void planShouldRejectMissingParentModelClass() {
         assertThatThrownBy(() -> StaticChildResolver.plan(null, "lines"))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("parentModelClass");
     }
 
     @Test
     void rulesShouldRejectNonListChildField() {
         assertThatThrownBy(() -> StaticChildResolver.plans(InvalidChildFieldRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("must be List");
     }
 
     @Test
     void rulesShouldRejectMismatchedChildGeneric() {
         assertThatThrownBy(() -> StaticChildResolver.plans(MismatchedChildFieldRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("not assignable");
     }
 
     @Test
     void rulesShouldRejectDuplicateRelationCodes() {
         assertThatThrownBy(() -> StaticChildResolver.plans(DuplicateRelationCodeRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("duplicate child relationCode");
     }
 
     @Test
     void rulesShouldRejectMissingChildForeignKeyField() {
         assertThatThrownBy(() -> StaticChildResolver.plans(MissingForeignKeyRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("cannot find child foreign key field")
                 .hasMessageContaining(MissingForeignKeyChild.class.getName())
                 .hasMessageContaining("invoiceId");
@@ -132,7 +133,7 @@ class StaticChildResolverTest {
     @Test
     void rulesShouldRejectNonStringChildForeignKeyField() {
         assertThatThrownBy(() -> StaticChildResolver.plans(NonStringForeignKeyRecord.class))
-                .isInstanceOf(AbilityException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("childForeignKeyField must be String")
                 .hasMessageContaining(NonStringForeignKeyChild.class.getName())
                 .hasMessageContaining("invoiceId");

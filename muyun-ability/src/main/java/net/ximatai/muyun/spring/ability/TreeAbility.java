@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.ability;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -33,7 +34,7 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     @Override
     default void validateSortScope(T left, T right) {
         if (!SortAbility.sameValue(left.getParentId(), right.getParentId())) {
-            throw new AbilityException("Tree sort can only move records within the same parent");
+            throw new PlatformException("Tree sort can only move records within the same parent");
         }
     }
 
@@ -48,7 +49,7 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         String parentId = current.getParentId();
         while (parentId != null && !parentId.isBlank() && !ROOT_ID.equals(parentId)) {
             if (!visited.add(parentId)) {
-                throw new AbilityException("Tree cycle detected while resolving ancestors: " + id);
+                throw new PlatformException("Tree cycle detected while resolving ancestors: " + id);
             }
             T parent = select(parentId);
             if (parent == null) {
@@ -82,23 +83,23 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
             return;
         }
         if (parentId.equals(id)) {
-            throw new AbilityException("Tree node cannot use itself as parent: " + id);
+            throw new PlatformException("Tree node cannot use itself as parent: " + id);
         }
         if (select(parentId) == null) {
-            throw new AbilityException("Tree node cannot use missing parent: " + parentId);
+            throw new PlatformException("Tree node cannot use missing parent: " + parentId);
         }
         if (ancestorIds(parentId).contains(id)) {
-            throw new AbilityException("Tree node cannot move under its descendant: " + id);
+            throw new PlatformException("Tree node cannot move under its descendant: " + id);
         }
     }
 
     private void collectDescendantIds(String parentId, List<String> result, Set<String> visited) {
         if (!visited.add(parentId)) {
-            throw new AbilityException("Tree cycle detected while resolving descendants: " + parentId);
+            throw new PlatformException("Tree cycle detected while resolving descendants: " + parentId);
         }
         for (T child : children(parentId)) {
             if (visited.contains(child.getId())) {
-                throw new AbilityException("Tree cycle detected while resolving descendants: " + parentId);
+                throw new PlatformException("Tree cycle detected while resolving descendants: " + parentId);
             }
             result.add(child.getId());
             collectDescendantIds(child.getId(), result, visited);

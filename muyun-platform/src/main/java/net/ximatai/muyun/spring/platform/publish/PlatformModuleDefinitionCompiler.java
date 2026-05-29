@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.platform.publish;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -80,10 +80,10 @@ public class PlatformModuleDefinitionCompiler {
     private PlatformModule requireDynamicModule(String moduleAlias) {
         PlatformModule module = moduleService.select(moduleAlias);
         if (module == null) {
-            throw new AbilityException("Dynamic publish requires existing module: " + moduleAlias);
+            throw new PlatformException("Dynamic publish requires existing module: " + moduleAlias);
         }
         if (module.getModuleKind() != ModuleKind.DYNAMIC) {
-            throw new AbilityException("Dynamic publish requires DYNAMIC module: " + moduleAlias);
+            throw new PlatformException("Dynamic publish requires DYNAMIC module: " + moduleAlias);
         }
         return module;
     }
@@ -100,7 +100,7 @@ public class PlatformModuleDefinitionCompiler {
         return relations.stream()
                 .filter(relation -> relation.getRelationRole() == RelationRole.MAIN)
                 .findFirst()
-                .orElseThrow(() -> new AbilityException("Dynamic module requires MAIN metadata relation: " + moduleAlias));
+                .orElseThrow(() -> new PlatformException("Dynamic module requires MAIN metadata relation: " + moduleAlias));
     }
 
     private Map<String, Metadata> metadataById(List<ModuleMetadataRelation> relations) {
@@ -108,7 +108,7 @@ public class PlatformModuleDefinitionCompiler {
         for (ModuleMetadataRelation relation : relations) {
             Metadata metadata = metadataService.select(relation.getMetadataId());
             if (metadata == null) {
-                throw new AbilityException("Module relation points to missing metadata: " + relation.getMetadataId());
+                throw new PlatformException("Module relation points to missing metadata: " + relation.getMetadataId());
             }
             values.put(metadata.getId(), metadata);
         }
@@ -167,7 +167,7 @@ public class PlatformModuleDefinitionCompiler {
         Metadata parent = metadataById.get(relation.getParentMetadataId());
         Metadata child = metadataById.get(relation.getMetadataId());
         if (parent == null || child == null) {
-            throw new AbilityException("Child relation metadata is incomplete: " + relation.getRelationAlias());
+            throw new PlatformException("Child relation metadata is incomplete: " + relation.getRelationAlias());
         }
         EntityRelationDefinition definition = EntityRelationDefinition.child(
                 relation.getRelationAlias(),

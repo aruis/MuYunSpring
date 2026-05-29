@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
-public class OptimisticLockException extends AbilityException {
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+public class OptimisticLockException extends PlatformException {
     public OptimisticLockException(String message) {
         super(message);
     }

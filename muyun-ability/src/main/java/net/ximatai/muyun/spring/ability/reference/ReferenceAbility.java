@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.ability.reference;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
-import net.ximatai.muyun.spring.ability.AbilityException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
@@ -22,7 +22,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         String moduleAlias = getModuleAlias();
         int separatorIndex = moduleAlias.lastIndexOf('.');
         if (separatorIndex <= 0 || separatorIndex == moduleAlias.length() - 1) {
-            throw new AbilityException("reference target requires '<moduleAlias>.<entityCode>': " + moduleAlias);
+            throw new PlatformException("reference target requires '<moduleAlias>.<entityCode>': " + moduleAlias);
         }
         return ReferenceTarget.of(moduleAlias.substring(0, separatorIndex), moduleAlias.substring(separatorIndex + 1));
     }
@@ -109,7 +109,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         if (title != null) {
             return title;
         }
-        throw new AbilityException("reference entity requires @TitleField or non-null TitledCapable title: "
+        throw new PlatformException("reference entity requires @TitleField or non-null TitledCapable title: "
                 + entity.getClass().getName());
     }
 }
