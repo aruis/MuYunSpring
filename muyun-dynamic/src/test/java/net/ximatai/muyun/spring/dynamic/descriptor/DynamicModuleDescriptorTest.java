@@ -44,6 +44,10 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityCode)
                 .containsExactly("customer", "contact");
         assertThat(descriptor.entities().getFirst().capabilities()).contains("CRUD", "REFERENCE");
+        assertThat(descriptor.entities().getFirst().actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("create", "select", "update", "delete", "list", "page", "count",
+                        "queryCriteria", "title", "titles", "projections", "referenceOptions");
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
@@ -60,5 +64,35 @@ class DynamicModuleDescriptorTest {
         assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
+    }
+
+    @Test
+    void shouldExposeCapabilitySpecificStandardActions() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                                FieldDefinition.titleField(),
+                                FieldDefinition.string("parentId", "Parent"),
+                                FieldDefinition.integer("sortOrder", "Sort"),
+                                FieldDefinition.bool("enabled", "Enabled")
+                        ), Set.of(EntityCapability.TREE, EntityCapability.ENABLE))
+                )
+        );
+
+        DynamicEntityDescriptor entity = DynamicModuleDescriptor.from(module).entities().getFirst();
+
+        assertThat(entity.actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("children", "ancestorIds", "descendantIds",
+                        "sortedList", "reorder", "moveBefore", "moveAfter",
+                        "enable", "disable", "isEnabled", "enabledCriteria");
+        assertThat(entity.actions().stream()
+                .filter(action -> action.code().equals("children"))
+                .findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::kind)
+                .isEqualTo(DynamicActionKind.TREE);
     }
 }
