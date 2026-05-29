@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.platform;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
+import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -53,6 +55,17 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");
+    }
+
+    @Test
+    void shouldMapMenuModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(MenuScheme.class)))
+                .contains("id", "tenant_id", "alias", "scope_type", "scope_id", "title", "enabled", "sort_order")
+                .doesNotContain("parent_id", "application_alias");
+        assertThat(columnNames(mapper.toTable(Menu.class)))
+                .contains("id", "tenant_id", "scheme_id", "parent_id", "menu_type", "module_alias",
+                        "route", "external_url", "title", "enabled", "sort_order")
+                .doesNotContain("application_alias");
     }
 
     private Set<String> columnNames(TableWrapper table) {

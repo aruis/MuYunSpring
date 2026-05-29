@@ -37,10 +37,10 @@ net.ximatai.muyun.spring
 | 应用 | `alias` | `applicationAlias` | 全局 |
 | 模块 | `alias` | `moduleAlias` | 全局，且必须以 `applicationAlias.` 开头 |
 | 元数据 | `alias` | `metadataAlias` | 应用内 |
-| 菜单 | `alias` | `menuAlias` | 应用内 |
+| 菜单方案 | `alias` | `menuSchemeAlias` | 同一租户/scope 内 |
 | 数据字典 | `alias` | `dictionaryAlias` | 应用内 |
 
-别名是稳定运行时标识，不是 URL，也不是 Java 包名。模块身份在业务字段、参数、DTO 和关系表列中统一叫 `moduleAlias` / `module_alias`，不使用 `moduleId` / `module_id` 表达同一件事。即使 `Module.id` 与 `Module.alias` 使用相同值，模块下属业务仍按 `moduleAlias` 命名。
+别名是稳定运行时标识，不是 URL，也不是 Java 包名。菜单节点本身不设计 alias/code；需要稳定选择的是菜单方案。模块身份在业务字段、参数、DTO 和关系表列中统一叫 `moduleAlias` / `module_alias`，不使用 `moduleId` / `module_id` 表达同一件事。即使 `Module.id` 与 `Module.alias` 使用相同值，模块下属业务仍按 `moduleAlias` 命名。
 
 元数据身份不等于物理表名。`Metadata.id` 是平台生成的稳定 ID；`metadataAlias` 是应用内业务别名；`schemaName + tableName` 才是物理表定位。
 

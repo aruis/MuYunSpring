@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.platform;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
+import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
+import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,8 @@ class PlatformEnumContractTest {
     void shouldExposeStableCodeAndTitleForPlatformEnums() {
         assertEnumContract(ModuleKind.class);
         assertEnumContract(RelationRole.class);
+        assertEnumContract(MenuScopeType.class);
+        assertEnumContract(MenuType.class);
     }
 
     private <E extends Enum<E> & CodeTitleEnum> void assertEnumContract(Class<E> enumType) {
