@@ -59,6 +59,37 @@ class MenuServiceContractTest {
     }
 
     @Test
+    void shouldRequireSystemContextForSystemScheme() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> schemeService.insert(scheme("admin_default", MenuScopeType.SYSTEM, null)))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("system context");
+        }
+    }
+
+    @Test
+    void shouldRejectSchemeIdentityChanges() {
+        String schemeId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            MenuScheme changedAlias = scheme("mobile", MenuScopeType.TENANT, "tenant-a");
+            changedAlias.setId(schemeId);
+            changedAlias.setVersion(0);
+            assertThatThrownBy(() -> schemeService.update(changedAlias))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("identity");
+
+            MenuScheme changedScope = scheme("default", MenuScopeType.ORGANIZATION, "org-a");
+            changedScope.setId(schemeId);
+            changedScope.setTenantId("tenant-a");
+            changedScope.setVersion(0);
+            assertThatThrownBy(() -> schemeService.update(changedScope))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("identity");
+        }
+    }
+
+    @Test
     void shouldCreateSchemeScopedMenuTreeAndRejectUnscopedRootLookup() {
         String schemeId;
         String rootId;
@@ -138,6 +169,30 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.insert(invalidGroup))
                     .isInstanceOf(AbilityException.class)
                     .hasMessageContaining("GROUP");
+            Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
+            moduleWithRoute.setRoute("/customer");
+            assertThatThrownBy(() -> menuService.insert(moduleWithRoute))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("MODULE");
+        }
+    }
+
+    @Test
+    void shouldRejectMenuSchemeChange() {
+        String firstSchemeId;
+        String secondSchemeId;
+        String menuId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            firstSchemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            secondSchemeId = schemeService.insert(scheme("mobile", MenuScopeType.TENANT, null));
+            menuId = menuService.insert(moduleMenu(firstSchemeId, "客户", TreeAbility.ROOT_ID, "crm.customer"));
+            Menu moving = moduleMenu(secondSchemeId, "客户", TreeAbility.ROOT_ID, "crm.customer");
+            moving.setId(menuId);
+            moving.setVersion(0);
+
+            assertThatThrownBy(() -> menuService.update(moving))
+                    .isInstanceOf(AbilityException.class)
+                    .hasMessageContaining("scheme");
         }
     }
 

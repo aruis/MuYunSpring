@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
 
     @Override
     public void beforeUpdate(MenuScheme scheme) {
+        validateImmutableIdentity(scheme);
         normalizeAndValidate(scheme);
     }
 
@@ -72,6 +74,9 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     private void normalizeScope(MenuScheme scheme) {
         switch (scheme.getScopeType()) {
             case SYSTEM -> {
+                if (!TenantContext.isSystem()) {
+                    throw new AbilityException("System menu scheme requires system context");
+                }
                 scheme.setTenantId(null);
                 scheme.setScopeId(SYSTEM_SCOPE_ID);
             }
@@ -105,5 +110,29 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         if (duplicate) {
             throw new AbilityException("menuSchemeAlias must be unique within scope: " + scheme.getAlias());
         }
+    }
+
+    private void validateImmutableIdentity(MenuScheme scheme) {
+        MenuScheme existing = selectIgnoreSoftDelete(scheme.getId());
+        if (existing == null) {
+            return;
+        }
+        if (!Objects.equals(existing.getAlias(), scheme.getAlias())
+                || existing.getScopeType() != scheme.getScopeType()
+                || !Objects.equals(existing.getScopeId(), effectiveScopeId(scheme))
+                || !Objects.equals(existing.getTenantId(), scheme.getTenantId())) {
+            throw new AbilityException("Menu scheme identity cannot be changed");
+        }
+    }
+
+    private String effectiveScopeId(MenuScheme scheme) {
+        if (scheme.getScopeType() == MenuScopeType.SYSTEM) {
+            return SYSTEM_SCOPE_ID;
+        }
+        if (scheme.getScopeType() == MenuScopeType.TENANT
+                && (scheme.getScopeId() == null || scheme.getScopeId().isBlank())) {
+            return scheme.getTenantId();
+        }
+        return scheme.getScopeId();
     }
 }

@@ -37,6 +37,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     @Override
     public void beforeUpdate(Menu menu) {
+        validateImmutableScheme(menu);
         normalizeAndValidate(menu);
     }
 
@@ -113,6 +114,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             }
             case MODULE -> {
                 PlatformAliasRules.requireModuleAlias(menu.getModuleAlias());
+                requireBlank(menu.getRoute(), "MODULE menu cannot have route");
                 requireBlank(menu.getExternalUrl(), "MODULE menu cannot have externalUrl");
             }
             case ROUTE -> {
@@ -151,6 +153,13 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     private void requireBlank(String value, String message) {
         if (value != null && !value.isBlank()) {
             throw new AbilityException(message);
+        }
+    }
+
+    private void validateImmutableScheme(Menu menu) {
+        Menu existing = selectIgnoreSoftDelete(menu.getId());
+        if (existing != null && !Objects.equals(existing.getSchemeId(), menu.getSchemeId())) {
+            throw new AbilityException("Menu scheme cannot be changed");
         }
     }
 }
