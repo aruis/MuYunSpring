@@ -36,14 +36,26 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<PlatformModule> moduleDao = new MemoryDao<>();
     private final MemoryDao<Metadata> metadataDao = new MemoryDao<>();
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
+    private final MemoryDao<PlatformFieldType> fieldTypeDao = new MemoryDao<>();
+    private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
     private final MemoryDao<DictionaryCategory> categoryDao = new MemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
-    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, categoryService);
+    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
+    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+    private final MetadataFieldConfigService fieldConfigService =
+            new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
+    private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
+            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+
+    {
+        fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
+        fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
+    }
 
     @Test
     void shouldCreateMetadataWithApplicationScopedAliasAndPhysicalLocation() {
@@ -91,11 +103,10 @@ class PlatformMetadataServiceContractTest {
         field.setTitle("客户名称");
         field.setRequired(true);
         field.setTitleField(true);
-        field.setFieldLength(128);
 
         fieldService.insert(field);
 
-        FieldDefinition definition = field.toDefinition();
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
         assertThat(definition.fieldName()).isEqualTo("customerName");
         assertThat(definition.columnName()).isEqualTo("customer_name");
         assertThat(definition.type()).isEqualTo(FieldType.STRING);
@@ -108,13 +119,10 @@ class PlatformMetadataServiceContractTest {
     void shouldCompileFieldQueryDefinition() {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         MetadataField field = field(metadataId, "customerName", "customer_name", FieldType.STRING);
-        field.setQueryable(true);
 
         fieldService.insert(field);
 
-        FieldDefinition definition = field.toDefinition();
-        assertThat(field.getDefaultQueryOperator()).isEqualTo(DynamicQueryOperator.LIKE);
-        assertThat(field.getQueryOperators()).contains("EQ", "LIKE", "IN");
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
         assertThat(definition.queryDefinition().queryable()).isTrue();
         assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
     }
@@ -124,14 +132,50 @@ class PlatformMetadataServiceContractTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
         MetadataField field = field(metadataId, "status", "status", FieldType.STRING);
-        field.setDictionaryCategoryAlias("customer_status");
-
         fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDictionaryCategoryAlias("customer_status");
+        fieldConfigService.insert(config);
 
-        FieldDefinition definition = field.toDefinition();
-        assertThat(field.getDictionaryApplicationAlias()).isEqualTo("crm");
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+        assertThat(config.getDictionaryApplicationAlias()).isEqualTo("crm");
         assertThat(definition.dictionaryBinding().applicationAlias()).isEqualTo("crm");
         assertThat(definition.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
+        assertThat(definition.queryDefinition().queryable()).isTrue();
+        assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+    }
+
+    @Test
+    void shouldOverrideFieldShapeWithoutChangingFieldTypeCatalog() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "shortCode", "short_code", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setFieldLength(32);
+        fieldConfigService.insert(config);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+        assertThat(definition.type()).isEqualTo(FieldType.STRING);
+        assertThat(definition.length()).isEqualTo(32);
+        assertThat(definition.queryDefinition().queryable()).isTrue();
+    }
+
+    @Test
+    void shouldRejectFieldShapeThatDoesNotMatchFieldType() {
+        PlatformFieldType invalidType = fieldType("integer_length", FieldType.INTEGER, 32);
+        assertThatThrownBy(() -> fieldTypeService.insert(invalidType))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("length only applies");
+
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "amount", "amount", FieldType.INTEGER);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setFieldLength(32);
+
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("length only applies");
     }
 
     @Test
@@ -139,9 +183,11 @@ class PlatformMetadataServiceContractTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
         MetadataField field = field(metadataId, "status", "status", FieldType.INTEGER);
-        field.setDictionaryCategoryAlias("customer_status");
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDictionaryCategoryAlias("customer_status");
 
-        assertThatThrownBy(() -> fieldService.insert(field))
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dictionary binding");
     }
@@ -150,9 +196,11 @@ class PlatformMetadataServiceContractTest {
     void shouldRejectDictionaryBindingWithoutExistingCategory() {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         MetadataField field = field(metadataId, "status", "status", FieldType.STRING);
-        field.setDictionaryCategoryAlias("customer_status");
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDictionaryCategoryAlias("customer_status");
 
-        assertThatThrownBy(() -> fieldService.insert(field))
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("existing category");
     }
@@ -255,9 +303,26 @@ class PlatformMetadataServiceContractTest {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldType(fieldType);
+        field.setFieldTypeAlias(fieldType.name().toLowerCase());
         field.setTitle(fieldName);
         return field;
+    }
+
+    private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
+        PlatformFieldType type = new PlatformFieldType();
+        type.setAlias(alias);
+        type.setTitle(alias);
+        type.setFieldType(fieldType);
+        type.setDefaultLength(length);
+        type.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType));
+        type.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(fieldType)));
+        return type;
+    }
+
+    private MetadataFieldConfig fieldConfig(String fieldId) {
+        MetadataFieldConfig config = new MetadataFieldConfig();
+        config.setMetadataFieldId(fieldId);
+        return config;
     }
 
     private DictionaryCategory category(String applicationAlias, String alias, DictionaryCategoryKind kind) {

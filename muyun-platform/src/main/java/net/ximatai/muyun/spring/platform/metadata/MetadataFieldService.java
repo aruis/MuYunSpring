@@ -8,12 +8,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
-import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
-import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import org.springframework.stereotype.Service;
-
-import java.util.Objects;
 
 @Service
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
@@ -23,14 +18,14 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     public static final String MODULE_ALIAS = "platform.metadataField";
 
     private final MetadataService metadataService;
-    private final DictionaryCategoryService categoryService;
+    private final PlatformFieldTypeService fieldTypeService;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
-                                DictionaryCategoryService categoryService) {
+                                PlatformFieldTypeService fieldTypeService) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
-        this.categoryService = Objects.requireNonNull(categoryService, "categoryService must not be null");
+        this.fieldTypeService = fieldTypeService;
     }
 
     @Override
@@ -59,11 +54,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         requireMetadata(field.getMetadataId());
         PlatformNameRules.requireFieldName(field.getFieldName(), "fieldName");
         PlatformNameRules.requireDatabaseName(field.getColumnName(), "columnName");
-        normalizeDictionaryBinding(field);
-        normalizeQueryDefinition(field);
-        if (field.getFieldType() == null) {
-            field.setFieldType(FieldType.STRING);
-        }
+        field.setFieldTypeAlias(PlatformNameRules.requireIdentifier(field.getFieldTypeAlias(), "fieldTypeAlias"));
+        fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         if (field.getRequired() == null) {
             field.setRequired(Boolean.FALSE);
         }
@@ -79,66 +71,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         if (field.getTitleField() == null) {
             field.setTitleField(Boolean.FALSE);
         }
-        if (field.getFieldLength() != null && field.getFieldLength() <= 0) {
-            throw new IllegalArgumentException("fieldLength must be positive");
-        }
-        if (field.getPrecision() != null && field.getPrecision() <= 0) {
-            throw new IllegalArgumentException("precision must be positive");
-        }
-        if (field.getScale() != null && field.getScale() < 0) {
-            throw new IllegalArgumentException("scale must not be negative");
-        }
-        if (field.getScale() != null && field.getPrecision() != null && field.getScale() > field.getPrecision()) {
-            throw new IllegalArgumentException("scale must not exceed precision");
-        }
         rejectDuplicateField(field);
         rejectDuplicateSingleFlag(field);
-    }
-
-    private void normalizeQueryDefinition(MetadataField field) {
-        if (field.getFieldType() == null) {
-            field.setFieldType(FieldType.STRING);
-        }
-        if (!Boolean.TRUE.equals(field.getQueryable())) {
-            field.setQueryable(Boolean.FALSE);
-            field.setDefaultQueryOperator(null);
-            field.setQueryOperators(null);
-            return;
-        }
-        if (field.getDefaultQueryOperator() == null) {
-            field.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(field.getFieldType()));
-        }
-        if (field.getQueryOperators() == null || field.getQueryOperators().isBlank()) {
-            field.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(field.getFieldType())));
-        }
-        try {
-            field.toDefinition().queryDefinition();
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("invalid field query definition: " + field.getFieldName(), e);
-        }
-    }
-
-    private void normalizeDictionaryBinding(MetadataField field) {
-        boolean hasCategory = field.getDictionaryCategoryAlias() != null && !field.getDictionaryCategoryAlias().isBlank();
-        boolean hasApplication = field.getDictionaryApplicationAlias() != null && !field.getDictionaryApplicationAlias().isBlank();
-        if (!hasCategory && !hasApplication) {
-            field.setDictionaryApplicationAlias(null);
-            field.setDictionaryCategoryAlias(null);
-            return;
-        }
-        if (!hasCategory) {
-            throw new IllegalArgumentException("dictionaryCategoryAlias must not be blank");
-        }
-        String applicationAlias = hasApplication
-                ? PlatformNameRules.requireApplicationAlias(field.getDictionaryApplicationAlias())
-                : requireMetadata(field.getMetadataId()).getApplicationAlias();
-        field.setDictionaryApplicationAlias(applicationAlias);
-        field.setDictionaryCategoryAlias(PlatformNameRules.requireIdentifier(
-                field.getDictionaryCategoryAlias(), "dictionaryCategoryAlias"));
-        categoryService.requireDictionaryCategory(field.getDictionaryApplicationAlias(), field.getDictionaryCategoryAlias());
-        if (field.getFieldType() != null && field.getFieldType() != FieldType.STRING && field.getFieldType() != FieldType.TEXT) {
-            throw new IllegalArgumentException("dictionary binding requires string field");
-        }
     }
 
     private void rejectDuplicateField(MetadataField field) {

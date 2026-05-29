@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -35,24 +36,29 @@ public class PlatformModuleDefinitionCompiler {
     private final PlatformModuleService moduleService;
     private final MetadataService metadataService;
     private final MetadataFieldService fieldService;
+    private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler;
     private final ModuleMetadataRelationService relationService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
                                             MetadataService metadataService,
                                             MetadataFieldService fieldService,
+                                            MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                             ModuleMetadataRelationService relationService) {
-        this(moduleService, metadataService, fieldService, relationService, new ModuleDefinitionValidator());
+        this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, relationService,
+                new ModuleDefinitionValidator());
     }
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
                                             MetadataService metadataService,
                                             MetadataFieldService fieldService,
+                                            MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                             ModuleMetadataRelationService relationService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.fieldService = fieldService;
+        this.fieldDefinitionCompiler = fieldDefinitionCompiler;
         this.relationService = relationService;
         this.validator = validator;
     }
@@ -138,7 +144,7 @@ public class PlatformModuleDefinitionCompiler {
                         Sort.asc(PlatformAbilityFields.SORT_FIELD)
                 )
                 .stream()
-                .map(MetadataField::toDefinition)
+                .map(fieldDefinitionCompiler::compile)
                 .toList();
     }
 

@@ -25,10 +25,15 @@ import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -88,8 +93,10 @@ class PlatformDynamicModulePublisherIT {
         services.fieldService.insert(titleField(customerMetadataId));
         services.fieldService.insert(field(customerMetadataId, "code", "code", FieldType.STRING));
         MetadataField status = field(customerMetadataId, "status", "status", FieldType.STRING);
-        status.setDictionaryCategoryAlias("customer_status");
         services.fieldService.insert(status);
+        MetadataFieldConfig statusConfig = fieldConfig(status.getId());
+        statusConfig.setDictionaryCategoryAlias("customer_status");
+        services.fieldConfigService.insert(statusConfig);
         services.fieldService.insert(titleField(contactMetadataId));
         services.fieldService.insert(field(contactMetadataId, "customerId", "customer_id", FieldType.STRING));
         services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
@@ -107,6 +114,7 @@ class PlatformDynamicModulePublisherIT {
                         services.moduleService,
                         services.metadataService,
                         services.fieldService,
+                        services.fieldDefinitionCompiler,
                         services.relationService
                 ),
                 new DynamicModulePublisher(schemaService, runtime)
@@ -152,6 +160,8 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
         TestMemoryDao<Metadata> metadataDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
+        TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
+        TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
@@ -162,13 +172,20 @@ class PlatformDynamicModulePublisherIT {
         DictionaryItemService itemService = new DictionaryItemService(itemDao, categoryService);
         PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
         MetadataService metadataService = new MetadataService(metadataDao);
-        MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, categoryService);
+        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
+        fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
+        fieldTypeService.insert(fieldType("id", FieldType.STRING, 32));
+        MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+        MetadataFieldConfigService fieldConfigService =
+                new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService, categoryService);
+        MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
+                new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
         ModuleMetadataRelationService relationService =
                 new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
-        return new PlatformServices(applicationService, moduleService, metadataService, fieldService, relationService,
-                schemeService, menuService, categoryService, itemService);
+        return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,
+                fieldDefinitionCompiler, relationService, schemeService, menuService, categoryService, itemService);
     }
 
     private Application application(String alias) {
@@ -201,7 +218,7 @@ class PlatformDynamicModulePublisherIT {
         field.setMetadataId(metadataId);
         field.setFieldName(fieldName);
         field.setColumnName(columnName);
-        field.setFieldType(fieldType);
+        field.setFieldTypeAlias(fieldType.name().toLowerCase());
         field.setTitle(fieldName);
         return field;
     }
@@ -209,8 +226,22 @@ class PlatformDynamicModulePublisherIT {
     private MetadataField titleField(String metadataId) {
         MetadataField field = field(metadataId, "title", "title", FieldType.STRING);
         field.setTitleField(true);
-        field.setFieldLength(128);
         return field;
+    }
+
+    private PlatformFieldType fieldType(String alias, FieldType fieldType, Integer length) {
+        PlatformFieldType type = new PlatformFieldType();
+        type.setAlias(alias);
+        type.setTitle(alias);
+        type.setFieldType(fieldType);
+        type.setDefaultLength(length);
+        return type;
+    }
+
+    private MetadataFieldConfig fieldConfig(String fieldId) {
+        MetadataFieldConfig config = new MetadataFieldConfig();
+        config.setMetadataFieldId(fieldId);
+        return config;
     }
 
     private ModuleMetadataRelation mainRelation(String moduleAlias, String metadataId) {
@@ -276,6 +307,8 @@ class PlatformDynamicModulePublisherIT {
                                     PlatformModuleService moduleService,
                                     MetadataService metadataService,
                                     MetadataFieldService fieldService,
+                                    MetadataFieldConfigService fieldConfigService,
+                                    MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                     ModuleMetadataRelationService relationService,
                                     MenuSchemeService schemeService,
                                     MenuService menuService,
