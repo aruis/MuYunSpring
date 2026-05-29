@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 public record FieldDefinition(
@@ -124,5 +125,9 @@ public record FieldDefinition(
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias));
+    }
+
+    public OptionBinding optionBinding() {
+        return dictionaryBinding == null ? null : dictionaryBinding.toOptionBinding();
     }
 }

@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.platform.dictionary;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionItem;
+import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -101,6 +103,26 @@ class DictionaryServiceContractTest {
         assertThatThrownBy(() -> itemService.resolveEnabledItem("crm", "customer_status", "active"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void shouldExposeDictionaryAsOptionSource() {
+        categoryService.insert(category("crm", "area", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String chinaId = itemService.insert(item("crm", "area", "china", TreeAbility.ROOT_ID));
+        String shanghaiId = itemService.insert(item("crm", "area", "shanghai", chinaId));
+        String beijingId = itemService.insert(item("crm", "area", "beijing", chinaId));
+        itemService.disable(beijingId);
+        DictionaryOptionSource source = new DictionaryOptionSource("crm", "area", itemService);
+
+        assertThat(source.binding().source()).isEqualTo("crm.area");
+        assertThat(source.options()).extracting(OptionItem::code)
+                .containsExactly("china", "shanghai");
+        assertThat(source.options(OptionQuery.all().childrenOf("china"))).extracting(OptionItem::code)
+                .containsExactly("shanghai", "beijing");
+        assertThat(source.resolve("shanghai"))
+                .extracting(OptionItem::code, OptionItem::title, OptionItem::enabled, OptionItem::parentCode)
+                .containsExactly("shanghai", "shanghai", true, "china");
+        assertThat(itemService.select(shanghaiId).getParentId()).isEqualTo(chinaId);
     }
 
     @Test

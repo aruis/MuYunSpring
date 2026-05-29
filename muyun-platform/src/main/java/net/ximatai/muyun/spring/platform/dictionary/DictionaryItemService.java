@@ -1,12 +1,15 @@
 package net.ximatai.muyun.spring.platform.dictionary;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
@@ -91,6 +94,21 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
                 .eq("categoryAlias", validCategoryAlias)
                 .eq("code", validCode)
                 .eq("enabled", Boolean.TRUE));
+    }
+
+    public List<DictionaryItem> listItems(String applicationAlias, String categoryAlias, boolean enabledOnly) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        String validCategoryAlias = requireCode(categoryAlias, "dictionaryCategoryAlias");
+        if (enabledOnly) {
+            categoryService.requireEnabledDictionaryCategory(validApplicationAlias, validCategoryAlias);
+        } else {
+            categoryService.requireDictionaryCategory(validApplicationAlias, validCategoryAlias);
+        }
+        Criteria criteria = categoryScope(validApplicationAlias, validCategoryAlias);
+        if (enabledOnly) {
+            criteria.eq("enabled", Boolean.TRUE);
+        }
+        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     private void normalizeAndValidate(DictionaryItem item) {
