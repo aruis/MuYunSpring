@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -24,6 +25,40 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         }
         Criteria criteria = activeCriteria(Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
         return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    /**
+     * Resolves children for trees partitioned by a business scope, such as an application,
+     * menu scheme, or dictionary category. The scope criteria is intentionally explicit so
+     * services keep their business-shaped root methods while sharing tree mechanics.
+     */
+    default List<T> children(Criteria scopeCriteria, String parentId) {
+        if (parentId == null || parentId.isBlank()) {
+            return List.of();
+        }
+        if (!ROOT_ID.equals(parentId) && selectInScope(scopeCriteria, parentId) == null) {
+            return List.of();
+        }
+        Criteria criteria = scopedTreeCriteria(scopeCriteria, parentId);
+        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    /**
+     * Builds the common sort/query scope for a tree node inside a business scope.
+     */
+    default Criteria scopedTreeCriteria(Criteria scopeCriteria, String parentId) {
+        Criteria criteria = Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId);
+        if (scopeCriteria != null && !scopeCriteria.isEmpty()) {
+            criteria.andGroup(scopeCriteria.getRoot());
+        }
+        return criteria;
+    }
+
+    /**
+     * Use from services that require a business scope to resolve root nodes.
+     */
+    default void rejectRootChildrenLookup(String scopedLookupName) {
+        throw new PlatformException("Use " + scopedLookupName + " to resolve scoped root tree nodes");
     }
 
     @Override
@@ -91,6 +126,35 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         if (ancestorIds(parentId).contains(id)) {
             throw new PlatformException("Tree node cannot move under its descendant: " + id);
         }
+    }
+
+    /**
+     * Validates normal tree placement and additionally requires the parent to be
+     * visible in the same business scope as the incoming node.
+     */
+    default void validateTreePlacementInScope(T entity, Criteria scopeCriteria, String message) {
+        String parentId = entity.getParentId();
+        if (parentId == null || parentId.isBlank() || ROOT_ID.equals(parentId)) {
+            return;
+        }
+        validateTreePlacement(entity);
+        if (selectInScope(scopeCriteria, parentId) == null) {
+            throw new PlatformException(message);
+        }
+    }
+
+    private T selectInScope(Criteria scopeCriteria, String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        Criteria criteria = Criteria.of().eq(StandardEntitySchema.ID_FIELD, id);
+        if (scopeCriteria != null && !scopeCriteria.isEmpty()) {
+            criteria.andGroup(scopeCriteria.getRoot());
+        }
+        return getDao().query(activeCriteria(criteria), new PageRequest(0, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private void collectDescendantIds(String parentId, List<String> result, Set<String> visited) {

@@ -1,16 +1,13 @@
 package net.ximatai.muyun.spring.platform.dictionary;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -44,10 +41,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
 
     @Override
     public Criteria sortScope(DictionaryItem item) {
-        return Criteria.of()
-                .eq("applicationAlias", item.getApplicationAlias())
-                .eq("categoryAlias", item.getCategoryAlias())
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, item.getParentId());
+        return scopedTreeCriteria(categoryScope(item.getApplicationAlias(), item.getCategoryAlias()), item.getParentId());
     }
 
     @Override
@@ -62,7 +56,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
     @Override
     public List<DictionaryItem> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new PlatformException("Use rootItems(applicationAlias, categoryAlias) to resolve category-scoped root items");
+            rejectRootChildrenLookup("rootItems(applicationAlias, categoryAlias)");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -72,42 +66,23 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
     }
 
     public List<DictionaryItem> children(String applicationAlias, String categoryAlias, String parentId) {
-        PlatformAliasRules.requireApplicationAlias(applicationAlias);
-        requireCode(categoryAlias, "dictionaryCategoryAlias");
-        if (parentId == null || parentId.isBlank()) {
-            return List.of();
-        }
-        if (!TreeAbility.ROOT_ID.equals(parentId)) {
-            DictionaryItem parent = selectActiveRaw(parentId);
-            if (parent == null
-                    || !applicationAlias.equals(parent.getApplicationAlias())
-                    || !categoryAlias.equals(parent.getCategoryAlias())) {
-                return List.of();
-            }
-        }
-        Criteria criteria = activeCriteria(Criteria.of()
-                .eq("applicationAlias", applicationAlias)
-                .eq("categoryAlias", categoryAlias)
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return TreeAbility.super.children(categoryScope(
+                PlatformNameRules.requireApplicationAlias(applicationAlias),
+                requireCode(categoryAlias, "dictionaryCategoryAlias")), parentId);
     }
 
     public DictionaryItem resolveItem(String applicationAlias, String categoryAlias, String code) {
-        String validApplicationAlias = PlatformAliasRules.requireApplicationAlias(applicationAlias);
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = requireCode(categoryAlias, "dictionaryCategoryAlias");
         String validCode = requireCode(code, "dictionaryItemCode");
-        return list(Criteria.of()
+        return findOne(Criteria.of()
                         .eq("applicationAlias", validApplicationAlias)
                         .eq("categoryAlias", validCategoryAlias)
-                        .eq("code", validCode),
-                PageRequest.of(1, 1))
-                .stream()
-                .findFirst()
-                .orElse(null);
+                        .eq("code", validCode));
     }
 
     private void normalizeAndValidate(DictionaryItem item) {
-        String applicationAlias = PlatformAliasRules.requireApplicationAlias(item.getApplicationAlias());
+        String applicationAlias = PlatformNameRules.requireApplicationAlias(item.getApplicationAlias());
         String categoryAlias = requireCode(item.getCategoryAlias(), "dictionaryCategoryAlias");
         DictionaryCategory category = categoryService.requireDictionaryCategory(applicationAlias, categoryAlias);
         String code = requireCode(item.getCode(), "dictionaryItemCode");
@@ -123,34 +98,24 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
     }
 
     private String requireCode(String value, String name) {
-        if (!PlatformAliasRules.isIdentifier(value)) {
-            throw new IllegalArgumentException("invalid " + name + ": " + value);
-        }
-        return value;
+        return PlatformNameRules.requireCode(value, name);
     }
 
     private void validateParentCategory(DictionaryItem item) {
-        String parentId = item.getParentId();
-        if (parentId == null || parentId.isBlank() || TreeAbility.ROOT_ID.equals(parentId)) {
-            return;
-        }
-        DictionaryItem parent = select(parentId);
-        if (parent == null) {
-            return;
-        }
-        if (!item.getApplicationAlias().equals(parent.getApplicationAlias())
-                || !item.getCategoryAlias().equals(parent.getCategoryAlias())) {
-            throw new PlatformException("Dictionary item parent must belong to the same category");
-        }
+        validateTreePlacementInScope(item, categoryScope(item.getApplicationAlias(), item.getCategoryAlias()),
+                "Dictionary item parent must belong to the same category");
     }
 
     private void validateImmutableIdentity(DictionaryItem item) {
-        DictionaryItem existing = selectIgnoreSoftDelete(item.getId());
-        if (existing == null) {
-            return;
-        }
-        rejectChanged("Dictionary item application", existing.getApplicationAlias(), item.getApplicationAlias());
-        rejectChanged("Dictionary item category", existing.getCategoryAlias(), item.getCategoryAlias());
-        rejectChanged("Dictionary item code", existing.getCode(), item.getCode());
+        DictionaryItem existing = selectIncludingDeleted(item.getId());
+        rejectChanged(existing, item, "Dictionary item application", DictionaryItem::getApplicationAlias);
+        rejectChanged(existing, item, "Dictionary item category", DictionaryItem::getCategoryAlias);
+        rejectChanged(existing, item, "Dictionary item code", DictionaryItem::getCode);
+    }
+
+    private Criteria categoryScope(String applicationAlias, String categoryAlias) {
+        return Criteria.of()
+                .eq("applicationAlias", applicationAlias)
+                .eq("categoryAlias", categoryAlias);
     }
 }

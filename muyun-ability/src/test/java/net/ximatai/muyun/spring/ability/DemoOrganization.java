@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 @Setter
 final class DemoOrganization extends StandardEntity implements TreeCapable, TitledCapable {
     private String parentId;
+    private String scopeKey;
     @TitleField
     private String title;
     private Integer sortOrder;

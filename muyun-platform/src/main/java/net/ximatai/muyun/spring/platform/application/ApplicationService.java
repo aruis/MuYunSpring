@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,6 +36,6 @@ public class ApplicationService extends AbstractAbilityService<Application> impl
     }
 
     private void requireAlias(String alias) {
-        PlatformAliasRules.requireApplicationAlias(alias);
+        PlatformNameRules.requireApplicationAlias(alias);
     }
 }

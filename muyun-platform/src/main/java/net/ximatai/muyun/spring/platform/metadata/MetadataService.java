@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,18 +45,18 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     }
 
     private void normalizeAndValidate(Metadata metadata) {
-        String applicationAlias = PlatformAliasRules.requireApplicationAlias(metadata.getApplicationAlias());
-        String alias = requireIdentifier(metadata.getAlias(), "metadataAlias");
+        String applicationAlias = PlatformNameRules.requireApplicationAlias(metadata.getApplicationAlias());
+        String alias = PlatformNameRules.requireIdentifier(metadata.getAlias(), "metadataAlias");
         metadata.setApplicationAlias(applicationAlias);
         metadata.setAlias(alias);
         if (metadata.getSchemaName() == null || metadata.getSchemaName().isBlank()) {
             metadata.setSchemaName(DEFAULT_SCHEMA);
         }
-        requireIdentifier(metadata.getSchemaName(), "schemaName");
+        PlatformNameRules.requireDatabaseName(metadata.getSchemaName(), "schemaName");
         if (metadata.getTableName() == null || metadata.getTableName().isBlank()) {
             metadata.setTableName(applicationAlias + "_" + alias);
         }
-        requireIdentifier(metadata.getTableName(), "tableName");
+        PlatformNameRules.requireDatabaseName(metadata.getTableName(), "tableName");
         rejectDuplicateMetadataAlias(metadata);
         rejectDuplicatePhysicalTable(metadata);
     }
@@ -73,19 +73,5 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
                 .eq("schemaName", metadata.getSchemaName())
                 .eq("tableName", metadata.getTableName()),
                 "metadata physical table must be unique: " + metadata.getSchemaName() + "." + metadata.getTableName());
-    }
-
-    static String requireIdentifier(String value, String name) {
-        if (!PlatformAliasRules.isIdentifier(value)) {
-            throw new IllegalArgumentException("invalid " + name + ": " + value);
-        }
-        return value;
-    }
-
-    static String requireFieldName(String value, String name) {
-        if (value == null || !value.matches("[a-z][A-Za-z0-9]{0,62}")) {
-            throw new IllegalArgumentException("invalid " + name + ": " + value);
-        }
-        return value;
     }
 }

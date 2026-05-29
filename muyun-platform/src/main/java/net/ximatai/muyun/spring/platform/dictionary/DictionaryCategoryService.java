@@ -1,16 +1,13 @@
 package net.ximatai.muyun.spring.platform.dictionary;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -40,9 +37,7 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
 
     @Override
     public Criteria sortScope(DictionaryCategory category) {
-        return Criteria.of()
-                .eq("applicationAlias", category.getApplicationAlias())
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, category.getParentId());
+        return scopedTreeCriteria(applicationScope(category.getApplicationAlias()), category.getParentId());
     }
 
     @Override
@@ -56,7 +51,7 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
     @Override
     public List<DictionaryCategory> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new PlatformException("Use rootCategories(applicationAlias) to resolve application-scoped root categories");
+            rejectRootChildrenLookup("rootCategories(applicationAlias)");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -66,32 +61,15 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
     }
 
     public List<DictionaryCategory> children(String applicationAlias, String parentId) {
-        PlatformAliasRules.requireApplicationAlias(applicationAlias);
-        if (parentId == null || parentId.isBlank()) {
-            return List.of();
-        }
-        if (!TreeAbility.ROOT_ID.equals(parentId)) {
-            DictionaryCategory parent = selectActiveRaw(parentId);
-            if (parent == null || !applicationAlias.equals(parent.getApplicationAlias())) {
-                return List.of();
-            }
-        }
-        Criteria criteria = activeCriteria(Criteria.of()
-                .eq("applicationAlias", applicationAlias)
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return TreeAbility.super.children(applicationScope(PlatformNameRules.requireApplicationAlias(applicationAlias)), parentId);
     }
 
     public DictionaryCategory requireDictionaryCategory(String applicationAlias, String categoryAlias) {
-        String validApplicationAlias = PlatformAliasRules.requireApplicationAlias(applicationAlias);
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = requireAlias(categoryAlias);
-        DictionaryCategory category = list(Criteria.of()
+        DictionaryCategory category = findOne(Criteria.of()
                         .eq("applicationAlias", validApplicationAlias)
-                        .eq("alias", validCategoryAlias),
-                PageRequest.of(1, 1))
-                .stream()
-                .findFirst()
-                .orElse(null);
+                        .eq("alias", validCategoryAlias));
         if (category == null) {
             throw new PlatformException("Dictionary category requires existing category: " + validCategoryAlias);
         }
@@ -102,7 +80,7 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
     }
 
     private void normalizeAndValidate(DictionaryCategory category) {
-        String applicationAlias = PlatformAliasRules.requireApplicationAlias(category.getApplicationAlias());
+        String applicationAlias = PlatformNameRules.requireApplicationAlias(category.getApplicationAlias());
         String alias = requireAlias(category.getAlias());
         category.setApplicationAlias(applicationAlias);
         category.setAlias(alias);
@@ -117,33 +95,22 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
     }
 
     private String requireAlias(String alias) {
-        if (!PlatformAliasRules.isIdentifier(alias)) {
-            throw new IllegalArgumentException("invalid dictionaryCategoryAlias: " + alias);
-        }
-        return alias;
+        return PlatformNameRules.requireIdentifier(alias, "dictionaryCategoryAlias");
     }
 
     private void validateParentApplication(DictionaryCategory category) {
-        String parentId = category.getParentId();
-        if (parentId == null || parentId.isBlank() || TreeAbility.ROOT_ID.equals(parentId)) {
-            return;
-        }
-        DictionaryCategory parent = select(parentId);
-        if (parent == null) {
-            return;
-        }
-        if (!category.getApplicationAlias().equals(parent.getApplicationAlias())) {
-            throw new PlatformException("Dictionary category parent must belong to the same application");
-        }
+        validateTreePlacementInScope(category, applicationScope(category.getApplicationAlias()),
+                "Dictionary category parent must belong to the same application");
     }
 
     private void validateImmutableIdentity(DictionaryCategory category) {
-        DictionaryCategory existing = selectIgnoreSoftDelete(category.getId());
-        if (existing == null) {
-            return;
-        }
-        rejectChanged("Dictionary category application", existing.getApplicationAlias(), category.getApplicationAlias());
-        rejectChanged("Dictionary category alias", existing.getAlias(), category.getAlias());
-        rejectChanged("Dictionary category kind", existing.getCategoryKind(), category.getCategoryKind());
+        DictionaryCategory existing = selectIncludingDeleted(category.getId());
+        rejectChanged(existing, category, "Dictionary category application", DictionaryCategory::getApplicationAlias);
+        rejectChanged(existing, category, "Dictionary category alias", DictionaryCategory::getAlias);
+        rejectChanged(existing, category, "Dictionary category kind", DictionaryCategory::getCategoryKind);
+    }
+
+    private Criteria applicationScope(String applicationAlias) {
+        return Criteria.of().eq("applicationAlias", applicationAlias);
     }
 }

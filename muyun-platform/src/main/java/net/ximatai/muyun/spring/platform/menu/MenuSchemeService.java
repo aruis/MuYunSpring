@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -64,10 +64,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     }
 
     private String requireAlias(String alias) {
-        if (!PlatformAliasRules.isIdentifier(alias)) {
-            throw new IllegalArgumentException("invalid menuSchemeAlias: " + alias);
-        }
-        return alias;
+        return PlatformNameRules.requireIdentifier(alias, "menuSchemeAlias");
     }
 
     private void normalizeScope(MenuScheme scheme) {

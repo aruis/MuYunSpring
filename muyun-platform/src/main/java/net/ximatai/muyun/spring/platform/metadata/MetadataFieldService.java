@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.stereotype.Service;
 
@@ -48,8 +49,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     private void normalizeAndValidate(MetadataField field) {
         requireMetadata(field.getMetadataId());
-        MetadataService.requireFieldName(field.getFieldName(), "fieldName");
-        MetadataService.requireIdentifier(field.getColumnName(), "columnName");
+        PlatformNameRules.requireFieldName(field.getFieldName(), "fieldName");
+        PlatformNameRules.requireDatabaseName(field.getColumnName(), "columnName");
         if (field.getFieldType() == null) {
             field.setFieldType(FieldType.STRING);
         }

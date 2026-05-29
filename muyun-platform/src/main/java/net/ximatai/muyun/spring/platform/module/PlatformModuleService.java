@@ -2,19 +2,18 @@ package net.ximatai.muyun.spring.platform.module;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class PlatformModuleService extends AbstractAbilityService<PlatformModule> implements
@@ -45,14 +44,12 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
 
     @Override
     public Criteria sortScope(PlatformModule module) {
-        return Criteria.of()
-                .eq("applicationAlias", module.getApplicationAlias())
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, module.getParentId());
+        return scopedTreeCriteria(applicationScope(module.getApplicationAlias()), module.getParentId());
     }
 
     @Override
     public void validateSortScope(PlatformModule left, PlatformModule right) {
-        if (!java.util.Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
+        if (!Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
             throw new PlatformException("Module sort can only move records within the same application");
         }
         TreeAbility.super.validateSortScope(left, right);
@@ -61,7 +58,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     @Override
     public List<PlatformModule> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new PlatformException("Use rootModules(applicationAlias) to resolve application-scoped root modules");
+            rejectRootChildrenLookup("rootModules(applicationAlias)");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -71,24 +68,11 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     }
 
     public List<PlatformModule> children(String applicationAlias, String parentId) {
-        PlatformAliasRules.requireApplicationAlias(applicationAlias);
-        if (parentId == null || parentId.isBlank()) {
-            return List.of();
-        }
-        if (!TreeAbility.ROOT_ID.equals(parentId)) {
-            PlatformModule parent = selectActiveRaw(parentId);
-            if (parent == null || !applicationAlias.equals(parent.getApplicationAlias())) {
-                return List.of();
-            }
-        }
-        Criteria criteria = activeCriteria(Criteria.of()
-                .eq("applicationAlias", applicationAlias)
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return TreeAbility.super.children(applicationScope(PlatformNameRules.requireApplicationAlias(applicationAlias)), parentId);
     }
 
     public PlatformModule resolveVisibleModule(String moduleAlias) {
-        String validAlias = PlatformAliasRules.requireModuleAlias(moduleAlias);
+        String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         if (TenantContext.currentTenantId().isPresent()) {
             PlatformModule scoped = select(validAlias);
             if (scoped != null) {
@@ -122,24 +106,19 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     }
 
     private String requireApplicationAlias(String applicationAlias) {
-        return PlatformAliasRules.requireApplicationAlias(applicationAlias);
+        return PlatformNameRules.requireApplicationAlias(applicationAlias);
     }
 
     private String requireModuleAlias(String moduleAlias, String applicationAlias) {
-        return PlatformAliasRules.requireModuleAliasInApplication(moduleAlias, applicationAlias);
+        return PlatformNameRules.requireModuleAliasInApplication(moduleAlias, applicationAlias);
     }
 
     private void validateParentApplication(PlatformModule module) {
-        String parentId = module.getParentId();
-        if (parentId == null || parentId.isBlank() || TreeAbility.ROOT_ID.equals(parentId)) {
-            return;
-        }
-        PlatformModule parent = select(parentId);
-        if (parent == null) {
-            return;
-        }
-        if (!module.getApplicationAlias().equals(parent.getApplicationAlias())) {
-            throw new PlatformException("Module parent must belong to the same application");
-        }
+        validateTreePlacementInScope(module, applicationScope(module.getApplicationAlias()),
+                "Module parent must belong to the same application");
+    }
+
+    private Criteria applicationScope(String applicationAlias) {
+        return Criteria.of().eq("applicationAlias", applicationAlias);
     }
 }

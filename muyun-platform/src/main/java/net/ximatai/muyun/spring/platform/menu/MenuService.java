@@ -1,16 +1,13 @@
 package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
 
@@ -46,9 +43,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     @Override
     public Criteria sortScope(Menu menu) {
-        return Criteria.of()
-                .eq("schemeId", menu.getSchemeId())
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, menu.getParentId());
+        return scopedTreeCriteria(schemeScope(menu.getSchemeId()), menu.getParentId());
     }
 
     @Override
@@ -62,7 +57,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     @Override
     public List<Menu> children(String parentId) {
         if (TreeAbility.ROOT_ID.equals(parentId)) {
-            throw new PlatformException("Use rootMenus(schemeId) to resolve scheme-scoped root menus");
+            rejectRootChildrenLookup("rootMenus(schemeId)");
         }
         return TreeAbility.super.children(parentId);
     }
@@ -75,16 +70,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         if (schemeId == null || schemeId.isBlank() || parentId == null || parentId.isBlank()) {
             return List.of();
         }
-        if (!TreeAbility.ROOT_ID.equals(parentId)) {
-            Menu parent = selectActiveRaw(parentId);
-            if (parent == null || !schemeId.equals(parent.getSchemeId())) {
-                return List.of();
-            }
-        }
-        Criteria criteria = activeCriteria(Criteria.of()
-                .eq("schemeId", schemeId)
-                .eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return TreeAbility.super.children(schemeScope(schemeId), parentId);
     }
 
     private void normalizeAndValidate(Menu menu) {
@@ -116,7 +102,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
             }
             case MODULE -> {
-                String moduleAlias = PlatformAliasRules.requireModuleAlias(menu.getModuleAlias());
+                String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
                 if (moduleService.resolveVisibleModule(moduleAlias) == null) {
                     throw new PlatformException("MODULE menu requires existing module: " + moduleAlias);
                 }
@@ -138,17 +124,8 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private void validateParentScheme(Menu menu) {
-        String parentId = menu.getParentId();
-        if (parentId == null || parentId.isBlank() || TreeAbility.ROOT_ID.equals(parentId)) {
-            return;
-        }
-        Menu parent = select(parentId);
-        if (parent == null) {
-            return;
-        }
-        if (!menu.getSchemeId().equals(parent.getSchemeId())) {
-            throw new PlatformException("Menu parent must belong to the same scheme");
-        }
+        validateTreePlacementInScope(menu, schemeScope(menu.getSchemeId()),
+                "Menu parent must belong to the same scheme");
     }
 
     private void requireText(String value, String message) {
@@ -164,9 +141,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private void validateImmutableScheme(Menu menu) {
-        Menu existing = selectIgnoreSoftDelete(menu.getId());
-        if (existing != null) {
-            rejectChanged("Menu scheme", existing.getSchemeId(), menu.getSchemeId());
-        }
+        Menu existing = selectIncludingDeleted(menu.getId());
+        rejectChanged(existing, menu, "Menu scheme", Menu::getSchemeId);
+    }
+
+    private Criteria schemeScope(String schemeId) {
+        return Criteria.of().eq("schemeId", schemeId);
     }
 }

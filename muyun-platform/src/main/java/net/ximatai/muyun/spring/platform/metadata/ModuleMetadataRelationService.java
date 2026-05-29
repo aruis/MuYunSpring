@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
@@ -51,7 +51,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
     }
 
     private void normalizeAndValidate(ModuleMetadataRelation relation) {
-        String moduleAlias = PlatformAliasRules.requireModuleAlias(relation.getModuleAlias());
+        String moduleAlias = PlatformNameRules.requireModuleAlias(relation.getModuleAlias());
         PlatformModule module = moduleService.select(moduleAlias);
         if (module == null) {
             throw new PlatformException("Module metadata relation requires existing module: " + moduleAlias);
@@ -66,7 +66,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         if (relation.getRelationAlias() == null || relation.getRelationAlias().isBlank()) {
             relation.setRelationAlias(metadata.getAlias());
         }
-        MetadataService.requireIdentifier(relation.getRelationAlias(), "relationAlias");
+        PlatformNameRules.requireIdentifier(relation.getRelationAlias(), "relationAlias");
         if (relation.getRelationRole() == RelationRole.MAIN) {
             rejectDuplicateMainRelation(relation);
         } else {
@@ -107,7 +107,7 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         if (relation.getForeignKey() == null || relation.getForeignKey().isBlank()) {
             throw new PlatformException("Non-main relation requires foreignKey");
         }
-        MetadataService.requireFieldName(relation.getForeignKey(), "foreignKey");
+        PlatformNameRules.requireFieldName(relation.getForeignKey(), "foreignKey");
     }
 
     private void rejectDuplicateRelationAlias(ModuleMetadataRelation relation) {

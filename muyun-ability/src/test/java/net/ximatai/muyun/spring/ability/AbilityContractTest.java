@@ -1198,6 +1198,40 @@ class AbilityContractTest {
     }
 
     @Test
+    void treeAbilityShouldSupportScopedChildrenAndPlacementValidation() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        DemoOrganization scopeAParent = new DemoOrganization("A Parent", TreeAbility.ROOT_ID);
+        scopeAParent.setScopeKey("scope-a");
+        DemoOrganization scopeBParent = new DemoOrganization("B Parent", TreeAbility.ROOT_ID);
+        scopeBParent.setScopeKey("scope-b");
+
+        String scopeAParentId = service.insert(scopeAParent);
+        String scopeBParentId = service.insert(scopeBParent);
+        DemoOrganization scopeAChild = new DemoOrganization("A Child", scopeAParentId);
+        scopeAChild.setScopeKey("scope-a");
+        service.validateTreePlacementInScope(scopeAChild, Criteria.of().eq("scopeKey", "scope-a"), "parent must match scope");
+        String scopeAChildId = service.insert(scopeAChild);
+
+        assertThat(service.children(Criteria.of().eq("scopeKey", "scope-a"), TreeAbility.ROOT_ID))
+                .extracting(DemoOrganization::getId)
+                .containsExactly(scopeAParentId);
+        assertThat(service.children(Criteria.of().eq("scopeKey", "scope-b"), scopeAParentId)).isEmpty();
+        assertThat(service.scopedTreeCriteria(Criteria.of().eq("scopeKey", "scope-a"), scopeAParentId).getClauses())
+                .extracting(clause -> clause.getField())
+                .contains("scopeKey", "parentId");
+
+        DemoOrganization invalidChild = new DemoOrganization("Invalid Child", scopeBParentId);
+        invalidChild.setScopeKey("scope-a");
+        assertThatThrownBy(() -> service.validateTreePlacementInScope(invalidChild,
+                Criteria.of().eq("scopeKey", "scope-a"), "parent must match scope"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("parent must match scope");
+        assertThat(service.children(Criteria.of().eq("scopeKey", "scope-a"), scopeAParentId))
+                .extracting(DemoOrganization::getId)
+                .containsExactly(scopeAChildId);
+    }
+
+    @Test
     void treeAbilityShouldHideSoftDeletedChildrenAndDescendants() {
         DemoOrganizationService service = new DemoOrganizationService();
         String parentId = service.insert(new DemoOrganization("Parent", TreeAbility.ROOT_ID));

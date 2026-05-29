@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
-import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -310,7 +310,7 @@ public class ModuleDefinitionValidator {
 
     private void requireModuleAlias(String value, String name) {
         try {
-            PlatformAliasRules.requireModuleAlias(value);
+            PlatformNameRules.requireModuleAlias(value);
         } catch (RuntimeException e) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }

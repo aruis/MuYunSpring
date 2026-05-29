@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 
 import java.util.Objects;
+import java.util.function.Function;
 
 public abstract class AbstractAbilityService<T extends EntityContract> implements CrudAbility<T> {
     private final String moduleAlias;
@@ -40,6 +41,30 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
                 .anyMatch(existing -> !Objects.equals(existing.getId(), currentId));
     }
 
+    protected final T findOne(Criteria criteria) {
+        return list(criteria, PageRequest.of(1, 1))
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    protected final T requireOne(Criteria criteria, String message) {
+        T existing = findOne(criteria);
+        if (existing == null) {
+            throw new PlatformException(message);
+        }
+        return existing;
+    }
+
+    protected final T selectIncludingDeleted(String id) {
+        if (this instanceof SoftDeleteAbility<?> softDeleteAbility) {
+            @SuppressWarnings("unchecked")
+            SoftDeleteAbility<T> typed = (SoftDeleteAbility<T>) softDeleteAbility;
+            return typed.selectIgnoreSoftDelete(id);
+        }
+        return select(id);
+    }
+
     protected final void rejectDuplicate(T entity, Criteria criteria, String message) {
         if (existsOtherInCurrentScope(entity, criteria)) {
             throw new PlatformException(message);
@@ -49,6 +74,12 @@ public abstract class AbstractAbilityService<T extends EntityContract> implement
     protected final void rejectChanged(String fieldName, Object existingValue, Object incomingValue) {
         if (!Objects.equals(existingValue, incomingValue)) {
             throw new PlatformException(fieldName + " cannot be changed");
+        }
+    }
+
+    protected final <V> void rejectChanged(T existing, T incoming, String fieldName, Function<T, V> valueReader) {
+        if (existing != null) {
+            rejectChanged(fieldName, valueReader.apply(existing), valueReader.apply(incoming));
         }
     }
 }
