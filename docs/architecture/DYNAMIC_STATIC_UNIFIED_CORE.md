@@ -70,7 +70,7 @@ DynamicRecordService
 1. 静态模型由 Java 类、注解、DAO 和 Ability 组合声明；业务开发者不应为了接入平台再手写 `ModuleDefinition`。
 2. 动态模型没有 Java 类，才直接使用 `ModuleDefinition`、`EntityDefinition`、`FieldDefinition` 表达配置态。
 3. `Definition` 是动态配置和平台内部编译结果，不是静态业务接入的额外负担。
-4. 字段定义只表达字段事实、物理列、类型、约束和基础能力意图；默认值、字典、引用、过滤、影响等字段行为应进入后续独立配置，不塞进 `FieldDefinition`。
+4. 字段定义只表达字段事实、物理列、类型、约束和运行态必须知道的轻量字段行为。字典绑定可以作为编译后的运行态事实进入 `FieldDefinition`，但字典类目、项目维护和启用校验仍属于平台字典能力；默认值、过滤、影响等复杂字段行为应进入后续独立配置。
 5. 模块运行时标识统一使用点分平台模块别名，例如 `iam.organization`。
 
 ## 建表路线

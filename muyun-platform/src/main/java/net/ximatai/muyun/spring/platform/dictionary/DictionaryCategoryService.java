@@ -79,6 +79,14 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
         return category;
     }
 
+    public DictionaryCategory requireEnabledDictionaryCategory(String applicationAlias, String categoryAlias) {
+        DictionaryCategory category = requireDictionaryCategory(applicationAlias, categoryAlias);
+        if (!Boolean.TRUE.equals(category.getEnabled())) {
+            throw new PlatformException("Dictionary category is disabled: " + categoryAlias);
+        }
+        return category;
+    }
+
     private void normalizeAndValidate(DictionaryCategory category) {
         String applicationAlias = PlatformNameRules.requireApplicationAlias(category.getApplicationAlias());
         String alias = requireAlias(category.getAlias());

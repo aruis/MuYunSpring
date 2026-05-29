@@ -127,6 +127,11 @@ public class ModuleDefinitionValidator {
         if (field.type() == null) {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
+        if (field.dictionaryBinding() != null
+                && field.type() != FieldType.STRING
+                && field.type() != FieldType.TEXT) {
+            throw new ModuleDefinitionException("dictionary binding requires string field: " + field.code());
+        }
         if (STANDARD_COLUMNS.contains(field.columnName())) {
             throw new ModuleDefinitionException("field column conflicts with standard column: " + field.columnName());
         }

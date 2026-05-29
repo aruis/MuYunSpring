@@ -82,6 +82,28 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void shouldResolveOnlyEnabledDictionaryItemForWriteValidation() {
+        String categoryId = categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String activeId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        String frozenId = itemService.insert(item("crm", "customer_status", "frozen", TreeAbility.ROOT_ID));
+
+        itemService.disable(frozenId);
+
+        assertThat(itemService.resolveEnabledItem("crm", "customer_status", "active").getId()).isEqualTo(activeId);
+        assertThat(itemService.resolveItem("crm", "customer_status", "frozen")).isNotNull();
+        assertThat(itemService.resolveEnabledItem("crm", "customer_status", "frozen")).isNull();
+
+        DictionaryCategory disabled = category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID);
+        disabled.setId(categoryId);
+        disabled.setVersion(0);
+        disabled.setEnabled(false);
+        categoryService.update(disabled);
+        assertThatThrownBy(() -> itemService.resolveEnabledItem("crm", "customer_status", "active"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    @Test
     void shouldRejectItemsForFolderCategoryAndDuplicateCodeWithinCategory() {
         categoryService.insert(category("crm", "base", DictionaryCategoryKind.FOLDER, TreeAbility.ROOT_ID));
         categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));

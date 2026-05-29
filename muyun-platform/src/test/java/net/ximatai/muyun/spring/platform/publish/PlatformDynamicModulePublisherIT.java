@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.platform.application.ApplicationService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
@@ -52,6 +53,7 @@ import javax.sql.DataSource;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = PlatformDynamicModulePublisherIT.TestApplication.class)
@@ -85,7 +87,9 @@ class PlatformDynamicModulePublisherIT {
         String contactMetadataId = services.metadataService.insert(metadata("crm", "customer_contact", "platform_publish_contact_it"));
         services.fieldService.insert(titleField(customerMetadataId));
         services.fieldService.insert(field(customerMetadataId, "code", "code", FieldType.STRING));
-        services.fieldService.insert(field(customerMetadataId, "status", "status", FieldType.STRING));
+        MetadataField status = field(customerMetadataId, "status", "status", FieldType.STRING);
+        status.setDictionaryCategoryAlias("customer_status");
+        services.fieldService.insert(status);
         services.fieldService.insert(titleField(contactMetadataId));
         services.fieldService.insert(field(contactMetadataId, "customerId", "customer_id", FieldType.STRING));
         services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
@@ -97,7 +101,7 @@ class PlatformDynamicModulePublisherIT {
                     .extracting(Menu::getModuleAlias)
                     .containsExactly("crm.customer");
         }
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, new DictionaryFieldValueValidator(services.itemService));
         PlatformDynamicModulePublisher publisher = new PlatformDynamicModulePublisher(
                 new PlatformModuleDefinitionCompiler(
                         services.moduleService,
@@ -133,6 +137,14 @@ class PlatformDynamicModulePublisherIT {
         assertThat(customer.list(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)))
                 .extracting(item -> item.getValue("title"))
                 .containsExactly("客户A");
+
+        DynamicRecord invalid = customer.newRecord()
+                .setValue("title", "客户B")
+                .setValue("code", "C-002")
+                .setValue("status", "frozen");
+        assertThatThrownBy(() -> customer.create(invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionary code");
     }
 
     private PlatformServices platformServices() {
@@ -146,15 +158,15 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
         TestMemoryDao<DictionaryItem> itemDao = new TestMemoryDao<>();
         ApplicationService applicationService = new ApplicationService(applicationDao);
+        DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
+        DictionaryItemService itemService = new DictionaryItemService(itemDao, categoryService);
         PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
         MetadataService metadataService = new MetadataService(metadataDao);
-        MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService);
+        MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, categoryService);
         ModuleMetadataRelationService relationService =
                 new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
-        DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
-        DictionaryItemService itemService = new DictionaryItemService(itemDao, categoryService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, relationService,
                 schemeService, menuService, categoryService, itemService);
     }

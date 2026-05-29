@@ -9,7 +9,10 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
 
 @Service
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
@@ -19,10 +22,14 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     public static final String MODULE_ALIAS = "platform.metadataField";
 
     private final MetadataService metadataService;
+    private final DictionaryCategoryService categoryService;
 
-    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao, MetadataService metadataService) {
+    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
+                                MetadataService metadataService,
+                                DictionaryCategoryService categoryService) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
+        this.categoryService = Objects.requireNonNull(categoryService, "categoryService must not be null");
     }
 
     @Override
@@ -51,6 +58,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         requireMetadata(field.getMetadataId());
         PlatformNameRules.requireFieldName(field.getFieldName(), "fieldName");
         PlatformNameRules.requireDatabaseName(field.getColumnName(), "columnName");
+        normalizeDictionaryBinding(field);
         if (field.getFieldType() == null) {
             field.setFieldType(FieldType.STRING);
         }
@@ -85,6 +93,29 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         rejectDuplicateSingleFlag(field);
     }
 
+    private void normalizeDictionaryBinding(MetadataField field) {
+        boolean hasCategory = field.getDictionaryCategoryAlias() != null && !field.getDictionaryCategoryAlias().isBlank();
+        boolean hasApplication = field.getDictionaryApplicationAlias() != null && !field.getDictionaryApplicationAlias().isBlank();
+        if (!hasCategory && !hasApplication) {
+            field.setDictionaryApplicationAlias(null);
+            field.setDictionaryCategoryAlias(null);
+            return;
+        }
+        if (!hasCategory) {
+            throw new IllegalArgumentException("dictionaryCategoryAlias must not be blank");
+        }
+        String applicationAlias = hasApplication
+                ? PlatformNameRules.requireApplicationAlias(field.getDictionaryApplicationAlias())
+                : requireMetadata(field.getMetadataId()).getApplicationAlias();
+        field.setDictionaryApplicationAlias(applicationAlias);
+        field.setDictionaryCategoryAlias(PlatformNameRules.requireIdentifier(
+                field.getDictionaryCategoryAlias(), "dictionaryCategoryAlias"));
+        categoryService.requireDictionaryCategory(field.getDictionaryApplicationAlias(), field.getDictionaryCategoryAlias());
+        if (field.getFieldType() != null && field.getFieldType() != FieldType.STRING && field.getFieldType() != FieldType.TEXT) {
+            throw new IllegalArgumentException("dictionary binding requires string field");
+        }
+    }
+
     private void rejectDuplicateField(MetadataField field) {
         rejectDuplicate(field, Criteria.of()
                         .eq("metadataId", field.getMetadataId())
@@ -109,9 +140,11 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         }
     }
 
-    private void requireMetadata(String metadataId) {
-        if (metadataId == null || metadataId.isBlank() || metadataService.select(metadataId) == null) {
+    private Metadata requireMetadata(String metadataId) {
+        Metadata metadata = metadataId == null || metadataId.isBlank() ? null : metadataService.select(metadataId);
+        if (metadata == null) {
             throw new PlatformException("Metadata field requires existing metadata: " + metadataId);
         }
+        return metadata;
     }
 }

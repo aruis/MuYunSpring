@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
 import java.util.Collection;
@@ -48,6 +49,7 @@ public class DynamicEntityService implements
     private final ModuleDefinition module;
     private final Function<String, DynamicEntityService> relationServiceResolver;
     private final String cacheNamespace;
+    private final DynamicFieldValueValidator fieldValueValidator;
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
@@ -73,12 +75,23 @@ public class DynamicEntityService implements
                                 ModuleDefinition module,
                                 Function<String, DynamicEntityService> relationServiceResolver,
                                 String cacheNamespacePrefix) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix, DynamicFieldValueValidator.NONE);
+    }
+
+    public DynamicEntityService(DynamicRecordDao dao,
+                                String moduleAlias,
+                                DynamicRecordLifecycle lifecycle,
+                                ModuleDefinition module,
+                                Function<String, DynamicEntityService> relationServiceResolver,
+                                String cacheNamespacePrefix,
+                                DynamicFieldValueValidator fieldValueValidator) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
         this.module = module;
         this.relationServiceResolver = Objects.requireNonNull(relationServiceResolver, "relationServiceResolver must not be null");
         this.cacheNamespace = resolveCacheNamespace(cacheNamespacePrefix);
+        this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
     }
 
     @Override
@@ -115,6 +128,7 @@ public class DynamicEntityService implements
         lifecycle.beforeInsert(record);
         validateChildPayload(record);
         record.validateForInsert();
+        validateFieldValues(record);
         validateTreePlacement(record);
     }
 
@@ -122,6 +136,7 @@ public class DynamicEntityService implements
     public void beforeUpdate(DynamicRecord record) {
         lifecycle.beforeUpdate(record);
         validateChildPayload(record);
+        validateFieldValues(record);
         validateTreePlacement(record);
     }
 
@@ -531,6 +546,15 @@ public class DynamicEntityService implements
                 if (!relation.childEntity().equals(child.getEntity().code())) {
                     throw new IllegalArgumentException("dynamic child entity mismatch: " + child.getEntity().code());
                 }
+            }
+        }
+    }
+
+    private void validateFieldValues(DynamicRecord record) {
+        requireSameEntity(record);
+        for (FieldDefinition field : dao.getEntity().fields()) {
+            if (record.getValues().containsKey(field.code())) {
+                fieldValueValidator.validate(moduleAlias, dao.getEntity(), field, record.getValue(field.code()));
             }
         }
     }

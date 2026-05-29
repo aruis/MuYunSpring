@@ -49,6 +49,12 @@ public class MetadataField extends StandardEnabledSortableEntity {
     @Column(name = "scale_value", type = ColumnType.INT, comment = "Decimal scale")
     private Integer scale;
 
+    @Column(name = "dictionary_application_alias", type = ColumnType.VARCHAR, length = 64, comment = "Dictionary application alias")
+    private String dictionaryApplicationAlias;
+
+    @Column(name = "dictionary_category_alias", type = ColumnType.VARCHAR, length = 64, comment = "Dictionary category alias")
+    private String dictionaryCategoryAlias;
+
     public FieldDefinition toDefinition() {
         FieldDefinition definition = new FieldDefinition(fieldName, columnName, fieldType, getTitle(),
                 Boolean.TRUE.equals(required),
@@ -58,7 +64,12 @@ public class MetadataField extends StandardEnabledSortableEntity {
                 Boolean.TRUE.equals(titleField),
                 fieldLength,
                 precision,
-                scale);
+                scale,
+                null);
+        if (dictionaryApplicationAlias != null && !dictionaryApplicationAlias.isBlank()
+                && dictionaryCategoryAlias != null && !dictionaryCategoryAlias.isBlank()) {
+            definition = definition.dictionary(dictionaryApplicationAlias, dictionaryCategoryAlias);
+        }
         return definition;
     }
 }

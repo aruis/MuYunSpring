@@ -16,14 +16,26 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final IDatabaseOperations<?> operations;
     private final DynamicModuleRegistry registry;
     private final String cacheNamespacePrefix;
+    private final DynamicFieldValueValidator fieldValueValidator;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
     }
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations, DynamicModuleRegistry registry) {
+        this(operations, registry, DynamicFieldValueValidator.NONE);
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations, DynamicFieldValueValidator fieldValueValidator) {
+        this(operations, new DynamicModuleRegistry(), fieldValueValidator);
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
+                                DynamicModuleRegistry registry,
+                                DynamicFieldValueValidator fieldValueValidator) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
+        this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
@@ -64,7 +76,8 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 lifecycle,
                 module,
                 childEntityCode -> entityService(moduleAlias, childEntityCode),
-                cacheNamespacePrefix
+                cacheNamespacePrefix,
+                fieldValueValidator
         );
     }
 

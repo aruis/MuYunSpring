@@ -13,6 +13,9 @@ import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -33,9 +36,11 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<Metadata> metadataDao = new MemoryDao<>();
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
+    private final MemoryDao<DictionaryCategory> categoryDao = new MemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
-    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService);
+    private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
+    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, categoryService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
 
@@ -96,6 +101,44 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.isRequired()).isTrue();
         assertThat(definition.isTitle()).isTrue();
         assertThat(definition.length()).isEqualTo(128);
+    }
+
+    @Test
+    void shouldCompileDictionaryBindingOnMetadataField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
+        MetadataField field = field(metadataId, "status", "status", FieldType.STRING);
+        field.setDictionaryCategoryAlias("customer_status");
+
+        fieldService.insert(field);
+
+        FieldDefinition definition = field.toDefinition();
+        assertThat(field.getDictionaryApplicationAlias()).isEqualTo("crm");
+        assertThat(definition.dictionaryBinding().applicationAlias()).isEqualTo("crm");
+        assertThat(definition.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
+    }
+
+    @Test
+    void shouldRejectDictionaryBindingOnNonStringField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
+        MetadataField field = field(metadataId, "status", "status", FieldType.INTEGER);
+        field.setDictionaryCategoryAlias("customer_status");
+
+        assertThatThrownBy(() -> fieldService.insert(field))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionary binding");
+    }
+
+    @Test
+    void shouldRejectDictionaryBindingWithoutExistingCategory() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "status", "status", FieldType.STRING);
+        field.setDictionaryCategoryAlias("customer_status");
+
+        assertThatThrownBy(() -> fieldService.insert(field))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("existing category");
     }
 
     @Test
@@ -199,6 +242,15 @@ class PlatformMetadataServiceContractTest {
         field.setFieldType(fieldType);
         field.setTitle(fieldName);
         return field;
+    }
+
+    private DictionaryCategory category(String applicationAlias, String alias, DictionaryCategoryKind kind) {
+        DictionaryCategory category = new DictionaryCategory();
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setCategoryKind(kind);
+        category.setTitle(alias);
+        return category;
     }
 
     private PlatformModule module(String alias, String applicationAlias, ModuleKind kind) {

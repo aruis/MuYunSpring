@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -198,6 +199,35 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldValidateDictionaryBoundFieldThroughRuntimeValidator() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicFieldValueValidator validator = (moduleAlias, entity, field, value) -> {
+            FieldDictionaryBinding binding = field.dictionaryBinding();
+            if (binding != null && !"active".equals(value)) {
+                throw new IllegalArgumentException("invalid dictionary code: " + value);
+            }
+        };
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, validator)
+                .register(new ModuleDefinition(MODULE, "Contract", List.of(dictionaryEntity())));
+        DynamicRecordService.EntityOperations contracts = new DynamicRecordService(runtime).entity(MODULE, "contract");
+        DynamicRecord record = contracts.newRecord()
+                .setValue("code", "C-001")
+                .setValue("status", "active");
+        record.setId("contract-1");
+
+        assertThat(contracts.create(record)).isEqualTo("contract-1");
+        DynamicRecord invalid = contracts.newRecord()
+                .setValue("code", "C-002")
+                .setValue("status", "frozen");
+        invalid.setId("contract-2");
+        assertThatThrownBy(() -> contracts.create(invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionary code");
+    }
+
+    @Test
     void shouldCacheDynamicSelectAcrossRuntimeFacadeCallsAndClearAfterUpdate() {
         IDatabaseOperations<Object> operations = operations();
         AtomicReference<String> storedCode = new AtomicReference<>("C-001");
@@ -246,6 +276,18 @@ class DynamicRecordServiceTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        );
+    }
+
+    private EntityDefinition dictionaryEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("status", "Status").dictionary("crm", "customer_status")
                 )
         );
     }

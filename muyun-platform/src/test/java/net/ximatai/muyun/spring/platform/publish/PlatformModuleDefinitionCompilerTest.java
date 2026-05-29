@@ -6,6 +6,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
@@ -29,9 +32,11 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<Metadata> metadataDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
+    private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
-    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService);
+    private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
+    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, categoryService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final PlatformModuleDefinitionCompiler compiler =
@@ -41,7 +46,11 @@ class PlatformModuleDefinitionCompilerTest {
     void shouldCompileMainMetadataIntoDynamicModuleDefinition() {
         moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
         fieldService.insert(titleField(metadataId));
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        status.setDictionaryCategoryAlias("customer_status");
+        fieldService.insert(status);
         fieldService.insert(sortField(metadataId));
         fieldService.insert(enabledField(metadataId));
         fieldService.insert(parentField(metadataId));
@@ -58,7 +67,9 @@ class PlatformModuleDefinitionCompilerTest {
                 .contains(EntityCapability.TREE, EntityCapability.SORT, EntityCapability.REFERENCE, EntityCapability.ENABLE);
         assertThat(definition.entities().getFirst().fields())
                 .extracting(FieldDefinition::fieldName)
-                .containsExactly("title", "sortOrder", "enabled", "parentId");
+                .containsExactly("title", "status", "sortOrder", "enabled", "parentId");
+        assertThat(definition.entities().getFirst().fields().get(1).dictionaryBinding().categoryAlias())
+                .isEqualTo("customer_status");
     }
 
     @Test
@@ -118,6 +129,15 @@ class PlatformModuleDefinitionCompilerTest {
         metadata.setAlias(alias);
         metadata.setTitle(alias);
         return metadata;
+    }
+
+    private DictionaryCategory category(String applicationAlias, String alias, DictionaryCategoryKind kind) {
+        DictionaryCategory category = new DictionaryCategory();
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setCategoryKind(kind);
+        category.setTitle(alias);
+        return category;
     }
 
     private MetadataField field(String metadataId, String fieldName, String columnName, FieldType fieldType) {

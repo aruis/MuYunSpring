@@ -54,7 +54,8 @@ class PlatformModelSchemaTest {
                 .contains("id", "application_alias", "alias", "schema_name", "table_name", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(MetadataField.class)))
                 .contains("id", "metadata_id", "field_name", "column_name", "field_type", "required",
-                        "unique_field", "indexed", "sortable_field", "title_field", "field_length");
+                        "unique_field", "indexed", "sortable_field", "title_field", "field_length",
+                        "dictionary_application_alias", "dictionary_category_alias");
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");

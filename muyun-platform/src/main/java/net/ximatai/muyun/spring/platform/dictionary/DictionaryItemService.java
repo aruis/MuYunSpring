@@ -81,6 +81,18 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
                         .eq("code", validCode));
     }
 
+    public DictionaryItem resolveEnabledItem(String applicationAlias, String categoryAlias, String code) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        String validCategoryAlias = requireCode(categoryAlias, "dictionaryCategoryAlias");
+        String validCode = requireCode(code, "dictionaryItemCode");
+        categoryService.requireEnabledDictionaryCategory(validApplicationAlias, validCategoryAlias);
+        return findOne(Criteria.of()
+                .eq("applicationAlias", validApplicationAlias)
+                .eq("categoryAlias", validCategoryAlias)
+                .eq("code", validCode)
+                .eq("enabled", Boolean.TRUE));
+    }
+
     private void normalizeAndValidate(DictionaryItem item) {
         String applicationAlias = PlatformNameRules.requireApplicationAlias(item.getApplicationAlias());
         String categoryAlias = requireCode(item.getCategoryAlias(), "dictionaryCategoryAlias");
