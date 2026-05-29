@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.platform;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -11,6 +13,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -68,6 +71,20 @@ class PlatformModelSchemaTest {
                 .doesNotContain("application_alias");
     }
 
+    @Test
+    void shouldMapDictionaryModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(DictionaryCategory.class)))
+                .contains("id", "tenant_id", "application_alias", "alias", "category_kind",
+                        "parent_id", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(DictionaryItem.class)))
+                .contains("id", "tenant_id", "application_alias", "category_alias", "code",
+                        "parent_id", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(DictionaryCategory.class)))
+                .contains(List.of("tenant_id", "application_alias", "alias"));
+        assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
+                .contains(List.of("tenant_id", "application_alias", "category_alias", "code"));
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -75,5 +92,12 @@ class PlatformModelSchemaTest {
         }
         table.getColumns().forEach(column -> names.add(column.getName()));
         return names;
+    }
+
+    private List<List<String>> uniqueIndexes(TableWrapper table) {
+        return table.getIndexes().stream()
+                .filter(index -> index.isUnique())
+                .map(index -> List.copyOf(index.getColumns()))
+                .toList();
     }
 }

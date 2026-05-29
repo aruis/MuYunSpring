@@ -1,0 +1,188 @@
+package net.ximatai.muyun.spring.platform.dictionary;
+
+import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class DictionaryServiceContractTest {
+    private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
+    private final TestMemoryDao<DictionaryItem> itemDao = new TestMemoryDao<>();
+    private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
+    private final DictionaryItemService itemService = new DictionaryItemService(itemDao, categoryService);
+
+    @Test
+    void shouldCreateApplicationScopedCategoryTree() {
+        String folderId = categoryService.insert(category("crm", "base", DictionaryCategoryKind.FOLDER, TreeAbility.ROOT_ID));
+        String categoryId = categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, folderId));
+
+        assertThat(categoryService.rootCategories("crm")).extracting(DictionaryCategory::getAlias).containsExactly("base");
+        assertThat(categoryService.children("crm", folderId)).extracting(DictionaryCategory::getId).containsExactly(categoryId);
+        assertThatThrownBy(() -> categoryService.children(TreeAbility.ROOT_ID))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("rootCategories");
+    }
+
+    @Test
+    void shouldRejectDuplicateCategoryAliasWithinApplication() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unique");
+        assertThat(categoryService.insert(category("sales", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID)))
+                .isNotBlank();
+    }
+
+    @Test
+    void shouldRejectCategoryTreeAcrossApplications() {
+        String crmFolderId = categoryService.insert(category("crm", "base", DictionaryCategoryKind.FOLDER, TreeAbility.ROOT_ID));
+        DictionaryCategory salesCategory = category("sales", "customer_status", DictionaryCategoryKind.DICTIONARY, crmFolderId);
+
+        assertThatThrownBy(() -> categoryService.insert(salesCategory))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("same application");
+    }
+
+    @Test
+    void shouldRejectCategoryIdentityChanges() {
+        String id = categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        DictionaryCategory changedAlias = category("crm", "customer_level", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID);
+        changedAlias.setId(id);
+        changedAlias.setVersion(0);
+
+        assertThatThrownBy(() -> categoryService.update(changedAlias))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("alias");
+
+        DictionaryCategory changedKind = category("crm", "customer_status", DictionaryCategoryKind.FOLDER, TreeAbility.ROOT_ID);
+        changedKind.setId(id);
+        changedKind.setVersion(0);
+        assertThatThrownBy(() -> categoryService.update(changedKind))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("kind");
+    }
+
+    @Test
+    void shouldCreateDictionaryItemsWithCodeAsBusinessValue() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String activeId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        DictionaryItem frozen = item("crm", "customer_status", "frozen", activeId);
+        String frozenId = itemService.insert(frozen);
+
+        assertThat(itemService.resolveItem("crm", "customer_status", "active").getId()).isEqualTo(activeId);
+        assertThat(itemService.rootItems("crm", "customer_status")).extracting(DictionaryItem::getCode).containsExactly("active");
+        assertThat(itemService.children("crm", "customer_status", activeId)).extracting(DictionaryItem::getId).containsExactly(frozenId);
+    }
+
+    @Test
+    void shouldRejectItemsForFolderCategoryAndDuplicateCodeWithinCategory() {
+        categoryService.insert(category("crm", "base", DictionaryCategoryKind.FOLDER, TreeAbility.ROOT_ID));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> itemService.insert(item("crm", "base", "active", TreeAbility.ROOT_ID)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("DICTIONARY");
+        assertThatThrownBy(() -> itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unique");
+    }
+
+    @Test
+    void shouldKeepItemCodeUniqueWithinWholeCategoryTree() {
+        categoryService.insert(category("crm", "area", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String parentId = itemService.insert(item("crm", "area", "china", TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> itemService.insert(item("crm", "area", "china", parentId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unique");
+    }
+
+    @Test
+    void shouldRejectItemTreeAcrossCategories() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        categoryService.insert(category("crm", "customer_level", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String statusId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> itemService.insert(item("crm", "customer_level", "vip", statusId)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("same category");
+    }
+
+    @Test
+    void shouldRejectItemCodeChangesBecauseBusinessDataStoresCode() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String id = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        DictionaryItem changedCode = item("crm", "customer_status", "inactive", TreeAbility.ROOT_ID);
+        changedCode.setId(id);
+        changedCode.setVersion(0);
+
+        assertThatThrownBy(() -> itemService.update(changedCode))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("code");
+
+        categoryService.insert(category("crm", "customer_level", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        DictionaryItem changedCategory = item("crm", "customer_level", "active", TreeAbility.ROOT_ID);
+        changedCategory.setId(id);
+        changedCategory.setVersion(0);
+        assertThatThrownBy(() -> itemService.update(changedCategory))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("category");
+    }
+
+    @Test
+    void shouldIsolateDictionaryByTenantScope() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+            itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
+            assertThat(categoryService.rootCategories("crm")).isEmpty();
+            assertThat(itemService.resolveItem("crm", "customer_status", "active")).isNull();
+        }
+    }
+
+    @Test
+    void shouldReorderItemsWithinSameCategoryAndParent() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String activeId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        String frozenId = itemService.insert(item("crm", "customer_status", "frozen", TreeAbility.ROOT_ID));
+
+        itemService.reorder(List.of(frozenId, activeId));
+
+        assertThat(itemService.rootItems("crm", "customer_status"))
+                .extracting(DictionaryItem::getCode)
+                .containsExactly("frozen", "active");
+    }
+
+    private DictionaryCategory category(String applicationAlias,
+                                        String alias,
+                                        DictionaryCategoryKind kind,
+                                        String parentId) {
+        DictionaryCategory category = new DictionaryCategory();
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setCategoryKind(kind);
+        category.setParentId(parentId);
+        category.setTitle(alias);
+        return category;
+    }
+
+    private DictionaryItem item(String applicationAlias, String categoryAlias, String code, String parentId) {
+        DictionaryItem item = new DictionaryItem();
+        item.setApplicationAlias(applicationAlias);
+        item.setCategoryAlias(categoryAlias);
+        item.setCode(code);
+        item.setParentId(parentId);
+        item.setTitle(code);
+        return item;
+    }
+}

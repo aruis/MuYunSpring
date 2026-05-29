@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -18,6 +19,7 @@ class PlatformEnumContractTest {
         assertEnumContract(RelationRole.class);
         assertEnumContract(MenuScopeType.class);
         assertEnumContract(MenuType.class);
+        assertEnumContract(DictionaryCategoryKind.class);
     }
 
     private <E extends Enum<E> & CodeTitleEnum> void assertEnumContract(Class<E> enumType) {
