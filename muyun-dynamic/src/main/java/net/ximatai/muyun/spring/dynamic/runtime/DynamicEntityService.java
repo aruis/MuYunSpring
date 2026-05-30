@@ -349,6 +349,12 @@ public class DynamicEntityService implements
         return referenceRuntime().referenceOptions(criteria, pageRequest);
     }
 
+    public DynamicReferenceResolveResponse resolveReference(String sourceField,
+                                                            DynamicReferenceResolveRequest request) {
+        ReferencePlan plan = referencePlan(sourceField);
+        return new DynamicReferenceResolver(this, plan, referenceService(plan.target())).resolve(request);
+    }
+
     @Override
     public List<ChildRelation<? extends EntityContract, DynamicRecord>> childRelations() {
         if (module == null) {
@@ -417,6 +423,24 @@ public class DynamicEntityService implements
                 .filter(reference -> dao.getEntity().code().equals(reference.sourceEntity()))
                 .map(EntityReferenceDefinition::plan)
                 .toList();
+    }
+
+    private ReferencePlan referencePlan(String sourceField) {
+        if (sourceField == null || sourceField.isBlank()) {
+            throw new IllegalArgumentException("reference sourceField must not be blank");
+        }
+        return referencePlans().stream()
+                .filter(plan -> sourceField.equals(plan.sourceField()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("dynamic reference is not configured: "
+                        + dao.getEntity().code() + "." + sourceField));
+    }
+
+    void requireSameEntityCodeForReference(ReferencePlan plan) {
+        if (plan == null) {
+            throw new IllegalArgumentException("reference plan must not be null");
+        }
+        referencePlan(plan.sourceField());
     }
 
     private DynamicEntityService referenceService(ReferenceTarget target) {

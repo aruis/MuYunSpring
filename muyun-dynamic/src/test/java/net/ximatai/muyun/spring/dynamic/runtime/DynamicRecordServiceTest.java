@@ -6,8 +6,10 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -144,6 +146,219 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldResolveDynamicReferenceQueryThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 2));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                referenceRow("contract-1", "Contract One"),
+                referenceRow("contract-2", "Contract Two")
+        ));
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Contract")
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.OK);
+        assertThat(response.mode()).isEqualTo(DynamicReferenceResolveMode.QUERY);
+        assertThat(response.total()).isEqualTo(2);
+        assertThat(response.options()).extracting(DynamicReferenceResolveItem::id)
+                .containsExactly("contract-1", "contract-2");
+        assertThat(response.options().getFirst().title()).isEqualTo("Contract One");
+        assertThat(response.options().getFirst().projections()).containsEntry("contractCode", "CONTRACT-1");
+    }
+
+    @Test
+    void shouldTranslateDynamicReferenceValuesThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("contract-1") && sql.contains("\"id\"")) {
+                return Map.of("total_count", 1);
+            }
+            if (params.containsValue("Contract Two") && sql.contains("\"title\"")) {
+                return Map.of("total_count", 1);
+            }
+            return Map.of("total_count", 0);
+        });
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("contract-1") && sql.contains("\"id\"")) {
+                return List.of(referenceRow("contract-1", "Contract One"));
+            }
+            if (params.containsValue("Contract Two") && sql.contains("\"title\"")) {
+                return List.of(referenceRow("contract-2", "Contract Two"));
+            }
+            return List.of();
+        });
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.translate(List.of("contract-1", "Contract Two", "missing"))
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.PARTIAL);
+        assertThat(response.results()).extracting(DynamicReferenceResolveResult::status)
+                .containsExactly(DynamicReferenceResolveStatus.RESOLVED,
+                        DynamicReferenceResolveStatus.RESOLVED,
+                        DynamicReferenceResolveStatus.NOT_FOUND);
+        assertThat(response.results().getFirst().matchedBy()).isEqualTo(DynamicReferenceMatchMode.KEY);
+        assertThat(response.results().get(1).matchedBy()).isEqualTo(DynamicReferenceMatchMode.LABEL);
+        assertThat(response.results().getFirst().item().projections()).containsEntry("contractCode", "CONTRACT-1");
+    }
+
+    @Test
+    void shouldOmitReferenceProjectionsWhenRequested() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(referenceRow("contract-1", "Contract One")));
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Contract").withoutProjections()
+        );
+
+        assertThat(response.options().getFirst().projections()).isEmpty();
+    }
+
+    @Test
+    void shouldReportLabelAmbiguityWhenTranslatingReference() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 2));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                referenceRow("contract-1", "Contract"),
+                referenceRow("contract-2", "Contract")
+        ));
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.translate(List.of("Contract"))
+                        .withMatchMode(DynamicReferenceMatchMode.LABEL)
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.AMBIGUOUS);
+        assertThat(response.results()).hasSize(1);
+        assertThat(response.results().getFirst().status()).isEqualTo(DynamicReferenceResolveStatus.AMBIGUOUS);
+        assertThat(response.results().getFirst().matchedBy()).isEqualTo(DynamicReferenceMatchMode.LABEL);
+        assertThat(response.results().getFirst().candidates()).extracting(DynamicReferenceResolveItem::id)
+                .containsExactly("contract-1", "contract-2");
+    }
+
+    @Test
+    void shouldPreserveKeyAmbiguityWhenAutoTranslateWouldResolveByLabel() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("shared") && sql.contains("\"id\"")) {
+                return Map.of("total_count", 2);
+            }
+            if (params.containsValue("shared") && sql.contains("\"title\"")) {
+                return Map.of("total_count", 1);
+            }
+            return Map.of("total_count", 0);
+        });
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("shared") && sql.contains("\"id\"")) {
+                return List.of(
+                        referenceRow("shared", "First"),
+                        referenceRow("shared", "Second")
+                );
+            }
+            if (params.containsValue("shared") && sql.contains("\"title\"")) {
+                return List.of(referenceRow("contract-3", "shared"));
+            }
+            return List.of();
+        });
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.translate(List.of("shared"))
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.AMBIGUOUS);
+        assertThat(response.results().getFirst().matchedBy()).isEqualTo(DynamicReferenceMatchMode.KEY);
+        assertThat(response.results().getFirst().candidates()).hasSize(2);
+        verify(operations, org.mockito.Mockito.never()).row(org.mockito.ArgumentMatchers.contains("\"title\""), anyMap());
+    }
+
+    @Test
+    void shouldApplyCriteriaWhenResolvingReference() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(referenceRow("contract-1", "Contract One")));
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Contract")
+                        .withCriteria(Criteria.of().eq("code", "CONTRACT-1"))
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.OK);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"code\" =")
+                .contains("\"title\" LIKE"));
+    }
+
+    @Test
+    void shouldReturnNotFoundForEmptyReferenceTranslateValues() {
+        DynamicRecordService service = referenceResolvingService(operations());
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.translate(List.of())
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.NOT_FOUND);
+        assertThat(response.results()).isEmpty();
+        assertThat(response.total()).isZero();
+    }
+
+    @Test
+    void shouldRejectMissingDynamicReferenceConfig() {
+        DynamicRecordService service = service(operations(), lineEntity());
+
+        assertThatThrownBy(() -> service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Contract")
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic reference is not configured: line.contractId");
+    }
+
+    @Test
     void shouldExposeEnableOperationsThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
         AtomicReference<Boolean> enabled = new AtomicReference<>(Boolean.FALSE);
@@ -268,6 +483,19 @@ class DynamicRecordServiceTest {
         return new DynamicRecordService(runtime);
     }
 
+    private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(referenceEntity(), lineEntity()),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
+                        .withAutoTitle("contractTitle")
+                        .withProjection("code", "contractCode"))
+        );
+        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
+    }
+
     private EntityDefinition contractEntity() {
         return new EntityDefinition(
                 "contract",
@@ -314,6 +542,18 @@ class DynamicRecordServiceTest {
                         FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
+    }
+
+    private EntityDefinition lineEntity() {
+        return new EntityDefinition(
+                "line",
+                "app_contract_line",
+                "Contract Line",
+                List.of(
+                        FieldDefinition.string("contractId", "Contract").column("contract_id").length(32),
+                        FieldDefinition.string("summary", "Summary").length(128)
+                )
+        );
     }
 
     private EntityDefinition enabledEntity() {

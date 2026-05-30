@@ -136,6 +136,13 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityCode).referenceOptions(criteria, pageRequest);
     }
 
+    public DynamicReferenceResolveResponse resolveReference(String moduleAlias,
+                                                            String entityCode,
+                                                            String sourceField,
+                                                            DynamicReferenceResolveRequest request) {
+        return entityService(moduleAlias, entityCode).resolveReference(sourceField, request);
+    }
+
     private DynamicEntityService entityService(String moduleAlias, String entityCode) {
         return runtime.entityService(moduleAlias, entityCode);
     }
@@ -257,6 +264,10 @@ public class DynamicRecordService {
 
         public PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
             return service.referenceOptions(moduleAlias, entityCode, criteria, pageRequest);
+        }
+
+        public DynamicReferenceResolveResponse resolveReference(String sourceField, DynamicReferenceResolveRequest request) {
+            return service.resolveReference(moduleAlias, entityCode, sourceField, request);
         }
     }
 }
