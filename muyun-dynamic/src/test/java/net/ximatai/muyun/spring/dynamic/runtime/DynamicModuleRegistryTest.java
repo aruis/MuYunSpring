@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
@@ -39,6 +42,27 @@ class DynamicModuleRegistryTest {
         assertThatThrownBy(() -> registry.requireEntity("sales.contract", "missing"))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("unknown entity");
+    }
+
+    @Test
+    void shouldRejectInvalidViewDefinitions() {
+        ModuleDefinition invalid = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                contractModule().entities(),
+                List.of(),
+                List.of(),
+                List.of(new EntityViewDefinition(
+                        "contract",
+                        EntityViewType.LIST,
+                        "Contract list",
+                        List.of(new EntityViewFieldDefinition("missingField"))
+                ))
+        );
+
+        assertThatThrownBy(() -> new DynamicModuleRegistry().register(invalid))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("unknown view field");
     }
 
     private ModuleDefinition contractModule() {

@@ -6,8 +6,12 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -51,6 +55,12 @@ class DynamicModuleDescriptorTest {
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
+        DynamicViewDescriptor listView = descriptor.entities().getFirst().views().getFirst();
+        assertThat(listView.viewType()).isEqualTo(EntityViewType.LIST);
+        assertThat(listView.fields())
+                .extracting(DynamicViewFieldDescriptor::fieldName)
+                .containsExactly("title", "status");
+        assertThat(listView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
                 .isEqualTo(DynamicQueryOperator.LIKE.name());
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().operators())
@@ -94,5 +104,43 @@ class DynamicModuleDescriptorTest {
                 .get()
                 .extracting(DynamicActionDescriptor::kind)
                 .isEqualTo(DynamicActionKind.TREE);
+    }
+
+    @Test
+    void shouldExposeExplicitViewDefinition() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                                FieldDefinition.titleField(),
+                                FieldDefinition.string("status", "Status").dictionary("crm", "customer_status"),
+                                FieldDefinition.text("description", "Description")
+                        ))
+                ),
+                List.of(),
+                List.of(),
+                List.of(new EntityViewDefinition(
+                        "customer",
+                        EntityViewType.FORM,
+                        "Customer form",
+                        List.of(
+                                new EntityViewFieldDefinition("title").title("Customer name"),
+                                new EntityViewFieldDefinition("status").control(ViewControlType.SELECT),
+                                new EntityViewFieldDefinition("description").hidden().control(ViewControlType.TEXTAREA)
+                        )
+                ))
+        );
+
+        DynamicViewDescriptor formView = DynamicModuleDescriptor.from(module).entities().getFirst().views().getFirst();
+
+        assertThat(formView.viewType()).isEqualTo(EntityViewType.FORM);
+        assertThat(formView.title()).isEqualTo("Customer form");
+        assertThat(formView.fields())
+                .extracting(DynamicViewFieldDescriptor::fieldName)
+                .containsExactly("title", "status", "description");
+        assertThat(formView.fields().getFirst().title()).isEqualTo("Customer name");
+        assertThat(formView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(formView.fields().get(2).visible()).isFalse();
     }
 }

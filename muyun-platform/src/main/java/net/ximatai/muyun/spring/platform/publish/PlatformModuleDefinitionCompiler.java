@@ -261,6 +261,7 @@ public class PlatformModuleDefinitionCompiler {
         List<EntityDefinition> ordered = definition.entities().stream()
                 .sorted((left, right) -> Boolean.compare(!left.code().equals(mainEntityCode), !right.code().equals(mainEntityCode)))
                 .toList();
-        return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(), definition.references());
+        return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(),
+                definition.references(), definition.views());
     }
 }

@@ -42,6 +42,11 @@ public class ModuleDefinitionValidator {
         for (EntityReferenceDefinition reference : module.references()) {
             validateReference(reference, entities, module.moduleAlias());
         }
+        Set<String> viewKeys = new HashSet<>();
+        for (EntityViewDefinition view : module.views()) {
+            validateView(view, entities);
+            requireUnique(viewKeys, view.entityCode() + "." + view.viewType(), "view");
+        }
     }
 
     public void validateEntity(EntityDefinition entity) {
@@ -184,6 +189,30 @@ public class ModuleDefinitionValidator {
 
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities) {
         validateReference(reference, entities, null);
+    }
+
+    public void validateView(EntityViewDefinition view, Map<String, EntityDefinition> entities) {
+        if (view == null) {
+            throw new ModuleDefinitionException("view must not be null");
+        }
+        EntityDefinition entity = requireEntity(entities, view.entityCode(), "view entity");
+        if (view.viewType() == null) {
+            throw new ModuleDefinitionException("view type must not be null: " + view.entityCode());
+        }
+        requireText(view.title(), "view title");
+        Set<String> fieldNames = new HashSet<>();
+        for (EntityViewFieldDefinition field : view.fields()) {
+            if (field == null) {
+                throw new ModuleDefinitionException("view field must not be null: " + view.entityCode());
+            }
+            requireFieldName(field.fieldName(), "view field name");
+            requireField(entity, field.fieldName(), "view field");
+            requireUnique(fieldNames, field.fieldName(), "view field");
+            if (field.title() != null && field.title().isBlank()) {
+                throw new ModuleDefinitionException("view field title must not be blank: "
+                        + view.entityCode() + "." + field.fieldName());
+            }
+        }
     }
 
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities, String moduleAlias) {
