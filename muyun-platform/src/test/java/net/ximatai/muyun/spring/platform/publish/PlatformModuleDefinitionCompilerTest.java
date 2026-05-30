@@ -5,9 +5,12 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
@@ -20,6 +23,10 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataView;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
@@ -44,6 +51,8 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
+    private final TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
+    private final TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -60,9 +69,12 @@ class PlatformModuleDefinitionCompilerTest {
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                     fieldTypeService, moduleService, relationService);
+    private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
+    private final MetadataViewFieldService viewFieldService =
+            new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
-                    referenceConfigService, relationService);
+                    referenceConfigService, relationService, viewService, viewFieldService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -235,6 +247,46 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
+    void shouldCompileConfiguredViewsIntoModuleDefinition() {
+        moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField title = titleField(metadataId);
+        fieldService.insert(title);
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        status.setRequired(true);
+        fieldService.insert(status);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        String listViewId = viewService.insert(metadataView(relationId, EntityViewType.LIST, "客户列表"));
+        MetadataViewField titleViewField = metadataViewField(listViewId, title.getId());
+        titleViewField.setTitle("客户名称");
+        viewFieldService.insert(titleViewField);
+        MetadataViewField statusViewField = metadataViewField(listViewId, status.getId());
+        statusViewField.setControlType(ViewControlType.SELECT);
+        statusViewField.setReadOnly(true);
+        statusViewField.setRequiredOverride(true);
+        viewFieldService.insert(statusViewField);
+
+        ModuleDefinition definition = compiler.compile("crm.customer");
+
+        assertThat(definition.views()).hasSize(1);
+        EntityViewDefinition view = definition.views().getFirst();
+        assertThat(view.entityCode()).isEqualTo("customer");
+        assertThat(view.viewType()).isEqualTo(EntityViewType.LIST);
+        assertThat(view.title()).isEqualTo("客户列表");
+        assertThat(view.fields()).extracting(field -> field.fieldName())
+                .containsExactly("title", "status");
+        assertThat(view.fields().getFirst().title()).isEqualTo("客户名称");
+        assertThat(view.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(view.fields().get(1).readOnly()).isTrue();
+        assertThat(view.fields().get(1).required()).isTrue();
+        List<net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor> descriptorViews =
+                DynamicModuleDescriptor.from(definition).entities().getFirst().views();
+        assertThat(descriptorViews).hasSize(2);
+        assertThat(descriptorViews.getFirst().fields().get(1).required()).isTrue();
+        assertThat(descriptorViews.get(1).viewType()).isEqualTo(EntityViewType.FORM);
+    }
+
+    @Test
     void shouldRejectStaticModuleAndDynamicModuleWithoutMainMetadata() {
         moduleService.insert(module("crm.report", ModuleKind.STATIC));
         moduleService.insert(module("crm.empty", ModuleKind.DYNAMIC));
@@ -325,6 +377,21 @@ class PlatformModuleDefinitionCompilerTest {
         config.setMetadataFieldId(fieldId);
         config.setTargetMetadataId(targetMetadataId);
         return config;
+    }
+
+    private MetadataView metadataView(String relationId, EntityViewType viewType, String title) {
+        MetadataView view = new MetadataView();
+        view.setRelationId(relationId);
+        view.setViewType(viewType);
+        view.setTitle(title);
+        return view;
+    }
+
+    private MetadataViewField metadataViewField(String viewId, String fieldId) {
+        MetadataViewField viewField = new MetadataViewField();
+        viewField.setViewId(viewId);
+        viewField.setMetadataFieldId(fieldId);
+        return viewField;
     }
 
     private FieldDefinition field(ModuleDefinition definition, String fieldName) {

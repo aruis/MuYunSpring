@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataView;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -73,6 +75,11 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");
+        assertThat(columnNames(mapper.toTable(MetadataView.class)))
+                .contains("id", "relation_id", "view_type", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(MetadataViewField.class)))
+                .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "read_only",
+                        "required_override", "title", "enabled", "sort_order");
     }
 
     @Test

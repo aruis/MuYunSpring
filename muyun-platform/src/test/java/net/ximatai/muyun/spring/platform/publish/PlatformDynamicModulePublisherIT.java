@@ -32,6 +32,10 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataView;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
@@ -124,7 +128,9 @@ class PlatformDynamicModulePublisherIT {
                         services.fieldService,
                         services.fieldDefinitionCompiler,
                         services.referenceConfigService,
-                        services.relationService
+                        services.relationService,
+                        services.viewService,
+                        services.viewFieldService
                 ),
                 new DynamicModulePublisher(schemaService, runtime)
         );
@@ -175,6 +181,8 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
+        TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
+        TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
         TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
@@ -198,11 +206,14 @@ class PlatformDynamicModulePublisherIT {
         MetadataFieldReferenceConfigService referenceConfigService =
                 new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                         fieldTypeService, moduleService, relationService);
+        MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
+        MetadataViewFieldService viewFieldService =
+                new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,
                 referenceConfigService, fieldDefinitionCompiler, relationService, schemeService, menuService,
-                categoryService, itemService);
+                categoryService, itemService, viewService, viewFieldService);
     }
 
     private Application application(String alias) {
@@ -338,7 +349,9 @@ class PlatformDynamicModulePublisherIT {
                                     MenuSchemeService schemeService,
                                     MenuService menuService,
                                     DictionaryCategoryService categoryService,
-                                    DictionaryItemService itemService) {
+                                    DictionaryItemService itemService,
+                                    MetadataViewService viewService,
+                                    MetadataViewFieldService viewFieldService) {
     }
 
     @SpringBootConfiguration

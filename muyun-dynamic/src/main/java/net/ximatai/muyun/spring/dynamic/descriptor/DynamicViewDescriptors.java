@@ -26,9 +26,20 @@ final class DynamicViewDescriptors {
         }
         Map<String, FieldDefinition> fields = entity.fields().stream()
                 .collect(Collectors.toMap(FieldDefinition::fieldName, Function.identity()));
-        return scoped.stream()
-                .map(view -> from(view, fields))
-                .toList();
+        Map<EntityViewType, EntityViewDefinition> configuredByType = scoped.stream()
+                .collect(Collectors.toMap(EntityViewDefinition::viewType, Function.identity()));
+        return List.of(
+                viewOrDefault(entity, fields, configuredByType, EntityViewType.LIST),
+                viewOrDefault(entity, fields, configuredByType, EntityViewType.FORM)
+        );
+    }
+
+    private static DynamicViewDescriptor viewOrDefault(EntityDefinition entity,
+                                                       Map<String, FieldDefinition> fields,
+                                                       Map<EntityViewType, EntityViewDefinition> configuredByType,
+                                                       EntityViewType type) {
+        EntityViewDefinition view = configuredByType.get(type);
+        return view == null ? defaultView(entity, type) : from(view, fields);
     }
 
     private static DynamicViewDescriptor defaultView(EntityDefinition entity, EntityViewType type) {
@@ -36,7 +47,8 @@ final class DynamicViewDescriptors {
                 type,
                 entity.name(),
                 entity.fields().stream()
-                        .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true, controlType(field)))
+                        .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true,
+                                controlType(field), false, field.isRequired()))
                         .toList()
         );
     }
@@ -56,7 +68,9 @@ final class DynamicViewDescriptors {
                 viewField.fieldName(),
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
                 viewField.visible(),
-                viewField.controlType() == null ? controlType(field) : viewField.controlType()
+                viewField.controlType() == null ? controlType(field) : viewField.controlType(),
+                Boolean.TRUE.equals(viewField.readOnly()),
+                field.isRequired() || Boolean.TRUE.equals(viewField.required())
         );
     }
 

@@ -12,8 +12,11 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
@@ -40,6 +43,8 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
+    private final MemoryDao<MetadataView> viewDao = new MemoryDao<>();
+    private final MemoryDao<MetadataViewField> viewFieldDao = new MemoryDao<>();
     private final MemoryDao<DictionaryCategory> categoryDao = new MemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -56,6 +61,9 @@ class PlatformMetadataServiceContractTest {
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                     fieldTypeService, moduleService, relationService);
+    private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
+    private final MetadataViewFieldService viewFieldService =
+            new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -300,6 +308,65 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldCreateRelationScopedMetadataViewFields() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        fieldService.insert(titleField(metadataId));
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        fieldService.insert(status);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        MetadataView view = metadataView(relationId, EntityViewType.LIST);
+        String viewId = viewService.insert(view);
+        MetadataViewField viewField = metadataViewField(viewId, status.getId());
+        viewField.setControlType(ViewControlType.SELECT);
+        viewField.setReadOnly(true);
+        viewField.setRequiredOverride(true);
+
+        viewFieldService.insert(viewField);
+
+        EntityViewFieldDefinition definition = viewFieldService.compile(viewField);
+        assertThat(viewService.listByRelationIds(List.of(relationId))).extracting(MetadataView::getId)
+                .containsExactly(viewId);
+        assertThat(definition.fieldName()).isEqualTo("status");
+        assertThat(definition.controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(definition.readOnly()).isTrue();
+        assertThat(definition.required()).isTrue();
+    }
+
+    @Test
+    void shouldRejectViewFieldOutsideRelationMetadata() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(titleField(customerId));
+        MetadataField contactTitle = titleField(contactId);
+        fieldService.insert(contactTitle);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerId));
+        String viewId = viewService.insert(metadataView(relationId, EntityViewType.FORM));
+
+        assertThatThrownBy(() -> viewFieldService.insert(metadataViewField(viewId, contactTitle.getId())))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("metadata mismatch");
+    }
+
+    @Test
+    void shouldRejectViewFieldThatRelaxesRequiredMetadataField() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField code = field(metadataId, "code", "code", FieldType.STRING);
+        code.setRequired(true);
+        fieldService.insert(code);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        String viewId = viewService.insert(metadataView(relationId, EntityViewType.FORM));
+        MetadataViewField viewField = metadataViewField(viewId, code.getId());
+        viewField.setRequiredOverride(false);
+
+        assertThatThrownBy(() -> viewFieldService.insert(viewField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot make required");
+    }
+
+    @Test
     void shouldRejectFieldWithoutExistingMetadata() {
         MetadataField field = field("missing", "code", "code", FieldType.STRING);
 
@@ -430,6 +497,20 @@ class PlatformMetadataServiceContractTest {
         config.setMetadataFieldId(fieldId);
         config.setTargetMetadataId(targetMetadataId);
         return config;
+    }
+
+    private MetadataView metadataView(String relationId, EntityViewType viewType) {
+        MetadataView view = new MetadataView();
+        view.setRelationId(relationId);
+        view.setViewType(viewType);
+        return view;
+    }
+
+    private MetadataViewField metadataViewField(String viewId, String fieldId) {
+        MetadataViewField viewField = new MetadataViewField();
+        viewField.setViewId(viewId);
+        viewField.setMetadataFieldId(fieldId);
+        return viewField;
     }
 
     private DictionaryCategory category(String applicationAlias, String alias, DictionaryCategoryKind kind) {

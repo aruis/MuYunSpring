@@ -6,6 +6,8 @@ public record DynamicViewFieldDescriptor(
         String fieldName,
         String title,
         boolean visible,
-        ViewControlType controlType
+        ViewControlType controlType,
+        boolean readOnly,
+        boolean required
 ) {
 }

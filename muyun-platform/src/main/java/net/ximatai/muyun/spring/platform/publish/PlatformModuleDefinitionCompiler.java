@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
@@ -20,6 +21,9 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataView;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -44,6 +48,8 @@ public class PlatformModuleDefinitionCompiler {
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler;
     private final MetadataFieldReferenceConfigService referenceConfigService;
     private final ModuleMetadataRelationService relationService;
+    private final MetadataViewService viewService;
+    private final MetadataViewFieldService viewFieldService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -51,8 +57,11 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataFieldService fieldService,
                                             MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                             MetadataFieldReferenceConfigService referenceConfigService,
-                                            ModuleMetadataRelationService relationService) {
+                                            ModuleMetadataRelationService relationService,
+                                            MetadataViewService viewService,
+                                            MetadataViewFieldService viewFieldService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
+                viewService, viewFieldService,
                 new ModuleDefinitionValidator());
     }
 
@@ -62,6 +71,8 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
                                             MetadataFieldReferenceConfigService referenceConfigService,
                                             ModuleMetadataRelationService relationService,
+                                            MetadataViewService viewService,
+                                            MetadataViewFieldService viewFieldService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
@@ -69,6 +80,8 @@ public class PlatformModuleDefinitionCompiler {
         this.fieldDefinitionCompiler = fieldDefinitionCompiler;
         this.referenceConfigService = referenceConfigService;
         this.relationService = relationService;
+        this.viewService = viewService;
+        this.viewFieldService = viewFieldService;
         this.validator = validator;
     }
 
@@ -85,7 +98,9 @@ public class PlatformModuleDefinitionCompiler {
                 .map(relation -> childRelation(relation, metadataById))
                 .toList();
         List<EntityReferenceDefinition> references = references(module.getAlias(), relations, metadataById);
-        ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations, references);
+        List<EntityViewDefinition> views = views(relations, metadataById);
+        ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations,
+                references, views);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -252,6 +267,35 @@ public class PlatformModuleDefinitionCompiler {
             definition = definition.withProjection(projection.targetField(), projection.outputField());
         }
         return definition;
+    }
+
+    private List<EntityViewDefinition> views(List<ModuleMetadataRelation> relations, Map<String, Metadata> metadataById) {
+        Map<String, ModuleMetadataRelation> relationById = relations.stream()
+                .collect(java.util.stream.Collectors.toMap(ModuleMetadataRelation::getId, relation -> relation));
+        return viewService.listByRelationIds(relations.stream().map(ModuleMetadataRelation::getId).toList()).stream()
+                .map(view -> view(view, relationById, metadataById))
+                .toList();
+    }
+
+    private EntityViewDefinition view(MetadataView view,
+                                      Map<String, ModuleMetadataRelation> relationById,
+                                      Map<String, Metadata> metadataById) {
+        ModuleMetadataRelation relation = relationById.get(view.getRelationId());
+        if (relation == null) {
+            throw new PlatformException("View points to relation outside current module: " + view.getRelationId());
+        }
+        Metadata metadata = metadataById.get(relation.getMetadataId());
+        if (metadata == null) {
+            throw new PlatformException("View relation metadata is incomplete: " + view.getRelationId());
+        }
+        return new EntityViewDefinition(
+                metadata.getAlias(),
+                view.getViewType(),
+                view.getTitle(),
+                viewFieldService.listByViewId(view.getId()).stream()
+                        .map(viewFieldService::compile)
+                        .toList()
+        );
     }
 
     private ModuleDefinition orderMainEntityFirst(ModuleDefinition definition,

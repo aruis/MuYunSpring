@@ -126,14 +126,20 @@ class DynamicModuleDescriptorTest {
                         "Customer form",
                         List.of(
                                 new EntityViewFieldDefinition("title").title("Customer name"),
-                                new EntityViewFieldDefinition("status").control(ViewControlType.SELECT),
+                                new EntityViewFieldDefinition("status").control(ViewControlType.SELECT).readOnly(true),
                                 new EntityViewFieldDefinition("description").hidden().control(ViewControlType.TEXTAREA)
                         )
                 ))
         );
 
-        DynamicViewDescriptor formView = DynamicModuleDescriptor.from(module).entities().getFirst().views().getFirst();
+        List<DynamicViewDescriptor> views = DynamicModuleDescriptor.from(module).entities().getFirst().views();
+        DynamicViewDescriptor listView = views.getFirst();
+        DynamicViewDescriptor formView = views.get(1);
 
+        assertThat(listView.viewType()).isEqualTo(EntityViewType.LIST);
+        assertThat(listView.fields())
+                .extracting(DynamicViewFieldDescriptor::fieldName)
+                .containsExactly("title", "status", "description");
         assertThat(formView.viewType()).isEqualTo(EntityViewType.FORM);
         assertThat(formView.title()).isEqualTo("Customer form");
         assertThat(formView.fields())
@@ -141,6 +147,37 @@ class DynamicModuleDescriptorTest {
                 .containsExactly("title", "status", "description");
         assertThat(formView.fields().getFirst().title()).isEqualTo("Customer name");
         assertThat(formView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(formView.fields().get(1).readOnly()).isTrue();
         assertThat(formView.fields().get(2).visible()).isFalse();
+    }
+
+    @Test
+    void shouldNeverRelaxModelRequiredFieldInViewDescriptor() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                                FieldDefinition.string("code", "Code").required(),
+                                FieldDefinition.string("remark", "Remark")
+                        ))
+                ),
+                List.of(),
+                List.of(),
+                List.of(new EntityViewDefinition(
+                        "customer",
+                        EntityViewType.FORM,
+                        "Customer form",
+                        List.of(
+                                new EntityViewFieldDefinition("code").required(false),
+                                new EntityViewFieldDefinition("remark").required(true)
+                        )
+                ))
+        );
+
+        DynamicViewDescriptor formView = DynamicModuleDescriptor.from(module).entities().getFirst().views().get(1);
+
+        assertThat(formView.fields().getFirst().required()).isTrue();
+        assertThat(formView.fields().get(1).required()).isTrue();
     }
 }
