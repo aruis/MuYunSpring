@@ -21,7 +21,9 @@ public record DynamicModuleDescriptor(
         return new DynamicModuleDescriptor(
                 module.moduleAlias(),
                 module.name(),
-                module.entities().stream().map(entity -> DynamicEntityDescriptor.from(entity, module.views())).toList(),
+                module.entities().stream()
+                        .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.views(), module.actions()))
+                        .toList(),
                 module.relations().stream().map(DynamicRelationDescriptor::from).toList(),
                 module.references().stream().map(DynamicReferenceDescriptor::from).toList()
         );

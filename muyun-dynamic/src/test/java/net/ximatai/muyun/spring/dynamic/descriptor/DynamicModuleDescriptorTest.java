@@ -2,6 +2,9 @@ package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -52,6 +55,12 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create", "select", "update", "delete", "list", "page", "count",
                         "queryCriteria", "title", "titles", "projections", "referenceOptions");
+        assertThat(descriptor.entities().getFirst().actions().stream()
+                .filter(action -> action.code().equals("create"))
+                .findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::permissionCode)
+                .isEqualTo("crm.customer.customer.create");
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
@@ -104,6 +113,56 @@ class DynamicModuleDescriptorTest {
                 .get()
                 .extracting(DynamicActionDescriptor::kind)
                 .isEqualTo(DynamicActionKind.TREE);
+        assertThat(entity.actions().stream()
+                .filter(action -> action.code().equals("delete"))
+                .findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::level)
+                .isEqualTo(EntityActionLevel.DANGER);
+    }
+
+    @Test
+    void shouldApplyConfiguredActionGovernance() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer",
+                                List.of(FieldDefinition.titleField()))
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
+                                "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
+                        new EntityActionDefinition("customer", "delete", EntityActionKind.RECORD,
+                                "删除客户", false, EntityActionLevel.DANGER, null),
+                        new EntityActionDefinition("customer", "exportData", EntityActionKind.CUSTOM,
+                                "导出", true, EntityActionLevel.NORMAL, "crm.customer.export")
+                )
+        );
+
+        List<DynamicActionDescriptor> actions = DynamicModuleDescriptor.from(module).entities().getFirst().actions();
+
+        assertThat(actions.stream().filter(action -> action.code().equals("create")).findFirst())
+                .get()
+                .satisfies(action -> {
+                    assertThat(action.title()).isEqualTo("新建客户");
+                    assertThat(action.enabled()).isTrue();
+                    assertThat(action.level()).isEqualTo(EntityActionLevel.PRIMARY);
+                    assertThat(action.permissionCode()).isEqualTo("crm.customer.create");
+                });
+        assertThat(actions.stream().filter(action -> action.code().equals("delete")).findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::enabled)
+                .isEqualTo(false);
+        assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
+                .get()
+                .satisfies(action -> {
+                    assertThat(action.kind()).isEqualTo(DynamicActionKind.CUSTOM);
+                    assertThat(action.permissionCode()).isEqualTo("crm.customer.export");
+                });
     }
 
     @Test

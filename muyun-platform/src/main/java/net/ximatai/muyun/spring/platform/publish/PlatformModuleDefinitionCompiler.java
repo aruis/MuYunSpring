@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
@@ -14,6 +15,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
+import net.ximatai.muyun.spring.platform.metadata.MetadataAction;
+import net.ximatai.muyun.spring.platform.metadata.MetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
@@ -50,6 +53,7 @@ public class PlatformModuleDefinitionCompiler {
     private final ModuleMetadataRelationService relationService;
     private final MetadataViewService viewService;
     private final MetadataViewFieldService viewFieldService;
+    private final MetadataActionService actionService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -59,9 +63,10 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataFieldReferenceConfigService referenceConfigService,
                                             ModuleMetadataRelationService relationService,
                                             MetadataViewService viewService,
-                                            MetadataViewFieldService viewFieldService) {
+                                            MetadataViewFieldService viewFieldService,
+                                            MetadataActionService actionService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService,
+                viewService, viewFieldService, actionService,
                 new ModuleDefinitionValidator());
     }
 
@@ -73,6 +78,7 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataRelationService relationService,
                                             MetadataViewService viewService,
                                             MetadataViewFieldService viewFieldService,
+                                            MetadataActionService actionService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
@@ -82,6 +88,7 @@ public class PlatformModuleDefinitionCompiler {
         this.relationService = relationService;
         this.viewService = viewService;
         this.viewFieldService = viewFieldService;
+        this.actionService = actionService;
         this.validator = validator;
     }
 
@@ -99,8 +106,9 @@ public class PlatformModuleDefinitionCompiler {
                 .toList();
         List<EntityReferenceDefinition> references = references(module.getAlias(), relations, metadataById);
         List<EntityViewDefinition> views = views(relations, metadataById);
+        List<EntityActionDefinition> actions = actions(relations, metadataById);
         ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations,
-                references, views);
+                references, views, actions);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -306,6 +314,36 @@ public class PlatformModuleDefinitionCompiler {
                 .sorted((left, right) -> Boolean.compare(!left.code().equals(mainEntityCode), !right.code().equals(mainEntityCode)))
                 .toList();
         return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(),
-                definition.references(), definition.views());
+                definition.references(), definition.views(), definition.actions());
+    }
+
+    private List<EntityActionDefinition> actions(List<ModuleMetadataRelation> relations, Map<String, Metadata> metadataById) {
+        Map<String, ModuleMetadataRelation> relationById = relations.stream()
+                .collect(java.util.stream.Collectors.toMap(ModuleMetadataRelation::getId, relation -> relation));
+        return actionService.listByRelationIds(relations.stream().map(ModuleMetadataRelation::getId).toList()).stream()
+                .map(action -> action(action, relationById, metadataById))
+                .toList();
+    }
+
+    private EntityActionDefinition action(MetadataAction action,
+                                          Map<String, ModuleMetadataRelation> relationById,
+                                          Map<String, Metadata> metadataById) {
+        ModuleMetadataRelation relation = relationById.get(action.getRelationId());
+        if (relation == null) {
+            throw new PlatformException("Action points to relation outside current module: " + action.getRelationId());
+        }
+        Metadata metadata = metadataById.get(relation.getMetadataId());
+        if (metadata == null) {
+            throw new PlatformException("Action relation metadata is incomplete: " + action.getRelationId());
+        }
+        return new EntityActionDefinition(
+                metadata.getAlias(),
+                action.getActionCode(),
+                action.getActionKind(),
+                action.getTitle(),
+                Boolean.TRUE.equals(action.getEnabled()),
+                action.getActionLevel(),
+                action.getPermissionCode()
+        );
     }
 }

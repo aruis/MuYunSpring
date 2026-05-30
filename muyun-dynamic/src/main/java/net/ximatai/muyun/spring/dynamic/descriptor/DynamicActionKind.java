@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+
 public enum DynamicActionKind {
     RECORD,
     COLLECTION,
@@ -7,5 +9,10 @@ public enum DynamicActionKind {
     TREE,
     SORT,
     REFERENCE,
-    STATE
+    STATE,
+    CUSTOM;
+
+    static DynamicActionKind from(EntityActionKind kind) {
+        return DynamicActionKind.valueOf(kind.name());
+    }
 }

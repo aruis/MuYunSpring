@@ -8,17 +8,18 @@ public record ModuleDefinition(
         List<EntityDefinition> entities,
         List<EntityRelationDefinition> relations,
         List<EntityReferenceDefinition> references,
-        List<EntityViewDefinition> views
+        List<EntityViewDefinition> views,
+        List<EntityActionDefinition> actions
 ) {
     public ModuleDefinition(String moduleAlias, String name, List<EntityDefinition> entities) {
-        this(moduleAlias, name, entities, List.of(), List.of(), List.of());
+        this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of());
     }
 
     public ModuleDefinition(String moduleAlias,
                             String name,
                             List<EntityDefinition> entities,
                             List<EntityRelationDefinition> relations) {
-        this(moduleAlias, name, entities, relations, List.of(), List.of());
+        this(moduleAlias, name, entities, relations, List.of(), List.of(), List.of());
     }
 
     public ModuleDefinition(String moduleAlias,
@@ -26,7 +27,16 @@ public record ModuleDefinition(
                             List<EntityDefinition> entities,
                             List<EntityRelationDefinition> relations,
                             List<EntityReferenceDefinition> references) {
-        this(moduleAlias, name, entities, relations, references, List.of());
+        this(moduleAlias, name, entities, relations, references, List.of(), List.of());
+    }
+
+    public ModuleDefinition(String moduleAlias,
+                            String name,
+                            List<EntityDefinition> entities,
+                            List<EntityRelationDefinition> relations,
+                            List<EntityReferenceDefinition> references,
+                            List<EntityViewDefinition> views) {
+        this(moduleAlias, name, entities, relations, references, views, List.of());
     }
 
     public ModuleDefinition {
@@ -34,6 +44,7 @@ public record ModuleDefinition(
         relations = relations == null ? List.of() : List.copyOf(relations);
         references = references == null ? List.of() : List.copyOf(references);
         views = views == null ? List.of() : List.copyOf(views);
+        actions = actions == null ? List.of() : List.copyOf(actions);
     }
 
     public String code() {

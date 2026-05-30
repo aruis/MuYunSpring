@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 
@@ -23,10 +24,23 @@ public record DynamicEntityDescriptor(
     }
 
     public static DynamicEntityDescriptor from(EntityDefinition entity) {
-        return from(entity, List.of());
+        return from(entity, List.of(), List.of());
     }
 
     public static DynamicEntityDescriptor from(EntityDefinition entity, List<EntityViewDefinition> views) {
+        return from(entity, views, List.of());
+    }
+
+    public static DynamicEntityDescriptor from(EntityDefinition entity,
+                                               List<EntityViewDefinition> views,
+                                               List<EntityActionDefinition> actions) {
+        return from(null, entity, views, actions);
+    }
+
+    public static DynamicEntityDescriptor from(String moduleAlias,
+                                               EntityDefinition entity,
+                                               List<EntityViewDefinition> views,
+                                               List<EntityActionDefinition> actions) {
         return new DynamicEntityDescriptor(
                 entity.code(),
                 entity.name(),
@@ -34,7 +48,7 @@ public record DynamicEntityDescriptor(
                         .map(EntityCapability::name)
                         .collect(Collectors.toUnmodifiableSet()),
                 entity.fields().stream().map(DynamicFieldDescriptor::from).toList(),
-                DynamicStandardActions.from(entity),
+                DynamicStandardActions.from(moduleAlias, entity, actions),
                 DynamicViewDescriptors.from(entity, views)
         );
     }

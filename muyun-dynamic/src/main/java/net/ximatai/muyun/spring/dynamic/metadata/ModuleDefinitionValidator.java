@@ -42,6 +42,11 @@ public class ModuleDefinitionValidator {
         for (EntityReferenceDefinition reference : module.references()) {
             validateReference(reference, entities, module.moduleAlias());
         }
+        Set<String> actionKeys = new HashSet<>();
+        for (EntityActionDefinition action : module.actions()) {
+            validateAction(action, entities);
+            requireUnique(actionKeys, action.entityCode() + "." + action.actionCode(), "action");
+        }
         Set<String> viewKeys = new HashSet<>();
         for (EntityViewDefinition view : module.views()) {
             validateView(view, entities);
@@ -215,6 +220,37 @@ public class ModuleDefinitionValidator {
         }
     }
 
+    public void validateAction(EntityActionDefinition action, Map<String, EntityDefinition> entities) {
+        if (action == null) {
+            throw new ModuleDefinitionException("action must not be null");
+        }
+        EntityDefinition entity = requireEntity(entities, action.entityCode(), "action entity");
+        requireActionCode(action.actionCode(), "action code");
+        requireText(action.title(), "action title");
+        if (action.kind() == null) {
+            throw new ModuleDefinitionException("action kind must not be null: " + action.actionCode());
+        }
+        if (action.level() == null) {
+            throw new ModuleDefinitionException("action level must not be null: " + action.actionCode());
+        }
+        if (action.permissionCode() != null && action.permissionCode().isBlank()) {
+            throw new ModuleDefinitionException("action permission code must not be blank: " + action.actionCode());
+        }
+        EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
+        if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
+            throw new ModuleDefinitionException("standard action is not supported by entity: "
+                    + entity.code() + "." + action.actionCode());
+        }
+        if (standardKind != null && action.kind() == EntityActionKind.CUSTOM) {
+            throw new ModuleDefinitionException("custom action conflicts with standard action: "
+                    + entity.code() + "." + action.actionCode());
+        }
+        if (standardKind != null && standardKind != action.kind()) {
+            throw new ModuleDefinitionException("standard action kind mismatch: "
+                    + entity.code() + "." + action.actionCode());
+        }
+    }
+
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities, String moduleAlias) {
         if (reference == null) {
             throw new ModuleDefinitionException("reference must not be null");
@@ -298,6 +334,13 @@ public class ModuleDefinitionValidator {
     private void requireFieldName(String value, String name) {
         requireText(value, name);
         if (!value.matches("[a-z][A-Za-z0-9]{0,62}")) {
+            throw new ModuleDefinitionException("invalid " + name + ": " + value);
+        }
+    }
+
+    private void requireActionCode(String value, String name) {
+        requireText(value, name);
+        if (!value.matches("[a-z][A-Za-z0-9]{0,63}")) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }
     }
