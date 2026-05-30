@@ -48,6 +48,10 @@ class DynamicModuleDescriptorTest {
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 
         assertThat(descriptor.moduleAlias()).isEqualTo("crm.customer");
+        assertThat(descriptor.actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("create", "select", "update", "delete", "list", "page", "count",
+                        "queryCriteria", "title", "titles", "projections", "referenceOptions");
         assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityCode)
                 .containsExactly("customer", "contact");
         assertThat(descriptor.entities().getFirst().capabilities()).contains("CRUD", "REFERENCE");
@@ -83,6 +87,43 @@ class DynamicModuleDescriptorTest {
         assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
+    }
+
+    @Test
+    void shouldExposeMainEntityActionsAsModuleActions() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("customer", "crm_customer", "Customer",
+                                List.of(FieldDefinition.titleField())),
+                        new EntityDefinition("contact", "crm_contact", "Contact",
+                                List.of(FieldDefinition.titleField()))
+                ),
+                List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
+                                "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
+                        new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
+                                "导出联系人", true, EntityActionLevel.NORMAL, "crm.contact.export")
+                )
+        );
+
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
+
+        assertThat(descriptor.actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("create")
+                .doesNotContain("exportContact");
+        assertThat(descriptor.actions().stream().filter(action -> action.code().equals("create")).findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::title)
+                .isEqualTo("新建客户");
+        assertThat(descriptor.entities().get(1).actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("exportContact");
     }
 
     @Test
