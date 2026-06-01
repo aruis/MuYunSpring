@@ -532,7 +532,7 @@ public class DynamicEntityService implements
     }
 
     private DynamicFormulaRuntime formulaRuntime() {
-        return new DynamicFormulaRuntime(dao.getEntity(), module);
+        return new DynamicFormulaRuntime(moduleAlias, dao.getEntity(), module);
     }
 
     private Map<String, List<DynamicRecord>> existingChildrenForFormula(DynamicRecord record) {

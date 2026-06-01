@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.common.formula.FormulaFieldDefinition;
 import net.ximatai.muyun.spring.common.formula.FormulaRule;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeData;
-import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicFormulaFieldDefinitions;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
@@ -22,10 +21,12 @@ import java.util.Set;
 
 final class DynamicFormulaRuntime {
     private final FormulaEngine engine = new FormulaEngine();
+    private final String moduleAlias;
     private final EntityDefinition entity;
     private final ModuleDefinition module;
 
-    DynamicFormulaRuntime(EntityDefinition entity, ModuleDefinition module) {
+    DynamicFormulaRuntime(String moduleAlias, EntityDefinition entity, ModuleDefinition module) {
+        this.moduleAlias = moduleAlias;
         this.entity = entity;
         this.module = module;
     }
@@ -60,7 +61,7 @@ final class DynamicFormulaRuntime {
         Map<String, List<Map<String, Object>>> tables = childValues(record);
         FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(main, tables, fieldDefinitions()));
         if (result.report().hasErrors()) {
-            throw new IllegalArgumentException(formulaErrorMessage(result.report()));
+            throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
     }
@@ -77,7 +78,7 @@ final class DynamicFormulaRuntime {
         Map<String, List<Map<String, Object>>> tables = childValues(record, existingChildren);
         FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(main, tables, fieldDefinitions()));
         if (result.report().hasErrors()) {
-            throw new IllegalArgumentException(formulaErrorMessage(result.report()));
+            throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
     }
@@ -230,10 +231,4 @@ final class DynamicFormulaRuntime {
         }
     }
 
-    private String formulaErrorMessage(FormulaRuntimeReport report) {
-        FormulaRuntimeReport.Issue issue = report.errors().getFirst();
-        String ruleId = issue.ruleId() == null ? "formula" : issue.ruleId();
-        String message = issue.message() == null ? issue.code() : issue.message();
-        return "dynamic formula rule failed: " + ruleId + ", " + message;
-    }
 }

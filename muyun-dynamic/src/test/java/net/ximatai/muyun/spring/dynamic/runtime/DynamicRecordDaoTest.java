@@ -208,7 +208,7 @@ class DynamicRecordDaoTest {
                 .calculation("amountCalc", "amount", "{quantity} * {price}")
                 .disabled());
 
-        assertThat(new DynamicFormulaRuntime(entity, null).hasBeforeUpdateRules(new DynamicRecord(entity))).isFalse();
+        assertThat(new DynamicFormulaRuntime("sales.contract", entity, null).hasBeforeUpdateRules(new DynamicRecord(entity))).isFalse();
     }
 
     @Test
@@ -225,8 +225,18 @@ class DynamicRecordDaoTest {
 
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract")
                 .insert(record))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dynamic formula rule failed: amountPositive");
+                .isInstanceOf(DynamicFormulaException.class)
+                .hasMessageContaining("dynamic formula rule failed: sales.contract.contract: amountPositive")
+                .satisfies(error -> {
+                    DynamicFormulaException exception = (DynamicFormulaException) error;
+                    assertThat(exception.moduleAlias()).isEqualTo("sales.contract");
+                    assertThat(exception.entityCode()).isEqualTo("contract");
+                    assertThat(exception.errors()).hasSize(1);
+                    assertThat(exception.firstError().ruleId()).isEqualTo("amountPositive");
+                    assertThat(exception.firstError().fieldPath()).isEqualTo("amount");
+                    assertThat(exception.firstError().code()).isEqualTo("FORMULA_RULE_NOT_MATCHED");
+                    assertThat(exception.warnings()).isEmpty();
+                });
         verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
     }
 
@@ -261,7 +271,7 @@ class DynamicRecordDaoTest {
                 .setValue("price", BigDecimal.valueOf(11));
         parent.setChildren("items", List.of(child));
 
-        new DynamicFormulaRuntime(invoice, module).beforeInsert(parent);
+        new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeInsert(parent);
 
         assertThat((BigDecimal) child.getValue("lineAmount")).isEqualByComparingTo("33");
     }
@@ -289,7 +299,7 @@ class DynamicRecordDaoTest {
         );
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
 
-        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+        new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeUpdate(record, null, Map.of());
 
         assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("100");
     }
@@ -328,7 +338,7 @@ class DynamicRecordDaoTest {
                 .setValue("price", BigDecimal.valueOf(20));
         record.setChildren("items", List.of(first, second));
 
-        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+        new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeUpdate(record, null, Map.of());
 
         assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("80");
         assertThat((BigDecimal) first.getValue("lineAmount")).isEqualByComparingTo("20");
@@ -359,7 +369,7 @@ class DynamicRecordDaoTest {
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
         record.setChildren("items", List.of());
 
-        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+        new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeUpdate(record, null, Map.of());
 
         assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("0");
     }
@@ -405,7 +415,7 @@ class DynamicRecordDaoTest {
         DynamicRecord attachmentRow = new DynamicRecord(attachment).setValue("fileSize", BigDecimal.valueOf(8));
         record.setChildren("attachments", List.of(attachmentRow));
 
-        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+        new DynamicFormulaRuntime("sales.invoice", invoice, module).beforeUpdate(record, null, Map.of());
 
         assertThat((BigDecimal) record.getValue("itemTotal")).isEqualByComparingTo("100");
         assertThat((BigDecimal) record.getValue("attachmentTotal")).isEqualByComparingTo("8");
@@ -445,7 +455,7 @@ class DynamicRecordDaoTest {
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.ZERO);
         record.setChildren("items", List.of(payloadLine));
 
-        new DynamicFormulaRuntime(invoice, module)
+        new DynamicFormulaRuntime("sales.invoice", invoice, module)
                 .beforeUpdate(record, null, Map.of("items", List.of(existingLine)));
 
         assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("40");
