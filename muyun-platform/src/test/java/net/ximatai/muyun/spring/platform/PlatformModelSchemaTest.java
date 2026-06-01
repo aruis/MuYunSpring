@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform;
 
+import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
@@ -66,11 +67,15 @@ class PlatformModelSchemaTest {
                 .contains("id", "alias", "title", "field_type", "default_length", "default_precision",
                         "default_scale", "default_query_operator", "query_operators")
                 .doesNotContain("verify_regex");
+        assertThat(columnType(mapper.toTable(PlatformFieldType.class), "query_operators"))
+                .isEqualTo(ColumnType.JSON_SET);
         assertThat(columnNames(mapper.toTable(MetadataFieldConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "dictionary_application_alias", "dictionary_category_alias",
                         "field_length", "precision", "scale", "queryable", "default_query_operator", "query_operators",
                         "default_value", "validation_regex", "copyable", "write_protected")
                 .doesNotContain("verify_regex");
+        assertThat(columnType(mapper.toTable(MetadataFieldConfig.class), "query_operators"))
+                .isEqualTo(ColumnType.JSON_SET);
         assertThat(columnNames(mapper.toTable(MetadataFieldReferenceConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "target_module_alias", "target_metadata_id",
                         "cardinality", "auto_title", "title_output_field", "projection_mappings");
@@ -126,5 +131,13 @@ class PlatformModelSchemaTest {
                 .filter(index -> index.isUnique())
                 .map(index -> List.copyOf(index.getColumns()))
                 .toList();
+    }
+
+    private ColumnType columnType(TableWrapper table, String columnName) {
+        return table.getColumns().stream()
+                .filter(column -> columnName.equals(column.getName()))
+                .findFirst()
+                .orElseThrow()
+                .getType();
     }
 }

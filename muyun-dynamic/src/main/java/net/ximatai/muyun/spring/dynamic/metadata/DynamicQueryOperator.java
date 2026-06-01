@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 import java.util.EnumSet;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -45,5 +47,24 @@ public enum DynamicQueryOperator {
 
     public static String format(Set<DynamicQueryOperator> operators) {
         return String.join(",", ordered(operators).stream().map(DynamicQueryOperator::name).toList());
+    }
+
+    public static Set<String> names(Set<DynamicQueryOperator> operators) {
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        ordered(operators).forEach(operator -> names.add(operator.name()));
+        return Collections.unmodifiableSet(names);
+    }
+
+    public static Set<DynamicQueryOperator> parseNames(Set<String> operators) {
+        if (operators == null || operators.isEmpty()) {
+            return Set.of();
+        }
+        LinkedHashSet<DynamicQueryOperator> parsed = new LinkedHashSet<>();
+        for (String value : operators) {
+            if (value != null && !value.isBlank()) {
+                parsed.add(DynamicQueryOperator.valueOf(value.trim()));
+            }
+        }
+        return Collections.unmodifiableSet(parsed);
     }
 }

@@ -156,8 +156,10 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         if (config.getDefaultQueryOperator() == null) {
             config.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType.getFieldType()));
         }
-        if (config.getQueryOperators() == null || config.getQueryOperators().isBlank()) {
-            config.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(fieldType.getFieldType())));
+        if (config.getQueryOperators() == null || config.getQueryOperators().isEmpty()) {
+            config.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.defaultOperators(fieldType.getFieldType())));
+        } else {
+            config.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.parseNames(config.getQueryOperators())));
         }
         config.queryDefinition(fieldType);
     }

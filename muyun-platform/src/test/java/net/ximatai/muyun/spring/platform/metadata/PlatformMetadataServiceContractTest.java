@@ -142,6 +142,20 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldNormalizeQueryOperatorSetBeforeSavingFieldType() {
+        PlatformFieldType type = fieldType("custom_string", FieldType.STRING, 128);
+        type.setDefaultQueryOperator(null);
+        type.setQueryOperators(java.util.Set.of(" LIKE ", "EQ"));
+
+        String id = fieldTypeService.insert(type);
+
+        PlatformFieldType saved = fieldTypeService.select(id);
+        assertThat(saved.getDefaultQueryOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+        assertThat(saved.getQueryOperators()).containsExactly("EQ", "LIKE");
+        assertThat(saved.queryDefinition().operators()).contains(DynamicQueryOperator.EQ, DynamicQueryOperator.LIKE);
+    }
+
+    @Test
     void shouldCompileDictionaryBindingOnMetadataField() {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
@@ -581,7 +595,7 @@ class PlatformMetadataServiceContractTest {
         type.setFieldType(fieldType);
         type.setDefaultLength(length);
         type.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType));
-        type.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(fieldType)));
+        type.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.defaultOperators(fieldType)));
         return type;
     }
 

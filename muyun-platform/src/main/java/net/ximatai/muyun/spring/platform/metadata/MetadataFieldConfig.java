@@ -10,9 +10,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 
-import java.util.Arrays;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -46,8 +44,8 @@ public class MetadataFieldConfig extends StandardEntity {
     @Column(name = "default_query_operator", type = ColumnType.VARCHAR, length = 32, comment = "Default query operator")
     private DynamicQueryOperator defaultQueryOperator;
 
-    @Column(name = "query_operators", type = ColumnType.VARCHAR, length = 256, comment = "Allowed query operators")
-    private String queryOperators;
+    @Column(name = "query_operators", type = ColumnType.JSON_SET, comment = "Allowed query operators")
+    private Set<String> queryOperators;
 
     @Column(name = "default_value", type = ColumnType.VARCHAR, length = 512, comment = "Default value")
     private String defaultValue;
@@ -71,13 +69,9 @@ public class MetadataFieldConfig extends StandardEntity {
         DynamicQueryOperator operator = defaultQueryOperator == null
                 ? DynamicQueryOperator.defaultOperator(fieldType.getFieldType())
                 : defaultQueryOperator;
-        Set<DynamicQueryOperator> operators = queryOperators == null || queryOperators.isBlank()
+        Set<DynamicQueryOperator> operators = queryOperators == null || queryOperators.isEmpty()
                 ? DynamicQueryOperator.defaultOperators(fieldType.getFieldType())
-                : Arrays.stream(queryOperators.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .map(DynamicQueryOperator::valueOf)
-                .collect(Collectors.toUnmodifiableSet());
+                : DynamicQueryOperator.parseNames(queryOperators);
         return FieldQueryDefinition.enabled(fieldType.getFieldType(), operator, operators);
     }
 

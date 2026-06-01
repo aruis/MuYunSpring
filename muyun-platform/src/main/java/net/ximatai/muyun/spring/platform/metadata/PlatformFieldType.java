@@ -11,9 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
-import java.util.Arrays;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -41,23 +39,19 @@ public class PlatformFieldType extends StandardEnabledSortableEntity {
     @Column(name = "default_query_operator", type = ColumnType.VARCHAR, length = 32, comment = "Default query operator")
     private DynamicQueryOperator defaultQueryOperator;
 
-    @Column(name = "query_operators", type = ColumnType.VARCHAR, length = 256, comment = "Allowed query operators")
-    private String queryOperators;
+    @Column(name = "query_operators", type = ColumnType.JSON_SET, comment = "Allowed query operators")
+    private Set<String> queryOperators;
 
     public FieldQueryDefinition queryDefinition() {
-        if (defaultQueryOperator == null && (queryOperators == null || queryOperators.isBlank())) {
+        if (defaultQueryOperator == null && (queryOperators == null || queryOperators.isEmpty())) {
             return FieldQueryDefinition.disabled();
         }
         DynamicQueryOperator operator = defaultQueryOperator == null
                 ? DynamicQueryOperator.defaultOperator(fieldType)
                 : defaultQueryOperator;
-        Set<DynamicQueryOperator> operators = queryOperators == null || queryOperators.isBlank()
+        Set<DynamicQueryOperator> operators = queryOperators == null || queryOperators.isEmpty()
                 ? DynamicQueryOperator.defaultOperators(fieldType)
-                : Arrays.stream(queryOperators.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .map(DynamicQueryOperator::valueOf)
-                .collect(Collectors.toUnmodifiableSet());
+                : DynamicQueryOperator.parseNames(queryOperators);
         return FieldQueryDefinition.enabled(fieldType, operator, operators);
     }
 }

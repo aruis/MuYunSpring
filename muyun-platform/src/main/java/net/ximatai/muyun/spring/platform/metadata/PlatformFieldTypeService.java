@@ -74,14 +74,16 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
 
     private void normalizeQueryDefinition(PlatformFieldType fieldType) {
         if (fieldType.getDefaultQueryOperator() == null && (fieldType.getQueryOperators() == null
-                || fieldType.getQueryOperators().isBlank())) {
+                || fieldType.getQueryOperators().isEmpty())) {
             return;
         }
         if (fieldType.getDefaultQueryOperator() == null) {
             fieldType.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType.getFieldType()));
         }
-        if (fieldType.getQueryOperators() == null || fieldType.getQueryOperators().isBlank()) {
-            fieldType.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(fieldType.getFieldType())));
+        if (fieldType.getQueryOperators() == null || fieldType.getQueryOperators().isEmpty()) {
+            fieldType.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.defaultOperators(fieldType.getFieldType())));
+        } else {
+            fieldType.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.parseNames(fieldType.getQueryOperators())));
         }
         fieldType.queryDefinition();
     }

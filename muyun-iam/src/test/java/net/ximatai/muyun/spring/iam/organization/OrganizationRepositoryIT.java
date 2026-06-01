@@ -90,9 +90,12 @@ class OrganizationRepositoryIT {
         branch.setParentId(rootId);
         organizationService.insert(branch);
 
-        assertThat(organizationService.select(rootId))
+        Organization selectedRoot = organizationService.select(rootId);
+        assertThat(selectedRoot)
                 .extracting(Organization::getTitle, Organization::getParentId, Organization::getEnabled)
                 .containsExactly("Headquarters", TreeAbility.ROOT_ID, Boolean.TRUE);
+        assertThat(selectedRoot.getCreatedAt()).isNotNull();
+        assertThat(selectedRoot.getUpdatedAt()).isNotNull();
         assertThat(organizationService.children(rootId))
                 .extracting(Organization::getCode)
                 .containsExactly("BR-001");
