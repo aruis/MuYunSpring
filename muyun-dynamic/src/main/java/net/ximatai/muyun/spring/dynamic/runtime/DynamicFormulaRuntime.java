@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.formula.FormulaFieldDefinition;
 import net.ximatai.muyun.spring.common.formula.FormulaRule;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeData;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicFormulaFieldDefinitions;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
@@ -31,12 +32,14 @@ final class DynamicFormulaRuntime {
         this.module = module;
     }
 
-    void beforeInsert(DynamicRecord record) {
-        execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true);
+    FormulaRuntimeReport beforeInsert(DynamicRecord record) {
+        return execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true);
     }
 
-    void beforeUpdate(DynamicRecord record, DynamicRecord existing, Map<String, List<DynamicRecord>> existingChildren) {
-        execute(record, existing, existingChildren, List.of(FormulaRulePhase.BEFORE_SAVE));
+    FormulaRuntimeReport beforeUpdate(DynamicRecord record,
+                                      DynamicRecord existing,
+                                      Map<String, List<DynamicRecord>> existingChildren) {
+        return execute(record, existing, existingChildren, List.of(FormulaRulePhase.BEFORE_SAVE));
     }
 
     boolean hasBeforeUpdateRules(DynamicRecord record) {
@@ -49,13 +52,13 @@ final class DynamicFormulaRuntime {
                         && phases.contains(rule.phase()));
     }
 
-    private void execute(DynamicRecord record,
-                         DynamicRecord existing,
-                         List<FormulaRulePhase> phases,
-                         boolean includeChildDependentRules) {
+    private FormulaRuntimeReport execute(DynamicRecord record,
+                                         DynamicRecord existing,
+                                         List<FormulaRulePhase> phases,
+                                         boolean includeChildDependentRules) {
         List<FormulaRule> rules = runtimeRules(phases, includeChildDependentRules);
         if (rules.isEmpty()) {
-            return;
+            return new FormulaRuntimeReport();
         }
         Map<String, Object> main = mainValues(record, existing);
         Map<String, List<Map<String, Object>>> tables = childValues(record);
@@ -64,15 +67,16 @@ final class DynamicFormulaRuntime {
             throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
+        return result.report();
     }
 
-    private void execute(DynamicRecord record,
-                         DynamicRecord existing,
-                         Map<String, List<DynamicRecord>> existingChildren,
-                         List<FormulaRulePhase> phases) {
+    private FormulaRuntimeReport execute(DynamicRecord record,
+                                         DynamicRecord existing,
+                                         Map<String, List<DynamicRecord>> existingChildren,
+                                         List<FormulaRulePhase> phases) {
         List<FormulaRule> rules = runtimeRulesForUpdate(record, phases);
         if (rules.isEmpty()) {
-            return;
+            return new FormulaRuntimeReport();
         }
         Map<String, Object> main = mainValues(record, existing);
         Map<String, List<Map<String, Object>>> tables = childValues(record, existingChildren);
@@ -81,6 +85,7 @@ final class DynamicFormulaRuntime {
             throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
+        return result.report();
     }
 
     private List<FormulaRule> runtimeRules(List<FormulaRulePhase> phases, boolean includeChildDependentRules) {

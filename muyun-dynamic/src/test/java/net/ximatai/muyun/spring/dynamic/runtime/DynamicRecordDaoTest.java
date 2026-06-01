@@ -9,6 +9,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
@@ -238,6 +240,103 @@ class DynamicRecordDaoTest {
                     assertThat(exception.warnings()).isEmpty();
                 });
         verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void shouldKeepFormulaWarningsOnRecordWithoutBlockingSave() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(18, 2))
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("amountHighRisk", "amount", "{amount} < 1000", "amount is high")
+                .severity(FormulaIssueLevel.WARNING));
+        DynamicRecord record = new DynamicRecord(entity).setValue("amount", BigDecimal.valueOf(1500));
+
+        String id = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract")
+                .insert(record);
+
+        assertThat(id).isNotBlank();
+        assertThat(record.formulaReport().hasErrors()).isFalse();
+        assertThat(record.formulaReport().warnings())
+                .hasSize(1)
+                .first()
+                .satisfies(issue -> {
+                    assertThat(issue.ruleId()).isEqualTo("amountHighRisk");
+                    assertThat(issue.fieldPath()).isEqualTo("amount");
+                    assertThat(issue.code()).isEqualTo("FORMULA_RULE_NOT_MATCHED");
+                    assertThat(issue.message()).isEqualTo("amount is high");
+                });
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
+    }
+
+    @Test
+    void shouldKeepFormulaWarningsOnRecordAfterUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "amount", BigDecimal.valueOf(1200),
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(18, 2))
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("amountHighRisk", "amount", "{amount} < 1000", "amount is high")
+                .severity(FormulaIssueLevel.WARNING));
+        DynamicRecord record = new DynamicRecord(entity).setValue("amount", BigDecimal.valueOf(1500));
+        record.setId("contract-1");
+        record.setVersion(2);
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").update(record);
+
+        assertThat(record.formulaReport().warnings())
+                .hasSize(1)
+                .first()
+                .extracting(issue -> issue.ruleId())
+                .isEqualTo("amountHighRisk");
+    }
+
+    @Test
+    void shouldClearFormulaReportWhenUpdateHasNoFormulaRules() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "amount", BigDecimal.TEN,
+                "deleted", Boolean.FALSE,
+                "version", 2
+        )));
+        DynamicRecord record = new DynamicRecord(contractEntity());
+        FormulaRuntimeReport staleReport = new FormulaRuntimeReport();
+        staleReport.warn("stale", "{amount}", "stale warning");
+        record.formulaReport(staleReport);
+        record.setId("contract-1");
+        record.setVersion(2);
+
+        new DynamicEntityService(new DynamicRecordDao(operations, contractEntity()), "sales.contract").update(record);
+
+        assertThat(record.formulaReport().warnings()).isEmpty();
+        assertThat(record.formulaReport().errors()).isEmpty();
+    }
+
+    @Test
+    void shouldNotCopyFormulaReportWithRecordData() {
+        DynamicRecord record = new DynamicRecord(contractEntity());
+        FormulaRuntimeReport report = new FormulaRuntimeReport();
+        report.warn("amountHighRisk", "{amount}", "amount is high");
+        record.formulaReport(report);
+
+        DynamicRecord copy = record.copy();
+
+        assertThat(copy.formulaReport().warnings()).isEmpty();
     }
 
     @Test

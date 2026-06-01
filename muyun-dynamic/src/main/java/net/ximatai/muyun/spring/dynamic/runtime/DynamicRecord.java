@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
@@ -31,6 +32,7 @@ public class DynamicRecord implements EntityContract {
     private final Map<String, Object> loadedValues = new LinkedHashMap<>();
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
     private final Set<String> explicitFields = new HashSet<>();
+    private FormulaRuntimeReport formulaReport = new FormulaRuntimeReport();
 
     private String id;
     private String tenantId;
@@ -242,6 +244,14 @@ public class DynamicRecord implements EntityContract {
                 throw new IllegalArgumentException("required dynamic field is missing: " + field.code());
             }
         }
+    }
+
+    public FormulaRuntimeReport formulaReport() {
+        return formulaReport;
+    }
+
+    void formulaReport(FormulaRuntimeReport formulaReport) {
+        this.formulaReport = formulaReport == null ? new FormulaRuntimeReport() : formulaReport;
     }
 
     void applyDefaultsForInsert() {

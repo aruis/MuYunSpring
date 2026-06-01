@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -128,7 +129,7 @@ public class DynamicEntityService implements
         record.applyDefaultsForInsert();
         prepareDynamicAbilityDefaults(record);
         lifecycle.beforeInsert(record);
-        formulaRuntime().beforeInsert(record);
+        record.formulaReport(formulaRuntime().beforeInsert(record));
         validateChildPayload(record);
         record.validateForInsert();
         validateFieldValues(record);
@@ -141,7 +142,14 @@ public class DynamicEntityService implements
         lifecycle.beforeUpdate(record);
         DynamicFormulaRuntime formulaRuntime = formulaRuntime();
         if (formulaRuntime.hasBeforeUpdateRules(record)) {
-            formulaRuntime.beforeUpdate(record, activeRaw(record.getId()), existingChildrenForFormula(record));
+            FormulaRuntimeReport report = formulaRuntime.beforeUpdate(
+                    record,
+                    activeRaw(record.getId()),
+                    existingChildrenForFormula(record)
+            );
+            record.formulaReport(report);
+        } else {
+            record.formulaReport(new FormulaRuntimeReport());
         }
         validateChildPayload(record);
         validateFieldValues(record);
