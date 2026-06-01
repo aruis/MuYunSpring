@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
+import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
@@ -9,6 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
@@ -33,12 +36,21 @@ class DynamicModuleDescriptorTest {
                 List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField().queryable(),
-                                FieldDefinition.string("status", "Status")
+                        FieldDefinition.string("status", "Status")
                                         .dictionary("crm", "customer_status")
                                         .defaultValue("active")
                                         .validationRegex("[a-z_]+")
                                         .notCopyable()
-                        ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)),
+                        ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE))
+                                .withFormulaRules(
+                                        EntityFormulaRuleDefinition
+                                                .calculation("lateRule", "title", "{title}")
+                                                .sortOrder(20),
+                                        EntityFormulaRuleDefinition
+                                                .calculation("statusTitle", "title", "{status} + '-' + {title}")
+                                                .phase(FormulaRulePhase.DEFAULT_VALUE)
+                                                .sortOrder(10)
+                                ),
                         new EntityDefinition("contact", "crm_contact", "Contact", List.of(
                                 FieldDefinition.titleField(),
                                 FieldDefinition.string("customerId", "Customer")
@@ -69,6 +81,14 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityCode)
                 .containsExactly("customer", "contact");
         assertThat(descriptor.entities().getFirst().capabilities()).contains("CRUD", "REFERENCE");
+        assertThat(descriptor.entities().getFirst().formulaRules().getFirst())
+                .satisfies(rule -> {
+                    assertThat(rule.code()).isEqualTo("statusTitle");
+                    assertThat(rule.kind()).isEqualTo(FormulaRuleKind.CALCULATION);
+                    assertThat(rule.phase()).isEqualTo(FormulaRulePhase.DEFAULT_VALUE);
+                    assertThat(rule.targetField()).isEqualTo("title");
+                    assertThat(rule.sortOrder()).isEqualTo(10);
+                });
         assertThat(descriptor.entities().getFirst().actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create", "select", "update", "delete", "list", "page", "count",

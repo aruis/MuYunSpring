@@ -15,12 +15,14 @@ public record DynamicEntityDescriptor(
         String title,
         Set<String> capabilities,
         List<DynamicFieldDescriptor> fields,
+        List<DynamicFormulaRuleDescriptor> formulaRules,
         List<DynamicActionDescriptor> actions,
         List<DynamicViewDescriptor> views,
         List<DynamicAssociationViewDescriptor> associationViews
 ) {
     public DynamicEntityDescriptor {
         fields = fields == null ? List.of() : List.copyOf(fields);
+        formulaRules = formulaRules == null ? List.of() : List.copyOf(formulaRules);
         actions = actions == null ? List.of() : List.copyOf(actions);
         views = views == null ? List.of() : List.copyOf(views);
         associationViews = associationViews == null ? List.of() : List.copyOf(associationViews);
@@ -52,6 +54,9 @@ public record DynamicEntityDescriptor(
                         .map(EntityCapability::name)
                         .collect(Collectors.toUnmodifiableSet()),
                 entity.fields().stream().map(DynamicFieldDescriptor::from).toList(),
+                entity.orderedFormulaRules().stream()
+                        .map(DynamicFormulaRuleDescriptor::from)
+                        .toList(),
                 DynamicStandardActions.from(moduleAlias, entity, actions),
                 DynamicViewDescriptors.from(entity, views),
                 scopedAssociationViews(entity, associationViews)

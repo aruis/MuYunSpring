@@ -4,6 +4,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.formula.FormulaEngine;
+import net.ximatai.muyun.spring.common.formula.FormulaEvaluationException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -19,6 +21,7 @@ public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
     private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardEntitySchema.columnNames());
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
+    private final FormulaEngine formulaEngine = new FormulaEngine();
 
     public void validate(ModuleDefinition module) {
         if (module == null) {
@@ -43,6 +46,7 @@ public class ModuleDefinitionValidator {
             validateRelation(relation, entities);
             requireUnique(relationCodes, relation.parentEntity() + "." + relation.code(), "relation code");
         }
+        validateFormulaRuleTargets(module, entities);
         for (EntityReferenceDefinition reference : module.references()) {
             validateReference(reference, entities, module.moduleAlias());
         }
@@ -130,6 +134,78 @@ public class ModuleDefinitionValidator {
         }
         if (entity.supports(EntityCapability.ENABLE)) {
             requireEnabledField(entity, enabledField);
+        }
+        validateFormulaRules(entity);
+    }
+
+    public void validateFormulaRules(EntityDefinition entity) {
+        Set<String> ruleCodes = new HashSet<>();
+        for (EntityFormulaRuleDefinition rule : entity.formulaRules()) {
+            validateFormulaRule(entity, rule);
+            requireUnique(ruleCodes, rule.code(), "formula rule code");
+        }
+    }
+
+    public void validateFormulaRule(EntityDefinition entity, EntityFormulaRuleDefinition rule) {
+        if (rule == null) {
+            throw new ModuleDefinitionException("formula rule must not be null: " + entity.code());
+        }
+        requireActionCode(rule.code(), "formula rule code");
+        requireText(rule.expression(), "formula expression");
+        requireFormulaExpression(rule);
+        if (rule.kind() == null) {
+            throw new ModuleDefinitionException("formula rule kind must not be null: " + rule.code());
+        }
+        if (rule.phase() == null) {
+            throw new ModuleDefinitionException("formula rule phase must not be null: " + rule.code());
+        }
+        if (rule.severity() == null) {
+            throw new ModuleDefinitionException("formula rule severity must not be null: " + rule.code());
+        }
+        if (rule.targetField() != null && !rule.targetField().contains(".")) {
+            requireFieldName(rule.targetField(), "formula target field");
+            requireField(entity, rule.targetField(), "formula target field");
+        }
+        if (rule.targetField() != null && rule.targetField().contains(".")) {
+            String[] parts = rule.targetField().split("\\.");
+            if (parts.length != 2) {
+                throw new ModuleDefinitionException("invalid formula target field: " + rule.targetField());
+            }
+            requireIdentifier(parts[0], "formula target relation");
+            requireFieldName(parts[1], "formula target field");
+        }
+    }
+
+    private void validateFormulaRuleTargets(ModuleDefinition module, Map<String, EntityDefinition> entities) {
+        for (EntityDefinition entity : module.entities()) {
+            for (EntityFormulaRuleDefinition rule : entity.formulaRules()) {
+                if (rule == null || rule.targetField() == null || !rule.targetField().contains(".")) {
+                    continue;
+                }
+                String[] parts = rule.targetField().split("\\.");
+                if (parts.length != 2) {
+                    continue;
+                }
+                EntityRelationDefinition relation = module.relations().stream()
+                        .filter(candidate -> entity.code().equals(candidate.parentEntity())
+                                && parts[0].equals(candidate.code()))
+                        .findFirst()
+                        .orElseThrow(() -> new ModuleDefinitionException("unknown formula target relation: "
+                                + entity.code() + "." + parts[0]));
+                EntityDefinition childEntity = requireEntity(entities, relation.childEntity(), "formula target child entity");
+                requireField(childEntity, parts[1], "formula target field");
+            }
+        }
+    }
+
+    private void requireFormulaExpression(EntityFormulaRuleDefinition rule) {
+        try {
+            Object parsed = formulaEngine.parse(rule.code(), rule.expression());
+            if (parsed == null) {
+                throw new ModuleDefinitionException("invalid formula expression: " + rule.code());
+            }
+        } catch (FormulaEvaluationException e) {
+            throw new ModuleDefinitionException("invalid formula expression: " + rule.code() + ", " + e.getMessage());
         }
     }
 
