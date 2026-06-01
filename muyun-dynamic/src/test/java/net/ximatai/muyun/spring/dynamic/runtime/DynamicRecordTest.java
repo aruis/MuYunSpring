@@ -56,6 +56,20 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldApplyDefaultValuesAndValidateRegex() {
+        DynamicRecord record = new DynamicRecord(behaviorEntity());
+
+        record.applyDefaultsForInsert();
+
+        assertThat(record.getValue("status")).isEqualTo("draft");
+        assertThatThrownBy(() -> record.setValue("code", "abc-001"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("validationRegex");
+        assertThat(new DynamicRecord(behaviorEntity()).setValue("code", "ABC-001").getValue("code"))
+                .isEqualTo("ABC-001");
+    }
+
+    @Test
     void shouldDeepCopyMutableDynamicValues() {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("items", new java.util.ArrayList<>(List.of("A")));
@@ -98,6 +112,18 @@ class DynamicRecordTest {
                 "app_contract",
                 "Contract",
                 List.of(FieldDefinition.of("payload", FieldType.JSON, "Payload"))
+        );
+    }
+
+    private EntityDefinition behaviorEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").validationRegex("[A-Z]+-[0-9]+"),
+                        FieldDefinition.string("status", "Status").defaultValue("draft")
+                )
         );
     }
 }

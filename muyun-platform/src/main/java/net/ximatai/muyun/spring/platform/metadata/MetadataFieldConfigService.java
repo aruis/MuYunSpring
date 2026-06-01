@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import org.springframework.stereotype.Service;
@@ -74,6 +76,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         normalizeFieldShape(config, fieldType);
         normalizeDictionaryBinding(config, field, fieldType);
         normalizeQueryDefinition(config, fieldType);
+        normalizeBehavior(config, fieldType);
         rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
                 "metadata field config must be unique in scope: " + config.getMetadataFieldId());
     }
@@ -157,6 +160,22 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
             config.setQueryOperators(DynamicQueryOperator.format(DynamicQueryOperator.defaultOperators(fieldType.getFieldType())));
         }
         config.queryDefinition(fieldType);
+    }
+
+    private void normalizeBehavior(MetadataFieldConfig config, PlatformFieldType fieldType) {
+        if (config.getDefaultValue() != null && config.getDefaultValue().isBlank()) {
+            config.setDefaultValue(null);
+        }
+        if (config.getValidationRegex() != null && config.getValidationRegex().isBlank()) {
+            config.setValidationRegex(null);
+        }
+        FieldBehaviorSupport.validateBehavior(
+                fieldType.getFieldType(),
+                new FieldBehaviorDefinition(config.getDefaultValue(), config.getValidationRegex(),
+                        config.getCopyable() == null || Boolean.TRUE.equals(config.getCopyable()),
+                        Boolean.TRUE.equals(config.getWriteProtected())),
+                config.getMetadataFieldId()
+        );
     }
 
     private MetadataField requireField(String metadataFieldId) {

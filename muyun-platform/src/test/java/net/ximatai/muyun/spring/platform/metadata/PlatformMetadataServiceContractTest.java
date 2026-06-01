@@ -68,6 +68,7 @@ class PlatformMetadataServiceContractTest {
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
+        fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
     }
 
     @Test
@@ -194,6 +195,104 @@ class PlatformMetadataServiceContractTest {
         assertThat(defaultDefinition.queryDefinition().queryable()).isTrue();
         assertThat(scopedDefinition.queryDefinition().queryable()).isFalse();
         assertThat(scopedDefinition.length()).isEqualTo(64);
+    }
+
+    @Test
+    void shouldCompileFieldBehaviorDefinition() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "code", "code", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDefaultValue("NEW");
+        config.setValidationRegex("[A-Z]+");
+        config.setCopyable(false);
+        config.setWriteProtected(true);
+        fieldConfigService.insert(config);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+
+        assertThat(definition.behavior().defaultValue()).isEqualTo("NEW");
+        assertThat(definition.behavior().validationRegex()).isEqualTo("[A-Z]+");
+        assertThat(definition.behavior().copyable()).isFalse();
+        assertThat(definition.behavior().writeProtected()).isTrue();
+    }
+
+    @Test
+    void shouldMergeRelationScopedFieldBehaviorByProperty() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "code", "code", FieldType.STRING);
+        fieldService.insert(field);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        MetadataFieldConfig defaultConfig = fieldConfig(field.getId());
+        defaultConfig.setDefaultValue("NEW");
+        defaultConfig.setValidationRegex("[A-Z]+");
+        fieldConfigService.insert(defaultConfig);
+        MetadataFieldConfig relationConfig = fieldConfig(field.getId());
+        relationConfig.setRelationId(relationId);
+        relationConfig.setCopyable(false);
+        fieldConfigService.insert(relationConfig);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field, relationId);
+
+        assertThat(definition.behavior().defaultValue()).isEqualTo("NEW");
+        assertThat(definition.behavior().validationRegex()).isEqualTo("[A-Z]+");
+        assertThat(definition.behavior().copyable()).isFalse();
+        assertThat(definition.behavior().writeProtected()).isFalse();
+    }
+
+    @Test
+    void shouldRejectInvalidMergedFieldBehaviorDefinition() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "code", "code", FieldType.STRING);
+        fieldService.insert(field);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        MetadataFieldConfig defaultConfig = fieldConfig(field.getId());
+        defaultConfig.setDefaultValue("abc");
+        fieldConfigService.insert(defaultConfig);
+        MetadataFieldConfig relationConfig = fieldConfig(field.getId());
+        relationConfig.setRelationId(relationId);
+        relationConfig.setValidationRegex("[A-Z]+");
+        fieldConfigService.insert(relationConfig);
+
+        assertThatThrownBy(() -> fieldDefinitionCompiler.compile(field, relationId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("defaultValue");
+    }
+
+    @Test
+    void shouldRejectRegexBehaviorOnNonStringField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "amount", "amount", FieldType.INTEGER);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setValidationRegex("[0-9]+");
+
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("validationRegex");
+    }
+
+    @Test
+    void shouldRejectInvalidFieldBehaviorDefaultValue() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField code = field(metadataId, "code", "code", FieldType.STRING);
+        fieldService.insert(code);
+        MetadataFieldConfig regexMismatch = fieldConfig(code.getId());
+        regexMismatch.setDefaultValue("abc");
+        regexMismatch.setValidationRegex("[A-Z]+");
+        assertThatThrownBy(() -> fieldConfigService.insert(regexMismatch))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("defaultValue");
+
+        MetadataField enabled = field(metadataId, "enabled", "enabled", FieldType.BOOLEAN);
+        fieldService.insert(enabled);
+        MetadataFieldConfig invalidBoolean = fieldConfig(enabled.getId());
+        invalidBoolean.setDefaultValue("abc");
+        assertThatThrownBy(() -> fieldConfigService.insert(invalidBoolean))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("boolean defaultValue");
     }
 
     @Test

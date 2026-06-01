@@ -5,12 +5,14 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -28,6 +30,7 @@ public class DynamicRecord implements EntityContract {
     private final Map<String, Object> values = new LinkedHashMap<>();
     private final Map<String, Object> loadedValues = new LinkedHashMap<>();
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
+    private final Set<String> explicitFields = new HashSet<>();
 
     private String id;
     private String tenantId;
@@ -57,6 +60,7 @@ public class DynamicRecord implements EntityContract {
         }
         validateValue(field, value);
         values.put(fieldCode, value);
+        explicitFields.add(fieldCode);
         return this;
     }
 
@@ -72,6 +76,14 @@ public class DynamicRecord implements EntityContract {
 
     public Map<String, Object> getValues() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
+    public boolean isExplicitlySet(String fieldCode) {
+        return explicitFields.contains(fieldCode);
+    }
+
+    public Set<String> explicitFieldCodes() {
+        return Collections.unmodifiableSet(new LinkedHashSet<>(explicitFields));
     }
 
     public DynamicRecord setChildren(String relationCode, List<DynamicRecord> records) {
@@ -98,6 +110,7 @@ public class DynamicRecord implements EntityContract {
         DynamicRecord copy = new DynamicRecord(entity);
         values.forEach((fieldCode, value) -> copy.values.put(fieldCode, copyValue(value)));
         loadedValues.forEach((fieldCode, value) -> copy.loadedValues.put(fieldCode, copyValue(value)));
+        copy.explicitFields.addAll(explicitFields);
         children.forEach((relationCode, records) -> copy.children.put(
                 relationCode,
                 records == null ? null : records.stream().map(DynamicRecord::copy).toList()
@@ -162,7 +175,7 @@ public class DynamicRecord implements EntityContract {
 
     void parentId(String parentId) {
         if (entity.supports(EntityCapability.TREE)) {
-            setAbilityValueIfPresent(PlatformAbilityFields.TREE_PARENT_FIELD, parentId);
+            setPlatformValueIfPresent(PlatformAbilityFields.TREE_PARENT_FIELD, parentId);
         }
     }
 
@@ -175,7 +188,7 @@ public class DynamicRecord implements EntityContract {
 
     void sortOrder(Integer sortOrder) {
         if (entity.supports(EntityCapability.SORT)) {
-            setAbilityValueIfPresent(PlatformAbilityFields.SORT_FIELD, sortOrder);
+            setPlatformValueIfPresent(PlatformAbilityFields.SORT_FIELD, sortOrder);
         }
     }
 
@@ -195,7 +208,7 @@ public class DynamicRecord implements EntityContract {
     }
 
     void enabled(Boolean enabled) {
-        setAbilityValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
+        setPlatformValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
     }
 
     Set<String> fieldCodes() {
@@ -214,10 +227,29 @@ public class DynamicRecord implements EntityContract {
         loadedValues.put(fieldCode, value);
     }
 
+    void putPlatformValue(String fieldCode, Object value) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field == null) {
+            throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        validateValue(field, value);
+        values.put(fieldCode, value);
+    }
+
     void validateForInsert() {
         for (FieldDefinition field : fields.values()) {
             if (field.isRequired() && values.get(field.code()) == null) {
                 throw new IllegalArgumentException("required dynamic field is missing: " + field.code());
+            }
+        }
+    }
+
+    void applyDefaultsForInsert() {
+        for (FieldDefinition field : fields.values()) {
+            if (!values.containsKey(field.code()) && field.behavior().defaultValue() != null) {
+                Object defaultValue = FieldBehaviorSupport.parseDefaultValue(field.type(), field.behavior().defaultValue());
+                validateValue(field, defaultValue);
+                values.put(field.code(), defaultValue);
             }
         }
     }
@@ -243,15 +275,20 @@ public class DynamicRecord implements EntityContract {
         if (!matched) {
             throw new IllegalArgumentException("invalid value type for dynamic field: " + field.code());
         }
+        if (field.behavior().validationRegex() != null
+                && value instanceof String text
+                && !text.matches(field.behavior().validationRegex())) {
+            throw new IllegalArgumentException("dynamic field value does not match validationRegex: " + field.code());
+        }
     }
 
     private boolean hasField(String fieldCode) {
         return fields.containsKey(fieldCode);
     }
 
-    private void setAbilityValueIfPresent(String fieldCode, Object value) {
+    private void setPlatformValueIfPresent(String fieldCode, Object value) {
         if (hasField(fieldCode)) {
-            setValue(fieldCode, value);
+            putPlatformValue(fieldCode, value);
         }
     }
 

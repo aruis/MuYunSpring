@@ -443,6 +443,62 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldApplyFieldDefaultAndRejectWriteProtectedInput() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordService service = service(operations, behaviorEntity());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+        record.setId("contract-1");
+
+        assertThat(service.create(MODULE, "contract", record)).isEqualTo("contract-1");
+        assertThatThrownBy(() -> {
+            DynamicRecord invalid = service.newRecord(MODULE, "contract")
+                    .setValue("code", "C-002")
+                    .setValue("serverCode", "MANUAL");
+            invalid.setId("contract-2");
+            service.create(MODULE, "contract", invalid);
+        })
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("write protected");
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), body.capture());
+        assertThat(body.getValue()).containsEntry("status", "draft");
+        assertThat(body.getValue()).doesNotContainKey("server_code");
+    }
+
+    @Test
+    void shouldRejectWriteProtectedDynamicFieldOnUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(behaviorRow("contract-1", "C-001", "SYS-1")));
+        DynamicRecordService service = service(operations, behaviorEntity());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("serverCode", "MANUAL");
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> service.update(MODULE, "contract", record))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("write protected");
+    }
+
+    @Test
+    void shouldAllowPlatformAbilityWriteOnWriteProtectedField() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(enabledRow("contract-1", false)));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        DynamicRecordService service = service(operations, writeProtectedEnabledEntity());
+
+        assertThat(service.enable(MODULE, "contract", "contract-1")).isEqualTo(1);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
+    }
+
+    @Test
     void shouldCacheDynamicSelectAcrossRuntimeFacadeCallsAndClearAfterUpdate() {
         IDatabaseOperations<Object> operations = operations();
         AtomicReference<String> storedCode = new AtomicReference<>("C-001");
@@ -518,6 +574,31 @@ class DynamicRecordServiceTest {
                         FieldDefinition.string("status", "Status").dictionary("crm", "customer_status")
                 )
         );
+    }
+
+    private EntityDefinition behaviorEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required().validationRegex("C-[0-9]+"),
+                        FieldDefinition.string("status", "Status").defaultValue("draft"),
+                        FieldDefinition.string("serverCode", "Server Code").column("server_code").writeProtected()
+                )
+        );
+    }
+
+    private EntityDefinition writeProtectedEnabledEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.enabled().writeProtected()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.ENABLE);
     }
 
     private EntityDefinition sortableEntity() {
@@ -603,6 +684,17 @@ class DynamicRecordServiceTest {
                 "id", id,
                 "code", id.toUpperCase(),
                 "enabled", enabled,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> behaviorRow(String id, String code, String serverCode) {
+        return Map.of(
+                "id", id,
+                "code", code,
+                "status", "draft",
+                "server_code", serverCode,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );

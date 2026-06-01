@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import org.springframework.stereotype.Service;
 
@@ -50,12 +51,43 @@ public class MetadataFieldDefinitionCompiler {
                 precision,
                 scale,
                 null,
-                queryDefinition
+                queryDefinition,
+                behavior(fieldType, defaultConfig, relationConfig, field.getId())
         );
         if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
             definition = definition.dictionary(dictionaryConfig.getDictionaryApplicationAlias(),
                     dictionaryConfig.getDictionaryCategoryAlias());
         }
         return definition;
+    }
+
+    private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,
+                                             MetadataFieldConfig defaultConfig,
+                                             MetadataFieldConfig relationConfig,
+                                             String fieldId) {
+        if (defaultConfig == null && relationConfig == null) {
+            return FieldBehaviorDefinition.DEFAULT;
+        }
+        String defaultValue = relationConfig != null && relationConfig.getDefaultValue() != null
+                ? relationConfig.getDefaultValue()
+                : defaultConfig == null ? null : defaultConfig.getDefaultValue();
+        String validationRegex = relationConfig != null && relationConfig.getValidationRegex() != null
+                ? relationConfig.getValidationRegex()
+                : defaultConfig == null ? null : defaultConfig.getValidationRegex();
+        boolean copyable = relationConfig != null && relationConfig.getCopyable() != null
+                ? Boolean.TRUE.equals(relationConfig.getCopyable())
+                : defaultConfig == null || defaultConfig.getCopyable() == null || Boolean.TRUE.equals(defaultConfig.getCopyable());
+        boolean writeProtected = relationConfig != null && relationConfig.getWriteProtected() != null
+                ? Boolean.TRUE.equals(relationConfig.getWriteProtected())
+                : defaultConfig != null && Boolean.TRUE.equals(defaultConfig.getWriteProtected());
+        FieldBehaviorDefinition behavior = new FieldBehaviorDefinition(
+                defaultValue,
+                validationRegex,
+                copyable,
+                writeProtected
+        );
+        net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport.validateBehavior(
+                fieldType.getFieldType(), behavior, fieldId);
+        return behavior;
     }
 }

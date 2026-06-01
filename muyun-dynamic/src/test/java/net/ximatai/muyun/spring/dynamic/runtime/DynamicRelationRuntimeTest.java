@@ -84,6 +84,29 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldLetChildRelationSetWriteProtectedForeignKeyInternally() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(writeProtectedForeignKeyInvoiceModule());
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        DynamicRecord line = runtime.newRecord(MODULE, "invoice_line").setValue("title", "L-001");
+        invoice.setChildren("lines", List.of(line));
+
+        String id = runtime.entityService(MODULE, "invoice").insert(invoice);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        assertThat(body.getAllValues().get(1)).containsEntry("invoice_id", id);
+        DynamicRecord externalLine = runtime.newRecord(MODULE, "invoice_line")
+                .setValue("title", "L-002")
+                .setValue("invoiceId", id);
+        assertThatThrownBy(() -> runtime.entityService(MODULE, "invoice_line").insert(externalLine))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("write protected");
+    }
+
+    @Test
     void shouldAutoPopulateAndCascadeDeleteDynamicChildren() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);
@@ -877,6 +900,15 @@ class DynamicRelationRuntimeTest {
         );
     }
 
+    private ModuleDefinition writeProtectedForeignKeyInvoiceModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoiceEntity(), writeProtectedInvoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
+        );
+    }
+
     private ModuleDefinition manyReferenceInvoiceModule() {
         return new ModuleDefinition(
                 MODULE,
@@ -930,6 +962,18 @@ class DynamicRelationRuntimeTest {
                 "Invoice Line",
                 List.of(
                         FieldDefinition.string("invoiceId", "Invoice").column("invoice_id").length(64).required().indexed(),
+                        FieldDefinition.titleField().required()
+                )
+        ).withCapabilities(EntityCapability.REFERENCE);
+    }
+
+    private EntityDefinition writeProtectedInvoiceLineEntity() {
+        return new EntityDefinition(
+                "invoice_line",
+                "app_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.string("invoiceId", "Invoice").column("invoice_id").length(64).required().indexed().writeProtected(),
                         FieldDefinition.titleField().required()
                 )
         ).withCapabilities(EntityCapability.REFERENCE);

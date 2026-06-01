@@ -19,14 +19,34 @@ public record FieldDefinition(
         Integer precision,
         Integer scale,
         FieldDictionaryBinding dictionaryBinding,
-        FieldQueryDefinition queryDefinition
+        FieldQueryDefinition queryDefinition,
+        FieldBehaviorDefinition behavior
 ) {
     public FieldDefinition(String fieldName, String columnName, FieldType type, String name) {
-        this(fieldName, columnName, type, name, false, false, false, false, false, null, null, null, null, null);
+        this(fieldName, columnName, type, name, false, false, false, false, false, null, null, null, null, null, null);
+    }
+
+    public FieldDefinition(String fieldName,
+                           String columnName,
+                           FieldType type,
+                           String name,
+                           boolean isRequired,
+                           boolean isUnique,
+                           boolean isIndexed,
+                           boolean isSortable,
+                           boolean isTitle,
+                           Integer length,
+                           Integer precision,
+                           Integer scale,
+                           FieldDictionaryBinding dictionaryBinding,
+                           FieldQueryDefinition queryDefinition) {
+        this(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, null);
     }
 
     public FieldDefinition {
         queryDefinition = queryDefinition == null ? FieldQueryDefinition.disabled() : queryDefinition;
+        behavior = behavior == null ? FieldBehaviorDefinition.DEFAULT : behavior;
     }
 
     public static FieldDefinition of(String fieldName, FieldType type, String name) {
@@ -91,47 +111,47 @@ public record FieldDefinition(
 
     public FieldDefinition column(String value) {
         return new FieldDefinition(fieldName, value, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition required() {
         return new FieldDefinition(fieldName, columnName, type, name, true, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition unique() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, true, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition indexed() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, true, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition sortable() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, true, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition title() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, true,
-                length, precision, scale, dictionaryBinding, queryDefinition);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition length(int value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                value, precision, scale, dictionaryBinding, queryDefinition);
+                value, precision, scale, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition precision(int value, int scaleValue) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, value, scaleValue, dictionaryBinding, queryDefinition);
+                length, value, scaleValue, dictionaryBinding, queryDefinition, behavior);
     }
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias), queryDefinition);
+                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias), queryDefinition, behavior);
     }
 
     public FieldDefinition queryable() {
@@ -144,7 +164,28 @@ public record FieldDefinition(
 
     public FieldDefinition queryable(FieldQueryDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, value);
+                length, precision, scale, dictionaryBinding, value, behavior);
+    }
+
+    public FieldDefinition defaultValue(String value) {
+        return behavior(new FieldBehaviorDefinition(value, behavior.validationRegex(), behavior.copyable(), behavior.writeProtected()));
+    }
+
+    public FieldDefinition validationRegex(String value) {
+        return behavior(new FieldBehaviorDefinition(behavior.defaultValue(), value, behavior.copyable(), behavior.writeProtected()));
+    }
+
+    public FieldDefinition notCopyable() {
+        return behavior(new FieldBehaviorDefinition(behavior.defaultValue(), behavior.validationRegex(), false, behavior.writeProtected()));
+    }
+
+    public FieldDefinition writeProtected() {
+        return behavior(new FieldBehaviorDefinition(behavior.defaultValue(), behavior.validationRegex(), behavior.copyable(), true));
+    }
+
+    public FieldDefinition behavior(FieldBehaviorDefinition value) {
+        return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, value);
     }
 
     public OptionBinding optionBinding() {

@@ -172,6 +172,11 @@ public class ModuleDefinitionValidator {
         if (field.isTitle() && field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
             throw new ModuleDefinitionException("title field must be a text type: " + field.code());
         }
+        try {
+            FieldBehaviorSupport.validateBehavior(field.type(), field.behavior(), field.code());
+        } catch (RuntimeException e) {
+            throw new ModuleDefinitionException(e.getMessage());
+        }
     }
 
     public void validateRelation(EntityRelationDefinition relation, Map<String, EntityDefinition> entities) {

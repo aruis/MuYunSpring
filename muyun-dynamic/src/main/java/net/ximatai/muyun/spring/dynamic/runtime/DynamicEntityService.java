@@ -124,6 +124,8 @@ public class DynamicEntityService implements
 
     @Override
     public void beforeInsert(DynamicRecord record) {
+        rejectWriteProtectedFields(record);
+        record.applyDefaultsForInsert();
         prepareDynamicAbilityDefaults(record);
         lifecycle.beforeInsert(record);
         validateChildPayload(record);
@@ -134,6 +136,7 @@ public class DynamicEntityService implements
 
     @Override
     public void beforeUpdate(DynamicRecord record) {
+        rejectWriteProtectedFields(record);
         lifecycle.beforeUpdate(record);
         validateChildPayload(record);
         validateFieldValues(record);
@@ -542,7 +545,7 @@ public class DynamicEntityService implements
         DynamicEntityService childService = relationServiceResolver.apply(plan.childEntity());
         ChildRelation<DynamicRecord, DynamicRecord> childRelation = new ChildRelation<>(
                 childService,
-                (child, parentId) -> child.setValue(plan.childForeignKeyField(), parentId),
+                (child, parentId) -> child.putPlatformValue(plan.childForeignKeyField(), parentId),
                 plan.childForeignKeyField(),
                 parent -> parent.getChildren(plan.relationCode())
         );
@@ -588,6 +591,15 @@ public class DynamicEntityService implements
         for (FieldDefinition field : dao.getEntity().fields()) {
             if (record.getValues().containsKey(field.code())) {
                 fieldValueValidator.validate(moduleAlias, dao.getEntity(), field, record.getValue(field.code()));
+            }
+        }
+    }
+
+    private void rejectWriteProtectedFields(DynamicRecord record) {
+        requireSameEntity(record);
+        for (FieldDefinition field : dao.getEntity().fields()) {
+            if (field.behavior().writeProtected() && record.isExplicitlySet(field.code())) {
+                throw new IllegalArgumentException("dynamic field is write protected: " + field.code());
             }
         }
     }

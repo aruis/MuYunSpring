@@ -17,7 +17,11 @@ public record DynamicFieldDescriptor(
         Integer precision,
         Integer scale,
         OptionBinding optionBinding,
-        DynamicFieldQueryDescriptor query
+        DynamicFieldQueryDescriptor query,
+        String defaultValue,
+        String validationRegex,
+        boolean copyable,
+        boolean writeProtected
 ) {
     public static DynamicFieldDescriptor from(FieldDefinition field) {
         return new DynamicFieldDescriptor(
@@ -33,7 +37,11 @@ public record DynamicFieldDescriptor(
                 field.precision(),
                 field.scale(),
                 field.optionBinding(),
-                DynamicFieldQueryDescriptor.from(field.queryDefinition())
+                DynamicFieldQueryDescriptor.from(field.queryDefinition()),
+                field.behavior().defaultValue(),
+                field.behavior().validationRegex(),
+                field.behavior().copyable(),
+                field.behavior().writeProtected()
         );
     }
 }

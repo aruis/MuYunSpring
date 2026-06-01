@@ -31,7 +31,11 @@ class DynamicModuleDescriptorTest {
                 List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField().queryable(),
-                                FieldDefinition.string("status", "Status").dictionary("crm", "customer_status")
+                                FieldDefinition.string("status", "Status")
+                                        .dictionary("crm", "customer_status")
+                                        .defaultValue("active")
+                                        .validationRegex("[a-z_]+")
+                                        .notCopyable()
                         ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)),
                         new EntityDefinition("contact", "crm_contact", "Contact", List.of(
                                 FieldDefinition.titleField(),
@@ -68,6 +72,10 @@ class DynamicModuleDescriptorTest {
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
+        assertThat(status.defaultValue()).isEqualTo("active");
+        assertThat(status.validationRegex()).isEqualTo("[a-z_]+");
+        assertThat(status.copyable()).isFalse();
+        assertThat(status.writeProtected()).isFalse();
         DynamicViewDescriptor listView = descriptor.entities().getFirst().views().getFirst();
         assertThat(listView.viewType()).isEqualTo(EntityViewType.LIST);
         assertThat(listView.fields())

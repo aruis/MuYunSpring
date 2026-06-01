@@ -49,6 +49,18 @@ public class MetadataFieldConfig extends StandardEntity {
     @Column(name = "query_operators", type = ColumnType.VARCHAR, length = 256, comment = "Allowed query operators")
     private String queryOperators;
 
+    @Column(name = "default_value", type = ColumnType.VARCHAR, length = 512, comment = "Default value")
+    private String defaultValue;
+
+    @Column(name = "validation_regex", type = ColumnType.VARCHAR, length = 512, comment = "Validation regex")
+    private String validationRegex;
+
+    @Column(name = "copyable", type = ColumnType.BOOLEAN, comment = "Copyable flag")
+    private Boolean copyable;
+
+    @Column(name = "write_protected", type = ColumnType.BOOLEAN, comment = "Write protected flag")
+    private Boolean writeProtected;
+
     public FieldQueryDefinition queryDefinition(PlatformFieldType fieldType) {
         if (queryable == null) {
             return fieldType.queryDefinition();
@@ -83,5 +95,12 @@ public class MetadataFieldConfig extends StandardEntity {
 
     public Integer effectiveScale(PlatformFieldType fieldType) {
         return scale == null ? fieldType.getDefaultScale() : scale;
+    }
+
+    public boolean hasBehaviorDefinition() {
+        return defaultValue != null
+                || validationRegex != null
+                || copyable != null
+                || writeProtected != null;
     }
 }
