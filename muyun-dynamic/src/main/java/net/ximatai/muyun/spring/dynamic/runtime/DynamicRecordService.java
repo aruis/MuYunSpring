@@ -5,6 +5,15 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
 import java.util.Collection;
 import java.util.List;
@@ -22,8 +31,78 @@ public class DynamicRecordService {
         return runtime.newRecord(moduleAlias, entityCode);
     }
 
+    public DynamicModuleDescriptor describe(String moduleAlias) {
+        return runtime.describe(moduleAlias);
+    }
+
+    public ModuleOperations module(String moduleAlias) {
+        return new ModuleOperations(this, moduleAlias);
+    }
+
     public EntityOperations entity(String moduleAlias, String entityCode) {
         return new EntityOperations(this, moduleAlias, entityCode);
+    }
+
+    public DynamicEntityDescriptor entityDescriptor(String moduleAlias, String entityCode) {
+        return findEntity(describe(moduleAlias), entityCode);
+    }
+
+    public List<DynamicActionDescriptor> actions(String moduleAlias) {
+        return describe(moduleAlias).actions();
+    }
+
+    public DynamicActionDescriptor action(String moduleAlias, String actionCode) {
+        return findAction(describe(moduleAlias), actionCode);
+    }
+
+    public List<DynamicActionDescriptor> actions(String moduleAlias, String entityCode) {
+        return entityDescriptor(moduleAlias, entityCode).actions();
+    }
+
+    public DynamicActionDescriptor action(String moduleAlias, String entityCode, String actionCode) {
+        return findAction(moduleAlias, entityDescriptor(moduleAlias, entityCode), actionCode);
+    }
+
+    public List<DynamicViewDescriptor> views(String moduleAlias, String entityCode) {
+        return entityDescriptor(moduleAlias, entityCode).views();
+    }
+
+    public DynamicViewDescriptor view(String moduleAlias, String entityCode, EntityViewType viewType) {
+        return findView(moduleAlias, entityDescriptor(moduleAlias, entityCode), viewType);
+    }
+
+    public List<DynamicAssociationViewDescriptor> associationViews(String moduleAlias) {
+        return describe(moduleAlias).associationViews();
+    }
+
+    public List<DynamicAssociationViewDescriptor> associationViews(String moduleAlias, String entityCode) {
+        return entityDescriptor(moduleAlias, entityCode).associationViews();
+    }
+
+    public DynamicAssociationViewDescriptor associationView(String moduleAlias, String entityCode, String viewCode) {
+        return findAssociationView(moduleAlias, entityDescriptor(moduleAlias, entityCode), viewCode);
+    }
+
+    public List<DynamicRelationDescriptor> relations(String moduleAlias) {
+        return describe(moduleAlias).relations();
+    }
+
+    public List<DynamicReferenceDescriptor> references(String moduleAlias) {
+        return describe(moduleAlias).references();
+    }
+
+    public List<DynamicReferenceDescriptor> references(String moduleAlias, String entityCode) {
+        return describe(moduleAlias).references().stream()
+                .filter(reference -> reference.sourceEntity().equals(entityCode))
+                .toList();
+    }
+
+    public DynamicReferenceDescriptor reference(String moduleAlias, String entityCode, String sourceField) {
+        return references(moduleAlias, entityCode).stream()
+                .filter(reference -> reference.sourceField().equals(sourceField))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic reference: "
+                        + moduleAlias + "." + entityCode + "." + sourceField));
     }
 
     public String create(String moduleAlias, String entityCode, DynamicRecord record) {
@@ -147,6 +226,90 @@ public class DynamicRecordService {
         return runtime.entityService(moduleAlias, entityCode);
     }
 
+    private DynamicEntityDescriptor findEntity(DynamicModuleDescriptor descriptor, String entityCode) {
+        return descriptor.entities().stream()
+                .filter(entity -> entity.entityCode().equals(entityCode))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic entity: "
+                        + descriptor.moduleAlias() + "." + entityCode));
+    }
+
+    private DynamicActionDescriptor findAction(DynamicModuleDescriptor module, String actionCode) {
+        return module.actions().stream()
+                .filter(action -> action.code().equals(actionCode))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic action: "
+                        + module.moduleAlias() + "." + actionCode));
+    }
+
+    private DynamicActionDescriptor findAction(String moduleAlias, DynamicEntityDescriptor entity, String actionCode) {
+        return entity.actions().stream()
+                .filter(action -> action.code().equals(actionCode))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic action: "
+                        + moduleAlias + "." + entity.entityCode() + "." + actionCode));
+    }
+
+    private DynamicViewDescriptor findView(String moduleAlias, DynamicEntityDescriptor entity, EntityViewType viewType) {
+        return entity.views().stream()
+                .filter(view -> view.viewType() == viewType)
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic view: "
+                        + moduleAlias + "." + entity.entityCode() + "." + viewType));
+    }
+
+    private DynamicAssociationViewDescriptor findAssociationView(String moduleAlias,
+                                                                DynamicEntityDescriptor entity,
+                                                                String viewCode) {
+        return entity.associationViews().stream()
+                .filter(view -> view.code().equals(viewCode))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic association view: "
+                        + moduleAlias + "." + entity.entityCode() + "." + viewCode));
+    }
+
+    public static final class ModuleOperations {
+        private final DynamicRecordService service;
+        private final String moduleAlias;
+
+        private ModuleOperations(DynamicRecordService service, String moduleAlias) {
+            this.service = service;
+            this.moduleAlias = moduleAlias;
+        }
+
+        public DynamicModuleDescriptor describe() {
+            return service.describe(moduleAlias);
+        }
+
+        public List<DynamicActionDescriptor> actions() {
+            return service.actions(moduleAlias);
+        }
+
+        public DynamicActionDescriptor action(String actionCode) {
+            return service.action(moduleAlias, actionCode);
+        }
+
+        public List<DynamicEntityDescriptor> entities() {
+            return describe().entities();
+        }
+
+        public List<DynamicRelationDescriptor> relations() {
+            return service.relations(moduleAlias);
+        }
+
+        public List<DynamicReferenceDescriptor> references() {
+            return service.references(moduleAlias);
+        }
+
+        public List<DynamicAssociationViewDescriptor> associationViews() {
+            return service.associationViews(moduleAlias);
+        }
+
+        public EntityOperations entity(String entityCode) {
+            return service.entity(moduleAlias, entityCode);
+        }
+    }
+
     public static final class EntityOperations {
         private final DynamicRecordService service;
         private final String moduleAlias;
@@ -160,6 +323,42 @@ public class DynamicRecordService {
 
         public DynamicRecord newRecord() {
             return service.newRecord(moduleAlias, entityCode);
+        }
+
+        public DynamicEntityDescriptor describe() {
+            return service.entityDescriptor(moduleAlias, entityCode);
+        }
+
+        public List<DynamicActionDescriptor> actions() {
+            return service.actions(moduleAlias, entityCode);
+        }
+
+        public DynamicActionDescriptor action(String actionCode) {
+            return service.action(moduleAlias, entityCode, actionCode);
+        }
+
+        public List<DynamicReferenceDescriptor> references() {
+            return service.references(moduleAlias, entityCode);
+        }
+
+        public DynamicReferenceDescriptor reference(String sourceField) {
+            return service.reference(moduleAlias, entityCode, sourceField);
+        }
+
+        public List<DynamicViewDescriptor> views() {
+            return service.views(moduleAlias, entityCode);
+        }
+
+        public DynamicViewDescriptor view(EntityViewType viewType) {
+            return service.view(moduleAlias, entityCode, viewType);
+        }
+
+        public List<DynamicAssociationViewDescriptor> associationViews() {
+            return service.associationViews(moduleAlias, entityCode);
+        }
+
+        public DynamicAssociationViewDescriptor associationView(String viewCode) {
+            return service.associationView(moduleAlias, entityCode, viewCode);
         }
 
         public String create(DynamicRecord record) {
