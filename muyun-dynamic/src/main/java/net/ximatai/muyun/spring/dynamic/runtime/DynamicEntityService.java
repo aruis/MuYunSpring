@@ -128,6 +128,7 @@ public class DynamicEntityService implements
         record.applyDefaultsForInsert();
         prepareDynamicAbilityDefaults(record);
         lifecycle.beforeInsert(record);
+        formulaRuntime().beforeInsert(record);
         validateChildPayload(record);
         record.validateForInsert();
         validateFieldValues(record);
@@ -138,6 +139,10 @@ public class DynamicEntityService implements
     public void beforeUpdate(DynamicRecord record) {
         rejectWriteProtectedFields(record);
         lifecycle.beforeUpdate(record);
+        DynamicFormulaRuntime formulaRuntime = formulaRuntime();
+        if (formulaRuntime.hasBeforeUpdateRules()) {
+            formulaRuntime.beforeUpdate(record, activeRaw(record.getId()));
+        }
         validateChildPayload(record);
         validateFieldValues(record);
         validateTreePlacement(record);
@@ -524,6 +529,10 @@ public class DynamicEntityService implements
 
     private DynamicReferenceRuntime referenceRuntime() {
         return new DynamicReferenceRuntime(this);
+    }
+
+    private DynamicFormulaRuntime formulaRuntime() {
+        return new DynamicFormulaRuntime(dao.getEntity(), module);
     }
 
     private void requireCapability(EntityCapability capability) {

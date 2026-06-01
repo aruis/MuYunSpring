@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -19,6 +20,7 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +64,26 @@ class DynamicRelationRuntimeTest {
                 .containsEntry("invoice_id", id)
                 .containsEntry("deleted", Boolean.FALSE);
     }
+
+    @Test
+    void shouldApplyDynamicChildFormulaBeforeChildRowsAreInserted() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(formulaInvoiceModule());
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        DynamicRecord line = runtime.newRecord(MODULE, "invoice_line")
+                .setValue("quantity", BigDecimal.valueOf(3))
+                .setValue("price", BigDecimal.valueOf(11));
+        invoice.setChildren("lines", List.of(line));
+
+        runtime.entityService(MODULE, "invoice").insert(invoice);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        assertThat((BigDecimal) body.getAllValues().get(1).get("line_amount")).isEqualByComparingTo("33");
+    }
+
 
     @Test
     void shouldInsertDynamicChildrenWithCurrentTenant() {
@@ -886,6 +908,34 @@ class DynamicRelationRuntimeTest {
                 List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceTitle")
                         .withProjection("title", "invoiceDisplayTitle"))
+        );
+    }
+
+    private ModuleDefinition formulaInvoiceModule() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "app_invoice",
+                "Invoice",
+                List.of(FieldDefinition.titleField().required())
+        ).withCapabilities(EntityCapability.REFERENCE)
+                .withFormulaRules(new EntityFormulaRuleDefinition("lineAmountCalc",
+                        "SUM({lines.lineAmount} = {lines.quantity} * {lines.price})"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "app_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.string("invoiceId", "Invoice").column("invoice_id").length(64).required().indexed(),
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                )
+        );
+        return new ModuleDefinition(
+                MODULE,
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("lines", "invoice", "invoice_line", "invoiceId"))
         );
     }
 

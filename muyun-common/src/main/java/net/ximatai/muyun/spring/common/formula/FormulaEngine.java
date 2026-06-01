@@ -100,6 +100,14 @@ public class FormulaEngine {
         return FormulaExpressionSupport.parse(ruleId, expression, tokenizer);
     }
 
+    public Set<String> referencedFields(String expression) {
+        FormulaExpressionSupport.ParsedExpression parsed = parse("expression", expression);
+        if (parsed == null) {
+            return Set.of();
+        }
+        return FormulaExpressionSupport.referencedFields(parsed.ast());
+    }
+
     private void applyRule(
             FormulaRule rule,
             FormulaExpressionSupport.ParsedExpression parsed,

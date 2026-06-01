@@ -18,6 +18,8 @@ import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -123,6 +125,173 @@ class DynamicRecordDaoTest {
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
         assertThat(insertBody.getValue()).containsEntry("code", "HOOK-CODE");
+    }
+
+    @Test
+    void shouldApplyDynamicFormulaRulesBeforeInsert() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = formulaEntity();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(15));
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void shouldApplyDynamicFormulaRulesAfterLifecycleHooks() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = formulaEntity();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordLifecycle lifecycle = new DynamicRecordLifecycle() {
+            @Override
+            public void beforeInsert(DynamicRecord record) {
+                record.setValue("quantity", BigDecimal.valueOf(4));
+            }
+        };
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(15));
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract", lifecycle).insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("60");
+    }
+
+    @Test
+    void shouldApplyDynamicFormulaRulesWithExistingValuesBeforePartialUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = formulaEntity();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "quantity", BigDecimal.valueOf(2),
+                "price", BigDecimal.TEN,
+                "amount", BigDecimal.valueOf(20),
+                "deleted", Boolean.FALSE,
+                "version", 3
+        )));
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("price", BigDecimal.valueOf(15));
+        record.setId("contract-1");
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").update(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+        assertThat(body.getValue())
+                .containsEntry("price", BigDecimal.valueOf(15))
+                .doesNotContainKey("quantity");
+        assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void shouldIgnoreDisabledFormulaRulesWhenCheckingUpdateRules() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .calculation("amountCalc", "amount", "{quantity} * {price}")
+                .disabled());
+
+        assertThat(new DynamicFormulaRuntime(entity, null).hasBeforeUpdateRules()).isFalse();
+    }
+
+    @Test
+    void shouldRejectDynamicRecordWhenFormulaValidationFails() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(18, 2))
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("amountPositive", "amount", "{amount} > 0", "amount must be positive"));
+        DynamicRecord record = new DynamicRecord(entity).setValue("amount", BigDecimal.valueOf(-1));
+
+        assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract")
+                .insert(record))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic formula rule failed: amountPositive");
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDynamicFormulaRulesToChildRows() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(FieldDefinition.decimal("totalAmount", "Total Amount").column("total_amount").precision(18, 2))
+        ).withFormulaRules(new EntityFormulaRuleDefinition("lineAmountCalc",
+                "SUM({items.lineAmount} = {items.quantity} * {items.price})"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                )
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
+        );
+        DynamicRecord parent = new DynamicRecord(invoice);
+        DynamicRecord child = new DynamicRecord(line)
+                .setValue("quantity", BigDecimal.valueOf(3))
+                .setValue("price", BigDecimal.valueOf(11));
+        parent.setChildren("items", List.of(child));
+
+        new DynamicFormulaRuntime(invoice, module).beforeInsert(parent);
+
+        assertThat((BigDecimal) child.getValue("lineAmount")).isEqualByComparingTo("33");
+    }
+
+    @Test
+    void shouldSkipChildDependentFormulaRulesOnUpdateUntilChildRowsAreComplete() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(FieldDefinition.decimal("totalAmount", "Total Amount").column("total_amount").precision(18, 2))
+        ).withFormulaRules(new EntityFormulaRuleDefinition("totalAmountCalc",
+                "{totalAmount} = SUM({ items.lineAmount })"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2))
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
+        );
+        DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
+
+        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null);
+
+        assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("100");
     }
 
     @Test
@@ -829,6 +998,20 @@ class DynamicRecordDaoTest {
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
+    }
+
+    private EntityDefinition formulaEntity() {
+        return new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .calculation("amountCalc", "amount", "{quantity} * {price}"));
     }
 
     private EntityDefinition enabledEntity() {

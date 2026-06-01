@@ -58,6 +58,12 @@ class FormulaEngineTest {
     }
 
     @Test
+    void shouldExposeReferencedFormulaFieldsFromParsedExpression() {
+        assertThat(engine.referencedFields("{ total } = SUM({ items.lineAmount } = { items.qty } * {items.price})"))
+                .containsExactlyInAnyOrder("total", "items.lineAmount", "items.qty", "items.price");
+    }
+
+    @Test
     void shouldSupportDateAndDateTimeFunctions() {
         FormulaRuntimeData data = FormulaRuntimeData.of(new LinkedHashMap<>(Map.of(
                 "signedDate", "2026-06-01",

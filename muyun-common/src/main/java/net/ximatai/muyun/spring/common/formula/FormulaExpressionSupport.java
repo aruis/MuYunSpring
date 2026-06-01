@@ -3,10 +3,13 @@ package net.ximatai.muyun.spring.common.formula;
 import net.ximatai.muyun.spring.common.formula.FormulaAst.AssignNode;
 import net.ximatai.muyun.spring.common.formula.FormulaAst.AstNode;
 import net.ximatai.muyun.spring.common.formula.FormulaAst.BinaryNode;
+import net.ximatai.muyun.spring.common.formula.FormulaAst.FieldNode;
 import net.ximatai.muyun.spring.common.formula.FormulaAst.FuncNode;
 import net.ximatai.muyun.spring.common.formula.FormulaAst.UnaryNode;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 final class FormulaExpressionSupport {
     private FormulaExpressionSupport() {
@@ -79,6 +82,39 @@ final class FormulaExpressionSupport {
             return funcNode.args.stream().filter(Objects::nonNull).anyMatch(FormulaExpressionSupport::containsAssignment);
         }
         return false;
+    }
+
+    static Set<String> referencedFields(AstNode node) {
+        LinkedHashSet<String> fields = new LinkedHashSet<>();
+        collectReferencedFields(node, fields);
+        return Set.copyOf(fields);
+    }
+
+    private static void collectReferencedFields(AstNode node, Set<String> fields) {
+        if (node == null) {
+            return;
+        }
+        if (node instanceof FieldNode fieldNode) {
+            fields.add(FormulaFieldPath.parse(fieldNode.dataIndex).dataIndex());
+            return;
+        }
+        if (node instanceof AssignNode assignNode) {
+            collectReferencedFields(assignNode.left, fields);
+            collectReferencedFields(assignNode.right, fields);
+            return;
+        }
+        if (node instanceof UnaryNode unaryNode) {
+            collectReferencedFields(unaryNode.arg, fields);
+            return;
+        }
+        if (node instanceof BinaryNode binaryNode) {
+            collectReferencedFields(binaryNode.left, fields);
+            collectReferencedFields(binaryNode.right, fields);
+            return;
+        }
+        if (node instanceof FuncNode funcNode) {
+            funcNode.args.stream().filter(Objects::nonNull).forEach(arg -> collectReferencedFields(arg, fields));
+        }
     }
 
     static boolean hasNestedAssignment(AstNode node) {
