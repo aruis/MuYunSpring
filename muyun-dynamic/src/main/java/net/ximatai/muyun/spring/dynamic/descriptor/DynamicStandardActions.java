@@ -41,7 +41,9 @@ final class DynamicStandardActions {
                 configured.level(),
                 configured.permissionCode() == null
                         ? defaultPermissionCode(moduleAlias, entityCode, configured.actionCode())
-                        : configured.permissionCode()
+                        : configured.permissionCode(),
+                configured.hasAvailabilityCondition(),
+                configured.unavailableMessage()
         );
     }
 

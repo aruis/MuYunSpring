@@ -7,6 +7,9 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -99,6 +102,80 @@ class DynamicRecordServiceTest {
         assertThatThrownBy(() -> contracts.enable("contract-1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ENABLE");
+    }
+
+    @Test
+    void shouldEvaluateConfiguredActionAvailabilityThroughStableServiceApi() {
+        DynamicRecordService service = actionService(operations());
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        DynamicRecord submitted = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002")
+                .setValue("status", "submitted");
+
+        DynamicActionAvailability available = service.actionAvailability(MODULE, "submit", draft);
+        DynamicActionAvailability unavailable = service.entity(MODULE, "contract")
+                .actionAvailability("submit", submitted);
+
+        assertThat(service.action(MODULE, "submit").availabilityCondition()).isTrue();
+        assertThat(available.available()).isTrue();
+        assertThat(available.report().errors()).isEmpty();
+        assertThat(unavailable.available()).isFalse();
+        assertThat(unavailable.message()).isEqualTo("只有草稿合同可以提交");
+        assertThat(unavailable.report().errors()).singleElement()
+                .extracting(error -> error.phase())
+                .isEqualTo(net.ximatai.muyun.spring.common.formula.FormulaRulePhase.ACTION_AVAILABLE);
+        assertThat(service.module(MODULE).actionAvailability("submit", draft).available()).isTrue();
+    }
+
+    @Test
+    void shouldTreatStandardActionWithoutConditionAsAvailable() {
+        DynamicRecordService service = actionService(operations());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+
+        assertThat(service.entity(MODULE, "contract").actionAvailability("create", record).available()).isTrue();
+    }
+
+    @Test
+    void shouldMergeExistingValuesWhenEvaluatingActionAvailability() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
+        DynamicRecordService service = actionService(operations);
+        DynamicRecord partial = service.newRecord(MODULE, "contract");
+        partial.setId("contract-1");
+
+        assertThat(service.entity(MODULE, "contract").actionAvailability("submit", partial).available()).isTrue();
+    }
+
+    @Test
+    void shouldKeepNonMainEntityActionOutOfModuleActionAvailability() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionEntity(), lineEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                                "提交", true, EntityActionLevel.PRIMARY, null)
+                                .availableWhen("{status} == 'draft'"),
+                        new EntityActionDefinition("line", "submit", EntityActionKind.CUSTOM,
+                                "提交行", true, EntityActionLevel.NORMAL, null)
+                                .availableWhen("{summary} != ''")
+                ),
+                "contract"
+        );
+        DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(operations()).register(module));
+        DynamicRecord line = service.newRecord(MODULE, "line")
+                .setValue("summary", "ok");
+
+        assertThatThrownBy(() -> service.actionAvailability(MODULE, "submit", line))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic record entity mismatch: line");
     }
 
     @Test
@@ -539,6 +616,21 @@ class DynamicRecordServiceTest {
         return new DynamicRecordService(runtime);
     }
 
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                        "提交", true, EntityActionLevel.PRIMARY, "contract.submit")
+                        .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"))
+        );
+        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
+    }
+
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
@@ -560,6 +652,18 @@ class DynamicRecordServiceTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        );
+    }
+
+    private EntityDefinition actionEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("status", "Status").length(32)
                 )
         );
     }
@@ -656,6 +760,16 @@ class DynamicRecordServiceTest {
                 "amount", BigDecimal.TEN,
                 "deleted", deleted,
                 "version", version
+        );
+    }
+
+    private Map<String, Object> actionRow(String id, String code, String status) {
+        return Map.of(
+                "id", id,
+                "code", code,
+                "status", status,
+                "deleted", Boolean.FALSE,
+                "version", 0
         );
     }
 

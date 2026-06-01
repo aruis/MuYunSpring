@@ -20,9 +20,13 @@ import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityStandardActionCatalog;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
@@ -111,6 +115,17 @@ public class DynamicEntityService implements
 
     public ReferenceTarget referenceTarget() {
         return ReferenceTarget.of(moduleAlias, dao.getEntity().code());
+    }
+
+    public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
+        if (record != null) {
+            requireSameEntity(record);
+        }
+        EntityActionDefinition action = actionDefinition(actionCode);
+        DynamicRecord existing = record != null && record.getId() != null && !record.getId().isBlank()
+                ? activeRaw(record.getId())
+                : null;
+        return new DynamicActionAvailabilityRuntime(dao.getEntity(), module).evaluate(action, record, existing);
     }
 
     @Override
@@ -541,6 +556,36 @@ public class DynamicEntityService implements
 
     private DynamicFormulaRuntime formulaRuntime() {
         return new DynamicFormulaRuntime(moduleAlias, dao.getEntity(), module);
+    }
+
+    private EntityActionDefinition actionDefinition(String actionCode) {
+        if (actionCode == null || actionCode.isBlank()) {
+            throw new IllegalArgumentException("dynamic action code must not be blank");
+        }
+        EntityDefinition entity = dao.getEntity();
+        EntityActionDefinition configured = configuredAction(actionCode);
+        if (configured != null) {
+            return configured;
+        }
+        EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, actionCode);
+        if (standardKind == null) {
+            throw new IllegalArgumentException("unknown dynamic action: " + moduleAlias + "." + entity.code() + "." + actionCode);
+        }
+        return EntityStandardActionCatalog.from(entity).stream()
+                .filter(action -> action.actionCode().equals(actionCode))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private EntityActionDefinition configuredAction(String actionCode) {
+        if (module == null) {
+            return null;
+        }
+        return module.actions().stream()
+                .filter(action -> dao.getEntity().code().equals(action.entityCode()))
+                .filter(action -> action.actionCode().equals(actionCode))
+                .findFirst()
+                .orElse(null);
     }
 
     private Map<String, List<DynamicRecord>> existingChildrenForFormula(DynamicRecord record) {

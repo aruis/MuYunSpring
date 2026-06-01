@@ -2,20 +2,16 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaExecutionResult;
-import net.ximatai.muyun.spring.common.formula.FormulaFieldDefinition;
 import net.ximatai.muyun.spring.common.formula.FormulaRule;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeData;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicFormulaFieldDefinitions;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,9 +56,10 @@ final class DynamicFormulaRuntime {
         if (rules.isEmpty()) {
             return new FormulaRuntimeReport();
         }
-        Map<String, Object> main = mainValues(record, existing);
-        Map<String, List<Map<String, Object>>> tables = childValues(record);
-        FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(main, tables, fieldDefinitions()));
+        Map<String, Object> main = DynamicFormulaDataSupport.mainValues(record, existing);
+        Map<String, List<Map<String, Object>>> tables = DynamicFormulaDataSupport.childValues(record);
+        FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(
+                main, tables, DynamicFormulaDataSupport.fieldDefinitions(entity, module)));
         if (result.report().hasErrors()) {
             throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
@@ -78,9 +75,10 @@ final class DynamicFormulaRuntime {
         if (rules.isEmpty()) {
             return new FormulaRuntimeReport();
         }
-        Map<String, Object> main = mainValues(record, existing);
-        Map<String, List<Map<String, Object>>> tables = childValues(record, existingChildren);
-        FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(main, tables, fieldDefinitions()));
+        Map<String, Object> main = DynamicFormulaDataSupport.mainValues(record, existing);
+        Map<String, List<Map<String, Object>>> tables = DynamicFormulaDataSupport.childValues(record, existingChildren);
+        FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(
+                main, tables, DynamicFormulaDataSupport.fieldDefinitions(entity, module)));
         if (result.report().hasErrors()) {
             throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
         }
@@ -143,74 +141,6 @@ final class DynamicFormulaRuntime {
             }
         });
         return relations;
-    }
-
-    private List<FormulaFieldDefinition> fieldDefinitions() {
-        List<FormulaFieldDefinition> definitions = new ArrayList<>(DynamicFormulaFieldDefinitions.mainFields(entity));
-        if (module != null) {
-            for (EntityRelationDefinition relation : module.relations()) {
-                if (!entity.code().equals(relation.parentEntity())) {
-                    continue;
-                }
-                module.entities().stream()
-                        .filter(candidate -> relation.childEntity().equals(candidate.code()))
-                        .findFirst()
-                        .ifPresent(child -> definitions.addAll(
-                                DynamicFormulaFieldDefinitions.childFields(relation.code(), child)
-                        ));
-            }
-        }
-        return List.copyOf(definitions);
-    }
-
-    private Map<String, Object> mainValues(DynamicRecord record, DynamicRecord existing) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        if (existing != null) {
-            values.putAll(existing.getValues());
-        }
-        values.putAll(record.getValues());
-        return values;
-    }
-
-    private Map<String, List<Map<String, Object>>> childValues(DynamicRecord record) {
-        return childValues(record, Map.of());
-    }
-
-    private Map<String, List<Map<String, Object>>> childValues(DynamicRecord record,
-                                                               Map<String, List<DynamicRecord>> existingChildren) {
-        Map<String, List<Map<String, Object>>> values = new LinkedHashMap<>();
-        record.getChildren().forEach((relationCode, children) -> {
-            if (children == null) {
-                return;
-            }
-            Map<String, Map<String, Object>> existingById = existingChildrenById(existingChildren.get(relationCode));
-            values.put(relationCode, children.stream()
-                    .<Map<String, Object>>map(child -> mergedChildValues(child, existingById))
-                    .toList());
-        });
-        return values;
-    }
-
-    private Map<String, Map<String, Object>> existingChildrenById(List<DynamicRecord> children) {
-        Map<String, Map<String, Object>> values = new LinkedHashMap<>();
-        if (children == null) {
-            return values;
-        }
-        for (DynamicRecord child : children) {
-            if (child.getId() != null && !child.getId().isBlank()) {
-                values.put(child.getId(), new LinkedHashMap<>(child.getValues()));
-            }
-        }
-        return values;
-    }
-
-    private Map<String, Object> mergedChildValues(DynamicRecord child, Map<String, Map<String, Object>> existingById) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        if (child.getId() != null && !child.getId().isBlank() && existingById.containsKey(child.getId())) {
-            values.putAll(existingById.get(child.getId()));
-        }
-        values.putAll(child.getValues());
-        return values;
     }
 
     private void applyChangedFields(DynamicRecord record,

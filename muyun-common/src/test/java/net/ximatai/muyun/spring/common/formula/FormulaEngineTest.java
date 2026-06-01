@@ -64,6 +64,12 @@ class FormulaEngineTest {
     }
 
     @Test
+    void shouldExposeWhetherExpressionContainsAssignment() {
+        assertThat(engine.containsAssignment("{amount} > 0")).isFalse();
+        assertThat(engine.containsAssignment("{status} = 'submitted'")).isTrue();
+    }
+
+    @Test
     void shouldSupportDateAndDateTimeFunctions() {
         FormulaRuntimeData data = FormulaRuntimeData.of(new LinkedHashMap<>(Map.of(
                 "signedDate", "2026-06-01",

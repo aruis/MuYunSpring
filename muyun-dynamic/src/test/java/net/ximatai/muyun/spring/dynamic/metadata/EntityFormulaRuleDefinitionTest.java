@@ -117,6 +117,61 @@ class EntityFormulaRuleDefinitionTest {
     }
 
     @Test
+    void shouldRejectAssignmentInActionAvailabilityExpression() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
+                        "删除", true, EntityActionLevel.DANGER, null)
+                        .availableWhen("{status} = 'draft'"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("action available expression must not assign fields: delete");
+    }
+
+    @Test
+    void shouldRejectUnknownFieldInActionAvailabilityExpression() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
+                        "删除", true, EntityActionLevel.DANGER, null)
+                        .availableWhen("{statsu} == 'draft'"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("unknown action available expression field: invoice.statsu");
+    }
+
+    @Test
+    void shouldValidateChildFieldInActionAvailabilityExpression() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity(), invoiceLineEntity()),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId")),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
+                        "提交", true, EntityActionLevel.PRIMARY, null)
+                        .availableWhen("SUM({items.lineAmount}) > 0"))
+        );
+
+        validator.validate(module);
+    }
+
+    @Test
     void shouldRejectUnknownChildFormulaTargetField() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.invoice",

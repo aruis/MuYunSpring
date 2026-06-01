@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 import java.util.Optional;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -57,7 +58,7 @@ public class ModuleDefinitionValidator {
         }
         Set<String> actionKeys = new HashSet<>();
         for (EntityActionDefinition action : module.actions()) {
-            validateAction(action, entities);
+            validateAction(action, entities, module.relations());
             requireUnique(actionKeys, action.entityCode() + "." + action.actionCode(), "action");
         }
         Set<String> viewKeys = new HashSet<>();
@@ -311,6 +312,12 @@ public class ModuleDefinitionValidator {
     }
 
     public void validateAction(EntityActionDefinition action, Map<String, EntityDefinition> entities) {
+        validateAction(action, entities, List.of());
+    }
+
+    public void validateAction(EntityActionDefinition action,
+                               Map<String, EntityDefinition> entities,
+                               List<EntityRelationDefinition> relations) {
         if (action == null) {
             throw new ModuleDefinitionException("action must not be null");
         }
@@ -326,6 +333,7 @@ public class ModuleDefinitionValidator {
         if (action.permissionCode() != null && action.permissionCode().isBlank()) {
             throw new ModuleDefinitionException("action permission code must not be blank: " + action.actionCode());
         }
+        validateActionAvailability(action, entity, entities, relations);
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
         if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
             throw new ModuleDefinitionException("standard action is not supported by entity: "
@@ -338,6 +346,60 @@ public class ModuleDefinitionValidator {
         if (standardKind != null && standardKind != action.kind()) {
             throw new ModuleDefinitionException("standard action kind mismatch: "
                     + entity.code() + "." + action.actionCode());
+        }
+    }
+
+    private void validateActionAvailability(EntityActionDefinition action,
+                                            EntityDefinition entity,
+                                            Map<String, EntityDefinition> entities,
+                                            List<EntityRelationDefinition> relations) {
+        if (action.availableExpression() == null) {
+            return;
+        }
+        requireText(action.availableExpression(), "action available expression");
+        try {
+            Object parsed = formulaEngine.parse(action.actionCode(), action.availableExpression());
+            if (parsed == null) {
+                throw new ModuleDefinitionException("invalid action available expression: " + action.actionCode());
+            }
+            if (formulaEngine.containsAssignment(action.availableExpression())) {
+                throw new ModuleDefinitionException("action available expression must not assign fields: "
+                        + action.actionCode());
+            }
+            validateActionAvailabilityFields(action, entity, entities, relations);
+        } catch (FormulaEvaluationException e) {
+            throw new ModuleDefinitionException("invalid action available expression: "
+                    + action.actionCode() + ", " + e.getMessage());
+        }
+        if (action.unavailableMessage() != null && action.unavailableMessage().isBlank()) {
+            throw new ModuleDefinitionException("action unavailable message must not be blank: "
+                    + action.actionCode());
+        }
+    }
+
+    private void validateActionAvailabilityFields(EntityActionDefinition action,
+                                                  EntityDefinition entity,
+                                                  Map<String, EntityDefinition> entities,
+                                                  List<EntityRelationDefinition> relations) {
+        for (String fieldPath : formulaEngine.referencedFields(action.availableExpression())) {
+            if (!fieldPath.contains(".")) {
+                requireField(entity, fieldPath, "action available expression field");
+                continue;
+            }
+            String[] parts = fieldPath.split("\\.");
+            if (parts.length != 2) {
+                throw new ModuleDefinitionException("invalid action available expression field: "
+                        + action.actionCode() + "." + fieldPath);
+            }
+            EntityRelationDefinition relation = relations.stream()
+                    .filter(candidate -> entity.code().equals(candidate.parentEntity())
+                            && parts[0].equals(candidate.code()))
+                    .findFirst()
+                    .orElseThrow(() -> new ModuleDefinitionException("unknown action available expression relation: "
+                            + action.actionCode() + "." + parts[0]));
+            EntityDefinition childEntity = requireEntity(entities, relation.childEntity(),
+                    "action available expression child entity");
+            requireField(childEntity, parts[1], "action available expression field");
         }
     }
 

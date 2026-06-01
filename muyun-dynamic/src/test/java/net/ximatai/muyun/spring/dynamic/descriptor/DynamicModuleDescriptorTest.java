@@ -236,7 +236,8 @@ class DynamicModuleDescriptorTest {
                         new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
                                 "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
                         new EntityActionDefinition("customer", "delete", EntityActionKind.RECORD,
-                                "删除客户", false, EntityActionLevel.DANGER, null),
+                                "删除客户", false, EntityActionLevel.DANGER, null)
+                                .availableWhen("{status} == 'draft'", "只有草稿客户可删除"),
                         new EntityActionDefinition("customer", "exportData", EntityActionKind.CUSTOM,
                                 "导出", true, EntityActionLevel.NORMAL, "crm.customer.export")
                 )
@@ -254,8 +255,11 @@ class DynamicModuleDescriptorTest {
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("delete")).findFirst())
                 .get()
-                .extracting(DynamicActionDescriptor::enabled)
-                .isEqualTo(false);
+                .satisfies(action -> {
+                    assertThat(action.enabled()).isFalse();
+                    assertThat(action.availabilityCondition()).isTrue();
+                    assertThat(action.unavailableMessage()).isEqualTo("只有草稿客户可删除");
+                });
         assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
                 .get()
                 .satisfies(action -> {

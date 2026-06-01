@@ -55,12 +55,27 @@ public class DynamicRecordService {
         return findAction(describe(moduleAlias), actionCode);
     }
 
+    public DynamicActionAvailability actionAvailability(String moduleAlias, String actionCode, DynamicRecord record) {
+        DynamicModuleDescriptor descriptor = describe(moduleAlias);
+        findAction(descriptor, actionCode);
+        return entityService(moduleAlias, runtime.registry().requireModule(moduleAlias).mainEntityCode())
+                .actionAvailability(actionCode, record);
+    }
+
     public List<DynamicActionDescriptor> actions(String moduleAlias, String entityCode) {
         return entityDescriptor(moduleAlias, entityCode).actions();
     }
 
     public DynamicActionDescriptor action(String moduleAlias, String entityCode, String actionCode) {
         return findAction(moduleAlias, entityDescriptor(moduleAlias, entityCode), actionCode);
+    }
+
+    public DynamicActionAvailability actionAvailability(String moduleAlias,
+                                                        String entityCode,
+                                                        String actionCode,
+                                                        DynamicRecord record) {
+        findAction(moduleAlias, entityDescriptor(moduleAlias, entityCode), actionCode);
+        return entityService(moduleAlias, entityCode).actionAvailability(actionCode, record);
     }
 
     public List<DynamicViewDescriptor> views(String moduleAlias, String entityCode) {
@@ -289,6 +304,10 @@ public class DynamicRecordService {
             return service.action(moduleAlias, actionCode);
         }
 
+        public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
+            return service.actionAvailability(moduleAlias, actionCode, record);
+        }
+
         public List<DynamicEntityDescriptor> entities() {
             return describe().entities();
         }
@@ -335,6 +354,10 @@ public class DynamicRecordService {
 
         public DynamicActionDescriptor action(String actionCode) {
             return service.action(moduleAlias, entityCode, actionCode);
+        }
+
+        public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
+            return service.actionAvailability(moduleAlias, entityCode, actionCode, record);
         }
 
         public List<DynamicReferenceDescriptor> references() {

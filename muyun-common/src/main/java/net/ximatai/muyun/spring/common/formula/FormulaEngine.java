@@ -108,6 +108,11 @@ public class FormulaEngine {
         return FormulaExpressionSupport.referencedFields(parsed.ast());
     }
 
+    public boolean containsAssignment(String expression) {
+        FormulaExpressionSupport.ParsedExpression parsed = parse("expression", expression);
+        return parsed != null && FormulaExpressionSupport.containsAssignment(parsed.ast());
+    }
+
     private void applyRule(
             FormulaRule rule,
             FormulaExpressionSupport.ParsedExpression parsed,
