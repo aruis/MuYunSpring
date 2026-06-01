@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.runtime;
+package net.ximatai.muyun.spring.dynamic.schema;
 
 import net.ximatai.muyun.database.core.builder.Column;
 import net.ximatai.muyun.database.core.builder.TableWrapper;

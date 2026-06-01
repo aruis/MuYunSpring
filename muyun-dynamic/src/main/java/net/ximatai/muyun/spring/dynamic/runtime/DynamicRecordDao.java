@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
+import net.ximatai.muyun.spring.dynamic.runtime.mapping.DynamicRecordMapping;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;

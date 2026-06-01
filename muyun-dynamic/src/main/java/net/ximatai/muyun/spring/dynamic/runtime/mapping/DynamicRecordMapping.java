@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.runtime;
+package net.ximatai.muyun.spring.dynamic.runtime.mapping;
 
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -7,10 +7,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import java.util.HashMap;
 import java.util.Map;
 
-final class DynamicRecordMapping {
+public final class DynamicRecordMapping {
     private final Map<String, String> columns = new HashMap<>();
 
-    DynamicRecordMapping(EntityDefinition entity) {
+    public DynamicRecordMapping(EntityDefinition entity) {
         columns.put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
         columns.put(StandardEntitySchema.ID_COLUMN, StandardEntitySchema.ID_COLUMN);
         columns.put(StandardEntitySchema.TENANT_ID_FIELD, StandardEntitySchema.TENANT_ID_COLUMN);
@@ -35,7 +35,7 @@ final class DynamicRecordMapping {
         }
     }
 
-    String resolveColumn(String fieldOrColumn) {
+    public String resolveColumn(String fieldOrColumn) {
         String column = columns.get(fieldOrColumn);
         if (column == null) {
             throw new IllegalArgumentException("unknown dynamic field or column: " + fieldOrColumn);

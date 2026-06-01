@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.runtime;
+package net.ximatai.muyun.spring.dynamic.schema;
 
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.title.TitleField;

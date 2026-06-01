@@ -1,8 +1,10 @@
-package net.ximatai.muyun.spring.dynamic.runtime;
+package net.ximatai.muyun.spring.dynamic.publish;
 
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 
 import java.util.Map;
 import java.util.Objects;

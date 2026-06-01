@@ -2,9 +2,9 @@ package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicSchemaService;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;

@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;

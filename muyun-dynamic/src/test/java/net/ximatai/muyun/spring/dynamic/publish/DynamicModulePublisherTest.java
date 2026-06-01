@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.runtime;
+package net.ximatai.muyun.spring.dynamic.publish;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

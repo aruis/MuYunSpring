@@ -2,8 +2,8 @@ package net.ximatai.muyun.spring.platform.publish;
 
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicModulePublishResult;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
+import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import org.springframework.stereotype.Service;
 
 @Service
