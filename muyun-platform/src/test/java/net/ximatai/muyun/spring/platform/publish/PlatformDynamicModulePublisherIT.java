@@ -3,7 +3,11 @@ package net.ximatai.muyun.spring.platform.publish;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -47,7 +51,6 @@ import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -104,7 +107,16 @@ class PlatformDynamicModulePublisherIT {
         services.fieldService.insert(status);
         MetadataFieldConfig statusConfig = fieldConfig(status.getId());
         statusConfig.setDictionaryCategoryAlias("customer_status");
+        statusConfig.setDefaultValue("active");
+        statusConfig.setValidationRegex("[a-z_]+");
+        statusConfig.setCopyable(false);
         services.fieldConfigService.insert(statusConfig);
+        MetadataField serverCode = field(customerMetadataId, "serverCode", "server_code", FieldType.STRING);
+        services.fieldService.insert(serverCode);
+        MetadataFieldConfig serverCodeConfig = fieldConfig(serverCode.getId());
+        serverCodeConfig.setDefaultValue("SYS");
+        serverCodeConfig.setWriteProtected(true);
+        services.fieldConfigService.insert(serverCodeConfig);
         services.fieldService.insert(titleField(contactMetadataId));
         MetadataField customerIdField = field(contactMetadataId, "customerId", "customer_id", FieldType.STRING);
         services.fieldService.insert(customerIdField);
@@ -113,8 +125,15 @@ class PlatformDynamicModulePublisherIT {
         customerReference.setTitleOutputField("customerTitle");
         customerReference.setProjectionMappings("code:customerCode");
         services.referenceConfigService.insert(customerReference);
-        services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        String mainRelationId = services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
         services.relationService.insert(childRelation("crm.customer", contactMetadataId, customerMetadataId));
+        String formViewId = services.viewService.insert(metadataView(mainRelationId, EntityViewType.FORM, "客户表单"));
+        MetadataViewField statusViewField = metadataViewField(formViewId, status.getId());
+        statusViewField.setControlType(ViewControlType.SELECT);
+        services.viewFieldService.insert(statusViewField);
+        MetadataAction createAction = metadataAction(mainRelationId, "create", EntityActionKind.RECORD);
+        createAction.setPermissionCode("crm.customer.create");
+        services.actionService.insert(createAction);
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             String schemeId = services.schemeService.insert(menuScheme("main"));
             services.menuService.insert(moduleMenu(schemeId, "客户", "crm.customer"));
@@ -139,7 +158,8 @@ class PlatformDynamicModulePublisherIT {
         );
 
         publisher.publish("crm.customer");
-        DynamicRecordService.EntityOperations customer = new DynamicRecordService(runtime).entity("crm.customer", "customer");
+        DynamicRecordService runtimeService = new DynamicRecordService(runtime);
+        DynamicRecordService.EntityOperations customer = runtimeService.entity("crm.customer", "customer");
         DynamicRecord contact = runtime.newRecord("crm.customer", "customer_contact")
                 .setValue("title", "张三");
         DynamicRecord record = customer.newRecord()
@@ -148,13 +168,52 @@ class PlatformDynamicModulePublisherIT {
                 .setValue("status", "active")
                 .setChildren("contacts", List.of(contact));
         String id = customer.create(record);
+        DynamicRecord defaulted = customer.newRecord()
+                .setValue("title", "客户B")
+                .setValue("code", "C-002");
+        String defaultedId = customer.create(defaulted);
 
         DynamicRecord selected = customer.select(id);
 
         assertThat(categoryId).isNotBlank();
+        assertThat(runtime.registry().requireModule("crm.customer").mainEntityCode()).isEqualTo("customer");
+        assertThat(runtimeService.module("crm.customer").action("create").permissionCode()).isEqualTo("crm.customer.create");
+        assertThat(customer.action("create").permissionCode()).isEqualTo("crm.customer.create");
+        assertThat(customer.view(EntityViewType.FORM).title()).isEqualTo("客户表单");
+        assertThat(customer.view(EntityViewType.FORM).fields())
+                .extracting(field -> field.fieldName())
+                .contains("status");
+        assertThat(customer.view(EntityViewType.FORM).fields().stream()
+                .filter(field -> field.fieldName().equals("status"))
+                .findFirst())
+                .get()
+                .extracting(field -> field.controlType())
+                .isEqualTo(ViewControlType.SELECT);
+        assertThat(customer.describe().fields().stream()
+                .filter(field -> field.fieldName().equals("status"))
+                .findFirst())
+                .get()
+                .satisfies(field -> {
+                    assertThat(field.defaultValue()).isEqualTo("active");
+                    assertThat(field.validationRegex()).isEqualTo("[a-z_]+");
+                    assertThat(field.copyable()).isFalse();
+                });
+        assertThat(customer.describe().fields().stream()
+                .filter(field -> field.fieldName().equals("serverCode"))
+                .findFirst())
+                .get()
+                .satisfies(field -> {
+                    assertThat(field.defaultValue()).isEqualTo("SYS");
+                    assertThat(field.writeProtected()).isTrue();
+                });
+        assertThat(runtimeService.module("crm.customer").associationViews())
+                .extracting(view -> view.code())
+                .contains("contacts", "customerId");
         assertThat(services.itemService.resolveItem("crm", "customer_status", "active").getCode()).isEqualTo("active");
         assertThat(selected.getValue("title")).isEqualTo("客户A");
         assertThat(selected.getValue("status")).isEqualTo("active");
+        assertThat(selected.getValue("serverCode")).isEqualTo("SYS");
+        assertThat(customer.select(defaultedId).getValue("status")).isEqualTo("active");
         assertThat(selected.getChildren("contacts"))
                 .hasSize(1)
                 .first()
@@ -173,6 +232,13 @@ class PlatformDynamicModulePublisherIT {
         assertThatThrownBy(() -> customer.create(invalid))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dictionary code");
+        DynamicRecord protectedWrite = customer.newRecord()
+                .setValue("title", "客户C")
+                .setValue("code", "C-003")
+                .setValue("serverCode", "MANUAL");
+        assertThatThrownBy(() -> customer.create(protectedWrite))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("write protected");
     }
 
     private PlatformServices platformServices() {
@@ -275,6 +341,29 @@ class PlatformDynamicModulePublisherIT {
         MetadataFieldConfig config = new MetadataFieldConfig();
         config.setMetadataFieldId(fieldId);
         return config;
+    }
+
+    private MetadataView metadataView(String relationId, EntityViewType viewType, String title) {
+        MetadataView view = new MetadataView();
+        view.setRelationId(relationId);
+        view.setViewType(viewType);
+        view.setTitle(title);
+        return view;
+    }
+
+    private MetadataViewField metadataViewField(String viewId, String fieldId) {
+        MetadataViewField viewField = new MetadataViewField();
+        viewField.setViewId(viewId);
+        viewField.setMetadataFieldId(fieldId);
+        return viewField;
+    }
+
+    private MetadataAction metadataAction(String relationId, String actionCode, EntityActionKind kind) {
+        MetadataAction action = new MetadataAction();
+        action.setRelationId(relationId);
+        action.setActionCode(actionCode);
+        action.setActionKind(kind);
+        return action;
     }
 
     private MetadataFieldReferenceConfig referenceConfig(String fieldId, String targetMetadataId) {

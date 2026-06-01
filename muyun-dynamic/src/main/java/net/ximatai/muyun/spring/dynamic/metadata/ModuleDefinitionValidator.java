@@ -35,6 +35,9 @@ public class ModuleDefinitionValidator {
         }
         Map<String, EntityDefinition> entities = module.entities().stream()
                 .collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
+        if (module.mainEntityCode() != null) {
+            requireEntity(entities, module.mainEntityCode(), "module main entity");
+        }
         Set<String> relationCodes = new HashSet<>();
         for (EntityRelationDefinition relation : module.relations()) {
             validateRelation(relation, entities);

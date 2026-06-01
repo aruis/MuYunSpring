@@ -131,12 +131,13 @@ class DynamicModuleDescriptorTest {
                 "crm.customer",
                 "Customer",
                 List.of(
-                        new EntityDefinition("customer", "crm_customer", "Customer",
-                                List.of(FieldDefinition.titleField())),
                         new EntityDefinition("contact", "crm_contact", "Contact",
+                                List.of(FieldDefinition.titleField())),
+                        new EntityDefinition("customer", "crm_customer", "Customer",
                                 List.of(FieldDefinition.titleField()))
                 ),
                 List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(
@@ -144,7 +145,8 @@ class DynamicModuleDescriptorTest {
                                 "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
                         new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
                                 "导出联系人", true, EntityActionLevel.NORMAL, "crm.contact.export")
-                )
+                ),
+                "customer"
         );
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
@@ -157,7 +159,7 @@ class DynamicModuleDescriptorTest {
                 .get()
                 .extracting(DynamicActionDescriptor::title)
                 .isEqualTo("新建客户");
-        assertThat(descriptor.entities().get(1).actions())
+        assertThat(descriptor.entities().getFirst().actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("exportContact");
     }

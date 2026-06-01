@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
 import java.util.List;
 
@@ -43,7 +44,12 @@ public record DynamicModuleDescriptor(
         if (entities == null || entities.isEmpty()) {
             return List.of();
         }
-        return DynamicEntityDescriptor.from(module.moduleAlias(), entities.getFirst(), module.views(),
+        EntityDefinition mainEntity = entities.stream()
+                .filter(entity -> entity.code().equals(module.mainEntityCode()))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("module main entity not found: "
+                        + module.moduleAlias() + "." + module.mainEntityCode()));
+        return DynamicEntityDescriptor.from(module.moduleAlias(), mainEntity, module.views(),
                 module.associationViews(), module.actions()).actions();
     }
 }

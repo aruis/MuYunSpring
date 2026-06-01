@@ -10,17 +10,18 @@ public record ModuleDefinition(
         List<EntityReferenceDefinition> references,
         List<EntityViewDefinition> views,
         List<EntityAssociationViewDefinition> associationViews,
-        List<EntityActionDefinition> actions
+        List<EntityActionDefinition> actions,
+        String mainEntityCode
 ) {
     public ModuleDefinition(String moduleAlias, String name, List<EntityDefinition> entities) {
-        this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of(), List.of());
+        this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of(), List.of(), null);
     }
 
     public ModuleDefinition(String moduleAlias,
                             String name,
                             List<EntityDefinition> entities,
                             List<EntityRelationDefinition> relations) {
-        this(moduleAlias, name, entities, relations, List.of(), List.of(), List.of(), List.of());
+        this(moduleAlias, name, entities, relations, List.of(), List.of(), List.of(), List.of(), null);
     }
 
     public ModuleDefinition(String moduleAlias,
@@ -28,7 +29,7 @@ public record ModuleDefinition(
                             List<EntityDefinition> entities,
                             List<EntityRelationDefinition> relations,
                             List<EntityReferenceDefinition> references) {
-        this(moduleAlias, name, entities, relations, references, List.of(), List.of(), List.of());
+        this(moduleAlias, name, entities, relations, references, List.of(), List.of(), List.of(), null);
     }
 
     public ModuleDefinition(String moduleAlias,
@@ -37,7 +38,7 @@ public record ModuleDefinition(
                             List<EntityRelationDefinition> relations,
                             List<EntityReferenceDefinition> references,
                             List<EntityViewDefinition> views) {
-        this(moduleAlias, name, entities, relations, references, views, List.of(), List.of());
+        this(moduleAlias, name, entities, relations, references, views, List.of(), List.of(), null);
     }
 
     public ModuleDefinition(String moduleAlias,
@@ -47,7 +48,18 @@ public record ModuleDefinition(
                             List<EntityReferenceDefinition> references,
                             List<EntityViewDefinition> views,
                             List<EntityActionDefinition> actions) {
-        this(moduleAlias, name, entities, relations, references, views, List.of(), actions);
+        this(moduleAlias, name, entities, relations, references, views, List.of(), actions, null);
+    }
+
+    public ModuleDefinition(String moduleAlias,
+                            String name,
+                            List<EntityDefinition> entities,
+                            List<EntityRelationDefinition> relations,
+                            List<EntityReferenceDefinition> references,
+                            List<EntityViewDefinition> views,
+                            List<EntityAssociationViewDefinition> associationViews,
+                            List<EntityActionDefinition> actions) {
+        this(moduleAlias, name, entities, relations, references, views, associationViews, actions, null);
     }
 
     public ModuleDefinition {
@@ -57,6 +69,9 @@ public record ModuleDefinition(
         views = views == null ? List.of() : List.copyOf(views);
         associationViews = associationViews == null ? List.of() : List.copyOf(associationViews);
         actions = actions == null ? List.of() : List.copyOf(actions);
+        if (mainEntityCode == null || mainEntityCode.isBlank()) {
+            mainEntityCode = entities.isEmpty() ? null : entities.getFirst().code();
+        }
     }
 
     public String code() {
