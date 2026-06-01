@@ -161,7 +161,7 @@ class FormulaEngineTest {
     }
 
     @Test
-    void shouldStopOnReportedErrorAndRejectNestedAssignment() {
+    void shouldRollbackNestedAssignmentsWhenRuleFails() {
         Map<String, Object> main = new LinkedHashMap<>();
         FormulaRuntimeData data = FormulaRuntimeData.of(main);
 
@@ -173,8 +173,38 @@ class FormulaEngineTest {
 
         assertThat(report.errors()).singleElement()
                 .extracting(FormulaRuntimeReport.Issue::code)
-                .isEqualTo("FORMULA_ASSIGNMENT_SCOPE_ERROR");
+                .isEqualTo("FORMULA_UNKNOWN_FUNCTION");
         assertThat(main).doesNotContainKeys("a", "b");
+    }
+
+    @Test
+    void shouldCommitNestedAssignmentsAfterRuleSucceeds() {
+        Map<String, Object> main = new LinkedHashMap<>(Map.of("flag", true));
+        FormulaRuntimeData data = FormulaRuntimeData.of(main);
+
+        FormulaExecutionResult result = engine.execute(List.of(
+                new FormulaRule("nested", "IF({flag}, {a} = 1, {b} = 2) + ({c} = {a} + 3)")
+        ), data);
+
+        assertThat(result.report().errors()).isEmpty();
+        assertThat(result.changedFields()).containsExactly("a", "c");
+        assertThat(main).containsEntry("a", 1d)
+                .containsEntry("c", 4d)
+                .doesNotContainKey("b");
+    }
+
+    @Test
+    void shouldLetNestedAssignmentReadStagedValuesFromLeftToRight() {
+        Map<String, Object> main = new LinkedHashMap<>(Map.of("a", 10));
+        FormulaRuntimeData data = FormulaRuntimeData.of(main);
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("leftToRight", "({a} = 1) + ({b} = {a} + 2) + ({a} = 5)")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(main).containsEntry("a", 5d)
+                .containsEntry("b", 3d);
     }
 
     @Test
@@ -261,6 +291,103 @@ class FormulaEngineTest {
 
         assertThat(report.errors()).isEmpty();
         assertThat(main).containsEntry("total", new BigDecimal("0.0"));
+    }
+
+    @Test
+    void shouldCommitChildRowAssignmentsAfterAggregateRuleSucceeds() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        Map<String, Object> first = new LinkedHashMap<>(Map.of("qty", 2, "price", 10));
+        Map<String, Object> second = new LinkedHashMap<>(Map.of("qty", 3, "price", 20));
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(first, second)), List.of(
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("items.price", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.lineAmount", FormulaValueType.DECIMAL)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("lineAndTotal", "{total} = SUM({items.lineAmount} = {items.qty} * {items.price})")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(first).containsEntry("lineAmount", new BigDecimal("20.0"));
+        assertThat(second).containsEntry("lineAmount", new BigDecimal("60.0"));
+        assertThat(main).containsEntry("total", new BigDecimal("80.0"));
+    }
+
+    @Test
+    void shouldNotRewriteChildRowsForReadOnlyAggregate() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        Map<String, Object> immutableChild = Map.of("qty", 2);
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(immutableChild)), List.of(
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("total", "SUM({items.qty})", FormulaRuleKind.CALCULATION,
+                        FormulaRulePhase.BEFORE_SAVE, "total")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(main).containsEntry("total", new BigDecimal("2.0"));
+    }
+
+    @Test
+    void shouldNotCommitMainWriteWhenChildWriteCommitFails() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        Map<String, Object> immutableChild = Map.of("qty", 2, "price", 10);
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(immutableChild)), List.of(
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("items.price", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.lineAmount", FormulaValueType.DECIMAL)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("lineAndTotal", "{total} = SUM({items.lineAmount} = {items.qty} * {items.price})")
+        ), data);
+
+        assertThat(report.errors()).isNotEmpty();
+        assertThat(main).doesNotContainKey("total");
+    }
+
+    @Test
+    void shouldRollbackCommittedChildRowsWhenLaterChildWriteFails() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        Map<String, Object> first = new LinkedHashMap<>(Map.of("qty", 2, "price", 10));
+        Map<String, Object> immutableSecond = Map.of("qty", 3, "price", 20);
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(first, immutableSecond)), List.of(
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("items.price", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.lineAmount", FormulaValueType.DECIMAL)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("lineAndTotal", "{total} = SUM({items.lineAmount} = {items.qty} * {items.price})")
+        ), data);
+
+        assertThat(report.errors()).isNotEmpty();
+        assertThat(first).doesNotContainKey("lineAmount");
+        assertThat(immutableSecond).doesNotContainKey("lineAmount");
+        assertThat(main).doesNotContainKey("total");
+    }
+
+    @Test
+    void shouldRejectAssignmentInValidationRule() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        FormulaRuntimeData data = FormulaRuntimeData.of(main);
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("badValidation", "{a} = 1", FormulaRuleKind.VALIDATION,
+                        FormulaRulePhase.BEFORE_SAVE, "a", FormulaIssueLevel.ERROR, null, false, true)
+        ), data);
+
+        assertThat(report.errors()).singleElement()
+                .extracting(FormulaRuntimeReport.Issue::code)
+                .isEqualTo("FORMULA_ASSIGNMENT_NOT_ALLOWED");
+        assertThat(main).doesNotContainKey("a");
     }
 
     @Test

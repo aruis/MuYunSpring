@@ -8,4 +8,11 @@ public interface FormulaEvaluationContext {
     FormulaFieldWriteResult set(FormulaFieldPath fieldPath, Object value, FormulaEvaluationScope scope);
 
     List<?> rows(String tableKey);
+
+    default FormulaEvaluationSession beginSession() {
+        throw new FormulaEvaluationException(
+                "FORMULA_STAGED_SESSION_REQUIRED",
+                "formula calculation requires staged evaluation context"
+        );
+    }
 }

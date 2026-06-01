@@ -110,6 +110,11 @@ public class FormulaEngine {
             applyCalculationRule(rule, parsed, data, result);
             return;
         }
+        if (FormulaExpressionSupport.containsAssignment(parsed.ast())) {
+            result.report().error(rule, "FORMULA_ASSIGNMENT_NOT_ALLOWED", rule.targetField(), null, parsed.expression(),
+                    "formula assignment is only allowed in calculation rules");
+            return;
+        }
         boolean passed = toBoolean(eval(parsed.ast(), data, FormulaEvaluationScope.main()).value());
         result.decide(rule, passed);
         if (!passed) {
@@ -124,21 +129,15 @@ public class FormulaEngine {
             FormulaEvaluationContext data,
             FormulaExecutionResult result
     ) {
-        if (FormulaExpressionSupport.hasNestedAssignment(parsed.ast())) {
-            result.report().error(rule, "FORMULA_ASSIGNMENT_SCOPE_ERROR", rule.targetField(), null, parsed.expression(),
-                    "formula assignment must be the top-level expression");
-            return;
-        }
+        FormulaEvaluationSession session = data.beginSession();
         if (rule.targetField() != null && !FormulaExpressionSupport.containsAssignment(parsed.ast())) {
-            EvalResult evalResult = eval(parsed.ast(), data, FormulaEvaluationScope.main());
-            FormulaFieldWriteResult writeResult = data.set(
+            EvalResult evalResult = eval(parsed.ast(), session, FormulaEvaluationScope.main());
+            session.set(
                     FormulaFieldPath.parse(rule.targetField()),
                     normalizeCalculatedValue(evalResult.value()),
                     FormulaEvaluationScope.main()
             );
-            if (writeResult.changed()) {
-                result.changed(writeResult.fieldPath());
-            }
+            commitSession(session, result);
             return;
         }
         if (!FormulaExpressionSupport.containsAssignment(parsed.ast())) {
@@ -146,8 +145,20 @@ public class FormulaEngine {
                     "calculation formula requires assignment or target field");
             return;
         }
-        EvalResult evalResult = eval(parsed.ast(), data, FormulaEvaluationScope.main());
-        evalResult.changedFields().forEach(result::changed);
+        try {
+            eval(parsed.ast(), session, FormulaEvaluationScope.main());
+            commitSession(session, result);
+        } catch (RuntimeException ex) {
+            session.rollback();
+            throw ex;
+        }
+    }
+
+    private void commitSession(FormulaEvaluationSession session, FormulaExecutionResult result) {
+        session.commit().stream()
+                .filter(FormulaFieldWriteResult::changed)
+                .map(FormulaFieldWriteResult::fieldPath)
+                .forEach(result::changed);
     }
 
     private EvalResult eval(AstNode node, FormulaEvaluationContext data, FormulaEvaluationScope context) {
@@ -280,9 +291,7 @@ public class FormulaEngine {
             FormulaEvaluationScope rowContext = tableKey == null ? context : FormulaEvaluationScope.row(tableKey, row);
             for (AstNode arg : node.args) {
                 EvalResult value = eval(arg, data, rowContext);
-                if (!(arg instanceof AssignNode)) {
-                    bucket.add(value.value());
-                }
+                bucket.add(value.value());
                 changed = changed || value.changed();
             }
         }
