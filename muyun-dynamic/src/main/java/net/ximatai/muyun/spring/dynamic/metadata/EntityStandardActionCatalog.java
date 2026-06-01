@@ -10,10 +10,12 @@ public final class EntityStandardActionCatalog {
     public static List<EntityActionDefinition> from(EntityDefinition entity) {
         List<EntityActionDefinition> actions = new ArrayList<>();
         if (entity.supports(EntityCapability.CRUD)) {
-            actions.add(action(entity, "create", EntityActionKind.RECORD, "Create", EntityActionLevel.PRIMARY));
-            actions.add(action(entity, "select", EntityActionKind.RECORD, "Select"));
+            actions.add(action(entity, "create", EntityActionKind.RECORD, "Create", EntityActionLevel.LIST,
+                    EntityActionStyle.PRIMARY));
+            actions.add(action(entity, "select", EntityActionKind.RECORD, "Select", EntityActionLevel.RECORD,
+                    EntityActionStyle.NORMAL));
             actions.add(action(entity, "update", EntityActionKind.RECORD, "Update"));
-            actions.add(action(entity, "delete", EntityActionKind.RECORD, "Delete", EntityActionLevel.DANGER));
+            actions.add(action(entity, "delete", EntityActionKind.RECORD, "Delete", EntityActionStyle.DANGER));
             actions.add(action(entity, "list", EntityActionKind.COLLECTION, "List"));
             actions.add(action(entity, "page", EntityActionKind.COLLECTION, "Page"));
             actions.add(action(entity, "count", EntityActionKind.QUERY, "Count"));
@@ -64,14 +66,24 @@ public final class EntityStandardActionCatalog {
                                                  String actionCode,
                                                  EntityActionKind kind,
                                                  String title) {
-        return action(entity, actionCode, kind, title, EntityActionLevel.NORMAL);
+        return action(entity, actionCode, kind, title, EntityActionStyle.NORMAL);
     }
 
     private static EntityActionDefinition action(EntityDefinition entity,
                                                  String actionCode,
                                                  EntityActionKind kind,
                                                  String title,
-                                                 EntityActionLevel level) {
-        return new EntityActionDefinition(entity.code(), actionCode, kind, title, true, level, null);
+                                                 EntityActionStyle style) {
+        return action(entity, actionCode, kind, title, null, style);
+    }
+
+    private static EntityActionDefinition action(EntityDefinition entity,
+                                                 String actionCode,
+                                                 EntityActionKind kind,
+                                                 String title,
+                                                 EntityActionLevel actionLevel,
+                                                 EntityActionStyle style) {
+        return new EntityActionDefinition(entity.code(), actionCode, kind, title, true, actionLevel, style,
+                null, null, null, null, null, null, null, null, null);
     }
 }

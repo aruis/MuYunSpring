@@ -4,8 +4,12 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -20,8 +24,8 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
-import net.ximatai.muyun.spring.platform.metadata.MetadataAction;
-import net.ximatai.muyun.spring.platform.metadata.MetadataActionService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
@@ -60,7 +64,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
-    private final TestMemoryDao<MetadataAction> actionDao = new TestMemoryDao<>();
+    private final TestMemoryDao<ModuleMetadataAction> actionDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -80,7 +84,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
-    private final MetadataActionService actionService = new MetadataActionService(actionDao, relationService);
+    private final ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
                     referenceConfigService, relationService, viewService, viewFieldService, actionService);
@@ -345,18 +349,26 @@ class PlatformModuleDefinitionCompilerTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        MetadataAction create = metadataAction(relationId, "create", EntityActionKind.RECORD);
+        ModuleMetadataAction create = metadataAction(relationId, "create", EntityActionKind.RECORD);
         create.setTitle("新建客户");
-        create.setActionLevel(EntityActionLevel.PRIMARY);
-        create.setPermissionCode("crm.customer.create");
+        create.setActionStyle(EntityActionStyle.PRIMARY);
+        create.setAvailableExpression("{title} != ''");
+        create.setUnavailableMessage("客户名称不能为空");
         actionService.insert(create);
-        MetadataAction delete = metadataAction(relationId, "delete", EntityActionKind.RECORD);
+        ModuleMetadataAction delete = metadataAction(relationId, "delete", EntityActionKind.RECORD);
         delete.setEnabled(false);
         delete.setTitle("删除客户");
-        delete.setActionLevel(EntityActionLevel.DANGER);
+        delete.setActionStyle(EntityActionStyle.DANGER);
         actionService.insert(delete);
-        MetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
+        ModuleMetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
         export.setTitle("导出");
+        export.setCategory(EntityActionCategory.DIALOG);
+        export.setActionLevel(EntityActionLevel.LIST);
+        export.setAccessMode(EntityActionAccessMode.AUTH_REQUIRED);
+        export.setDataAuth(true);
+        export.setAuthInheritAlias("create");
+        export.setExecutorType(EntityActionExecutorType.DIALOG);
+        export.setExecutorKey("customerExportDialog");
         actionService.insert(export);
 
         ModuleDefinition definition = compiler.compile("crm.customer");
@@ -370,21 +382,31 @@ class PlatformModuleDefinitionCompilerTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.title()).isEqualTo("新建客户");
-                    assertThat(action.level()).isEqualTo(EntityActionLevel.PRIMARY);
-                    assertThat(action.permissionCode()).isEqualTo("crm.customer.create");
+                    assertThat(action.style()).isEqualTo(EntityActionStyle.PRIMARY);
+                    assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
+                    assertThat(action.availabilityCondition()).isTrue();
+                    assertThat(action.unavailableMessage()).isEqualTo("客户名称不能为空");
                     assertThat(action.enabled()).isTrue();
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("delete")).findFirst())
                 .get()
                 .satisfies(action -> {
                     assertThat(action.enabled()).isFalse();
-                    assertThat(action.level()).isEqualTo(EntityActionLevel.DANGER);
+                    assertThat(action.style()).isEqualTo(EntityActionStyle.DANGER);
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
                 .get()
                 .satisfies(action -> {
                     assertThat(action.kind()).isEqualTo(net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind.CUSTOM);
                     assertThat(action.title()).isEqualTo("导出");
+                    assertThat(action.category()).isEqualTo(EntityActionCategory.DIALOG);
+                    assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
+                    assertThat(action.accessMode()).isEqualTo(EntityActionAccessMode.AUTH_REQUIRED);
+                    assertThat(action.actionAuth()).isTrue();
+                    assertThat(action.dataAuth()).isTrue();
+                    assertThat(action.authInheritActionAlias()).isEqualTo("create");
+                    assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
+                    assertThat(action.executorKey()).isEqualTo("customerExportDialog");
                 });
     }
 
@@ -509,10 +531,10 @@ class PlatformModuleDefinitionCompilerTest {
         return viewField;
     }
 
-    private MetadataAction metadataAction(String relationId, String actionCode, EntityActionKind kind) {
-        MetadataAction action = new MetadataAction();
+    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+        ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
-        action.setActionCode(actionCode);
+        action.setAlias(alias);
         action.setActionKind(kind);
         return action;
     }

@@ -28,8 +28,8 @@ import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
-import net.ximatai.muyun.spring.platform.metadata.MetadataAction;
-import net.ximatai.muyun.spring.platform.metadata.MetadataActionService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
@@ -131,8 +131,7 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewField statusViewField = metadataViewField(formViewId, status.getId());
         statusViewField.setControlType(ViewControlType.SELECT);
         services.viewFieldService.insert(statusViewField);
-        MetadataAction createAction = metadataAction(mainRelationId, "create", EntityActionKind.RECORD);
-        createAction.setPermissionCode("crm.customer.create");
+        ModuleMetadataAction createAction = metadataAction(mainRelationId, "create", EntityActionKind.RECORD);
         services.actionService.insert(createAction);
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             String schemeId = services.schemeService.insert(menuScheme("main"));
@@ -177,8 +176,8 @@ class PlatformDynamicModulePublisherIT {
 
         assertThat(categoryId).isNotBlank();
         assertThat(runtime.registry().requireModule("crm.customer").mainEntityCode()).isEqualTo("customer");
-        assertThat(runtimeService.module("crm.customer").action("create").permissionCode()).isEqualTo("crm.customer.create");
-        assertThat(customer.action("create").permissionCode()).isEqualTo("crm.customer.create");
+        assertThat(runtimeService.module("crm.customer").action("create").actionAuth()).isTrue();
+        assertThat(customer.action("create").actionAuth()).isTrue();
         assertThat(customer.view(EntityViewType.FORM).title()).isEqualTo("客户表单");
         assertThat(customer.view(EntityViewType.FORM).fields())
                 .extracting(field -> field.fieldName())
@@ -252,7 +251,7 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
-        TestMemoryDao<MetadataAction> actionDao = new TestMemoryDao<>();
+        TestMemoryDao<ModuleMetadataAction> actionDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
         TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
@@ -279,7 +278,7 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
         MetadataViewFieldService viewFieldService =
                 new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
-        MetadataActionService actionService = new MetadataActionService(actionDao, relationService);
+        ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,
@@ -358,10 +357,10 @@ class PlatformDynamicModulePublisherIT {
         return viewField;
     }
 
-    private MetadataAction metadataAction(String relationId, String actionCode, EntityActionKind kind) {
-        MetadataAction action = new MetadataAction();
+    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+        ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
-        action.setActionCode(actionCode);
+        action.setAlias(alias);
         action.setActionKind(kind);
         return action;
     }
@@ -446,7 +445,7 @@ class PlatformDynamicModulePublisherIT {
                                     DictionaryItemService itemService,
                                     MetadataViewService viewService,
                                     MetadataViewFieldService viewFieldService,
-                                    MetadataActionService actionService) {
+                                    ModuleMetadataActionService actionService) {
     }
 
     @SpringBootConfiguration

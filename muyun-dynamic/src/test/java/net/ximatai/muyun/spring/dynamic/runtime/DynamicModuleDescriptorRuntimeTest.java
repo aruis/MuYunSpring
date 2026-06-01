@@ -63,7 +63,7 @@ class DynamicModuleDescriptorRuntimeTest {
                                 "contract", "contractId")
                 ),
                 List.of(new EntityActionDefinition("contract", "create", EntityActionKind.RECORD,
-                        "Create contract", true, null, "sales.contract.create"))
+                        "Create contract", true, null))
         );
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations()).publish(module);
         DynamicRecordService service = new DynamicRecordService(runtime);
@@ -73,12 +73,12 @@ class DynamicModuleDescriptorRuntimeTest {
 
         assertThat(moduleApi.describe().moduleAlias()).isEqualTo("sales.contract");
         assertThat(moduleApi.actions()).extracting(action -> action.code()).contains("create");
-        assertThat(moduleApi.action("create").permissionCode()).isEqualTo("sales.contract.create");
+        assertThat(moduleApi.action("create").actionAuth()).isTrue();
         assertThat(moduleApi.relations()).extracting(relation -> relation.code()).containsExactly("lines");
         assertThat(moduleApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
         assertThat(moduleApi.associationViews()).extracting(view -> view.code()).containsExactly("lines", "contractId");
         assertThat(contractApi.describe().entityCode()).isEqualTo("contract");
-        assertThat(contractApi.action("create").permissionCode()).isEqualTo("sales.contract.create");
+        assertThat(contractApi.action("create").actionAuth()).isTrue();
         assertThat(contractApi.view(EntityViewType.FORM).title()).isEqualTo("Contract form");
         assertThat(contractApi.associationView("lines").targetEntity()).isEqualTo("line");
         DynamicRecordService.EntityOperations lineApi = service.entity("sales.contract", "line");

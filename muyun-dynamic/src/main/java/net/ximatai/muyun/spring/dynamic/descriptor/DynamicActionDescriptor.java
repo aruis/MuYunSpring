@@ -1,27 +1,26 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 
 public record DynamicActionDescriptor(
         String code,
         DynamicActionKind kind,
         String title,
         boolean enabled,
-        EntityActionLevel level,
-        String permissionCode,
+        EntityActionStyle style,
+        EntityActionLevel actionLevel,
+        EntityActionCategory category,
+        EntityActionAccessMode accessMode,
+        boolean actionAuth,
+        boolean dataAuth,
+        String authInheritActionAlias,
         boolean availabilityCondition,
-        String unavailableMessage
+        String unavailableMessage,
+        EntityActionExecutorType executorType,
+        String executorKey
 ) {
-    public DynamicActionDescriptor(String code, DynamicActionKind kind, String title) {
-        this(code, kind, title, true, EntityActionLevel.NORMAL, null);
-    }
-
-    public DynamicActionDescriptor(String code,
-                                   DynamicActionKind kind,
-                                   String title,
-                                   boolean enabled,
-                                   EntityActionLevel level,
-                                   String permissionCode) {
-        this(code, kind, title, enabled, level, permissionCode, false, null);
-    }
 }

@@ -17,8 +17,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
-import net.ximatai.muyun.spring.platform.metadata.MetadataAction;
-import net.ximatai.muyun.spring.platform.metadata.MetadataActionService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
@@ -55,7 +55,7 @@ public class PlatformModuleDefinitionCompiler {
     private final ModuleMetadataRelationService relationService;
     private final MetadataViewService viewService;
     private final MetadataViewFieldService viewFieldService;
-    private final MetadataActionService actionService;
+    private final ModuleMetadataActionService actionService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -66,7 +66,7 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataRelationService relationService,
                                             MetadataViewService viewService,
                                             MetadataViewFieldService viewFieldService,
-                                            MetadataActionService actionService) {
+                                            ModuleMetadataActionService actionService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
                 viewService, viewFieldService, actionService,
                 new ModuleDefinitionValidator());
@@ -80,7 +80,7 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataRelationService relationService,
                                             MetadataViewService viewService,
                                             MetadataViewFieldService viewFieldService,
-                                            MetadataActionService actionService,
+                                            ModuleMetadataActionService actionService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
@@ -356,7 +356,7 @@ public class PlatformModuleDefinitionCompiler {
                 .toList();
     }
 
-    private EntityActionDefinition action(MetadataAction action,
+    private EntityActionDefinition action(ModuleMetadataAction action,
                                           Map<String, ModuleMetadataRelation> relationById,
                                           Map<String, Metadata> metadataById) {
         ModuleMetadataRelation relation = relationById.get(action.getRelationId());
@@ -369,12 +369,21 @@ public class PlatformModuleDefinitionCompiler {
         }
         return new EntityActionDefinition(
                 metadata.getAlias(),
-                action.getActionCode(),
+                action.getAlias(),
                 action.getActionKind(),
                 action.getTitle(),
                 Boolean.TRUE.equals(action.getEnabled()),
                 action.getActionLevel(),
-                action.getPermissionCode()
+                action.getActionStyle(),
+                action.getCategory(),
+                action.getAccessMode(),
+                action.getActionAuth(),
+                action.getDataAuth(),
+                action.getAuthInheritAlias(),
+                action.getAvailableExpression(),
+                action.getUnavailableMessage(),
+                action.getExecutorType(),
+                action.getExecutorKey()
         );
     }
 }

@@ -61,6 +61,7 @@ public class ModuleDefinitionValidator {
             validateAction(action, entities, module.relations());
             requireUnique(actionKeys, action.entityCode() + "." + action.actionCode(), "action");
         }
+        validateActionAuthInherits(module.actions(), entities);
         Set<String> viewKeys = new HashSet<>();
         for (EntityViewDefinition view : module.views()) {
             validateView(view, entities);
@@ -330,9 +331,22 @@ public class ModuleDefinitionValidator {
         if (action.level() == null) {
             throw new ModuleDefinitionException("action level must not be null: " + action.actionCode());
         }
-        if (action.permissionCode() != null && action.permissionCode().isBlank()) {
-            throw new ModuleDefinitionException("action permission code must not be blank: " + action.actionCode());
+        if (action.style() == null) {
+            throw new ModuleDefinitionException("action style must not be null: " + action.actionCode());
         }
+        if (action.category() == null) {
+            throw new ModuleDefinitionException("action category must not be null: " + action.actionCode());
+        }
+        if (action.accessMode() == null) {
+            throw new ModuleDefinitionException("action access mode must not be null: " + action.actionCode());
+        }
+        if (action.executorType() == null) {
+            throw new ModuleDefinitionException("action executor type must not be null: " + action.actionCode());
+        }
+        if (action.executorKey() != null && action.executorKey().isBlank()) {
+            throw new ModuleDefinitionException("action executor key must not be blank: " + action.actionCode());
+        }
+        validateActionAccessPolicy(action);
         validateActionAvailability(action, entity, entities, relations);
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
         if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
@@ -346,6 +360,31 @@ public class ModuleDefinitionValidator {
         if (standardKind != null && standardKind != action.kind()) {
             throw new ModuleDefinitionException("standard action kind mismatch: "
                     + entity.code() + "." + action.actionCode());
+        }
+    }
+
+    private void validateActionAccessPolicy(EntityActionDefinition action) {
+        if (action.accessMode() == EntityActionAccessMode.ANONYMOUS_ALLOWED) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
+                throw new ModuleDefinitionException("anonymous action must not require auth policy: "
+                        + action.entityCode() + "." + action.actionCode());
+            }
+            return;
+        }
+        if (action.accessMode() == EntityActionAccessMode.LOGIN_REQUIRED) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
+                throw new ModuleDefinitionException("login-only action must not require auth policy: "
+                        + action.entityCode() + "." + action.actionCode());
+            }
+            return;
+        }
+        if (!action.actionAuth()) {
+            throw new ModuleDefinitionException("auth-required action must enable action auth: "
+                    + action.entityCode() + "." + action.actionCode());
+        }
+        if (action.authInheritActionAlias() != null && !action.actionAuth()) {
+            throw new ModuleDefinitionException("action auth inherit requires action auth: "
+                    + action.entityCode() + "." + action.actionCode());
         }
     }
 
@@ -400,6 +439,67 @@ public class ModuleDefinitionValidator {
             EntityDefinition childEntity = requireEntity(entities, relation.childEntity(),
                     "action available expression child entity");
             requireField(childEntity, parts[1], "action available expression field");
+        }
+    }
+
+    private void validateActionAuthInherits(List<EntityActionDefinition> actions,
+                                            Map<String, EntityDefinition> entities) {
+        Map<String, Set<String>> configuredByEntity = actions.stream()
+                .collect(Collectors.groupingBy(
+                        EntityActionDefinition::entityCode,
+                        Collectors.mapping(EntityActionDefinition::actionCode, Collectors.toSet())
+                ));
+        for (EntityActionDefinition action : actions) {
+            if (action.authInheritActionAlias() == null) {
+                continue;
+            }
+            requireActionCode(action.authInheritActionAlias(), "action auth inherit alias");
+            if (action.actionCode().equals(action.authInheritActionAlias())) {
+                throw new ModuleDefinitionException("action auth inherit alias must not point to self: "
+                        + action.entityCode() + "." + action.actionCode());
+            }
+            if (!actionExists(action.entityCode(), action.authInheritActionAlias(), entities, configuredByEntity)) {
+                throw new ModuleDefinitionException("action auth inherit target is not configured: "
+                        + action.entityCode() + "." + action.authInheritActionAlias());
+            }
+            detectActionAuthInheritCycle(action, actions, entities, configuredByEntity);
+        }
+    }
+
+    private boolean actionExists(String entityCode,
+                                 String actionCode,
+                                 Map<String, EntityDefinition> entities,
+                                 Map<String, Set<String>> configuredByEntity) {
+        EntityDefinition entity = entities.get(entityCode);
+        return configuredByEntity.getOrDefault(entityCode, Set.of()).contains(actionCode)
+                || EntityStandardActionCatalog.standardKind(entity, actionCode) != null;
+    }
+
+    private void detectActionAuthInheritCycle(EntityActionDefinition start,
+                                              List<EntityActionDefinition> actions,
+                                              Map<String, EntityDefinition> entities,
+                                              Map<String, Set<String>> configuredByEntity) {
+        Map<String, EntityActionDefinition> configured = actions.stream()
+                .filter(action -> start.entityCode().equals(action.entityCode()))
+                .collect(Collectors.toMap(EntityActionDefinition::actionCode, Function.identity(), (left, ignored) -> left));
+        Set<String> visited = new HashSet<>();
+        visited.add(start.actionCode());
+        String current = start.authInheritActionAlias();
+        while (current != null) {
+            if (!visited.add(current)) {
+                throw new ModuleDefinitionException("action auth inherit cycle: "
+                        + start.entityCode() + "." + start.actionCode());
+            }
+            if (!actionExists(start.entityCode(), current, entities, configuredByEntity)) {
+                throw new ModuleDefinitionException("action auth inherit target is not configured: "
+                        + start.entityCode() + "." + current);
+            }
+            EntityActionDefinition next = configured.get(current);
+            if (next != null && (!next.actionAuth() || next.accessMode() != EntityActionAccessMode.AUTH_REQUIRED)) {
+                throw new ModuleDefinitionException("action auth inherit target must require action auth: "
+                        + start.entityCode() + "." + current);
+            }
+            current = next == null ? null : next.authInheritActionAlias();
         }
     }
 

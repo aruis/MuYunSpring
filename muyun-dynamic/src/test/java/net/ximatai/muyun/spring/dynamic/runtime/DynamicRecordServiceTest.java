@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -161,10 +161,10 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                                "提交", true, EntityActionLevel.PRIMARY, null)
+                                "提交", true, EntityActionStyle.PRIMARY)
                                 .availableWhen("{status} == 'draft'"),
                         new EntityActionDefinition("line", "submit", EntityActionKind.CUSTOM,
-                                "提交行", true, EntityActionLevel.NORMAL, null)
+                                "提交行", true, EntityActionStyle.NORMAL)
                                 .availableWhen("{summary} != ''")
                 ),
                 "contract"
@@ -625,7 +625,7 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, EntityActionLevel.PRIMARY, "contract.submit")
+                        "提交", true, EntityActionStyle.PRIMARY)
                         .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"))
         );
         return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));

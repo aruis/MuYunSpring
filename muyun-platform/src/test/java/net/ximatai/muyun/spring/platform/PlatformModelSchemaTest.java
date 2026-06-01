@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
-import net.ximatai.muyun.spring.platform.metadata.MetadataAction;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
@@ -87,9 +87,12 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(MetadataViewField.class)))
                 .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "read_only",
                         "required_override", "title", "enabled", "sort_order");
-        assertThat(columnNames(mapper.toTable(MetadataAction.class)))
-                .contains("id", "relation_id", "action_code", "action_kind", "action_level",
-                        "permission_code", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(ModuleMetadataAction.class)))
+                .contains("id", "relation_id", "alias", "category", "action_kind", "action_level",
+                        "action_style", "access_mode", "action_auth", "data_auth", "auth_inherit_alias",
+                        "available_expression", "unavailable_message", "executor_type", "executor_key",
+                        "target_metadata_id", "config_id", "system_managed", "title", "enabled", "sort_order")
+                .doesNotContain("permission_code", "action_code");
     }
 
     @Test

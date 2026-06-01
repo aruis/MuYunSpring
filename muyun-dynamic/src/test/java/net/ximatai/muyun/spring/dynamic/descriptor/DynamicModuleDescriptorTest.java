@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -97,8 +97,10 @@ class DynamicModuleDescriptorTest {
                 .filter(action -> action.code().equals("create"))
                 .findFirst())
                 .get()
-                .extracting(DynamicActionDescriptor::permissionCode)
-                .isEqualTo("crm.customer.customer.create");
+                .satisfies(action -> {
+                    assertThat(action.actionAuth()).isTrue();
+                    assertThat(action.accessMode()).isNotNull();
+                });
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
@@ -162,9 +164,9 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
-                                "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
+                                "新建客户", true, EntityActionStyle.PRIMARY),
                         new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
-                                "导出联系人", true, EntityActionLevel.NORMAL, "crm.contact.export")
+                                "导出联系人", true, EntityActionStyle.NORMAL)
                 ),
                 "customer"
         );
@@ -216,8 +218,16 @@ class DynamicModuleDescriptorTest {
                 .filter(action -> action.code().equals("delete"))
                 .findFirst())
                 .get()
-                .extracting(DynamicActionDescriptor::level)
-                .isEqualTo(EntityActionLevel.DANGER);
+                .satisfies(action -> {
+                    assertThat(action.style()).isEqualTo(EntityActionStyle.DANGER);
+                    assertThat(action.actionLevel()).isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.RECORD);
+                });
+        assertThat(entity.actions().stream()
+                .filter(action -> action.code().equals("create"))
+                .findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::actionLevel)
+                .isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.LIST);
     }
 
     @Test
@@ -234,12 +244,12 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
-                                "新建客户", true, EntityActionLevel.PRIMARY, "crm.customer.create"),
+                                "新建客户", true, EntityActionStyle.PRIMARY),
                         new EntityActionDefinition("customer", "delete", EntityActionKind.RECORD,
-                                "删除客户", false, EntityActionLevel.DANGER, null)
+                                "删除客户", false, EntityActionStyle.DANGER)
                                 .availableWhen("{status} == 'draft'", "只有草稿客户可删除"),
                         new EntityActionDefinition("customer", "exportData", EntityActionKind.CUSTOM,
-                                "导出", true, EntityActionLevel.NORMAL, "crm.customer.export")
+                                "导出", true, EntityActionStyle.NORMAL)
                 )
         );
 
@@ -250,8 +260,7 @@ class DynamicModuleDescriptorTest {
                 .satisfies(action -> {
                     assertThat(action.title()).isEqualTo("新建客户");
                     assertThat(action.enabled()).isTrue();
-                    assertThat(action.level()).isEqualTo(EntityActionLevel.PRIMARY);
-                    assertThat(action.permissionCode()).isEqualTo("crm.customer.create");
+                    assertThat(action.style()).isEqualTo(EntityActionStyle.PRIMARY);
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("delete")).findFirst())
                 .get()
@@ -264,7 +273,7 @@ class DynamicModuleDescriptorTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.kind()).isEqualTo(DynamicActionKind.CUSTOM);
-                    assertThat(action.permissionCode()).isEqualTo("crm.customer.export");
+                    assertThat(action.category().name()).isEqualTo("CUSTOM");
                 });
     }
 

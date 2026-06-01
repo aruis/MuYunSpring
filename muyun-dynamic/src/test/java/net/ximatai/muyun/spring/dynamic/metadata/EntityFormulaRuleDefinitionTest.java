@@ -126,7 +126,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
-                        "删除", true, EntityActionLevel.DANGER, null)
+                        "删除", true, EntityActionStyle.DANGER)
                         .availableWhen("{status} = 'draft'"))
         );
 
@@ -145,13 +145,21 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
-                        "删除", true, EntityActionLevel.DANGER, null)
+                        "删除", true, EntityActionStyle.DANGER)
                         .availableWhen("{statsu} == 'draft'"))
         );
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("unknown action available expression field: invoice.statsu");
+    }
+
+    @Test
+    void shouldDefaultCreateActionToListLevel() {
+        EntityActionDefinition action = new EntityActionDefinition("invoice", "create", EntityActionKind.RECORD,
+                "新建", true, EntityActionStyle.PRIMARY);
+
+        assertThat(action.level()).isEqualTo(EntityActionLevel.LIST);
     }
 
     @Test
@@ -164,11 +172,99 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, EntityActionLevel.PRIMARY, null)
+                        "提交", true, EntityActionStyle.PRIMARY)
                         .availableWhen("SUM({items.lineAmount}) > 0"))
         );
 
         validator.validate(module);
+    }
+
+    @Test
+    void shouldValidateActionAuthInheritanceTarget() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
+                        "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                        true, false, "approve", null, null, null, null))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("action auth inherit target is not configured: invoice.approve");
+    }
+
+    @Test
+    void shouldRejectAnonymousActionWithAuthPolicy() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("invoice", "publicPreview", EntityActionKind.CUSTOM,
+                        "公开预览", true, null, EntityActionStyle.NORMAL, null,
+                        EntityActionAccessMode.ANONYMOUS_ALLOWED, true, false,
+                        null, null, null, null, null))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("anonymous action must not require auth policy: invoice.publicPreview");
+    }
+
+    @Test
+    void shouldRejectActionAuthInheritanceTargetWithoutActionAuth() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
+                                "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                                true, false, "preview", null, null, null, null),
+                        new EntityActionDefinition("invoice", "preview", EntityActionKind.CUSTOM,
+                                "预览", true, null, EntityActionStyle.NORMAL, null,
+                                EntityActionAccessMode.LOGIN_REQUIRED, false, false,
+                                null, null, null, null, null)
+                )
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("action auth inherit target must require action auth: invoice.preview");
+    }
+
+    @Test
+    void shouldRejectActionAuthInheritanceCycle() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoiceEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
+                                "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                                true, false, "approve", null, null, null, null),
+                        new EntityActionDefinition("invoice", "approve", EntityActionKind.CUSTOM,
+                                "审核", true, null, EntityActionStyle.PRIMARY, null, null,
+                                true, false, "submit", null, null, null, null)
+                )
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("action auth inherit cycle: invoice.submit");
     }
 
     @Test

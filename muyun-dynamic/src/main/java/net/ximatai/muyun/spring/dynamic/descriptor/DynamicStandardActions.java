@@ -38,12 +38,17 @@ final class DynamicStandardActions {
                 kind,
                 configured.title(),
                 configured.enabled(),
+                configured.style(),
                 configured.level(),
-                configured.permissionCode() == null
-                        ? defaultPermissionCode(moduleAlias, entityCode, configured.actionCode())
-                        : configured.permissionCode(),
+                configured.category(),
+                configured.accessMode(),
+                configured.actionAuth(),
+                configured.dataAuth(),
+                configured.authInheritActionAlias(),
                 configured.hasAvailabilityCondition(),
-                configured.unavailableMessage()
+                configured.unavailableMessage(),
+                configured.executorType(),
+                configured.executorKey()
         );
     }
 
@@ -51,10 +56,4 @@ final class DynamicStandardActions {
         actions.put(action.code(), action);
     }
 
-    private static String defaultPermissionCode(String moduleAlias, String entityCode, String actionCode) {
-        if (moduleAlias == null || entityCode == null || actionCode == null) {
-            return null;
-        }
-        return moduleAlias + "." + entityCode + "." + actionCode;
-    }
 }
