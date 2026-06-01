@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +175,92 @@ class FormulaEngineTest {
                 .extracting(FormulaRuntimeReport.Issue::code)
                 .isEqualTo("FORMULA_ASSIGNMENT_SCOPE_ERROR");
         assertThat(main).doesNotContainKeys("a", "b");
+    }
+
+    @Test
+    void shouldNormalizeTypedFieldWrites() {
+        Map<String, Object> main = new LinkedHashMap<>(Map.of(
+                "amount", 12,
+                "signedDate", "2026-06-01"
+        ));
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of(), List.of(
+                FormulaFieldDefinition.of("amount", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("approved", FormulaValueType.BOOLEAN),
+                FormulaFieldDefinition.of("signedDate", FormulaValueType.DATE),
+                FormulaFieldDefinition.of("signedAt", FormulaValueType.TIMESTAMP)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("total", "{total} = {amount} * 2"),
+                new FormulaRule("approved", "{approved} = 1"),
+                new FormulaRule("signedDate", "{signedDate} = DATE_ADD({signedDate}, 1)"),
+                new FormulaRule("signedAt", "{signedAt} = DATETIME_ADD('2026-06-01T02:03:04Z', 2, 'HOUR')")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(main)
+                .containsEntry("total", new BigDecimal("24.0"))
+                .containsEntry("approved", true)
+                .containsEntry("signedDate", LocalDate.parse("2026-06-02"))
+                .containsEntry("signedAt", Instant.parse("2026-06-01T04:03:04Z"));
+    }
+
+    @Test
+    void shouldRejectTypedWriteMismatchReadonlyAndRequiredEmpty() {
+        Map<String, Object> main = new LinkedHashMap<>(Map.of("amount", 12));
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of(), List.of(
+                FormulaFieldDefinition.of("amount", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("count", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("name", FormulaValueType.STRING).readonly(),
+                FormulaFieldDefinition.of("requiredName", FormulaValueType.STRING).asRequired()
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("count", "{count} = 12.5"),
+                new FormulaRule("name", "{name} = 'readonly'"),
+                new FormulaRule("requiredName", "{requiredName} = null")
+        ), data);
+
+        assertThat(report.errors()).extracting(FormulaRuntimeReport.Issue::code)
+                .containsExactly("FORMULA_TYPE_MISMATCH", "FORMULA_FIELD_NOT_WRITABLE", "FORMULA_REQUIRED_FIELD_EMPTY");
+        assertThat(report.errors()).extracting(FormulaRuntimeReport.Issue::fieldPath)
+                .containsExactly("count", "name", "requiredName");
+        assertThat(main).doesNotContainKeys("count", "name", "requiredName");
+    }
+
+    @Test
+    void shouldKeepEmptyStringForTextFieldsAndRejectUnknownTypedFields() {
+        Map<String, Object> main = new LinkedHashMap<>(Map.of("name", "old"));
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of(), List.of(
+                FormulaFieldDefinition.of("name", FormulaValueType.STRING)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("name", "{name} = ''"),
+                new FormulaRule("missing", "{missing} = 1")
+        ), data);
+
+        assertThat(report.errors()).singleElement()
+                .extracting(FormulaRuntimeReport.Issue::code)
+                .isEqualTo("FORMULA_UNKNOWN_FIELD");
+        assertThat(main).containsEntry("name", "");
+    }
+
+    @Test
+    void shouldTreatDeclaredButEmptyChildTableAsEmptyRows() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of(), List.of(
+                FormulaFieldDefinition.of("total", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("total", "{total} = SUM({items.qty})")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(main).containsEntry("total", new BigDecimal("0.0"));
     }
 
     @Test
