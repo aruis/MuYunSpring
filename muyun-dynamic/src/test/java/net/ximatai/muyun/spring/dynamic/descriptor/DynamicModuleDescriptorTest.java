@@ -2,9 +2,11 @@ package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -46,7 +48,15 @@ class DynamicModuleDescriptorTest {
                         .withAutoPopulate()),
                 List.of(EntityReferenceDefinition.to("contact", "customerId", "crm.customer.customer")
                         .withAutoTitle("customerTitle")
-                        .withProjection("title", "customerTitle"))
+                        .withProjection("title", "customerTitle")),
+                List.of(),
+                List.of(
+                        EntityAssociationViewDefinition.childRelation("contacts", "customer", "crm.customer",
+                                "contact", "contacts"),
+                        EntityAssociationViewDefinition.reference("customerId", "contact", "crm.customer",
+                                "customer", "customerId")
+                ),
+                List.of()
         );
 
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
@@ -88,6 +98,24 @@ class DynamicModuleDescriptorTest {
                 .containsExactly("EQ", "LIKE", "IN");
         assertThat(descriptor.relations().getFirst().code()).isEqualTo("contacts");
         assertThat(descriptor.relations().getFirst().autoPopulate()).isTrue();
+        assertThat(descriptor.associationViews())
+                .extracting(DynamicAssociationViewDescriptor::code)
+                .containsExactly("contacts", "customerId");
+        assertThat(descriptor.entities().getFirst().associationViews().getFirst())
+                .satisfies(view -> {
+                    assertThat(view.displayMode()).isEqualTo(AssociationViewDisplayMode.INLINE_LIST);
+                    assertThat(view.targetEntity()).isEqualTo("contact");
+                    assertThat(view.relationCode()).isEqualTo("contacts");
+                    assertThat(view.queryable()).isTrue();
+                });
+        assertThat(descriptor.entities().get(1).associationViews().getFirst())
+                .satisfies(view -> {
+                    assertThat(view.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_RECORD);
+                    assertThat(view.targetEntity()).isEqualTo("customer");
+                    assertThat(view.referenceField()).isEqualTo("customerId");
+                    assertThat(view.viewType()).isEqualTo(EntityViewType.FORM);
+                    assertThat(view.queryable()).isFalse();
+                });
         DynamicReferenceDescriptor reference = descriptor.references().getFirst();
         assertThat(reference.sourceEntity()).isEqualTo("contact");
         assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");

@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
+import java.util.Optional;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +42,11 @@ public class ModuleDefinitionValidator {
         }
         for (EntityReferenceDefinition reference : module.references()) {
             validateReference(reference, entities, module.moduleAlias());
+        }
+        Set<String> associationViewKeys = new HashSet<>();
+        for (EntityAssociationViewDefinition view : module.associationViews()) {
+            validateAssociationView(view, entities, module.moduleAlias(), module.relations(), module.references());
+            requireUnique(associationViewKeys, view.sourceEntity() + "." + view.code(), "association view");
         }
         Set<String> actionKeys = new HashSet<>();
         for (EntityActionDefinition action : module.actions()) {
@@ -256,6 +262,49 @@ public class ModuleDefinitionValidator {
         }
     }
 
+    public void validateAssociationView(EntityAssociationViewDefinition view,
+                                        Map<String, EntityDefinition> entities,
+                                        String moduleAlias,
+                                        java.util.List<EntityRelationDefinition> relations,
+                                        java.util.List<EntityReferenceDefinition> references) {
+        if (view == null) {
+            throw new ModuleDefinitionException("association view must not be null");
+        }
+        requireAssociationViewCode(view.code(), "association view code");
+        EntityDefinition source = requireEntity(entities, view.sourceEntity(), "association view source entity");
+        requireModuleAlias(view.targetModuleAlias(), "association view target module alias");
+        requireIdentifier(view.targetEntity(), "association view target entity");
+        if (view.displayMode() == null) {
+            throw new ModuleDefinitionException("association view display mode must not be null: " + view.code());
+        }
+        if (view.viewType() == null) {
+            throw new ModuleDefinitionException("association view type must not be null: " + view.code());
+        }
+        if (moduleAlias != null && moduleAlias.equals(view.targetModuleAlias())) {
+            requireEntity(entities, view.targetEntity(), "association view target entity");
+        }
+        boolean hasRelation = view.relationCode() != null && !view.relationCode().isBlank();
+        boolean hasReference = view.referenceField() != null && !view.referenceField().isBlank();
+        if (hasRelation == hasReference) {
+            throw new ModuleDefinitionException("association view requires exactly one relationCode or referenceField: "
+                    + view.code());
+        }
+        if (hasRelation) {
+            requireIdentifier(view.relationCode(), "association view relation code");
+            if (moduleAlias != null && !moduleAlias.equals(view.targetModuleAlias())) {
+                throw new ModuleDefinitionException("association view relation target module must be current module: "
+                        + view.code());
+            }
+            requireMatchingRelation(view, relations);
+        }
+        if (hasReference) {
+            requireFieldName(view.referenceField(), "association view reference field");
+            requireField(source, view.referenceField(), "association view reference field");
+            EntityReferenceDefinition reference = requireMatchingReference(view, references);
+            requireMatchingReferenceDisplay(view, reference);
+        }
+    }
+
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities, String moduleAlias) {
         if (reference == null) {
             throw new ModuleDefinitionException("reference must not be null");
@@ -323,6 +372,56 @@ public class ModuleDefinitionValidator {
         }
     }
 
+    private void requireMatchingRelation(EntityAssociationViewDefinition view,
+                                         java.util.List<EntityRelationDefinition> relations) {
+        boolean exists = relations.stream().anyMatch(relation ->
+                view.relationCode().equals(relation.code())
+                        && view.sourceEntity().equals(relation.parentEntity())
+                        && view.targetEntity().equals(relation.childEntity()));
+        if (!exists) {
+            throw new ModuleDefinitionException("association view relation does not match module relation: "
+                    + view.sourceEntity() + "." + view.code());
+        }
+    }
+
+    private EntityReferenceDefinition requireMatchingReference(EntityAssociationViewDefinition view,
+                                                              java.util.List<EntityReferenceDefinition> references) {
+        Optional<EntityReferenceDefinition> found = references.stream().filter(reference -> {
+            if (!view.sourceEntity().equals(reference.sourceEntity())
+                    || !view.referenceField().equals(reference.sourceField())) {
+                return false;
+            }
+            ReferenceTarget target;
+            try {
+                target = reference.target();
+            } catch (RuntimeException e) {
+                return false;
+            }
+            String effectiveModuleAlias = target.moduleAlias();
+            return view.targetModuleAlias().equals(effectiveModuleAlias)
+                    && view.targetEntity().equals(target.entityCode());
+        }).findFirst();
+        if (found.isEmpty()) {
+            throw new ModuleDefinitionException("association view reference does not match module reference: "
+                    + view.sourceEntity() + "." + view.code());
+        }
+        return found.get();
+    }
+
+    private void requireMatchingReferenceDisplay(EntityAssociationViewDefinition view, EntityReferenceDefinition reference) {
+        if (reference.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY) {
+            if (view.displayMode() != AssociationViewDisplayMode.LINKED_LIST || view.viewType() != EntityViewType.LIST) {
+                throw new ModuleDefinitionException("many reference association view requires LINKED_LIST LIST: "
+                        + view.sourceEntity() + "." + view.code());
+            }
+            return;
+        }
+        if (view.displayMode() != AssociationViewDisplayMode.LINKED_RECORD || view.viewType() != EntityViewType.FORM) {
+            throw new ModuleDefinitionException("single reference association view requires LINKED_RECORD FORM: "
+                    + view.sourceEntity() + "." + view.code());
+        }
+    }
+
     private void requireText(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new ModuleDefinitionException(name + " must not be blank");
@@ -346,6 +445,13 @@ public class ModuleDefinitionValidator {
     private void requireActionCode(String value, String name) {
         requireText(value, name);
         if (!value.matches("[a-z][A-Za-z0-9]{0,63}")) {
+            throw new ModuleDefinitionException("invalid " + name + ": " + value);
+        }
+    }
+
+    private void requireAssociationViewCode(String value, String name) {
+        requireText(value, name);
+        if (!value.matches("[a-z][A-Za-z0-9_]{0,63}")) {
             throw new ModuleDefinitionException("invalid " + name + ": " + value);
         }
     }

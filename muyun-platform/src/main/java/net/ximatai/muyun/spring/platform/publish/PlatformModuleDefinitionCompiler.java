@@ -4,10 +4,12 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
@@ -107,8 +109,10 @@ public class PlatformModuleDefinitionCompiler {
         List<EntityReferenceDefinition> references = references(module.getAlias(), relations, metadataById);
         List<EntityViewDefinition> views = views(relations, metadataById);
         List<EntityActionDefinition> actions = actions(relations, metadataById);
+        List<EntityAssociationViewDefinition> associationViews = associationViews(module.getAlias(), childRelations,
+                references);
         ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations,
-                references, views, actions);
+                references, views, associationViews, actions);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -314,7 +318,32 @@ public class PlatformModuleDefinitionCompiler {
                 .sorted((left, right) -> Boolean.compare(!left.code().equals(mainEntityCode), !right.code().equals(mainEntityCode)))
                 .toList();
         return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(),
-                definition.references(), definition.views(), definition.actions());
+                definition.references(), definition.views(), definition.associationViews(), definition.actions());
+    }
+
+    private List<EntityAssociationViewDefinition> associationViews(String moduleAlias,
+                                                                   List<EntityRelationDefinition> childRelations,
+                                                                   List<EntityReferenceDefinition> references) {
+        return java.util.stream.Stream.concat(
+                childRelations.stream().map(relation -> EntityAssociationViewDefinition.childRelation(
+                        relation.code(),
+                        relation.parentEntity(),
+                        moduleAlias,
+                        relation.childEntity(),
+                        relation.code()
+                )),
+                references.stream().map(reference -> {
+                    ReferenceTarget target = reference.target();
+                    return EntityAssociationViewDefinition.reference(
+                            reference.sourceField(),
+                            reference.sourceEntity(),
+                            target.moduleAlias(),
+                            target.entityCode(),
+                            reference.sourceField(),
+                            reference.cardinality()
+                    );
+                })
+        ).toList();
     }
 
     private List<EntityActionDefinition> actions(List<ModuleMetadataRelation> relations, Map<String, Metadata> metadataById) {

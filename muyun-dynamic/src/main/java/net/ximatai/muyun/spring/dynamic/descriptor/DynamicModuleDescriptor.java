@@ -11,13 +11,15 @@ public record DynamicModuleDescriptor(
         List<DynamicActionDescriptor> actions,
         List<DynamicEntityDescriptor> entities,
         List<DynamicRelationDescriptor> relations,
-        List<DynamicReferenceDescriptor> references
+        List<DynamicReferenceDescriptor> references,
+        List<DynamicAssociationViewDescriptor> associationViews
 ) {
     public DynamicModuleDescriptor {
         actions = actions == null ? List.of() : List.copyOf(actions);
         entities = entities == null ? List.of() : List.copyOf(entities);
         relations = relations == null ? List.of() : List.copyOf(relations);
         references = references == null ? List.of() : List.copyOf(references);
+        associationViews = associationViews == null ? List.of() : List.copyOf(associationViews);
     }
 
     public static DynamicModuleDescriptor from(ModuleDefinition module) {
@@ -27,10 +29,12 @@ public record DynamicModuleDescriptor(
                 module.name(),
                 mainEntityActions(module, moduleEntities),
                 moduleEntities.stream()
-                        .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.views(), module.actions()))
+                        .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.views(),
+                                module.associationViews(), module.actions()))
                         .toList(),
                 module.relations().stream().map(DynamicRelationDescriptor::from).toList(),
-                module.references().stream().map(DynamicReferenceDescriptor::from).toList()
+                module.references().stream().map(DynamicReferenceDescriptor::from).toList(),
+                module.associationViews().stream().map(DynamicAssociationViewDescriptor::from).toList()
         );
     }
 
@@ -39,6 +43,7 @@ public record DynamicModuleDescriptor(
         if (entities == null || entities.isEmpty()) {
             return List.of();
         }
-        return DynamicEntityDescriptor.from(module.moduleAlias(), entities.getFirst(), module.views(), module.actions()).actions();
+        return DynamicEntityDescriptor.from(module.moduleAlias(), entities.getFirst(), module.views(),
+                module.associationViews(), module.actions()).actions();
     }
 }

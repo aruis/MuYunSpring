@@ -1,9 +1,12 @@
 package net.ximatai.muyun.spring.platform.publish;
 
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
@@ -148,6 +151,14 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(relation.childForeignKeyField()).isEqualTo("invoiceId");
         assertThat(relation.autoPopulate()).isTrue();
         assertThat(relation.autoDeleteWithParent()).isTrue();
+        assertThat(definition.associationViews()).hasSize(1);
+        EntityAssociationViewDefinition associationView = definition.associationViews().getFirst();
+        assertThat(associationView.sourceEntity()).isEqualTo("invoice");
+        assertThat(associationView.targetModuleAlias()).isEqualTo("sales.invoice");
+        assertThat(associationView.targetEntity()).isEqualTo("invoice_line");
+        assertThat(associationView.displayMode()).isEqualTo(AssociationViewDisplayMode.INLINE_LIST);
+        assertThat(associationView.relationCode()).isEqualTo("lines");
+        assertThat(associationView.queryable()).isTrue();
     }
 
     @Test
@@ -181,6 +192,42 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
         assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
         assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityCode()).isEqualTo("invoice");
+        assertThat(definition.associationViews()).extracting(EntityAssociationViewDefinition::code)
+                .contains("lines", "invoiceId");
+        EntityAssociationViewDefinition referenceView = definition.associationViews().stream()
+                .filter(view -> "invoiceId".equals(view.code()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(referenceView.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_RECORD);
+        assertThat(referenceView.referenceField()).isEqualTo("invoiceId");
+        assertThat(referenceView.targetEntity()).isEqualTo("invoice");
+        assertThat(referenceView.queryable()).isFalse();
+    }
+
+    @Test
+    void shouldCompileManyReferenceAssociationViewAsLinkedList() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(titleField(invoiceId));
+        fieldService.insert(titleField(lineId));
+        MetadataField invoiceField = field(lineId, "invoiceId", "invoice_id", FieldType.STRING);
+        fieldService.insert(invoiceField);
+        relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+        MetadataFieldReferenceConfig referenceConfig = referenceConfig(invoiceField.getId(), invoiceId);
+        referenceConfig.setCardinality(ReferenceCardinality.MANY);
+        referenceConfigService.insert(referenceConfig);
+
+        ModuleDefinition definition = compiler.compile("sales.invoice");
+
+        EntityAssociationViewDefinition referenceView = definition.associationViews().stream()
+                .filter(view -> "invoiceId".equals(view.code()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(referenceView.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_LIST);
+        assertThat(referenceView.viewType()).isEqualTo(EntityViewType.LIST);
+        assertThat(referenceView.queryable()).isTrue();
     }
 
     @Test
