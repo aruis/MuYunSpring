@@ -84,6 +84,44 @@ class DynamicRelationRuntimeTest {
         assertThat((BigDecimal) body.getAllValues().get(1).get("line_amount")).isEqualByComparingTo("33");
     }
 
+    @Test
+    void shouldApplyDynamicChildFormulaBeforeChildRowsAreReplaced() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"invoice_id\" =")) {
+                return containsParam(params, "invoice-1")
+                        ? List.of(formulaLineRow("line-1", 1, 1, 1))
+                        : List.of();
+            }
+            if (sql.contains("\"app_invoice_line\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "line-1") ? List.of(formulaLineRow("line-1", 1, 1, 1)) : List.of();
+            }
+            if (sql.contains("\"app_invoice\"") && sql.contains("\"id\" =")) {
+                return containsParam(params, "invoice-1") ? List.of(invoiceRow()) : List.of();
+            }
+            return List.of();
+        });
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(formulaInvoiceModule());
+        DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        invoice.setId("invoice-1");
+        invoice.setVersion(1);
+        DynamicRecord line = runtime.newRecord(MODULE, "invoice_line")
+                .setValue("quantity", BigDecimal.valueOf(5))
+                .setValue("price", BigDecimal.valueOf(7));
+        line.setId("line-1");
+        line.setVersion(1);
+        invoice.setChildren("lines", List.of(line));
+
+        runtime.entityService(MODULE, "invoice").update(invoice);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), anyString(), body.capture(), anyMap());
+        assertThat((BigDecimal) body.getAllValues().get(1).get("line_amount")).isEqualByComparingTo("35");
+    }
+
 
     @Test
     void shouldInsertDynamicChildrenWithCurrentTenant() {
@@ -1088,6 +1126,19 @@ class DynamicRelationRuntimeTest {
                 "invoice_id", "invoice-1",
                 "title", title,
                 "sort_order", sortOrder,
+                "deleted", Boolean.FALSE,
+                "version", 1
+        );
+    }
+
+    private Map<String, Object> formulaLineRow(String id, int quantity, int price, int lineAmount) {
+        return Map.of(
+                "id", id,
+                "tenant_id", "tenant-a",
+                "invoice_id", "invoice-1",
+                "quantity", BigDecimal.valueOf(quantity),
+                "price", BigDecimal.valueOf(price),
+                "line_amount", BigDecimal.valueOf(lineAmount),
                 "deleted", Boolean.FALSE,
                 "version", 1
         );

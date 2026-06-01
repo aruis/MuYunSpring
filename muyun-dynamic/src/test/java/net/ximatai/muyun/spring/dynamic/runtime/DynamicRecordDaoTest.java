@@ -208,7 +208,7 @@ class DynamicRecordDaoTest {
                 .calculation("amountCalc", "amount", "{quantity} * {price}")
                 .disabled());
 
-        assertThat(new DynamicFormulaRuntime(entity, null).hasBeforeUpdateRules()).isFalse();
+        assertThat(new DynamicFormulaRuntime(entity, null).hasBeforeUpdateRules(new DynamicRecord(entity))).isFalse();
     }
 
     @Test
@@ -267,7 +267,7 @@ class DynamicRecordDaoTest {
     }
 
     @Test
-    void shouldSkipChildDependentFormulaRulesOnUpdateUntilChildRowsAreComplete() {
+    void shouldSkipChildDependentFormulaRulesOnUpdateWhenChildRowsAreNotSubmitted() {
         EntityDefinition invoice = new EntityDefinition(
                 "invoice",
                 "sales_invoice",
@@ -289,9 +289,167 @@ class DynamicRecordDaoTest {
         );
         DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
 
-        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null);
+        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
 
         assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void shouldApplyChildDependentFormulaRulesOnUpdateWhenChildRowsAreSubmitted() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(FieldDefinition.decimal("totalAmount", "Total Amount").column("total_amount").precision(18, 2))
+        ).withFormulaRules(new EntityFormulaRuleDefinition("totalAmountCalc",
+                "{totalAmount} = SUM({ items.lineAmount } = {items.quantity} * {items.price})"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                )
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
+        );
+        DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.ZERO);
+        DynamicRecord first = new DynamicRecord(line)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(10));
+        DynamicRecord second = new DynamicRecord(line)
+                .setValue("quantity", BigDecimal.valueOf(3))
+                .setValue("price", BigDecimal.valueOf(20));
+        record.setChildren("items", List.of(first, second));
+
+        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+
+        assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("80");
+        assertThat((BigDecimal) first.getValue("lineAmount")).isEqualByComparingTo("20");
+        assertThat((BigDecimal) second.getValue("lineAmount")).isEqualByComparingTo("60");
+    }
+
+    @Test
+    void shouldApplyChildDependentFormulaRulesOnEmptySubmittedChildRows() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(FieldDefinition.decimal("totalAmount", "Total Amount").column("total_amount").precision(18, 2))
+        ).withFormulaRules(new EntityFormulaRuleDefinition("totalAmountCalc",
+                "{totalAmount} = SUM({items.lineAmount})"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2))
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
+        );
+        DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.valueOf(100));
+        record.setChildren("items", List.of());
+
+        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+
+        assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void shouldOnlyRunChildDependentFormulaWhenItsRelationIsSubmitted() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(
+                        FieldDefinition.decimal("itemTotal", "Item Total").column("item_total").precision(18, 2),
+                        FieldDefinition.decimal("attachmentTotal", "Attachment Total").column("attachment_total").precision(18, 2)
+                )
+        ).withFormulaRules(
+                new EntityFormulaRuleDefinition("itemTotalCalc", "{itemTotal} = SUM({items.lineAmount})"),
+                new EntityFormulaRuleDefinition("attachmentTotalCalc", "{attachmentTotal} = SUM({attachments.fileSize})")
+        );
+        EntityDefinition item = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2))
+        );
+        EntityDefinition attachment = new EntityDefinition(
+                "invoice_attachment",
+                "sales_invoice_attachment",
+                "Invoice Attachment",
+                List.of(FieldDefinition.decimal("fileSize", "File Size").column("file_size").precision(18, 2))
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, item, attachment),
+                List.of(
+                        EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"),
+                        EntityRelationDefinition.child("attachments", "invoice", "invoice_attachment", "invoiceId")
+                )
+        );
+        DynamicRecord record = new DynamicRecord(invoice)
+                .setValue("itemTotal", BigDecimal.valueOf(100))
+                .setValue("attachmentTotal", BigDecimal.ZERO);
+        DynamicRecord attachmentRow = new DynamicRecord(attachment).setValue("fileSize", BigDecimal.valueOf(8));
+        record.setChildren("attachments", List.of(attachmentRow));
+
+        new DynamicFormulaRuntime(invoice, module).beforeUpdate(record, null, Map.of());
+
+        assertThat((BigDecimal) record.getValue("itemTotal")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) record.getValue("attachmentTotal")).isEqualByComparingTo("8");
+    }
+
+    @Test
+    void shouldMergeExistingChildValuesBeforeUpdateFormulaCalculation() {
+        EntityDefinition invoice = new EntityDefinition(
+                "invoice",
+                "sales_invoice",
+                "Invoice",
+                List.of(FieldDefinition.decimal("totalAmount", "Total Amount").column("total_amount").precision(18, 2))
+        ).withFormulaRules(new EntityFormulaRuleDefinition("totalAmountCalc",
+                "{totalAmount} = SUM({items.lineAmount} = {items.quantity} * {items.price})"));
+        EntityDefinition line = new EntityDefinition(
+                "invoice_line",
+                "sales_invoice_line",
+                "Invoice Line",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                )
+        );
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(invoice, line),
+                List.of(EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"))
+        );
+        DynamicRecord existingLine = new DynamicRecord(line)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(10));
+        existingLine.setId("line-1");
+        DynamicRecord payloadLine = new DynamicRecord(line).setValue("quantity", BigDecimal.valueOf(4));
+        payloadLine.setId("line-1");
+        DynamicRecord record = new DynamicRecord(invoice).setValue("totalAmount", BigDecimal.ZERO);
+        record.setChildren("items", List.of(payloadLine));
+
+        new DynamicFormulaRuntime(invoice, module)
+                .beforeUpdate(record, null, Map.of("items", List.of(existingLine)));
+
+        assertThat((BigDecimal) record.getValue("totalAmount")).isEqualByComparingTo("40");
+        assertThat((BigDecimal) payloadLine.getValue("lineAmount")).isEqualByComparingTo("40");
     }
 
     @Test

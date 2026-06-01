@@ -140,8 +140,8 @@ public class DynamicEntityService implements
         rejectWriteProtectedFields(record);
         lifecycle.beforeUpdate(record);
         DynamicFormulaRuntime formulaRuntime = formulaRuntime();
-        if (formulaRuntime.hasBeforeUpdateRules()) {
-            formulaRuntime.beforeUpdate(record, activeRaw(record.getId()));
+        if (formulaRuntime.hasBeforeUpdateRules(record)) {
+            formulaRuntime.beforeUpdate(record, activeRaw(record.getId()), existingChildrenForFormula(record));
         }
         validateChildPayload(record);
         validateFieldValues(record);
@@ -533,6 +533,25 @@ public class DynamicEntityService implements
 
     private DynamicFormulaRuntime formulaRuntime() {
         return new DynamicFormulaRuntime(dao.getEntity(), module);
+    }
+
+    private Map<String, List<DynamicRecord>> existingChildrenForFormula(DynamicRecord record) {
+        if (module == null || record == null || record.getId() == null || record.getId().isBlank()) {
+            return Map.of();
+        }
+        Map<String, List<DynamicRecord>> values = new LinkedHashMap<>();
+        for (EntityRelationDefinition relation : module.relations()) {
+            if (!dao.getEntity().code().equals(relation.parentEntity())
+                    || !record.getChildren().containsKey(relation.code())
+                    || record.getChildren(relation.code()) == null) {
+                continue;
+            }
+            DynamicEntityService childService = relationServiceResolver.apply(relation.childEntity());
+            values.put(relation.code(), childService.selectChildRows(
+                    Criteria.of().eq(relation.childForeignKeyField(), record.getId())
+            ));
+        }
+        return values;
     }
 
     private void requireCapability(EntityCapability capability) {

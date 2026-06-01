@@ -14,9 +14,11 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class DynamicFormulaRuntime {
     private final FormulaEngine engine = new FormulaEngine();
@@ -32,19 +34,18 @@ final class DynamicFormulaRuntime {
         execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true);
     }
 
-    void beforeUpdate(DynamicRecord record, DynamicRecord existing) {
-        execute(record, existing, List.of(FormulaRulePhase.BEFORE_SAVE), false);
+    void beforeUpdate(DynamicRecord record, DynamicRecord existing, Map<String, List<DynamicRecord>> existingChildren) {
+        execute(record, existing, existingChildren, List.of(FormulaRulePhase.BEFORE_SAVE));
     }
 
-    boolean hasBeforeUpdateRules() {
-        return hasRules(List.of(FormulaRulePhase.BEFORE_SAVE), false);
+    boolean hasBeforeUpdateRules(DynamicRecord record) {
+        return !runtimeRulesForUpdate(record, List.of(FormulaRulePhase.BEFORE_SAVE)).isEmpty();
     }
 
-    private boolean hasRules(List<FormulaRulePhase> phases, boolean includeChildDependentRules) {
+    private boolean hasRules(List<FormulaRulePhase> phases) {
         return entity.orderedFormulaRules().stream()
                 .anyMatch(rule -> rule.enabled()
-                        && phases.contains(rule.phase())
-                        && (includeChildDependentRules || !dependsOnChildRows(rule)));
+                        && phases.contains(rule.phase()));
     }
 
     private void execute(DynamicRecord record,
@@ -64,6 +65,23 @@ final class DynamicFormulaRuntime {
         applyChangedFields(record, main, tables, result.changedFields());
     }
 
+    private void execute(DynamicRecord record,
+                         DynamicRecord existing,
+                         Map<String, List<DynamicRecord>> existingChildren,
+                         List<FormulaRulePhase> phases) {
+        List<FormulaRule> rules = runtimeRulesForUpdate(record, phases);
+        if (rules.isEmpty()) {
+            return;
+        }
+        Map<String, Object> main = mainValues(record, existing);
+        Map<String, List<Map<String, Object>>> tables = childValues(record, existingChildren);
+        FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(main, tables, fieldDefinitions()));
+        if (result.report().hasErrors()) {
+            throw new IllegalArgumentException(formulaErrorMessage(result.report()));
+        }
+        applyChangedFields(record, main, tables, result.changedFields());
+    }
+
     private List<FormulaRule> runtimeRules(List<FormulaRulePhase> phases, boolean includeChildDependentRules) {
         return entity.orderedFormulaRules().stream()
                 .filter(EntityFormulaRuleDefinition::enabled)
@@ -73,9 +91,24 @@ final class DynamicFormulaRuntime {
                 .toList();
     }
 
+    private List<FormulaRule> runtimeRulesForUpdate(DynamicRecord record, List<FormulaRulePhase> phases) {
+        Set<String> submittedRelations = submittedRelations(record);
+        return entity.orderedFormulaRules().stream()
+                .filter(EntityFormulaRuleDefinition::enabled)
+                .filter(rule -> phases.contains(rule.phase()))
+                .filter(rule -> relationDependencies(rule).stream().allMatch(submittedRelations::contains))
+                .map(EntityFormulaRuleDefinition::toRuntimeRule)
+                .toList();
+    }
+
     private boolean dependsOnChildRows(EntityFormulaRuleDefinition rule) {
+        return !relationDependencies(rule).isEmpty();
+    }
+
+    private Set<String> relationDependencies(EntityFormulaRuleDefinition rule) {
+        Set<String> dependencies = new HashSet<>();
         if (module == null) {
-            return false;
+            return dependencies;
         }
         for (EntityRelationDefinition relation : module.relations()) {
             if (!entity.code().equals(relation.parentEntity())) {
@@ -83,14 +116,27 @@ final class DynamicFormulaRuntime {
             }
             String prefix = relation.code() + ".";
             if (rule.targetField() != null && rule.targetField().startsWith(prefix)) {
-                return true;
+                dependencies.add(relation.code());
             }
             if (rule.expression() != null && engine.referencedFields(rule.expression()).stream()
                     .anyMatch(field -> field.startsWith(prefix))) {
-                return true;
+                dependencies.add(relation.code());
             }
         }
-        return false;
+        return dependencies;
+    }
+
+    private Set<String> submittedRelations(DynamicRecord record) {
+        if (record == null) {
+            return Set.of();
+        }
+        Set<String> relations = new HashSet<>();
+        record.getChildren().forEach((relationCode, children) -> {
+            if (children != null) {
+                relations.add(relationCode);
+            }
+        });
+        return relations;
     }
 
     private List<FormulaFieldDefinition> fieldDefinitions() {
@@ -121,15 +167,43 @@ final class DynamicFormulaRuntime {
     }
 
     private Map<String, List<Map<String, Object>>> childValues(DynamicRecord record) {
+        return childValues(record, Map.of());
+    }
+
+    private Map<String, List<Map<String, Object>>> childValues(DynamicRecord record,
+                                                               Map<String, List<DynamicRecord>> existingChildren) {
         Map<String, List<Map<String, Object>>> values = new LinkedHashMap<>();
         record.getChildren().forEach((relationCode, children) -> {
             if (children == null) {
                 return;
             }
+            Map<String, Map<String, Object>> existingById = existingChildrenById(existingChildren.get(relationCode));
             values.put(relationCode, children.stream()
-                    .<Map<String, Object>>map(child -> new LinkedHashMap<>(child.getValues()))
+                    .<Map<String, Object>>map(child -> mergedChildValues(child, existingById))
                     .toList());
         });
+        return values;
+    }
+
+    private Map<String, Map<String, Object>> existingChildrenById(List<DynamicRecord> children) {
+        Map<String, Map<String, Object>> values = new LinkedHashMap<>();
+        if (children == null) {
+            return values;
+        }
+        for (DynamicRecord child : children) {
+            if (child.getId() != null && !child.getId().isBlank()) {
+                values.put(child.getId(), new LinkedHashMap<>(child.getValues()));
+            }
+        }
+        return values;
+    }
+
+    private Map<String, Object> mergedChildValues(DynamicRecord child, Map<String, Map<String, Object>> existingById) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        if (child.getId() != null && !child.getId().isBlank() && existingById.containsKey(child.getId())) {
+            values.putAll(existingById.get(child.getId()));
+        }
+        values.putAll(child.getValues());
         return values;
     }
 
