@@ -42,6 +42,10 @@ final class DynamicFormulaRuntime {
         return !runtimeRulesForUpdate(record, List.of(FormulaRulePhase.BEFORE_SAVE)).isEmpty();
     }
 
+    FormulaRuntimeReport beforeActionExecute(DynamicRecord record) {
+        return execute(record, null, List.of(FormulaRulePhase.ACTION_BEFORE_EXECUTE), true);
+    }
+
     private boolean hasRules(List<FormulaRulePhase> phases) {
         return entity.orderedFormulaRules().stream()
                 .anyMatch(rule -> rule.enabled()

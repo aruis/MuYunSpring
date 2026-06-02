@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -22,6 +23,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -44,6 +46,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -308,6 +311,88 @@ class DynamicRecordServiceTest {
                     assertThat(event.payload()).containsEntry("executorType", "SERVICE")
                             .containsEntry("result", "submitted:contract-1");
                 });
+    }
+
+    @Test
+    void shouldBlockServiceActionWhenBeforeExecuteRuleFails() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionRuleService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft")
+                .setValue("amount", BigDecimal.ZERO);
+        draft.setId("contract-1");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasCauseInstanceOf(DynamicFormulaException.class)
+                .hasMessageContaining("提交金额必须大于0")
+                .satisfies(error -> {
+                    DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.context().availability().available()).isTrue();
+                    assertThat(exception.context().traceId()).isNotBlank();
+                });
+        assertThat(executor.context()).isNull();
+        assertThat(events.events()).isEmpty();
+    }
+
+    @Test
+    void shouldExecuteServiceActionWhenBeforeExecuteRulePasses() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionRuleService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft")
+                .setValue("amount", BigDecimal.ONE);
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+                    assertThat(event.traceId()).isEqualTo(result.context().traceId());
+                });
+    }
+
+    @Test
+    void shouldLoadExistingRecordForBeforeExecuteRuleWhenRequestOnlyHasRecordId() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap()))
+                .thenReturn(List.of(actionAmountRow("contract-1", "C-001", "draft", BigDecimal.ONE)));
+        IdReturningActionExecutor executor = new IdReturningActionExecutor();
+        DynamicRecordService service = actionRuleService(operations, RuntimeEventPublisher.noop(), executor);
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.id("contract-1"));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(executor.context().recordId()).isEqualTo("contract-1");
+        verify(operations, atLeastOnce()).query(anyString(), anyMap());
+    }
+
+    @Test
+    void shouldKeepSubmittedChildrenForBeforeExecuteRuleWhenRequestHasNoMainFields() {
+        IDatabaseOperations<Object> operations = operations();
+        IdReturningActionExecutor executor = new IdReturningActionExecutor();
+        DynamicRecordService service = childActionRuleService(operations, RuntimeEventPublisher.noop(), executor);
+        DynamicRecord line = service.newRecord(MODULE, "line")
+                .setValue("summary", "明细已填写");
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setChildren("lines", List.of(line));
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(executor.context().recordId()).isEqualTo("contract-1");
+        verify(operations, never()).query(anyString(), anyMap());
     }
 
     @Test
@@ -1187,12 +1272,68 @@ class DynamicRecordServiceTest {
         ).register(module));
     }
 
+    private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
+                                                   RuntimeEventPublisher eventPublisher,
+                                                   DynamicActionExecutor executor) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionRuleEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(submitActionWithExecutorKey("contractSubmit"))
+        );
+        DynamicActionExecutorRegistry executorRegistry = executor == null
+                ? DynamicActionExecutorRegistry.empty()
+                : new DynamicActionExecutorRegistry(List.of(executor));
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher,
+                executorRegistry
+        ).register(module));
+    }
+
+    private DynamicRecordService childActionRuleService(IDatabaseOperations<Object> operations,
+                                                        RuntimeEventPublisher eventPublisher,
+                                                        DynamicActionExecutor executor) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionChildRuleEntity(), lineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
+                List.of(),
+                List.of(),
+                List.of(submitActionWithoutAvailability("contractSubmit"))
+        );
+        DynamicActionExecutorRegistry executorRegistry = executor == null
+                ? DynamicActionExecutorRegistry.empty()
+                : new DynamicActionExecutorRegistry(List.of(executor));
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher,
+                executorRegistry
+        ).register(module));
+    }
+
     private EntityActionDefinition submitActionWithExecutorKey(String executorKey) {
         return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
                 "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
                 EntityActionCategory.CUSTOM, null, null, null, null,
                 "{status} == 'draft'", "只有草稿合同可以提交",
                 EntityActionExecutorType.SERVICE, executorKey
+        );
+    }
+
+    private EntityActionDefinition submitActionWithoutAvailability(String executorKey) {
+        return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                EntityActionCategory.CUSTOM, null, null, null, null,
+                null, null, EntityActionExecutorType.SERVICE, executorKey
         );
     }
 
@@ -1231,6 +1372,35 @@ class DynamicRecordServiceTest {
                         FieldDefinition.string("status", "Status").length(32)
                 )
         );
+    }
+
+    private EntityDefinition actionRuleEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("status", "Status").length(32),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("submitAmountPositive", "amount", "{amount} > 0", "提交金额必须大于0")
+                .phase(FormulaRulePhase.ACTION_BEFORE_EXECUTE));
+    }
+
+    private EntityDefinition actionChildRuleEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("status", "Status").length(32)
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("submitLineRequired", "lines.summary", "COUNT({lines.summary}) > 0", "提交前必须填写明细")
+                .phase(FormulaRulePhase.ACTION_BEFORE_EXECUTE));
     }
 
     private EntityDefinition dictionaryEntity() {
@@ -1359,6 +1529,17 @@ class DynamicRecordServiceTest {
         );
     }
 
+    private Map<String, Object> actionAmountRow(String id, String code, String status, BigDecimal amount) {
+        return Map.of(
+                "id", id,
+                "code", code,
+                "status", status,
+                "amount", amount,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
     private Map<String, Object> sortableRow(String id, int sortOrder) {
         return Map.of(
                 "id", id,
@@ -1480,6 +1661,25 @@ class DynamicRecordServiceTest {
         @Override
         public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
             throw new IllegalStateException("submit failed");
+        }
+    }
+
+    private static final class IdReturningActionExecutor implements DynamicActionExecutor {
+        private DynamicActionExecutionContext context;
+
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            this.context = context;
+            return "submitted:" + context.recordId();
+        }
+
+        DynamicActionExecutionContext context() {
+            return context;
         }
     }
 }

@@ -346,10 +346,39 @@ public class DynamicRecordService {
         if (!availability.available()) {
             throw new DynamicActionExecutionException(availability.message(), context);
         }
+        validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
         Object value = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
         DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, value, traceId);
         publishActionEvent(completed, value);
         return new DynamicActionExecutionResult(completed, value);
+    }
+
+    private void validateBeforeActionExecute(String moduleAlias,
+                                             String entityAlias,
+                                             DynamicActionExecutionRequest request,
+                                             DynamicActionExecutionContext context) {
+        DynamicRecord record = availabilityRecord(moduleAlias, entityAlias, request);
+        if (record != null && (record.getId() == null || record.getId().isBlank()) && request.recordId() != null) {
+            record.setId(request.recordId());
+        }
+        if (record != null
+                && record.explicitFieldCodes().isEmpty()
+                && record.getChildren().isEmpty()
+                && record.getId() != null) {
+            DynamicRecord existing = select(moduleAlias, entityAlias, record.getId());
+            if (existing != null) {
+                record = existing;
+            }
+        }
+        if (record == null) {
+            return;
+        }
+        try {
+            new DynamicFormulaRuntime(moduleAlias, record.getEntity(), runtime.registry().requireModule(moduleAlias))
+                    .beforeActionExecute(record);
+        } catch (DynamicFormulaException e) {
+            throw new DynamicActionExecutionException(e.getMessage(), context, e);
+        }
     }
 
     private Object executeActionValue(String moduleAlias,

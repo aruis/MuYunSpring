@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
+import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -432,6 +433,7 @@ class PlatformModuleDefinitionCompilerTest {
         fieldService.insert(field(metadataId, "amount", "amount", FieldType.INTEGER));
         String relationId = relationService.insert(mainRelation("sales.invoice", metadataId));
         ModuleMetadataFormulaRule validation = formulaRule(relationId, "amountPositive", "{amount} > 0");
+        validation.setRulePhase(FormulaRulePhase.ACTION_BEFORE_EXECUTE);
         validation.setMessageTemplate("金额必须大于 0");
         formulaRuleService.insert(validation);
 
@@ -443,6 +445,7 @@ class PlatformModuleDefinitionCompilerTest {
                 .satisfies(rule -> {
                     assertThat(rule.code()).isEqualTo("amountPositive");
                     assertThat(rule.kind()).isEqualTo(FormulaRuleKind.VALIDATION);
+                    assertThat(rule.phase()).isEqualTo(FormulaRulePhase.ACTION_BEFORE_EXECUTE);
                     assertThat(rule.severity()).isEqualTo(FormulaIssueLevel.ERROR);
                     assertThat(rule.messageTemplate()).isEqualTo("金额必须大于 0");
                     assertThat(rule.stopOnError()).isTrue();
