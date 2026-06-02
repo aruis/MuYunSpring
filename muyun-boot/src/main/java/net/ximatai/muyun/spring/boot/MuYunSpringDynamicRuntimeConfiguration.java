@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
@@ -11,6 +13,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidato
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -45,8 +48,8 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    RuntimeEventPublisher runtimeEventPublisher() {
-        return RuntimeEventPublisher.noop();
+    RuntimeEventPublisher runtimeEventPublisher(ObjectProvider<RuntimeEventListener> listeners) {
+        return new RuntimeEventMulticaster(() -> listeners.orderedStream().toList());
     }
 
     @Bean
