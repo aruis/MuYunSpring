@@ -31,6 +31,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DynamicModuleDescriptorTest {
     @Test
+    void shouldExposeZonedTimestampTimeZoneCompanionInDescriptors() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.meeting",
+                "Meeting",
+                List.of(new EntityDefinition("meeting", "app_meeting", "Meeting", List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
+                )))
+        );
+
+        DynamicEntityDescriptor entity = DynamicModuleDescriptor.from(module).entities().getFirst();
+
+        assertThat(entity.fields().getFirst().fieldName()).isEqualTo("meetingAt");
+        assertThat(entity.fields().getFirst().timeZoneField()).isEqualTo("meetingAtTimeZone");
+        assertThat(entity.fields().get(1).timeZoneField()).isNull();
+        assertThat(entity.views().getFirst().fields().getFirst().timeZoneField()).isEqualTo("meetingAtTimeZone");
+    }
+
+    @Test
     void shouldExposeRuntimeModuleDefinitionAsStableDescriptor() {
         ModuleDefinition module = new ModuleDefinition(
                 "crm.customer",

@@ -101,4 +101,61 @@ class FieldDefinitionTest {
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("multiple dictionary binding requires JSON field");
     }
+
+    @Test
+    void shouldValidateZonedTimestampCompanionFieldContract() {
+        ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+
+        validator.validateEntity(new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at").required(),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at").required()
+                )
+        ));
+
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"))
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("zoned timestamp requires timeZone field");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"),
+                        FieldDefinition.integer("meetingAtTimeZone", "Time Zone").column("meeting_at_timezone")
+                )
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("zoned timestamp timeZone field must be STRING");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"),
+                        FieldDefinition.string("meetingAtTimeZone", "Time Zone").column("time_zone")
+                )
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("zoned timestamp timeZone column mismatch");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at").required(),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
+                )
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("required zoned timestamp requires required timeZone field");
+    }
 }

@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
 import java.time.Instant;
@@ -30,6 +31,7 @@ public class DynamicRecord implements EntityContract {
     private final Map<String, Object> loadedValues = new LinkedHashMap<>();
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
     private final Set<String> explicitFields = new HashSet<>();
+    private final Set<String> zonedTimestampCompanionFields;
     private FormulaRuntimeReport formulaReport = new FormulaRuntimeReport();
 
     private String id;
@@ -47,6 +49,10 @@ public class DynamicRecord implements EntityContract {
         this.entity = entity;
         this.fields = entity.fields().stream()
                 .collect(Collectors.toUnmodifiableMap(FieldDefinition::code, Function.identity()));
+        this.zonedTimestampCompanionFields = entity.fields().stream()
+                .filter(field -> field.type() == FieldType.ZONED_TIMESTAMP)
+                .map(field -> DynamicFieldValueSupport.companionFieldName(field.fieldName()))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public EntityDefinition getEntity() {
@@ -240,6 +246,24 @@ public class DynamicRecord implements EntityContract {
             if (field.isRequired() && values.get(field.code()) == null) {
                 throw new IllegalArgumentException("required dynamic field is missing: " + field.code());
             }
+            if (field.type() == FieldType.ZONED_TIMESTAMP && values.get(field.code()) != null) {
+                String companionField = DynamicFieldValueSupport.companionFieldName(field.fieldName());
+                if (values.get(companionField) == null) {
+                    throw new IllegalArgumentException("zoned timestamp timeZone is missing: " + companionField);
+                }
+            }
+        }
+    }
+
+    void validateForUpdate() {
+        for (FieldDefinition field : fields.values()) {
+            if (field.type() == FieldType.ZONED_TIMESTAMP
+                    && explicitFields.contains(field.code())) {
+                String companionField = DynamicFieldValueSupport.companionFieldName(field.fieldName());
+                if (!explicitFields.contains(companionField)) {
+                    throw new IllegalArgumentException("zoned timestamp timeZone is missing: " + companionField);
+                }
+            }
         }
     }
 
@@ -269,7 +293,11 @@ public class DynamicRecord implements EntityContract {
         }
         Object normalized;
         try {
-            normalized = DynamicFieldValueSupport.normalize(field.type(), value);
+            normalized = zonedTimestampCompanionFields.contains(field.code())
+                    ? DynamicFieldValueSupport.normalizeTimeZone(value)
+                    : (enforceRequired
+                    ? DynamicFieldValueSupport.normalize(field.type(), value)
+                    : DynamicFieldValueSupport.normalizeLoaded(field.type(), value));
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("invalid value type for dynamic field: " + field.code());
         }

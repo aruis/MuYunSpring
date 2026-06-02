@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,16 +75,31 @@ class DynamicRecordTest {
     void shouldNormalizeDynamicDateAndTimestampValues() {
         DynamicRecord record = new DynamicRecord(timeEntity())
                 .setValue("businessDate", "2026-01-02")
-                .setValue("submittedAt", LocalDateTime.parse("2026-01-02T09:30:00"));
+                .setValue("submittedAt", "2026-01-02T09:30:00Z");
 
         assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
         assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T09:30:00Z"));
 
         DynamicRecord jdbcRecord = new DynamicRecord(timeEntity())
                 .setValue("businessDate", java.sql.Date.valueOf("2026-01-03"))
-                .setValue("submittedAt", java.sql.Timestamp.from(Instant.parse("2026-01-03T01:00:00Z")));
+                .setValue("submittedAt", Instant.parse("2026-01-03T01:00:00Z"));
         assertThat(jdbcRecord.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-03"));
         assertThat(jdbcRecord.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-03T01:00:00Z"));
+    }
+
+    @Test
+    void shouldRejectTimestampWriteValuesWithoutUtcInstantSemantics() {
+        DynamicRecord record = new DynamicRecord(timeEntity());
+
+        assertThatThrownBy(() -> record.setValue("submittedAt", "2026-01-02T09:30:00+08:00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid value type");
+        assertThatThrownBy(() -> record.setValue("submittedAt", "2026-01-02T09:30:00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid value type");
+        assertThatThrownBy(() -> record.setValue("submittedAt", java.sql.Timestamp.from(Instant.parse("2026-01-03T01:00:00Z"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid value type");
     }
 
     @Test
@@ -103,13 +117,40 @@ class DynamicRecordTest {
         DynamicRecord record = new DynamicRecord(requiredTimeEntity());
 
         record.putLoadedValue("businessDate", java.sql.Date.valueOf("2026-01-02"));
-        record.putLoadedValue("submittedAt", OffsetDateTime.parse("2026-01-02T09:30:00+08:00"));
+        record.putLoadedValue("submittedAt", LocalDateTime.parse("2026-01-02T09:30:00"));
 
         assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
-        assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T01:30:00Z"));
+        assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T09:30:00Z"));
 
         record.putLoadedValue("businessDate", null);
         assertThat(record.getValue("businessDate")).isNull();
+    }
+
+    @Test
+    void shouldNormalizeZonedTimestampAndIanaTimeZoneCompanion() {
+        DynamicRecord record = new DynamicRecord(zonedTimestampEntity())
+                .setValue("meetingAt", "2026-01-02T01:30:00Z")
+                .setValue("meetingAtTimeZone", "Asia/Shanghai");
+
+        assertThat(record.getValue("meetingAt")).isEqualTo(Instant.parse("2026-01-02T01:30:00Z"));
+        assertThat(record.getValue("meetingAtTimeZone")).isEqualTo("Asia/Shanghai");
+        record.validateForInsert();
+    }
+
+    @Test
+    void shouldRejectZonedTimestampWithoutIanaTimeZoneCompanion() {
+        DynamicRecord record = new DynamicRecord(optionalZonedTimestampEntity())
+                .setValue("meetingAt", "2026-01-02T01:30:00Z");
+
+        assertThatThrownBy(record::validateForInsert)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zoned timestamp timeZone is missing");
+        assertThatThrownBy(() -> record.setValue("meetingAtTimeZone", "+08:00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid value type");
+        assertThatThrownBy(() -> record.setValue("meetingAtTimeZone", "Z"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid value type");
     }
 
     @Test
@@ -204,6 +245,30 @@ class DynamicRecordTest {
                 List.of(
                         FieldDefinition.of("businessDate", FieldType.DATE, "Business Date").column("business_date").required(),
                         FieldDefinition.timestamp("submittedAt", "Submitted At").column("submitted_at").required()
+                )
+        );
+    }
+
+    private EntityDefinition zonedTimestampEntity() {
+        return new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at").required(),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at").required()
+                )
+        );
+    }
+
+    private EntityDefinition optionalZonedTimestampEntity() {
+        return new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
                 )
         );
     }

@@ -50,7 +50,7 @@ public final class DynamicFormulaFieldDefinitions {
             case INTEGER -> FormulaValueType.INTEGER;
             case LONG -> FormulaValueType.LONG;
             case BOOLEAN -> FormulaValueType.BOOLEAN;
-            case TIMESTAMP -> FormulaValueType.TIMESTAMP;
+            case TIMESTAMP, ZONED_TIMESTAMP -> FormulaValueType.TIMESTAMP;
             case DATE -> FormulaValueType.DATE;
             case DECIMAL -> FormulaValueType.DECIMAL;
             case JSON -> FormulaValueType.JSON;

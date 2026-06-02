@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
@@ -20,6 +21,7 @@ public record DynamicFieldDescriptor(
         OptionBinding optionBinding,
         OptionSelectionMode selectionMode,
         DynamicReferenceDescriptor reference,
+        String timeZoneField,
         DynamicFieldQueryDescriptor query,
         String defaultValue,
         String validationRegex,
@@ -42,6 +44,7 @@ public record DynamicFieldDescriptor(
                 field.optionBinding(),
                 field.dictionaryBinding() == null ? null : field.dictionaryBinding().selectionMode(),
                 null,
+                timeZoneField(field),
                 DynamicFieldQueryDescriptor.from(field.queryDefinition()),
                 field.behavior().defaultValue(),
                 field.behavior().validationRegex(),
@@ -67,11 +70,18 @@ public record DynamicFieldDescriptor(
                 descriptor.optionBinding(),
                 descriptor.selectionMode(),
                 reference,
+                descriptor.timeZoneField(),
                 descriptor.query(),
                 descriptor.defaultValue(),
                 descriptor.validationRegex(),
                 descriptor.copyable(),
                 descriptor.writeProtected()
         );
+    }
+
+    private static String timeZoneField(FieldDefinition field) {
+        return field.type() == FieldType.ZONED_TIMESTAMP
+                ? DynamicFieldValueSupport.companionFieldName(field.fieldName())
+                : null;
     }
 }

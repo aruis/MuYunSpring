@@ -9,6 +9,7 @@ public enum FieldType {
     LONG(ColumnType.BIGINT),
     BOOLEAN(ColumnType.BOOLEAN),
     TIMESTAMP(ColumnType.TIMESTAMP),
+    ZONED_TIMESTAMP(ColumnType.TIMESTAMP),
     DATE(ColumnType.DATE),
     DECIMAL(ColumnType.NUMERIC),
     JSON(ColumnType.JSON);

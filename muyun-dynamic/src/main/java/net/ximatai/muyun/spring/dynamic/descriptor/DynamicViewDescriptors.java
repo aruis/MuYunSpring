@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
@@ -49,7 +50,7 @@ final class DynamicViewDescriptors {
                 entity.name(),
                 entity.fields().stream()
                         .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true,
-                                controlType(field), false, field.isRequired()))
+                                controlType(field), timeZoneField(field), false, field.isRequired()))
                         .toList()
         );
     }
@@ -70,9 +71,16 @@ final class DynamicViewDescriptors {
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
                 viewField.visible(),
                 effectiveControlType(viewField, field),
+                timeZoneField(field),
                 Boolean.TRUE.equals(viewField.readOnly()),
                 field.isRequired() || Boolean.TRUE.equals(viewField.required())
         );
+    }
+
+    private static String timeZoneField(FieldDefinition field) {
+        return field.type() == FieldType.ZONED_TIMESTAMP
+                ? DynamicFieldValueSupport.companionFieldName(field.fieldName())
+                : null;
     }
 
     private static ViewControlType effectiveControlType(EntityViewFieldDefinition viewField, FieldDefinition field) {
@@ -97,7 +105,7 @@ final class DynamicViewDescriptors {
             case INTEGER, LONG -> ViewControlType.NUMBER;
             case BOOLEAN -> ViewControlType.SWITCH;
             case DATE -> ViewControlType.DATE;
-            case TIMESTAMP -> ViewControlType.DATETIME;
+            case TIMESTAMP, ZONED_TIMESTAMP -> ViewControlType.DATETIME;
             case DECIMAL -> ViewControlType.DECIMAL;
             case JSON -> ViewControlType.JSON;
         };

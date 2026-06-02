@@ -67,13 +67,16 @@ class DynamicQueryCriteriaBuilderTest {
 
         Criteria criteria = builder.build(List.of(
                 DynamicQueryCondition.of("businessDate", DynamicQueryOperator.BETWEEN, "2026-01-01", "2026-01-31"),
-                DynamicQueryCondition.of("submittedAt", DynamicQueryOperator.GTE, "2026-01-01T00:00:00Z")
+                DynamicQueryCondition.of("submittedAt", DynamicQueryOperator.GTE, "2026-01-01T00:00:00Z"),
+                DynamicQueryCondition.of("meetingAt", DynamicQueryOperator.LTE, "2026-01-02T00:00:00Z")
         ));
 
         assertThat(criteria.getClauses().get(0).getValues())
                 .containsExactly(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"));
         assertThat(criteria.getClauses().get(1).getValues())
                 .containsExactly(Instant.parse("2026-01-01T00:00:00Z"));
+        assertThat(criteria.getClauses().get(2).getValues())
+                .containsExactly(Instant.parse("2026-01-02T00:00:00Z"));
     }
 
     @Test
@@ -84,6 +87,9 @@ class DynamicQueryCriteriaBuilderTest {
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("invalid query value type");
         assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.of("submittedAt", "2026-01-01"))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid query value type");
+        assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.of("meetingAt", "2026-01-01T00:00:00+08:00"))))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("invalid query value type");
     }
@@ -102,7 +108,9 @@ class DynamicQueryCriteriaBuilderTest {
         return new EntityDefinition("contract", "app_contract", "Contract", List.of(
                 FieldDefinition.of("businessDate", FieldType.DATE, "Business Date")
                         .queryable(),
-                FieldDefinition.timestamp("submittedAt", "Submitted At").queryable()
+                FieldDefinition.timestamp("submittedAt", "Submitted At").queryable(),
+                FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").queryable(),
+                FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
         ));
     }
 }

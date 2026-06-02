@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -655,6 +656,65 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldRequireTimeZoneCompanionWhenUpdatingZonedTimestamp() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "meeting-1",
+                "meeting_at", Instant.parse("2026-01-01T01:30:00Z"),
+                "meeting_at_timezone", "Asia/Shanghai",
+                "deleted", Boolean.FALSE,
+                "version", 1
+        )));
+        EntityDefinition entity = zonedTimestampEntity();
+        DynamicEntityService service = new DynamicEntityService(
+                new DynamicRecordDao(operations, entity),
+                "sales.meeting"
+        );
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("meetingAt", Instant.parse("2026-01-02T01:30:00Z"));
+        record.setId("meeting-1");
+        record.setVersion(1);
+
+        assertThat(record.explicitFieldCodes()).contains("meetingAt");
+        assertThatThrownBy(record::validateForUpdate)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zoned timestamp timeZone is missing");
+        assertThatThrownBy(() -> service.update(record))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zoned timestamp timeZone is missing");
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+
+        DynamicRecord clearWithoutCompanion = new DynamicRecord(entity)
+                .setValue("meetingAt", null);
+        clearWithoutCompanion.setId("meeting-1");
+        clearWithoutCompanion.setVersion(1);
+        assertThatThrownBy(() -> service.update(clearWithoutCompanion))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zoned timestamp timeZone is missing");
+
+        DynamicRecord clearWithCompanion = new DynamicRecord(entity)
+                .setValue("meetingAt", null)
+                .setValue("meetingAtTimeZone", null);
+        clearWithCompanion.setId("meeting-1");
+        clearWithCompanion.setVersion(1);
+        service.update(clearWithCompanion);
+
+        DynamicRecord valid = new DynamicRecord(entity)
+                .setValue("meetingAt", Instant.parse("2026-01-02T01:30:00Z"))
+                .setValue("meetingAtTimeZone", "Asia/Shanghai");
+        valid.setId("meeting-1");
+        valid.setVersion(1);
+        service.update(valid);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations, times(2))
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_meeting"), body.capture(), anyMap());
+        assertThat(body.getValue())
+                .containsEntry("meeting_at", Instant.parse("2026-01-02T01:30:00Z"))
+                .containsEntry("meeting_at_timezone", "Asia/Shanghai");
+    }
+
+    @Test
     void shouldRejectDynamicUpdateWhenExpectedVersionDoesNotMatch() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(0);
@@ -1263,6 +1323,18 @@ class DynamicRecordDaoTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        );
+    }
+
+    private EntityDefinition zonedTimestampEntity() {
+        return new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
                 )
         );
     }

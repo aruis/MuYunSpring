@@ -82,6 +82,17 @@ public record FieldDefinition(
         return of(fieldName, FieldType.TIMESTAMP, name);
     }
 
+    public static FieldDefinition zonedTimestamp(String fieldName, String name) {
+        return of(fieldName, FieldType.ZONED_TIMESTAMP, name);
+    }
+
+    public static FieldDefinition zonedTimestampTimeZone(String zonedTimestampFieldName, String zonedTimestampColumnName) {
+        return string(
+                DynamicFieldValueSupport.companionFieldName(zonedTimestampFieldName),
+                "Time Zone"
+        ).column(DynamicFieldValueSupport.companionColumnName(zonedTimestampColumnName)).length(64);
+    }
+
     public static FieldDefinition parentId() {
         return string(PlatformAbilityFields.TREE_PARENT_FIELD, "Parent")
                 .column(PlatformAbilityFields.TREE_PARENT_COLUMN)

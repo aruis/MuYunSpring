@@ -20,7 +20,7 @@ public enum DynamicQueryOperator {
         return switch (fieldType) {
             case STRING, TEXT -> EnumSet.of(EQ, LIKE, IN);
             case BOOLEAN -> EnumSet.of(EQ);
-            case INTEGER, LONG, DECIMAL, TIMESTAMP, DATE -> EnumSet.of(EQ, BETWEEN, GT, GTE, LT, LTE, IN);
+            case INTEGER, LONG, DECIMAL, TIMESTAMP, ZONED_TIMESTAMP, DATE -> EnumSet.of(EQ, BETWEEN, GT, GTE, LT, LTE, IN);
             case JSON -> EnumSet.of(EQ);
         };
     }

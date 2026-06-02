@@ -7,6 +7,7 @@ public record DynamicViewFieldDescriptor(
         String title,
         boolean visible,
         ViewControlType controlType,
+        String timeZoneField,
         boolean readOnly,
         boolean required
 ) {
