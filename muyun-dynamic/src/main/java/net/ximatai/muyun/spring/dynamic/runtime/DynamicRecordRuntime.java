@@ -21,6 +21,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final DynamicFieldValueValidator fieldValueValidator;
     private final RuntimeEventPublisher eventPublisher;
     private final DynamicActionExecutorRegistry actionExecutorRegistry;
+    private final DynamicActionTransactionOperator actionTransactionOperator;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
@@ -52,6 +53,16 @@ public class DynamicRecordRuntime implements AutoCloseable {
                                 DynamicFieldValueValidator fieldValueValidator,
                                 RuntimeEventPublisher eventPublisher,
                                 DynamicActionExecutorRegistry actionExecutorRegistry) {
+        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry,
+                DynamicActionTransactionOperator.none());
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
+                                DynamicModuleRegistry registry,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                RuntimeEventPublisher eventPublisher,
+                                DynamicActionExecutorRegistry actionExecutorRegistry,
+                                DynamicActionTransactionOperator actionTransactionOperator) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
@@ -59,6 +70,9 @@ public class DynamicRecordRuntime implements AutoCloseable {
         this.actionExecutorRegistry = actionExecutorRegistry == null
                 ? DynamicActionExecutorRegistry.empty()
                 : actionExecutorRegistry;
+        this.actionTransactionOperator = actionTransactionOperator == null
+                ? DynamicActionTransactionOperator.none()
+                : actionTransactionOperator;
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
@@ -96,6 +110,10 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
     public DynamicActionExecutorRegistry actionExecutorRegistry() {
         return actionExecutorRegistry;
+    }
+
+    public DynamicActionTransactionOperator actionTransactionOperator() {
+        return actionTransactionOperator;
     }
 
     public DynamicEntityService entityService(String moduleAlias, String entityAlias) {

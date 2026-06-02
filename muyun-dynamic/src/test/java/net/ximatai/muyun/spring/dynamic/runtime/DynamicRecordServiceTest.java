@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -412,6 +413,54 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExecuteServiceActionInsideConfiguredTransactionOperator() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        RecordingActionTransactionOperator transactionOperator = new RecordingActionTransactionOperator();
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(), new WritingActionExecutor(),
+                submitActionWithExecutorKey("contractSubmit"), transactionOperator);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo(1);
+        assertThat(transactionOperator.calls()).isEqualTo(1);
+        assertThat(transactionOperator.committed()).isEqualTo(1);
+        assertThat(transactionOperator.rolledBack()).isZero();
+    }
+
+    @Test
+    void shouldRollbackActionTransactionAndPublishFailureEventWhenExecutorFails() {
+        RecordingActionTransactionOperator transactionOperator = new RecordingActionTransactionOperator();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, new FailingActionExecutor(),
+                submitActionWithExecutorKey("contractSubmit"), transactionOperator);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                .isInstanceOf(DynamicActionExecutionException.class);
+
+        assertThat(transactionOperator.calls()).isEqualTo(1);
+        assertThat(transactionOperator.committed()).isZero();
+        assertThat(transactionOperator.rolledBack()).isEqualTo(1);
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+                    assertThat(event.actionCode()).isEqualTo("submit");
+                    assertThat(event.payload()).containsEntry("failureStage", "execute");
+                });
+    }
+
+    @Test
     void shouldPassPayloadToServiceActionAndExposeStructuredResultBody() {
         PayloadActionExecutor executor = new PayloadActionExecutor();
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
@@ -714,6 +763,52 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("event publish failed");
         assertThat(events.eventTypes()).containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
+    }
+
+    @Test
+    void shouldNotPublishActionFailureWhenSuccessEventFailsAfterActionTransactionCommits() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        ThrowingActionEventPublisher events = new ThrowingActionEventPublisher();
+        SpringLikeActionTransactionOperator transactionOperator = new SpringLikeActionTransactionOperator();
+        DynamicRecordService service = actionService(operations, events, null,
+                submitActionWithExecutorKey("contractSubmit"), transactionOperator);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> service.module(MODULE)
+                .executeAction("create", DynamicActionExecutionRequest.record(record)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("event publish failed");
+
+        assertThat(transactionOperator.committed()).isEqualTo(1);
+        assertThat(events.eventTypes()).containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
+    }
+
+    @Test
+    void shouldNotPublishActionFailureWhenMutationEventFailsAfterActionTransactionCommits() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        ThrowingMutationEventPublisher events = new ThrowingMutationEventPublisher();
+        SpringLikeActionTransactionOperator transactionOperator = new SpringLikeActionTransactionOperator();
+        DynamicRecordService service = actionService(operations, events, null,
+                submitActionWithExecutorKey("contractSubmit"), transactionOperator);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> service.module(MODULE)
+                .executeAction("create", DynamicActionExecutionRequest.record(record)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mutation event publish failed");
+
+        assertThat(transactionOperator.committed()).isEqualTo(1);
+        assertThat(events.eventTypes()).containsExactly(RuntimeEventType.AFTER_CREATE);
     }
 
     @Test
@@ -1544,6 +1639,15 @@ class DynamicRecordServiceTest {
                                                RuntimeEventPublisher eventPublisher,
                                                DynamicActionExecutor executor,
                                                EntityActionDefinition submitAction) {
+        return actionService(operations, eventPublisher, executor, submitAction,
+                DynamicActionTransactionOperator.none());
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations,
+                                               RuntimeEventPublisher eventPublisher,
+                                               DynamicActionExecutor executor,
+                                               EntityActionDefinition submitAction,
+                                               DynamicActionTransactionOperator transactionOperator) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1561,7 +1665,8 @@ class DynamicRecordServiceTest {
                 new DynamicModuleRegistry(),
                 DynamicFieldValueValidator.NONE,
                 eventPublisher,
-                executorRegistry
+                executorRegistry,
+                transactionOperator
         ).register(module));
     }
 
@@ -1950,6 +2055,71 @@ class DynamicRecordServiceTest {
         }
     }
 
+    private static final class RecordingActionTransactionOperator implements DynamicActionTransactionOperator {
+        private int calls;
+        private int committed;
+        private int rolledBack;
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, Supplier<?> action) {
+            calls++;
+            try {
+                Object result = action.get();
+                committed++;
+                return result;
+            } catch (RuntimeException e) {
+                rolledBack++;
+                throw e;
+            }
+        }
+
+        int calls() {
+            return calls;
+        }
+
+        int committed() {
+            return committed;
+        }
+
+        int rolledBack() {
+            return rolledBack;
+        }
+    }
+
+    private static final class SpringLikeActionTransactionOperator implements DynamicActionTransactionOperator {
+        private int committed;
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, Supplier<?> action) {
+            boolean actionCompleted = false;
+            try {
+                TransactionSynchronizationManager.initSynchronization();
+                TransactionSynchronizationManager.setActualTransactionActive(true);
+                Object result = action.get();
+                actionCompleted = true;
+                committed++;
+                TransactionSynchronizationManager.getSynchronizations()
+                        .forEach(TransactionSynchronization::afterCommit);
+                return result;
+            } catch (RuntimeException e) {
+                if (!actionCompleted && TransactionSynchronizationManager.isSynchronizationActive()) {
+                    TransactionSynchronizationManager.getSynchronizations()
+                            .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+                }
+                throw e;
+            } finally {
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    TransactionSynchronizationManager.clearSynchronization();
+                }
+                TransactionSynchronizationManager.setActualTransactionActive(false);
+            }
+        }
+
+        int committed() {
+            return committed;
+        }
+    }
+
     private static final class ThrowingActionEventPublisher implements RuntimeEventPublisher {
         private final List<RuntimeEventType> eventTypes = new ArrayList<>();
 
@@ -1958,6 +2128,22 @@ class DynamicRecordServiceTest {
             eventTypes.add(event.eventType());
             if (event.eventType() == RuntimeEventType.ACTION_EXECUTED) {
                 throw new IllegalStateException("event publish failed");
+            }
+        }
+
+        List<RuntimeEventType> eventTypes() {
+            return eventTypes;
+        }
+    }
+
+    private static final class ThrowingMutationEventPublisher implements RuntimeEventPublisher {
+        private final List<RuntimeEventType> eventTypes = new ArrayList<>();
+
+        @Override
+        public void publish(RuntimeEvent event) {
+            eventTypes.add(event.eventType());
+            if (event.eventType() == RuntimeEventType.AFTER_CREATE) {
+                throw new IllegalStateException("mutation event publish failed");
             }
         }
 

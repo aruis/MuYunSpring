@@ -9,6 +9,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TransactionScopeSupportTest {
     @BeforeEach
@@ -63,5 +64,20 @@ class TransactionScopeSupportTest {
         TransactionSynchronizationManager.getSynchronizations()
                 .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
         assertThat(calls).hasValue(0);
+    }
+
+    @Test
+    void shouldMarkAfterCommitActionFailure() {
+        TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        TransactionScopeSupport.afterCommitOrNow(() -> {
+            throw new IllegalStateException("event failed");
+        });
+
+        assertThatThrownBy(() -> TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit))
+                .isInstanceOf(TransactionScopeSupport.AfterCommitActionException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
     }
 }

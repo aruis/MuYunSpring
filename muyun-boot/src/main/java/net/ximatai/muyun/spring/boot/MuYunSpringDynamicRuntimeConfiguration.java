@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
@@ -19,6 +20,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration(proxyBeanMethods = false)
 public class MuYunSpringDynamicRuntimeConfiguration {
@@ -46,9 +49,10 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations<?> operations,
                                               DynamicFieldValueValidator fieldValueValidator,
                                               RuntimeEventPublisher eventPublisher,
-                                              DynamicActionExecutorRegistry actionExecutorRegistry) {
+                                              DynamicActionExecutorRegistry actionExecutorRegistry,
+                                              DynamicActionTransactionOperator actionTransactionOperator) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
-                eventPublisher, actionExecutorRegistry);
+                eventPublisher, actionExecutorRegistry, actionTransactionOperator);
     }
 
     @Bean
@@ -61,6 +65,18 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     @ConditionalOnMissingBean
     DynamicActionExecutorRegistry dynamicActionExecutorRegistry(ObjectProvider<DynamicActionExecutor> executors) {
         return new DynamicActionExecutorRegistry(() -> executors.orderedStream().toList());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    DynamicActionTransactionOperator dynamicActionTransactionOperator(
+            ObjectProvider<PlatformTransactionManager> transactionManager) {
+        PlatformTransactionManager manager = transactionManager.getIfAvailable();
+        if (manager == null) {
+            return DynamicActionTransactionOperator.none();
+        }
+        TransactionTemplate transactionTemplate = new TransactionTemplate(manager);
+        return (context, action) -> transactionTemplate.execute(status -> action.get());
     }
 
     @Bean

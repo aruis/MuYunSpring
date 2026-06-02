@@ -29,7 +29,11 @@ public final class TransactionScopeSupport {
                     new Class<?>[]{synchronization},
                     (proxy, method, args) -> {
                         if ("afterCommit".equals(method.getName())) {
-                            action.run();
+                            try {
+                                action.run();
+                            } catch (RuntimeException e) {
+                                throw new AfterCommitActionException(e);
+                            }
                         }
                         return defaultValue(method.getReturnType());
                     }
@@ -62,5 +66,15 @@ public final class TransactionScopeSupport {
             return '\0';
         }
         return 0;
+    }
+
+    public static final class AfterCommitActionException extends RuntimeException {
+        public AfterCommitActionException(RuntimeException cause) {
+            super(cause);
+        }
+
+        public RuntimeException unwrap() {
+            return (RuntimeException) getCause();
+        }
     }
 }

@@ -9,19 +9,26 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class MuYunSpringDynamicRuntimeConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -117,6 +124,41 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
 
                     assertThat(context).hasSingleBean(DynamicRecordRuntime.class);
                     assertThat(registry.contains("runtimeSubmit")).isTrue();
+                });
+    }
+
+    @Test
+    void shouldConfigureActionTransactionOperatorFromTransactionManager() {
+        PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+        when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+
+        contextRunner.withBean(PlatformTransactionManager.class, () -> transactionManager)
+                .run(context -> {
+                    DynamicActionTransactionOperator operator = context.getBean(DynamicActionTransactionOperator.class);
+
+                    String result = operator.executeResult(null, () -> "ok");
+
+                    assertThat(result).isEqualTo("ok");
+                    verify(transactionManager).getTransaction(any());
+                    verify(transactionManager).commit(any());
+                });
+    }
+
+    @Test
+    void shouldRollbackActionTransactionWhenCallbackFails() {
+        PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+        when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+
+        contextRunner.withBean(PlatformTransactionManager.class, () -> transactionManager)
+                .run(context -> {
+                    DynamicActionTransactionOperator operator = context.getBean(DynamicActionTransactionOperator.class);
+
+                    assertThatThrownBy(() -> operator.execute(null, () -> {
+                        throw new IllegalStateException("boom");
+                    })).isInstanceOf(IllegalStateException.class);
+
+                    verify(transactionManager).getTransaction(any());
+                    verify(transactionManager).rollback(any());
                 });
     }
 

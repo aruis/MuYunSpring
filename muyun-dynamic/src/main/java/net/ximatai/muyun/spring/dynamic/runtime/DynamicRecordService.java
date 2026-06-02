@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
@@ -352,20 +353,38 @@ public class DynamicRecordService {
             throw new DynamicActionExecutionException(availability.message(), context,
                     DynamicActionExecutionException.STAGE_AVAILABILITY, null);
         }
-        DynamicActionResultBody body;
+        DynamicActionExecutionResult result;
         try {
-            validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
-            body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
+            result = runtime.actionTransactionOperator().executeResult(context, () -> {
+                validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
+                DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
+                DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
+                return new DynamicActionExecutionResult(completed, body.value(), body);
+            });
         } catch (DynamicActionExecutionException e) {
             publishActionFailureEvent(context, e.failureStage(), e.getMessage(), failureError(e));
             throw e;
         } catch (RuntimeException e) {
+            RuntimeException afterCommitFailure = afterCommitFailure(e);
+            if (afterCommitFailure != null) {
+                throw afterCommitFailure;
+            }
             publishActionFailureEvent(context, DynamicActionExecutionException.STAGE_EXECUTE, e.getMessage(), e);
             throw e;
         }
-        DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
-        publishActionEvent(completed, body);
-        return new DynamicActionExecutionResult(completed, body.value(), body);
+        publishActionEvent(result.context(), result.body());
+        return result;
+    }
+
+    private RuntimeException afterCommitFailure(RuntimeException error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof TransactionScopeSupport.AfterCommitActionException afterCommit) {
+                return afterCommit.unwrap();
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private void validateBeforeActionExecute(String moduleAlias,
@@ -985,4 +1004,5 @@ public class DynamicRecordService {
             return service.resolveFieldReference(moduleAlias, entityAlias, fieldName, request);
         }
     }
+
 }
