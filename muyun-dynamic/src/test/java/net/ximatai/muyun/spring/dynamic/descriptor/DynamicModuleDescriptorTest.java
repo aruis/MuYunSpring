@@ -177,13 +177,63 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create")
                 .doesNotContain("exportContact");
+        assertThat(descriptor.actions())
+                .extracting(DynamicActionDescriptor::code)
+                .contains("list", "page", "count");
         assertThat(descriptor.actions().stream().filter(action -> action.code().equals("create")).findFirst())
                 .get()
                 .extracting(DynamicActionDescriptor::title)
                 .isEqualTo("新建客户");
-        assertThat(descriptor.entities().getFirst().actions())
+        List<String> contactActions = descriptor.entities().stream()
+                .filter(entity -> entity.entityCode().equals("contact"))
+                .findFirst()
+                .get()
+                .actions().stream()
+                .map(DynamicActionDescriptor::code)
+                .toList();
+        List<String> customerActions = descriptor.entities().stream()
+                .filter(entity -> entity.entityCode().equals("customer"))
+                .findFirst()
+                .get()
+                .actions().stream()
+                .map(DynamicActionDescriptor::code)
+                .toList();
+        assertThat(contactActions).contains("exportContact");
+        assertThat(customerActions)
+                .contains("create")
+                .doesNotContain("exportContact");
+    }
+
+    @Test
+    void shouldNotInferModuleActionsFromFirstEntityWhenMainEntityIsExplicit() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(
+                        new EntityDefinition("contact", "crm_contact", "Contact",
+                                List.of(FieldDefinition.titleField())),
+                        new EntityDefinition("customer", "crm_customer", "Customer",
+                                List.of(FieldDefinition.titleField()))
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
+                                "导出联系人", true, EntityActionStyle.NORMAL),
+                        new EntityActionDefinition("customer", "approveCustomer", EntityActionKind.CUSTOM,
+                                "审核客户", true, EntityActionStyle.PRIMARY)
+                ),
+                "customer"
+        );
+
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
+
+        assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
-                .contains("exportContact");
+                .contains("approveCustomer")
+                .doesNotContain("exportContact");
     }
 
     @Test
