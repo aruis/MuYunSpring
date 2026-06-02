@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
+import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
@@ -17,10 +19,14 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 class DynamicModuleDescriptorRuntimeTest {
     @Test
@@ -93,7 +99,46 @@ class DynamicModuleDescriptorRuntimeTest {
         assertThat(lineApi.actions()).extracting(action -> action.code()).contains("exportLine");
         assertThat(lineApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
         assertThat(lineApi.reference("contractId").targetEntityAlias()).isEqualTo("contract");
+        assertThat(lineApi.describe().fields().get(1).reference().targetEntityAlias()).isEqualTo("contract");
         assertThat(lineApi.associationView("contractId").targetEntityAlias()).isEqualTo("contract");
+    }
+
+    @Test
+    void shouldResolveReferenceByFieldName() {
+        @SuppressWarnings("unchecked")
+        net.ximatai.muyun.database.core.IDatabaseOperations<Object> operations =
+                org.mockito.Mockito.mock(net.ximatai.muyun.database.core.IDatabaseOperations.class);
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "title", "Contract One",
+                "deleted", false,
+                "version", 0
+        )));
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(
+                        new EntityDefinition("contract", "sales_contract", "Contract",
+                                List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE)),
+                        new EntityDefinition("line", "sales_contract_line", "Line",
+                                List.of(FieldDefinition.titleField(), new FieldDefinition("contractId", "contract_id",
+                                        net.ximatai.muyun.spring.dynamic.metadata.FieldType.STRING, "Contract")),
+                                Set.of(EntityCapability.REFERENCE))
+                ),
+                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
+                List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract"))
+        );
+        DynamicRecordService.EntityOperations lineApi = new DynamicRecordService(
+                new DynamicRecordRuntime(operations).publish(module)).entity("sales.contract", "line");
+
+        DynamicReferenceResolveResponse response = lineApi.resolveFieldReference("contractId",
+                DynamicReferenceResolveRequest.query("Contract").withPage(PageRequest.of(1, 10)));
+
+        assertThat(response.options())
+                .extracting(DynamicReferenceResolveItem::id)
+                .containsExactly("contract-1");
     }
 
     @Test

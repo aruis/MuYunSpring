@@ -196,6 +196,12 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
         assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
         assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityAlias()).isEqualTo("invoice");
+        assertThat(DynamicModuleDescriptor.from(definition).entities().get(1).fields().stream()
+                .filter(field -> field.fieldName().equals("invoiceId"))
+                .findFirst())
+                .get()
+                .extracting(field -> field.reference().targetEntityAlias())
+                .isEqualTo("invoice");
         assertThat(definition.associationViews()).extracting(EntityAssociationViewDefinition::code)
                 .contains("lines", "invoiceId");
         EntityAssociationViewDefinition referenceView = definition.associationViews().stream()

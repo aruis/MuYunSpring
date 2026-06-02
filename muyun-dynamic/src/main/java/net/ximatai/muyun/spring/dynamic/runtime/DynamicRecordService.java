@@ -237,6 +237,13 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityAlias).resolveReference(sourceField, request);
     }
 
+    public DynamicReferenceResolveResponse resolveFieldReference(String moduleAlias,
+                                                                 String entityAlias,
+                                                                 String fieldName,
+                                                                 DynamicReferenceResolveRequest request) {
+        return resolveReference(moduleAlias, entityAlias, fieldName, request);
+    }
+
     private DynamicEntityService entityService(String moduleAlias, String entityAlias) {
         return runtime.entityService(moduleAlias, entityAlias);
     }
@@ -490,6 +497,10 @@ public class DynamicRecordService {
 
         public DynamicReferenceResolveResponse resolveReference(String sourceField, DynamicReferenceResolveRequest request) {
             return service.resolveReference(moduleAlias, entityAlias, sourceField, request);
+        }
+
+        public DynamicReferenceResolveResponse resolveFieldReference(String fieldName, DynamicReferenceResolveRequest request) {
+            return service.resolveFieldReference(moduleAlias, entityAlias, fieldName, request);
         }
     }
 }
