@@ -195,6 +195,8 @@ class DynamicRecordServiceTest {
                 .executeAction("create", DynamicActionExecutionRequest.record(record));
 
         assertThat(result.value()).isEqualTo("contract-1");
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.RECORD_ID);
+        assertThat(result.body().refresh()).isTrue();
         assertThat(result.context().moduleAlias()).isEqualTo(MODULE);
         assertThat(result.context().entityAlias()).isEqualTo("contract");
         assertThat(result.context().actionCode()).isEqualTo("create");
@@ -243,6 +245,8 @@ class DynamicRecordServiceTest {
         assertThat(action.recordId()).isEqualTo("contract-1");
         assertThat(action.actionCode()).isEqualTo("create");
         assertThat(action.payload()).containsEntry("executorType", "STANDARD")
+                .containsEntry("resultType", "RECORD_ID")
+                .containsEntry("refresh", true)
                 .containsEntry("result", "contract-1");
     }
 
@@ -297,6 +301,7 @@ class DynamicRecordServiceTest {
                 .executeAction("submit", DynamicActionExecutionRequest.record(draft));
 
         assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.VALUE);
         assertThat(executor.context().moduleAlias()).isEqualTo(MODULE);
         assertThat(executor.context().entityAlias()).isEqualTo("contract");
         assertThat(executor.context().actionCode()).isEqualTo("submit");
@@ -309,8 +314,55 @@ class DynamicRecordServiceTest {
                     assertThat(event.actionCode()).isEqualTo("submit");
                     assertThat(event.traceId()).isEqualTo(result.context().traceId());
                     assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("resultType", "VALUE")
                             .containsEntry("result", "submitted:contract-1");
                 });
+    }
+
+    @Test
+    void shouldPassPayloadToServiceActionAndExposeStructuredResultBody() {
+        PayloadActionExecutor executor = new PayloadActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)
+                        .withPayloadValue("comment", "同意提交"));
+
+        assertThat(executor.request().payload()).containsEntry("comment", "同意提交");
+        assertThat(result.value()).isEqualTo("同意提交");
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.VALUE);
+        assertThat(result.body().message()).isEqualTo("已提交");
+        assertThat(result.body().refresh()).isTrue();
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> assertThat(event.payload())
+                        .containsEntry("executorType", "SERVICE")
+                        .containsEntry("resultType", "VALUE")
+                        .containsEntry("message", "已提交")
+                        .containsEntry("refresh", true)
+                        .containsEntry("result", "同意提交"));
+    }
+
+    @Test
+    void shouldAllowNullPayloadValueAndKeepPayloadImmutable() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.empty()
+                .withPayloadValue("comment", null);
+
+        assertThat(request.payload()).containsEntry("comment", null);
+        assertThatThrownBy(() -> request.payload().put("another", "value"))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void shouldClassifyStructuredActionResultAsObject() {
+        DynamicActionResultBody body = DynamicActionResultBody.of(Map.of("nextStatus", "submitted"));
+
+        assertThat(body.type()).isEqualTo(DynamicActionResultType.OBJECT);
+        assertThat(body.value()).isEqualTo(Map.of("nextStatus", "submitted"));
     }
 
     @Test
@@ -918,6 +970,8 @@ class DynamicRecordServiceTest {
                 .executeAction("enable", DynamicActionExecutionRequest.id("contract-1"));
 
         assertThat(result.value()).isEqualTo(1);
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.COUNT);
+        assertThat(result.body().refresh()).isTrue();
         assertThat(result.context().recordId()).isEqualTo("contract-1");
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
@@ -1715,6 +1769,27 @@ class DynamicRecordServiceTest {
         @Override
         public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
             return null;
+        }
+    }
+
+    private static final class PayloadActionExecutor implements DynamicActionExecutor {
+        private DynamicActionExecutionRequest request;
+
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            this.request = request;
+            return DynamicActionResultBody.of(request.payload().get("comment"))
+                    .message("已提交")
+                    .withRefresh();
+        }
+
+        DynamicActionExecutionRequest request() {
+            return request;
         }
     }
 

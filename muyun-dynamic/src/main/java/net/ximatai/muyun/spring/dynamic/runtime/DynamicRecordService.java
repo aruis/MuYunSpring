@@ -347,10 +347,10 @@ public class DynamicRecordService {
             throw new DynamicActionExecutionException(availability.message(), context);
         }
         validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
-        Object value = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
-        DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, value, traceId);
-        publishActionEvent(completed, value);
-        return new DynamicActionExecutionResult(completed, value);
+        DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
+        DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
+        publishActionEvent(completed, body);
+        return new DynamicActionExecutionResult(completed, body.value(), body);
     }
 
     private void validateBeforeActionExecute(String moduleAlias,
@@ -393,12 +393,12 @@ public class DynamicRecordService {
                 && (isActionRecordProbe(record) || !record.getChildren().isEmpty());
     }
 
-    private Object executeActionValue(String moduleAlias,
-                                      String entityAlias,
-                                      DynamicActionDescriptor action,
-                                      DynamicActionExecutionRequest request,
-                                      DynamicActionExecutionContext context,
-                                      String traceId) {
+    private DynamicActionResultBody executeActionValue(String moduleAlias,
+                                                       String entityAlias,
+                                                       DynamicActionDescriptor action,
+                                                       DynamicActionExecutionRequest request,
+                                                       DynamicActionExecutionContext context,
+                                                       String traceId) {
         if (action.executorType() == EntityActionExecutorType.STANDARD) {
             return executeStandardAction(moduleAlias, entityAlias, action.code(), request, traceId);
         }
@@ -410,7 +410,7 @@ public class DynamicRecordService {
                 throw new DynamicActionExecutionException(e.getMessage(), context);
             }
             try {
-                return executor.execute(context, request);
+                return actionResultBody(executor.execute(context, request));
             } catch (DynamicActionExecutionException e) {
                 throw e;
             } catch (RuntimeException e) {
@@ -423,50 +423,68 @@ public class DynamicRecordService {
         );
     }
 
-    private Object executeStandardAction(String moduleAlias,
-                                         String entityAlias,
-                                         String actionCode,
-                                         DynamicActionExecutionRequest request,
-                                         String traceId) {
+    private DynamicActionResultBody executeStandardAction(String moduleAlias,
+                                                          String entityAlias,
+                                                          String actionCode,
+                                                          DynamicActionExecutionRequest request,
+                                                          String traceId) {
         return switch (actionCode) {
-            case "create" -> create(moduleAlias, entityAlias, requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId);
-            case "select" -> select(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "update" -> update(moduleAlias, entityAlias, requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId);
-            case "delete" -> delete(moduleAlias, entityAlias, requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId);
-            case "list" -> list(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request));
-            case "page" -> page(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request));
-            case "count" -> count(moduleAlias, entityAlias, criteria(request));
-            case "queryCriteria" -> queryCriteria(moduleAlias, entityAlias, request.queryConditions());
-            case "sortedList" -> sortedList(moduleAlias, entityAlias, criteria(request));
+            case "create" -> new DynamicActionResultBody(DynamicActionResultType.RECORD_ID,
+                    create(moduleAlias, entityAlias, requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId),
+                    null, true, null);
+            case "select" -> DynamicActionResultBody.of(select(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "update" -> countResult(update(moduleAlias, entityAlias,
+                    requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId));
+            case "delete" -> countResult(delete(moduleAlias, entityAlias,
+                    requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId));
+            case "list" -> DynamicActionResultBody.of(list(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request)));
+            case "page" -> DynamicActionResultBody.of(page(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request)));
+            case "count" -> new DynamicActionResultBody(DynamicActionResultType.COUNT,
+                    count(moduleAlias, entityAlias, criteria(request)), null, false, null);
+            case "queryCriteria" -> DynamicActionResultBody.of(queryCriteria(moduleAlias, entityAlias, request.queryConditions()));
+            case "sortedList" -> DynamicActionResultBody.of(sortedList(moduleAlias, entityAlias, criteria(request)));
             case "reorder" -> {
                 reorder(moduleAlias, entityAlias, request.orderedIds(), RuntimeMutationSource.ACTION, traceId);
-                yield null;
+                yield DynamicActionResultBody.none().withRefresh();
             }
             case "moveBefore" -> {
                 moveBefore(moduleAlias, entityAlias, requireRecordId(request, actionCode),
                         requireText(request.beforeId(), "beforeId"), RuntimeMutationSource.ACTION, traceId);
-                yield null;
+                yield DynamicActionResultBody.none().withRefresh();
             }
             case "moveAfter" -> {
                 moveAfter(moduleAlias, entityAlias, requireRecordId(request, actionCode),
                         requireText(request.afterId(), "afterId"), RuntimeMutationSource.ACTION, traceId);
-                yield null;
+                yield DynamicActionResultBody.none().withRefresh();
             }
-            case "children" -> children(moduleAlias, entityAlias, request.parentId());
-            case "ancestorIds" -> ancestorIds(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "ancestorIdsAndSelf" -> ancestorIdsAndSelf(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "descendantIds" -> descendantIds(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "title" -> title(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "titles" -> titles(moduleAlias, entityAlias, request.ids());
-            case "projections" -> projections(moduleAlias, entityAlias, request.ids(), request.fieldNames());
-            case "referenceOptions" -> referenceOptions(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode));
-            case "enable" -> enable(moduleAlias, entityAlias, requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId);
-            case "disable" -> disable(moduleAlias, entityAlias, requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId);
-            case "isEnabled" -> isEnabled(moduleAlias, entityAlias, requireRecordId(request, actionCode));
-            case "enabledCriteria" -> enabledCriteria(moduleAlias, entityAlias, criteria(request));
+            case "children" -> DynamicActionResultBody.of(children(moduleAlias, entityAlias, request.parentId()));
+            case "ancestorIds" -> DynamicActionResultBody.of(ancestorIds(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "ancestorIdsAndSelf" -> DynamicActionResultBody.of(ancestorIdsAndSelf(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "descendantIds" -> DynamicActionResultBody.of(descendantIds(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "title" -> DynamicActionResultBody.of(title(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "titles" -> DynamicActionResultBody.of(titles(moduleAlias, entityAlias, request.ids()));
+            case "projections" -> DynamicActionResultBody.of(projections(moduleAlias, entityAlias, request.ids(), request.fieldNames()));
+            case "referenceOptions" -> DynamicActionResultBody.of(referenceOptions(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode)));
+            case "enable" -> countResult(enable(moduleAlias, entityAlias,
+                    requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId));
+            case "disable" -> countResult(disable(moduleAlias, entityAlias,
+                    requireRecordId(request, actionCode), RuntimeMutationSource.ACTION, traceId));
+            case "isEnabled" -> DynamicActionResultBody.of(isEnabled(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
+            case "enabledCriteria" -> DynamicActionResultBody.of(enabledCriteria(moduleAlias, entityAlias, criteria(request)));
             default -> throw new IllegalArgumentException("unknown standard dynamic action: "
                     + moduleAlias + "." + entityAlias + "." + actionCode);
         };
+    }
+
+    private DynamicActionResultBody actionResultBody(Object value) {
+        if (value instanceof DynamicActionResultBody body) {
+            return body;
+        }
+        return DynamicActionResultBody.of(value);
+    }
+
+    private DynamicActionResultBody countResult(int count) {
+        return new DynamicActionResultBody(DynamicActionResultType.COUNT, count, null, count > 0, null);
     }
 
     private DynamicRecord availabilityRecord(String moduleAlias, String entityAlias, DynamicActionExecutionRequest request) {
@@ -580,7 +598,7 @@ public class DynamicRecordService {
         ));
     }
 
-    private void publishActionEvent(DynamicActionExecutionContext context, Object value) {
+    private void publishActionEvent(DynamicActionExecutionContext context, DynamicActionResultBody body) {
         runtime.eventPublisher().publishAfterCommit(RuntimeEvent.of(
                 context.traceId(),
                 RuntimeEventType.ACTION_EXECUTED,
@@ -591,16 +609,26 @@ public class DynamicRecordService {
                 context.tenantId(),
                 context.systemContext(),
                 RuntimeMutationSource.ACTION,
-                actionPayload(context, value)
+                actionPayload(context, body)
         ));
     }
 
-    private Map<String, Object> actionPayload(DynamicActionExecutionContext context, Object value) {
+    private Map<String, Object> actionPayload(DynamicActionExecutionContext context, DynamicActionResultBody body) {
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("executorType", context.action().executorType().name());
         payload.put("available", context.availability().available());
-        if (value != null && isSimpleEventValue(value)) {
-            payload.put("result", value);
+        payload.put("resultType", body.type().name());
+        if (body.message() != null) {
+            payload.put("message", body.message());
+        }
+        if (body.refresh()) {
+            payload.put("refresh", true);
+        }
+        if (body.redirectTo() != null) {
+            payload.put("redirectTo", body.redirectTo());
+        }
+        if (body.value() != null && isSimpleEventValue(body.value())) {
+            payload.put("result", body.value());
         }
         return payload;
     }
