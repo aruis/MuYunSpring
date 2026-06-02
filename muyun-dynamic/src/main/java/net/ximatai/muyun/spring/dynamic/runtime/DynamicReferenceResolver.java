@@ -29,7 +29,7 @@ final class DynamicReferenceResolver {
         DynamicReferenceResolveRequest effective = request == null
                 ? DynamicReferenceResolveRequest.query(null)
                 : request;
-        sourceService.requireSameEntityCodeForReference(plan);
+        sourceService.requireSameEntityAliasForReference(plan);
         if (effective.mode() == DynamicReferenceResolveMode.TRANSLATE) {
             return translate(effective);
         }

@@ -30,22 +30,22 @@ public class ModuleDefinitionValidator {
         }
         requireModuleAlias(module.moduleAlias(), "module alias");
         requireText(module.name(), "module name");
-        Set<String> entityCodes = new HashSet<>();
+        Set<String> entityAliases = new HashSet<>();
         Set<String> tableNames = new HashSet<>();
         for (EntityDefinition entity : module.entities()) {
             validateEntity(entity);
-            requireUnique(entityCodes, entity.code(), "entity code");
+            requireUnique(entityAliases, entity.alias(), "entity alias");
             requireUnique(tableNames, physicalTableKey(entity), "table name");
         }
         Map<String, EntityDefinition> entities = module.entities().stream()
-                .collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
-        if (module.mainEntityCode() != null) {
-            requireEntity(entities, module.mainEntityCode(), "module main entity");
+                .collect(Collectors.toMap(EntityDefinition::alias, Function.identity()));
+        if (module.mainEntityAlias() != null) {
+            requireEntity(entities, module.mainEntityAlias(), "module main entity");
         }
         Set<String> relationCodes = new HashSet<>();
         for (EntityRelationDefinition relation : module.relations()) {
             validateRelation(relation, entities);
-            requireUnique(relationCodes, relation.parentEntity() + "." + relation.code(), "relation code");
+            requireUnique(relationCodes, relation.parentEntityAlias() + "." + relation.code(), "relation code");
         }
         validateFormulaRuleTargets(module, entities);
         for (EntityReferenceDefinition reference : module.references()) {
@@ -54,18 +54,18 @@ public class ModuleDefinitionValidator {
         Set<String> associationViewKeys = new HashSet<>();
         for (EntityAssociationViewDefinition view : module.associationViews()) {
             validateAssociationView(view, entities, module.moduleAlias(), module.relations(), module.references());
-            requireUnique(associationViewKeys, view.sourceEntity() + "." + view.code(), "association view");
+            requireUnique(associationViewKeys, view.sourceEntityAlias() + "." + view.code(), "association view");
         }
         Set<String> actionKeys = new HashSet<>();
         for (EntityActionDefinition action : module.actions()) {
             validateAction(action, entities, module.relations());
-            requireUnique(actionKeys, action.entityCode() + "." + action.actionCode(), "action");
+            requireUnique(actionKeys, action.entityAlias() + "." + action.actionCode(), "action");
         }
         validateActionAuthInherits(module.actions(), entities);
         Set<String> viewKeys = new HashSet<>();
         for (EntityViewDefinition view : module.views()) {
             validateView(view, entities);
-            requireUnique(viewKeys, view.entityCode() + "." + view.viewType(), "view");
+            requireUnique(viewKeys, view.entityAlias() + "." + view.viewType(), "view");
         }
     }
 
@@ -73,7 +73,7 @@ public class ModuleDefinitionValidator {
         if (entity == null) {
             throw new ModuleDefinitionException("entity must not be null");
         }
-        requireIdentifier(entity.code(), "entity code");
+        requireIdentifier(entity.alias(), "entity alias");
         if (entity.schemaName() != null && !entity.schemaName().isBlank()) {
             requireIdentifier(entity.schemaName(), "schema name");
         }
@@ -108,16 +108,16 @@ public class ModuleDefinitionValidator {
             }
         }
         if (!entity.supports(EntityCapability.CRUD)) {
-            throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.code());
+            throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.alias());
         }
         if (sortableFields > 1) {
-            throw new ModuleDefinitionException("entity can only have one sortable field: " + entity.code());
+            throw new ModuleDefinitionException("entity can only have one sortable field: " + entity.alias());
         }
         if (titleFields > 1) {
-            throw new ModuleDefinitionException("entity can only have one title field: " + entity.code());
+            throw new ModuleDefinitionException("entity can only have one title field: " + entity.alias());
         }
         if (sortableFields > 0 && !entity.supports(EntityCapability.SORT)) {
-            throw new ModuleDefinitionException("sortable field requires SORT capability: " + entity.code());
+            throw new ModuleDefinitionException("sortable field requires SORT capability: " + entity.alias());
         }
         if (entity.supports(EntityCapability.TREE)) {
             requireTreeParentField(entity, treeParentField);
@@ -126,10 +126,10 @@ public class ModuleDefinitionValidator {
             requireSortField(entity, sortableField);
         }
         if (titleFields > 0 && !entity.supports(EntityCapability.REFERENCE)) {
-            throw new ModuleDefinitionException("title field requires REFERENCE capability: " + entity.code());
+            throw new ModuleDefinitionException("title field requires REFERENCE capability: " + entity.alias());
         }
         if (enabledField != null && !entity.supports(EntityCapability.ENABLE)) {
-            throw new ModuleDefinitionException("enabled field requires ENABLE capability: " + entity.code());
+            throw new ModuleDefinitionException("enabled field requires ENABLE capability: " + entity.alias());
         }
         if (entity.supports(EntityCapability.REFERENCE)) {
             requireTitleField(entity, titleField);
@@ -150,7 +150,7 @@ public class ModuleDefinitionValidator {
 
     public void validateFormulaRule(EntityDefinition entity, EntityFormulaRuleDefinition rule) {
         if (rule == null) {
-            throw new ModuleDefinitionException("formula rule must not be null: " + entity.code());
+            throw new ModuleDefinitionException("formula rule must not be null: " + entity.alias());
         }
         requireActionCode(rule.code(), "formula rule code");
         requireText(rule.expression(), "formula expression");
@@ -189,12 +189,12 @@ public class ModuleDefinitionValidator {
                     continue;
                 }
                 EntityRelationDefinition relation = module.relations().stream()
-                        .filter(candidate -> entity.code().equals(candidate.parentEntity())
+                        .filter(candidate -> entity.alias().equals(candidate.parentEntityAlias())
                                 && parts[0].equals(candidate.code()))
                         .findFirst()
                         .orElseThrow(() -> new ModuleDefinitionException("unknown formula target relation: "
-                                + entity.code() + "." + parts[0]));
-                EntityDefinition childEntity = requireEntity(entities, relation.childEntity(), "formula target child entity");
+                                + entity.alias() + "." + parts[0]));
+                EntityDefinition childEntity = requireEntity(entities, relation.childEntityAlias(), "formula target child entity");
                 requireField(childEntity, parts[1], "formula target field");
             }
         }
@@ -271,16 +271,16 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("relation must not be null");
         }
         requireIdentifier(relation.code(), "relation code");
-        EntityDefinition parent = requireEntity(entities, relation.parentEntity(), "relation parent entity");
-        EntityDefinition child = requireEntity(entities, relation.childEntity(), "relation child entity");
+        EntityDefinition parent = requireEntity(entities, relation.parentEntityAlias(), "relation parent entity");
+        EntityDefinition child = requireEntity(entities, relation.childEntityAlias(), "relation child entity");
         requireFieldName(relation.childForeignKeyField(), "relation child foreign key field");
-        if (parent.code().equals(child.code())) {
+        if (parent.alias().equals(child.alias())) {
             throw new ModuleDefinitionException("child relation must use different parent and child entities: " + relation.code());
         }
         FieldDefinition childForeignKeyField = requireField(child, relation.childForeignKeyField(), "relation child foreign key field");
         if (childForeignKeyField.type() != FieldType.STRING) {
             throw new ModuleDefinitionException("relation child foreign key field must be STRING: "
-                    + child.code() + "." + relation.childForeignKeyField());
+                    + child.alias() + "." + relation.childForeignKeyField());
         }
     }
 
@@ -292,22 +292,22 @@ public class ModuleDefinitionValidator {
         if (view == null) {
             throw new ModuleDefinitionException("view must not be null");
         }
-        EntityDefinition entity = requireEntity(entities, view.entityCode(), "view entity");
+        EntityDefinition entity = requireEntity(entities, view.entityAlias(), "view entity");
         if (view.viewType() == null) {
-            throw new ModuleDefinitionException("view type must not be null: " + view.entityCode());
+            throw new ModuleDefinitionException("view type must not be null: " + view.entityAlias());
         }
         requireText(view.title(), "view title");
         Set<String> fieldNames = new HashSet<>();
         for (EntityViewFieldDefinition field : view.fields()) {
             if (field == null) {
-                throw new ModuleDefinitionException("view field must not be null: " + view.entityCode());
+                throw new ModuleDefinitionException("view field must not be null: " + view.entityAlias());
             }
             requireFieldName(field.fieldName(), "view field name");
             requireField(entity, field.fieldName(), "view field");
             requireUnique(fieldNames, field.fieldName(), "view field");
             if (field.title() != null && field.title().isBlank()) {
                 throw new ModuleDefinitionException("view field title must not be blank: "
-                        + view.entityCode() + "." + field.fieldName());
+                        + view.entityAlias() + "." + field.fieldName());
             }
         }
     }
@@ -322,7 +322,7 @@ public class ModuleDefinitionValidator {
         if (action == null) {
             throw new ModuleDefinitionException("action must not be null");
         }
-        EntityDefinition entity = requireEntity(entities, action.entityCode(), "action entity");
+        EntityDefinition entity = requireEntity(entities, action.entityAlias(), "action entity");
         requireActionCode(action.actionCode(), "action code");
         requireText(action.title(), "action title");
         if (action.kind() == null) {
@@ -351,15 +351,15 @@ public class ModuleDefinitionValidator {
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
         if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
             throw new ModuleDefinitionException("standard action is not supported by entity: "
-                    + entity.code() + "." + action.actionCode());
+                    + entity.alias() + "." + action.actionCode());
         }
         if (standardKind != null && action.kind() == EntityActionKind.CUSTOM) {
             throw new ModuleDefinitionException("custom action conflicts with standard action: "
-                    + entity.code() + "." + action.actionCode());
+                    + entity.alias() + "." + action.actionCode());
         }
         if (standardKind != null && standardKind != action.kind()) {
             throw new ModuleDefinitionException("standard action kind mismatch: "
-                    + entity.code() + "." + action.actionCode());
+                    + entity.alias() + "." + action.actionCode());
         }
     }
 
@@ -367,24 +367,24 @@ public class ModuleDefinitionValidator {
         if (action.accessMode() == EntityActionAccessMode.ANONYMOUS_ALLOWED) {
             if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
                 throw new ModuleDefinitionException("anonymous action must not require auth policy: "
-                        + action.entityCode() + "." + action.actionCode());
+                        + action.entityAlias() + "." + action.actionCode());
             }
             return;
         }
         if (action.accessMode() == EntityActionAccessMode.LOGIN_REQUIRED) {
             if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
                 throw new ModuleDefinitionException("login-only action must not require auth policy: "
-                        + action.entityCode() + "." + action.actionCode());
+                        + action.entityAlias() + "." + action.actionCode());
             }
             return;
         }
         if (!action.actionAuth()) {
             throw new ModuleDefinitionException("auth-required action must enable action auth: "
-                    + action.entityCode() + "." + action.actionCode());
+                    + action.entityAlias() + "." + action.actionCode());
         }
         if (action.authInheritActionAlias() != null && !action.actionAuth()) {
             throw new ModuleDefinitionException("action auth inherit requires action auth: "
-                    + action.entityCode() + "." + action.actionCode());
+                    + action.entityAlias() + "." + action.actionCode());
         }
     }
 
@@ -431,12 +431,12 @@ public class ModuleDefinitionValidator {
                         + action.actionCode() + "." + fieldPath);
             }
             EntityRelationDefinition relation = relations.stream()
-                    .filter(candidate -> entity.code().equals(candidate.parentEntity())
+                    .filter(candidate -> entity.alias().equals(candidate.parentEntityAlias())
                             && parts[0].equals(candidate.code()))
                     .findFirst()
                     .orElseThrow(() -> new ModuleDefinitionException("unknown action available expression relation: "
                             + action.actionCode() + "." + parts[0]));
-            EntityDefinition childEntity = requireEntity(entities, relation.childEntity(),
+            EntityDefinition childEntity = requireEntity(entities, relation.childEntityAlias(),
                     "action available expression child entity");
             requireField(childEntity, parts[1], "action available expression field");
         }
@@ -446,7 +446,7 @@ public class ModuleDefinitionValidator {
                                             Map<String, EntityDefinition> entities) {
         Map<String, Set<String>> configuredByEntity = actions.stream()
                 .collect(Collectors.groupingBy(
-                        EntityActionDefinition::entityCode,
+                        EntityActionDefinition::entityAlias,
                         Collectors.mapping(EntityActionDefinition::actionCode, Collectors.toSet())
                 ));
         for (EntityActionDefinition action : actions) {
@@ -456,22 +456,22 @@ public class ModuleDefinitionValidator {
             requireActionCode(action.authInheritActionAlias(), "action auth inherit alias");
             if (action.actionCode().equals(action.authInheritActionAlias())) {
                 throw new ModuleDefinitionException("action auth inherit alias must not point to self: "
-                        + action.entityCode() + "." + action.actionCode());
+                        + action.entityAlias() + "." + action.actionCode());
             }
-            if (!actionExists(action.entityCode(), action.authInheritActionAlias(), entities, configuredByEntity)) {
+            if (!actionExists(action.entityAlias(), action.authInheritActionAlias(), entities, configuredByEntity)) {
                 throw new ModuleDefinitionException("action auth inherit target is not configured: "
-                        + action.entityCode() + "." + action.authInheritActionAlias());
+                        + action.entityAlias() + "." + action.authInheritActionAlias());
             }
             detectActionAuthInheritCycle(action, actions, entities, configuredByEntity);
         }
     }
 
-    private boolean actionExists(String entityCode,
+    private boolean actionExists(String entityAlias,
                                  String actionCode,
                                  Map<String, EntityDefinition> entities,
                                  Map<String, Set<String>> configuredByEntity) {
-        EntityDefinition entity = entities.get(entityCode);
-        return configuredByEntity.getOrDefault(entityCode, Set.of()).contains(actionCode)
+        EntityDefinition entity = entities.get(entityAlias);
+        return configuredByEntity.getOrDefault(entityAlias, Set.of()).contains(actionCode)
                 || EntityStandardActionCatalog.standardKind(entity, actionCode) != null;
     }
 
@@ -480,7 +480,7 @@ public class ModuleDefinitionValidator {
                                               Map<String, EntityDefinition> entities,
                                               Map<String, Set<String>> configuredByEntity) {
         Map<String, EntityActionDefinition> configured = actions.stream()
-                .filter(action -> start.entityCode().equals(action.entityCode()))
+                .filter(action -> start.entityAlias().equals(action.entityAlias()))
                 .collect(Collectors.toMap(EntityActionDefinition::actionCode, Function.identity(), (left, ignored) -> left));
         Set<String> visited = new HashSet<>();
         visited.add(start.actionCode());
@@ -488,16 +488,16 @@ public class ModuleDefinitionValidator {
         while (current != null) {
             if (!visited.add(current)) {
                 throw new ModuleDefinitionException("action auth inherit cycle: "
-                        + start.entityCode() + "." + start.actionCode());
+                        + start.entityAlias() + "." + start.actionCode());
             }
-            if (!actionExists(start.entityCode(), current, entities, configuredByEntity)) {
+            if (!actionExists(start.entityAlias(), current, entities, configuredByEntity)) {
                 throw new ModuleDefinitionException("action auth inherit target is not configured: "
-                        + start.entityCode() + "." + current);
+                        + start.entityAlias() + "." + current);
             }
             EntityActionDefinition next = configured.get(current);
             if (next != null && (!next.actionAuth() || next.accessMode() != EntityActionAccessMode.AUTH_REQUIRED)) {
                 throw new ModuleDefinitionException("action auth inherit target must require action auth: "
-                        + start.entityCode() + "." + current);
+                        + start.entityAlias() + "." + current);
             }
             current = next == null ? null : next.authInheritActionAlias();
         }
@@ -512,9 +512,9 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("association view must not be null");
         }
         requireAssociationViewCode(view.code(), "association view code");
-        EntityDefinition source = requireEntity(entities, view.sourceEntity(), "association view source entity");
+        EntityDefinition source = requireEntity(entities, view.sourceEntityAlias(), "association view source entity");
         requireModuleAlias(view.targetModuleAlias(), "association view target module alias");
-        requireIdentifier(view.targetEntity(), "association view target entity");
+        requireIdentifier(view.targetEntityAlias(), "association view target entity");
         if (view.displayMode() == null) {
             throw new ModuleDefinitionException("association view display mode must not be null: " + view.code());
         }
@@ -522,7 +522,7 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("association view type must not be null: " + view.code());
         }
         if (moduleAlias != null && moduleAlias.equals(view.targetModuleAlias())) {
-            requireEntity(entities, view.targetEntity(), "association view target entity");
+            requireEntity(entities, view.targetEntityAlias(), "association view target entity");
         }
         boolean hasRelation = view.relationCode() != null && !view.relationCode().isBlank();
         boolean hasReference = view.referenceField() != null && !view.referenceField().isBlank();
@@ -550,7 +550,7 @@ public class ModuleDefinitionValidator {
         if (reference == null) {
             throw new ModuleDefinitionException("reference must not be null");
         }
-        EntityDefinition source = requireEntity(entities, reference.sourceEntity(), "reference source entity");
+        EntityDefinition source = requireEntity(entities, reference.sourceEntityAlias(), "reference source entity");
         requireFieldName(reference.sourceField(), "reference source field");
         ReferenceTarget target;
         try {
@@ -559,10 +559,10 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("invalid reference target qualified name: " + reference.targetQualifiedName());
         }
         requireModuleAlias(target.moduleAlias(), "reference target module alias");
-        requireIdentifier(target.entityCode(), "reference target entity code");
+        requireIdentifier(target.entityAlias(), "reference target entity alias");
         requireField(source, reference.sourceField(), "reference source field");
         if (moduleAlias != null && moduleAlias.equals(target.moduleAlias())) {
-            requireEntity(entities, target.entityCode(), "reference target entity");
+            requireEntity(entities, target.entityAlias(), "reference target entity");
         }
         Set<String> outputFields = new HashSet<>();
         ReferencePlan plan = referencePlan(reference);
@@ -570,7 +570,7 @@ public class ModuleDefinitionValidator {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference projection requires same module target: " + target.qualifiedName());
             }
-            EntityDefinition targetEntity = requireEntity(entities, target.entityCode(), "reference target entity");
+            EntityDefinition targetEntity = requireEntity(entities, target.entityAlias(), "reference target entity");
             requireReferenceTargetCapability(targetEntity, target);
             for (ReferenceProjection projection : reference.projections()) {
                 requireField(targetEntity, projection.targetField(), "reference projection target field");
@@ -583,7 +583,7 @@ public class ModuleDefinitionValidator {
             if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
                 throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
             }
-            EntityDefinition targetEntity = requireEntity(entities, target.entityCode(), "reference target entity");
+            EntityDefinition targetEntity = requireEntity(entities, target.entityAlias(), "reference target entity");
             requireReferenceTargetCapability(targetEntity, target);
             String outputField = plan.titleOutputField();
             requireFieldName(outputField, "reference title output field");
@@ -609,7 +609,7 @@ public class ModuleDefinitionValidator {
 
     private void requireReferenceOutputField(EntityDefinition source, String outputField, String name) {
         if (STANDARD_FIELDS.contains(outputField) || source.fields().stream().anyMatch(field -> field.fieldName().equals(outputField))) {
-            throw new ModuleDefinitionException(name + " conflicts with entity field: " + source.code() + "." + outputField);
+            throw new ModuleDefinitionException(name + " conflicts with entity field: " + source.alias() + "." + outputField);
         }
     }
 
@@ -617,18 +617,18 @@ public class ModuleDefinitionValidator {
                                          java.util.List<EntityRelationDefinition> relations) {
         boolean exists = relations.stream().anyMatch(relation ->
                 view.relationCode().equals(relation.code())
-                        && view.sourceEntity().equals(relation.parentEntity())
-                        && view.targetEntity().equals(relation.childEntity()));
+                        && view.sourceEntityAlias().equals(relation.parentEntityAlias())
+                        && view.targetEntityAlias().equals(relation.childEntityAlias()));
         if (!exists) {
             throw new ModuleDefinitionException("association view relation does not match module relation: "
-                    + view.sourceEntity() + "." + view.code());
+                    + view.sourceEntityAlias() + "." + view.code());
         }
     }
 
     private EntityReferenceDefinition requireMatchingReference(EntityAssociationViewDefinition view,
                                                               java.util.List<EntityReferenceDefinition> references) {
         Optional<EntityReferenceDefinition> found = references.stream().filter(reference -> {
-            if (!view.sourceEntity().equals(reference.sourceEntity())
+            if (!view.sourceEntityAlias().equals(reference.sourceEntityAlias())
                     || !view.referenceField().equals(reference.sourceField())) {
                 return false;
             }
@@ -640,11 +640,11 @@ public class ModuleDefinitionValidator {
             }
             String effectiveModuleAlias = target.moduleAlias();
             return view.targetModuleAlias().equals(effectiveModuleAlias)
-                    && view.targetEntity().equals(target.entityCode());
+                    && view.targetEntityAlias().equals(target.entityAlias());
         }).findFirst();
         if (found.isEmpty()) {
             throw new ModuleDefinitionException("association view reference does not match module reference: "
-                    + view.sourceEntity() + "." + view.code());
+                    + view.sourceEntityAlias() + "." + view.code());
         }
         return found.get();
     }
@@ -653,13 +653,13 @@ public class ModuleDefinitionValidator {
         if (reference.cardinality() == net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.MANY) {
             if (view.displayMode() != AssociationViewDisplayMode.LINKED_LIST || view.viewType() != EntityViewType.LIST) {
                 throw new ModuleDefinitionException("many reference association view requires LINKED_LIST LIST: "
-                        + view.sourceEntity() + "." + view.code());
+                        + view.sourceEntityAlias() + "." + view.code());
             }
             return;
         }
         if (view.displayMode() != AssociationViewDisplayMode.LINKED_RECORD || view.viewType() != EntityViewType.FORM) {
             throw new ModuleDefinitionException("single reference association view requires LINKED_RECORD FORM: "
-                    + view.sourceEntity() + "." + view.code());
+                    + view.sourceEntityAlias() + "." + view.code());
         }
     }
 
@@ -704,46 +704,46 @@ public class ModuleDefinitionValidator {
 
     private void requireSortField(EntityDefinition entity, FieldDefinition field) {
         if (field == null) {
-            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder: " + entity.code());
+            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder: " + entity.alias());
         }
         if (!PlatformAbilityFields.SORT_FIELD.equals(field.fieldName())
                 || !PlatformAbilityFields.SORT_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.INTEGER) {
-            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder/sort_order: " + entity.code());
+            throw new ModuleDefinitionException("SORT capability requires standard field sortOrder/sort_order: " + entity.alias());
         }
     }
 
     private void requireTreeParentField(EntityDefinition entity, FieldDefinition field) {
         if (field == null) {
-            throw new ModuleDefinitionException("TREE capability requires standard field parentId: " + entity.code());
+            throw new ModuleDefinitionException("TREE capability requires standard field parentId: " + entity.alias());
         }
         if (!PlatformAbilityFields.TREE_PARENT_FIELD.equals(field.fieldName())
                 || !PlatformAbilityFields.TREE_PARENT_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.STRING
                 || !Integer.valueOf(PlatformAbilityFields.TREE_PARENT_LENGTH).equals(field.length())) {
-            throw new ModuleDefinitionException("TREE capability requires standard field parentId/parent_id: " + entity.code());
+            throw new ModuleDefinitionException("TREE capability requires standard field parentId/parent_id: " + entity.alias());
         }
     }
 
     private void requireTitleField(EntityDefinition entity, FieldDefinition field) {
         if (field == null) {
-            throw new ModuleDefinitionException("REFERENCE capability requires standard field title: " + entity.code());
+            throw new ModuleDefinitionException("REFERENCE capability requires standard field title: " + entity.alias());
         }
         if (!PlatformAbilityFields.TITLE_FIELD.equals(field.fieldName())
                 || !PlatformAbilityFields.TITLE_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.STRING) {
-            throw new ModuleDefinitionException("REFERENCE capability requires standard field title/title: " + entity.code());
+            throw new ModuleDefinitionException("REFERENCE capability requires standard field title/title: " + entity.alias());
         }
     }
 
     private void requireEnabledField(EntityDefinition entity, FieldDefinition field) {
         if (field == null) {
-            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled: " + entity.code());
+            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled: " + entity.alias());
         }
         if (!PlatformAbilityFields.ENABLED_FIELD.equals(field.fieldName())
                 || !PlatformAbilityFields.ENABLED_COLUMN.equals(field.columnName())
                 || field.type() != FieldType.BOOLEAN) {
-            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled/enabled: " + entity.code());
+            throw new ModuleDefinitionException("ENABLE capability requires standard field enabled/enabled: " + entity.alias());
         }
     }
 
@@ -774,6 +774,6 @@ public class ModuleDefinitionValidator {
         return entity.fields().stream()
                 .filter(field -> field.fieldName().equals(fieldName))
                 .findFirst()
-                .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": " + entity.code() + "." + fieldName));
+                .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": " + entity.alias() + "." + fieldName));
     }
 }

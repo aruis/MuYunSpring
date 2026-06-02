@@ -45,7 +45,7 @@ public class DynamicSchemaService {
     public Map<String, Boolean> ensureModule(ModuleDefinition module) {
         Map<String, MigrationResult> migrations = ensureModule(module, MigrationOptions.execute());
         Map<String, Boolean> results = new LinkedHashMap<>();
-        migrations.forEach((entityCode, migration) -> results.put(entityCode, migration.isChanged()));
+        migrations.forEach((entityAlias, migration) -> results.put(entityAlias, migration.isChanged()));
         return results;
     }
 
@@ -62,10 +62,10 @@ public class DynamicSchemaService {
         }
         Map<String, EntityDefinition> previousEntities = previousModule == null
                 ? Map.of()
-                : previousModule.entities().stream().collect(Collectors.toMap(EntityDefinition::code, Function.identity()));
+                : previousModule.entities().stream().collect(Collectors.toMap(EntityDefinition::alias, Function.identity()));
         Map<String, MigrationResult> results = new LinkedHashMap<>();
         for (EntityDefinition entity : module.entities()) {
-            results.put(entity.code(), ensureTable(entity, previousEntities.get(entity.code()), options));
+            results.put(entity.alias(), ensureTable(entity, previousEntities.get(entity.alias()), options));
         }
         return results;
     }

@@ -13,7 +13,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 final class DemoReferencingRecord extends StandardEntity {
     @ReferenceTo(
             moduleAlias = "demo",
-            entityCode = "customer",
+            entityAlias = "customer",
             autoTitle = true,
             titleOutputField = "customerTitle",
             projections = @ReferenceProject(targetField = "status", outputField = "customerStatus")
@@ -21,10 +21,10 @@ final class DemoReferencingRecord extends StandardEntity {
     private String customerId;
     private transient String customerTitle;
     private transient String customerStatus;
-    @ReferenceTo(moduleAlias = "iam", entityCode = "user", autoTitle = true, titleOutputField = "ownerTitle")
+    @ReferenceTo(moduleAlias = "iam", entityAlias = "user", autoTitle = true, titleOutputField = "ownerTitle")
     private String ownerId;
     private transient String ownerTitle;
-    @ReferenceTo(moduleAlias = "iam", entityCode = "user", cardinality = ReferenceCardinality.MANY)
+    @ReferenceTo(moduleAlias = "iam", entityAlias = "user", cardinality = ReferenceCardinality.MANY)
     private String watcherIds;
 
     DemoReferencingRecord(String customerId, String ownerId) {

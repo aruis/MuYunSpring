@@ -100,7 +100,7 @@ class StaticReferenceResolverTest {
     }
 
     private static final class CollectionReferenceRecord {
-        @ReferenceTo(moduleAlias = "iam", entityCode = "user", cardinality = ReferenceCardinality.MANY)
+        @ReferenceTo(moduleAlias = "iam", entityAlias = "user", cardinality = ReferenceCardinality.MANY)
         private List<String> userIds;
     }
 
@@ -109,14 +109,14 @@ class StaticReferenceResolverTest {
     }
 
     private static final class TitleOutputWithoutAutoTitleRecord {
-        @ReferenceTo(moduleAlias = "demo", entityCode = "customer", titleOutputField = "customerTitle")
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "customer", titleOutputField = "customerTitle")
         private String customerId;
     }
 
     private static final class DuplicateOutputFieldRecord {
         @ReferenceTo(
                 moduleAlias = "demo",
-                entityCode = "customer",
+                entityAlias = "customer",
                 autoTitle = true,
                 titleOutputField = "customerTitle",
                 projections = @ReferenceProject(targetField = "status", outputField = "customerTitle")

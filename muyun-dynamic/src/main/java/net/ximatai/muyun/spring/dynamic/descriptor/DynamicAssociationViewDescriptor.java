@@ -6,9 +6,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 
 public record DynamicAssociationViewDescriptor(
         String code,
-        String sourceEntity,
+        String sourceEntityAlias,
         String targetModuleAlias,
-        String targetEntity,
+        String targetEntityAlias,
         AssociationViewDisplayMode displayMode,
         String relationCode,
         String referenceField,
@@ -18,9 +18,9 @@ public record DynamicAssociationViewDescriptor(
     public static DynamicAssociationViewDescriptor from(EntityAssociationViewDefinition view) {
         return new DynamicAssociationViewDescriptor(
                 view.code(),
-                view.sourceEntity(),
+                view.sourceEntityAlias(),
                 view.targetModuleAlias(),
-                view.targetEntity(),
+                view.targetEntityAlias(),
                 view.displayMode(),
                 view.relationCode(),
                 view.referenceField(),

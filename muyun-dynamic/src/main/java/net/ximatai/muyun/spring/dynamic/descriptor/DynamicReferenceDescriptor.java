@@ -7,10 +7,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import java.util.List;
 
 public record DynamicReferenceDescriptor(
-        String sourceEntity,
+        String sourceEntityAlias,
         String sourceField,
         String targetModuleAlias,
-        String targetEntityCode,
+        String targetEntityAlias,
         ReferenceCardinality cardinality,
         boolean autoTitle,
         String titleOutputField,
@@ -23,10 +23,10 @@ public record DynamicReferenceDescriptor(
     public static DynamicReferenceDescriptor from(EntityReferenceDefinition reference) {
         ReferenceTarget target = reference.target();
         return new DynamicReferenceDescriptor(
-                reference.sourceEntity(),
+                reference.sourceEntityAlias(),
                 reference.sourceField(),
                 target.moduleAlias(),
-                target.entityCode(),
+                target.entityAlias(),
                 reference.cardinality(),
                 reference.autoTitle(),
                 reference.titleOutputField(),

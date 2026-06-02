@@ -45,10 +45,10 @@ public record DynamicModuleDescriptor(
             return List.of();
         }
         EntityDefinition mainEntity = entities.stream()
-                .filter(entity -> entity.code().equals(module.mainEntityCode()))
+                .filter(entity -> entity.alias().equals(module.mainEntityAlias()))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("module main entity not found: "
-                        + module.moduleAlias() + "." + module.mainEntityCode()));
+                        + module.moduleAlias() + "." + module.mainEntityAlias()));
         return DynamicEntityDescriptor.from(module.moduleAlias(), mainEntity, module.views(),
                 module.associationViews(), module.actions()).actions();
     }

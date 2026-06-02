@@ -83,7 +83,7 @@ public final class EntityStandardActionCatalog {
                                                  String title,
                                                  EntityActionLevel actionLevel,
                                                  EntityActionStyle style) {
-        return new EntityActionDefinition(entity.code(), actionCode, kind, title, true, actionLevel, style,
+        return new EntityActionDefinition(entity.alias(), actionCode, kind, title, true, actionLevel, style,
                 null, null, null, null, null, null, null, null, null);
     }
 }

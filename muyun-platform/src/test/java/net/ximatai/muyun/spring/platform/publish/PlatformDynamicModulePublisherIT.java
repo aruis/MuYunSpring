@@ -175,7 +175,7 @@ class PlatformDynamicModulePublisherIT {
         DynamicRecord selected = customer.select(id);
 
         assertThat(categoryId).isNotBlank();
-        assertThat(runtime.registry().requireModule("crm.customer").mainEntityCode()).isEqualTo("customer");
+        assertThat(runtime.registry().requireModule("crm.customer").mainEntityAlias()).isEqualTo("customer");
         assertThat(runtimeService.module("crm.customer").action("create").actionAuth()).isTrue();
         assertThat(customer.action("create").actionAuth()).isTrue();
         assertThat(customer.view(EntityViewType.FORM).title()).isEqualTo("客户表单");

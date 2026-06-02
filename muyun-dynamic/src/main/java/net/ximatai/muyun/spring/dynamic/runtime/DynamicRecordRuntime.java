@@ -60,27 +60,27 @@ public class DynamicRecordRuntime implements AutoCloseable {
         return registry;
     }
 
-    public DynamicRecord newRecord(String moduleAlias, String entityCode) {
-        return new DynamicRecord(registry.requireEntity(moduleAlias, entityCode));
+    public DynamicRecord newRecord(String moduleAlias, String entityAlias) {
+        return new DynamicRecord(registry.requireEntity(moduleAlias, entityAlias));
     }
 
     public DynamicModuleDescriptor describe(String moduleAlias) {
         return registry.describe(moduleAlias);
     }
 
-    public DynamicEntityService entityService(String moduleAlias, String entityCode) {
-        return entityService(moduleAlias, entityCode, DynamicRecordLifecycle.NONE);
+    public DynamicEntityService entityService(String moduleAlias, String entityAlias) {
+        return entityService(moduleAlias, entityAlias, DynamicRecordLifecycle.NONE);
     }
 
-    public DynamicEntityService entityService(String moduleAlias, String entityCode, DynamicRecordLifecycle lifecycle) {
+    public DynamicEntityService entityService(String moduleAlias, String entityAlias, DynamicRecordLifecycle lifecycle) {
         ModuleDefinition module = registry.requireModule(moduleAlias);
-        EntityDefinition entity = registry.requireEntity(moduleAlias, entityCode);
+        EntityDefinition entity = registry.requireEntity(moduleAlias, entityAlias);
         return new DynamicEntityService(
                 new DynamicRecordDao(operations, entity),
                 moduleAlias,
                 lifecycle,
                 module,
-                childEntityCode -> entityService(moduleAlias, childEntityCode),
+                childEntityAliasCode -> entityService(moduleAlias, childEntityAliasCode),
                 cacheNamespacePrefix,
                 fieldValueValidator
         );

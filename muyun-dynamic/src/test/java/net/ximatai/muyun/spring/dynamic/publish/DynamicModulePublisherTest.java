@@ -236,8 +236,8 @@ class DynamicModulePublisherTest {
             }
             Map<String, MigrationResult> results = new LinkedHashMap<>();
             for (EntityDefinition entity : module.entities()) {
-                ensuredEntities.add(entity.code());
-                results.put(entity.code(), new MigrationResult(
+                ensuredEntities.add(entity.alias());
+                results.put(entity.alias(), new MigrationResult(
                         true,
                         dryRun,
                         nonAdditive,

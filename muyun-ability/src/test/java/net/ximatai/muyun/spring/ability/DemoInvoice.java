@@ -16,7 +16,7 @@ final class DemoInvoice extends StandardEntity {
     private String title;
     @ReferenceTo(
             moduleAlias = "demo",
-            entityCode = "customer",
+            entityAlias = "customer",
             autoTitle = true,
             titleOutputField = "customerTitle",
             projections = @ReferenceProject(targetField = "status", outputField = "customerStatus")
@@ -25,18 +25,18 @@ final class DemoInvoice extends StandardEntity {
     private transient String customerTitle;
     private transient String customerStatus;
     @ChildRef(
-            parentEntity = "invoice",
+            parentEntityAlias = "invoice",
             childModel = DemoInvoiceLine.class,
-            childEntity = "invoiceLine",
+            childEntityAlias = "invoiceLine",
             childForeignKeyField = "invoiceId",
             autoPopulate = true,
             autoDeleteWithParent = true
     )
     private List<DemoInvoiceLine> lines;
     @ChildRef(
-            parentEntity = "invoice",
+            parentEntityAlias = "invoice",
             childModel = DemoInvoiceNote.class,
-            childEntity = "invoiceNote",
+            childEntityAlias = "invoiceNote",
             childForeignKeyField = "invoiceId",
             autoPopulate = true,
             autoDeleteWithParent = true

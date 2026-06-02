@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public record DynamicEntityDescriptor(
-        String entityCode,
+        String entityAlias,
         String title,
         Set<String> capabilities,
         List<DynamicFieldDescriptor> fields,
@@ -48,7 +48,7 @@ public record DynamicEntityDescriptor(
                                                List<EntityAssociationViewDefinition> associationViews,
                                                List<EntityActionDefinition> actions) {
         return new DynamicEntityDescriptor(
-                entity.code(),
+                entity.alias(),
                 entity.name(),
                 entity.capabilities().stream()
                         .map(EntityCapability::name)
@@ -66,7 +66,7 @@ public record DynamicEntityDescriptor(
     private static List<DynamicAssociationViewDescriptor> scopedAssociationViews(EntityDefinition entity,
                                                                                 List<EntityAssociationViewDefinition> views) {
         return views == null ? List.of() : views.stream()
-                .filter(view -> entity.code().equals(view.sourceEntity()))
+                .filter(view -> entity.alias().equals(view.sourceEntityAlias()))
                 .map(DynamicAssociationViewDescriptor::from)
                 .toList();
     }

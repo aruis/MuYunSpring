@@ -232,7 +232,7 @@ class DynamicRecordDaoTest {
                 .satisfies(error -> {
                     DynamicFormulaException exception = (DynamicFormulaException) error;
                     assertThat(exception.moduleAlias()).isEqualTo("sales.contract");
-                    assertThat(exception.entityCode()).isEqualTo("contract");
+                    assertThat(exception.entityAlias()).isEqualTo("contract");
                     assertThat(exception.errors()).hasSize(1);
                     assertThat(exception.firstError().ruleId()).isEqualTo("amountPositive");
                     assertThat(exception.firstError().fieldPath()).isEqualTo("amount");

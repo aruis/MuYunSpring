@@ -19,7 +19,7 @@ final class DynamicViewDescriptors {
 
     static List<DynamicViewDescriptor> from(EntityDefinition entity, List<EntityViewDefinition> views) {
         List<EntityViewDefinition> scoped = views == null ? List.of() : views.stream()
-                .filter(view -> entity.code().equals(view.entityCode()))
+                .filter(view -> entity.alias().equals(view.entityAlias()))
                 .toList();
         if (scoped.isEmpty()) {
             return List.of(defaultView(entity, EntityViewType.LIST), defaultView(entity, EntityViewType.FORM));

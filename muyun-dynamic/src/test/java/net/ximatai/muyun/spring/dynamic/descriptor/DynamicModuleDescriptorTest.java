@@ -78,7 +78,7 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create", "select", "update", "delete", "list", "page", "count",
                         "queryCriteria", "title", "titles", "projections", "referenceOptions");
-        assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityCode)
+        assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityAlias)
                 .containsExactly("customer", "contact");
         assertThat(descriptor.entities().getFirst().capabilities()).contains("CRUD", "REFERENCE");
         assertThat(descriptor.entities().getFirst().formulaRules().getFirst())
@@ -126,22 +126,22 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.entities().getFirst().associationViews().getFirst())
                 .satisfies(view -> {
                     assertThat(view.displayMode()).isEqualTo(AssociationViewDisplayMode.INLINE_LIST);
-                    assertThat(view.targetEntity()).isEqualTo("contact");
+                    assertThat(view.targetEntityAlias()).isEqualTo("contact");
                     assertThat(view.relationCode()).isEqualTo("contacts");
                     assertThat(view.queryable()).isTrue();
                 });
         assertThat(descriptor.entities().get(1).associationViews().getFirst())
                 .satisfies(view -> {
                     assertThat(view.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_RECORD);
-                    assertThat(view.targetEntity()).isEqualTo("customer");
+                    assertThat(view.targetEntityAlias()).isEqualTo("customer");
                     assertThat(view.referenceField()).isEqualTo("customerId");
                     assertThat(view.viewType()).isEqualTo(EntityViewType.FORM);
                     assertThat(view.queryable()).isFalse();
                 });
         DynamicReferenceDescriptor reference = descriptor.references().getFirst();
-        assertThat(reference.sourceEntity()).isEqualTo("contact");
+        assertThat(reference.sourceEntityAlias()).isEqualTo("contact");
         assertThat(reference.targetModuleAlias()).isEqualTo("crm.customer");
-        assertThat(reference.targetEntityCode()).isEqualTo("customer");
+        assertThat(reference.targetEntityAlias()).isEqualTo("customer");
         assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
@@ -185,14 +185,14 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicActionDescriptor::title)
                 .isEqualTo("新建客户");
         List<String> contactActions = descriptor.entities().stream()
-                .filter(entity -> entity.entityCode().equals("contact"))
+                .filter(entity -> entity.entityAlias().equals("contact"))
                 .findFirst()
                 .get()
                 .actions().stream()
                 .map(DynamicActionDescriptor::code)
                 .toList();
         List<String> customerActions = descriptor.entities().stream()
-                .filter(entity -> entity.entityCode().equals("customer"))
+                .filter(entity -> entity.entityAlias().equals("customer"))
                 .findFirst()
                 .get()
                 .actions().stream()

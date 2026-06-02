@@ -14,7 +14,7 @@ class ReferenceTargetTest {
         ReferenceTarget target = ReferenceTarget.parse("sales.invoice.invoice");
 
         assertThat(target.moduleAlias()).isEqualTo("sales.invoice");
-        assertThat(target.entityCode()).isEqualTo("invoice");
+        assertThat(target.entityAlias()).isEqualTo("invoice");
         assertThat(target.qualifiedName()).isEqualTo("sales.invoice.invoice");
     }
 
@@ -25,6 +25,6 @@ class ReferenceTargetTest {
                 .hasMessageContaining("reference target");
         assertThatThrownBy(() -> ReferenceTarget.of("sales.invoice", " "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("entityCode");
+                .hasMessageContaining("entityAlias");
     }
 }

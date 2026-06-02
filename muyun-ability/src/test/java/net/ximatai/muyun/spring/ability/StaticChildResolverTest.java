@@ -34,7 +34,7 @@ class StaticChildResolverTest {
     }
 
     @Test
-    void plansShouldDefaultEntityCodesWhenAnnotationOmitsThem() {
+    void plansShouldDefaultEntityAliasesWhenAnnotationOmitsThem() {
         assertThat(StaticChildResolver.plans(DefaultChildParent.class))
                 .containsExactly(new ChildPlan(
                         "items",

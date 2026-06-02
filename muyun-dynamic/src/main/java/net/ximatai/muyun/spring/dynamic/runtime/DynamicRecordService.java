@@ -27,8 +27,8 @@ public class DynamicRecordService {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
     }
 
-    public DynamicRecord newRecord(String moduleAlias, String entityCode) {
-        return runtime.newRecord(moduleAlias, entityCode);
+    public DynamicRecord newRecord(String moduleAlias, String entityAlias) {
+        return runtime.newRecord(moduleAlias, entityAlias);
     }
 
     public DynamicModuleDescriptor describe(String moduleAlias) {
@@ -39,12 +39,12 @@ public class DynamicRecordService {
         return new ModuleOperations(this, moduleAlias);
     }
 
-    public EntityOperations entity(String moduleAlias, String entityCode) {
-        return new EntityOperations(this, moduleAlias, entityCode);
+    public EntityOperations entity(String moduleAlias, String entityAlias) {
+        return new EntityOperations(this, moduleAlias, entityAlias);
     }
 
-    public DynamicEntityDescriptor entityDescriptor(String moduleAlias, String entityCode) {
-        return findEntity(describe(moduleAlias), entityCode);
+    public DynamicEntityDescriptor entityDescriptor(String moduleAlias, String entityAlias) {
+        return findEntity(describe(moduleAlias), entityAlias);
     }
 
     public List<DynamicActionDescriptor> actions(String moduleAlias) {
@@ -58,44 +58,44 @@ public class DynamicRecordService {
     public DynamicActionAvailability actionAvailability(String moduleAlias, String actionCode, DynamicRecord record) {
         DynamicModuleDescriptor descriptor = describe(moduleAlias);
         findAction(descriptor, actionCode);
-        return entityService(moduleAlias, runtime.registry().requireModule(moduleAlias).mainEntityCode())
+        return entityService(moduleAlias, runtime.registry().requireModule(moduleAlias).mainEntityAlias())
                 .actionAvailability(actionCode, record);
     }
 
-    public List<DynamicActionDescriptor> actions(String moduleAlias, String entityCode) {
-        return entityDescriptor(moduleAlias, entityCode).actions();
+    public List<DynamicActionDescriptor> actions(String moduleAlias, String entityAlias) {
+        return entityDescriptor(moduleAlias, entityAlias).actions();
     }
 
-    public DynamicActionDescriptor action(String moduleAlias, String entityCode, String actionCode) {
-        return findAction(moduleAlias, entityDescriptor(moduleAlias, entityCode), actionCode);
+    public DynamicActionDescriptor action(String moduleAlias, String entityAlias, String actionCode) {
+        return findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
     }
 
     public DynamicActionAvailability actionAvailability(String moduleAlias,
-                                                        String entityCode,
+                                                        String entityAlias,
                                                         String actionCode,
                                                         DynamicRecord record) {
-        findAction(moduleAlias, entityDescriptor(moduleAlias, entityCode), actionCode);
-        return entityService(moduleAlias, entityCode).actionAvailability(actionCode, record);
+        findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
+        return entityService(moduleAlias, entityAlias).actionAvailability(actionCode, record);
     }
 
-    public List<DynamicViewDescriptor> views(String moduleAlias, String entityCode) {
-        return entityDescriptor(moduleAlias, entityCode).views();
+    public List<DynamicViewDescriptor> views(String moduleAlias, String entityAlias) {
+        return entityDescriptor(moduleAlias, entityAlias).views();
     }
 
-    public DynamicViewDescriptor view(String moduleAlias, String entityCode, EntityViewType viewType) {
-        return findView(moduleAlias, entityDescriptor(moduleAlias, entityCode), viewType);
+    public DynamicViewDescriptor view(String moduleAlias, String entityAlias, EntityViewType viewType) {
+        return findView(moduleAlias, entityDescriptor(moduleAlias, entityAlias), viewType);
     }
 
     public List<DynamicAssociationViewDescriptor> associationViews(String moduleAlias) {
         return describe(moduleAlias).associationViews();
     }
 
-    public List<DynamicAssociationViewDescriptor> associationViews(String moduleAlias, String entityCode) {
-        return entityDescriptor(moduleAlias, entityCode).associationViews();
+    public List<DynamicAssociationViewDescriptor> associationViews(String moduleAlias, String entityAlias) {
+        return entityDescriptor(moduleAlias, entityAlias).associationViews();
     }
 
-    public DynamicAssociationViewDescriptor associationView(String moduleAlias, String entityCode, String viewCode) {
-        return findAssociationView(moduleAlias, entityDescriptor(moduleAlias, entityCode), viewCode);
+    public DynamicAssociationViewDescriptor associationView(String moduleAlias, String entityAlias, String viewCode) {
+        return findAssociationView(moduleAlias, entityDescriptor(moduleAlias, entityAlias), viewCode);
     }
 
     public List<DynamicRelationDescriptor> relations(String moduleAlias) {
@@ -106,147 +106,147 @@ public class DynamicRecordService {
         return describe(moduleAlias).references();
     }
 
-    public List<DynamicReferenceDescriptor> references(String moduleAlias, String entityCode) {
+    public List<DynamicReferenceDescriptor> references(String moduleAlias, String entityAlias) {
         return describe(moduleAlias).references().stream()
-                .filter(reference -> reference.sourceEntity().equals(entityCode))
+                .filter(reference -> reference.sourceEntityAlias().equals(entityAlias))
                 .toList();
     }
 
-    public DynamicReferenceDescriptor reference(String moduleAlias, String entityCode, String sourceField) {
-        return references(moduleAlias, entityCode).stream()
+    public DynamicReferenceDescriptor reference(String moduleAlias, String entityAlias, String sourceField) {
+        return references(moduleAlias, entityAlias).stream()
                 .filter(reference -> reference.sourceField().equals(sourceField))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic reference: "
-                        + moduleAlias + "." + entityCode + "." + sourceField));
+                        + moduleAlias + "." + entityAlias + "." + sourceField));
     }
 
-    public String create(String moduleAlias, String entityCode, DynamicRecord record) {
-        return entityService(moduleAlias, entityCode).insert(record);
+    public String create(String moduleAlias, String entityAlias, DynamicRecord record) {
+        return entityService(moduleAlias, entityAlias).insert(record);
     }
 
-    public DynamicRecord select(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).select(id);
+    public DynamicRecord select(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).select(id);
     }
 
-    public DynamicRecord selectIgnoreSoftDelete(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).selectIgnoreSoftDelete(id);
+    public DynamicRecord selectIgnoreSoftDelete(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).selectIgnoreSoftDelete(id);
     }
 
-    public int update(String moduleAlias, String entityCode, DynamicRecord record) {
-        return entityService(moduleAlias, entityCode).update(record);
+    public int update(String moduleAlias, String entityAlias, DynamicRecord record) {
+        return entityService(moduleAlias, entityAlias).update(record);
     }
 
-    public int delete(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).delete(id);
+    public int delete(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).delete(id);
     }
 
-    public int deleteBatch(String moduleAlias, String entityCode, Collection<String> ids) {
-        return entityService(moduleAlias, entityCode).deleteBatch(ids);
+    public int deleteBatch(String moduleAlias, String entityAlias, Collection<String> ids) {
+        return entityService(moduleAlias, entityAlias).deleteBatch(ids);
     }
 
-    public List<DynamicRecord> list(String moduleAlias, String entityCode, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-        return entityService(moduleAlias, entityCode).list(criteria, pageRequest, sorts);
+    public List<DynamicRecord> list(String moduleAlias, String entityAlias, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        return entityService(moduleAlias, entityAlias).list(criteria, pageRequest, sorts);
     }
 
-    public PageResult<DynamicRecord> page(String moduleAlias, String entityCode, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-        return entityService(moduleAlias, entityCode).pageQuery(criteria, pageRequest, sorts);
+    public PageResult<DynamicRecord> page(String moduleAlias, String entityAlias, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        return entityService(moduleAlias, entityAlias).pageQuery(criteria, pageRequest, sorts);
     }
 
-    public long count(String moduleAlias, String entityCode, Criteria criteria) {
-        return entityService(moduleAlias, entityCode).count(criteria);
+    public long count(String moduleAlias, String entityAlias, Criteria criteria) {
+        return entityService(moduleAlias, entityAlias).count(criteria);
     }
 
-    public List<DynamicRecord> sortedList(String moduleAlias, String entityCode, Criteria criteria) {
-        return entityService(moduleAlias, entityCode).sortedList(criteria);
+    public List<DynamicRecord> sortedList(String moduleAlias, String entityAlias, Criteria criteria) {
+        return entityService(moduleAlias, entityAlias).sortedList(criteria);
     }
 
-    public void reorder(String moduleAlias, String entityCode, List<String> orderedIds) {
-        entityService(moduleAlias, entityCode).reorder(orderedIds);
+    public void reorder(String moduleAlias, String entityAlias, List<String> orderedIds) {
+        entityService(moduleAlias, entityAlias).reorder(orderedIds);
     }
 
-    public void moveBefore(String moduleAlias, String entityCode, String id, String beforeId) {
-        entityService(moduleAlias, entityCode).moveBefore(id, beforeId);
+    public void moveBefore(String moduleAlias, String entityAlias, String id, String beforeId) {
+        entityService(moduleAlias, entityAlias).moveBefore(id, beforeId);
     }
 
-    public void moveAfter(String moduleAlias, String entityCode, String id, String afterId) {
-        entityService(moduleAlias, entityCode).moveAfter(id, afterId);
+    public void moveAfter(String moduleAlias, String entityAlias, String id, String afterId) {
+        entityService(moduleAlias, entityAlias).moveAfter(id, afterId);
     }
 
-    public List<DynamicRecord> children(String moduleAlias, String entityCode, String parentId) {
-        return entityService(moduleAlias, entityCode).children(parentId);
+    public List<DynamicRecord> children(String moduleAlias, String entityAlias, String parentId) {
+        return entityService(moduleAlias, entityAlias).children(parentId);
     }
 
-    public List<String> ancestorIds(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).ancestorIds(id);
+    public List<String> ancestorIds(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).ancestorIds(id);
     }
 
-    public List<String> ancestorIdsAndSelf(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).ancestorIdsAndSelf(id);
+    public List<String> ancestorIdsAndSelf(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).ancestorIdsAndSelf(id);
     }
 
-    public List<String> descendantIds(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).descendantIds(id);
+    public List<String> descendantIds(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).descendantIds(id);
     }
 
-    public int enable(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).enable(id);
+    public int enable(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).enable(id);
     }
 
-    public int disable(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).disable(id);
+    public int disable(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).disable(id);
     }
 
-    public boolean isEnabled(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).isEnabled(id);
+    public boolean isEnabled(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).isEnabled(id);
     }
 
-    public Criteria enabledCriteria(String moduleAlias, String entityCode, Criteria criteria) {
-        return entityService(moduleAlias, entityCode).enabledCriteria(criteria);
+    public Criteria enabledCriteria(String moduleAlias, String entityAlias, Criteria criteria) {
+        return entityService(moduleAlias, entityAlias).enabledCriteria(criteria);
     }
 
-    public Criteria queryCriteria(String moduleAlias, String entityCode, Collection<DynamicQueryCondition> conditions) {
-        return entityService(moduleAlias, entityCode).queryCriteria(conditions);
+    public Criteria queryCriteria(String moduleAlias, String entityAlias, Collection<DynamicQueryCondition> conditions) {
+        return entityService(moduleAlias, entityAlias).queryCriteria(conditions);
     }
 
-    public String title(String moduleAlias, String entityCode, String id) {
-        return entityService(moduleAlias, entityCode).title(id);
+    public String title(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).title(id);
     }
 
-    public Map<String, String> titles(String moduleAlias, String entityCode, Collection<String> ids) {
-        return entityService(moduleAlias, entityCode).titles(ids);
+    public Map<String, String> titles(String moduleAlias, String entityAlias, Collection<String> ids) {
+        return entityService(moduleAlias, entityAlias).titles(ids);
     }
 
     public Map<String, Map<String, Object>> projections(String moduleAlias,
-                                                        String entityCode,
+                                                        String entityAlias,
                                                         Collection<String> ids,
                                                         Collection<String> fieldNames) {
-        return entityService(moduleAlias, entityCode).projections(ids, fieldNames);
+        return entityService(moduleAlias, entityAlias).projections(ids, fieldNames);
     }
 
     public PageResult<ReferenceOption> referenceOptions(String moduleAlias,
-                                                        String entityCode,
+                                                        String entityAlias,
                                                         Criteria criteria,
                                                         PageRequest pageRequest) {
-        return entityService(moduleAlias, entityCode).referenceOptions(criteria, pageRequest);
+        return entityService(moduleAlias, entityAlias).referenceOptions(criteria, pageRequest);
     }
 
     public DynamicReferenceResolveResponse resolveReference(String moduleAlias,
-                                                            String entityCode,
+                                                            String entityAlias,
                                                             String sourceField,
                                                             DynamicReferenceResolveRequest request) {
-        return entityService(moduleAlias, entityCode).resolveReference(sourceField, request);
+        return entityService(moduleAlias, entityAlias).resolveReference(sourceField, request);
     }
 
-    private DynamicEntityService entityService(String moduleAlias, String entityCode) {
-        return runtime.entityService(moduleAlias, entityCode);
+    private DynamicEntityService entityService(String moduleAlias, String entityAlias) {
+        return runtime.entityService(moduleAlias, entityAlias);
     }
 
-    private DynamicEntityDescriptor findEntity(DynamicModuleDescriptor descriptor, String entityCode) {
+    private DynamicEntityDescriptor findEntity(DynamicModuleDescriptor descriptor, String entityAlias) {
         return descriptor.entities().stream()
-                .filter(entity -> entity.entityCode().equals(entityCode))
+                .filter(entity -> entity.entityAlias().equals(entityAlias))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic entity: "
-                        + descriptor.moduleAlias() + "." + entityCode));
+                        + descriptor.moduleAlias() + "." + entityAlias));
     }
 
     private DynamicActionDescriptor findAction(DynamicModuleDescriptor module, String actionCode) {
@@ -262,7 +262,7 @@ public class DynamicRecordService {
                 .filter(action -> action.code().equals(actionCode))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic action: "
-                        + moduleAlias + "." + entity.entityCode() + "." + actionCode));
+                        + moduleAlias + "." + entity.entityAlias() + "." + actionCode));
     }
 
     private DynamicViewDescriptor findView(String moduleAlias, DynamicEntityDescriptor entity, EntityViewType viewType) {
@@ -270,7 +270,7 @@ public class DynamicRecordService {
                 .filter(view -> view.viewType() == viewType)
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic view: "
-                        + moduleAlias + "." + entity.entityCode() + "." + viewType));
+                        + moduleAlias + "." + entity.entityAlias() + "." + viewType));
     }
 
     private DynamicAssociationViewDescriptor findAssociationView(String moduleAlias,
@@ -280,7 +280,7 @@ public class DynamicRecordService {
                 .filter(view -> view.code().equals(viewCode))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic association view: "
-                        + moduleAlias + "." + entity.entityCode() + "." + viewCode));
+                        + moduleAlias + "." + entity.entityAlias() + "." + viewCode));
     }
 
     public static final class ModuleOperations {
@@ -324,172 +324,172 @@ public class DynamicRecordService {
             return service.associationViews(moduleAlias);
         }
 
-        public EntityOperations entity(String entityCode) {
-            return service.entity(moduleAlias, entityCode);
+        public EntityOperations entity(String entityAlias) {
+            return service.entity(moduleAlias, entityAlias);
         }
     }
 
     public static final class EntityOperations {
         private final DynamicRecordService service;
         private final String moduleAlias;
-        private final String entityCode;
+        private final String entityAlias;
 
-        private EntityOperations(DynamicRecordService service, String moduleAlias, String entityCode) {
+        private EntityOperations(DynamicRecordService service, String moduleAlias, String entityAlias) {
             this.service = service;
             this.moduleAlias = moduleAlias;
-            this.entityCode = entityCode;
+            this.entityAlias = entityAlias;
         }
 
         public DynamicRecord newRecord() {
-            return service.newRecord(moduleAlias, entityCode);
+            return service.newRecord(moduleAlias, entityAlias);
         }
 
         public DynamicEntityDescriptor describe() {
-            return service.entityDescriptor(moduleAlias, entityCode);
+            return service.entityDescriptor(moduleAlias, entityAlias);
         }
 
         public List<DynamicActionDescriptor> actions() {
-            return service.actions(moduleAlias, entityCode);
+            return service.actions(moduleAlias, entityAlias);
         }
 
         public DynamicActionDescriptor action(String actionCode) {
-            return service.action(moduleAlias, entityCode, actionCode);
+            return service.action(moduleAlias, entityAlias, actionCode);
         }
 
         public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
-            return service.actionAvailability(moduleAlias, entityCode, actionCode, record);
+            return service.actionAvailability(moduleAlias, entityAlias, actionCode, record);
         }
 
         public List<DynamicReferenceDescriptor> references() {
-            return service.references(moduleAlias, entityCode);
+            return service.references(moduleAlias, entityAlias);
         }
 
         public DynamicReferenceDescriptor reference(String sourceField) {
-            return service.reference(moduleAlias, entityCode, sourceField);
+            return service.reference(moduleAlias, entityAlias, sourceField);
         }
 
         public List<DynamicViewDescriptor> views() {
-            return service.views(moduleAlias, entityCode);
+            return service.views(moduleAlias, entityAlias);
         }
 
         public DynamicViewDescriptor view(EntityViewType viewType) {
-            return service.view(moduleAlias, entityCode, viewType);
+            return service.view(moduleAlias, entityAlias, viewType);
         }
 
         public List<DynamicAssociationViewDescriptor> associationViews() {
-            return service.associationViews(moduleAlias, entityCode);
+            return service.associationViews(moduleAlias, entityAlias);
         }
 
         public DynamicAssociationViewDescriptor associationView(String viewCode) {
-            return service.associationView(moduleAlias, entityCode, viewCode);
+            return service.associationView(moduleAlias, entityAlias, viewCode);
         }
 
         public String create(DynamicRecord record) {
-            return service.create(moduleAlias, entityCode, record);
+            return service.create(moduleAlias, entityAlias, record);
         }
 
         public DynamicRecord select(String id) {
-            return service.select(moduleAlias, entityCode, id);
+            return service.select(moduleAlias, entityAlias, id);
         }
 
         public DynamicRecord selectIgnoreSoftDelete(String id) {
-            return service.selectIgnoreSoftDelete(moduleAlias, entityCode, id);
+            return service.selectIgnoreSoftDelete(moduleAlias, entityAlias, id);
         }
 
         public int update(DynamicRecord record) {
-            return service.update(moduleAlias, entityCode, record);
+            return service.update(moduleAlias, entityAlias, record);
         }
 
         public int delete(String id) {
-            return service.delete(moduleAlias, entityCode, id);
+            return service.delete(moduleAlias, entityAlias, id);
         }
 
         public int deleteBatch(Collection<String> ids) {
-            return service.deleteBatch(moduleAlias, entityCode, ids);
+            return service.deleteBatch(moduleAlias, entityAlias, ids);
         }
 
         public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-            return service.list(moduleAlias, entityCode, criteria, pageRequest, sorts);
+            return service.list(moduleAlias, entityAlias, criteria, pageRequest, sorts);
         }
 
         public PageResult<DynamicRecord> page(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
-            return service.page(moduleAlias, entityCode, criteria, pageRequest, sorts);
+            return service.page(moduleAlias, entityAlias, criteria, pageRequest, sorts);
         }
 
         public long count(Criteria criteria) {
-            return service.count(moduleAlias, entityCode, criteria);
+            return service.count(moduleAlias, entityAlias, criteria);
         }
 
         public List<DynamicRecord> sortedList(Criteria criteria) {
-            return service.sortedList(moduleAlias, entityCode, criteria);
+            return service.sortedList(moduleAlias, entityAlias, criteria);
         }
 
         public void reorder(List<String> orderedIds) {
-            service.reorder(moduleAlias, entityCode, orderedIds);
+            service.reorder(moduleAlias, entityAlias, orderedIds);
         }
 
         public void moveBefore(String id, String beforeId) {
-            service.moveBefore(moduleAlias, entityCode, id, beforeId);
+            service.moveBefore(moduleAlias, entityAlias, id, beforeId);
         }
 
         public void moveAfter(String id, String afterId) {
-            service.moveAfter(moduleAlias, entityCode, id, afterId);
+            service.moveAfter(moduleAlias, entityAlias, id, afterId);
         }
 
         public List<DynamicRecord> children(String parentId) {
-            return service.children(moduleAlias, entityCode, parentId);
+            return service.children(moduleAlias, entityAlias, parentId);
         }
 
         public List<String> ancestorIds(String id) {
-            return service.ancestorIds(moduleAlias, entityCode, id);
+            return service.ancestorIds(moduleAlias, entityAlias, id);
         }
 
         public List<String> ancestorIdsAndSelf(String id) {
-            return service.ancestorIdsAndSelf(moduleAlias, entityCode, id);
+            return service.ancestorIdsAndSelf(moduleAlias, entityAlias, id);
         }
 
         public List<String> descendantIds(String id) {
-            return service.descendantIds(moduleAlias, entityCode, id);
+            return service.descendantIds(moduleAlias, entityAlias, id);
         }
 
         public int enable(String id) {
-            return service.enable(moduleAlias, entityCode, id);
+            return service.enable(moduleAlias, entityAlias, id);
         }
 
         public int disable(String id) {
-            return service.disable(moduleAlias, entityCode, id);
+            return service.disable(moduleAlias, entityAlias, id);
         }
 
         public boolean isEnabled(String id) {
-            return service.isEnabled(moduleAlias, entityCode, id);
+            return service.isEnabled(moduleAlias, entityAlias, id);
         }
 
         public Criteria enabledCriteria(Criteria criteria) {
-            return service.enabledCriteria(moduleAlias, entityCode, criteria);
+            return service.enabledCriteria(moduleAlias, entityAlias, criteria);
         }
 
         public Criteria queryCriteria(Collection<DynamicQueryCondition> conditions) {
-            return service.queryCriteria(moduleAlias, entityCode, conditions);
+            return service.queryCriteria(moduleAlias, entityAlias, conditions);
         }
 
         public String title(String id) {
-            return service.title(moduleAlias, entityCode, id);
+            return service.title(moduleAlias, entityAlias, id);
         }
 
         public Map<String, String> titles(Collection<String> ids) {
-            return service.titles(moduleAlias, entityCode, ids);
+            return service.titles(moduleAlias, entityAlias, ids);
         }
 
         public Map<String, Map<String, Object>> projections(Collection<String> ids, Collection<String> fieldNames) {
-            return service.projections(moduleAlias, entityCode, ids, fieldNames);
+            return service.projections(moduleAlias, entityAlias, ids, fieldNames);
         }
 
         public PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
-            return service.referenceOptions(moduleAlias, entityCode, criteria, pageRequest);
+            return service.referenceOptions(moduleAlias, entityAlias, criteria, pageRequest);
         }
 
         public DynamicReferenceResolveResponse resolveReference(String sourceField, DynamicReferenceResolveRequest request) {
-            return service.resolveReference(moduleAlias, entityCode, sourceField, request);
+            return service.resolveReference(moduleAlias, entityAlias, sourceField, request);
         }
     }
 }

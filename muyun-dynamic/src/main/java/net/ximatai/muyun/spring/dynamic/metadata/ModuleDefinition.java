@@ -11,7 +11,7 @@ public record ModuleDefinition(
         List<EntityViewDefinition> views,
         List<EntityAssociationViewDefinition> associationViews,
         List<EntityActionDefinition> actions,
-        String mainEntityCode
+        String mainEntityAlias
 ) {
     public ModuleDefinition(String moduleAlias, String name, List<EntityDefinition> entities) {
         this(moduleAlias, name, entities, List.of(), List.of(), List.of(), List.of(), List.of(), null);
@@ -69,8 +69,8 @@ public record ModuleDefinition(
         views = views == null ? List.of() : List.copyOf(views);
         associationViews = associationViews == null ? List.of() : List.copyOf(associationViews);
         actions = actions == null ? List.of() : List.copyOf(actions);
-        if (mainEntityCode == null || mainEntityCode.isBlank()) {
-            mainEntityCode = entities.isEmpty() ? null : entities.getFirst().code();
+        if (mainEntityAlias == null || mainEntityAlias.isBlank()) {
+            mainEntityAlias = entities.isEmpty() ? null : entities.getFirst().alias();
         }
     }
 

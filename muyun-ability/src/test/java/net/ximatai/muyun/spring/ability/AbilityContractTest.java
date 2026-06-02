@@ -1660,7 +1660,7 @@ class AbilityContractTest {
     }
 
     private static final class StaticReferenceProxyRecord extends StaticReferenceBaseRecord {
-        @ReferenceTo(moduleAlias = "demo", entityCode = "customer")
+        @ReferenceTo(moduleAlias = "demo", entityAlias = "customer")
         private final String customerId;
 
         private StaticReferenceProxyRecord(String customerId) {

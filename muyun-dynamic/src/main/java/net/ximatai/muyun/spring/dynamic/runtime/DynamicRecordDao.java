@@ -316,8 +316,8 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     private void requireSameEntity(DynamicRecord record) {
         Objects.requireNonNull(record, "record must not be null");
-        if (!entity.code().equals(record.getEntity().code())) {
-            throw new IllegalArgumentException("dynamic record entity mismatch: " + record.getEntity().code());
+        if (!entity.alias().equals(record.getEntity().alias())) {
+            throw new IllegalArgumentException("dynamic record entity mismatch: " + record.getEntity().alias());
         }
     }
 }

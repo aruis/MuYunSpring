@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 public @interface ReferenceTo {
     String moduleAlias();
 
-    String entityCode();
+    String entityAlias();
 
     ReferenceCardinality cardinality() default ReferenceCardinality.ONE;
 

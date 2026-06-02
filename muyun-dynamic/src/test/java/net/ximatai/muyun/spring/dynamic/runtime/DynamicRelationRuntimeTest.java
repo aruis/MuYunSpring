@@ -612,14 +612,14 @@ class DynamicRelationRuntimeTest {
                     }
                 },
                 module,
-                entityCode -> "invoice_line".equals(entityCode) ? lineService.get() : invoiceService.get()
+                entityAlias -> "invoice_line".equals(entityAlias) ? lineService.get() : invoiceService.get()
         ));
         lineService.set(new DynamicEntityService(
                 new DynamicRecordDao(operations, invoiceLineEntity()),
                 MODULE,
                 DynamicRecordLifecycle.NONE,
                 module,
-                entityCode -> "invoice".equals(entityCode) ? invoiceService.get() : lineService.get()
+                entityAlias -> "invoice".equals(entityAlias) ? invoiceService.get() : lineService.get()
         ));
 
         DynamicRecord line = lineService.get().select("line-1");

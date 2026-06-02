@@ -111,9 +111,9 @@ public class PlatformModuleDefinitionCompiler {
         List<EntityActionDefinition> actions = actions(relations, metadataById);
         List<EntityAssociationViewDefinition> associationViews = associationViews(module.getAlias(), childRelations,
                 references);
-        String mainEntityCode = metadataById.get(mainRelation.getMetadataId()).getAlias();
+        String mainEntityAlias = metadataById.get(mainRelation.getMetadataId()).getAlias();
         ModuleDefinition definition = new ModuleDefinition(module.getAlias(), module.getTitle(), entities, childRelations,
-                references, views, associationViews, actions, mainEntityCode);
+                references, views, associationViews, actions, mainEntityAlias);
         validator.validate(definition);
         if (!mainRelation.getMetadataId().equals(relations.getFirst().getMetadataId())) {
             return orderMainEntityFirst(definition, mainRelation, metadataById);
@@ -314,13 +314,13 @@ public class PlatformModuleDefinitionCompiler {
     private ModuleDefinition orderMainEntityFirst(ModuleDefinition definition,
                                                  ModuleMetadataRelation mainRelation,
                                                  Map<String, Metadata> metadataById) {
-        String mainEntityCode = metadataById.get(mainRelation.getMetadataId()).getAlias();
+        String mainEntityAlias = metadataById.get(mainRelation.getMetadataId()).getAlias();
         List<EntityDefinition> ordered = definition.entities().stream()
-                .sorted((left, right) -> Boolean.compare(!left.code().equals(mainEntityCode), !right.code().equals(mainEntityCode)))
+                .sorted((left, right) -> Boolean.compare(!left.alias().equals(mainEntityAlias), !right.alias().equals(mainEntityAlias)))
                 .toList();
         return new ModuleDefinition(definition.moduleAlias(), definition.name(), ordered, definition.relations(),
                 definition.references(), definition.views(), definition.associationViews(), definition.actions(),
-                definition.mainEntityCode());
+                definition.mainEntityAlias());
     }
 
     private List<EntityAssociationViewDefinition> associationViews(String moduleAlias,
@@ -329,18 +329,18 @@ public class PlatformModuleDefinitionCompiler {
         return java.util.stream.Stream.concat(
                 childRelations.stream().map(relation -> EntityAssociationViewDefinition.childRelation(
                         relation.code(),
-                        relation.parentEntity(),
+                        relation.parentEntityAlias(),
                         moduleAlias,
-                        relation.childEntity(),
+                        relation.childEntityAlias(),
                         relation.code()
                 )),
                 references.stream().map(reference -> {
                     ReferenceTarget target = reference.target();
                     return EntityAssociationViewDefinition.reference(
                             reference.sourceField(),
-                            reference.sourceEntity(),
+                            reference.sourceEntityAlias(),
                             target.moduleAlias(),
-                            target.entityCode(),
+                            target.entityAlias(),
                             reference.sourceField(),
                             reference.cardinality()
                     );

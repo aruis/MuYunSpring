@@ -85,15 +85,15 @@ class DynamicModuleDescriptorRuntimeTest {
         assertThat(moduleApi.relations()).extracting(relation -> relation.code()).containsExactly("lines");
         assertThat(moduleApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
         assertThat(moduleApi.associationViews()).extracting(view -> view.code()).containsExactly("lines", "contractId");
-        assertThat(contractApi.describe().entityCode()).isEqualTo("contract");
+        assertThat(contractApi.describe().entityAlias()).isEqualTo("contract");
         assertThat(contractApi.action("create").actionAuth()).isTrue();
         assertThat(contractApi.view(EntityViewType.FORM).title()).isEqualTo("Contract form");
-        assertThat(contractApi.associationView("lines").targetEntity()).isEqualTo("line");
+        assertThat(contractApi.associationView("lines").targetEntityAlias()).isEqualTo("line");
         DynamicRecordService.EntityOperations lineApi = service.entity("sales.contract", "line");
         assertThat(lineApi.actions()).extracting(action -> action.code()).contains("exportLine");
         assertThat(lineApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
-        assertThat(lineApi.reference("contractId").targetEntityCode()).isEqualTo("contract");
-        assertThat(lineApi.associationView("contractId").targetEntity()).isEqualTo("contract");
+        assertThat(lineApi.reference("contractId").targetEntityAlias()).isEqualTo("contract");
+        assertThat(lineApi.associationView("contractId").targetEntityAlias()).isEqualTo("contract");
     }
 
     @Test

@@ -50,11 +50,11 @@ public class DynamicModuleRegistry {
                 .orElseThrow(() -> new ModuleDefinitionException("unknown module alias: " + moduleAlias));
     }
 
-    public EntityDefinition requireEntity(String moduleAlias, String entityCode) {
+    public EntityDefinition requireEntity(String moduleAlias, String entityAlias) {
         return requireModule(moduleAlias).entities().stream()
-                .filter(entity -> entity.code().equals(entityCode))
+                .filter(entity -> entity.alias().equals(entityAlias))
                 .findFirst()
-                .orElseThrow(() -> new ModuleDefinitionException("unknown entity: " + moduleAlias + "." + entityCode));
+                .orElseThrow(() -> new ModuleDefinitionException("unknown entity: " + moduleAlias + "." + entityAlias));
     }
 
     public List<ModuleDefinition> modules() {

@@ -61,7 +61,7 @@ public class DynamicEntityService implements
     }
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias, DynamicRecordLifecycle lifecycle) {
-        this(dao, moduleAlias, lifecycle, null, entityCode -> {
+        this(dao, moduleAlias, lifecycle, null, entityAlias -> {
             throw new IllegalStateException("dynamic relation service resolver is not configured");
         });
     }
@@ -114,7 +114,7 @@ public class DynamicEntityService implements
     }
 
     public ReferenceTarget referenceTarget() {
-        return ReferenceTarget.of(moduleAlias, dao.getEntity().code());
+        return ReferenceTarget.of(moduleAlias, dao.getEntity().alias());
     }
 
     public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
@@ -393,7 +393,7 @@ public class DynamicEntityService implements
         }
         List<ChildRelation<? extends EntityContract, DynamicRecord>> relations = new ArrayList<>();
         for (EntityRelationDefinition relation : module.relations()) {
-            if (dao.getEntity().code().equals(relation.parentEntity())) {
+            if (dao.getEntity().alias().equals(relation.parentEntityAlias())) {
                 relations.add(toChildRelation(relation.plan()));
             }
         }
@@ -451,7 +451,7 @@ public class DynamicEntityService implements
             return List.of();
         }
         return module.references().stream()
-                .filter(reference -> dao.getEntity().code().equals(reference.sourceEntity()))
+                .filter(reference -> dao.getEntity().alias().equals(reference.sourceEntityAlias()))
                 .map(EntityReferenceDefinition::plan)
                 .toList();
     }
@@ -464,10 +464,10 @@ public class DynamicEntityService implements
                 .filter(plan -> sourceField.equals(plan.sourceField()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("dynamic reference is not configured: "
-                        + dao.getEntity().code() + "." + sourceField));
+                        + dao.getEntity().alias() + "." + sourceField));
     }
 
-    void requireSameEntityCodeForReference(ReferencePlan plan) {
+    void requireSameEntityAliasForReference(ReferencePlan plan) {
         if (plan == null) {
             throw new IllegalArgumentException("reference plan must not be null");
         }
@@ -478,7 +478,7 @@ public class DynamicEntityService implements
         if (!moduleAlias.equals(target.moduleAlias())) {
             throw new IllegalArgumentException("cross module dynamic reference title is not supported: " + target.qualifiedName());
         }
-        return relationServiceResolver.apply(target.entityCode());
+        return relationServiceResolver.apply(target.entityAlias());
     }
 
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
@@ -569,7 +569,7 @@ public class DynamicEntityService implements
         }
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, actionCode);
         if (standardKind == null) {
-            throw new IllegalArgumentException("unknown dynamic action: " + moduleAlias + "." + entity.code() + "." + actionCode);
+            throw new IllegalArgumentException("unknown dynamic action: " + moduleAlias + "." + entity.alias() + "." + actionCode);
         }
         return EntityStandardActionCatalog.from(entity).stream()
                 .filter(action -> action.actionCode().equals(actionCode))
@@ -582,7 +582,7 @@ public class DynamicEntityService implements
             return null;
         }
         return module.actions().stream()
-                .filter(action -> dao.getEntity().code().equals(action.entityCode()))
+                .filter(action -> dao.getEntity().alias().equals(action.entityAlias()))
                 .filter(action -> action.actionCode().equals(actionCode))
                 .findFirst()
                 .orElse(null);
@@ -594,12 +594,12 @@ public class DynamicEntityService implements
         }
         Map<String, List<DynamicRecord>> values = new LinkedHashMap<>();
         for (EntityRelationDefinition relation : module.relations()) {
-            if (!dao.getEntity().code().equals(relation.parentEntity())
+            if (!dao.getEntity().alias().equals(relation.parentEntityAlias())
                     || !record.getChildren().containsKey(relation.code())
                     || record.getChildren(relation.code()) == null) {
                 continue;
             }
-            DynamicEntityService childService = relationServiceResolver.apply(relation.childEntity());
+            DynamicEntityService childService = relationServiceResolver.apply(relation.childEntityAlias());
             values.put(relation.code(), childService.selectChildRows(
                     Criteria.of().eq(relation.childForeignKeyField(), record.getId())
             ));
@@ -623,7 +623,7 @@ public class DynamicEntityService implements
     }
 
     private ChildRelation<DynamicRecord, DynamicRecord> toChildRelation(ChildPlan plan) {
-        DynamicEntityService childService = relationServiceResolver.apply(plan.childEntity());
+        DynamicEntityService childService = relationServiceResolver.apply(plan.childEntityAlias());
         ChildRelation<DynamicRecord, DynamicRecord> childRelation = new ChildRelation<>(
                 childService,
                 (child, parentId) -> child.putPlatformValue(plan.childForeignKeyField(), parentId),
@@ -646,7 +646,7 @@ public class DynamicEntityService implements
         }
         Map<String, EntityRelationDefinition> relations = new LinkedHashMap<>();
         for (EntityRelationDefinition relation : module.relations()) {
-            if (dao.getEntity().code().equals(relation.parentEntity())) {
+            if (dao.getEntity().alias().equals(relation.parentEntityAlias())) {
                 relations.put(relation.code(), relation);
             }
         }
@@ -660,8 +660,8 @@ public class DynamicEntityService implements
                 continue;
             }
             for (DynamicRecord child : children) {
-                if (!relation.childEntity().equals(child.getEntity().code())) {
-                    throw new IllegalArgumentException("dynamic child entity mismatch: " + child.getEntity().code());
+                if (!relation.childEntityAlias().equals(child.getEntity().alias())) {
+                    throw new IllegalArgumentException("dynamic child entity mismatch: " + child.getEntity().alias());
                 }
             }
         }
@@ -686,8 +686,8 @@ public class DynamicEntityService implements
     }
 
     private void requireSameEntity(DynamicRecord record) {
-        if (!dao.getEntity().code().equals(record.getEntity().code())) {
-            throw new IllegalArgumentException("dynamic record entity mismatch: " + record.getEntity().code());
+        if (!dao.getEntity().alias().equals(record.getEntity().alias())) {
+            throw new IllegalArgumentException("dynamic record entity mismatch: " + record.getEntity().alias());
         }
     }
 
@@ -700,7 +700,7 @@ public class DynamicEntityService implements
     }
 
     private String resolveCacheNamespace(String cacheNamespacePrefix) {
-        String suffix = moduleAlias + "." + dao.getEntity().code();
+        String suffix = moduleAlias + "." + dao.getEntity().alias();
         if (cacheNamespacePrefix != null && !cacheNamespacePrefix.isBlank()) {
             return cacheNamespacePrefix + "::" + suffix;
         }

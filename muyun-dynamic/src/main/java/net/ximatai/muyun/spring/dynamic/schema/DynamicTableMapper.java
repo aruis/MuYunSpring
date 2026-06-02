@@ -29,7 +29,7 @@ public class DynamicTableMapper {
                 PlatformUniqueIndexes.addTenantUniqueIndex(table, field.columnName());
             }
         }
-        tableValidator.requireStandardEntityTable(table, entity.code());
+        tableValidator.requireStandardEntityTable(table, entity.alias());
         return table;
     }
 

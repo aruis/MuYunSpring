@@ -22,7 +22,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         String moduleAlias = getModuleAlias();
         int separatorIndex = moduleAlias.lastIndexOf('.');
         if (separatorIndex <= 0 || separatorIndex == moduleAlias.length() - 1) {
-            throw new PlatformException("reference target requires '<moduleAlias>.<entityCode>': " + moduleAlias);
+            throw new PlatformException("reference target requires '<moduleAlias>.<entityAlias>': " + moduleAlias);
         }
         return ReferenceTarget.of(moduleAlias.substring(0, separatorIndex), moduleAlias.substring(separatorIndex + 1));
     }

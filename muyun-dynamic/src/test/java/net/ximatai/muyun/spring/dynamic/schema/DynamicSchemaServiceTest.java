@@ -75,8 +75,8 @@ class DynamicSchemaServiceTest {
             new net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator().validate(module);
             Map<String, MigrationResult> results = new LinkedHashMap<>();
             for (EntityDefinition entity : module.entities()) {
-                ensuredEntities.add(entity.code());
-                results.put(entity.code(), new MigrationResult(ensuredEntities.size() == 1, false, false, List.of()));
+                ensuredEntities.add(entity.alias());
+                results.put(entity.alias(), new MigrationResult(ensuredEntities.size() == 1, false, false, List.of()));
             }
             return results;
         }

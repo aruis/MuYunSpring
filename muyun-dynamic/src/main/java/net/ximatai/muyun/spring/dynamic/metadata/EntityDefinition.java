@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 public record EntityDefinition(
-        String code,
+        String alias,
         String schemaName,
         String tableName,
         String name,
@@ -16,25 +16,25 @@ public record EntityDefinition(
 ) {
     public static final String DEFAULT_SCHEMA_NAME = "public";
 
-    public EntityDefinition(String code, String tableName, String name, List<FieldDefinition> fields) {
-        this(code, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of());
+    public EntityDefinition(String alias, String tableName, String name, List<FieldDefinition> fields) {
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, Set.of(EntityCapability.CRUD), List.of());
     }
 
-    public EntityDefinition(String code,
+    public EntityDefinition(String alias,
                             String tableName,
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(code, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of());
+        this(alias, DEFAULT_SCHEMA_NAME, tableName, name, fields, capabilities, List.of());
     }
 
-    public EntityDefinition(String code,
+    public EntityDefinition(String alias,
                             String schemaName,
                             String tableName,
                             String name,
                             List<FieldDefinition> fields,
                             Set<EntityCapability> capabilities) {
-        this(code, schemaName, tableName, name, fields, capabilities, List.of());
+        this(alias, schemaName, tableName, name, fields, capabilities, List.of());
     }
 
     public EntityDefinition {
@@ -45,11 +45,11 @@ public record EntityDefinition(
     }
 
     public EntityDefinition withCapabilities(EntityCapability... values) {
-        return new EntityDefinition(code, schemaName, tableName, name, fields, Set.of(values), formulaRules);
+        return new EntityDefinition(alias, schemaName, tableName, name, fields, Set.of(values), formulaRules);
     }
 
     public EntityDefinition withFormulaRules(EntityFormulaRuleDefinition... values) {
-        return new EntityDefinition(code, schemaName, tableName, name, fields, capabilities,
+        return new EntityDefinition(alias, schemaName, tableName, name, fields, capabilities,
                 values == null ? List.of() : List.of(values));
     }
 

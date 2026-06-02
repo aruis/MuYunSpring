@@ -12,11 +12,11 @@ import java.lang.annotation.Target;
 public @interface ChildRef {
     String relationCode() default "";
 
-    String parentEntity() default "";
+    String parentEntityAlias() default "";
 
     Class<? extends EntityContract> childModel();
 
-    String childEntity() default "";
+    String childEntityAlias() default "";
 
     String childForeignKeyField();
 

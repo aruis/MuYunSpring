@@ -14,7 +14,7 @@ public final class DynamicFormulaFieldDefinitions {
     }
 
     public static List<FormulaFieldDefinition> childFields(EntityDefinition entity) {
-        return childFields(entity == null ? null : entity.code(), entity);
+        return childFields(entity == null ? null : entity.alias(), entity);
     }
 
     public static List<FormulaFieldDefinition> childFields(String relationCode, EntityDefinition entity) {

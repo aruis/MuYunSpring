@@ -61,7 +61,7 @@ final class DynamicFormulaRuntime {
         FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(
                 main, tables, DynamicFormulaDataSupport.fieldDefinitions(entity, module)));
         if (result.report().hasErrors()) {
-            throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
+            throw new DynamicFormulaException(moduleAlias, entity.alias(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
         return result.report();
@@ -80,7 +80,7 @@ final class DynamicFormulaRuntime {
         FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(
                 main, tables, DynamicFormulaDataSupport.fieldDefinitions(entity, module)));
         if (result.report().hasErrors()) {
-            throw new DynamicFormulaException(moduleAlias, entity.code(), result.report());
+            throw new DynamicFormulaException(moduleAlias, entity.alias(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
         return result.report();
@@ -115,7 +115,7 @@ final class DynamicFormulaRuntime {
             return dependencies;
         }
         for (EntityRelationDefinition relation : module.relations()) {
-            if (!entity.code().equals(relation.parentEntity())) {
+            if (!entity.alias().equals(relation.parentEntityAlias())) {
                 continue;
             }
             String prefix = relation.code() + ".";

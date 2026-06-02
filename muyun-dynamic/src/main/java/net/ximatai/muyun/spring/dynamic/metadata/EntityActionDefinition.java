@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 public record EntityActionDefinition(
-        String entityCode,
+        String entityAlias,
         String actionCode,
         EntityActionKind kind,
         String title,
@@ -28,21 +28,21 @@ public record EntityActionDefinition(
         executorType = executorType == null ? defaultExecutorType(category) : executorType;
     }
 
-    public EntityActionDefinition(String entityCode,
+    public EntityActionDefinition(String entityAlias,
                                   String actionCode,
                                   EntityActionKind kind,
                                   String title,
                                   boolean enabled,
                                   EntityActionStyle style) {
-        this(entityCode, actionCode, kind, title, enabled, null, style, null, null,
+        this(entityAlias, actionCode, kind, title, enabled, null, style, null, null,
                 null, null, null, null, null, null, null);
     }
 
-    public static EntityActionDefinition enabled(String entityCode,
+    public static EntityActionDefinition enabled(String entityAlias,
                                                  String actionCode,
                                                  EntityActionKind kind,
                                                  String title) {
-        return new EntityActionDefinition(entityCode, actionCode, kind, title, true, EntityActionStyle.NORMAL);
+        return new EntityActionDefinition(entityAlias, actionCode, kind, title, true, EntityActionStyle.NORMAL);
     }
 
     public EntityActionDefinition availableWhen(String expression) {
@@ -50,7 +50,7 @@ public record EntityActionDefinition(
     }
 
     public EntityActionDefinition availableWhen(String expression, String message) {
-        return new EntityActionDefinition(entityCode, actionCode, kind, title, enabled, level, style, category,
+        return new EntityActionDefinition(entityAlias, actionCode, kind, title, enabled, level, style, category,
                 accessMode, actionAuth, dataAuth, authInheritActionAlias, expression, message, executorType, executorKey);
     }
 

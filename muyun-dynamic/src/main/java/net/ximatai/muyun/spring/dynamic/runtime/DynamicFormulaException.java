@@ -7,16 +7,16 @@ import java.util.List;
 
 public class DynamicFormulaException extends PlatformException {
     private final String moduleAlias;
-    private final String entityCode;
+    private final String entityAlias;
     private final List<FormulaRuntimeReport.Issue> errors;
     private final List<FormulaRuntimeReport.Issue> warnings;
 
     public DynamicFormulaException(String moduleAlias,
-                                   String entityCode,
+                                   String entityAlias,
                                    FormulaRuntimeReport report) {
-        super(message(moduleAlias, entityCode, report));
+        super(message(moduleAlias, entityAlias, report));
         this.moduleAlias = moduleAlias;
-        this.entityCode = entityCode;
+        this.entityAlias = entityAlias;
         this.errors = report == null ? List.of() : List.copyOf(report.errors());
         this.warnings = report == null ? List.of() : List.copyOf(report.warnings());
     }
@@ -25,8 +25,8 @@ public class DynamicFormulaException extends PlatformException {
         return moduleAlias;
     }
 
-    public String entityCode() {
-        return entityCode;
+    public String entityAlias() {
+        return entityAlias;
     }
 
     public List<FormulaRuntimeReport.Issue> errors() {
@@ -41,13 +41,13 @@ public class DynamicFormulaException extends PlatformException {
         return errors.isEmpty() ? null : errors.getFirst();
     }
 
-    private static String message(String moduleAlias, String entityCode, FormulaRuntimeReport report) {
+    private static String message(String moduleAlias, String entityAlias, FormulaRuntimeReport report) {
         FormulaRuntimeReport.Issue issue = report == null || report.errors().isEmpty()
                 ? null
                 : report.errors().getFirst();
         String ruleId = issue == null || issue.ruleId() == null ? "formula" : issue.ruleId();
         String errorMessage = issue == null || issue.message() == null ? "formula rule failed" : issue.message();
-        String target = moduleAlias == null || entityCode == null ? "" : moduleAlias + "." + entityCode + ": ";
+        String target = moduleAlias == null || entityAlias == null ? "" : moduleAlias + "." + entityAlias + ": ";
         return "dynamic formula rule failed: " + target + ruleId + ", " + errorMessage;
     }
 }

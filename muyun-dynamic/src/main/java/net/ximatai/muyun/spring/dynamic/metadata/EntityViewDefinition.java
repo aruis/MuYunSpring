@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.dynamic.metadata;
 import java.util.List;
 
 public record EntityViewDefinition(
-        String entityCode,
+        String entityAlias,
         EntityViewType viewType,
         String title,
         List<EntityViewFieldDefinition> fields

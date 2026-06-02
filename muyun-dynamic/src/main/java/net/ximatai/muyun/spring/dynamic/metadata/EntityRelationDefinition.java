@@ -4,28 +4,28 @@ import net.ximatai.muyun.spring.ability.child.ChildPlan;
 
 public record EntityRelationDefinition(
         String code,
-        String parentEntity,
-        String childEntity,
+        String parentEntityAlias,
+        String childEntityAlias,
         String childForeignKeyField,
         boolean autoPopulate,
         boolean autoDeleteWithParent
 ) {
     public static EntityRelationDefinition child(String code,
-                                                 String parentEntity,
-                                                 String childEntity,
+                                                 String parentEntityAlias,
+                                                 String childEntityAlias,
                                                  String childForeignKeyField) {
-        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, false, false);
+        return new EntityRelationDefinition(code, parentEntityAlias, childEntityAlias, childForeignKeyField, false, false);
     }
 
     public EntityRelationDefinition withAutoPopulate() {
-        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, true, autoDeleteWithParent);
+        return new EntityRelationDefinition(code, parentEntityAlias, childEntityAlias, childForeignKeyField, true, autoDeleteWithParent);
     }
 
     public EntityRelationDefinition withAutoDeleteWithParent() {
-        return new EntityRelationDefinition(code, parentEntity, childEntity, childForeignKeyField, autoPopulate, true);
+        return new EntityRelationDefinition(code, parentEntityAlias, childEntityAlias, childForeignKeyField, autoPopulate, true);
     }
 
     public ChildPlan plan() {
-        return new ChildPlan(code, parentEntity, childEntity, childForeignKeyField, autoPopulate, autoDeleteWithParent);
+        return new ChildPlan(code, parentEntityAlias, childEntityAlias, childForeignKeyField, autoPopulate, autoDeleteWithParent);
     }
 }

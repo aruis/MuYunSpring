@@ -94,22 +94,22 @@ public final class StaticChildResolver {
                             + parentModelClass.getName() + "." + field.getName(), e);
                 }
                 String relationCode = childRef.relationCode().isBlank() ? field.getName() : childRef.relationCode();
-                String childEntity = childRef.childEntity().isBlank()
-                        ? defaultEntityCode(childRef.childModel())
-                        : childRef.childEntity();
+                String childEntityAlias = childRef.childEntityAlias().isBlank()
+                        ? defaultEntityAlias(childRef.childModel())
+                        : childRef.childEntityAlias();
                 Field childForeignKeyField = validateChildForeignKeyField(
                         parentModelClass,
                         field,
                         childRef.childModel(),
                         childRef.childForeignKeyField()
                 );
-                String parentEntity = childRef.parentEntity().isBlank()
-                        ? defaultEntityCode(parentModelClass)
-                        : childRef.parentEntity();
+                String parentEntityAlias = childRef.parentEntityAlias().isBlank()
+                        ? defaultEntityAlias(parentModelClass)
+                        : childRef.parentEntityAlias();
                 ChildPlan plan = new ChildPlan(
                         relationCode,
-                        parentEntity,
-                        childEntity,
+                        parentEntityAlias,
+                        childEntityAlias,
                         childRef.childForeignKeyField(),
                         childRef.autoPopulate(),
                         childRef.autoDeleteWithParent()
@@ -177,7 +177,7 @@ public final class StaticChildResolver {
                 + childClass.getName() + "." + fieldName);
     }
 
-    private static String defaultEntityCode(Class<?> modelClass) {
+    private static String defaultEntityAlias(Class<?> modelClass) {
         String simpleName = modelClass.getSimpleName();
         if (simpleName.isBlank()) {
             throw new PlatformException("model simple name must not be blank");

@@ -19,11 +19,11 @@ final class DynamicFormulaDataSupport {
         List<FormulaFieldDefinition> definitions = new ArrayList<>(DynamicFormulaFieldDefinitions.mainFields(entity));
         if (module != null) {
             for (EntityRelationDefinition relation : module.relations()) {
-                if (!entity.code().equals(relation.parentEntity())) {
+                if (!entity.alias().equals(relation.parentEntityAlias())) {
                     continue;
                 }
                 module.entities().stream()
-                        .filter(candidate -> relation.childEntity().equals(candidate.code()))
+                        .filter(candidate -> relation.childEntityAlias().equals(candidate.alias()))
                         .findFirst()
                         .ifPresent(child -> definitions.addAll(
                                 DynamicFormulaFieldDefinitions.childFields(relation.code(), child)

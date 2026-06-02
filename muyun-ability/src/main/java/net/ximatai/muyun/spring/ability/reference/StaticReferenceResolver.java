@@ -95,7 +95,7 @@ public final class StaticReferenceResolver {
                         field,
                         new ReferencePlan(
                                 field.getName(),
-                                ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityCode()),
+                                ReferenceTarget.of(referenceTo.moduleAlias(), referenceTo.entityAlias()),
                                 referenceTo.cardinality(),
                                 referenceTo.autoTitle(),
                                 referenceTo.titleOutputField(),

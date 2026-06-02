@@ -17,11 +17,11 @@ final class DynamicStandardActions {
                                               List<EntityActionDefinition> configuredActions) {
         Map<String, DynamicActionDescriptor> actions = new LinkedHashMap<>();
         for (EntityActionDefinition standard : EntityStandardActionCatalog.from(entity)) {
-            put(actions, action(moduleAlias, entity.code(), standard, null));
+            put(actions, action(moduleAlias, entity.alias(), standard, null));
         }
         for (EntityActionDefinition configured : configuredActions) {
-            if (entity.code().equals(configured.entityCode())) {
-                actions.put(configured.actionCode(), action(moduleAlias, entity.code(), configured,
+            if (entity.alias().equals(configured.entityAlias())) {
+                actions.put(configured.actionCode(), action(moduleAlias, entity.alias(), configured,
                         actions.get(configured.actionCode())));
             }
         }
@@ -29,7 +29,7 @@ final class DynamicStandardActions {
     }
 
     private static DynamicActionDescriptor action(String moduleAlias,
-                                                  String entityCode,
+                                                  String entityAlias,
                                                   EntityActionDefinition configured,
                                                   DynamicActionDescriptor standard) {
         DynamicActionKind kind = standard == null ? DynamicActionKind.from(configured.kind()) : standard.kind();

@@ -36,7 +36,7 @@ public final class DynamicQueryCriteriaBuilder {
     private void append(Criteria criteria, DynamicQueryCondition condition) {
         FieldDefinition field = field(condition.fieldName());
         if (!field.queryDefinition().queryable()) {
-            throw new ModuleDefinitionException("field is not queryable: " + entity.code() + "." + condition.fieldName());
+            throw new ModuleDefinitionException("field is not queryable: " + entity.alias() + "." + condition.fieldName());
         }
         DynamicQueryOperator operator = condition.operator() == null
                 ? field.queryDefinition().defaultOperator()
@@ -60,7 +60,7 @@ public final class DynamicQueryCriteriaBuilder {
     private FieldDefinition field(String fieldName) {
         FieldDefinition field = fields.get(fieldName);
         if (field == null) {
-            throw new ModuleDefinitionException("unknown query field: " + entity.code() + "." + fieldName);
+            throw new ModuleDefinitionException("unknown query field: " + entity.alias() + "." + fieldName);
         }
         return field;
     }

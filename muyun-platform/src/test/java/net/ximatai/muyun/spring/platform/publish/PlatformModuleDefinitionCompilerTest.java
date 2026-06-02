@@ -116,7 +116,7 @@ class PlatformModuleDefinitionCompilerTest {
 
         assertThat(definition.moduleAlias()).isEqualTo("crm.customer");
         assertThat(definition.entities()).hasSize(1);
-        assertThat(definition.entities().getFirst().code()).isEqualTo("customer");
+        assertThat(definition.entities().getFirst().alias()).isEqualTo("customer");
         assertThat(definition.entities().getFirst().schemaName()).isEqualTo(MetadataService.DEFAULT_SCHEMA);
         assertThat(definition.entities().getFirst().tableName()).isEqualTo("crm_customer");
         assertThat(definition.entities().getFirst().capabilities())
@@ -144,22 +144,22 @@ class PlatformModuleDefinitionCompilerTest {
 
         ModuleDefinition definition = compiler.compile("sales.invoice");
 
-        assertThat(definition.entities()).extracting(entity -> entity.code())
+        assertThat(definition.entities()).extracting(entity -> entity.alias())
                 .containsExactly("invoice", "invoice_line");
         assertThat(definition.entities().getFirst().capabilities()).contains(EntityCapability.CHILD_RELATION);
         assertThat(definition.relations()).hasSize(1);
         EntityRelationDefinition relation = definition.relations().getFirst();
         assertThat(relation.code()).isEqualTo("lines");
-        assertThat(relation.parentEntity()).isEqualTo("invoice");
-        assertThat(relation.childEntity()).isEqualTo("invoice_line");
+        assertThat(relation.parentEntityAlias()).isEqualTo("invoice");
+        assertThat(relation.childEntityAlias()).isEqualTo("invoice_line");
         assertThat(relation.childForeignKeyField()).isEqualTo("invoiceId");
         assertThat(relation.autoPopulate()).isTrue();
         assertThat(relation.autoDeleteWithParent()).isTrue();
         assertThat(definition.associationViews()).hasSize(1);
         EntityAssociationViewDefinition associationView = definition.associationViews().getFirst();
-        assertThat(associationView.sourceEntity()).isEqualTo("invoice");
+        assertThat(associationView.sourceEntityAlias()).isEqualTo("invoice");
         assertThat(associationView.targetModuleAlias()).isEqualTo("sales.invoice");
-        assertThat(associationView.targetEntity()).isEqualTo("invoice_line");
+        assertThat(associationView.targetEntityAlias()).isEqualTo("invoice_line");
         assertThat(associationView.displayMode()).isEqualTo(AssociationViewDisplayMode.INLINE_LIST);
         assertThat(associationView.relationCode()).isEqualTo("lines");
         assertThat(associationView.queryable()).isTrue();
@@ -187,7 +187,7 @@ class PlatformModuleDefinitionCompilerTest {
 
         assertThat(definition.references()).hasSize(1);
         EntityReferenceDefinition reference = definition.references().getFirst();
-        assertThat(reference.sourceEntity()).isEqualTo("invoice_line");
+        assertThat(reference.sourceEntityAlias()).isEqualTo("invoice_line");
         assertThat(reference.sourceField()).isEqualTo("invoiceId");
         assertThat(reference.targetQualifiedName()).isEqualTo("sales.invoice.invoice");
         assertThat(reference.autoTitle()).isTrue();
@@ -195,7 +195,7 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(reference.projections()).hasSize(1);
         assertThat(reference.projections().getFirst().targetField()).isEqualTo("code");
         assertThat(reference.projections().getFirst().outputField()).isEqualTo("invoiceCode");
-        assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityCode()).isEqualTo("invoice");
+        assertThat(DynamicModuleDescriptor.from(definition).references().getFirst().targetEntityAlias()).isEqualTo("invoice");
         assertThat(definition.associationViews()).extracting(EntityAssociationViewDefinition::code)
                 .contains("lines", "invoiceId");
         EntityAssociationViewDefinition referenceView = definition.associationViews().stream()
@@ -204,7 +204,7 @@ class PlatformModuleDefinitionCompilerTest {
                 .orElseThrow();
         assertThat(referenceView.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_RECORD);
         assertThat(referenceView.referenceField()).isEqualTo("invoiceId");
-        assertThat(referenceView.targetEntity()).isEqualTo("invoice");
+        assertThat(referenceView.targetEntityAlias()).isEqualTo("invoice");
         assertThat(referenceView.queryable()).isFalse();
     }
 
@@ -327,7 +327,7 @@ class PlatformModuleDefinitionCompilerTest {
 
         assertThat(definition.views()).hasSize(1);
         EntityViewDefinition view = definition.views().getFirst();
-        assertThat(view.entityCode()).isEqualTo("customer");
+        assertThat(view.entityAlias()).isEqualTo("customer");
         assertThat(view.viewType()).isEqualTo(EntityViewType.LIST);
         assertThat(view.title()).isEqualTo("客户列表");
         assertThat(view.fields()).extracting(field -> field.fieldName())
