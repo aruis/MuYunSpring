@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
@@ -48,6 +49,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               DynamicActionExecutorRegistry actionExecutorRegistry) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
                 eventPublisher, actionExecutorRegistry);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime) {
+        return new DynamicRecordService(runtime);
     }
 
     @Bean
