@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
@@ -344,7 +345,10 @@ class DynamicModuleDescriptorTest {
                                 "删除客户", false, EntityActionStyle.DANGER)
                                 .availableWhen("{status} == 'draft'", "只有草稿客户可删除"),
                         new EntityActionDefinition("customer", "exportData", EntityActionKind.CUSTOM,
-                                "导出", true, EntityActionStyle.NORMAL)
+                                "导出", true, EntityActionStyle.NORMAL),
+                        new EntityActionDefinition("customer", "archiveSelected", EntityActionKind.CUSTOM,
+                                "批量归档", true, EntityActionLevel.BATCH, EntityActionStyle.NORMAL,
+                                null, null, null, null, null, null, null, null, null)
                 )
         );
 
@@ -370,6 +374,10 @@ class DynamicModuleDescriptorTest {
                     assertThat(action.kind()).isEqualTo(DynamicActionKind.CUSTOM);
                     assertThat(action.category().name()).isEqualTo("CUSTOM");
                 });
+        assertThat(actions.stream().filter(action -> action.code().equals("archiveSelected")).findFirst())
+                .get()
+                .extracting(DynamicActionDescriptor::actionLevel)
+                .isEqualTo(EntityActionLevel.BATCH);
     }
 
     @Test

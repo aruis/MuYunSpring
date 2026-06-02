@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -93,6 +94,21 @@ public class DynamicRecordWebController {
         return recordService.actions(moduleAlias);
     }
 
+    @PostMapping("/view/{recordId}/actions")
+    public List<DynamicWebActionAvailabilityResponse> mainEntityRecordActions(@PathVariable String moduleAlias,
+                                                                              @PathVariable String recordId) {
+        String entityAlias = mainEntityAlias(moduleAlias);
+        DynamicRecord record = recordService.select(moduleAlias, entityAlias, recordId);
+        if (record == null) {
+            throw new IllegalArgumentException("dynamic record does not exist: " + recordId);
+        }
+        return recordService.actions(moduleAlias).stream()
+                .filter(DynamicRecordWebController::isRecordAction)
+                .map(action -> DynamicWebActionAvailabilityResponse.from(action,
+                        recordService.actionAvailability(moduleAlias, action.code(), record)))
+                .toList();
+    }
+
     @PostMapping("/{actionCode}")
     public DynamicWebActionExecutionResponse executeListAction(@PathVariable String moduleAlias,
                                                                @PathVariable String actionCode,
@@ -110,7 +126,7 @@ public class DynamicRecordWebController {
         if (normalized.ids().isEmpty()) {
             throw new IllegalArgumentException("batch action requires ids");
         }
-        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.BATCH, EntityActionLevel.ANY),
                 "dynamic action does not support batch path: ");
         return executeAction(moduleAlias, actionCode, null, normalized);
     }
@@ -360,6 +376,10 @@ public class DynamicRecordWebController {
         return value;
     }
 
+    private static boolean isRecordAction(DynamicActionDescriptor action) {
+        return action.actionLevel() == EntityActionLevel.RECORD || action.actionLevel() == EntityActionLevel.ANY;
+    }
+
     public record DynamicRecordPayload(String id, Integer version, Map<String, Object> values) {
         public DynamicRecordPayload {
             values = values == null ? Map.of() : Map.copyOf(values);
@@ -508,6 +528,15 @@ public class DynamicRecordWebController {
                     context.recordId(),
                     context.traceId()
             );
+        }
+    }
+
+    public record DynamicWebActionAvailabilityResponse(DynamicActionDescriptor action,
+                                                       boolean available,
+                                                       String message) {
+        static DynamicWebActionAvailabilityResponse from(DynamicActionDescriptor action,
+                                                         DynamicActionAvailability availability) {
+            return new DynamicWebActionAvailabilityResponse(action, availability.available(), availability.message());
         }
     }
 

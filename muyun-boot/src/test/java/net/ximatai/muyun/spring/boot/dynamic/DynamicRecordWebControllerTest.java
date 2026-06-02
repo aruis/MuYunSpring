@@ -191,7 +191,11 @@ class DynamicRecordWebControllerTest {
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
         when(service.delete(MODULE, ENTITY, "contract-1")).thenReturn(1);
-        when(service.actions(MODULE)).thenReturn(List.of(action("submit", EntityActionLevel.RECORD)));
+        when(service.actions(MODULE)).thenReturn(List.of(
+                action("export", EntityActionLevel.LIST),
+                action("submit", EntityActionLevel.RECORD),
+                action("archive", EntityActionLevel.BATCH)
+        ));
 
         mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
@@ -204,12 +208,53 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("submit"));
+                .andExpect(jsonPath("$[0].code").value("export"))
+                .andExpect(jsonPath("$[1].code").value("submit"))
+                .andExpect(jsonPath("$[2].code").value("archive"));
 
         verify(service, times(2)).mainEntityAlias(MODULE);
         verify(service).select(MODULE, ENTITY, "contract-1");
         verify(service).delete(MODULE, ENTITY, "contract-1");
         verify(service).actions(MODULE);
+    }
+
+    @Test
+    void shouldExposeRecordActionAvailabilityWithoutListAndBatchActions() throws Exception {
+        DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
+        DynamicActionDescriptor preview = action("preview", EntityActionLevel.ANY);
+        DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
+        DynamicRecord existing = new DynamicRecord(entity()).setValue("code", "C-001");
+        existing.setId("contract-1");
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(existing);
+        when(service.actions(MODULE)).thenReturn(List.of(export, submit, preview, archive));
+        when(service.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "只有草稿合同可以提交"));
+        when(service.actionAvailability(eq(MODULE), eq("preview"), any(DynamicRecord.class)))
+                .thenReturn(DynamicActionAvailability.available("preview"));
+
+        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action.code").value("submit"))
+                .andExpect(jsonPath("$[0].available").value(false))
+                .andExpect(jsonPath("$[0].message").value("只有草稿合同可以提交"))
+                .andExpect(jsonPath("$[1].action.code").value("preview"))
+                .andExpect(jsonPath("$[1].available").value(true))
+                .andExpect(jsonPath("$[2]").doesNotExist());
+
+        ArgumentCaptor<DynamicRecord> record = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(service).actionAvailability(eq(MODULE), eq("submit"), record.capture());
+        assertThat(record.getValue().getId()).isEqualTo("contract-1");
+    }
+
+    @Test
+    void shouldRejectRecordActionAvailabilityWhenRecordDoesNotExist() throws Exception {
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+
+        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "missing"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic record does not exist: missing"));
     }
 
     @Test
@@ -293,7 +338,8 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldExecuteListAndBatchActionsThroughStaticLikePaths() throws Exception {
         when(service.action(MODULE, "export")).thenReturn(action("export", EntityActionLevel.LIST));
-        when(service.action(MODULE, "archive")).thenReturn(action("archive", EntityActionLevel.LIST));
+        when(service.action(MODULE, "archive")).thenReturn(action("archive", EntityActionLevel.BATCH));
+        when(service.action(MODULE, "refreshSelected")).thenReturn(action("refreshSelected", EntityActionLevel.ANY));
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.executeAction(eq(MODULE), eq("export"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
@@ -301,6 +347,9 @@ class DynamicRecordWebControllerTest {
         when(service.executeAction(eq(MODULE), eq("archive"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, 2,
                         new DynamicActionResultBody(DynamicActionResultType.COUNT, 2, null, true, null)));
+        when(service.executeAction(eq(MODULE), eq("refreshSelected"), any(DynamicActionExecutionRequest.class)))
+                .thenReturn(new DynamicActionExecutionResult(null, "ok",
+                        new DynamicActionResultBody(DynamicActionResultType.VALUE, "ok", null, true, null)));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "export")
                         .contentType("application/json")
@@ -314,6 +363,12 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.body.value").value(2));
 
+        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "refreshSelected")
+                        .contentType("application/json")
+                        .content(json(Map.of("ids", List.of("contract-1")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.body.value").value("ok"));
+
         ArgumentCaptor<DynamicActionExecutionRequest> batchRequest = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
         verify(service).executeAction(eq(MODULE), eq("archive"), batchRequest.capture());
         assertThat(batchRequest.getValue().ids()).containsExactly("contract-1", "contract-2");
@@ -323,6 +378,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectActionPathWhenLevelDoesNotMatch() throws Exception {
         when(service.action(MODULE, "submit")).thenReturn(action("submit", EntityActionLevel.RECORD));
         when(service.action(MODULE, "export")).thenReturn(action("export", EntityActionLevel.LIST));
+        when(service.action(MODULE, "archive")).thenReturn(action("archive", EntityActionLevel.BATCH));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "submit")
                         .contentType("application/json")
@@ -335,6 +391,18 @@ class DynamicRecordWebControllerTest {
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic action does not support record path: export"));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "archive")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic action does not support list path: archive"));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "export")
+                        .contentType("application/json")
+                        .content(json(Map.of("ids", List.of("contract-1")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic action does not support batch path: export"));
     }
 
     @Test

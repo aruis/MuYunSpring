@@ -1,7 +1,15 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import org.junit.jupiter.api.Test;
@@ -18,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -65,10 +75,33 @@ class DynamicRecordWebControllerIT {
         verifyNoInteractions(recordService);
     }
 
+    @Test
+    void shouldRouteRecordActionAvailabilityBeforeGenericActionPath() throws Exception {
+        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
+        record.setId("contract-1");
+        when(recordService.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(recordService.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
+        when(recordService.actions(MODULE)).thenReturn(List.of(action("submit", EntityActionLevel.RECORD)));
+        when(recordService.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
+                .thenReturn(DynamicActionAvailability.available("submit"));
+
+        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action.code").value("submit"))
+                .andExpect(jsonPath("$[0].available").value(true));
+    }
+
     private EntityDefinition entity() {
         return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").length(64).required()
         ));
+    }
+
+    private DynamicActionDescriptor action(String code, EntityActionLevel level) {
+        return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "Submit", true,
+                EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
+                EntityActionAccessMode.AUTH_REQUIRED, true, false, null, false, null,
+                EntityActionExecutorType.SERVICE, "submitExecutor");
     }
 
     @RestController
