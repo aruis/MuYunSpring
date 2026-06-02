@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.database.core.orm.SortDirection;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -69,7 +70,7 @@ public class TestMemoryDao<T extends EntityContract> implements BaseDao<T, Strin
     public List<T> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         List<T> filtered = rows.values().stream()
                 .filter(row -> matches(row, criteria))
-                .sorted(Comparator.comparing(this::sortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .sorted(comparator(sorts))
                 .toList();
         int from = Math.min(pageRequest.getOffset(), filtered.size());
         int to = Math.min(from + pageRequest.getLimit(), filtered.size());
@@ -95,6 +96,31 @@ public class TestMemoryDao<T extends EntityContract> implements BaseDao<T, Strin
 
     private Integer sortOrder(T row) {
         return row instanceof SortCapable sortable ? sortable.getSortOrder() : null;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private Comparator<T> comparator(Sort... sorts) {
+        if (sorts == null || sorts.length == 0) {
+            return Comparator.comparing(this::sortOrder, Comparator.nullsLast(Integer::compareTo));
+        }
+        Comparator<T> comparator = null;
+        for (Sort sort : sorts) {
+            if (sort == null) {
+                continue;
+            }
+            Comparator<Comparable> valueComparator = sort.getDirection() == SortDirection.DESC
+                    ? Comparator.nullsLast(Comparator.reverseOrder())
+                    : Comparator.nullsLast(Comparator.naturalOrder());
+            Comparator<T> next = Comparator.comparing(row -> comparableValue(row, sort.getField()), valueComparator);
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        return comparator == null ? Comparator.comparing(this::sortOrder, Comparator.nullsLast(Integer::compareTo)) : comparator;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Comparable comparableValue(T row, String field) {
+        Object value = value(row, field);
+        return value instanceof Comparable comparable ? comparable : null;
     }
 
     private boolean matches(T row, Criteria criteria) {

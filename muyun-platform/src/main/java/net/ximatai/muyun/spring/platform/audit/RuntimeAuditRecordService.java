@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.platform.audit;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -87,6 +90,31 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
                 .eq("moduleAlias", requireText(moduleAlias, "moduleAlias"))
                 .eq("entityAlias", requireText(entityAlias, "entityAlias"))
                 .eq("recordId", requireText(recordId, "recordId"));
+    }
+
+    public Criteria failedActionCriteria(String moduleAlias) {
+        return Criteria.of()
+                .eq("moduleAlias", requireText(moduleAlias, "moduleAlias"))
+                .eq("eventType", RuntimeEventType.ACTION_FAILED);
+    }
+
+    public List<RuntimeAuditRecord> traceEvents(String traceId, PageRequest pageRequest) {
+        return list(traceCriteria(traceId), pageRequest, Sort.asc("occurredAt"));
+    }
+
+    public List<RuntimeAuditRecord> recordTimeline(String moduleAlias,
+                                                   String entityAlias,
+                                                   String recordId,
+                                                   PageRequest pageRequest) {
+        return list(recordCriteria(moduleAlias, entityAlias, recordId), pageRequest, Sort.asc("occurredAt"));
+    }
+
+    public List<RuntimeAuditRecord> actionEvents(String moduleAlias, String actionCode, PageRequest pageRequest) {
+        return list(actionCriteria(moduleAlias, actionCode), pageRequest, Sort.desc("occurredAt"));
+    }
+
+    public List<RuntimeAuditRecord> failedActions(String moduleAlias, PageRequest pageRequest) {
+        return list(failedActionCriteria(moduleAlias), pageRequest, Sort.desc("occurredAt"));
     }
 
     @Override

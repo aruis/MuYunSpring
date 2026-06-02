@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -87,6 +88,38 @@ class RuntimeAuditRecordServiceContractTest {
                 .singleElement()
                 .extracting(RuntimeAuditRecord::getTraceId)
                 .isEqualTo("trace-2");
+    }
+
+    @Test
+    void shouldExposeRuntimeAuditConsumptionQueries() {
+        service.record(event());
+        service.record(otherActionEvent());
+        service.record(actionFailedEvent());
+
+        assertThat(service.traceEvents("trace-1", PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getEventId)
+                .isEqualTo("event-1");
+        assertThat(service.recordTimeline("sales.contract", "contract", "contract-1", PageRequest.of(1, 10)))
+                .extracting(RuntimeAuditRecord::getEventType)
+                .containsExactly(RuntimeEventType.ACTION_EXECUTED, RuntimeEventType.ACTION_FAILED);
+        assertThat(service.actionEvents("sales.contract", "submit", PageRequest.of(1, 10)))
+                .extracting(RuntimeAuditRecord::getEventId)
+                .containsExactly("action-failed-event", "event-2");
+        assertThat(service.failedActions("sales.contract", PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getFailureStage)
+                .isEqualTo("execute");
+    }
+
+    @Test
+    void shouldRejectBlankRuntimeAuditConsumptionQueryKeys() {
+        assertThatThrownBy(() -> service.failedActions(" ", PageRequest.of(1, 10)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("moduleAlias must not be blank");
+        assertThatThrownBy(() -> service.recordTimeline("sales.contract", " ", "contract-1", PageRequest.of(1, 10)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("entityAlias must not be blank");
     }
 
     @Test
