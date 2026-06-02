@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
+import net.ximatai.muyun.spring.platform.audit.RuntimeAuditRecord;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.menu.Menu;
@@ -122,6 +123,19 @@ class PlatformModelSchemaTest {
                 .contains(List.of("tenant_id", "application_alias", "alias"));
         assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
                 .contains(List.of("tenant_id", "application_alias", "category_alias", "code"));
+    }
+
+    @Test
+    void shouldMapRuntimeAuditRecordAsPlatformTable() {
+        TableWrapper table = mapper.toTable(RuntimeAuditRecord.class);
+
+        assertThat(table.getName()).isEqualTo("platform_runtime_audit_record");
+        assertThat(columnNames(table))
+                .contains("id", "tenant_id", "event_id", "trace_id", "event_type", "module_alias",
+                        "entity_alias", "record_id", "action_code", "system_context",
+                        "mutation_source", "payload_text", "occurred_at");
+        assertThat(uniqueIndexes(table)).contains(List.of("tenant_id", "event_id"));
+        assertThat(columnType(table, "payload_text")).isEqualTo(ColumnType.TEXT);
     }
 
     private Set<String> columnNames(TableWrapper table) {
