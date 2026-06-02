@@ -8,6 +8,11 @@ public class DynamicActionExecutionException extends RuntimeException {
         this.context = context;
     }
 
+    public DynamicActionExecutionException(String message, DynamicActionExecutionContext context, Throwable cause) {
+        super(message, cause);
+        this.context = context;
+    }
+
     public DynamicActionExecutionContext context() {
         return context;
     }

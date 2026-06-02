@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
@@ -42,8 +44,16 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     @ConditionalOnMissingBean
     DynamicRecordRuntime dynamicRecordRuntime(IDatabaseOperations<?> operations,
                                               DynamicFieldValueValidator fieldValueValidator,
-                                              RuntimeEventPublisher eventPublisher) {
-        return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator, eventPublisher);
+                                              RuntimeEventPublisher eventPublisher,
+                                              DynamicActionExecutorRegistry actionExecutorRegistry) {
+        return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
+                eventPublisher, actionExecutorRegistry);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    DynamicActionExecutorRegistry dynamicActionExecutorRegistry(ObjectProvider<DynamicActionExecutor> executors) {
+        return new DynamicActionExecutorRegistry(() -> executors.orderedStream().toList());
     }
 
     @Bean

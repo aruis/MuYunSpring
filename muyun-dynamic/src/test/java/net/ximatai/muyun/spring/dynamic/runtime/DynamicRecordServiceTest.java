@@ -13,7 +13,10 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -259,7 +262,7 @@ class DynamicRecordServiceTest {
     }
 
     @Test
-    void shouldRejectCustomActionExecutionUntilExecutorIsConfigured() {
+    void shouldRejectServiceActionExecutionWhenExecutorKeyIsMissing() {
         DynamicRecordService service = actionService(operations());
         DynamicRecord draft = service.newRecord(MODULE, "contract")
                 .setValue("code", "C-001")
@@ -268,13 +271,103 @@ class DynamicRecordServiceTest {
         assertThatThrownBy(() -> service.entity(MODULE, "contract")
                 .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
                 .isInstanceOf(DynamicActionExecutionException.class)
-                .hasMessageContaining("SERVICE")
+                .hasMessageContaining("dynamic action executorKey must not be blank")
                 .satisfies(error -> {
                     DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
                     assertThat(exception.context().availability().available()).isTrue();
                     assertThat(exception.context().action().executorType())
                             .isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType.SERVICE);
                 });
+    }
+
+    @Test
+    void shouldExecuteRegisteredServiceActionThroughStableActionApi() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(executor.context().moduleAlias()).isEqualTo(MODULE);
+        assertThat(executor.context().entityAlias()).isEqualTo("contract");
+        assertThat(executor.context().actionCode()).isEqualTo("submit");
+        assertThat(executor.context().availability().available()).isTrue();
+        assertThat(executor.request().record()).isSameAs(draft);
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+                    assertThat(event.recordId()).isEqualTo("contract-1");
+                    assertThat(event.actionCode()).isEqualTo("submit");
+                    assertThat(event.traceId()).isEqualTo(result.context().traceId());
+                    assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("result", "submitted:contract-1");
+                });
+    }
+
+    @Test
+    void shouldRejectServiceActionExecutionWhenExecutorIsNotRegistered() {
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(), null,
+                submitActionWithExecutorKey("missingSubmitExecutor"));
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasMessageContaining("unknown dynamic action executor key: missingSubmitExecutor");
+    }
+
+    @Test
+    void shouldKeepActionContextWhenServiceActionExecutorFails() {
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(), new FailingActionExecutor());
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .satisfies(error -> {
+                    DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.context().actionCode()).isEqualTo("submit");
+                    assertThat(exception.context().recordId()).isEqualTo("contract-1");
+                    assertThat(exception.context().traceId()).isNotBlank();
+                });
+    }
+
+    @Test
+    void shouldRejectDuplicateDynamicActionExecutorKey() {
+        assertThatThrownBy(() -> new DynamicActionExecutorRegistry(List.of(
+                new TestActionExecutor("contractSubmit"),
+                new TestActionExecutor("contractSubmit")
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate dynamic action executor key: contractSubmit");
+    }
+
+    @Test
+    void shouldRegisterDynamicActionExecutorByMutatingRegistry() {
+        DynamicActionExecutorRegistry registry = DynamicActionExecutorRegistry.empty();
+
+        registry.register(new TestActionExecutor("contractSubmit"));
+
+        assertThat(registry.contains("contractSubmit")).isTrue();
+    }
+
+    @Test
+    void shouldRejectDynamicActionExecutorKeyWithSurroundingSpaces() {
+        assertThatThrownBy(() -> new DynamicActionExecutorRegistry(List.of(new TestActionExecutor(" contractSubmit "))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not contain leading or trailing spaces");
     }
 
     @Test
@@ -1057,6 +1150,22 @@ class DynamicRecordServiceTest {
     }
 
     private DynamicRecordService actionService(IDatabaseOperations<Object> operations, RuntimeEventPublisher eventPublisher) {
+        return actionService(operations, eventPublisher, null,
+                new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                        "提交", true, EntityActionStyle.PRIMARY)
+                        .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"));
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations,
+                                               RuntimeEventPublisher eventPublisher,
+                                               DynamicActionExecutor executor) {
+        return actionService(operations, eventPublisher, executor, submitActionWithExecutorKey("contractSubmit"));
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations,
+                                               RuntimeEventPublisher eventPublisher,
+                                               DynamicActionExecutor executor,
+                                               EntityActionDefinition submitAction) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1064,16 +1173,27 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, EntityActionStyle.PRIMARY)
-                        .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"))
+                List.of(submitAction)
         );
+        DynamicActionExecutorRegistry executorRegistry = executor == null
+                ? DynamicActionExecutorRegistry.empty()
+                : new DynamicActionExecutorRegistry(List.of(executor));
         return new DynamicRecordService(new DynamicRecordRuntime(
                 operations,
                 new DynamicModuleRegistry(),
                 DynamicFieldValueValidator.NONE,
-                eventPublisher
+                eventPublisher,
+                executorRegistry
         ).register(module));
+    }
+
+    private EntityActionDefinition submitActionWithExecutorKey(String executorKey) {
+        return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                EntityActionCategory.CUSTOM, null, null, null, null,
+                "{status} == 'draft'", "只有草稿合同可以提交",
+                EntityActionExecutorType.SERVICE, executorKey
+        );
     }
 
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
@@ -1316,6 +1436,50 @@ class DynamicRecordServiceTest {
 
         List<RuntimeEvent> events() {
             return events;
+        }
+    }
+
+    private static final class RecordingActionExecutor implements DynamicActionExecutor {
+        private DynamicActionExecutionContext context;
+        private DynamicActionExecutionRequest request;
+
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            this.context = context;
+            this.request = request;
+            return "submitted:" + request.record().getId();
+        }
+
+        DynamicActionExecutionContext context() {
+            return context;
+        }
+
+        DynamicActionExecutionRequest request() {
+            return request;
+        }
+    }
+
+    private record TestActionExecutor(String executorKey) implements DynamicActionExecutor {
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            return null;
+        }
+    }
+
+    private static final class FailingActionExecutor implements DynamicActionExecutor {
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            throw new IllegalStateException("submit failed");
         }
     }
 }

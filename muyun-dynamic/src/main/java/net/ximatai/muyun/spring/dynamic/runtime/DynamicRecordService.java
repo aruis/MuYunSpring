@@ -346,16 +346,40 @@ public class DynamicRecordService {
         if (!availability.available()) {
             throw new DynamicActionExecutionException(availability.message(), context);
         }
-        if (action.executorType() != EntityActionExecutorType.STANDARD) {
-            throw new DynamicActionExecutionException(
-                    "dynamic action executor is not supported: " + action.executorType(),
-                    context
-            );
-        }
-        Object value = executeStandardAction(moduleAlias, entityAlias, action.code(), normalized, traceId);
+        Object value = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
         DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, value, traceId);
         publishActionEvent(completed, value);
         return new DynamicActionExecutionResult(completed, value);
+    }
+
+    private Object executeActionValue(String moduleAlias,
+                                      String entityAlias,
+                                      DynamicActionDescriptor action,
+                                      DynamicActionExecutionRequest request,
+                                      DynamicActionExecutionContext context,
+                                      String traceId) {
+        if (action.executorType() == EntityActionExecutorType.STANDARD) {
+            return executeStandardAction(moduleAlias, entityAlias, action.code(), request, traceId);
+        }
+        if (action.executorType() == EntityActionExecutorType.SERVICE) {
+            DynamicActionExecutor executor;
+            try {
+                executor = runtime.actionExecutorRegistry().require(action.executorKey());
+            } catch (IllegalArgumentException e) {
+                throw new DynamicActionExecutionException(e.getMessage(), context);
+            }
+            try {
+                return executor.execute(context, request);
+            } catch (DynamicActionExecutionException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                throw new DynamicActionExecutionException(e.getMessage(), context, e);
+            }
+        }
+        throw new DynamicActionExecutionException(
+                "dynamic action executor is not supported: " + action.executorType(),
+                context
+        );
     }
 
     private Object executeStandardAction(String moduleAlias,

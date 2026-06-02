@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -90,6 +92,34 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 });
     }
 
+    @Test
+    void shouldConfigureDynamicActionExecutorRegistryFromExecutorBeans() {
+        contextRunner.withBean(DynamicActionExecutor.class, () -> new TestActionExecutor("contractSubmit"))
+                .run(context -> assertThat(context.getBean(DynamicActionExecutorRegistry.class)
+                        .contains("contractSubmit")).isTrue());
+    }
+
+    @Test
+    void shouldRespectCustomDynamicActionExecutorRegistry() {
+        DynamicActionExecutorRegistry customRegistry = new DynamicActionExecutorRegistry(List.of(
+                new TestActionExecutor("customSubmit")
+        ));
+
+        contextRunner.withBean(DynamicActionExecutorRegistry.class, () -> customRegistry)
+                .run(context -> assertThat(context.getBean(DynamicActionExecutorRegistry.class)).isSameAs(customRegistry));
+    }
+
+    @Test
+    void shouldAllowDynamicActionExecutorToDependOnDynamicRecordRuntime() {
+        contextRunner.withUserConfiguration(RuntimeDependentExecutorConfig.class)
+                .run(context -> {
+                    DynamicActionExecutorRegistry registry = context.getBean(DynamicActionExecutorRegistry.class);
+
+                    assertThat(context).hasSingleBean(DynamicRecordRuntime.class);
+                    assertThat(registry.contains("runtimeSubmit")).isTrue();
+                });
+    }
+
     private RuntimeEvent event() {
         return RuntimeEvent.of(RuntimeEventType.AFTER_CREATE, "sales.contract", "contract", "contract-1",
                 null, "tenant-1", false, RuntimeMutationSource.BUSINESS, Map.of());
@@ -136,6 +166,14 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
         }
     }
 
+    private record TestActionExecutor(String executorKey) implements DynamicActionExecutor {
+        @Override
+        public Object execute(net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext context,
+                              net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest request) {
+            return null;
+        }
+    }
+
     @Configuration(proxyBeanMethods = false)
     static class RuntimeDependentListenerConfig {
         @Bean
@@ -149,6 +187,15 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 assertThat(runtime).isNotNull();
                 recorder.add("runtime-listener");
             };
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class RuntimeDependentExecutorConfig {
+        @Bean
+        DynamicActionExecutor runtimeDependentActionExecutor(DynamicRecordRuntime runtime) {
+            assertThat(runtime).isNotNull();
+            return new TestActionExecutor("runtimeSubmit");
         }
     }
 }
