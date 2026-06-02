@@ -9,6 +9,7 @@ import java.util.List;
 public record DynamicModuleDescriptor(
         String moduleAlias,
         String title,
+        String mainEntityAlias,
         List<DynamicActionDescriptor> actions,
         List<DynamicEntityDescriptor> entities,
         List<DynamicRelationDescriptor> relations,
@@ -28,6 +29,7 @@ public record DynamicModuleDescriptor(
         return new DynamicModuleDescriptor(
                 module.moduleAlias(),
                 module.name(),
+                module.mainEntityAlias(),
                 mainEntityActions(module, moduleEntities),
                 moduleEntities.stream()
                         .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.references(),

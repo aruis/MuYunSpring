@@ -20,6 +20,8 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 
 import java.util.Collection;
 import java.util.List;
@@ -28,6 +30,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class DynamicRecordService {
+    private static final DynamicOpenApiGenerator OPEN_API_GENERATOR = new DynamicOpenApiGenerator();
+
     private final DynamicRecordRuntime runtime;
 
     public DynamicRecordService(DynamicRecordRuntime runtime) {
@@ -40,6 +44,10 @@ public class DynamicRecordService {
 
     public DynamicModuleDescriptor describe(String moduleAlias) {
         return runtime.describe(moduleAlias);
+    }
+
+    public DynamicOpenApiDocument openApi(String moduleAlias) {
+        return OPEN_API_GENERATOR.generate(describe(moduleAlias));
     }
 
     public String mainEntityAlias(String moduleAlias) {

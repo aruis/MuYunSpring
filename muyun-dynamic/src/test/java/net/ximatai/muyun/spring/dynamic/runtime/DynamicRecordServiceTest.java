@@ -28,6 +28,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -110,6 +111,20 @@ class DynamicRecordServiceTest {
 
         verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
         verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldExposeOpenApiFromStableServiceApi() {
+        DynamicRecordService service = service(operations(), contractEntity());
+
+        DynamicOpenApiDocument document = service.openApi(MODULE);
+
+        assertThat(document.moduleAlias()).isEqualTo(MODULE);
+        assertThat(document.basePath()).isEqualTo("/" + MODULE);
+        assertThat(document.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .contains("/" + MODULE + "/query", "/" + MODULE + "/insert", "/" + MODULE + "/openapi");
+        assertThat(document.schemas()).containsKey("ContractRecord");
     }
 
     @Test

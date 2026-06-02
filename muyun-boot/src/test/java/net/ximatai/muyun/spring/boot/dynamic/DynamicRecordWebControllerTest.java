@@ -19,6 +19,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
@@ -81,7 +83,22 @@ class DynamicRecordWebControllerTest {
         mvc.perform(post("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.mainEntityAlias").value(ENTITY))
                 .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY));
+    }
+
+    @Test
+    void shouldExposeDynamicOpenApiDocument() throws Exception {
+        DynamicOpenApiDocument document = new DynamicOpenApiGenerator()
+                .generate(DynamicModuleDescriptor.from(module()));
+        when(service.openApi(MODULE)).thenReturn(document);
+
+        mvc.perform(post("/{moduleAlias}/openapi", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.basePath").value("/" + MODULE))
+                .andExpect(jsonPath("$.operations[0].path").value("/" + MODULE + "/describe"))
+                .andExpect(jsonPath("$.schemas.ContractRecord.type").value("object"));
     }
 
     @Test
@@ -409,6 +426,15 @@ class DynamicRecordWebControllerTest {
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic web response does not expose internal Criteria"));
+    }
+
+    @Test
+    void shouldRejectReservedOpenApiAsActionPath() throws Exception {
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "openapi", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: openapi"));
     }
 
     @Test

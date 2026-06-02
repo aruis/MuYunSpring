@@ -112,6 +112,7 @@ class DynamicModuleDescriptorTest {
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
 
         assertThat(descriptor.moduleAlias()).isEqualTo("crm.customer");
+        assertThat(descriptor.mainEntityAlias()).isEqualTo("customer");
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create", "select", "update", "delete", "list", "page", "count",
