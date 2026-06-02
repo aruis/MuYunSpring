@@ -170,8 +170,8 @@ public class DynamicRecordWebController {
 
     @ExceptionHandler(DynamicActionExecutionException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public DynamicWebError handleActionFailure(DynamicActionExecutionException exception) {
-        return new DynamicWebError(exception.getMessage());
+    public DynamicWebActionError handleActionFailure(DynamicActionExecutionException exception) {
+        return DynamicWebActionError.from(exception);
     }
 
     @ExceptionHandler(OptimisticLockException.class)

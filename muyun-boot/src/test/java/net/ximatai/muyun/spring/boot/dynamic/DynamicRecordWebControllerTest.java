@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
@@ -316,6 +317,30 @@ class DynamicRecordWebControllerTest {
                         ))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("action request recordId must match record.id"));
+    }
+
+    @Test
+    void shouldExposeActionFailureStageAndContext() throws Exception {
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
+        DynamicActionExecutionContext context = new DynamicActionExecutionContext(MODULE, ENTITY, "submit", submit,
+                "contract-1", "trace-1", "tenant-1", false,
+                DynamicActionAvailability.unavailable("submit", "只有草稿合同可以提交"));
+        when(service.action(MODULE, "submit")).thenReturn(submit);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class)))
+                .thenThrow(new DynamicActionExecutionException("只有草稿合同可以提交", context,
+                        DynamicActionExecutionException.STAGE_AVAILABILITY, null));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("只有草稿合同可以提交"))
+                .andExpect(jsonPath("$.failureStage").value("availability"))
+                .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.context.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.context.traceId").value("trace-1"));
     }
 
     @Test

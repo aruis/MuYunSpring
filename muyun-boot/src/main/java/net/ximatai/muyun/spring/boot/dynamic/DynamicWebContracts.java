@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
@@ -194,6 +195,18 @@ record DynamicWebActionResultBody(String type,
 }
 
 record DynamicWebError(String message) {
+}
+
+record DynamicWebActionError(String message,
+                             String failureStage,
+                             DynamicWebActionContext context) {
+    static DynamicWebActionError from(DynamicActionExecutionException exception) {
+        return new DynamicWebActionError(
+                exception.getMessage(),
+                exception.failureStage(),
+                DynamicWebActionContext.from(exception.context())
+        );
+    }
 }
 
 final class DynamicWebValues {
