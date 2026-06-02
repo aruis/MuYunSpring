@@ -132,10 +132,19 @@ class PlatformModelSchemaTest {
         assertThat(table.getName()).isEqualTo("platform_runtime_audit_record");
         assertThat(columnNames(table))
                 .contains("id", "tenant_id", "event_id", "trace_id", "event_type", "module_alias",
-                        "entity_alias", "record_id", "action_code", "system_context",
+                        "entity_alias", "record_id", "action_code", "executor_type", "result_type",
+                        "result_message", "refresh_requested", "redirect_to", "result_text", "system_context",
                         "mutation_source", "payload_text", "occurred_at");
         assertThat(uniqueIndexes(table)).contains(List.of("tenant_id", "event_id"));
+        assertThat(indexes(table)).contains(
+                List.of("trace_id"),
+                List.of("tenant_id", "action_code", "occurred_at"),
+                List.of("tenant_id", "result_type", "occurred_at")
+        );
         assertThat(columnType(table, "payload_text")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(table, "result_message")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(table, "redirect_to")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(table, "result_text")).isEqualTo(ColumnType.TEXT);
     }
 
     private Set<String> columnNames(TableWrapper table) {
@@ -150,6 +159,12 @@ class PlatformModelSchemaTest {
     private List<List<String>> uniqueIndexes(TableWrapper table) {
         return table.getIndexes().stream()
                 .filter(index -> index.isUnique())
+                .map(index -> List.copyOf(index.getColumns()))
+                .toList();
+    }
+
+    private List<List<String>> indexes(TableWrapper table) {
+        return table.getIndexes().stream()
                 .map(index -> List.copyOf(index.getColumns()))
                 .toList();
     }

@@ -19,6 +19,8 @@ import java.time.Instant;
 @CompositeIndex(columns = {"trace_id"})
 @CompositeIndex(columns = {"tenant_id", "module_alias", "entity_alias", "record_id"})
 @CompositeIndex(columns = {"event_type", "occurred_at"})
+@CompositeIndex(columns = {"tenant_id", "action_code", "occurred_at"})
+@CompositeIndex(columns = {"tenant_id", "result_type", "occurred_at"})
 public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "event_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Runtime event id")
     private String eventId;
@@ -40,6 +42,24 @@ public class RuntimeAuditRecord extends StandardEntity {
 
     @Column(name = "action_code", type = ColumnType.VARCHAR, length = 64, comment = "Action code")
     private String actionCode;
+
+    @Column(name = "executor_type", type = ColumnType.VARCHAR, length = 32, comment = "Action executor type")
+    private String executorType;
+
+    @Column(name = "result_type", type = ColumnType.VARCHAR, length = 32, comment = "Action result type")
+    private String resultType;
+
+    @Column(name = "result_message", type = ColumnType.TEXT, comment = "Action result message")
+    private String resultMessage;
+
+    @Column(name = "refresh_requested", type = ColumnType.BOOLEAN, comment = "Action result refresh flag")
+    private Boolean refreshRequested;
+
+    @Column(name = "redirect_to", type = ColumnType.TEXT, comment = "Action result redirect target")
+    private String redirectTo;
+
+    @Column(name = "result_text", type = ColumnType.TEXT, comment = "Simple action result text")
+    private String resultText;
 
     @Column(name = "system_context", type = ColumnType.BOOLEAN, nullable = false, comment = "System context flag")
     private Boolean systemContext;

@@ -35,6 +35,12 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getEntityAlias()).isEqualTo("contract");
         assertThat(record.getRecordId()).isEqualTo("contract-1");
         assertThat(record.getActionCode()).isEqualTo("approve");
+        assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getResultType()).isEqualTo("VALUE");
+        assertThat(record.getResultMessage()).isEqualTo("审批通过");
+        assertThat(record.getRefreshRequested()).isTrue();
+        assertThat(record.getRedirectTo()).isEqualTo("/contracts/contract-1");
+        assertThat(record.getResultText()).isEqualTo("approved");
         assertThat(record.getSystemContext()).isFalse();
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
         assertThat(record.getPayloadText()).contains("available=true");
@@ -63,6 +69,27 @@ class RuntimeAuditRecordServiceContractTest {
     }
 
     @Test
+    void shouldBuildRuntimeAuditQueryCriteriaForActionDimensions() {
+        service.record(event());
+        service.record(otherActionEvent());
+
+        assertThat(service.list(service.traceCriteria("trace-1"), PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getEventId)
+                .isEqualTo("event-1");
+        assertThat(service.list(service.actionCriteria("sales.contract", "approve"), PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getActionCode)
+                .isEqualTo("approve");
+        assertThat(service.list(service.eventTypeCriteria(RuntimeEventType.ACTION_EXECUTED), PageRequest.of(1, 10)))
+                .hasSize(2);
+        assertThat(service.list(service.recordCriteria("sales.contract", "contract", "contract-2"), PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getTraceId)
+                .isEqualTo("trace-2");
+    }
+
+    @Test
     void shouldKeepNullEventTenantEvenWhenTenantContextExists() {
         String id;
         try (TenantContext.Scope ignored = TenantContext.use("tenant-context")) {
@@ -70,6 +97,18 @@ class RuntimeAuditRecordServiceContractTest {
         }
 
         assertThat(service.select(id).getTenantId()).isNull();
+    }
+
+    @Test
+    void shouldNotExtractActionResultColumnsFromNonActionEventPayload() {
+        String id = service.record(moduleEventWithActionLikePayload());
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
+        assertThat(record.getResultType()).isNull();
+        assertThat(record.getResultMessage()).isNull();
+        assertThat(record.getResultText()).isNull();
+        assertThat(record.getPayloadText()).contains("resultType=VALUE");
     }
 
     private RuntimeEvent event() {
@@ -84,8 +123,33 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                Map.of("available", true),
+                Map.of(
+                        "available", true,
+                        "executorType", "SERVICE",
+                        "resultType", "VALUE",
+                        "message", "审批通过",
+                        "refresh", true,
+                        "redirectTo", "/contracts/contract-1",
+                        "result", "approved"
+                ),
                 Instant.parse("2026-06-02T04:00:00Z")
+        );
+    }
+
+    private RuntimeEvent otherActionEvent() {
+        return new RuntimeEvent(
+                "event-2",
+                "trace-2",
+                RuntimeEventType.ACTION_EXECUTED,
+                "sales.contract",
+                "contract",
+                "contract-2",
+                "submit",
+                "tenant-1",
+                false,
+                RuntimeMutationSource.ACTION,
+                Map.of("executorType", "STANDARD", "resultType", "RECORD_ID", "result", "contract-2"),
+                Instant.parse("2026-06-02T04:05:00Z")
         );
     }
 
@@ -103,6 +167,23 @@ class RuntimeAuditRecordServiceContractTest {
                 RuntimeMutationSource.SYSTEM,
                 Map.of(),
                 Instant.parse("2026-06-02T04:00:00Z")
+        );
+    }
+
+    private RuntimeEvent moduleEventWithActionLikePayload() {
+        return new RuntimeEvent(
+                "module-event-with-action-like-payload",
+                "module-trace",
+                RuntimeEventType.MODULE_PUBLISHED,
+                "sales.contract",
+                null,
+                null,
+                null,
+                "tenant-1",
+                true,
+                RuntimeMutationSource.SYSTEM,
+                Map.of("resultType", "VALUE", "message", "发布完成", "result", "ok"),
+                Instant.parse("2026-06-02T04:10:00Z")
         );
     }
 }

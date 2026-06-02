@@ -63,6 +63,23 @@ class RuntimeAuditRecordRepositoryIT {
     }
 
     @Test
+    void shouldPersistActionResultColumnsThroughRepository() {
+        listener.onRuntimeEvent(actionEvent("audit-it-action-event"));
+
+        RuntimeAuditRecord record = service.list(Criteria.of().eq("eventId", "audit-it-action-event"),
+                        PageRequest.of(1, 10))
+                .getFirst();
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+        assertThat(record.getActionCode()).isEqualTo("submit");
+        assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getResultType()).isEqualTo("VALUE");
+        assertThat(record.getResultMessage()).isEqualTo("提交成功");
+        assertThat(record.getRefreshRequested()).isTrue();
+        assertThat(record.getRedirectTo()).hasSizeGreaterThan(512);
+        assertThat(record.getResultText()).isEqualTo("submitted");
+    }
+
+    @Test
     void shouldRejectDuplicateRuntimeEventIdThroughRepositoryService() {
         RuntimeEvent event = event("audit-it-event-duplicate");
         listener.onRuntimeEvent(event);
@@ -86,6 +103,30 @@ class RuntimeAuditRecordRepositoryIT {
                 RuntimeMutationSource.SYSTEM,
                 Map.of("changed", true),
                 Instant.parse("2026-06-02T05:00:00Z")
+        );
+    }
+
+    private RuntimeEvent actionEvent(String eventId) {
+        return new RuntimeEvent(
+                eventId,
+                "audit-it-action-trace",
+                RuntimeEventType.ACTION_EXECUTED,
+                "sales.contract",
+                "contract",
+                "contract-it-1",
+                "submit",
+                "tenant-it",
+                false,
+                RuntimeMutationSource.ACTION,
+                Map.of(
+                        "executorType", "SERVICE",
+                        "resultType", "VALUE",
+                        "message", "提交成功",
+                        "refresh", true,
+                        "redirectTo", "/contracts/" + "x".repeat(600),
+                        "result", "submitted"
+                ),
+                Instant.parse("2026-06-02T05:05:00Z")
         );
     }
 
