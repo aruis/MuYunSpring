@@ -234,7 +234,7 @@ class DynamicRecordWebControllerTest {
         when(service.actionAvailability(eq(MODULE), eq("preview"), any(DynamicRecord.class)))
                 .thenReturn(DynamicActionAvailability.available("preview"));
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].action.code").value("submit"))
                 .andExpect(jsonPath("$[0].available").value(false))
@@ -252,7 +252,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectRecordActionAvailabilityWhenRecordDoesNotExist() throws Exception {
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "missing"))
+        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "missing"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic record does not exist: missing"));
     }
@@ -406,12 +406,14 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
-    void shouldRejectOldActionsExecutionPath() throws Exception {
+    void shouldTreatActionsPathAsRecordActionQueryInsteadOfExecution() throws Exception {
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+
         mvc.perform(post("/{moduleAlias}/actions/{actionCode}", MODULE, "submit")
                         .contentType("application/json")
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: actions"));
+                .andExpect(jsonPath("$.message").value("dynamic record does not exist: submit"));
     }
 
     @Test

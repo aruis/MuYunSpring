@@ -94,7 +94,7 @@ public class DynamicRecordWebController {
         return recordService.actions(moduleAlias);
     }
 
-    @PostMapping("/view/{recordId}/actions")
+    @PostMapping("/actions/{recordId}")
     public List<DynamicWebActionAvailabilityResponse> mainEntityRecordActions(@PathVariable String moduleAlias,
                                                                               @PathVariable String recordId) {
         String entityAlias = mainEntityAlias(moduleAlias);

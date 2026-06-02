@@ -85,7 +85,7 @@ class DynamicRecordWebControllerIT {
         when(recordService.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
                 .thenReturn(DynamicActionAvailability.available("submit"));
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}/actions", MODULE, "contract-1"))
+        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].action.code").value("submit"))
                 .andExpect(jsonPath("$[0].available").value(true));
