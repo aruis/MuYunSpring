@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -18,6 +19,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final DynamicModuleRegistry registry;
     private final String cacheNamespacePrefix;
     private final DynamicFieldValueValidator fieldValueValidator;
+    private final RuntimeEventPublisher eventPublisher;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
@@ -34,9 +36,17 @@ public class DynamicRecordRuntime implements AutoCloseable {
     public DynamicRecordRuntime(IDatabaseOperations<?> operations,
                                 DynamicModuleRegistry registry,
                                 DynamicFieldValueValidator fieldValueValidator) {
+        this(operations, registry, fieldValueValidator, RuntimeEventPublisher.noop());
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
+                                DynamicModuleRegistry registry,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                RuntimeEventPublisher eventPublisher) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
+        this.eventPublisher = eventPublisher == null ? RuntimeEventPublisher.noop() : eventPublisher;
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
@@ -66,6 +76,10 @@ public class DynamicRecordRuntime implements AutoCloseable {
 
     public DynamicModuleDescriptor describe(String moduleAlias) {
         return registry.describe(moduleAlias);
+    }
+
+    RuntimeEventPublisher eventPublisher() {
+        return eventPublisher;
     }
 
     public DynamicEntityService entityService(String moduleAlias, String entityAlias) {

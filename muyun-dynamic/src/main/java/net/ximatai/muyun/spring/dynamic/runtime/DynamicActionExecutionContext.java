@@ -8,6 +8,7 @@ public record DynamicActionExecutionContext(
         String actionCode,
         DynamicActionDescriptor action,
         String recordId,
+        String traceId,
         String tenantId,
         boolean systemContext,
         DynamicActionAvailability availability

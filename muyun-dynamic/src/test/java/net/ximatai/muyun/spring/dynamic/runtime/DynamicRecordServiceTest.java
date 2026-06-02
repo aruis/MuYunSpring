@@ -5,6 +5,10 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
+import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
@@ -21,8 +25,11 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -204,6 +211,33 @@ class DynamicRecordServiceTest {
 
         assertThat(result.value()).isInstanceOf(String.class);
         assertThat(result.context().recordId()).isEqualTo(result.value());
+    }
+
+    @Test
+    void shouldPublishActionExecutionEventAfterStandardAction() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations, events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        record.setId("contract-1");
+
+        service.module(MODULE).executeAction("create", DynamicActionExecutionRequest.record(record));
+
+        assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                .containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
+        assertThat(events.events().getFirst().mutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
+        RuntimeEvent action = events.events().getLast();
+        assertThat(events.events().getFirst().traceId()).isEqualTo(action.traceId());
+        assertThat(action.moduleAlias()).isEqualTo(MODULE);
+        assertThat(action.entityAlias()).isEqualTo("contract");
+        assertThat(action.recordId()).isEqualTo("contract-1");
+        assertThat(action.actionCode()).isEqualTo("create");
+        assertThat(action.payload()).containsEntry("executorType", "STANDARD")
+                .containsEntry("result", "contract-1");
     }
 
     @Test
@@ -673,6 +707,124 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldPublishRecordMutationEventsThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+        record.setId("contract-1");
+
+        service.create(MODULE, "contract", record);
+        service.update(MODULE, "contract", record);
+        service.delete(MODULE, "contract", "contract-1");
+
+        assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                .containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.AFTER_UPDATE, RuntimeEventType.AFTER_DELETE);
+        assertThat(events.events()).extracting(RuntimeEvent::mutationSource)
+                .containsExactly(RuntimeMutationSource.BUSINESS, RuntimeMutationSource.BUSINESS, RuntimeMutationSource.BUSINESS);
+        assertThat(events.events()).allSatisfy(event -> {
+            assertThat(event.moduleAlias()).isEqualTo(MODULE);
+            assertThat(event.entityAlias()).isEqualTo("contract");
+            assertThat(event.recordId()).isEqualTo("contract-1");
+            assertThat(event.actionCode()).isNull();
+        });
+    }
+
+    @Test
+    void shouldPublishBatchDeleteAndSortMutationEvents() {
+        IDatabaseOperations<Object> operations = operations();
+        stubSortableRows(operations);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, sortableEntity(), events);
+
+        service.reorder(MODULE, "contract", List.of("first", "second", "third"));
+        service.moveBefore(MODULE, "contract", "third", "first");
+        service.deleteBatch(MODULE, "contract", List.of("first", "second"));
+
+        assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                .containsExactly(RuntimeEventType.AFTER_UPDATE, RuntimeEventType.AFTER_UPDATE, RuntimeEventType.AFTER_DELETE);
+        assertThat(events.events().get(0).payload())
+                .containsEntry("operation", "reorder")
+                .containsEntry("recordIds", List.of("first", "second", "third"));
+        assertThat(events.events().get(1).payload())
+                .containsEntry("operation", "moveBefore")
+                .containsEntry("beforeId", "first");
+        assertThat(events.events().get(2).payload())
+                .containsEntry("recordIds", List.of("first", "second"))
+                .containsEntry("count", 2);
+    }
+
+    @Test
+    void shouldPublishRuntimeEventAfterCommitWhenTransactionIsActive() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+        record.setId("contract-1");
+
+        try {
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            service.create(MODULE, "contract", record);
+            assertThat(events.events()).isEmpty();
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+            assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                    .containsExactly(RuntimeEventType.AFTER_CREATE);
+        } finally {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void shouldNotPublishRuntimeEventAfterRollback() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+        record.setId("contract-1");
+
+        try {
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            service.create(MODULE, "contract", record);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(events.events()).isEmpty();
+        } finally {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void shouldRejectIncompleteRuntimeEvent() {
+        assertThatThrownBy(() -> new RuntimeEvent(null, null, null, MODULE, "contract", null, null,
+                null, false, RuntimeMutationSource.BUSINESS, Map.of(), null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("eventType");
+        assertThatThrownBy(() -> RuntimeEvent.of(RuntimeEventType.ACTION_EXECUTED, MODULE, "contract", "contract-1",
+                null, null, false, RuntimeMutationSource.ACTION, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("actionCode");
+    }
+
+    @Test
     void shouldExecuteReferenceOptionsActionWithExplicitPageRequest() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -884,12 +1036,27 @@ class DynamicRecordServiceTest {
     }
 
     private DynamicRecordService service(IDatabaseOperations<Object> operations, EntityDefinition entity) {
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
+        return service(operations, entity, RuntimeEventPublisher.noop());
+    }
+
+    private DynamicRecordService service(IDatabaseOperations<Object> operations,
+                                         EntityDefinition entity,
+                                         RuntimeEventPublisher eventPublisher) {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher
+        )
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(entity)));
         return new DynamicRecordService(runtime);
     }
 
     private DynamicRecordService actionService(IDatabaseOperations<Object> operations) {
+        return actionService(operations, RuntimeEventPublisher.noop());
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations, RuntimeEventPublisher eventPublisher) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -901,7 +1068,12 @@ class DynamicRecordServiceTest {
                         "提交", true, EntityActionStyle.PRIMARY)
                         .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"))
         );
-        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher
+        ).register(module));
     }
 
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
@@ -1132,5 +1304,18 @@ class DynamicRecordServiceTest {
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<Map<String, Object>> mapCaptor() {
         return ArgumentCaptor.forClass(Map.class);
+    }
+
+    private static final class CollectingRuntimeEventPublisher implements RuntimeEventPublisher {
+        private final List<RuntimeEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(RuntimeEvent event) {
+            events.add(event);
+        }
+
+        List<RuntimeEvent> events() {
+            return events;
+        }
     }
 }
