@@ -52,7 +52,8 @@ class DynamicModuleDescriptorRuntimeTest {
                 "Contract",
                 List.of(
                         new EntityDefinition("contract", "sales_contract", "Contract",
-                                List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE)),
+                                List.of(FieldDefinition.titleField(), FieldDefinition.string("code", "Code")),
+                                Set.of(EntityCapability.REFERENCE)),
                         new EntityDefinition("line", "sales_contract_line", "Line",
                                 List.of(FieldDefinition.titleField(), new FieldDefinition("contractId", "contract_id",
                                         net.ximatai.muyun.spring.dynamic.metadata.FieldType.STRING, "Contract")),
@@ -112,6 +113,7 @@ class DynamicModuleDescriptorRuntimeTest {
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
+                "code", "C-001",
                 "title", "Contract One",
                 "deleted", false,
                 "version", 0
@@ -121,14 +123,16 @@ class DynamicModuleDescriptorRuntimeTest {
                 "Contract",
                 List.of(
                         new EntityDefinition("contract", "sales_contract", "Contract",
-                                List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE)),
+                                List.of(FieldDefinition.titleField(), FieldDefinition.string("code", "Code")),
+                                Set.of(EntityCapability.REFERENCE)),
                         new EntityDefinition("line", "sales_contract_line", "Line",
                                 List.of(FieldDefinition.titleField(), new FieldDefinition("contractId", "contract_id",
                                         net.ximatai.muyun.spring.dynamic.metadata.FieldType.STRING, "Contract")),
                                 Set.of(EntityCapability.REFERENCE))
                 ),
                 List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
-                List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract"))
+                List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")
+                        .withProjection("code", "contractCode"))
         );
         DynamicRecordService.EntityOperations lineApi = new DynamicRecordService(
                 new DynamicRecordRuntime(operations).publish(module)).entity("sales.contract", "line");
@@ -139,6 +143,9 @@ class DynamicModuleDescriptorRuntimeTest {
         assertThat(response.options())
                 .extracting(DynamicReferenceResolveItem::id)
                 .containsExactly("contract-1");
+        assertThat(response.options().getFirst().title()).isEqualTo("Contract One");
+        assertThat(response.options().getFirst().matchedBy()).isEqualTo(DynamicReferenceMatchMode.LABEL);
+        assertThat(response.options().getFirst().projections()).containsEntry("contractCode", "C-001");
     }
 
     @Test

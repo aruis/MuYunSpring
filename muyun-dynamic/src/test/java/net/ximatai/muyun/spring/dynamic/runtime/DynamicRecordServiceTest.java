@@ -406,6 +406,71 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExcludeSoftDeletedTargetWhenResolvingReference() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveFieldReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Deleted Contract")
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.NOT_FOUND);
+        assertThat(response.options()).isEmpty();
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL"));
+    }
+
+    @Test
+    void shouldExcludeSoftDeletedTargetWhenTranslatingReference() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordService service = referenceResolvingService(operations);
+
+        DynamicReferenceResolveResponse response = service.resolveFieldReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.translate(List.of("deleted-contract"))
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.NOT_FOUND);
+        assertThat(response.results()).singleElement()
+                .extracting(DynamicReferenceResolveResult::status)
+                .isEqualTo(DynamicReferenceResolveStatus.NOT_FOUND);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"deleted\" =")
+                .contains("\"deleted\" IS NULL"));
+    }
+
+    @Test
+    void shouldRejectSoftDeletedTargetWhenSavingReference() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DynamicRecordService.EntityOperations lines = referenceResolvingService(operations).entity(MODULE, "line");
+        DynamicRecord line = lines.newRecord()
+                .setValue("contractId", "deleted-contract")
+                .setValue("summary", "should fail");
+        line.setId("line-1");
+
+        assertThatThrownBy(() -> lines.create(line))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic reference target not found")
+                .hasMessageContaining("sales.contract.contract.deleted-contract");
+        verify(operations, org.mockito.Mockito.never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
     void shouldReturnNotFoundForEmptyReferenceTranslateValues() {
         DynamicRecordService service = referenceResolvingService(operations());
 
