@@ -19,6 +19,7 @@ public record DynamicFieldDescriptor(
         Integer scale,
         OptionBinding optionBinding,
         OptionSelectionMode selectionMode,
+        DynamicReferenceDescriptor reference,
         DynamicFieldQueryDescriptor query,
         String defaultValue,
         String validationRegex,
@@ -40,11 +41,37 @@ public record DynamicFieldDescriptor(
                 field.scale(),
                 field.optionBinding(),
                 field.dictionaryBinding() == null ? null : field.dictionaryBinding().selectionMode(),
+                null,
                 DynamicFieldQueryDescriptor.from(field.queryDefinition()),
                 field.behavior().defaultValue(),
                 field.behavior().validationRegex(),
                 field.behavior().copyable(),
                 field.behavior().writeProtected()
+        );
+    }
+
+    public static DynamicFieldDescriptor from(FieldDefinition field, DynamicReferenceDescriptor reference) {
+        DynamicFieldDescriptor descriptor = from(field);
+        return new DynamicFieldDescriptor(
+                descriptor.fieldName(),
+                descriptor.type(),
+                descriptor.title(),
+                descriptor.required(),
+                descriptor.unique(),
+                descriptor.indexed(),
+                descriptor.sortable(),
+                descriptor.titleField(),
+                descriptor.length(),
+                descriptor.precision(),
+                descriptor.scale(),
+                descriptor.optionBinding(),
+                descriptor.selectionMode(),
+                reference,
+                descriptor.query(),
+                descriptor.defaultValue(),
+                descriptor.validationRegex(),
+                descriptor.copyable(),
+                descriptor.writeProtected()
         );
     }
 }

@@ -4,10 +4,13 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public record DynamicEntityDescriptor(
@@ -47,13 +50,30 @@ public record DynamicEntityDescriptor(
                                                List<EntityViewDefinition> views,
                                                List<EntityAssociationViewDefinition> associationViews,
                                                List<EntityActionDefinition> actions) {
+        return from(moduleAlias, entity, List.of(), views, associationViews, actions);
+    }
+
+    public static DynamicEntityDescriptor from(String moduleAlias,
+                                               EntityDefinition entity,
+                                               List<EntityReferenceDefinition> references,
+                                               List<EntityViewDefinition> views,
+                                               List<EntityAssociationViewDefinition> associationViews,
+                                               List<EntityActionDefinition> actions) {
+        Map<String, DynamicReferenceDescriptor> referencesByField = references == null
+                ? Map.of()
+                : references.stream()
+                .filter(reference -> entity.alias().equals(reference.sourceEntityAlias()))
+                .map(DynamicReferenceDescriptor::from)
+                .collect(Collectors.toMap(DynamicReferenceDescriptor::sourceField, Function.identity()));
         return new DynamicEntityDescriptor(
                 entity.alias(),
                 entity.name(),
                 entity.capabilities().stream()
                         .map(EntityCapability::name)
                         .collect(Collectors.toUnmodifiableSet()),
-                entity.fields().stream().map(DynamicFieldDescriptor::from).toList(),
+                entity.fields().stream()
+                        .map(field -> DynamicFieldDescriptor.from(field, referencesByField.get(field.fieldName())))
+                        .toList(),
                 entity.orderedFormulaRules().stream()
                         .map(DynamicFormulaRuleDescriptor::from)
                         .toList(),

@@ -167,6 +167,36 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldValidateExplicitDynamicReferenceTargetOnWrite() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceRows(operations);
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicEntityService lineService = new DynamicRecordRuntime(operations)
+                .register(invoiceModule())
+                .entityService(MODULE, "invoice_line");
+
+        DynamicRecord valid = new DynamicRecord(invoiceLineEntity())
+                .setValue("title", "L-001")
+                .setValue("invoiceId", "invoice-1");
+        lineService.insert(valid);
+
+        DynamicRecord missing = new DynamicRecord(invoiceLineEntity())
+                .setValue("title", "L-002")
+                .setValue("invoiceId", "missing-invoice");
+        assertThatThrownBy(() -> lineService.insert(missing))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic reference target not found");
+
+        DynamicRecord blankRequired = new DynamicRecord(invoiceLineEntity())
+                .setValue("title", "L-003")
+                .setValue("invoiceId", " ");
+        assertThatThrownBy(() -> lineService.insert(blankRequired))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("required dynamic reference field");
+    }
+
+    @Test
     void shouldAutoPopulateAndCascadeDeleteDynamicChildren() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);

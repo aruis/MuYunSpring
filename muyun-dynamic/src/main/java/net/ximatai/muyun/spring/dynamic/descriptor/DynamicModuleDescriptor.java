@@ -30,8 +30,8 @@ public record DynamicModuleDescriptor(
                 module.name(),
                 mainEntityActions(module, moduleEntities),
                 moduleEntities.stream()
-                        .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.views(),
-                                module.associationViews(), module.actions()))
+                        .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.references(),
+                                module.views(), module.associationViews(), module.actions()))
                         .toList(),
                 module.relations().stream().map(DynamicRelationDescriptor::from).toList(),
                 module.references().stream().map(DynamicReferenceDescriptor::from).toList(),

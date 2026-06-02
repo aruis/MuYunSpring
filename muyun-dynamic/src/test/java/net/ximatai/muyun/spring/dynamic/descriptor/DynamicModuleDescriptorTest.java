@@ -151,6 +151,12 @@ class DynamicModuleDescriptorTest {
         assertThat(reference.titleOutputField()).isEqualTo("customerTitle");
         assertThat(reference.projections())
                 .containsExactly(new DynamicReferenceProjectionDescriptor("title", "customerTitle"));
+        assertThat(descriptor.entities().get(1).fields().get(1).reference())
+                .satisfies(fieldReference -> {
+                    assertThat(fieldReference.sourceField()).isEqualTo("customerId");
+                    assertThat(fieldReference.targetModuleAlias()).isEqualTo("crm.customer");
+                    assertThat(fieldReference.targetEntityAlias()).isEqualTo("customer");
+                });
     }
 
     @Test

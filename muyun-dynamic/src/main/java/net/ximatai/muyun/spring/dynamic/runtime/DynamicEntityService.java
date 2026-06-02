@@ -148,6 +148,7 @@ public class DynamicEntityService implements
         validateChildPayload(record);
         record.validateForInsert();
         validateFieldValues(record);
+        validateReferenceValues(record);
         validateTreePlacement(record);
     }
 
@@ -168,6 +169,7 @@ public class DynamicEntityService implements
         }
         validateChildPayload(record);
         validateFieldValues(record);
+        validateReferenceValues(record);
         validateTreePlacement(record);
     }
 
@@ -672,6 +674,39 @@ public class DynamicEntityService implements
         for (FieldDefinition field : dao.getEntity().fields()) {
             if (record.getValues().containsKey(field.code())) {
                 fieldValueValidator.validate(moduleAlias, dao.getEntity(), field, record.getValue(field.code()));
+            }
+        }
+    }
+
+    private void validateReferenceValues(DynamicRecord record) {
+        requireSameEntity(record);
+        if (module == null) {
+            return;
+        }
+        Map<String, FieldDefinition> fields = dao.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, Function.identity()));
+        for (ReferencePlan plan : referencePlans()) {
+            if (!record.isExplicitlySet(plan.sourceField())) {
+                continue;
+            }
+            FieldDefinition field = fields.get(plan.sourceField());
+            List<String> ids = plan.normalizeValues(record.getValue(plan.sourceField()));
+            if (field != null && field.isRequired() && ids.isEmpty()) {
+                throw new IllegalArgumentException("required dynamic reference field must not be blank: " + plan.sourceField());
+            }
+            validateReferenceIds(plan, ids);
+        }
+    }
+
+    private void validateReferenceIds(ReferencePlan plan, List<String> ids) {
+        if (ids.isEmpty() || !moduleAlias.equals(plan.target().moduleAlias())) {
+            return;
+        }
+        DynamicEntityService targetService = relationServiceResolver.apply(plan.target().entityAlias());
+        for (String id : ids) {
+            if (targetService.activeRaw(id) == null) {
+                throw new IllegalArgumentException("dynamic reference target not found: "
+                        + plan.target().qualifiedName() + "." + id);
             }
         }
     }
