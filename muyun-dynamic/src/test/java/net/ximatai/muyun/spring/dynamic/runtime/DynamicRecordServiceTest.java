@@ -264,6 +264,7 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("只有草稿合同可以提交")
                 .satisfies(error -> {
                     DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.failureStage()).isEqualTo(DynamicActionExecutionException.STAGE_AVAILABILITY);
                     assertThat(exception.context().availability().available()).isFalse();
                     assertThat(exception.context().action().availabilityCondition()).isTrue();
                 });
@@ -292,6 +293,7 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("dynamic action executorKey must not be blank")
                 .satisfies(error -> {
                     DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.failureStage()).isEqualTo(DynamicActionExecutionException.STAGE_EXECUTE);
                     assertThat(exception.context().availability().available()).isTrue();
                     assertThat(exception.context().action().executorType())
                             .isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType.SERVICE);
@@ -431,6 +433,7 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("提交金额必须大于0")
                 .satisfies(error -> {
                     DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.failureStage()).isEqualTo(DynamicActionExecutionException.STAGE_BEFORE_EXECUTE_RULE);
                     assertThat(exception.context().availability().available()).isTrue();
                     assertThat(exception.context().traceId()).isNotBlank();
                 });
@@ -573,6 +576,7 @@ class DynamicRecordServiceTest {
                 .hasCauseInstanceOf(IllegalStateException.class)
                 .satisfies(error -> {
                     DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.failureStage()).isEqualTo(DynamicActionExecutionException.STAGE_EXECUTE);
                     assertThat(exception.context().actionCode()).isEqualTo("submit");
                     assertThat(exception.context().recordId()).isEqualTo("contract-1");
                     assertThat(exception.context().traceId()).isNotBlank();

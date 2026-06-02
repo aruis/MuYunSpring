@@ -348,18 +348,19 @@ public class DynamicRecordService {
         String traceId = UUID.randomUUID().toString();
         DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized, availability, null, traceId);
         if (!availability.available()) {
-            publishActionFailureEvent(context, "availability", availability.message(), null);
-            throw new DynamicActionExecutionException(availability.message(), context);
+            publishActionFailureEvent(context, DynamicActionExecutionException.STAGE_AVAILABILITY, availability.message(), null);
+            throw new DynamicActionExecutionException(availability.message(), context,
+                    DynamicActionExecutionException.STAGE_AVAILABILITY, null);
         }
         DynamicActionResultBody body;
         try {
             validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
             body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
         } catch (DynamicActionExecutionException e) {
-            publishActionFailureEvent(context, failureStage(e), e.getMessage(), failureError(e));
+            publishActionFailureEvent(context, e.failureStage(), e.getMessage(), failureError(e));
             throw e;
         } catch (RuntimeException e) {
-            publishActionFailureEvent(context, "execute", e.getMessage(), e);
+            publishActionFailureEvent(context, DynamicActionExecutionException.STAGE_EXECUTE, e.getMessage(), e);
             throw e;
         }
         DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
@@ -393,7 +394,8 @@ public class DynamicRecordService {
         try {
             formulaRuntime.beforeActionExecute(record, existing);
         } catch (DynamicFormulaException e) {
-            throw new DynamicActionExecutionException(e.getMessage(), context, e);
+            throw new DynamicActionExecutionException(e.getMessage(), context,
+                    DynamicActionExecutionException.STAGE_BEFORE_EXECUTE_RULE, e);
         }
     }
 
@@ -683,13 +685,6 @@ public class DynamicRecordService {
             payload.put("errorType", cause.getClass().getName());
         }
         return payload;
-    }
-
-    private String failureStage(DynamicActionExecutionException exception) {
-        if (exception.getCause() instanceof DynamicFormulaException) {
-            return "beforeExecuteRule";
-        }
-        return "execute";
     }
 
     private Throwable failureError(DynamicActionExecutionException exception) {
