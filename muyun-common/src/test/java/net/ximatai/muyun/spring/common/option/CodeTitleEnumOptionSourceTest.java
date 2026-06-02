@@ -35,6 +35,16 @@ class CodeTitleEnumOptionSourceTest {
                 .hasMessageContaining("unsupported option binding");
     }
 
+    @Test
+    void shouldRejectDuplicateOptionSourceProviders() {
+        assertThatThrownBy(() -> new OptionSourceRegistry(List.of(
+                new CodeTitleEnumOptionSourceProvider(),
+                new CodeTitleEnumOptionSourceProvider()
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate option source provider");
+    }
+
     private enum OrderState implements CodeTitleEnum {
         DRAFT("draft", "Draft"),
         APPROVED("approved", "Approved");

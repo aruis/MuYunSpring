@@ -14,8 +14,13 @@ public final class DictionaryOptionSourceProvider implements OptionSourceProvide
     }
 
     @Override
+    public String sourceType() {
+        return OptionBinding.DICTIONARY_SOURCE;
+    }
+
+    @Override
     public boolean supports(OptionBinding binding) {
-        return binding != null && OptionBinding.DICTIONARY_SOURCE.equals(binding.sourceType());
+        return binding != null && sourceType().equals(binding.sourceType());
     }
 
     @Override
@@ -23,11 +28,7 @@ public final class DictionaryOptionSourceProvider implements OptionSourceProvide
         if (!supports(binding)) {
             throw new IllegalArgumentException("unsupported dictionary option binding: " + binding);
         }
-        String[] parts = binding.source().split("\\.", -1);
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("dictionary option source must be applicationAlias.categoryAlias: "
-                    + binding.source());
-        }
-        return new DictionaryOptionSource(parts[0], parts[1], itemService);
+        OptionBinding.DictionarySource source = binding.dictionarySource();
+        return new DictionaryOptionSource(source.applicationAlias(), source.categoryAlias(), itemService);
     }
 }

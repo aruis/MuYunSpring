@@ -4,8 +4,13 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
 public final class CodeTitleEnumOptionSourceProvider implements OptionSourceProvider {
     @Override
+    public String sourceType() {
+        return OptionBinding.ENUM_SOURCE;
+    }
+
+    @Override
     public boolean supports(OptionBinding binding) {
-        return binding != null && OptionBinding.ENUM_SOURCE.equals(binding.sourceType());
+        return binding != null && sourceType().equals(binding.sourceType());
     }
 
     @Override
@@ -22,7 +27,7 @@ public final class CodeTitleEnumOptionSourceProvider implements OptionSourceProv
 
     private Class<?> loadType(String className) {
         try {
-            return Class.forName(className);
+            return Class.forName(className, false, Thread.currentThread().getContextClassLoader());
         } catch (ClassNotFoundException ex) {
             throw new IllegalArgumentException("unknown enum option type: " + className, ex);
         }

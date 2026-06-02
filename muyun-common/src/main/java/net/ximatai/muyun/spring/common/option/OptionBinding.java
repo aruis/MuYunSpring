@@ -21,7 +21,25 @@ public record OptionBinding(String sourceType, String source) {
         return new OptionBinding(DICTIONARY_SOURCE, validApplicationAlias + "." + validCategoryAlias);
     }
 
+    public DictionarySource dictionarySource() {
+        if (!DICTIONARY_SOURCE.equals(sourceType)) {
+            throw new IllegalArgumentException("option binding is not dictionary source: " + sourceType);
+        }
+        String[] parts = source.split("\\.", -1);
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("dictionary option source must be applicationAlias.categoryAlias: " + source);
+        }
+        return new DictionarySource(parts[0], parts[1]);
+    }
+
     public static <E extends Enum<E> & CodeTitleEnum> OptionBinding enumType(Class<E> enumType) {
         return new OptionBinding(ENUM_SOURCE, Objects.requireNonNull(enumType, "enumType must not be null").getName());
+    }
+
+    public record DictionarySource(String applicationAlias, String categoryAlias) {
+        public DictionarySource {
+            applicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+            categoryAlias = PlatformNameRules.requireIdentifier(categoryAlias, "dictionaryCategoryAlias");
+        }
     }
 }
