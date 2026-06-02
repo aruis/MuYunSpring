@@ -132,6 +132,31 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeModuleActionsAsMainEntityActions() {
+        DynamicRecordService service = actionService(operations());
+
+        assertThat(service.module(MODULE).actions())
+                .containsExactlyElementsOf(service.entity(MODULE, "contract").actions());
+        assertThat(service.module(MODULE).action("submit"))
+                .isEqualTo(service.entity(MODULE, "contract").action("submit"));
+    }
+
+    @Test
+    void shouldEvaluateModuleActionAvailabilityAsMainEntityActionAvailability() {
+        DynamicRecordService service = actionService(operations());
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+
+        DynamicActionAvailability moduleAvailability = service.module(MODULE).actionAvailability("submit", draft);
+        DynamicActionAvailability entityAvailability = service.entity(MODULE, "contract").actionAvailability("submit", draft);
+
+        assertThat(moduleAvailability.available()).isEqualTo(entityAvailability.available());
+        assertThat(moduleAvailability.message()).isEqualTo(entityAvailability.message());
+        assertThat(moduleAvailability.report().errors()).hasSameSizeAs(entityAvailability.report().errors());
+    }
+
+    @Test
     void shouldTreatStandardActionWithoutConditionAsAvailable() {
         DynamicRecordService service = actionService(operations());
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -194,6 +219,7 @@ class DynamicRecordServiceTest {
         assertThatThrownBy(() -> service.actionAvailability(MODULE, "submit", line))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dynamic record entity mismatch: line");
+        assertThat(service.entity(MODULE, "line").actionAvailability("submit", line).available()).isTrue();
     }
 
     @Test
