@@ -17,7 +17,7 @@ public record DynamicActionDescriptor(
         EntityActionAccessMode accessMode,
         boolean actionAuth,
         boolean dataAuth,
-        String authInheritActionAlias,
+        String authInheritActionCode,
         boolean availabilityCondition,
         String unavailableMessage,
         EntityActionExecutorType executorType,

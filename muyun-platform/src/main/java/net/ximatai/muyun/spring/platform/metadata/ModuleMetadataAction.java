@@ -17,13 +17,13 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 @Getter
 @Setter
 @Table(name = "platform_module_metadata_action", comment = "Module metadata action")
-@CompositeIndex(columns = {"relation_id", "alias"}, unique = true)
+@CompositeIndex(columns = {"relation_id", "action_code"}, unique = true)
 public class ModuleMetadataAction extends StandardEnabledSortableEntity {
     @Column(name = "relation_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module metadata relation id")
     private String relationId;
 
-    @Column(name = "alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Action alias")
-    private String alias;
+    @Column(name = "action_code", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Action code")
+    private String actionCode;
 
     @Column(name = "category", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action category")
     private EntityActionCategory category;
@@ -46,8 +46,8 @@ public class ModuleMetadataAction extends StandardEnabledSortableEntity {
     @Column(name = "data_auth", comment = "Whether data permission applies")
     private Boolean dataAuth;
 
-    @Column(name = "auth_inherit_alias", type = ColumnType.VARCHAR, length = 64, comment = "Inherited action alias")
-    private String authInheritAlias;
+    @Column(name = "auth_inherit_action_code", type = ColumnType.VARCHAR, length = 64, comment = "Inherited action code")
+    private String authInheritActionCode;
 
     @Column(name = "available_expression", type = ColumnType.TEXT, comment = "Availability expression")
     private String availableExpression;

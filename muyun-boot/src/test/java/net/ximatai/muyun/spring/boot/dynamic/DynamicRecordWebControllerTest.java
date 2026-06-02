@@ -193,7 +193,7 @@ class DynamicRecordWebControllerTest {
         when(service.delete(MODULE, ENTITY, "contract-1")).thenReturn(1);
         when(service.actions(MODULE)).thenReturn(List.of(
                 action("export", EntityActionLevel.LIST),
-                action("submit", EntityActionLevel.RECORD),
+                action("submit", EntityActionLevel.RECORD, "select"),
                 action("archive", EntityActionLevel.BATCH)
         ));
 
@@ -210,6 +210,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("export"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
+                .andExpect(jsonPath("$[1].authInheritActionCode").value("select"))
+                .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
         verify(service, times(2)).mainEntityAlias(MODULE);
@@ -496,9 +498,13 @@ class DynamicRecordWebControllerTest {
     }
 
     private DynamicActionDescriptor action(String code, EntityActionLevel level) {
+        return action(code, level, null);
+    }
+
+    private DynamicActionDescriptor action(String code, EntityActionLevel level, String authInheritActionCode) {
         return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "Submit", true,
                 EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
-                EntityActionAccessMode.AUTH_REQUIRED, true, false, null, false, null,
+                EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor");
     }
 

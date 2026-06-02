@@ -44,7 +44,7 @@ final class DynamicStandardActions {
                 configured.accessMode(),
                 configured.actionAuth(),
                 configured.dataAuth(),
-                configured.authInheritActionAlias(),
+                configured.authInheritActionCode(),
                 configured.hasAvailabilityCondition(),
                 configured.unavailableMessage(),
                 configured.executorType(),

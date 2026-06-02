@@ -371,14 +371,14 @@ public class ModuleDefinitionValidator {
 
     private void validateActionAccessPolicy(EntityActionDefinition action) {
         if (action.accessMode() == EntityActionAccessMode.ANONYMOUS_ALLOWED) {
-            if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null) {
                 throw new ModuleDefinitionException("anonymous action must not require auth policy: "
                         + action.entityAlias() + "." + action.actionCode());
             }
             return;
         }
         if (action.accessMode() == EntityActionAccessMode.LOGIN_REQUIRED) {
-            if (action.actionAuth() || action.dataAuth() || action.authInheritActionAlias() != null) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null) {
                 throw new ModuleDefinitionException("login-only action must not require auth policy: "
                         + action.entityAlias() + "." + action.actionCode());
             }
@@ -388,7 +388,7 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("auth-required action must enable action auth: "
                     + action.entityAlias() + "." + action.actionCode());
         }
-        if (action.authInheritActionAlias() != null && !action.actionAuth()) {
+        if (action.authInheritActionCode() != null && !action.actionAuth()) {
             throw new ModuleDefinitionException("action auth inherit requires action auth: "
                     + action.entityAlias() + "." + action.actionCode());
         }
@@ -456,17 +456,17 @@ public class ModuleDefinitionValidator {
                         Collectors.mapping(EntityActionDefinition::actionCode, Collectors.toSet())
                 ));
         for (EntityActionDefinition action : actions) {
-            if (action.authInheritActionAlias() == null) {
+            if (action.authInheritActionCode() == null) {
                 continue;
             }
-            requireActionCode(action.authInheritActionAlias(), "action auth inherit alias");
-            if (action.actionCode().equals(action.authInheritActionAlias())) {
-                throw new ModuleDefinitionException("action auth inherit alias must not point to self: "
+            requireActionCode(action.authInheritActionCode(), "action auth inherit code");
+            if (action.actionCode().equals(action.authInheritActionCode())) {
+                throw new ModuleDefinitionException("action auth inherit code must not point to self: "
                         + action.entityAlias() + "." + action.actionCode());
             }
-            if (!actionExists(action.entityAlias(), action.authInheritActionAlias(), entities, configuredByEntity)) {
+            if (!actionExists(action.entityAlias(), action.authInheritActionCode(), entities, configuredByEntity)) {
                 throw new ModuleDefinitionException("action auth inherit target is not configured: "
-                        + action.entityAlias() + "." + action.authInheritActionAlias());
+                        + action.entityAlias() + "." + action.authInheritActionCode());
             }
             detectActionAuthInheritCycle(action, actions, entities, configuredByEntity);
         }
@@ -490,7 +490,7 @@ public class ModuleDefinitionValidator {
                 .collect(Collectors.toMap(EntityActionDefinition::actionCode, Function.identity(), (left, ignored) -> left));
         Set<String> visited = new HashSet<>();
         visited.add(start.actionCode());
-        String current = start.authInheritActionAlias();
+        String current = start.authInheritActionCode();
         while (current != null) {
             if (!visited.add(current)) {
                 throw new ModuleDefinitionException("action auth inherit cycle: "
@@ -505,7 +505,7 @@ public class ModuleDefinitionValidator {
                 throw new ModuleDefinitionException("action auth inherit target must require action auth: "
                         + start.entityAlias() + "." + current);
             }
-            current = next == null ? null : next.authInheritActionAlias();
+            current = next == null ? null : next.authInheritActionCode();
         }
     }
 

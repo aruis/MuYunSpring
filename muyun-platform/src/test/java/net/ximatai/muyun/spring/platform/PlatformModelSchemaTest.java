@@ -90,11 +90,11 @@ class PlatformModelSchemaTest {
                 .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "read_only",
                         "required_override", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(ModuleMetadataAction.class)))
-                .contains("id", "relation_id", "alias", "category", "action_kind", "action_level",
-                        "action_style", "access_mode", "action_auth", "data_auth", "auth_inherit_alias",
+                .contains("id", "relation_id", "action_code", "category", "action_kind", "action_level",
+                        "action_style", "access_mode", "action_auth", "data_auth", "auth_inherit_action_code",
                         "available_expression", "unavailable_message", "executor_type", "executor_key",
                         "target_metadata_id", "config_id", "system_managed", "title", "enabled", "sort_order")
-                .doesNotContain("permission_code", "action_code");
+                .doesNotContain("permission_code", "alias");
         assertThat(columnNames(mapper.toTable(ModuleMetadataFormulaRule.class)))
                 .contains("id", "relation_id", "alias", "rule_kind", "rule_phase", "target_field",
                         "expression", "severity", "message_template", "stop_on_error", "enabled", "sort_order");

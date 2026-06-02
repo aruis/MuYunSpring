@@ -382,7 +382,7 @@ public class PlatformModuleDefinitionCompiler {
         }
         return new EntityActionDefinition(
                 metadata.getAlias(),
-                action.getAlias(),
+                action.getActionCode(),
                 action.getActionKind(),
                 action.getTitle(),
                 Boolean.TRUE.equals(action.getEnabled()),
@@ -392,7 +392,7 @@ public class PlatformModuleDefinitionCompiler {
                 action.getAccessMode(),
                 action.getActionAuth(),
                 action.getDataAuth(),
-                action.getAuthInheritAlias(),
+                action.getAuthInheritActionCode(),
                 action.getAvailableExpression(),
                 action.getUnavailableMessage(),
                 action.getExecutorType(),

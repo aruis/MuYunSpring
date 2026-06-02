@@ -400,7 +400,7 @@ class PlatformDynamicModulePublisherIT {
     private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
         ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
-        action.setAlias(alias);
+        action.setActionCode(alias);
         action.setActionKind(kind);
         return action;
     }

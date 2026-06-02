@@ -80,8 +80,8 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
         if (relation == null) {
             throw new PlatformException("Metadata action requires existing relation: " + action.getRelationId());
         }
-        if (action.getAlias() == null || !action.getAlias().matches("[a-z][A-Za-z0-9]{0,63}")) {
-            throw new PlatformException("Module metadata action requires valid alias: " + action.getAlias());
+        if (action.getActionCode() == null || !action.getActionCode().matches("[a-z][A-Za-z0-9]{0,63}")) {
+            throw new PlatformException("Module metadata action requires valid actionCode: " + action.getActionCode());
         }
         if (action.getCategory() == null) {
             action.setCategory(EntityActionCategory.STANDARD);
@@ -90,7 +90,7 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
             throw new PlatformException("Metadata action requires actionKind");
         }
         if (action.getActionLevel() == null) {
-            action.setActionLevel(EntityActionDefinition.defaultLevel(action.getAlias(), action.getActionKind()));
+            action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getActionKind()));
         }
         if (action.getActionStyle() == null) {
             action.setActionStyle(EntityActionStyle.NORMAL);
@@ -104,8 +104,8 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
         if (action.getDataAuth() == null) {
             action.setDataAuth(false);
         }
-        if (action.getAuthInheritAlias() != null && action.getAuthInheritAlias().isBlank()) {
-            action.setAuthInheritAlias(null);
+        if (action.getAuthInheritActionCode() != null && action.getAuthInheritActionCode().isBlank()) {
+            action.setAuthInheritActionCode(null);
         }
         if (action.getAvailableExpression() != null && action.getAvailableExpression().isBlank()) {
             action.setAvailableExpression(null);
@@ -130,12 +130,12 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
             action.setSystemManaged(false);
         }
         if (action.getTitle() == null || action.getTitle().isBlank()) {
-            action.setTitle(action.getAlias());
+            action.setTitle(action.getActionCode());
         }
         rejectDuplicate(action, Criteria.of()
                         .eq("relationId", action.getRelationId())
-                        .eq("alias", action.getAlias()),
-                "module metadata action must be unique in relation: " + action.getRelationId() + "." + action.getAlias());
+                        .eq("actionCode", action.getActionCode()),
+                "module metadata action must be unique in relation: " + action.getRelationId() + "." + action.getActionCode());
     }
 
     private void validateAvailableExpression(ModuleMetadataAction action, ModuleMetadataRelation relation) {
@@ -143,17 +143,17 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
             return;
         }
         try {
-            if (formulaEngine.parse(action.getAlias(), action.getAvailableExpression()) == null) {
-                throw new PlatformException("Metadata action availableExpression is invalid: " + action.getAlias());
+            if (formulaEngine.parse(action.getActionCode(), action.getAvailableExpression()) == null) {
+                throw new PlatformException("Metadata action availableExpression is invalid: " + action.getActionCode());
             }
             if (formulaEngine.containsAssignment(action.getAvailableExpression())) {
-                throw new PlatformException("Metadata action availableExpression must not assign fields: " + action.getAlias());
+                throw new PlatformException("Metadata action availableExpression must not assign fields: " + action.getActionCode());
             }
             fieldValidator.validateExpressionFields(formulaEngine.referencedFields(action.getAvailableExpression()),
                     relation, "Metadata action availableExpression");
         } catch (FormulaEvaluationException exception) {
             throw new PlatformException("Metadata action availableExpression is invalid: "
-                    + action.getAlias() + ", " + exception.getMessage(), exception);
+                    + action.getActionCode() + ", " + exception.getMessage(), exception);
         }
     }
 

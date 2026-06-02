@@ -12,7 +12,7 @@ public record EntityActionDefinition(
         EntityActionAccessMode accessMode,
         Boolean actionAuth,
         Boolean dataAuth,
-        String authInheritActionAlias,
+        String authInheritActionCode,
         String availableExpression,
         String unavailableMessage,
         EntityActionExecutorType executorType,
@@ -51,7 +51,7 @@ public record EntityActionDefinition(
 
     public EntityActionDefinition availableWhen(String expression, String message) {
         return new EntityActionDefinition(entityAlias, actionCode, kind, title, enabled, level, style, category,
-                accessMode, actionAuth, dataAuth, authInheritActionAlias, expression, message, executorType, executorKey);
+                accessMode, actionAuth, dataAuth, authInheritActionCode, expression, message, executorType, executorKey);
     }
 
     public boolean hasAvailabilityCondition() {

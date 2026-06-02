@@ -382,7 +382,7 @@ class PlatformModuleDefinitionCompilerTest {
         export.setActionLevel(EntityActionLevel.LIST);
         export.setAccessMode(EntityActionAccessMode.AUTH_REQUIRED);
         export.setDataAuth(true);
-        export.setAuthInheritAlias("create");
+        export.setAuthInheritActionCode("create");
         export.setExecutorType(EntityActionExecutorType.DIALOG);
         export.setExecutorKey("customerExportDialog");
         actionService.insert(export);
@@ -420,7 +420,7 @@ class PlatformModuleDefinitionCompilerTest {
                     assertThat(action.accessMode()).isEqualTo(EntityActionAccessMode.AUTH_REQUIRED);
                     assertThat(action.actionAuth()).isTrue();
                     assertThat(action.dataAuth()).isTrue();
-                    assertThat(action.authInheritActionAlias()).isEqualTo("create");
+                    assertThat(action.authInheritActionCode()).isEqualTo("create");
                     assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
                     assertThat(action.executorKey()).isEqualTo("customerExportDialog");
                 });
@@ -606,7 +606,7 @@ class PlatformModuleDefinitionCompilerTest {
     private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
         ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
-        action.setAlias(alias);
+        action.setActionCode(alias);
         action.setActionKind(kind);
         return action;
     }
