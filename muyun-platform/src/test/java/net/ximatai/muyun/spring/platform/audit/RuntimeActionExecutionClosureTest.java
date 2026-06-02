@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.audit;
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -19,7 +20,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
@@ -28,6 +31,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -36,39 +40,59 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class RuntimeActionExecutionClosureTest {
     private static final String MODULE = "sales.contract";
+    private final IDatabaseOperations<Object> operations = operations();
     private final RuntimeAuditRecordService auditService = new RuntimeAuditRecordService(new TestMemoryDao<>());
     private final DynamicRecordService recordService = recordService(new RuntimeAuditEventListener(auditService));
 
     @Test
     void shouldAuditSuccessfulContractSubmitActionAsCompleteRuntimeClosure() {
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(contractRow("contract-1", "draft", BigDecimal.TEN)));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
         DynamicRecord draft = contract("contract-1", "draft", BigDecimal.TEN);
 
         DynamicActionExecutionResult result = recordService.entity(MODULE, "contract")
                 .executeAction("submit", DynamicActionExecutionRequest.record(draft)
                         .withPayloadValue("comment", "同意提交"));
 
-        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.VALUE);
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.COUNT);
+        assertThat(result.body().value()).isEqualTo(1);
         assertThat(result.body().message()).isEqualTo("已提交");
         assertThat(result.body().refresh()).isTrue();
         assertThat(result.context().recordId()).isEqualTo("contract-1");
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.captor();
+        verify(operations).patchUpdateItemWhere(eq("public"), eq("app_contract"), body.capture(), anyMap());
+        assertThat(body.getValue()).containsEntry("status", "submitted");
 
         List<RuntimeAuditRecord> trace = auditService.traceEvents(result.context().traceId(), PageRequest.of(1, 10));
-        assertThat(trace).singleElement().satisfies(record -> {
+        assertThat(trace).hasSize(2);
+        RuntimeAuditRecord mutation = onlyEvent(trace, RuntimeEventType.AFTER_UPDATE);
+        assertThat(mutation.getModuleAlias()).isEqualTo(MODULE);
+        assertThat(mutation.getEntityAlias()).isEqualTo("contract");
+        assertThat(mutation.getRecordId()).isEqualTo("contract-1");
+        assertThat(mutation.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
+        assertThat(mutation.getActionCode()).isNull();
+
+        RuntimeAuditRecord action = onlyEvent(trace, RuntimeEventType.ACTION_EXECUTED);
+        assertThat(action).satisfies(record -> {
             assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
             assertThat(record.getModuleAlias()).isEqualTo(MODULE);
             assertThat(record.getEntityAlias()).isEqualTo("contract");
             assertThat(record.getRecordId()).isEqualTo("contract-1");
             assertThat(record.getActionCode()).isEqualTo("submit");
             assertThat(record.getExecutorType()).isEqualTo("SERVICE");
-            assertThat(record.getResultType()).isEqualTo("VALUE");
+            assertThat(record.getResultType()).isEqualTo("COUNT");
             assertThat(record.getResultMessage()).isEqualTo("已提交");
             assertThat(record.getRefreshRequested()).isTrue();
-            assertThat(record.getResultText()).isEqualTo("submitted:同意提交");
+            assertThat(record.getResultText()).isEqualTo("1");
         });
     }
 
@@ -136,10 +160,18 @@ class RuntimeActionExecutionClosureTest {
                 });
     }
 
+    private RuntimeAuditRecord onlyEvent(List<RuntimeAuditRecord> trace, RuntimeEventType eventType) {
+        List<RuntimeAuditRecord> matched = trace.stream()
+                .filter(record -> record.getEventType() == eventType)
+                .toList();
+        assertThat(matched).hasSize(1);
+        return matched.getFirst();
+    }
+
     private DynamicRecordService recordService(RuntimeAuditEventListener listener) {
         DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(List.of(new SubmitExecutor()));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(
-                operations(),
+                operations,
                 new DynamicModuleRegistry(),
                 DynamicFieldValueValidator.NONE,
                 listener::onRuntimeEvent,
@@ -193,6 +225,17 @@ class RuntimeActionExecutionClosureTest {
         return record;
     }
 
+    private Map<String, Object> contractRow(String id, String status, BigDecimal amount) {
+        return Map.of(
+                "id", id,
+                "code", "C-001",
+                "status", status,
+                "amount", amount,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
     private IDatabaseOperations<Object> operations() {
         @SuppressWarnings("unchecked")
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
@@ -207,10 +250,18 @@ class RuntimeActionExecutionClosureTest {
         }
 
         @Override
-        public Object execute(net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext context,
+        public Object execute(DynamicActionExecutionContext context,
                               DynamicActionExecutionRequest request) {
-            return DynamicActionResultBody.refreshed("submitted:" + request.payload().get("comment"))
-                    .message("已提交");
+            throw new UnsupportedOperationException("contract submit requires dynamic action operations");
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context,
+                              DynamicActionExecutionRequest request,
+                              DynamicActionOperations operations) {
+            DynamicRecord record = request.record();
+            record.setValue("status", "submitted");
+            return DynamicActionResultBody.changedCount(operations.update(record), "已提交");
         }
     }
 }

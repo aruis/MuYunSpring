@@ -426,7 +426,8 @@ public class DynamicRecordService {
                 throw new DynamicActionExecutionException(e.getMessage(), context, e);
             }
             try {
-                return actionResultBody(executor.execute(context, request));
+                return actionResultBody(executor.execute(context, request,
+                        actionOperations(moduleAlias, entityAlias, traceId)));
             } catch (DynamicActionExecutionException e) {
                 throw e;
             } catch (RuntimeException e) {
@@ -500,6 +501,32 @@ public class DynamicRecordService {
 
     private DynamicActionResultBody countResult(int count) {
         return DynamicActionResultBody.changedCount(count);
+    }
+
+    private DynamicActionOperations actionOperations(String moduleAlias, String entityAlias, String traceId) {
+        return new DynamicActionOperations() {
+            @Override
+            public DynamicRecord newRecord() {
+                return DynamicRecordService.this.newRecord(moduleAlias, entityAlias);
+            }
+
+            @Override
+            public DynamicRecord select(String id) {
+                return DynamicRecordService.this.select(moduleAlias, entityAlias, id);
+            }
+
+            @Override
+            public int update(DynamicRecord record) {
+                return DynamicRecordService.this.update(moduleAlias, entityAlias, record,
+                        RuntimeMutationSource.ACTION, traceId);
+            }
+
+            @Override
+            public int delete(String id) {
+                return DynamicRecordService.this.delete(moduleAlias, entityAlias, id,
+                        RuntimeMutationSource.ACTION, traceId);
+            }
+        };
     }
 
     private DynamicRecord availabilityRecord(String moduleAlias, String entityAlias, DynamicActionExecutionRequest request) {

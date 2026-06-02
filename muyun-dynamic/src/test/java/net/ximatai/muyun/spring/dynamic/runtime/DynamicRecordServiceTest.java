@@ -386,6 +386,32 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeCurrentEntityOperationsToServiceActionWithSameTrace() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations, events, new WritingActionExecutor());
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.COUNT);
+        assertThat(result.value()).isEqualTo(1);
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        assertThat(body.getValue()).containsEntry("status", "submitted");
+        assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                .containsExactly(RuntimeEventType.AFTER_UPDATE, RuntimeEventType.ACTION_EXECUTED);
+        assertActionTrace(events.events().get(0), events.events().get(1), RuntimeEventType.AFTER_UPDATE, "submit");
+        assertThat(events.events().get(1).traceId()).isEqualTo(result.context().traceId());
+    }
+
+    @Test
     void shouldPassPayloadToServiceActionAndExposeStructuredResultBody() {
         PayloadActionExecutor executor = new PayloadActionExecutor();
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
@@ -1969,6 +1995,27 @@ class DynamicRecordServiceTest {
         @Override
         public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
             return null;
+        }
+    }
+
+    private static final class WritingActionExecutor implements DynamicActionExecutor {
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            throw new UnsupportedOperationException("writing action requires dynamic action operations");
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context,
+                              DynamicActionExecutionRequest request,
+                              DynamicActionOperations operations) {
+            DynamicRecord record = request.record();
+            record.setValue("status", "submitted");
+            return DynamicActionResultBody.changedCount(operations.update(record));
         }
     }
 
