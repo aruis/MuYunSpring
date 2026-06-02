@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionDialog;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
@@ -319,6 +320,33 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().record().getValue("code")).isEqualTo("C-001");
         assertThat(request.getValue().queryConditions().iterator().next().fieldName()).isEqualTo("code");
         assertThat(request.getValue().payload()).containsEntry("comment", "submit");
+    }
+
+    @Test
+    void shouldExposeDialogActionResultThroughStableWebResponse() throws Exception {
+        DynamicActionDescriptor submitDialog = dialogAction("submitDialog", EntityActionLevel.RECORD);
+        DynamicActionDialog dialog = new DynamicActionDialog("contractSubmitDialog", "提交合同");
+        when(service.action(MODULE, "submitDialog")).thenReturn(submitDialog);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.executeAction(eq(MODULE), eq("submitDialog"), any(DynamicActionExecutionRequest.class)))
+                .thenReturn(new DynamicActionExecutionResult(
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "submitDialog", submitDialog,
+                                "contract-1", "trace-1", "tenant-1", false,
+                                DynamicActionAvailability.available("submitDialog")),
+                        dialog,
+                        DynamicActionResultBody.dialog("contractSubmitDialog", "提交合同")));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submitDialog", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.context.actionCode").value("submitDialog"))
+                .andExpect(jsonPath("$.context.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.body.type").value("DIALOG"))
+                .andExpect(jsonPath("$.body.value.dialogKey").value("contractSubmitDialog"))
+                .andExpect(jsonPath("$.body.value.title").value("提交合同"))
+                .andExpect(jsonPath("$.body.refresh").value(false));
     }
 
     @Test
@@ -620,6 +648,13 @@ class DynamicRecordWebControllerTest {
                 EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor");
+    }
+
+    private DynamicActionDescriptor dialogAction(String code, EntityActionLevel level) {
+        return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "提交合同", true,
+                EntityActionStyle.PRIMARY, level, EntityActionCategory.DIALOG,
+                EntityActionAccessMode.AUTH_REQUIRED, true, false, null, false, null,
+                EntityActionExecutorType.DIALOG, "contractSubmitDialog");
     }
 
     private EntityDefinition entity() {

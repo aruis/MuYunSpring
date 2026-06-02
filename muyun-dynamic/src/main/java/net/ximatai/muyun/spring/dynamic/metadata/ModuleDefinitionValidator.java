@@ -352,6 +352,9 @@ public class ModuleDefinitionValidator {
         if (action.executorKey() != null && action.executorKey().isBlank()) {
             throw new ModuleDefinitionException("action executor key must not be blank: " + action.actionCode());
         }
+        if (action.executorType() == EntityActionExecutorType.DIALOG && action.executorKey() == null) {
+            throw new ModuleDefinitionException("dialog action requires executor key: " + action.actionCode());
+        }
         if (action.category() != EntityActionCategory.STANDARD
                 && DynamicActionPathRules.isReservedWebActionCode(action.actionCode())) {
             throw new ModuleDefinitionException("custom action conflicts with reserved web action path: "

@@ -8,5 +8,6 @@ public enum DynamicActionResultType {
     PAGE,
     COUNT,
     OBJECT,
+    DIALOG,
     NONE
 }

@@ -199,6 +199,10 @@ class DynamicOpenApiGeneratorTest {
                 .containsKeys("moduleAlias", "actionCode", "recordId", "traceId");
         assertThat(document.schemas().get("DynamicWebActionResultBody").properties())
                 .containsKeys("type", "value", "message", "refresh", "redirectTo");
+        assertThat(document.schemas().get("DynamicActionDialog").required())
+                .containsExactly("dialogKey");
+        assertThat(document.schemas().get("DynamicActionDialog").properties())
+                .containsKeys("dialogKey", "title");
         assertThat(document.schemas().get("DynamicWebActionAvailabilityResponse").properties())
                 .containsKeys("action", "available", "message");
         assertThat(document.schemas().get("DynamicWebActionExecutionResponse").properties().get("body").type())

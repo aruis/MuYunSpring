@@ -62,6 +62,11 @@ public record DynamicActionResultBody(
         return redirect(value).message(message);
     }
 
+    public static DynamicActionResultBody dialog(String dialogKey, String title) {
+        return new DynamicActionResultBody(DynamicActionResultType.DIALOG,
+                new DynamicActionDialog(dialogKey, title), null, false, null);
+    }
+
     public DynamicActionResultBody message(String value) {
         return new DynamicActionResultBody(type, this.value, value, refresh, redirectTo);
     }
@@ -89,6 +94,9 @@ public record DynamicActionResultBody(
         }
         if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Enum<?>) {
             return DynamicActionResultType.VALUE;
+        }
+        if (value instanceof DynamicActionDialog) {
+            return DynamicActionResultType.DIALOG;
         }
         if (value instanceof Map<?, ?>) {
             return DynamicActionResultType.OBJECT;

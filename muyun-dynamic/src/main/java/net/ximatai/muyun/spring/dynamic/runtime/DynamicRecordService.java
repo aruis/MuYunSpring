@@ -364,7 +364,9 @@ public class DynamicRecordService {
         DynamicActionExecutionResult result;
         try {
             result = runtime.actionTransactionOperator().executeResult(context, () -> {
-                validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
+                if (!isInteractionOnlyAction(action)) {
+                    validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
+                }
                 DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
                 DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
                 return new DynamicActionExecutionResult(completed, body.value(), body);
@@ -461,10 +463,21 @@ public class DynamicRecordService {
                 throw new DynamicActionExecutionException(e.getMessage(), context, e);
             }
         }
+        if (action.executorType() == EntityActionExecutorType.DIALOG) {
+            return DynamicActionResultBody.dialog(dialogKey(action), action.title());
+        }
         throw new DynamicActionExecutionException(
                 "dynamic action executor is not supported: " + action.executorType(),
                 context
         );
+    }
+
+    private String dialogKey(DynamicActionDescriptor action) {
+        return requireText(action.executorKey(), "dialog executorKey");
+    }
+
+    private boolean isInteractionOnlyAction(DynamicActionDescriptor action) {
+        return action.executorType() == EntityActionExecutorType.DIALOG;
     }
 
     private DynamicActionResultBody executeStandardAction(String moduleAlias,
@@ -709,6 +722,9 @@ public class DynamicRecordService {
         payload.put("executorType", context.action().executorType().name());
         payload.put("available", context.availability().available());
         payload.put("resultType", body.type().name());
+        if (isInteractionOnlyAction(context.action())) {
+            payload.put("interactionOnly", true);
+        }
         if (body.message() != null) {
             payload.put("message", body.message());
         }

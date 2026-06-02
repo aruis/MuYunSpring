@@ -160,6 +160,7 @@ public class DynamicOpenApiGenerator {
         schemas.put("DynamicWebActionAvailabilityResponse", actionAvailabilityResponseSchema());
         schemas.put("DynamicWebActionContext", actionContextSchema());
         schemas.put("DynamicWebActionResultBody", actionResultBodySchema());
+        schemas.put("DynamicActionDialog", actionDialogSchema());
         schemas.put("RecordIdResponse", recordIdResponseSchema());
         schemas.put("CountResponse", countResponseSchema());
         schemas.put("DynamicWebError", errorSchema("DynamicWebError", false));
@@ -441,6 +442,14 @@ public class DynamicOpenApiGenerator {
         properties.put("redirectTo", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicWebActionResultBody", "object", null,
                 List.of("type", "refresh"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionDialogSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("dialogKey", stringProperty(false));
+        properties.put("title", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicActionDialog", "object", null,
+                List.of("dialogKey"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionAvailabilityResponseSchema() {

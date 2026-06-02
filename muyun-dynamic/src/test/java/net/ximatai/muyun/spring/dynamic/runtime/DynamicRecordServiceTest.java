@@ -402,6 +402,64 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExecuteDialogActionAsFrontendInteractionResult() {
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, null,
+                new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
+                        "提交合同", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        EntityActionCategory.DIALOG, null, null, null, null,
+                        null, null, null, "contractSubmitDialog"
+                ));
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submitDialog", DynamicActionExecutionRequest.id("contract-1"));
+
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.DIALOG);
+        assertThat(result.value()).isInstanceOf(DynamicActionDialog.class);
+        assertThat((DynamicActionDialog) result.value())
+                .extracting(DynamicActionDialog::dialogKey, DynamicActionDialog::title)
+                .containsExactly("contractSubmitDialog", "提交合同");
+        assertThat(result.body().refresh()).isFalse();
+        assertThat(result.context().action().executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+                    assertThat(event.recordId()).isEqualTo("contract-1");
+                    assertThat(event.actionCode()).isEqualTo("submitDialog");
+                    assertThat(event.payload()).containsEntry("executorType", "DIALOG")
+                            .containsEntry("resultType", "DIALOG")
+                            .containsEntry("interactionOnly", true);
+                    assertThat(event.payload()).doesNotContainKey("result");
+                });
+    }
+
+    @Test
+    void shouldOpenDialogActionWithoutBeforeExecuteRules() {
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionRuleService(operations(), events, null,
+                new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
+                        "提交合同", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        EntityActionCategory.DIALOG, null, null, null, null,
+                        null, null, EntityActionExecutorType.DIALOG, "contractSubmitDialog"
+                ));
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft")
+                .setValue("amount", BigDecimal.ZERO);
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submitDialog", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.DIALOG);
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> assertThat(event.payload())
+                        .containsEntry("executorType", "DIALOG")
+                        .containsEntry("resultType", "DIALOG")
+                        .containsEntry("interactionOnly", true));
+    }
+
+    @Test
     void shouldExposeCurrentEntityOperationsToServiceActionWithSameTrace() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
@@ -531,6 +589,7 @@ class DynamicRecordServiceTest {
         DynamicActionResultBody refresh = DynamicActionResultBody.refreshed();
         DynamicActionResultBody refreshedNotice = DynamicActionResultBody.refreshedNotice("已提交");
         DynamicActionResultBody redirect = DynamicActionResultBody.redirect("/contracts/contract-1", "已创建");
+        DynamicActionResultBody dialog = DynamicActionResultBody.dialog("contractSubmitDialog", "提交合同");
 
         assertThat(recordId.type()).isEqualTo(DynamicActionResultType.RECORD_ID);
         assertThat(recordId.value()).isEqualTo("contract-1");
@@ -550,6 +609,11 @@ class DynamicRecordServiceTest {
         assertThat(redirect.type()).isEqualTo(DynamicActionResultType.NONE);
         assertThat(redirect.redirectTo()).isEqualTo("/contracts/contract-1");
         assertThat(redirect.message()).isEqualTo("已创建");
+        assertThat(dialog.type()).isEqualTo(DynamicActionResultType.DIALOG);
+        assertThat((DynamicActionDialog) dialog.value())
+                .extracting(DynamicActionDialog::dialogKey, DynamicActionDialog::title)
+                .containsExactly("contractSubmitDialog", "提交合同");
+        assertThat(dialog.refresh()).isFalse();
     }
 
     @Test
@@ -1688,6 +1752,13 @@ class DynamicRecordServiceTest {
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
                                                    RuntimeEventPublisher eventPublisher,
                                                    DynamicActionExecutor executor) {
+        return actionRuleService(operations, eventPublisher, executor, submitActionWithExecutorKey("contractSubmit"));
+    }
+
+    private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
+                                                   RuntimeEventPublisher eventPublisher,
+                                                   DynamicActionExecutor executor,
+                                                   EntityActionDefinition action) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1695,7 +1766,7 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(submitActionWithExecutorKey("contractSubmit"))
+                List.of(action)
         );
         DynamicActionExecutorRegistry executorRegistry = executor == null
                 ? DynamicActionExecutorRegistry.empty()

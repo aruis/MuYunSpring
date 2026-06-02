@@ -48,6 +48,27 @@ class ModuleDefinitionValidatorTest {
                 .hasMessageContaining("custom action conflicts with reserved web action path: contract.delete");
     }
 
+    @Test
+    void shouldRejectDialogActionWithoutExecutorKey() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
+                        "Submit Dialog", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        EntityActionCategory.DIALOG, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, null, null, null, EntityActionExecutorType.DIALOG, null))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("dialog action requires executor key: submitDialog");
+    }
+
     private EntityActionDefinition customAction(String actionCode) {
         return new EntityActionDefinition("contract", actionCode, EntityActionKind.CUSTOM,
                 "Custom " + actionCode, true, EntityActionLevel.LIST, EntityActionStyle.NORMAL,
