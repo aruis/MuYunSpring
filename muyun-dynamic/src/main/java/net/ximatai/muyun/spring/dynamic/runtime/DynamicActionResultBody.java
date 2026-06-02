@@ -22,8 +22,28 @@ public record DynamicActionResultBody(
         return new DynamicActionResultBody(null, value, null, false, null);
     }
 
+    public static DynamicActionResultBody createdRecordId(String value) {
+        return new DynamicActionResultBody(DynamicActionResultType.RECORD_ID, value, null, true, null);
+    }
+
+    public static DynamicActionResultBody changedCount(int value) {
+        return new DynamicActionResultBody(DynamicActionResultType.COUNT, value, null, value > 0, null);
+    }
+
     public static DynamicActionResultBody none() {
         return new DynamicActionResultBody(DynamicActionResultType.NONE, null, null, false, null);
+    }
+
+    public static DynamicActionResultBody refreshed() {
+        return none().withRefresh();
+    }
+
+    public static DynamicActionResultBody refreshed(Object value) {
+        return of(value).withRefresh();
+    }
+
+    public static DynamicActionResultBody redirect(String value) {
+        return none().redirectTo(value);
     }
 
     public DynamicActionResultBody message(String value) {

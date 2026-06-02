@@ -443,9 +443,8 @@ public class DynamicRecordService {
                                                           DynamicActionExecutionRequest request,
                                                           String traceId) {
         return switch (actionCode) {
-            case "create" -> new DynamicActionResultBody(DynamicActionResultType.RECORD_ID,
-                    create(moduleAlias, entityAlias, requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId),
-                    null, true, null);
+            case "create" -> DynamicActionResultBody.createdRecordId(
+                    create(moduleAlias, entityAlias, requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId));
             case "select" -> DynamicActionResultBody.of(select(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
             case "update" -> countResult(update(moduleAlias, entityAlias,
                     requireRecord(request, actionCode), RuntimeMutationSource.ACTION, traceId));
@@ -459,17 +458,17 @@ public class DynamicRecordService {
             case "sortedList" -> DynamicActionResultBody.of(sortedList(moduleAlias, entityAlias, criteria(request)));
             case "reorder" -> {
                 reorder(moduleAlias, entityAlias, request.orderedIds(), RuntimeMutationSource.ACTION, traceId);
-                yield DynamicActionResultBody.none().withRefresh();
+                yield DynamicActionResultBody.refreshed();
             }
             case "moveBefore" -> {
                 moveBefore(moduleAlias, entityAlias, requireRecordId(request, actionCode),
                         requireText(request.beforeId(), "beforeId"), RuntimeMutationSource.ACTION, traceId);
-                yield DynamicActionResultBody.none().withRefresh();
+                yield DynamicActionResultBody.refreshed();
             }
             case "moveAfter" -> {
                 moveAfter(moduleAlias, entityAlias, requireRecordId(request, actionCode),
                         requireText(request.afterId(), "afterId"), RuntimeMutationSource.ACTION, traceId);
-                yield DynamicActionResultBody.none().withRefresh();
+                yield DynamicActionResultBody.refreshed();
             }
             case "children" -> DynamicActionResultBody.of(children(moduleAlias, entityAlias, request.parentId()));
             case "ancestorIds" -> DynamicActionResultBody.of(ancestorIds(moduleAlias, entityAlias, requireRecordId(request, actionCode)));
@@ -498,7 +497,7 @@ public class DynamicRecordService {
     }
 
     private DynamicActionResultBody countResult(int count) {
-        return new DynamicActionResultBody(DynamicActionResultType.COUNT, count, null, count > 0, null);
+        return DynamicActionResultBody.changedCount(count);
     }
 
     private DynamicRecord availabilityRecord(String moduleAlias, String entityAlias, DynamicActionExecutionRequest request) {

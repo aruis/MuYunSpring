@@ -383,6 +383,29 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldBuildCommonActionResultBodiesWithBusinessSemantics() {
+        DynamicActionResultBody recordId = DynamicActionResultBody.createdRecordId("contract-1");
+        DynamicActionResultBody changedCount = DynamicActionResultBody.changedCount(2);
+        DynamicActionResultBody unchangedCount = DynamicActionResultBody.changedCount(0);
+        DynamicActionResultBody refresh = DynamicActionResultBody.refreshed();
+        DynamicActionResultBody redirect = DynamicActionResultBody.redirect("/contracts/contract-1")
+                .message("已创建");
+
+        assertThat(recordId.type()).isEqualTo(DynamicActionResultType.RECORD_ID);
+        assertThat(recordId.value()).isEqualTo("contract-1");
+        assertThat(recordId.refresh()).isTrue();
+        assertThat(changedCount.type()).isEqualTo(DynamicActionResultType.COUNT);
+        assertThat(changedCount.value()).isEqualTo(2);
+        assertThat(changedCount.refresh()).isTrue();
+        assertThat(unchangedCount.refresh()).isFalse();
+        assertThat(refresh.type()).isEqualTo(DynamicActionResultType.NONE);
+        assertThat(refresh.refresh()).isTrue();
+        assertThat(redirect.type()).isEqualTo(DynamicActionResultType.NONE);
+        assertThat(redirect.redirectTo()).isEqualTo("/contracts/contract-1");
+        assertThat(redirect.message()).isEqualTo("已创建");
+    }
+
+    @Test
     void shouldBlockServiceActionWhenBeforeExecuteRuleFails() {
         RecordingActionExecutor executor = new RecordingActionExecutor();
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
