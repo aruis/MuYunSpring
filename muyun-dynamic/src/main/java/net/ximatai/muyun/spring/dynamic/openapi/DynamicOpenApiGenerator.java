@@ -153,8 +153,11 @@ public class DynamicOpenApiGenerator {
         schemas.put("DynamicOpenApiDocument", objectSchema("DynamicOpenApiDocument"));
         schemas.put("DynamicActionDescriptorList", arraySchema("DynamicActionDescriptorList", "DynamicActionDescriptor"));
         schemas.put("DynamicWebActionAvailabilityList", arraySchema("DynamicWebActionAvailabilityList", "DynamicWebActionAvailabilityResponse"));
-        schemas.put("RecordIdResponse", objectSchema("RecordIdResponse"));
-        schemas.put("CountResponse", objectSchema("CountResponse"));
+        schemas.put("DynamicWebActionAvailabilityResponse", actionAvailabilityResponseSchema());
+        schemas.put("DynamicWebActionContext", actionContextSchema());
+        schemas.put("DynamicWebActionResultBody", actionResultBodySchema());
+        schemas.put("RecordIdResponse", recordIdResponseSchema());
+        schemas.put("CountResponse", countResponseSchema());
         schemas.put("DynamicWebError", errorSchema("DynamicWebError", false));
         schemas.put("DynamicWebActionError", errorSchema("DynamicWebActionError", true));
         return Map.copyOf(schemas);
@@ -332,6 +335,38 @@ public class DynamicOpenApiGenerator {
                 List.of(), properties, null);
     }
 
+    private DynamicOpenApiDocument.Schema actionContextSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("moduleAlias", stringProperty(false));
+        properties.put("actionCode", stringProperty(false));
+        properties.put("recordId", stringProperty(true));
+        properties.put("traceId", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicWebActionContext", "object", null,
+                List.of("moduleAlias", "actionCode"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionResultBodySchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("type", stringProperty(false));
+        properties.put("value", objectProperty("object"));
+        properties.put("message", stringProperty(true));
+        properties.put("refresh", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("redirectTo", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicWebActionResultBody", "object", null,
+                List.of("type", "refresh"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionAvailabilityResponseSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("action", objectProperty("DynamicActionDescriptor"));
+        properties.put("available", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("message", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicWebActionAvailabilityResponse", "object", null,
+                List.of("action", "available"), properties, null);
+    }
+
     private DynamicOpenApiDocument.Schema referenceResolveResponseSchema() {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("status", stringProperty(false));
@@ -346,6 +381,21 @@ public class DynamicOpenApiGenerator {
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveResponse", "object", null,
                 List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema recordIdResponseSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("id", stringProperty(false));
+        return new DynamicOpenApiDocument.Schema("RecordIdResponse", "object", null,
+                List.of("id"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema countResponseSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("count", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
+                false, null, null, null, null, null, List.of()));
+        return new DynamicOpenApiDocument.Schema("CountResponse", "object", null,
+                List.of("count"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema arraySchema(String name, String itemName) {

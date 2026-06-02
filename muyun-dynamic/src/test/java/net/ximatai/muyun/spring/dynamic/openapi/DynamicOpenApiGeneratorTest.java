@@ -184,6 +184,29 @@ class DynamicOpenApiGeneratorTest {
                 .containsKeys("code", "status", "message", "traceId", "failureStage", "context");
     }
 
+    @Test
+    void shouldExposeWebResponseSchemasForActionAndCrudContracts() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
+
+        assertThat(document.schemas().get("RecordIdResponse").properties().get("id").type())
+                .isEqualTo("string");
+        assertThat(document.schemas().get("CountResponse").properties().get("count"))
+                .satisfies(property -> {
+                    assertThat(property.type()).isEqualTo("integer");
+                    assertThat(property.format()).isEqualTo("int32");
+                });
+        assertThat(document.schemas().get("DynamicWebActionContext").properties())
+                .containsKeys("moduleAlias", "actionCode", "recordId", "traceId");
+        assertThat(document.schemas().get("DynamicWebActionResultBody").properties())
+                .containsKeys("type", "value", "message", "refresh", "redirectTo");
+        assertThat(document.schemas().get("DynamicWebActionAvailabilityResponse").properties())
+                .containsKeys("action", "available", "message");
+        assertThat(document.schemas().get("DynamicWebActionExecutionResponse").properties().get("body").type())
+                .isEqualTo("DynamicWebActionResultBody");
+        assertThat(document.schemas().get("DynamicWebActionAvailabilityList").items().type())
+                .isEqualTo("DynamicWebActionAvailabilityResponse");
+    }
+
     private ModuleDefinition module() {
         return new ModuleDefinition(
                 "sales.contract",
