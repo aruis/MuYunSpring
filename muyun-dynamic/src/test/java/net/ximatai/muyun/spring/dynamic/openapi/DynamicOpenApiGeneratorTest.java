@@ -207,6 +207,28 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("DynamicWebActionAvailabilityResponse");
     }
 
+    @Test
+    void shouldExposeDescribeAndOpenApiDocumentSchemas() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
+
+        assertThat(document.schemas().get("DynamicModuleDescriptor").properties())
+                .containsKeys("moduleAlias", "title", "mainEntityAlias", "actions", "entities",
+                        "relations", "references", "associationViews");
+        assertThat(document.schemas().get("DynamicOpenApiDocument").properties())
+                .containsKeys("moduleAlias", "title", "basePath", "operations", "schemas", "errors");
+        assertThat(document.schemas().get("DynamicOpenApiDocument").properties().get("operations").itemType())
+                .isEqualTo("DynamicOpenApiOperation");
+        assertThat(document.schemas().get("DynamicOpenApiOperation").properties())
+                .containsKeys("method", "path", "operationId", "summary", "requestSchema",
+                        "responseSchema", "actionCode", "errorCodes");
+        assertThat(document.schemas().get("DynamicOpenApiProperty").properties())
+                .containsKeys("type", "format", "required", "nullable", "multiple",
+                        "optionSourceType", "optionSource", "referenceModuleAlias",
+                        "referenceEntityAlias", "itemType", "companionFields");
+        assertThat(document.schemas().get("DynamicOpenApiErrorResponse").required())
+                .containsExactly("code", "status", "schemaName");
+    }
+
     private ModuleDefinition module() {
         return new ModuleDefinition(
                 "sales.contract",
