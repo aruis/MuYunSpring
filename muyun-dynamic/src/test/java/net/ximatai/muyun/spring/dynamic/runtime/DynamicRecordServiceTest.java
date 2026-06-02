@@ -377,10 +377,12 @@ class DynamicRecordServiceTest {
     }
 
     @Test
-    void shouldKeepSubmittedChildrenForBeforeExecuteRuleWhenRequestHasNoMainFields() {
+    void shouldMergeExistingMainFieldsAndSubmittedChildrenForBeforeExecuteRule() {
         IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap()))
+                .thenReturn(List.of(actionAmountRow("contract-1", "C-001", "draft", BigDecimal.ONE)));
         IdReturningActionExecutor executor = new IdReturningActionExecutor();
-        DynamicRecordService service = childActionRuleService(operations, RuntimeEventPublisher.noop(), executor);
+        DynamicRecordService service = childActionRuleService(operations, RuntimeEventPublisher.noop(), executor, "C-001");
         DynamicRecord line = service.newRecord(MODULE, "line")
                 .setValue("summary", "明细已填写");
         DynamicRecord draft = service.newRecord(MODULE, "contract")
@@ -392,6 +394,44 @@ class DynamicRecordServiceTest {
 
         assertThat(result.value()).isEqualTo("submitted:contract-1");
         assertThat(executor.context().recordId()).isEqualTo("contract-1");
+        verify(operations, atLeastOnce()).query(anyString(), anyMap());
+    }
+
+    @Test
+    void shouldPreferSubmittedMainFieldsOverExistingRecordForBeforeExecuteRule() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap()))
+                .thenReturn(List.of(actionAmountRow("contract-1", "C-001", "draft", BigDecimal.ONE)));
+        IdReturningActionExecutor executor = new IdReturningActionExecutor();
+        DynamicRecordService service = childActionRuleService(operations, RuntimeEventPublisher.noop(), executor, "C-002");
+        DynamicRecord line = service.newRecord(MODULE, "line")
+                .setValue("summary", "明细已填写");
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002")
+                .setChildren("lines", List.of(line));
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
+        assertThat(executor.context().recordId()).isEqualTo("contract-1");
+        verify(operations, atLeastOnce()).query(anyString(), anyMap());
+    }
+
+    @Test
+    void shouldNotLoadExistingRecordForChildrenPayloadWhenBeforeExecuteRuleIsNotConfigured() {
+        IDatabaseOperations<Object> operations = operations();
+        IdReturningActionExecutor executor = new IdReturningActionExecutor();
+        DynamicRecordService service = childActionWithoutRuleService(operations, RuntimeEventPublisher.noop(), executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setChildren("lines", List.of(service.newRecord(MODULE, "line").setValue("summary", "明细已填写")));
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+
+        assertThat(result.value()).isEqualTo("submitted:contract-1");
         verify(operations, never()).query(anyString(), anyMap());
     }
 
@@ -1298,11 +1338,36 @@ class DynamicRecordServiceTest {
 
     private DynamicRecordService childActionRuleService(IDatabaseOperations<Object> operations,
                                                         RuntimeEventPublisher eventPublisher,
-                                                        DynamicActionExecutor executor) {
+                                                        DynamicActionExecutor executor,
+                                                        String expectedCode) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
-                List.of(actionChildRuleEntity(), lineEntity()),
+                List.of(actionChildRuleEntity(expectedCode), lineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
+                List.of(),
+                List.of(),
+                List.of(submitActionWithoutAvailability("contractSubmit"))
+        );
+        DynamicActionExecutorRegistry executorRegistry = executor == null
+                ? DynamicActionExecutorRegistry.empty()
+                : new DynamicActionExecutorRegistry(List.of(executor));
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher,
+                executorRegistry
+        ).register(module));
+    }
+
+    private DynamicRecordService childActionWithoutRuleService(IDatabaseOperations<Object> operations,
+                                                               RuntimeEventPublisher eventPublisher,
+                                                               DynamicActionExecutor executor) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionEntity(), lineEntity()),
                 List.of(EntityRelationDefinition.child("lines", "contract", "line", "contractId")),
                 List.of(),
                 List.of(),
@@ -1389,7 +1454,7 @@ class DynamicRecordServiceTest {
                 .phase(FormulaRulePhase.ACTION_BEFORE_EXECUTE));
     }
 
-    private EntityDefinition actionChildRuleEntity() {
+    private EntityDefinition actionChildRuleEntity(String expectedCode) {
         return new EntityDefinition(
                 "contract",
                 "app_contract",
@@ -1399,7 +1464,8 @@ class DynamicRecordServiceTest {
                         FieldDefinition.string("status", "Status").length(32)
                 )
         ).withFormulaRules(EntityFormulaRuleDefinition
-                .validation("submitLineRequired", "lines.summary", "COUNT({lines.summary}) > 0", "提交前必须填写明细")
+                .validation("submitLineRequired", "lines.summary",
+                        "{code} == '" + expectedCode + "' && COUNT({lines.summary}) > 0", "提交前必须填写明细")
                 .phase(FormulaRulePhase.ACTION_BEFORE_EXECUTE));
     }
 

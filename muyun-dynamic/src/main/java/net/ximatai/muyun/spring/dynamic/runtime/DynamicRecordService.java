@@ -361,24 +361,36 @@ public class DynamicRecordService {
         if (record != null && (record.getId() == null || record.getId().isBlank()) && request.recordId() != null) {
             record.setId(request.recordId());
         }
-        if (record != null
-                && record.explicitFieldCodes().isEmpty()
-                && record.getChildren().isEmpty()
-                && record.getId() != null) {
-            DynamicRecord existing = select(moduleAlias, entityAlias, record.getId());
-            if (existing != null) {
-                record = existing;
-            }
-        }
         if (record == null) {
             return;
         }
+        DynamicFormulaRuntime formulaRuntime = new DynamicFormulaRuntime(
+                moduleAlias, record.getEntity(), runtime.registry().requireModule(moduleAlias));
+        if (!formulaRuntime.hasBeforeActionExecuteRules()) {
+            return;
+        }
+        DynamicRecord existing = !shouldLoadExistingForActionRules(record)
+                ? null
+                : select(moduleAlias, entityAlias, record.getId());
+        if (isActionRecordProbe(record) && existing != null) {
+            record = existing;
+            existing = null;
+        }
         try {
-            new DynamicFormulaRuntime(moduleAlias, record.getEntity(), runtime.registry().requireModule(moduleAlias))
-                    .beforeActionExecute(record);
+            formulaRuntime.beforeActionExecute(record, existing);
         } catch (DynamicFormulaException e) {
             throw new DynamicActionExecutionException(e.getMessage(), context, e);
         }
+    }
+
+    private boolean isActionRecordProbe(DynamicRecord record) {
+        return record.explicitFieldCodes().isEmpty() && record.getChildren().isEmpty();
+    }
+
+    private boolean shouldLoadExistingForActionRules(DynamicRecord record) {
+        return record.getId() != null
+                && !record.getId().isBlank()
+                && (isActionRecordProbe(record) || !record.getChildren().isEmpty());
     }
 
     private Object executeActionValue(String moduleAlias,
