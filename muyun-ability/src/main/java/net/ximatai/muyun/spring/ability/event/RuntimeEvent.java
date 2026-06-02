@@ -27,7 +27,7 @@ public record RuntimeEvent(
             requireText(entityAlias, "entityAlias");
         }
         Objects.requireNonNull(mutationSource, "mutationSource must not be null");
-        if (eventType == RuntimeEventType.ACTION_EXECUTED) {
+        if (eventType == RuntimeEventType.ACTION_EXECUTED || eventType == RuntimeEventType.ACTION_FAILED) {
             requireText(actionCode, "actionCode");
         }
         eventId = eventId == null || eventId.isBlank() ? UUID.randomUUID().toString() : eventId;

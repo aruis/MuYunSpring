@@ -16,6 +16,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -40,11 +42,15 @@ class RuntimeAuditRecordRepositoryIT {
 
     private final RuntimeAuditRecordService service;
     private final RuntimeAuditEventListener listener;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired
-    RuntimeAuditRecordRepositoryIT(RuntimeAuditRecordService service, RuntimeAuditEventListener listener) {
+    RuntimeAuditRecordRepositoryIT(RuntimeAuditRecordService service,
+                                   RuntimeAuditEventListener listener,
+                                   PlatformTransactionManager transactionManager) {
         this.service = service;
         this.listener = listener;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Test
@@ -77,6 +83,24 @@ class RuntimeAuditRecordRepositoryIT {
         assertThat(record.getRefreshRequested()).isTrue();
         assertThat(record.getRedirectTo()).hasSizeGreaterThan(512);
         assertThat(record.getResultText()).isEqualTo("submitted");
+    }
+
+    @Test
+    void shouldPersistActionFailureAuditWhenOuterTransactionRollsBack() {
+        transactionTemplate.executeWithoutResult(status -> {
+            listener.onRuntimeEvent(actionFailedEvent("audit-it-action-failed-rollback"));
+            status.setRollbackOnly();
+        });
+
+        RuntimeAuditRecord record = service.list(Criteria.of().eq("eventId", "audit-it-action-failed-rollback"),
+                        PageRequest.of(1, 10))
+                .getFirst();
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+        assertThat(record.getActionCode()).isEqualTo("submit");
+        assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getFailureStage()).isEqualTo("execute");
+        assertThat(record.getErrorMessage()).isEqualTo("submit failed");
+        assertThat(record.getErrorType()).isEqualTo(IllegalStateException.class.getName());
     }
 
     @Test
@@ -127,6 +151,29 @@ class RuntimeAuditRecordRepositoryIT {
                         "result", "submitted"
                 ),
                 Instant.parse("2026-06-02T05:05:00Z")
+        );
+    }
+
+    private RuntimeEvent actionFailedEvent(String eventId) {
+        return new RuntimeEvent(
+                eventId,
+                "audit-it-action-failed-trace",
+                RuntimeEventType.ACTION_FAILED,
+                "sales.contract",
+                "contract",
+                "contract-it-2",
+                "submit",
+                "tenant-it",
+                false,
+                RuntimeMutationSource.ACTION,
+                Map.of(
+                        "executorType", "SERVICE",
+                        "available", true,
+                        "failureStage", "execute",
+                        "errorMessage", "submit failed",
+                        "errorType", IllegalStateException.class.getName()
+                ),
+                Instant.parse("2026-06-02T05:10:00Z")
         );
     }
 

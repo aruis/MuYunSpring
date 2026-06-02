@@ -61,6 +61,15 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "result_text", type = ColumnType.TEXT, comment = "Simple action result text")
     private String resultText;
 
+    @Column(name = "failure_stage", type = ColumnType.VARCHAR, length = 64, comment = "Action failure stage")
+    private String failureStage;
+
+    @Column(name = "error_message", type = ColumnType.TEXT, comment = "Action failure message")
+    private String errorMessage;
+
+    @Column(name = "error_type", type = ColumnType.VARCHAR, length = 256, comment = "Action failure error type")
+    private String errorType;
+
     @Column(name = "system_context", type = ColumnType.BOOLEAN, nullable = false, comment = "System context flag")
     private Boolean systemContext;
 

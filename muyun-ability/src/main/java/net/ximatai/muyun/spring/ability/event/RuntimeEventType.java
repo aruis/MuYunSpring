@@ -5,6 +5,7 @@ public enum RuntimeEventType {
     AFTER_UPDATE(true),
     AFTER_DELETE(true),
     ACTION_EXECUTED(true),
+    ACTION_FAILED(true),
     MODULE_PUBLISHED(false);
 
     private final boolean requiresEntityAlias;

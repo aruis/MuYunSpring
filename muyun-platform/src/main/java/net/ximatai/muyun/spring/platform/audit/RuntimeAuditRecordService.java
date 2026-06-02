@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Objects;
@@ -20,6 +22,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         super(MODULE_ALIAS, RuntimeAuditRecord.class, auditRecordDao);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String record(RuntimeEvent event) {
         Objects.requireNonNull(event, "event must not be null");
         RuntimeAuditRecord record = new RuntimeAuditRecord();
@@ -45,15 +48,21 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
     }
 
     private void fillActionPayload(RuntimeAuditRecord record, RuntimeEvent event) {
-        if (event.eventType() != RuntimeEventType.ACTION_EXECUTED) {
+        if (event.eventType() == RuntimeEventType.ACTION_EXECUTED) {
+            record.setExecutorType(textPayload(event.payload(), "executorType"));
+            record.setResultType(textPayload(event.payload(), "resultType"));
+            record.setResultMessage(textPayload(event.payload(), "message"));
+            record.setRefreshRequested(booleanPayload(event.payload(), "refresh"));
+            record.setRedirectTo(textPayload(event.payload(), "redirectTo"));
+            record.setResultText(textPayload(event.payload(), "result"));
             return;
         }
-        record.setExecutorType(textPayload(event.payload(), "executorType"));
-        record.setResultType(textPayload(event.payload(), "resultType"));
-        record.setResultMessage(textPayload(event.payload(), "message"));
-        record.setRefreshRequested(booleanPayload(event.payload(), "refresh"));
-        record.setRedirectTo(textPayload(event.payload(), "redirectTo"));
-        record.setResultText(textPayload(event.payload(), "result"));
+        if (event.eventType() == RuntimeEventType.ACTION_FAILED) {
+            record.setExecutorType(textPayload(event.payload(), "executorType"));
+            record.setFailureStage(textPayload(event.payload(), "failureStage"));
+            record.setErrorMessage(textPayload(event.payload(), "errorMessage"));
+            record.setErrorType(textPayload(event.payload(), "errorType"));
+        }
     }
 
     public Criteria traceCriteria(String traceId) {

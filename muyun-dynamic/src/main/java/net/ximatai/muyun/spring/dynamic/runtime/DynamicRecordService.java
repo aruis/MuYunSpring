@@ -344,10 +344,20 @@ public class DynamicRecordService {
         String traceId = UUID.randomUUID().toString();
         DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized, availability, null, traceId);
         if (!availability.available()) {
+            publishActionFailureEvent(context, "availability", availability.message(), null);
             throw new DynamicActionExecutionException(availability.message(), context);
         }
-        validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
-        DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
+        DynamicActionResultBody body;
+        try {
+            validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
+            body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId);
+        } catch (DynamicActionExecutionException e) {
+            publishActionFailureEvent(context, failureStage(e), e.getMessage(), failureError(e));
+            throw e;
+        } catch (RuntimeException e) {
+            publishActionFailureEvent(context, "execute", e.getMessage(), e);
+            throw e;
+        }
         DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
         publishActionEvent(completed, body);
         return new DynamicActionExecutionResult(completed, body.value(), body);
@@ -407,7 +417,7 @@ public class DynamicRecordService {
             try {
                 executor = runtime.actionExecutorRegistry().require(action.executorKey());
             } catch (IllegalArgumentException e) {
-                throw new DynamicActionExecutionException(e.getMessage(), context);
+                throw new DynamicActionExecutionException(e.getMessage(), context, e);
             }
             try {
                 return actionResultBody(executor.execute(context, request));
@@ -613,6 +623,28 @@ public class DynamicRecordService {
         ));
     }
 
+    private void publishActionFailureEvent(DynamicActionExecutionContext context,
+                                           String failureStage,
+                                           String errorMessage,
+                                           Throwable cause) {
+        try {
+            runtime.eventPublisher().publish(RuntimeEvent.of(
+                    context.traceId(),
+                    RuntimeEventType.ACTION_FAILED,
+                    context.moduleAlias(),
+                    context.entityAlias(),
+                    context.recordId(),
+                    context.actionCode(),
+                    context.tenantId(),
+                    context.systemContext(),
+                    RuntimeMutationSource.ACTION,
+                    actionFailurePayload(context, failureStage, errorMessage, cause)
+            ));
+        } catch (RuntimeException ignored) {
+            // Failure audit must not replace the original action failure.
+        }
+    }
+
     private Map<String, Object> actionPayload(DynamicActionExecutionContext context, DynamicActionResultBody body) {
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("executorType", context.action().executorType().name());
@@ -631,6 +663,34 @@ public class DynamicRecordService {
             payload.put("result", body.value());
         }
         return payload;
+    }
+
+    private Map<String, Object> actionFailurePayload(DynamicActionExecutionContext context,
+                                                     String failureStage,
+                                                     String errorMessage,
+                                                     Throwable cause) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("executorType", context.action().executorType().name());
+        payload.put("available", context.availability().available());
+        payload.put("failureStage", failureStage);
+        if (errorMessage != null && !errorMessage.isBlank()) {
+            payload.put("errorMessage", errorMessage);
+        }
+        if (cause != null) {
+            payload.put("errorType", cause.getClass().getName());
+        }
+        return payload;
+    }
+
+    private String failureStage(DynamicActionExecutionException exception) {
+        if (exception.getCause() instanceof DynamicFormulaException) {
+            return "beforeExecuteRule";
+        }
+        return "execute";
+    }
+
+    private Throwable failureError(DynamicActionExecutionException exception) {
+        return exception.getCause() == null ? exception : exception.getCause();
     }
 
     private boolean isSimpleEventValue(Object value) {

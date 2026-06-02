@@ -252,7 +252,8 @@ class DynamicRecordServiceTest {
 
     @Test
     void shouldBlockActionExecutionWhenAvailabilityFormulaFails() {
-        DynamicRecordService service = actionService(operations());
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events);
         DynamicRecord submitted = service.newRecord(MODULE, "contract")
                 .setValue("code", "C-001")
                 .setValue("status", "submitted");
@@ -266,11 +267,21 @@ class DynamicRecordServiceTest {
                     assertThat(exception.context().availability().available()).isFalse();
                     assertThat(exception.context().action().availabilityCondition()).isTrue();
                 });
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+                    assertThat(event.actionCode()).isEqualTo("submit");
+                    assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("available", false)
+                            .containsEntry("failureStage", "availability")
+                            .containsEntry("errorMessage", "只有草稿合同可以提交");
+                });
     }
 
     @Test
     void shouldRejectServiceActionExecutionWhenExecutorKeyIsMissing() {
-        DynamicRecordService service = actionService(operations());
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events);
         DynamicRecord draft = service.newRecord(MODULE, "contract")
                 .setValue("code", "C-001")
                 .setValue("status", "draft");
@@ -284,6 +295,12 @@ class DynamicRecordServiceTest {
                     assertThat(exception.context().availability().available()).isTrue();
                     assertThat(exception.context().action().executorType())
                             .isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType.SERVICE);
+                });
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+                    assertThat(event.payload()).containsEntry("failureStage", "execute")
+                            .containsEntry("errorType", IllegalArgumentException.class.getName());
                 });
     }
 
@@ -387,7 +404,16 @@ class DynamicRecordServiceTest {
                     assertThat(exception.context().traceId()).isNotBlank();
                 });
         assertThat(executor.context()).isNull();
-        assertThat(events.events()).isEmpty();
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+                    assertThat(event.actionCode()).isEqualTo("submit");
+                    assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("available", true)
+                            .containsEntry("failureStage", "beforeExecuteRule")
+                            .containsEntry("errorType", DynamicFormulaException.class.getName());
+                    assertThat(String.valueOf(event.payload().get("errorMessage"))).contains("提交金额必须大于0");
+                });
     }
 
     @Test
@@ -503,7 +529,8 @@ class DynamicRecordServiceTest {
 
     @Test
     void shouldKeepActionContextWhenServiceActionExecutorFails() {
-        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(), new FailingActionExecutor());
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, new FailingActionExecutor());
         DynamicRecord draft = service.newRecord(MODULE, "contract")
                 .setValue("code", "C-001")
                 .setValue("status", "draft");
@@ -519,6 +546,66 @@ class DynamicRecordServiceTest {
                     assertThat(exception.context().recordId()).isEqualTo("contract-1");
                     assertThat(exception.context().traceId()).isNotBlank();
                 });
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+                    assertThat(event.recordId()).isEqualTo("contract-1");
+                    assertThat(event.actionCode()).isEqualTo("submit");
+                    assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("available", true)
+                            .containsEntry("failureStage", "execute")
+                            .containsEntry("errorMessage", "submit failed")
+                            .containsEntry("errorType", IllegalStateException.class.getName());
+                });
+    }
+
+    @Test
+    void shouldPublishActionFailureImmediatelyWhenTransactionRollsBack() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionRuleService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft")
+                .setValue("amount", BigDecimal.ZERO);
+        draft.setId("contract-1");
+
+        try {
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                    .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                    .isInstanceOf(DynamicActionExecutionException.class);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(events.events()).singleElement()
+                    .extracting(RuntimeEvent::eventType)
+                    .isEqualTo(RuntimeEventType.ACTION_FAILED);
+        } finally {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void shouldNotPublishActionFailureWhenSuccessEventPublisherFails() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        ThrowingActionEventPublisher events = new ThrowingActionEventPublisher();
+        DynamicRecordService service = actionService(operations, events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> service.module(MODULE)
+                .executeAction("create", DynamicActionExecutionRequest.record(record)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("event publish failed");
+        assertThat(events.eventTypes()).containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
     }
 
     @Test
@@ -1091,6 +1178,10 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("eventType");
         assertThatThrownBy(() -> RuntimeEvent.of(RuntimeEventType.ACTION_EXECUTED, MODULE, "contract", "contract-1",
+                null, null, false, RuntimeMutationSource.ACTION, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("actionCode");
+        assertThatThrownBy(() -> RuntimeEvent.of(RuntimeEventType.ACTION_FAILED, MODULE, "contract", "contract-1",
                 null, null, false, RuntimeMutationSource.ACTION, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("actionCode");
@@ -1737,6 +1828,22 @@ class DynamicRecordServiceTest {
 
         List<RuntimeEvent> events() {
             return events;
+        }
+    }
+
+    private static final class ThrowingActionEventPublisher implements RuntimeEventPublisher {
+        private final List<RuntimeEventType> eventTypes = new ArrayList<>();
+
+        @Override
+        public void publish(RuntimeEvent event) {
+            eventTypes.add(event.eventType());
+            if (event.eventType() == RuntimeEventType.ACTION_EXECUTED) {
+                throw new IllegalStateException("event publish failed");
+            }
+        }
+
+        List<RuntimeEventType> eventTypes() {
+            return eventTypes;
         }
     }
 

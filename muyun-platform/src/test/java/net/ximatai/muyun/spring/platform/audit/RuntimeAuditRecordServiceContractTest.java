@@ -111,6 +111,20 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getPayloadText()).contains("resultType=VALUE");
     }
 
+    @Test
+    void shouldPersistActionFailurePayloadAsAuditColumns() {
+        String id = service.record(actionFailedEvent());
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
+        assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getFailureStage()).isEqualTo("execute");
+        assertThat(record.getErrorMessage()).isEqualTo("submit failed");
+        assertThat(record.getErrorType()).isEqualTo(IllegalStateException.class.getName());
+        assertThat(record.getResultType()).isNull();
+        assertThat(record.getResultText()).isNull();
+    }
+
     private RuntimeEvent event() {
         return new RuntimeEvent(
                 "event-1",
@@ -184,6 +198,29 @@ class RuntimeAuditRecordServiceContractTest {
                 RuntimeMutationSource.SYSTEM,
                 Map.of("resultType", "VALUE", "message", "发布完成", "result", "ok"),
                 Instant.parse("2026-06-02T04:10:00Z")
+        );
+    }
+
+    private RuntimeEvent actionFailedEvent() {
+        return new RuntimeEvent(
+                "action-failed-event",
+                "action-failed-trace",
+                RuntimeEventType.ACTION_FAILED,
+                "sales.contract",
+                "contract",
+                "contract-1",
+                "submit",
+                "tenant-1",
+                false,
+                RuntimeMutationSource.ACTION,
+                Map.of(
+                        "executorType", "SERVICE",
+                        "available", true,
+                        "failureStage", "execute",
+                        "errorMessage", "submit failed",
+                        "errorType", IllegalStateException.class.getName()
+                ),
+                Instant.parse("2026-06-02T04:15:00Z")
         );
     }
 }
