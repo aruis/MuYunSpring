@@ -2,8 +2,11 @@ package net.ximatai.muyun.spring.platform.dictionary;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
+import net.ximatai.muyun.spring.common.option.OptionSource;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -12,6 +15,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 
 class DictionaryServiceContractTest {
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
@@ -123,6 +127,20 @@ class DictionaryServiceContractTest {
                 .extracting(OptionItem::code, OptionItem::title, OptionItem::enabled, OptionItem::parentCode)
                 .containsExactly("shanghai", "shanghai", true, "china");
         assertThat(itemService.select(shanghaiId).getParentId()).isEqualTo(chinaId);
+    }
+
+    @Test
+    void shouldResolveDictionaryOptionSourceByBinding() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
+        OptionSourceRegistry registry = new OptionSourceRegistry(List.of(new DictionaryOptionSourceProvider(itemService)));
+
+        OptionSource source = registry.source(OptionBinding.dictionary("crm", "customer_status"));
+
+        assertThat(source.options())
+                .extracting(OptionItem::code, OptionItem::title, OptionItem::enabled)
+                .containsExactly(tuple("active", "active", true));
+        assertThat(source.resolve("active").code()).isEqualTo("active");
     }
 
     @Test
