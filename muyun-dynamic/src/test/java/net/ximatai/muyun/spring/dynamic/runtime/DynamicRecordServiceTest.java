@@ -168,6 +168,82 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExecuteStandardCreateActionThroughStableActionApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordService service = actionService(operations);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        record.setId("contract-1");
+
+        DynamicActionExecutionResult result = service.module(MODULE)
+                .executeAction("create", DynamicActionExecutionRequest.record(record));
+
+        assertThat(result.value()).isEqualTo("contract-1");
+        assertThat(result.context().moduleAlias()).isEqualTo(MODULE);
+        assertThat(result.context().entityAlias()).isEqualTo("contract");
+        assertThat(result.context().actionCode()).isEqualTo("create");
+        assertThat(result.context().availability().available()).isTrue();
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+    }
+
+    @Test
+    void shouldExposeGeneratedRecordIdInCreateActionContext() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordService service = actionService(operations);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+
+        DynamicActionExecutionResult result = service.module(MODULE)
+                .executeAction("create", DynamicActionExecutionRequest.record(record));
+
+        assertThat(result.value()).isInstanceOf(String.class);
+        assertThat(result.context().recordId()).isEqualTo(result.value());
+    }
+
+    @Test
+    void shouldBlockActionExecutionWhenAvailabilityFormulaFails() {
+        DynamicRecordService service = actionService(operations());
+        DynamicRecord submitted = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "submitted");
+
+        assertThatThrownBy(() -> service.module(MODULE)
+                .executeAction("submit", DynamicActionExecutionRequest.record(submitted)))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasMessageContaining("只有草稿合同可以提交")
+                .satisfies(error -> {
+                    DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.context().availability().available()).isFalse();
+                    assertThat(exception.context().action().availabilityCondition()).isTrue();
+                });
+    }
+
+    @Test
+    void shouldRejectCustomActionExecutionUntilExecutorIsConfigured() {
+        DynamicRecordService service = actionService(operations());
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submit", DynamicActionExecutionRequest.record(draft)))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasMessageContaining("SERVICE")
+                .satisfies(error -> {
+                    DynamicActionExecutionException exception = (DynamicActionExecutionException) error;
+                    assertThat(exception.context().availability().available()).isTrue();
+                    assertThat(exception.context().action().executorType())
+                            .isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType.SERVICE);
+                });
+    }
+
+    @Test
     void shouldNotLoadExistingRecordForActionWithoutCondition() {
         IDatabaseOperations<Object> operations = operations();
         DynamicRecordService service = actionService(operations);
@@ -578,6 +654,51 @@ class DynamicRecordServiceTest {
         assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
                 .contains("\"enabled\" =")
                 .contains("\"code\" ="));
+    }
+
+    @Test
+    void shouldExecuteEnableActionThroughStableActionApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(enabledRow("contract-1", false)));
+        DynamicRecordService service = service(operations, enabledEntity());
+
+        DynamicActionExecutionResult result = service.module(MODULE)
+                .executeAction("enable", DynamicActionExecutionRequest.id("contract-1"));
+
+        assertThat(result.value()).isEqualTo(1);
+        assertThat(result.context().recordId()).isEqualTo("contract-1");
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
+    }
+
+    @Test
+    void shouldExecuteReferenceOptionsActionWithExplicitPageRequest() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(referenceRow("contract-1", "Contract One")));
+        DynamicRecordService service = service(operations, referenceEntity());
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("referenceOptions", DynamicActionExecutionRequest.empty()
+                        .withCriteria(Criteria.of().eq("code", "CONTRACT-1"))
+                        .withPageRequest(PageRequest.of(1, 10)));
+
+        assertThat(result.value()).isInstanceOf(net.ximatai.muyun.database.core.orm.PageResult.class);
+        @SuppressWarnings("unchecked")
+        net.ximatai.muyun.database.core.orm.PageResult<ReferenceOption> options =
+                (net.ximatai.muyun.database.core.orm.PageResult<ReferenceOption>) result.value();
+        assertThat(options.getRecords()).containsExactly(new ReferenceOption("contract-1", "Contract One"));
+    }
+
+    @Test
+    void shouldRequirePageRequestForPagedActionExecution() {
+        DynamicRecordService service = service(operations(), referenceEntity());
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("referenceOptions", DynamicActionExecutionRequest.empty()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("pageRequest");
     }
 
     @Test

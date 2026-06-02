@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
@@ -12,6 +13,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
@@ -62,6 +64,15 @@ public class DynamicRecordService {
                 .actionAvailability(actionCode, record);
     }
 
+    public DynamicActionExecutionResult executeAction(String moduleAlias,
+                                                      String actionCode,
+                                                      DynamicActionExecutionRequest request) {
+        DynamicModuleDescriptor module = describe(moduleAlias);
+        DynamicActionDescriptor action = findAction(module, actionCode);
+        String entityAlias = runtime.registry().requireModule(moduleAlias).mainEntityAlias();
+        return executeAction(moduleAlias, entityAlias, action, request);
+    }
+
     public List<DynamicActionDescriptor> actions(String moduleAlias, String entityAlias) {
         return entityDescriptor(moduleAlias, entityAlias).actions();
     }
@@ -76,6 +87,14 @@ public class DynamicRecordService {
                                                         DynamicRecord record) {
         findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
         return entityService(moduleAlias, entityAlias).actionAvailability(actionCode, record);
+    }
+
+    public DynamicActionExecutionResult executeAction(String moduleAlias,
+                                                      String entityAlias,
+                                                      String actionCode,
+                                                      DynamicActionExecutionRequest request) {
+        DynamicActionDescriptor action = findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
+        return executeAction(moduleAlias, entityAlias, action, request);
     }
 
     public List<DynamicViewDescriptor> views(String moduleAlias, String entityAlias) {
@@ -244,6 +263,157 @@ public class DynamicRecordService {
         return resolveReference(moduleAlias, entityAlias, fieldName, request);
     }
 
+    private DynamicActionExecutionResult executeAction(String moduleAlias,
+                                                       String entityAlias,
+                                                       DynamicActionDescriptor action,
+                                                       DynamicActionExecutionRequest request) {
+        DynamicActionExecutionRequest normalized = request == null ? DynamicActionExecutionRequest.empty() : request;
+        DynamicRecord availabilityRecord = availabilityRecord(moduleAlias, entityAlias, normalized);
+        DynamicActionAvailability availability = actionAvailability(moduleAlias, entityAlias, action.code(), availabilityRecord);
+        DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized, availability);
+        if (!availability.available()) {
+            throw new DynamicActionExecutionException(availability.message(), context);
+        }
+        if (action.executorType() != EntityActionExecutorType.STANDARD) {
+            throw new DynamicActionExecutionException(
+                    "dynamic action executor is not supported: " + action.executorType(),
+                    context
+            );
+        }
+        Object value = executeStandardAction(moduleAlias, entityAlias, action.code(), normalized);
+        return new DynamicActionExecutionResult(
+                executionContext(moduleAlias, entityAlias, action, normalized, availability, value),
+                value
+        );
+    }
+
+    private Object executeStandardAction(String moduleAlias,
+                                         String entityAlias,
+                                         String actionCode,
+                                         DynamicActionExecutionRequest request) {
+        return switch (actionCode) {
+            case "create" -> create(moduleAlias, entityAlias, requireRecord(request, actionCode));
+            case "select" -> select(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "update" -> update(moduleAlias, entityAlias, requireRecord(request, actionCode));
+            case "delete" -> delete(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "list" -> list(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request));
+            case "page" -> page(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode), sorts(request));
+            case "count" -> count(moduleAlias, entityAlias, criteria(request));
+            case "queryCriteria" -> queryCriteria(moduleAlias, entityAlias, request.queryConditions());
+            case "sortedList" -> sortedList(moduleAlias, entityAlias, criteria(request));
+            case "reorder" -> {
+                reorder(moduleAlias, entityAlias, request.orderedIds());
+                yield null;
+            }
+            case "moveBefore" -> {
+                moveBefore(moduleAlias, entityAlias, requireRecordId(request, actionCode), requireText(request.beforeId(), "beforeId"));
+                yield null;
+            }
+            case "moveAfter" -> {
+                moveAfter(moduleAlias, entityAlias, requireRecordId(request, actionCode), requireText(request.afterId(), "afterId"));
+                yield null;
+            }
+            case "children" -> children(moduleAlias, entityAlias, request.parentId());
+            case "ancestorIds" -> ancestorIds(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "ancestorIdsAndSelf" -> ancestorIdsAndSelf(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "descendantIds" -> descendantIds(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "title" -> title(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "titles" -> titles(moduleAlias, entityAlias, request.ids());
+            case "projections" -> projections(moduleAlias, entityAlias, request.ids(), request.fieldNames());
+            case "referenceOptions" -> referenceOptions(moduleAlias, entityAlias, criteria(request), requirePageRequest(request, actionCode));
+            case "enable" -> enable(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "disable" -> disable(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "isEnabled" -> isEnabled(moduleAlias, entityAlias, requireRecordId(request, actionCode));
+            case "enabledCriteria" -> enabledCriteria(moduleAlias, entityAlias, criteria(request));
+            default -> throw new IllegalArgumentException("unknown standard dynamic action: "
+                    + moduleAlias + "." + entityAlias + "." + actionCode);
+        };
+    }
+
+    private DynamicRecord availabilityRecord(String moduleAlias, String entityAlias, DynamicActionExecutionRequest request) {
+        if (request.record() != null) {
+            return request.record();
+        }
+        if (request.recordId() == null || request.recordId().isBlank()) {
+            return null;
+        }
+        DynamicRecord probe = newRecord(moduleAlias, entityAlias);
+        probe.setId(request.recordId());
+        return probe;
+    }
+
+    private DynamicActionExecutionContext executionContext(String moduleAlias,
+                                                           String entityAlias,
+                                                           DynamicActionDescriptor action,
+                                                           DynamicActionExecutionRequest request,
+                                                           DynamicActionAvailability availability) {
+        return executionContext(moduleAlias, entityAlias, action, request, availability, null);
+    }
+
+    private DynamicActionExecutionContext executionContext(String moduleAlias,
+                                                           String entityAlias,
+                                                           DynamicActionDescriptor action,
+                                                           DynamicActionExecutionRequest request,
+                                                           DynamicActionAvailability availability,
+                                                           Object value) {
+        String recordId = request.recordId();
+        if ((recordId == null || recordId.isBlank()) && request.record() != null) {
+            recordId = request.record().getId();
+        }
+        if ((recordId == null || recordId.isBlank()) && "create".equals(action.code()) && value instanceof String id) {
+            recordId = id;
+        }
+        return new DynamicActionExecutionContext(
+                moduleAlias,
+                entityAlias,
+                action.code(),
+                action,
+                recordId,
+                TenantContext.currentTenantId().orElse(null),
+                TenantContext.isSystem(),
+                availability
+        );
+    }
+
+    private DynamicRecord requireRecord(DynamicActionExecutionRequest request, String actionCode) {
+        if (request.record() == null) {
+            throw new IllegalArgumentException("dynamic action requires record: " + actionCode);
+        }
+        return request.record();
+    }
+
+    private String requireRecordId(DynamicActionExecutionRequest request, String actionCode) {
+        if (request.recordId() != null && !request.recordId().isBlank()) {
+            return request.recordId();
+        }
+        if (request.record() != null && request.record().getId() != null && !request.record().getId().isBlank()) {
+            return request.record().getId();
+        }
+        throw new IllegalArgumentException("dynamic action requires recordId: " + actionCode);
+    }
+
+    private String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("dynamic action requires " + fieldName);
+        }
+        return value;
+    }
+
+    private Criteria criteria(DynamicActionExecutionRequest request) {
+        return request.criteria() == null ? Criteria.of() : request.criteria();
+    }
+
+    private PageRequest requirePageRequest(DynamicActionExecutionRequest request, String actionCode) {
+        if (request.pageRequest() == null) {
+            throw new IllegalArgumentException("dynamic action requires pageRequest: " + actionCode);
+        }
+        return request.pageRequest();
+    }
+
+    private Sort[] sorts(DynamicActionExecutionRequest request) {
+        return request.sorts().toArray(Sort[]::new);
+    }
+
     private DynamicEntityService entityService(String moduleAlias, String entityAlias) {
         return runtime.entityService(moduleAlias, entityAlias);
     }
@@ -315,6 +485,10 @@ public class DynamicRecordService {
             return service.actionAvailability(moduleAlias, actionCode, record);
         }
 
+        public DynamicActionExecutionResult executeAction(String actionCode, DynamicActionExecutionRequest request) {
+            return service.executeAction(moduleAlias, actionCode, request);
+        }
+
         public List<DynamicEntityDescriptor> entities() {
             return describe().entities();
         }
@@ -365,6 +539,10 @@ public class DynamicRecordService {
 
         public DynamicActionAvailability actionAvailability(String actionCode, DynamicRecord record) {
             return service.actionAvailability(moduleAlias, entityAlias, actionCode, record);
+        }
+
+        public DynamicActionExecutionResult executeAction(String actionCode, DynamicActionExecutionRequest request) {
+            return service.executeAction(moduleAlias, entityAlias, actionCode, request);
         }
 
         public List<DynamicReferenceDescriptor> references() {
