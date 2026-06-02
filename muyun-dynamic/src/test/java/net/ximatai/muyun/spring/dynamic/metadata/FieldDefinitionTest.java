@@ -123,7 +123,7 @@ class FieldDefinitionTest {
                 java.util.List.of(FieldDefinition.zonedTimestamp("meetingAt", "Meeting At").column("meeting_at"))
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("zoned timestamp requires timeZone field");
+                .hasMessageContaining("field companion is missing");
         assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
                 "meeting",
                 "app_meeting",
@@ -134,7 +134,7 @@ class FieldDefinitionTest {
                 )
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("zoned timestamp timeZone field must be STRING");
+                .hasMessageContaining("field companion type mismatch");
         assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
                 "meeting",
                 "app_meeting",
@@ -145,7 +145,7 @@ class FieldDefinitionTest {
                 )
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("zoned timestamp timeZone column mismatch");
+                .hasMessageContaining("field companion column mismatch");
         assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
                 "meeting",
                 "app_meeting",
@@ -156,6 +156,6 @@ class FieldDefinitionTest {
                 )
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("required zoned timestamp requires required timeZone field");
+                .hasMessageContaining("required field requires required companion");
     }
 }

@@ -1,11 +1,11 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -50,7 +50,7 @@ final class DynamicViewDescriptors {
                 entity.name(),
                 entity.fields().stream()
                         .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true,
-                                controlType(field), timeZoneField(field), false, field.isRequired()))
+                                controlType(field), companions(field), false, field.isRequired()))
                         .toList()
         );
     }
@@ -71,16 +71,17 @@ final class DynamicViewDescriptors {
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
                 viewField.visible(),
                 effectiveControlType(viewField, field),
-                timeZoneField(field),
+                companions(field),
                 Boolean.TRUE.equals(viewField.readOnly()),
                 field.isRequired() || Boolean.TRUE.equals(viewField.required())
         );
     }
 
-    private static String timeZoneField(FieldDefinition field) {
-        return field.type() == FieldType.ZONED_TIMESTAMP
-                ? DynamicFieldValueSupport.companionFieldName(field.fieldName())
-                : null;
+    private static List<DynamicFieldCompanionDescriptor> companions(FieldDefinition field) {
+        return FieldCompanionRules.group(field).stream()
+                .flatMap(group -> group.companions().stream()
+                        .map(companion -> DynamicFieldCompanionDescriptor.from(group.kind(), companion)))
+                .toList();
     }
 
     private static ViewControlType effectiveControlType(EntityViewFieldDefinition viewField, FieldDefinition field) {

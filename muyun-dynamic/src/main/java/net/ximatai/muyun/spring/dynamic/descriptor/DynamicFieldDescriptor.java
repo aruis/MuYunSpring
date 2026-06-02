@@ -2,9 +2,11 @@ package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+
+import java.util.List;
 
 public record DynamicFieldDescriptor(
         String fieldName,
@@ -21,13 +23,17 @@ public record DynamicFieldDescriptor(
         OptionBinding optionBinding,
         OptionSelectionMode selectionMode,
         DynamicReferenceDescriptor reference,
-        String timeZoneField,
+        List<DynamicFieldCompanionDescriptor> companions,
         DynamicFieldQueryDescriptor query,
         String defaultValue,
         String validationRegex,
         boolean copyable,
         boolean writeProtected
 ) {
+    public DynamicFieldDescriptor {
+        companions = companions == null ? List.of() : List.copyOf(companions);
+    }
+
     public static DynamicFieldDescriptor from(FieldDefinition field) {
         return new DynamicFieldDescriptor(
                 field.fieldName(),
@@ -44,7 +50,7 @@ public record DynamicFieldDescriptor(
                 field.optionBinding(),
                 field.dictionaryBinding() == null ? null : field.dictionaryBinding().selectionMode(),
                 null,
-                timeZoneField(field),
+                companions(field),
                 DynamicFieldQueryDescriptor.from(field.queryDefinition()),
                 field.behavior().defaultValue(),
                 field.behavior().validationRegex(),
@@ -70,7 +76,7 @@ public record DynamicFieldDescriptor(
                 descriptor.optionBinding(),
                 descriptor.selectionMode(),
                 reference,
-                descriptor.timeZoneField(),
+                descriptor.companions(),
                 descriptor.query(),
                 descriptor.defaultValue(),
                 descriptor.validationRegex(),
@@ -79,9 +85,10 @@ public record DynamicFieldDescriptor(
         );
     }
 
-    private static String timeZoneField(FieldDefinition field) {
-        return field.type() == FieldType.ZONED_TIMESTAMP
-                ? DynamicFieldValueSupport.companionFieldName(field.fieldName())
-                : null;
+    private static List<DynamicFieldCompanionDescriptor> companions(FieldDefinition field) {
+        return FieldCompanionRules.group(field).stream()
+                .flatMap(group -> group.companions().stream()
+                        .map(companion -> DynamicFieldCompanionDescriptor.from(group.kind(), companion)))
+                .toList();
     }
 }

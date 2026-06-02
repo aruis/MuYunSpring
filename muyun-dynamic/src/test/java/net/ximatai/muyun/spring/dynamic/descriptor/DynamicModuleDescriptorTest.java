@@ -44,9 +44,23 @@ class DynamicModuleDescriptorTest {
         DynamicEntityDescriptor entity = DynamicModuleDescriptor.from(module).entities().getFirst();
 
         assertThat(entity.fields().getFirst().fieldName()).isEqualTo("meetingAt");
-        assertThat(entity.fields().getFirst().timeZoneField()).isEqualTo("meetingAtTimeZone");
-        assertThat(entity.fields().get(1).timeZoneField()).isNull();
-        assertThat(entity.views().getFirst().fields().getFirst().timeZoneField()).isEqualTo("meetingAtTimeZone");
+        assertThat(entity.fields().getFirst().companions())
+                .containsExactly(new DynamicFieldCompanionDescriptor(
+                        "meetingAtTimeZone",
+                        "ZONED_TIMESTAMP",
+                        "TIME_ZONE",
+                        true,
+                        true
+                ));
+        assertThat(entity.fields().get(1).companions()).isEmpty();
+        assertThat(entity.views().getFirst().fields().getFirst().companions())
+                .containsExactly(new DynamicFieldCompanionDescriptor(
+                        "meetingAtTimeZone",
+                        "ZONED_TIMESTAMP",
+                        "TIME_ZONE",
+                        true,
+                        true
+                ));
     }
 
     @Test

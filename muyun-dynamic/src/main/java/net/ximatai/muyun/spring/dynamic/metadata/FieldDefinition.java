@@ -88,9 +88,9 @@ public record FieldDefinition(
 
     public static FieldDefinition zonedTimestampTimeZone(String zonedTimestampFieldName, String zonedTimestampColumnName) {
         return string(
-                DynamicFieldValueSupport.companionFieldName(zonedTimestampFieldName),
+                FieldCompanionRules.zonedTimestampTimeZoneFieldName(zonedTimestampFieldName),
                 "Time Zone"
-        ).column(DynamicFieldValueSupport.companionColumnName(zonedTimestampColumnName)).length(64);
+        ).column(FieldCompanionRules.zonedTimestampTimeZoneColumnName(zonedTimestampColumnName)).length(64);
     }
 
     public static FieldDefinition parentId() {

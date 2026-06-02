@@ -144,7 +144,7 @@ class DynamicRecordTest {
 
         assertThatThrownBy(record::validateForInsert)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("zoned timestamp timeZone is missing");
+                .hasMessageContaining("field companion is missing");
         assertThatThrownBy(() -> record.setValue("meetingAtTimeZone", "+08:00"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("invalid value type");

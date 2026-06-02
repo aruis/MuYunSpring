@@ -138,7 +138,7 @@ public class ModuleDefinitionValidator {
         if (entity.supports(EntityCapability.ENABLE)) {
             requireEnabledField(entity, enabledField);
         }
-        validateZonedTimestampCompanions(entity);
+        FieldCompanionRules.validateEntity(entity);
         validateFormulaRules(entity);
     }
 
@@ -147,35 +147,6 @@ public class ModuleDefinitionValidator {
         for (EntityFormulaRuleDefinition rule : entity.formulaRules()) {
             validateFormulaRule(entity, rule);
             requireUnique(ruleCodes, rule.code(), "formula rule code");
-        }
-    }
-
-    private void validateZonedTimestampCompanions(EntityDefinition entity) {
-        Map<String, FieldDefinition> fieldsByName = entity.fields().stream()
-                .collect(Collectors.toMap(FieldDefinition::fieldName, Function.identity()));
-        for (FieldDefinition field : entity.fields()) {
-            if (field.type() != FieldType.ZONED_TIMESTAMP) {
-                continue;
-            }
-            String companionFieldName = DynamicFieldValueSupport.companionFieldName(field.fieldName());
-            String companionColumnName = DynamicFieldValueSupport.companionColumnName(field.columnName());
-            FieldDefinition companion = fieldsByName.get(companionFieldName);
-            if (companion == null) {
-                throw new ModuleDefinitionException("zoned timestamp requires timeZone field: "
-                        + entity.alias() + "." + companionFieldName);
-            }
-            if (companion.type() != FieldType.STRING) {
-                throw new ModuleDefinitionException("zoned timestamp timeZone field must be STRING: "
-                        + entity.alias() + "." + companionFieldName);
-            }
-            if (!companionColumnName.equals(companion.columnName())) {
-                throw new ModuleDefinitionException("zoned timestamp timeZone column mismatch: "
-                        + entity.alias() + "." + companionFieldName);
-            }
-            if (field.isRequired() && !companion.isRequired()) {
-                throw new ModuleDefinitionException("required zoned timestamp requires required timeZone field: "
-                        + entity.alias() + "." + companionFieldName);
-            }
         }
     }
 

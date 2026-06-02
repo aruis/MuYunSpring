@@ -678,10 +678,10 @@ class DynamicRecordDaoTest {
         assertThat(record.explicitFieldCodes()).contains("meetingAt");
         assertThatThrownBy(record::validateForUpdate)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("zoned timestamp timeZone is missing");
+                .hasMessageContaining("field companion is missing");
         assertThatThrownBy(() -> service.update(record))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("zoned timestamp timeZone is missing");
+                .hasMessageContaining("field companion is missing");
         verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
 
         DynamicRecord clearWithoutCompanion = new DynamicRecord(entity)
@@ -690,7 +690,7 @@ class DynamicRecordDaoTest {
         clearWithoutCompanion.setVersion(1);
         assertThatThrownBy(() -> service.update(clearWithoutCompanion))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("zoned timestamp timeZone is missing");
+                .hasMessageContaining("field companion is missing");
 
         DynamicRecord clearWithCompanion = new DynamicRecord(entity)
                 .setValue("meetingAt", null)

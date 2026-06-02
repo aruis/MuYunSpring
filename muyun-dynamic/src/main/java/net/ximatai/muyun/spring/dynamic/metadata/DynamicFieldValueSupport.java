@@ -64,20 +64,6 @@ public final class DynamicFieldValueSupport {
         };
     }
 
-    public static String companionFieldName(String fieldName) {
-        if (fieldName == null || fieldName.isBlank()) {
-            throw new IllegalArgumentException("zoned timestamp fieldName must not be blank");
-        }
-        return fieldName + "TimeZone";
-    }
-
-    public static String companionColumnName(String columnName) {
-        if (columnName == null || columnName.isBlank()) {
-            throw new IllegalArgumentException("zoned timestamp columnName must not be blank");
-        }
-        return columnName + "_timezone";
-    }
-
     public static String normalizeTimeZone(Object value) {
         if (value == null) {
             return null;
