@@ -2,6 +2,10 @@ package net.ximatai.muyun.spring.dynamic.publish;
 
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
+import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
+import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
@@ -32,7 +36,35 @@ public class DynamicModulePublisher {
         Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, safeOptions);
         if (!safeOptions.isDryRun()) {
             runtime.publish(module);
+            publishModuleEvent(module, migrations);
         }
         return new DynamicModulePublishResult(module, migrations, safeOptions.isDryRun());
+    }
+
+    private void publishModuleEvent(ModuleDefinition module, Map<String, MigrationResult> migrations) {
+        DynamicModulePublishResult result = new DynamicModulePublishResult(module, migrations, false);
+        runtime.eventPublisher().publishAfterCommit(RuntimeEvent.of(
+                RuntimeEventType.MODULE_PUBLISHED,
+                module.moduleAlias(),
+                null,
+                null,
+                null,
+                TenantContext.currentTenantId().orElse(null),
+                TenantContext.isSystem(),
+                RuntimeMutationSource.SYSTEM,
+                Map.of(
+                        "changed", result.changed(),
+                        "entities", result.migrations().entrySet().stream()
+                                .map(entry -> Map.of(
+                                        "entityAlias", entry.getKey(),
+                                        "changed", entry.getValue().isChanged(),
+                                        "dryRun", entry.getValue().isDryRun(),
+                                        "nonAdditiveChanges", entry.getValue().hasNonAdditiveChanges(),
+                                        "statements", entry.getValue().getStatements()
+                                ))
+                                .toList(),
+                        "nonAdditiveChanges", result.hasNonAdditiveChanges()
+                )
+        ));
     }
 }

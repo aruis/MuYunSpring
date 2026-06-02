@@ -23,7 +23,9 @@ public record RuntimeEvent(
     public RuntimeEvent {
         Objects.requireNonNull(eventType, "eventType must not be null");
         requireText(moduleAlias, "moduleAlias");
-        requireText(entityAlias, "entityAlias");
+        if (eventType.requiresEntityAlias()) {
+            requireText(entityAlias, "entityAlias");
+        }
         Objects.requireNonNull(mutationSource, "mutationSource must not be null");
         if (eventType == RuntimeEventType.ACTION_EXECUTED) {
             requireText(actionCode, "actionCode");

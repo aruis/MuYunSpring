@@ -4,15 +4,23 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
+import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
+import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +43,57 @@ class DynamicModulePublisherTest {
         assertThat(schemaService.ensuredEntities).containsExactly("contract");
         assertThat(runtime.registry().requireEntity("sales.contract", "contract").tableName())
                 .isEqualTo("app_contract");
+    }
+
+    @Test
+    void shouldPublishModuleEventAfterRuntimePublication() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(false);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordRuntime runtime = runtime(events);
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+
+        publisher.publish(contractModule());
+
+        assertThat(events.events()).hasSize(1);
+        RuntimeEvent event = events.events().getFirst();
+        assertThat(event.eventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
+        assertThat(event.moduleAlias()).isEqualTo("sales.contract");
+        assertThat(event.entityAlias()).isNull();
+        assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
+        assertThat(event.payload()).containsEntry("changed", Boolean.TRUE)
+                .containsEntry("nonAdditiveChanges", Boolean.FALSE);
+        assertThat(event.payload().get("entities")).isEqualTo(List.of(Map.of(
+                "entityAlias", "contract",
+                "changed", Boolean.TRUE,
+                "dryRun", Boolean.FALSE,
+                "nonAdditiveChanges", Boolean.FALSE,
+                "statements", List.of()
+        )));
+    }
+
+    @Test
+    void shouldNotPublishModuleEventForPreview() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(true);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime(events));
+
+        publisher.preview(contractModule());
+
+        assertThat(events.events()).isEmpty();
+    }
+
+    @Test
+    void shouldKeepSystemContextOnModulePublicationEvent() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(false);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime(events));
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            publisher.publish(contractModule());
+        }
+
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> assertThat(event.systemContext()).isTrue());
     }
 
     @Test
@@ -173,6 +232,11 @@ class DynamicModulePublisherTest {
         return new ModuleDefinition("sales.contract", "Contract", List.of(entity("contract", "app_contract")));
     }
 
+    private DynamicRecordRuntime runtime(RuntimeEventPublisher eventPublisher) {
+        return new DynamicRecordRuntime(operations(), new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE, eventPublisher);
+    }
+
     private ModuleDefinition emptyModule() {
         return new ModuleDefinition("sales.empty", "Empty", List.of());
     }
@@ -274,6 +338,19 @@ class DynamicModulePublisherTest {
                                                          MigrationOptions options) {
             lastOptions = options;
             return Map.of();
+        }
+    }
+
+    private static final class CollectingRuntimeEventPublisher implements RuntimeEventPublisher {
+        private final List<RuntimeEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(RuntimeEvent event) {
+            events.add(event);
+        }
+
+        List<RuntimeEvent> events() {
+            return events;
         }
     }
 }

@@ -1,8 +1,19 @@
 package net.ximatai.muyun.spring.ability.event;
 
 public enum RuntimeEventType {
-    AFTER_CREATE,
-    AFTER_UPDATE,
-    AFTER_DELETE,
-    ACTION_EXECUTED
+    AFTER_CREATE(true),
+    AFTER_UPDATE(true),
+    AFTER_DELETE(true),
+    ACTION_EXECUTED(true),
+    MODULE_PUBLISHED(false);
+
+    private final boolean requiresEntityAlias;
+
+    RuntimeEventType(boolean requiresEntityAlias) {
+        this.requiresEntityAlias = requiresEntityAlias;
+    }
+
+    public boolean requiresEntityAlias() {
+        return requiresEntityAlias;
+    }
 }

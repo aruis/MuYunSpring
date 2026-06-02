@@ -78,7 +78,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         return registry.describe(moduleAlias);
     }
 
-    RuntimeEventPublisher eventPublisher() {
+    public RuntimeEventPublisher eventPublisher() {
         return eventPublisher;
     }
 
