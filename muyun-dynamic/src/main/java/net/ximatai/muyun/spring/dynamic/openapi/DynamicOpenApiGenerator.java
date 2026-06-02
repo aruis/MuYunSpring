@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -16,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 public class DynamicOpenApiGenerator {
     private static final String METHOD_POST = "POST";
@@ -24,9 +24,6 @@ public class DynamicOpenApiGenerator {
             "DYNAMIC_BAD_REQUEST",
             "DYNAMIC_ACTION_FAILED",
             "DYNAMIC_CONFLICT"
-    );
-    private static final Set<String> RESERVED_ACTION_PATHS = Set.of(
-            "actions", "delete", "describe", "entities", "insert", "openapi", "query", "references", "update", "view"
     );
 
     public DynamicOpenApiDocument generate(DynamicModuleDescriptor descriptor) {
@@ -78,7 +75,7 @@ public class DynamicOpenApiGenerator {
         descriptor.actions().stream()
                 .filter(DynamicActionDescriptor::enabled)
                 .filter(action -> action.category() != EntityActionCategory.STANDARD)
-                .filter(action -> !RESERVED_ACTION_PATHS.contains(action.code()))
+                .filter(action -> !DynamicActionPathRules.isReservedWebActionCode(action.code()))
                 .filter(action -> action.actionLevel() != null)
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
         mainEntity.fields().stream()

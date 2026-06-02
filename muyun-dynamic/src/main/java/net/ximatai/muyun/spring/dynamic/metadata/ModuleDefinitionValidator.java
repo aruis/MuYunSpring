@@ -352,6 +352,11 @@ public class ModuleDefinitionValidator {
         if (action.executorKey() != null && action.executorKey().isBlank()) {
             throw new ModuleDefinitionException("action executor key must not be blank: " + action.actionCode());
         }
+        if (action.category() != EntityActionCategory.STANDARD
+                && DynamicActionPathRules.isReservedWebActionCode(action.actionCode())) {
+            throw new ModuleDefinitionException("custom action conflicts with reserved web action path: "
+                    + entity.alias() + "." + action.actionCode());
+        }
         validateActionAccessPolicy(action);
         validateActionAvailability(action, entity, entities, relations);
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());

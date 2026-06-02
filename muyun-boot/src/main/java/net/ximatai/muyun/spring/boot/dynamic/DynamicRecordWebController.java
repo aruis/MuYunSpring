@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
@@ -38,9 +39,6 @@ import java.util.Set;
 public class DynamicRecordWebController {
     private static final int MAX_PAGE_SIZE = 500;
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
-    private static final Set<String> RESERVED_ACTION_PATHS = Set.of(
-            "actions", "delete", "describe", "entities", "insert", "openapi", "query", "references", "update", "view"
-    );
     private final DynamicRecordService recordService;
 
     public DynamicRecordWebController(DynamicRecordService recordService) {
@@ -307,7 +305,7 @@ public class DynamicRecordWebController {
     }
 
     private void rejectReservedActionPath(String actionCode) {
-        if (RESERVED_ACTION_PATHS.contains(actionCode)) {
+        if (DynamicActionPathRules.isReservedWebActionCode(actionCode)) {
             throw new IllegalArgumentException("dynamic action path is reserved: " + actionCode);
         }
     }
