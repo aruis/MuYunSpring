@@ -291,7 +291,7 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
         MetadataViewFieldService viewFieldService =
                 new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
-        ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService);
+        ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService, fieldService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,

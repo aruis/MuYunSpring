@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -65,6 +66,8 @@ class PlatformMetadataServiceContractTest {
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
+    private final ModuleMetadataActionService actionService =
+            new ModuleMetadataActionService(new MemoryDao<>(), relationService, fieldService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -548,6 +551,49 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldRejectMetadataActionAvailableExpressionAssignment() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        fieldService.insert(titleField(metadataId));
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        ModuleMetadataAction action = metadataAction(relationId, "submit", EntityActionKind.CUSTOM);
+        action.setAvailableExpression("{title} = 'updated'");
+
+        assertThatThrownBy(() -> actionService.insert(action))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must not assign fields");
+    }
+
+    @Test
+    void shouldRejectMetadataActionAvailableExpressionUnknownField() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        fieldService.insert(titleField(metadataId));
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        ModuleMetadataAction action = metadataAction(relationId, "submit", EntityActionKind.CUSTOM);
+        action.setAvailableExpression("{missingStatus} == 'active'");
+
+        assertThatThrownBy(() -> actionService.insert(action))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("availableExpression field does not exist: missingStatus");
+    }
+
+    @Test
+    void shouldValidateMetadataActionAvailableExpressionChildField() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        String profileMetadataId = metadataService.insert(metadata("crm", "profile"));
+        fieldService.insert(titleField(customerMetadataId));
+        fieldService.insert(field(profileMetadataId, "score", "score", FieldType.INTEGER));
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        relationService.insert(childRelation("crm.customer", profileMetadataId, customerMetadataId));
+        ModuleMetadataAction action = metadataAction(relationId, "scoreAudit", EntityActionKind.CUSTOM);
+        action.setAvailableExpression("SUM({profile.score}) > 0");
+
+        assertThat(actionService.insert(action)).isNotBlank();
+    }
+
+    @Test
     void shouldRejectFieldWithoutExistingMetadata() {
         MetadataField field = field("missing", "code", "code", FieldType.STRING);
 
@@ -731,6 +777,14 @@ class PlatformMetadataServiceContractTest {
         relation.setRelationAlias("profile");
         relation.setTitle("profile");
         return relation;
+    }
+
+    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+        ModuleMetadataAction action = new ModuleMetadataAction();
+        action.setRelationId(relationId);
+        action.setAlias(alias);
+        action.setActionKind(kind);
+        return action;
     }
 
     private static class MemoryDao<T extends EntityContract> implements BaseDao<T, String> {

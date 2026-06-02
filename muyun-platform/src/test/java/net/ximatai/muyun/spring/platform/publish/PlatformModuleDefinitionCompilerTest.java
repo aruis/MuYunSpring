@@ -84,7 +84,8 @@ class PlatformModuleDefinitionCompilerTest {
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
-    private final ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService);
+    private final ModuleMetadataActionService actionService =
+            new ModuleMetadataActionService(actionDao, relationService, fieldService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
                     referenceConfigService, relationService, viewService, viewFieldService, actionService);
