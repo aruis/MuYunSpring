@@ -165,7 +165,7 @@ public class DynamicRecordWebController {
     @ExceptionHandler({IllegalArgumentException.class, ModuleDefinitionException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public DynamicWebError handleBadRequest(RuntimeException exception) {
-        return new DynamicWebError(exception.getMessage());
+        return DynamicWebError.badRequest(exception.getMessage());
     }
 
     @ExceptionHandler(DynamicActionExecutionException.class)
@@ -177,7 +177,7 @@ public class DynamicRecordWebController {
     @ExceptionHandler(OptimisticLockException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public DynamicWebError handleOptimisticLock(OptimisticLockException exception) {
-        return new DynamicWebError(exception.getMessage());
+        return DynamicWebError.conflict(exception.getMessage());
     }
 
     private DynamicRecord record(String moduleAlias, String entityAlias, DynamicRecordPayload payload) {

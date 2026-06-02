@@ -316,6 +316,8 @@ class DynamicRecordWebControllerTest {
                                 "record", Map.of("id", "contract-2", "values", Map.of("code", "C-001"))
                         ))))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("action request recordId must match record.id"));
     }
 
@@ -335,12 +337,58 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("只有草稿合同可以提交"))
                 .andExpect(jsonPath("$.failureStage").value("availability"))
+                .andExpect(jsonPath("$.traceId").value("trace-1"))
                 .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.context.actionCode").value("submit"))
                 .andExpect(jsonPath("$.context.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.context.traceId").value("trace-1"));
+    }
+
+    @Test
+    void shouldExposeExecuteActionFailureWithStableErrorShape() throws Exception {
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
+        DynamicActionExecutionContext context = new DynamicActionExecutionContext(MODULE, ENTITY, "submit", submit,
+                "contract-1", "trace-2", "tenant-1", false,
+                DynamicActionAvailability.available("submit"));
+        when(service.action(MODULE, "submit")).thenReturn(submit);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class)))
+                .thenThrow(new DynamicActionExecutionException("submit failed", context,
+                        DynamicActionExecutionException.STAGE_EXECUTE, new IllegalStateException("boom")));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("submit failed"))
+                .andExpect(jsonPath("$.failureStage").value("execute"))
+                .andExpect(jsonPath("$.traceId").value("trace-2"))
+                .andExpect(jsonPath("$.context.actionCode").value("submit"));
+    }
+
+    @Test
+    void shouldExposeActionFailureWithoutContextAsStableErrorShape() throws Exception {
+        when(service.action(MODULE, "submit")).thenReturn(action("submit", EntityActionLevel.RECORD));
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class)))
+                .thenThrow(new DynamicActionExecutionException("submit failed", null));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("submit failed"))
+                .andExpect(jsonPath("$.failureStage").value("execute"))
+                .andExpect(jsonPath("$.traceId").doesNotExist())
+                .andExpect(jsonPath("$.context").doesNotExist());
     }
 
     @Test
@@ -507,6 +555,9 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.traceId").doesNotExist())
                 .andExpect(jsonPath("$.message").value("unknown module alias: " + MODULE));
     }
 
@@ -521,6 +572,8 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("values", Map.of("code", "C-001")))))
                 .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_CONFLICT"))
+                .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("record version conflict: contract-1"));
     }
 
