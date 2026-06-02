@@ -41,6 +41,10 @@ public class DynamicRecordService {
         return runtime.describe(moduleAlias);
     }
 
+    public String mainEntityAlias(String moduleAlias) {
+        return runtime.registry().requireModule(moduleAlias).mainEntityAlias();
+    }
+
     public ModuleOperations module(String moduleAlias) {
         return new ModuleOperations(this, moduleAlias);
     }

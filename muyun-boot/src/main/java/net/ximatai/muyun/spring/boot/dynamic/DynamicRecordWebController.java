@@ -5,12 +5,13 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
-import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
@@ -22,12 +23,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -39,115 +37,108 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/dynamic/modules/{moduleAlias}")
+@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
 public class DynamicRecordWebController {
     private static final int MAX_PAGE_SIZE = 500;
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
+    private static final Set<String> RESERVED_ACTION_PATHS = Set.of(
+            "actions", "delete", "describe", "entities", "insert", "query", "references", "update", "view"
+    );
     private final DynamicRecordService recordService;
 
     public DynamicRecordWebController(DynamicRecordService recordService) {
         this.recordService = recordService;
     }
 
-    @GetMapping
+    @PostMapping("/describe")
     public DynamicModuleDescriptor describeModule(@PathVariable String moduleAlias) {
         return recordService.describe(moduleAlias);
     }
 
-    @GetMapping("/entities/{entityAlias}")
-    public DynamicEntityDescriptor describeEntity(@PathVariable String moduleAlias,
-                                                  @PathVariable String entityAlias) {
-        return recordService.entityDescriptor(moduleAlias, entityAlias);
+    @PostMapping("/query")
+    public DynamicPageResponse queryMainEntity(@PathVariable String moduleAlias,
+                                               @RequestBody(required = false) DynamicQueryRequest request) {
+        return pageRecords(moduleAlias, mainEntityAlias(moduleAlias), request);
     }
 
-    @GetMapping("/entities/{entityAlias}/views/{viewType}")
-    public Object view(@PathVariable String moduleAlias,
-                       @PathVariable String entityAlias,
-                       @PathVariable EntityViewType viewType) {
-        return recordService.view(moduleAlias, entityAlias, viewType);
+    @PostMapping("/view/{recordId}")
+    public DynamicRecordResponse selectMainEntity(@PathVariable String moduleAlias,
+                                                  @PathVariable String recordId) {
+        return selectRecord(moduleAlias, mainEntityAlias(moduleAlias), recordId);
     }
 
-    @PostMapping("/entities/{entityAlias}/records")
+    @PostMapping("/insert")
     @ResponseStatus(HttpStatus.CREATED)
-    public RecordIdResponse create(@PathVariable String moduleAlias,
-                                   @PathVariable String entityAlias,
-                                   @RequestBody(required = false) DynamicRecordPayload payload) {
-        return new RecordIdResponse(recordService.create(moduleAlias, entityAlias,
-                record(moduleAlias, entityAlias, payload)));
+    public RecordIdResponse createMainEntity(@PathVariable String moduleAlias,
+                                             @RequestBody(required = false) DynamicRecordPayload payload) {
+        String entityAlias = mainEntityAlias(moduleAlias);
+        return createRecord(moduleAlias, entityAlias, payload);
     }
 
-    @GetMapping("/entities/{entityAlias}/records/{recordId}")
-    public DynamicRecordResponse select(@PathVariable String moduleAlias,
-                                        @PathVariable String entityAlias,
-                                        @PathVariable String recordId) {
-        return DynamicRecordResponse.from(recordService.select(moduleAlias, entityAlias, recordId));
+    @PostMapping("/update/{recordId}")
+    public CountResponse updateMainEntity(@PathVariable String moduleAlias,
+                                          @PathVariable String recordId,
+                                          @RequestBody(required = false) DynamicRecordPayload payload) {
+        return updateRecord(moduleAlias, mainEntityAlias(moduleAlias), recordId, payload);
     }
 
-    @PutMapping("/entities/{entityAlias}/records/{recordId}")
-    public CountResponse update(@PathVariable String moduleAlias,
-                                @PathVariable String entityAlias,
-                                @PathVariable String recordId,
-                                @RequestBody(required = false) DynamicRecordPayload payload) {
-        DynamicRecord record = record(moduleAlias, entityAlias, payload);
-        record.setId(recordId);
-        return new CountResponse(recordService.update(moduleAlias, entityAlias, record));
+    @PostMapping("/delete/{recordId}")
+    public CountResponse deleteMainEntity(@PathVariable String moduleAlias,
+                                          @PathVariable String recordId) {
+        return deleteRecord(moduleAlias, mainEntityAlias(moduleAlias), recordId);
     }
 
-    @DeleteMapping("/entities/{entityAlias}/records/{recordId}")
-    public CountResponse delete(@PathVariable String moduleAlias,
-                                @PathVariable String entityAlias,
-                                @PathVariable String recordId) {
-        return new CountResponse(recordService.delete(moduleAlias, entityAlias, recordId));
+    @PostMapping("/actions")
+    public List<DynamicActionDescriptor> mainEntityActions(@PathVariable String moduleAlias) {
+        return recordService.actions(moduleAlias);
     }
 
-    @PostMapping("/entities/{entityAlias}/query")
-    public List<DynamicRecordResponse> query(@PathVariable String moduleAlias,
-                                             @PathVariable String entityAlias,
-                                             @RequestBody(required = false) DynamicQueryRequest request) {
-        DynamicQueryRequest normalized = request == null ? DynamicQueryRequest.empty() : request;
-        return recordService.list(moduleAlias, entityAlias,
-                criteria(moduleAlias, entityAlias, normalized.conditions()),
-                page(normalized.page()),
-                sorts(normalized.sorts())).stream()
-                .map(DynamicRecordResponse::from)
-                .toList();
+    @PostMapping("/{actionCode}")
+    public DynamicWebActionExecutionResponse executeListAction(@PathVariable String moduleAlias,
+                                                               @PathVariable String actionCode,
+                                                               @RequestBody(required = false) DynamicWebActionRequest request) {
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
+                "dynamic action does not support list path: ");
+        return executeAction(moduleAlias, actionCode, null, request);
     }
 
-    @PostMapping("/entities/{entityAlias}/page")
-    public DynamicPageResponse page(@PathVariable String moduleAlias,
-                                    @PathVariable String entityAlias,
-                                    @RequestBody(required = false) DynamicQueryRequest request) {
-        DynamicQueryRequest normalized = request == null ? DynamicQueryRequest.empty() : request;
-        return DynamicPageResponse.from(recordService.page(moduleAlias, entityAlias,
-                criteria(moduleAlias, entityAlias, normalized.conditions()),
-                page(normalized.page()),
-                sorts(normalized.sorts())));
+    @PostMapping("/{actionCode}/batch")
+    public DynamicWebActionExecutionResponse executeBatchAction(@PathVariable String moduleAlias,
+                                                                @PathVariable String actionCode,
+                                                                @RequestBody(required = false) DynamicWebActionRequest request) {
+        DynamicWebActionRequest normalized = request == null ? DynamicWebActionRequest.empty() : request;
+        if (normalized.ids().isEmpty()) {
+            throw new IllegalArgumentException("batch action requires ids");
+        }
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
+                "dynamic action does not support batch path: ");
+        return executeAction(moduleAlias, actionCode, null, normalized);
     }
 
-    @PostMapping("/actions/{actionCode}")
-    public DynamicWebActionExecutionResponse executeModuleAction(@PathVariable String moduleAlias,
+    @PostMapping("/{actionCode}/{recordId}")
+    public DynamicWebActionExecutionResponse executeRecordAction(@PathVariable String moduleAlias,
                                                                  @PathVariable String actionCode,
+                                                                 @PathVariable String recordId,
                                                                  @RequestBody(required = false) DynamicWebActionRequest request) {
-        rejectInternalResultAction(actionCode);
-        return DynamicWebActionExecutionResponse.from(recordService.executeAction(
-                moduleAlias, actionCode, actionRequest(moduleAlias, null, request)));
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.RECORD, EntityActionLevel.ANY),
+                "dynamic action does not support record path: ");
+        return executeAction(moduleAlias, actionCode, recordId, request);
     }
 
-    @PostMapping("/entities/{entityAlias}/actions/{actionCode}")
-    public DynamicWebActionExecutionResponse executeEntityAction(@PathVariable String moduleAlias,
-                                                                 @PathVariable String entityAlias,
-                                                                 @PathVariable String actionCode,
-                                                                 @RequestBody(required = false) DynamicWebActionRequest request) {
-        rejectInternalResultAction(actionCode);
+    private DynamicWebActionExecutionResponse executeAction(String moduleAlias,
+                                                            String actionCode,
+                                                            String pathRecordId,
+                                                            DynamicWebActionRequest request) {
+        String entityAlias = mainEntityAlias(moduleAlias);
         return DynamicWebActionExecutionResponse.from(recordService.executeAction(
-                moduleAlias, entityAlias, actionCode, actionRequest(moduleAlias, entityAlias, request)));
+                moduleAlias, actionCode, actionRequest(moduleAlias, entityAlias, pathRecordId, request)));
     }
 
-    @PostMapping("/entities/{entityAlias}/references/{fieldName}/resolve")
+    @PostMapping("/references/{fieldName}/resolve")
     public DynamicReferenceResolveResponse resolveReference(@PathVariable String moduleAlias,
-                                                            @PathVariable String entityAlias,
                                                             @PathVariable String fieldName,
                                                             @RequestBody(required = false) DynamicWebReferenceRequest request) {
+        String entityAlias = mainEntityAlias(moduleAlias);
         DynamicWebReferenceRequest normalized = request == null ? DynamicWebReferenceRequest.empty() : request;
         return recordService.resolveFieldReference(moduleAlias, entityAlias, fieldName, new DynamicReferenceResolveRequest(
                 normalized.mode(),
@@ -191,6 +182,40 @@ public class DynamicRecordWebController {
         return record;
     }
 
+    private String mainEntityAlias(String moduleAlias) {
+        return recordService.mainEntityAlias(moduleAlias);
+    }
+
+    private RecordIdResponse createRecord(String moduleAlias, String entityAlias, DynamicRecordPayload payload) {
+        return new RecordIdResponse(recordService.create(moduleAlias, entityAlias,
+                record(moduleAlias, entityAlias, payload)));
+    }
+
+    private DynamicRecordResponse selectRecord(String moduleAlias, String entityAlias, String recordId) {
+        return DynamicRecordResponse.from(recordService.select(moduleAlias, entityAlias, recordId));
+    }
+
+    private CountResponse updateRecord(String moduleAlias,
+                                       String entityAlias,
+                                       String recordId,
+                                       DynamicRecordPayload payload) {
+        DynamicRecord record = record(moduleAlias, entityAlias, payload);
+        record.setId(recordId);
+        return new CountResponse(recordService.update(moduleAlias, entityAlias, record));
+    }
+
+    private CountResponse deleteRecord(String moduleAlias, String entityAlias, String recordId) {
+        return new CountResponse(recordService.delete(moduleAlias, entityAlias, recordId));
+    }
+
+    private DynamicPageResponse pageRecords(String moduleAlias, String entityAlias, DynamicQueryRequest request) {
+        DynamicQueryRequest normalized = request == null ? DynamicQueryRequest.empty() : request;
+        return DynamicPageResponse.from(recordService.page(moduleAlias, entityAlias,
+                criteria(moduleAlias, entityAlias, normalized.conditions()),
+                page(normalized.page()),
+                sorts(normalized.sorts())));
+    }
+
     private Criteria criteria(String moduleAlias, String entityAlias, Collection<DynamicWebQueryCondition> conditions) {
         if (conditions == null || conditions.isEmpty()) {
             return Criteria.of();
@@ -223,10 +248,12 @@ public class DynamicRecordWebController {
 
     private DynamicActionExecutionRequest actionRequest(String moduleAlias,
                                                         String entityAlias,
+                                                        String pathRecordId,
                                                         DynamicWebActionRequest request) {
         DynamicWebActionRequest normalized = request == null ? DynamicWebActionRequest.empty() : request;
+        String recordId = resolveActionRecordId(pathRecordId, normalized.recordId());
         DynamicActionExecutionRequest actionRequest = DynamicActionExecutionRequest.empty()
-                .withRecordId(normalized.recordId())
+                .withRecordId(recordId)
                 .withIds(normalized.ids())
                 .withOrderedIds(normalized.orderedIds())
                 .withBeforeId(normalized.beforeId())
@@ -236,7 +263,7 @@ public class DynamicRecordWebController {
                 .withQueryConditions(queryConditions(normalized.conditions()))
                 .withPayload(normalized.payload());
         if (normalized.record() != null && entityAlias != null) {
-            actionRequest = actionRequest.withRecord(record(moduleAlias, entityAlias, normalized.record()));
+            actionRequest = actionRequest.withRecord(actionRecord(moduleAlias, entityAlias, recordId, normalized.record()));
         }
         if (!normalized.conditions().isEmpty() && entityAlias != null) {
             actionRequest = actionRequest.withCriteria(criteria(moduleAlias, entityAlias, normalized.conditions()));
@@ -248,6 +275,49 @@ public class DynamicRecordWebController {
             actionRequest = actionRequest.withSorts(List.of(sorts(normalized.sorts())));
         }
         return actionRequest;
+    }
+
+    private void requireActionLevel(String moduleAlias,
+                                    String actionCode,
+                                    Set<EntityActionLevel> allowed,
+                                    String messagePrefix) {
+        rejectInternalResultAction(actionCode);
+        rejectReservedActionPath(actionCode);
+        EntityActionLevel level = recordService.action(moduleAlias, actionCode).actionLevel();
+        if (!allowed.contains(level)) {
+            throw new IllegalArgumentException(messagePrefix + actionCode);
+        }
+    }
+
+    private void rejectReservedActionPath(String actionCode) {
+        if (RESERVED_ACTION_PATHS.contains(actionCode)) {
+            throw new IllegalArgumentException("dynamic action path is reserved: " + actionCode);
+        }
+    }
+
+    private String resolveActionRecordId(String pathRecordId, String bodyRecordId) {
+        if (pathRecordId == null || pathRecordId.isBlank()) {
+            return bodyRecordId;
+        }
+        if (bodyRecordId != null && !bodyRecordId.isBlank() && !pathRecordId.equals(bodyRecordId)) {
+            throw new IllegalArgumentException("action path recordId must match request recordId");
+        }
+        return pathRecordId;
+    }
+
+    private DynamicRecord actionRecord(String moduleAlias,
+                                       String entityAlias,
+                                       String recordId,
+                                       DynamicRecordPayload payload) {
+        DynamicRecord record = record(moduleAlias, entityAlias, payload);
+        if (recordId == null || recordId.isBlank()) {
+            return record;
+        }
+        if (record.getId() != null && !record.getId().isBlank() && !recordId.equals(record.getId())) {
+            throw new IllegalArgumentException("action request recordId must match record.id");
+        }
+        record.setId(recordId);
+        return record;
     }
 
     private List<DynamicQueryCondition> queryConditions(Collection<DynamicWebQueryCondition> conditions) {
@@ -363,6 +433,7 @@ public class DynamicRecordWebController {
         public DynamicWebReferenceRequest {
             values = values == null ? List.of() : List.copyOf(values);
             conditions = conditions == null ? List.of() : List.copyOf(conditions);
+            includeProjections = includeProjections == null || includeProjections;
         }
 
         static DynamicWebReferenceRequest empty() {
@@ -414,11 +485,28 @@ public class DynamicRecordWebController {
         }
     }
 
-    public record DynamicWebActionExecutionResponse(Object context, DynamicWebActionResultBody body) {
+    public record DynamicWebActionExecutionResponse(DynamicWebActionContext context, DynamicWebActionResultBody body) {
         static DynamicWebActionExecutionResponse from(DynamicActionExecutionResult result) {
             return new DynamicWebActionExecutionResponse(
-                    result.context(),
+                    DynamicWebActionContext.from(result.context()),
                     DynamicWebActionResultBody.from(result.body())
+            );
+        }
+    }
+
+    public record DynamicWebActionContext(String moduleAlias,
+                                          String actionCode,
+                                          String recordId,
+                                          String traceId) {
+        static DynamicWebActionContext from(DynamicActionExecutionContext context) {
+            if (context == null) {
+                return null;
+            }
+            return new DynamicWebActionContext(
+                    context.moduleAlias(),
+                    context.actionCode(),
+                    context.recordId(),
+                    context.traceId()
             );
         }
     }
