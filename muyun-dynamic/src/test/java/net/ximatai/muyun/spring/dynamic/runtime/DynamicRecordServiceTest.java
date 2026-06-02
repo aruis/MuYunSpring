@@ -7,11 +7,13 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
@@ -629,6 +631,47 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldRejectSaveWhenDynamicFormulaValidationFailsThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        DynamicRecordService service = service(operations, formulaValidationEntity());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("amount", BigDecimal.valueOf(-1));
+        record.setId("contract-1");
+
+        assertThatThrownBy(() -> service.create(MODULE, "contract", record))
+                .isInstanceOf(DynamicFormulaException.class)
+                .hasMessageContaining("amount must be positive")
+                .satisfies(error -> {
+                    DynamicFormulaException exception = (DynamicFormulaException) error;
+                    assertThat(exception.firstError().ruleId()).isEqualTo("amountPositive");
+                    assertThat(exception.firstError().fieldPath()).isEqualTo("amount");
+                });
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void shouldKeepFormulaWarningsOnRecordThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordService service = service(operations, formulaWarningEntity());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("amount", BigDecimal.valueOf(1500));
+        record.setId("contract-1");
+
+        assertThat(service.create(MODULE, "contract", record)).isEqualTo("contract-1");
+
+        assertThat(record.formulaReport().warnings())
+                .hasSize(1)
+                .first()
+                .satisfies(issue -> {
+                    assertThat(issue.ruleId()).isEqualTo("amountHighRisk");
+                    assertThat(issue.message()).isEqualTo("amount is high");
+                });
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+    }
+
+    @Test
     void shouldApplyFieldDefaultAndRejectWriteProtectedInput() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
@@ -812,6 +855,27 @@ class DynamicRecordServiceTest {
                         FieldDefinition.enabled().writeProtected()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.ENABLE);
+    }
+
+    private EntityDefinition formulaValidationEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(18, 2))
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("amountPositive", "amount", "{amount} > 0", "amount must be positive"));
+    }
+
+    private EntityDefinition formulaWarningEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.decimal("amount", "Amount").precision(18, 2))
+        ).withFormulaRules(EntityFormulaRuleDefinition
+                .validation("amountHighRisk", "amount", "{amount} < 1000", "amount is high")
+                .severity(FormulaIssueLevel.WARNING));
     }
 
     private EntityDefinition sortableEntity() {

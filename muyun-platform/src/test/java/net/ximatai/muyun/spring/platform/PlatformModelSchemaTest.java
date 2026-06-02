@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import org.junit.jupiter.api.Test;
@@ -93,6 +94,9 @@ class PlatformModelSchemaTest {
                         "available_expression", "unavailable_message", "executor_type", "executor_key",
                         "target_metadata_id", "config_id", "system_managed", "title", "enabled", "sort_order")
                 .doesNotContain("permission_code", "action_code");
+        assertThat(columnNames(mapper.toTable(ModuleMetadataFormulaRule.class)))
+                .contains("id", "relation_id", "alias", "rule_kind", "rule_phase", "target_field",
+                        "expression", "severity", "message_template", "stop_on_error", "enabled", "sort_order");
     }
 
     @Test

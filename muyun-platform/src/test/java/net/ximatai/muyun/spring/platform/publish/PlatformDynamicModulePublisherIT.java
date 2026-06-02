@@ -8,7 +8,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
+import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
@@ -42,6 +44,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
@@ -118,6 +122,8 @@ class PlatformDynamicModulePublisherIT {
         serverCodeConfig.setWriteProtected(true);
         services.fieldConfigService.insert(serverCodeConfig);
         services.fieldService.insert(titleField(contactMetadataId));
+        services.fieldService.insert(field(contactMetadataId, "quantity", "quantity", FieldType.INTEGER));
+        services.fieldService.insert(field(contactMetadataId, "lineAmount", "line_amount", FieldType.INTEGER));
         MetadataField customerIdField = field(contactMetadataId, "customerId", "customer_id", FieldType.STRING);
         services.fieldService.insert(customerIdField);
         MetadataFieldReferenceConfig customerReference = referenceConfig(customerIdField.getId(), customerMetadataId);
@@ -127,6 +133,13 @@ class PlatformDynamicModulePublisherIT {
         services.referenceConfigService.insert(customerReference);
         String mainRelationId = services.relationService.insert(mainRelation("crm.customer", customerMetadataId));
         services.relationService.insert(childRelation("crm.customer", contactMetadataId, customerMetadataId));
+        ModuleMetadataFormulaRule titleRequiredRule = formulaRule(mainRelationId, "titleRequired", "{title} != ''");
+        titleRequiredRule.setMessageTemplate("客户名称不能为空");
+        services.formulaRuleService.insert(titleRequiredRule);
+        ModuleMetadataFormulaRule lineAmountRule = formulaRule(mainRelationId, "lineAmountCalc",
+                "SUM({contacts.lineAmount} = {contacts.quantity} * 2)");
+        lineAmountRule.setRuleKind(FormulaRuleKind.CALCULATION);
+        services.formulaRuleService.insert(lineAmountRule);
         String formViewId = services.viewService.insert(metadataView(mainRelationId, EntityViewType.FORM, "客户表单"));
         MetadataViewField statusViewField = metadataViewField(formViewId, status.getId());
         statusViewField.setControlType(ViewControlType.SELECT);
@@ -155,7 +168,8 @@ class PlatformDynamicModulePublisherIT {
                         services.relationService,
                         services.viewService,
                         services.viewFieldService,
-                        services.actionService
+                        services.actionService,
+                        services.formulaRuleService
                 ),
                 new DynamicModulePublisher(schemaService, runtime)
         );
@@ -164,7 +178,8 @@ class PlatformDynamicModulePublisherIT {
         DynamicRecordService runtimeService = new DynamicRecordService(runtime);
         DynamicRecordService.EntityOperations customer = runtimeService.entity("crm.customer", "customer");
         DynamicRecord contact = runtime.newRecord("crm.customer", "customer_contact")
-                .setValue("title", "张三");
+                .setValue("title", "张三")
+                .setValue("quantity", 3);
         DynamicRecord record = customer.newRecord()
                 .setValue("title", "客户A")
                 .setValue("code", "C-001")
@@ -233,6 +248,7 @@ class PlatformDynamicModulePublisherIT {
                 .isEqualTo("张三");
         assertThat(selected.getChildren("contacts").getFirst().getValue("customerTitle")).isEqualTo("客户A");
         assertThat(selected.getChildren("contacts").getFirst().getValue("customerCode")).isEqualTo("C-001");
+        assertThat(selected.getChildren("contacts").getFirst().getValue("lineAmount")).isEqualTo(6);
         assertThat(customer.list(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)))
                 .extracting(item -> item.getValue("title"))
                 .containsExactly("客户A");
@@ -251,6 +267,13 @@ class PlatformDynamicModulePublisherIT {
         assertThatThrownBy(() -> customer.create(protectedWrite))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("write protected");
+        DynamicRecord invalidByFormula = customer.newRecord()
+                .setValue("title", "")
+                .setValue("code", "C-004")
+                .setValue("status", "active");
+        assertThatThrownBy(() -> customer.create(invalidByFormula))
+                .isInstanceOf(DynamicFormulaException.class)
+                .hasMessageContaining("客户名称不能为空");
     }
 
     private PlatformServices platformServices() {
@@ -265,6 +288,7 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataAction> actionDao = new TestMemoryDao<>();
+        TestMemoryDao<ModuleMetadataFormulaRule> formulaRuleDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
         TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
@@ -277,6 +301,7 @@ class PlatformDynamicModulePublisherIT {
         PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("id", FieldType.STRING, 32));
+        fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
         MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
         ModuleMetadataRelationService relationService =
                 new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
@@ -292,11 +317,13 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewFieldService viewFieldService =
                 new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
         ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService, fieldService);
+        ModuleMetadataFormulaRuleService formulaRuleService =
+                new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
         MenuService menuService = new MenuService(menuDao, schemeService, moduleService);
         return new PlatformServices(applicationService, moduleService, metadataService, fieldService, fieldConfigService,
                 referenceConfigService, fieldDefinitionCompiler, relationService, schemeService, menuService,
-                categoryService, itemService, viewService, viewFieldService, actionService);
+                categoryService, itemService, viewService, viewFieldService, actionService, formulaRuleService);
     }
 
     private Application application(String alias) {
@@ -376,6 +403,14 @@ class PlatformDynamicModulePublisherIT {
         action.setAlias(alias);
         action.setActionKind(kind);
         return action;
+    }
+
+    private ModuleMetadataFormulaRule formulaRule(String relationId, String alias, String expression) {
+        ModuleMetadataFormulaRule rule = new ModuleMetadataFormulaRule();
+        rule.setRelationId(relationId);
+        rule.setAlias(alias);
+        rule.setExpression(expression);
+        return rule;
     }
 
     private MetadataFieldReferenceConfig referenceConfig(String fieldId, String targetMetadataId) {
@@ -458,7 +493,8 @@ class PlatformDynamicModulePublisherIT {
                                     DictionaryItemService itemService,
                                     MetadataViewService viewService,
                                     MetadataViewFieldService viewFieldService,
-                                    ModuleMetadataActionService actionService) {
+                                    ModuleMetadataActionService actionService,
+                                    ModuleMetadataFormulaRuleService formulaRuleService) {
     }
 
     @SpringBootConfiguration

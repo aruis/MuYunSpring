@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMetadataAction> implements
@@ -34,15 +33,15 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final ModuleMetadataRelationService relationService;
-    private final MetadataFieldService fieldService;
     private final FormulaEngine formulaEngine = new FormulaEngine();
+    private final MetadataFormulaFieldValidator fieldValidator;
 
     public ModuleMetadataActionService(BaseDao<ModuleMetadataAction, String> actionDao,
                                        ModuleMetadataRelationService relationService,
                                        MetadataFieldService fieldService) {
         super(MODULE_ALIAS, ModuleMetadataAction.class, actionDao);
         this.relationService = relationService;
-        this.fieldService = fieldService;
+        this.fieldValidator = new MetadataFormulaFieldValidator(relationService, fieldService);
     }
 
     @Override
@@ -150,44 +149,11 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
             if (formulaEngine.containsAssignment(action.getAvailableExpression())) {
                 throw new PlatformException("Metadata action availableExpression must not assign fields: " + action.getAlias());
             }
-            validateExpressionFields(action, relation);
+            fieldValidator.validateExpressionFields(formulaEngine.referencedFields(action.getAvailableExpression()),
+                    relation, "Metadata action availableExpression");
         } catch (FormulaEvaluationException exception) {
             throw new PlatformException("Metadata action availableExpression is invalid: "
                     + action.getAlias() + ", " + exception.getMessage(), exception);
-        }
-    }
-
-    private void validateExpressionFields(ModuleMetadataAction action, ModuleMetadataRelation relation) {
-        Set<String> fieldPaths = formulaEngine.referencedFields(action.getAvailableExpression());
-        for (String fieldPath : fieldPaths) {
-            if (!fieldPath.contains(".")) {
-                requireMetadataField(relation.getMetadataId(), fieldPath, "Metadata action availableExpression field");
-                continue;
-            }
-            String[] parts = fieldPath.split("\\.");
-            if (parts.length != 2) {
-                throw new PlatformException("Metadata action availableExpression field is invalid: "
-                        + action.getAlias() + "." + fieldPath);
-            }
-            ModuleMetadataRelation childRelation = relationService.list(Criteria.of()
-                    .eq("moduleAlias", relation.getModuleAlias())
-                    .eq("parentMetadataId", relation.getMetadataId())
-                    .eq("relationAlias", parts[0]), new PageRequest(0, 1)).stream()
-                    .findFirst()
-                    .orElse(null);
-            if (childRelation == null) {
-                throw new PlatformException("Metadata action availableExpression relation does not exist: "
-                        + action.getAlias() + "." + parts[0]);
-            }
-            requireMetadataField(childRelation.getMetadataId(), parts[1], "Metadata action availableExpression field");
-        }
-    }
-
-    private void requireMetadataField(String metadataId, String fieldName, String name) {
-        if (fieldService.count(Criteria.of()
-                .eq("metadataId", metadataId)
-                .eq("fieldName", fieldName)) <= 0) {
-            throw new PlatformException(name + " does not exist: " + fieldName);
         }
     }
 

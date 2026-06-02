@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -139,6 +140,11 @@ public class TestMemoryDao<T extends EntityContract> implements BaseDao<T, Strin
         if (clause.getOperator() == CriteriaOperator.EQ) {
             Object expected = clause.getValues().getFirst();
             return expected == null ? actual == null : expected.equals(actual);
+        }
+        if (clause.getOperator() == CriteriaOperator.IN) {
+            return clause.getValues().stream()
+                    .flatMap(value -> value instanceof Collection<?> collection ? collection.stream() : java.util.stream.Stream.of(value))
+                    .anyMatch(expected -> expected == null ? actual == null : expected.equals(actual));
         }
         return true;
     }

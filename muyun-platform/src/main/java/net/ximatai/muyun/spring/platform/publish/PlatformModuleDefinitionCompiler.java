@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
@@ -29,6 +30,7 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -56,6 +58,7 @@ public class PlatformModuleDefinitionCompiler {
     private final MetadataViewService viewService;
     private final MetadataViewFieldService viewFieldService;
     private final ModuleMetadataActionService actionService;
+    private final ModuleMetadataFormulaRuleService formulaRuleService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -66,9 +69,10 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataRelationService relationService,
                                             MetadataViewService viewService,
                                             MetadataViewFieldService viewFieldService,
-                                            ModuleMetadataActionService actionService) {
+                                            ModuleMetadataActionService actionService,
+                                            ModuleMetadataFormulaRuleService formulaRuleService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService, actionService,
+                viewService, viewFieldService, actionService, formulaRuleService,
                 new ModuleDefinitionValidator());
     }
 
@@ -81,6 +85,7 @@ public class PlatformModuleDefinitionCompiler {
                                             MetadataViewService viewService,
                                             MetadataViewFieldService viewFieldService,
                                             ModuleMetadataActionService actionService,
+                                            ModuleMetadataFormulaRuleService formulaRuleService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
@@ -91,6 +96,7 @@ public class PlatformModuleDefinitionCompiler {
         this.viewService = viewService;
         this.viewFieldService = viewFieldService;
         this.actionService = actionService;
+        this.formulaRuleService = formulaRuleService;
         this.validator = validator;
     }
 
@@ -172,7 +178,14 @@ public class PlatformModuleDefinitionCompiler {
                 metadata.getTableName(),
                 metadata.getTitle(),
                 fields,
-                capabilities);
+                capabilities,
+                formulaRules(relation));
+    }
+
+    private List<EntityFormulaRuleDefinition> formulaRules(ModuleMetadataRelation relation) {
+        return formulaRuleService.listByRelationIds(List.of(relation.getId())).stream()
+                .map(formulaRuleService::compile)
+                .toList();
     }
 
     private List<FieldDefinition> fields(String metadataId, String relationId) {

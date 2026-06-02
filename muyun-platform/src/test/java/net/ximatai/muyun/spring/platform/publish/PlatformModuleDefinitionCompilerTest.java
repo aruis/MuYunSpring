@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.platform.publish;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
+import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -39,6 +41,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
@@ -65,6 +69,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataAction> actionDao = new TestMemoryDao<>();
+    private final TestMemoryDao<ModuleMetadataFormulaRule> formulaRuleDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -86,9 +91,12 @@ class PlatformModuleDefinitionCompilerTest {
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
     private final ModuleMetadataActionService actionService =
             new ModuleMetadataActionService(actionDao, relationService, fieldService);
+    private final ModuleMetadataFormulaRuleService formulaRuleService =
+            new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
-                    referenceConfigService, relationService, viewService, viewFieldService, actionService);
+                    referenceConfigService, relationService, viewService, viewFieldService, actionService,
+                    formulaRuleService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -418,6 +426,60 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
+    void shouldCompileRelationScopedFormulaRulesIntoModuleDefinition() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "invoice"));
+        fieldService.insert(field(metadataId, "amount", "amount", FieldType.INTEGER));
+        String relationId = relationService.insert(mainRelation("sales.invoice", metadataId));
+        ModuleMetadataFormulaRule validation = formulaRule(relationId, "amountPositive", "{amount} > 0");
+        validation.setMessageTemplate("金额必须大于 0");
+        formulaRuleService.insert(validation);
+
+        ModuleDefinition definition = compiler.compile("sales.invoice");
+
+        assertThat(definition.entities().getFirst().formulaRules())
+                .hasSize(1)
+                .first()
+                .satisfies(rule -> {
+                    assertThat(rule.code()).isEqualTo("amountPositive");
+                    assertThat(rule.kind()).isEqualTo(FormulaRuleKind.VALIDATION);
+                    assertThat(rule.severity()).isEqualTo(FormulaIssueLevel.ERROR);
+                    assertThat(rule.messageTemplate()).isEqualTo("金额必须大于 0");
+                    assertThat(rule.stopOnError()).isTrue();
+                });
+    }
+
+    @Test
+    void shouldRejectFormulaRuleWithUnknownField() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "invoice"));
+        fieldService.insert(field(metadataId, "amount", "amount", FieldType.INTEGER));
+        String relationId = relationService.insert(mainRelation("sales.invoice", metadataId));
+
+        assertThatThrownBy(() -> formulaRuleService.insert(formulaRule(relationId, "amountPositive", "{amout} > 0")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Metadata formula field does not exist: amout");
+    }
+
+    @Test
+    void shouldRejectChildTargetFieldForCalculationFormulaRule() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String invoiceId = metadataService.insert(metadata("sales", "invoice"));
+        String lineId = metadataService.insert(metadata("sales", "invoice_line"));
+        fieldService.insert(field(invoiceId, "amount", "amount", FieldType.INTEGER));
+        fieldService.insert(field(lineId, "lineAmount", "line_amount", FieldType.INTEGER));
+        String relationId = relationService.insert(mainRelation("sales.invoice", invoiceId));
+        relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
+        ModuleMetadataFormulaRule rule = formulaRule(relationId, "lineAmountCalc", "{amount}");
+        rule.setRuleKind(FormulaRuleKind.CALCULATION);
+        rule.setTargetField("lines.lineAmount");
+
+        assertThatThrownBy(() -> formulaRuleService.insert(rule))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("targetField cannot be child field");
+    }
+
+    @Test
     void shouldRejectActionConfigThatDoesNotMatchEntityCapability() {
         moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("crm", "customer"));
@@ -544,6 +606,14 @@ class PlatformModuleDefinitionCompilerTest {
         action.setAlias(alias);
         action.setActionKind(kind);
         return action;
+    }
+
+    private ModuleMetadataFormulaRule formulaRule(String relationId, String alias, String expression) {
+        ModuleMetadataFormulaRule rule = new ModuleMetadataFormulaRule();
+        rule.setRelationId(relationId);
+        rule.setAlias(alias);
+        rule.setExpression(expression);
+        return rule;
     }
 
     private FieldDefinition field(ModuleDefinition definition, String fieldName) {
