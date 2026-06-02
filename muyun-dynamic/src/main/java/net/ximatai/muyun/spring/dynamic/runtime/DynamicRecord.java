@@ -7,12 +7,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
-import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,8 +58,7 @@ public class DynamicRecord implements EntityContract {
         if (field == null) {
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
         }
-        validateValue(field, value);
-        values.put(fieldCode, value);
+        values.put(fieldCode, normalizeValue(field, value, true));
         explicitFields.add(fieldCode);
         return this;
     }
@@ -218,8 +215,9 @@ public class DynamicRecord implements EntityContract {
     }
 
     void putLoadedValue(String fieldCode, Object value) {
-        if (fields.containsKey(fieldCode)) {
-            values.put(fieldCode, value);
+        FieldDefinition field = fields.get(fieldCode);
+        if (field != null) {
+            values.put(fieldCode, normalizeValue(field, value, false));
         } else {
             loadedValues.put(fieldCode, value);
         }
@@ -234,8 +232,7 @@ public class DynamicRecord implements EntityContract {
         if (field == null) {
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
         }
-        validateValue(field, value);
-        values.put(fieldCode, value);
+        values.put(fieldCode, normalizeValue(field, value, true));
     }
 
     void validateForInsert() {
@@ -258,38 +255,30 @@ public class DynamicRecord implements EntityContract {
         for (FieldDefinition field : fields.values()) {
             if (!values.containsKey(field.code()) && field.behavior().defaultValue() != null) {
                 Object defaultValue = FieldBehaviorSupport.parseDefaultValue(field.type(), field.behavior().defaultValue());
-                validateValue(field, defaultValue);
-                values.put(field.code(), defaultValue);
+                values.put(field.code(), normalizeValue(field, defaultValue, true));
             }
         }
     }
 
-    private void validateValue(FieldDefinition field, Object value) {
+    private Object normalizeValue(FieldDefinition field, Object value, boolean enforceRequired) {
         if (value == null) {
-            if (field.isRequired()) {
+            if (enforceRequired && field.isRequired()) {
                 throw new IllegalArgumentException("required dynamic field must not be null: " + field.code());
             }
-            return;
+            return null;
         }
-        FieldType type = field.type();
-        boolean matched = switch (type) {
-            case STRING, TEXT -> value instanceof String;
-            case INTEGER -> value instanceof Integer;
-            case LONG -> value instanceof Long;
-            case BOOLEAN -> value instanceof Boolean;
-            case TIMESTAMP -> value instanceof Instant || value instanceof java.sql.Timestamp;
-            case DATE -> value instanceof LocalDate || value instanceof java.sql.Date;
-            case DECIMAL -> value instanceof BigDecimal || value instanceof Number;
-            case JSON -> true;
-        };
-        if (!matched) {
+        Object normalized;
+        try {
+            normalized = DynamicFieldValueSupport.normalize(field.type(), value);
+        } catch (RuntimeException e) {
             throw new IllegalArgumentException("invalid value type for dynamic field: " + field.code());
         }
         if (field.behavior().validationRegex() != null
-                && value instanceof String text
+                && normalized instanceof String text
                 && !text.matches(field.behavior().validationRegex())) {
             throw new IllegalArgumentException("dynamic field value does not match validationRegex: " + field.code());
         }
+        return normalized;
     }
 
     private boolean hasField(String fieldCode) {

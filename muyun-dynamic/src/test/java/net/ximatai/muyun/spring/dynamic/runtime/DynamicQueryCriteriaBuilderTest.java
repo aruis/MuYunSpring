@@ -5,9 +5,12 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Collections;
 import java.util.Set;
@@ -58,6 +61,33 @@ class DynamicQueryCriteriaBuilderTest {
                 .hasMessageContaining("null query value");
     }
 
+    @Test
+    void shouldNormalizeDateAndTimestampQueryValues() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(timeEntity());
+
+        Criteria criteria = builder.build(List.of(
+                DynamicQueryCondition.of("businessDate", DynamicQueryOperator.BETWEEN, "2026-01-01", "2026-01-31"),
+                DynamicQueryCondition.of("submittedAt", DynamicQueryOperator.GTE, "2026-01-01T00:00:00Z")
+        ));
+
+        assertThat(criteria.getClauses().get(0).getValues())
+                .containsExactly(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"));
+        assertThat(criteria.getClauses().get(1).getValues())
+                .containsExactly(Instant.parse("2026-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void shouldRejectInvalidDateAndTimestampQueryValues() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(timeEntity());
+
+        assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.of("businessDate", "2026-13-01"))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid query value type");
+        assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.of("submittedAt", "2026-01-01"))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid query value type");
+    }
+
     private EntityDefinition entity() {
         return new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                 FieldDefinition.titleField().queryable(),
@@ -65,6 +95,14 @@ class DynamicQueryCriteriaBuilderTest {
                 FieldDefinition.string("status", "Status")
                         .queryable(DynamicQueryOperator.EQ, Set.of(DynamicQueryOperator.EQ, DynamicQueryOperator.IN)),
                 FieldDefinition.text("remark", "Remark")
+        ));
+    }
+
+    private EntityDefinition timeEntity() {
+        return new EntityDefinition("contract", "app_contract", "Contract", List.of(
+                FieldDefinition.of("businessDate", FieldType.DATE, "Business Date")
+                        .queryable(),
+                FieldDefinition.timestamp("submittedAt", "Submitted At").queryable()
         ));
     }
 }

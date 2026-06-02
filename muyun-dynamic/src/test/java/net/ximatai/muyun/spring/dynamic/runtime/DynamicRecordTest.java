@@ -7,6 +7,9 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +73,46 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldNormalizeDynamicDateAndTimestampValues() {
+        DynamicRecord record = new DynamicRecord(timeEntity())
+                .setValue("businessDate", "2026-01-02")
+                .setValue("submittedAt", LocalDateTime.parse("2026-01-02T09:30:00"));
+
+        assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
+        assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T09:30:00Z"));
+
+        DynamicRecord jdbcRecord = new DynamicRecord(timeEntity())
+                .setValue("businessDate", java.sql.Date.valueOf("2026-01-03"))
+                .setValue("submittedAt", java.sql.Timestamp.from(Instant.parse("2026-01-03T01:00:00Z")));
+        assertThat(jdbcRecord.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-03"));
+        assertThat(jdbcRecord.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-03T01:00:00Z"));
+    }
+
+    @Test
+    void shouldApplyDateAndTimestampDefaultValuesAsStableTypes() {
+        DynamicRecord record = new DynamicRecord(timeDefaultEntity());
+
+        record.applyDefaultsForInsert();
+
+        assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
+        assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T09:30:00Z"));
+    }
+
+    @Test
+    void shouldNormalizeLoadedDateAndTimestampValuesWithoutRequiredWriteValidation() {
+        DynamicRecord record = new DynamicRecord(requiredTimeEntity());
+
+        record.putLoadedValue("businessDate", java.sql.Date.valueOf("2026-01-02"));
+        record.putLoadedValue("submittedAt", OffsetDateTime.parse("2026-01-02T09:30:00+08:00"));
+
+        assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
+        assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T01:30:00Z"));
+
+        record.putLoadedValue("businessDate", null);
+        assertThat(record.getValue("businessDate")).isNull();
+    }
+
+    @Test
     void shouldDeepCopyMutableDynamicValues() {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("items", new java.util.ArrayList<>(List.of("A")));
@@ -123,6 +166,44 @@ class DynamicRecordTest {
                 List.of(
                         FieldDefinition.string("code", "Code").validationRegex("[A-Z]+-[0-9]+"),
                         FieldDefinition.string("status", "Status").defaultValue("draft")
+                )
+        );
+    }
+
+    private EntityDefinition timeEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.of("businessDate", FieldType.DATE, "Business Date").column("business_date"),
+                        FieldDefinition.timestamp("submittedAt", "Submitted At").column("submitted_at")
+                )
+        );
+    }
+
+    private EntityDefinition timeDefaultEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.of("businessDate", FieldType.DATE, "Business Date").column("business_date")
+                                .defaultValue("2026-01-02"),
+                        FieldDefinition.timestamp("submittedAt", "Submitted At").column("submitted_at")
+                                .defaultValue("2026-01-02T09:30:00Z")
+                )
+        );
+    }
+
+    private EntityDefinition requiredTimeEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.of("businessDate", FieldType.DATE, "Business Date").column("business_date").required(),
+                        FieldDefinition.timestamp("submittedAt", "Submitted At").column("submitted_at").required()
                 )
         );
     }

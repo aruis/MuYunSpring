@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
 import java.util.Collection;
@@ -46,14 +47,14 @@ public final class DynamicQueryCriteriaBuilder {
         }
         List<?> values = condition.values();
         switch (operator) {
-            case EQ -> criteria.eq(field.fieldName(), singleValue(condition, values));
-            case LIKE -> criteria.like(field.fieldName(), String.valueOf(singleValue(condition, values)));
-            case IN -> criteria.in(field.fieldName(), listValues(condition, values));
-            case BETWEEN -> criteria.between(field.fieldName(), rangeValue(condition, values, 0), rangeValue(condition, values, 1));
-            case GT -> criteria.gt(field.fieldName(), singleValue(condition, values));
-            case GTE -> criteria.gte(field.fieldName(), singleValue(condition, values));
-            case LT -> criteria.lt(field.fieldName(), singleValue(condition, values));
-            case LTE -> criteria.lte(field.fieldName(), singleValue(condition, values));
+            case EQ -> criteria.eq(field.fieldName(), singleValue(field, condition, values));
+            case LIKE -> criteria.like(field.fieldName(), String.valueOf(singleValue(field, condition, values)));
+            case IN -> criteria.in(field.fieldName(), listValues(field, condition, values));
+            case BETWEEN -> criteria.between(field.fieldName(), rangeValue(field, condition, values, 0), rangeValue(field, condition, values, 1));
+            case GT -> criteria.gt(field.fieldName(), singleValue(field, condition, values));
+            case GTE -> criteria.gte(field.fieldName(), singleValue(field, condition, values));
+            case LT -> criteria.lt(field.fieldName(), singleValue(field, condition, values));
+            case LTE -> criteria.lte(field.fieldName(), singleValue(field, condition, values));
         }
     }
 
@@ -65,36 +66,42 @@ public final class DynamicQueryCriteriaBuilder {
         return field;
     }
 
-    private Object singleValue(DynamicQueryCondition condition, List<?> values) {
+    private Object singleValue(FieldDefinition field, DynamicQueryCondition condition, List<?> values) {
         if (values.size() != 1) {
             throw new ModuleDefinitionException("query operator requires exactly one value: "
                     + condition.fieldName() + "." + condition.operator());
         }
-        return nonNullValue(condition, values.getFirst());
+        return normalizedValue(field, condition, values.getFirst());
     }
 
-    private List<?> listValues(DynamicQueryCondition condition, List<?> values) {
+    private List<?> listValues(FieldDefinition field, DynamicQueryCondition condition, List<?> values) {
         if (values.isEmpty()) {
             throw new ModuleDefinitionException("query operator requires at least one value: "
                     + condition.fieldName() + "." + condition.operator());
         }
-        values.forEach(value -> nonNullValue(condition, value));
-        return values;
+        return values.stream()
+                .map(value -> normalizedValue(field, condition, value))
+                .toList();
     }
 
-    private Object rangeValue(DynamicQueryCondition condition, List<?> values, int index) {
+    private Object rangeValue(FieldDefinition field, DynamicQueryCondition condition, List<?> values, int index) {
         if (values.size() != 2) {
             throw new ModuleDefinitionException("query operator requires exactly two values: "
                     + condition.fieldName() + "." + condition.operator());
         }
-        return nonNullValue(condition, values.get(index));
+        return normalizedValue(field, condition, values.get(index));
     }
 
-    private Object nonNullValue(DynamicQueryCondition condition, Object value) {
+    private Object normalizedValue(FieldDefinition field, DynamicQueryCondition condition, Object value) {
         if (value == null) {
             throw new ModuleDefinitionException("null query value is not supported: "
                     + condition.fieldName() + "." + condition.operator());
         }
-        return value;
+        try {
+            return DynamicFieldValueSupport.normalize(field.type(), value);
+        } catch (RuntimeException e) {
+            throw new ModuleDefinitionException("invalid query value type: "
+                    + condition.fieldName() + "." + condition.operator(), e);
+        }
     }
 }

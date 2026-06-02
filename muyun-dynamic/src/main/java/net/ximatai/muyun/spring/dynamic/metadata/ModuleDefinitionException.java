@@ -4,4 +4,8 @@ public class ModuleDefinitionException extends RuntimeException {
     public ModuleDefinitionException(String message) {
         super(message);
     }
+
+    public ModuleDefinitionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
