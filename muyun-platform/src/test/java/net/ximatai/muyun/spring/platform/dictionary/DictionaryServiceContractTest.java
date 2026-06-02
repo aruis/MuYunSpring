@@ -5,9 +5,13 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.option.OptionSource;
 import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +145,35 @@ class DictionaryServiceContractTest {
                 .extracting(OptionItem::code, OptionItem::title, OptionItem::enabled)
                 .containsExactly(tuple("active", "active", true));
         assertThat(source.resolve("active").code()).isEqualTo("active");
+    }
+
+    @Test
+    void shouldValidateMultipleDictionaryCodes() {
+        categoryService.insert(category("crm", "customer_tag", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(item("crm", "customer_tag", "vip", TreeAbility.ROOT_ID));
+        itemService.insert(item("crm", "customer_tag", "important", TreeAbility.ROOT_ID));
+        DictionaryFieldValueValidator validator = new DictionaryFieldValueValidator(itemService);
+        EntityDefinition entity = new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                        .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE)
+                        .required()
+        ));
+        FieldDefinition field = entity.fields().getFirst();
+
+        validator.validate("crm.customer", entity, field, List.of("vip", "important"));
+
+        assertThatThrownBy(() -> validator.validate("crm.customer", entity, field, List.of("vip", "missing")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("invalid dictionary code");
+        assertThatThrownBy(() -> validator.validate("crm.customer", entity, field, "vip"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires collection");
+        assertThatThrownBy(() -> validator.validate("crm.customer", entity, field, List.of("vip", "vip")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate dictionary code");
+        assertThatThrownBy(() -> validator.validate("crm.customer", entity, field, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be empty");
     }
 
     @Test

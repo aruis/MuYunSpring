@@ -71,8 +71,8 @@ class PlatformModelSchemaTest {
                 .isEqualTo(ColumnType.JSON_SET);
         assertThat(columnNames(mapper.toTable(MetadataFieldConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "dictionary_application_alias", "dictionary_category_alias",
-                        "field_length", "precision", "scale", "queryable", "default_query_operator", "query_operators",
-                        "default_value", "validation_regex", "copyable", "write_protected")
+                        "selection_mode", "field_length", "precision", "scale", "queryable", "default_query_operator",
+                        "query_operators", "default_value", "validation_regex", "copyable", "write_protected")
                 .doesNotContain("verify_regex");
         assertThat(columnType(mapper.toTable(MetadataFieldConfig.class), "query_operators"))
                 .isEqualTo(ColumnType.JSON_SET);

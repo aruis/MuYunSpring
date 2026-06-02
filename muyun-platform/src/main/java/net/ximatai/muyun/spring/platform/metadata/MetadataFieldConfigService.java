@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
@@ -121,12 +122,20 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         if (!hasCategory && !hasApplication) {
             config.setDictionaryApplicationAlias(null);
             config.setDictionaryCategoryAlias(null);
+            config.setSelectionMode(null);
             return;
         }
         if (!hasCategory) {
             throw new IllegalArgumentException("dictionaryCategoryAlias must not be blank");
         }
-        if (fieldType.getFieldType() != FieldType.STRING && fieldType.getFieldType() != FieldType.TEXT) {
+        if (config.getSelectionMode() == null) {
+            config.setSelectionMode(OptionSelectionMode.SINGLE);
+        }
+        if (config.getSelectionMode() == OptionSelectionMode.MULTIPLE) {
+            if (fieldType.getFieldType() != FieldType.JSON) {
+                throw new IllegalArgumentException("multiple dictionary binding requires JSON field");
+            }
+        } else if (fieldType.getFieldType() != FieldType.STRING && fieldType.getFieldType() != FieldType.TEXT) {
             throw new IllegalArgumentException("dictionary binding requires string field");
         }
         Metadata metadata = metadataService.select(field.getMetadataId());

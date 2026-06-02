@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -16,8 +17,17 @@ class FieldDefinitionTest {
 
         assertThat(field.dictionaryBinding())
                 .isEqualTo(new FieldDictionaryBinding("crm", "customer_status"));
+        assertThat(field.dictionaryBinding().selectionMode()).isEqualTo(OptionSelectionMode.SINGLE);
         assertThat(field.optionBinding())
                 .isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
+    }
+
+    @Test
+    void shouldExposeMultipleDictionarySelectionMode() {
+        FieldDefinition field = FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE);
+
+        assertThat(field.dictionaryBinding().selectionMode()).isEqualTo(OptionSelectionMode.MULTIPLE);
     }
 
     @Test
@@ -75,5 +85,20 @@ class FieldDefinitionTest {
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("boolean defaultValue");
+    }
+
+    @Test
+    void shouldRequireJsonFieldForMultipleDictionaryBinding() {
+        ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "customer",
+                "crm_customer",
+                "Customer",
+                java.util.List.of(FieldDefinition.string("tags", "Tags")
+                        .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE))
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("multiple dictionary binding requires JSON field");
     }
 }

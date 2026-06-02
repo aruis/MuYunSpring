@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaEvaluationException;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -224,10 +225,14 @@ public class ModuleDefinitionValidator {
         if (field.type() == null) {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
-        if (field.dictionaryBinding() != null
-                && field.type() != FieldType.STRING
-                && field.type() != FieldType.TEXT) {
-            throw new ModuleDefinitionException("dictionary binding requires string field: " + field.code());
+        if (field.dictionaryBinding() != null) {
+            if (field.dictionaryBinding().selectionMode() == OptionSelectionMode.MULTIPLE) {
+                if (field.type() != FieldType.JSON) {
+                    throw new ModuleDefinitionException("multiple dictionary binding requires JSON field: " + field.code());
+                }
+            } else if (field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
+                throw new ModuleDefinitionException("dictionary binding requires string field: " + field.code());
+            }
         }
         if (STANDARD_COLUMNS.contains(field.columnName())) {
             throw new ModuleDefinitionException("field column conflicts with standard column: " + field.columnName());

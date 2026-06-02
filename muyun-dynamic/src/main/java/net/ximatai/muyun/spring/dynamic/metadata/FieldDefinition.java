@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
 import java.util.Set;
@@ -150,8 +151,12 @@ public record FieldDefinition(
     }
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
+        return dictionary(applicationAlias, categoryAlias, OptionSelectionMode.SINGLE);
+    }
+
+    public FieldDefinition dictionary(String applicationAlias, String categoryAlias, OptionSelectionMode selectionMode) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias), queryDefinition, behavior);
+                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias, selectionMode), queryDefinition, behavior);
     }
 
     public FieldDefinition queryable() {

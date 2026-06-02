@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 
@@ -28,6 +29,9 @@ public class MetadataFieldConfig extends StandardEntity {
 
     @Column(name = "dictionary_category_alias", type = ColumnType.VARCHAR, length = 64, comment = "Dictionary category alias")
     private String dictionaryCategoryAlias;
+
+    @Column(name = "selection_mode", type = ColumnType.VARCHAR, length = 16, comment = "Option selection mode")
+    private OptionSelectionMode selectionMode;
 
     @Column(name = "field_length", type = ColumnType.INT, comment = "Field length")
     private Integer fieldLength;

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
@@ -68,14 +69,26 @@ final class DynamicViewDescriptors {
                 viewField.fieldName(),
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
                 viewField.visible(),
-                viewField.controlType() == null ? controlType(field) : viewField.controlType(),
+                effectiveControlType(viewField, field),
                 Boolean.TRUE.equals(viewField.readOnly()),
                 field.isRequired() || Boolean.TRUE.equals(viewField.required())
         );
     }
 
+    private static ViewControlType effectiveControlType(EntityViewFieldDefinition viewField, FieldDefinition field) {
+        if (field.dictionaryBinding() != null
+                && field.dictionaryBinding().selectionMode() == OptionSelectionMode.MULTIPLE) {
+            return ViewControlType.MULTI_SELECT;
+        }
+        return viewField.controlType() == null ? controlType(field) : viewField.controlType();
+    }
+
     private static ViewControlType controlType(FieldDefinition field) {
         if (field.optionBinding() != null) {
+            if (field.dictionaryBinding() != null
+                    && field.dictionaryBinding().selectionMode() == OptionSelectionMode.MULTIPLE) {
+                return ViewControlType.MULTI_SELECT;
+            }
             return ViewControlType.SELECT;
         }
         return switch (field.type()) {

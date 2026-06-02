@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
@@ -69,6 +70,7 @@ class PlatformMetadataServiceContractTest {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
         fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
+        fieldTypeService.insert(fieldType("json", FieldType.JSON, null));
     }
 
     @Test
@@ -169,8 +171,27 @@ class PlatformMetadataServiceContractTest {
         assertThat(config.getDictionaryApplicationAlias()).isEqualTo("crm");
         assertThat(definition.dictionaryBinding().applicationAlias()).isEqualTo("crm");
         assertThat(definition.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
+        assertThat(definition.dictionaryBinding().selectionMode()).isEqualTo(OptionSelectionMode.SINGLE);
         assertThat(definition.queryDefinition().queryable()).isTrue();
         assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+    }
+
+    @Test
+    void shouldCompileMultipleDictionaryBindingOnJsonMetadataField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_tag", DictionaryCategoryKind.DICTIONARY));
+        MetadataField field = field(metadataId, "tags", "tags", FieldType.JSON);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDictionaryCategoryAlias("customer_tag");
+        config.setSelectionMode(OptionSelectionMode.MULTIPLE);
+        fieldConfigService.insert(config);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+
+        assertThat(definition.type()).isEqualTo(FieldType.JSON);
+        assertThat(definition.dictionaryBinding().categoryAlias()).isEqualTo("customer_tag");
+        assertThat(definition.dictionaryBinding().selectionMode()).isEqualTo(OptionSelectionMode.MULTIPLE);
     }
 
     @Test
@@ -355,6 +376,21 @@ class PlatformMetadataServiceContractTest {
         assertThatThrownBy(() -> fieldConfigService.insert(config))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dictionary binding");
+    }
+
+    @Test
+    void shouldRejectMultipleDictionaryBindingOnNonJsonField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_tag", DictionaryCategoryKind.DICTIONARY));
+        MetadataField field = field(metadataId, "tags", "tags", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setDictionaryCategoryAlias("customer_tag");
+        config.setSelectionMode(OptionSelectionMode.MULTIPLE);
+
+        assertThatThrownBy(() -> fieldConfigService.insert(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("multiple dictionary binding requires JSON field");
     }
 
     @Test

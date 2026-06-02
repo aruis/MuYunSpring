@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
@@ -17,6 +18,7 @@ public record DynamicFieldDescriptor(
         Integer precision,
         Integer scale,
         OptionBinding optionBinding,
+        OptionSelectionMode selectionMode,
         DynamicFieldQueryDescriptor query,
         String defaultValue,
         String validationRegex,
@@ -37,6 +39,7 @@ public record DynamicFieldDescriptor(
                 field.precision(),
                 field.scale(),
                 field.optionBinding(),
+                field.dictionaryBinding() == null ? null : field.dictionaryBinding().selectionMode(),
                 DynamicFieldQueryDescriptor.from(field.queryDefinition()),
                 field.behavior().defaultValue(),
                 field.behavior().validationRegex(),

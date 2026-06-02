@@ -56,7 +56,8 @@ public class MetadataFieldDefinitionCompiler {
         );
         if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
             definition = definition.dictionary(dictionaryConfig.getDictionaryApplicationAlias(),
-                    dictionaryConfig.getDictionaryCategoryAlias());
+                    dictionaryConfig.getDictionaryCategoryAlias(),
+                    dictionaryConfig.getSelectionMode());
         }
         return definition;
     }

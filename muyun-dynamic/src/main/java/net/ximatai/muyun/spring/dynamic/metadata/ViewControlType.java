@@ -9,5 +9,6 @@ public enum ViewControlType {
     DATETIME,
     DECIMAL,
     SELECT,
+    MULTI_SELECT,
     JSON
 }

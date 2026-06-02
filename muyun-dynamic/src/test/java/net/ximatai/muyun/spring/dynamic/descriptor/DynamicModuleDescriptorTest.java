@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
@@ -18,6 +19,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import org.junit.jupiter.api.Test;
@@ -40,7 +42,9 @@ class DynamicModuleDescriptorTest {
                                         .dictionary("crm", "customer_status")
                                         .defaultValue("active")
                                         .validationRegex("[a-z_]+")
-                                        .notCopyable()
+                                        .notCopyable(),
+                                FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                                        .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE)
                         ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE))
                                 .withFormulaRules(
                                         EntityFormulaRuleDefinition
@@ -104,6 +108,7 @@ class DynamicModuleDescriptorTest {
         DynamicFieldDescriptor status = descriptor.entities().getFirst().fields().get(1);
         assertThat(status.fieldName()).isEqualTo("status");
         assertThat(status.optionBinding()).isEqualTo(OptionBinding.dictionary("crm", "customer_status"));
+        assertThat(status.selectionMode()).isEqualTo(OptionSelectionMode.SINGLE);
         assertThat(status.defaultValue()).isEqualTo("active");
         assertThat(status.validationRegex()).isEqualTo("[a-z_]+");
         assertThat(status.copyable()).isFalse();
@@ -112,8 +117,9 @@ class DynamicModuleDescriptorTest {
         assertThat(listView.viewType()).isEqualTo(EntityViewType.LIST);
         assertThat(listView.fields())
                 .extracting(DynamicViewFieldDescriptor::fieldName)
-                .containsExactly("title", "status");
+                .containsExactly("title", "status", "tags");
         assertThat(listView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(listView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
                 .isEqualTo(DynamicQueryOperator.LIKE.name());
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().operators())
@@ -336,6 +342,8 @@ class DynamicModuleDescriptorTest {
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField(),
                                 FieldDefinition.string("status", "Status").dictionary("crm", "customer_status"),
+                                FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                                        .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE),
                                 FieldDefinition.text("description", "Description")
                         ))
                 ),
@@ -348,6 +356,7 @@ class DynamicModuleDescriptorTest {
                         List.of(
                                 new EntityViewFieldDefinition("title").title("Customer name"),
                                 new EntityViewFieldDefinition("status").control(ViewControlType.SELECT).readOnly(true),
+                                new EntityViewFieldDefinition("tags").control(ViewControlType.SELECT),
                                 new EntityViewFieldDefinition("description").hidden().control(ViewControlType.TEXTAREA)
                         )
                 ))
@@ -360,16 +369,17 @@ class DynamicModuleDescriptorTest {
         assertThat(listView.viewType()).isEqualTo(EntityViewType.LIST);
         assertThat(listView.fields())
                 .extracting(DynamicViewFieldDescriptor::fieldName)
-                .containsExactly("title", "status", "description");
+                .containsExactly("title", "status", "tags", "description");
         assertThat(formView.viewType()).isEqualTo(EntityViewType.FORM);
         assertThat(formView.title()).isEqualTo("Customer form");
         assertThat(formView.fields())
                 .extracting(DynamicViewFieldDescriptor::fieldName)
-                .containsExactly("title", "status", "description");
+                .containsExactly("title", "status", "tags", "description");
         assertThat(formView.fields().getFirst().title()).isEqualTo("Customer name");
         assertThat(formView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
         assertThat(formView.fields().get(1).readOnly()).isTrue();
-        assertThat(formView.fields().get(2).visible()).isFalse();
+        assertThat(formView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
+        assertThat(formView.fields().get(3).visible()).isFalse();
     }
 
     @Test
