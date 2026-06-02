@@ -386,10 +386,12 @@ class DynamicRecordServiceTest {
     void shouldBuildCommonActionResultBodiesWithBusinessSemantics() {
         DynamicActionResultBody recordId = DynamicActionResultBody.createdRecordId("contract-1");
         DynamicActionResultBody changedCount = DynamicActionResultBody.changedCount(2);
+        DynamicActionResultBody changedCountWithMessage = DynamicActionResultBody.changedCount(2, "已归档 2 条");
         DynamicActionResultBody unchangedCount = DynamicActionResultBody.changedCount(0);
+        DynamicActionResultBody notice = DynamicActionResultBody.notice("无需刷新");
         DynamicActionResultBody refresh = DynamicActionResultBody.refreshed();
-        DynamicActionResultBody redirect = DynamicActionResultBody.redirect("/contracts/contract-1")
-                .message("已创建");
+        DynamicActionResultBody refreshedNotice = DynamicActionResultBody.refreshedNotice("已提交");
+        DynamicActionResultBody redirect = DynamicActionResultBody.redirect("/contracts/contract-1", "已创建");
 
         assertThat(recordId.type()).isEqualTo(DynamicActionResultType.RECORD_ID);
         assertThat(recordId.value()).isEqualTo("contract-1");
@@ -397,9 +399,15 @@ class DynamicRecordServiceTest {
         assertThat(changedCount.type()).isEqualTo(DynamicActionResultType.COUNT);
         assertThat(changedCount.value()).isEqualTo(2);
         assertThat(changedCount.refresh()).isTrue();
+        assertThat(changedCountWithMessage.message()).isEqualTo("已归档 2 条");
         assertThat(unchangedCount.refresh()).isFalse();
+        assertThat(notice.type()).isEqualTo(DynamicActionResultType.NONE);
+        assertThat(notice.refresh()).isFalse();
+        assertThat(notice.message()).isEqualTo("无需刷新");
         assertThat(refresh.type()).isEqualTo(DynamicActionResultType.NONE);
         assertThat(refresh.refresh()).isTrue();
+        assertThat(refreshedNotice.refresh()).isTrue();
+        assertThat(refreshedNotice.message()).isEqualTo("已提交");
         assertThat(redirect.type()).isEqualTo(DynamicActionResultType.NONE);
         assertThat(redirect.redirectTo()).isEqualTo("/contracts/contract-1");
         assertThat(redirect.message()).isEqualTo("已创建");

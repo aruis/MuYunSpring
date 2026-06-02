@@ -30,8 +30,16 @@ public record DynamicActionResultBody(
         return new DynamicActionResultBody(DynamicActionResultType.COUNT, value, null, value > 0, null);
     }
 
+    public static DynamicActionResultBody changedCount(int value, String message) {
+        return changedCount(value).message(message);
+    }
+
     public static DynamicActionResultBody none() {
         return new DynamicActionResultBody(DynamicActionResultType.NONE, null, null, false, null);
+    }
+
+    public static DynamicActionResultBody notice(String message) {
+        return none().message(message);
     }
 
     public static DynamicActionResultBody refreshed() {
@@ -42,8 +50,16 @@ public record DynamicActionResultBody(
         return of(value).withRefresh();
     }
 
+    public static DynamicActionResultBody refreshedNotice(String message) {
+        return refreshed().message(message);
+    }
+
     public static DynamicActionResultBody redirect(String value) {
         return none().redirectTo(value);
+    }
+
+    public static DynamicActionResultBody redirect(String value, String message) {
+        return redirect(value).message(message);
     }
 
     public DynamicActionResultBody message(String value) {

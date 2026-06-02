@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
@@ -271,7 +270,7 @@ class DynamicRecordWebControllerTest {
                                 "contract-1", "trace-1", "tenant-1", false,
                                 DynamicActionAvailability.available("submit")),
                         "ok",
-                        new DynamicActionResultBody(DynamicActionResultType.VALUE, "ok", null, true, null)));
+                        DynamicActionResultBody.refreshed("ok").message("已提交")));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")
                         .contentType("application/json")
@@ -291,7 +290,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.context.traceId").value("trace-1"))
                 .andExpect(jsonPath("$.context.entityAlias").doesNotExist())
                 .andExpect(jsonPath("$.context.action").doesNotExist())
+                .andExpect(jsonPath("$.body.type").value("VALUE"))
                 .andExpect(jsonPath("$.body.value").value("ok"))
+                .andExpect(jsonPath("$.body.message").value("已提交"))
                 .andExpect(jsonPath("$.body.refresh").value(true));
 
         ArgumentCaptor<DynamicActionExecutionRequest> request = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
@@ -345,31 +346,40 @@ class DynamicRecordWebControllerTest {
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.executeAction(eq(MODULE), eq("export"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
-                        new DynamicActionResultBody(DynamicActionResultType.VALUE, "ok", null, false, null)));
+                        DynamicActionResultBody.redirect("/exports/contract.xlsx", "导出已生成")));
         when(service.executeAction(eq(MODULE), eq("archive"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, 2,
-                        new DynamicActionResultBody(DynamicActionResultType.COUNT, 2, null, true, null)));
+                        DynamicActionResultBody.changedCount(2, "已归档 2 条")));
         when(service.executeAction(eq(MODULE), eq("refreshSelected"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
-                        new DynamicActionResultBody(DynamicActionResultType.VALUE, "ok", null, true, null)));
+                        DynamicActionResultBody.refreshed("ok")));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "export")
                         .contentType("application/json")
                         .content(json(Map.of("payload", Map.of("format", "xlsx")))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.body.value").value("ok"));
+                .andExpect(jsonPath("$.body.type").value("NONE"))
+                .andExpect(jsonPath("$.body.value").doesNotExist())
+                .andExpect(jsonPath("$.body.message").value("导出已生成"))
+                .andExpect(jsonPath("$.body.refresh").value(false))
+                .andExpect(jsonPath("$.body.redirectTo").value("/exports/contract.xlsx"));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "archive")
                         .contentType("application/json")
                         .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.body.value").value(2));
+                .andExpect(jsonPath("$.body.type").value("COUNT"))
+                .andExpect(jsonPath("$.body.value").value(2))
+                .andExpect(jsonPath("$.body.message").value("已归档 2 条"))
+                .andExpect(jsonPath("$.body.refresh").value(true));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "refreshSelected")
                         .contentType("application/json")
-                        .content(json(Map.of("ids", List.of("contract-1")))))
+                .content(json(Map.of("ids", List.of("contract-1")))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.body.value").value("ok"));
+                .andExpect(jsonPath("$.body.type").value("VALUE"))
+                .andExpect(jsonPath("$.body.value").value("ok"))
+                .andExpect(jsonPath("$.body.refresh").value(true));
 
         ArgumentCaptor<DynamicActionExecutionRequest> batchRequest = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
         verify(service).executeAction(eq(MODULE), eq("archive"), batchRequest.capture());
