@@ -133,6 +133,10 @@ class PlatformDynamicModulePublisherIT {
         services.viewFieldService.insert(statusViewField);
         ModuleMetadataAction createAction = metadataAction(mainRelationId, "create", EntityActionKind.RECORD);
         services.actionService.insert(createAction);
+        ModuleMetadataAction submitAction = metadataAction(mainRelationId, "submit", EntityActionKind.CUSTOM);
+        submitAction.setAvailableExpression("{title} != ''");
+        submitAction.setUnavailableMessage("客户名称不能为空");
+        services.actionService.insert(submitAction);
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             String schemeId = services.schemeService.insert(menuScheme("main"));
             services.menuService.insert(moduleMenu(schemeId, "客户", "crm.customer"));
@@ -178,6 +182,15 @@ class PlatformDynamicModulePublisherIT {
         assertThat(runtime.registry().requireModule("crm.customer").mainEntityAlias()).isEqualTo("customer");
         assertThat(runtimeService.module("crm.customer").action("create").actionAuth()).isTrue();
         assertThat(customer.action("create").actionAuth()).isTrue();
+        assertThat(runtimeService.module("crm.customer").action("submit").availabilityCondition()).isTrue();
+        assertThat(runtimeService.module("crm.customer").actionAvailability("submit", selected).available()).isTrue();
+        DynamicRecord unnamed = customer.newRecord()
+                .setValue("title", "");
+        assertThat(runtimeService.module("crm.customer").actionAvailability("submit", unnamed))
+                .satisfies(availability -> {
+                    assertThat(availability.available()).isFalse();
+                    assertThat(availability.message()).isEqualTo("客户名称不能为空");
+                });
         assertThat(customer.view(EntityViewType.FORM).title()).isEqualTo("客户表单");
         assertThat(customer.view(EntityViewType.FORM).fields())
                 .extracting(field -> field.fieldName())

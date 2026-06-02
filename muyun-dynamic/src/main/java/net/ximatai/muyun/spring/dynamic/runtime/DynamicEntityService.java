@@ -123,6 +123,12 @@ public class DynamicEntityService implements
             requireSameEntity(record);
         }
         EntityActionDefinition action = actionDefinition(actionCode);
+        if (!action.enabled()) {
+            return DynamicActionAvailability.unavailable(action.actionCode(), disabledActionMessage(action));
+        }
+        if (!action.hasAvailabilityCondition()) {
+            return DynamicActionAvailability.available(action.actionCode());
+        }
         DynamicRecord existing = record != null && record.getId() != null && !record.getId().isBlank()
                 ? activeRaw(record.getId())
                 : null;
@@ -578,6 +584,10 @@ public class DynamicEntityService implements
                 .filter(action -> action.actionCode().equals(actionCode))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private String disabledActionMessage(EntityActionDefinition action) {
+        return action.unavailableMessage() == null ? "action is disabled" : action.unavailableMessage();
     }
 
     private EntityActionDefinition configuredAction(String actionCode) {

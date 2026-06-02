@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -140,6 +141,21 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldNotLoadExistingRecordForActionWithoutCondition() {
+        IDatabaseOperations<Object> operations = operations();
+        DynamicRecordService service = actionService(operations);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001");
+        record.setId("contract-1");
+
+        DynamicActionAvailability availability = service.entity(MODULE, "contract")
+                .actionAvailability("create", record);
+
+        assertThat(availability.available()).isTrue();
+        verify(operations, never()).query(anyString(), anyMap());
+    }
+
+    @Test
     void shouldMergeExistingValuesWhenEvaluatingActionAvailability() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
@@ -148,6 +164,7 @@ class DynamicRecordServiceTest {
         partial.setId("contract-1");
 
         assertThat(service.entity(MODULE, "contract").actionAvailability("submit", partial).available()).isTrue();
+        verify(operations).query(anyString(), anyMap());
     }
 
     @Test
