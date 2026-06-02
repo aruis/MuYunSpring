@@ -251,6 +251,53 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldLinkCrudMutationAndActionEventsWithSameTrace() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.ONE);
+        record.setId("contract-1");
+
+        DynamicActionExecutionResult update = service.entity(MODULE, "contract")
+                .executeAction("update", DynamicActionExecutionRequest.record(record));
+        DynamicActionExecutionResult delete = service.entity(MODULE, "contract")
+                .executeAction("delete", DynamicActionExecutionRequest.id("contract-1"));
+
+        assertThat(update.value()).isEqualTo(1);
+        assertThat(delete.value()).isEqualTo(1);
+        assertActionTrace(events.events().get(0), events.events().get(1), RuntimeEventType.AFTER_UPDATE, "update");
+        assertActionTrace(events.events().get(2), events.events().get(3), RuntimeEventType.AFTER_DELETE, "delete");
+        assertThat(events.events().get(1).traceId()).isEqualTo(update.context().traceId());
+        assertThat(events.events().get(3).traceId()).isEqualTo(delete.context().traceId());
+    }
+
+    @Test
+    void shouldLinkSortMutationAndActionEventsWithSameTrace() {
+        IDatabaseOperations<Object> operations = operations();
+        stubSortableRows(operations);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, sortableEntity(), events);
+
+        DynamicActionExecutionResult reorder = service.entity(MODULE, "contract")
+                .executeAction("reorder", DynamicActionExecutionRequest.empty()
+                        .withOrderedIds(List.of("first", "second", "third")));
+        DynamicActionExecutionResult moveBefore = service.entity(MODULE, "contract")
+                .executeAction("moveBefore", DynamicActionExecutionRequest.id("third").withBeforeId("first"));
+
+        assertThat(reorder.body().refresh()).isTrue();
+        assertThat(moveBefore.body().refresh()).isTrue();
+        assertActionTrace(events.events().get(0), events.events().get(1), RuntimeEventType.AFTER_UPDATE, "reorder");
+        assertActionTrace(events.events().get(2), events.events().get(3), RuntimeEventType.AFTER_UPDATE, "moveBefore");
+        assertThat(events.events().get(0).payload()).containsEntry("operation", "reorder");
+        assertThat(events.events().get(2).payload()).containsEntry("operation", "moveBefore");
+        assertThat(events.events().get(1).traceId()).isEqualTo(reorder.context().traceId());
+        assertThat(events.events().get(3).traceId()).isEqualTo(moveBefore.context().traceId());
+    }
+
+    @Test
     void shouldBlockActionExecutionWhenAvailabilityFormulaFails() {
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = actionService(operations(), events);
@@ -1851,6 +1898,17 @@ class DynamicRecordServiceTest {
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<Map<String, Object>> mapCaptor() {
         return ArgumentCaptor.forClass(Map.class);
+    }
+
+    private void assertActionTrace(RuntimeEvent mutation,
+                                   RuntimeEvent action,
+                                   RuntimeEventType mutationType,
+                                   String actionCode) {
+        assertThat(mutation.eventType()).isEqualTo(mutationType);
+        assertThat(mutation.mutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
+        assertThat(action.eventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+        assertThat(action.actionCode()).isEqualTo(actionCode);
+        assertThat(action.traceId()).isEqualTo(mutation.traceId());
     }
 
     private static final class CollectingRuntimeEventPublisher implements RuntimeEventPublisher {
