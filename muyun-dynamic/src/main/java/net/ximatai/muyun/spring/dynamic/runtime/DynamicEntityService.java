@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityStandardActionCatalog;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
 import java.util.Collection;
 import java.util.ArrayList;
@@ -460,13 +461,13 @@ public class DynamicEntityService implements
 
     private ReferencePlan referencePlan(String sourceField) {
         if (sourceField == null || sourceField.isBlank()) {
-            throw new IllegalArgumentException("reference sourceField must not be blank");
+            throw new ModuleDefinitionException("reference sourceField must not be blank");
         }
         return referencePlans().stream()
                 .filter(plan -> sourceField.equals(plan.sourceField()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("dynamic reference is not configured: "
-                        + dao.getEntity().alias() + "." + sourceField));
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic reference: "
+                        + moduleAlias + "." + dao.getEntity().alias() + "." + sourceField));
     }
 
     void requireSameEntityAliasForReference(ReferencePlan plan) {

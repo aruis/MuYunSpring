@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -496,8 +497,8 @@ class DynamicRecordServiceTest {
                 "contractId",
                 DynamicReferenceResolveRequest.query("Contract")
         ))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dynamic reference is not configured: line.contractId");
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("unknown dynamic reference: sales.contract.line.contractId");
     }
 
     @Test

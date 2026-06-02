@@ -457,6 +457,38 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldRejectReferenceTitleOutputConflictWithSourceField() {
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(titleField(customerId));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        fieldService.insert(field(contactId, "customerTitle", "customer_title", FieldType.STRING));
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setAutoTitle(true);
+        config.setTitleOutputField("customerTitle");
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reference title output field conflicts with source field");
+    }
+
+    @Test
+    void shouldRejectReferenceProjectionOutputConflictWithStandardField() {
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(field(customerId, "code", "code", FieldType.STRING));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        MetadataFieldReferenceConfig config = referenceConfig(customerField.getId(), customerId);
+        config.setProjectionMappings("code:id");
+
+        assertThatThrownBy(() -> referenceConfigService.insert(config))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reference projection output field conflicts with source field");
+    }
+
+    @Test
     void shouldCreateRelationScopedMetadataViewFields() {
         moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("crm", "customer"));

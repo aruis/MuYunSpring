@@ -7,15 +7,20 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 @Service
 public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
         SoftDeleteAbility<MetadataFieldReferenceConfig> {
     public static final String MODULE_ALIAS = "platform.metadataFieldReferenceConfig";
+    private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
     private final MetadataFieldService fieldService;
     private final MetadataService metadataService;
@@ -95,7 +100,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
             config.setCardinality(ReferenceCardinality.ONE);
         }
         normalizeAutoTitle(config);
-        validateProjections(config);
+        validateOutputFields(config, sourceField.getMetadataId());
         if (config.getTargetModuleAlias() != null
                 && (Boolean.TRUE.equals(config.getAutoTitle()) || !config.projections().isEmpty())) {
             throw new PlatformException("Cross-module reference display is not supported yet: " + config.getTargetModuleAlias());
@@ -140,11 +145,20 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         config.setTitleOutputField(PlatformNameRules.requireFieldName(config.getTitleOutputField(), "titleOutputField"));
     }
 
-    private void validateProjections(MetadataFieldReferenceConfig config) {
+    private void validateOutputFields(MetadataFieldReferenceConfig config, String sourceMetadataId) {
+        LinkedHashSet<String> outputFields = new LinkedHashSet<>();
+        if (Boolean.TRUE.equals(config.getAutoTitle())) {
+            requireAvailableOutputField(sourceMetadataId, config.getTitleOutputField(), "reference title output field");
+            outputFields.add(config.getTitleOutputField());
+        }
         for (ReferenceProjection projection : config.projections()) {
             PlatformNameRules.requireFieldName(projection.targetField(), "projection.targetField");
             PlatformNameRules.requireFieldName(projection.outputField(), "projection.outputField");
             requireTargetField(config.getTargetMetadataId(), projection.targetField());
+            requireAvailableOutputField(sourceMetadataId, projection.outputField(), "reference projection output field");
+            if (!outputFields.add(projection.outputField())) {
+                throw new PlatformException("Duplicate reference output field: " + projection.outputField());
+            }
         }
     }
 
@@ -153,6 +167,15 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
                 .eq("metadataId", targetMetadataId)
                 .eq("fieldName", targetFieldName)) <= 0) {
             throw new PlatformException("Reference projection requires existing target field: " + targetFieldName);
+        }
+    }
+
+    private void requireAvailableOutputField(String sourceMetadataId, String outputField, String name) {
+        if (STANDARD_FIELDS.contains(outputField)
+                || fieldService.count(Criteria.of()
+                .eq("metadataId", sourceMetadataId)
+                .eq("fieldName", outputField)) > 0) {
+            throw new PlatformException(name + " conflicts with source field: " + outputField);
         }
     }
 
