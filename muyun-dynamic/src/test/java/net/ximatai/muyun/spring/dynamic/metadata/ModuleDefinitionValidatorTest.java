@@ -28,7 +28,7 @@ class ModuleDefinitionValidatorTest {
     }
 
     @Test
-    void shouldRejectCustomActionThatConflictsWithPlatformStandardAction() {
+    void shouldRejectCustomActionThatConflictsWithPlatformStandardPath() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.contract",
                 "Contract",
@@ -42,7 +42,7 @@ class ModuleDefinitionValidatorTest {
 
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("custom action conflicts with platform standard action: contract.create");
+                .hasMessageContaining("custom action conflicts with reserved web action path: contract.create");
     }
 
     @Test
