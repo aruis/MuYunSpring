@@ -4,9 +4,8 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class OrganizationService extends AbstractAbilityService<Organization> implements
+        TenantActiveScopedAbility<Organization>,
         SoftDeleteAbility<Organization>,
         EnableAbility<Organization>,
         TreeAbility<Organization>,
@@ -34,32 +34,14 @@ public class OrganizationService extends AbstractAbilityService<Organization> im
     }
 
     @Override
-    public void beforePrepareInsert(Organization organization) {
-        requireActiveTenantContext();
-        normalizeOrganization(organization);
-    }
-
-    @Override
-    public void beforeUpdate(Organization organization) {
-        requireActiveTenantContext();
-        normalizeOrganization(organization);
-    }
-
-    @Override
-    public void beforeDelete(String id) {
-        requireActiveTenantContext();
-    }
-
-    private void normalizeOrganization(Organization organization) {
+    public void normalizeBeforeMutation(Organization organization) {
         organization.setCode(Preconditions.requireText(organization.getCode(), "organizationCode"));
     }
 
-    private String requireActiveTenantContext() {
-        String tenantId = TenantContext.currentTenantId()
-                .orElseThrow(() -> new PlatformException("Organization management requires tenant context"));
+    @Override
+    public void verifyActiveTenant(String tenantId) {
         if (tenantService != null) {
             tenantService.requireActiveTenant(tenantId);
         }
-        return tenantId;
     }
 }

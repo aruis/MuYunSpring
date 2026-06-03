@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 
@@ -16,6 +17,14 @@ public interface EnableAbility<T extends EnabledCapable> extends CrudAbility<T> 
     default boolean isEnabled(String id) {
         T entity = selectActiveRaw(id);
         return entity != null && Boolean.TRUE.equals(entity.getEnabled());
+    }
+
+    default T requireEnabled(String id, String message) {
+        T entity = selectActiveRaw(id);
+        if (entity == null || !Boolean.TRUE.equals(entity.getEnabled())) {
+            throw new PlatformException(message);
+        }
+        return entity;
     }
 
     default Criteria enabledCriteria(Criteria criteria) {

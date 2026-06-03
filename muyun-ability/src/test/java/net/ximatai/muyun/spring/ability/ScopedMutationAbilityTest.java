@@ -1,0 +1,141 @@
+package net.ximatai.muyun.spring.ability;
+
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ScopedMutationAbilityTest {
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void systemManagedAbilityShouldRequireSystemContextForMutation() {
+        SystemManagedDemoService service = new SystemManagedDemoService();
+
+        assertThatThrownBy(() -> service.insert(new DemoEnabledRecord("Tenant")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            String id = service.insert(new DemoEnabledRecord("System"));
+            assertThat(service.select(id).getTitle()).isEqualTo("System");
+        }
+    }
+
+    @Test
+    void systemManagedAbilityShouldRequireSystemContextForUpdateAndDelete() {
+        SystemManagedDemoService service = new SystemManagedDemoService();
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            id = service.insert(new DemoEnabledRecord("System"));
+        }
+
+        DemoEnabledRecord update = new DemoEnabledRecord("Updated");
+        update.setId(id);
+        assertThatThrownBy(() -> service.update(update))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+        assertThatThrownBy(() -> service.delete(id))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+    }
+
+    @Test
+    void tenantActiveScopedAbilityShouldRequireTenantContextAndVerifyActiveTenant() {
+        TenantScopedDemoService service = new TenantScopedDemoService();
+
+        assertThatThrownBy(() -> service.insert(new DemoPlainRecord("No tenant")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("tenant context");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String id = service.insert(new DemoPlainRecord("Tenant"));
+            assertThat(service.verifiedTenantId).isEqualTo("tenant-a");
+            assertThat(service.select(id).getTenantId()).isEqualTo("tenant-a");
+        }
+    }
+
+    @Test
+    void tenantActiveScopedAbilityShouldRequireTenantContextForUpdateAndDelete() {
+        TenantScopedDemoService service = new TenantScopedDemoService();
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            id = service.insert(new DemoPlainRecord("Tenant"));
+        }
+
+        DemoPlainRecord update = new DemoPlainRecord("Updated");
+        update.setId(id);
+        assertThatThrownBy(() -> service.update(update))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("tenant context");
+        assertThatThrownBy(() -> service.delete(id))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("tenant context");
+    }
+
+    @Test
+    void globalScopedAbilityShouldKeepSoftDeleteButIgnoreTenantScope() {
+        SystemManagedDemoService service = new SystemManagedDemoService();
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            id = service.insert(new DemoEnabledRecord("Global"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select(id)).isNotNull();
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            service.delete(id);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.select(id)).isNull();
+            assertThat(service.selectIgnoreSoftDelete(id)).isNotNull();
+        }
+    }
+
+    @Test
+    void enableAbilityShouldRequireEnabledRecord() {
+        SystemManagedDemoService service = new SystemManagedDemoService();
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            id = service.insert(new DemoEnabledRecord("Enabled"));
+            service.disable(id);
+        }
+
+        assertThatThrownBy(() -> service.requireEnabled(id, "Record is disabled"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    private static final class SystemManagedDemoService extends AbstractAbilityService<DemoEnabledRecord> implements
+            SystemManagedAbility<DemoEnabledRecord>,
+            GlobalScopedAbility<DemoEnabledRecord>,
+            EnableAbility<DemoEnabledRecord> {
+
+        private SystemManagedDemoService() {
+            super("demo.systemManaged", DemoEnabledRecord.class, new InMemoryBaseDao<>());
+        }
+    }
+
+    private static final class TenantScopedDemoService extends AbstractAbilityService<DemoPlainRecord> implements
+            TenantActiveScopedAbility<DemoPlainRecord> {
+
+        private String verifiedTenantId;
+
+        private TenantScopedDemoService() {
+            super("demo.tenantScoped", DemoPlainRecord.class, new InMemoryBaseDao<>());
+        }
+
+        @Override
+        public void verifyActiveTenant(String tenantId) {
+            verifiedTenantId = tenantId;
+        }
+    }
+}
