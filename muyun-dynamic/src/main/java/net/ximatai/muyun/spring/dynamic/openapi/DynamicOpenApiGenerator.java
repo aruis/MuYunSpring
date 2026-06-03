@@ -62,6 +62,12 @@ public class DynamicOpenApiGenerator {
                 "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
         operations.add(operation(basePath + "/delete/{id}", operationId(descriptor, "delete"),
                 "Delete " + mainEntity.title(), null, "WebCountResponse", null));
+        if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())) {
+            operations.add(operation(basePath + "/enable/{id}", operationId(descriptor, "enable"),
+                    "Enable " + mainEntity.title(), null, "WebCountResponse", null));
+            operations.add(operation(basePath + "/disable/{id}", operationId(descriptor, "disable"),
+                    "Disable " + mainEntity.title(), null, "WebCountResponse", null));
+        }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
             operations.add(operation(basePath + "/tree", operationId(descriptor, "tree"),
                     "Tree " + mainEntity.title(), null, "WebListResponse", null));

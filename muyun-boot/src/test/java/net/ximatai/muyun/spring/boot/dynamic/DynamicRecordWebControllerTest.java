@@ -381,6 +381,33 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldExposeDynamicEnableThroughStandardEnableWebContract() throws Exception {
+        when(mainEntity.enable("contract-1")).thenReturn(1);
+        when(mainEntity.disable("contract-1")).thenReturn(1);
+
+        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/{moduleAlias}/disable/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(mainEntity).enable("contract-1");
+        verify(mainEntity).disable("contract-1");
+    }
+
+    @Test
+    void shouldRejectEnableWebWhenDynamicMainEntityDoesNotSupportEnable() throws Exception {
+        when(mainEntity.enable("contract-1"))
+                .thenThrow(new PlatformException("dynamic entity does not support capability: ENABLE"));
+
+        mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: ENABLE"));
+    }
+
+    @Test
     void shouldExposeRecordActionAvailabilityWithoutListAndBatchActions() throws Exception {
         DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
         DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);

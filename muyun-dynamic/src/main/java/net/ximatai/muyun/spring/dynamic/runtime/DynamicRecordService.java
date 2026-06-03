@@ -6,6 +6,8 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
@@ -852,7 +854,10 @@ public class DynamicRecordService {
         }
     }
 
-    public static final class EntityOperations implements TreeAbility<DynamicRecord> {
+    public static final class EntityOperations implements
+            TreeAbility<DynamicRecord>,
+            EnableAbility<DynamicRecord>,
+            SoftDeleteAbility<DynamicRecord> {
         private final DynamicRecordService service;
         private final String moduleAlias;
         private final String entityAlias;
@@ -935,6 +940,7 @@ public class DynamicRecordService {
             return service.select(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public DynamicRecord selectIgnoreSoftDelete(String id) {
             return service.selectIgnoreSoftDelete(moduleAlias, entityAlias, id);
         }
@@ -1004,18 +1010,22 @@ public class DynamicRecordService {
             return service.descendantIds(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public int enable(String id) {
             return service.enable(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public int disable(String id) {
             return service.disable(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public boolean isEnabled(String id) {
             return service.isEnabled(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public Criteria enabledCriteria(Criteria criteria) {
             return service.enabledCriteria(moduleAlias, entityAlias, criteria);
         }

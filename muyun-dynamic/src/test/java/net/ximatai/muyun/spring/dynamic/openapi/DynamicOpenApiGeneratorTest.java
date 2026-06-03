@@ -112,6 +112,8 @@ class DynamicOpenApiGeneratorTest {
                 List.of(
                         action("openapi", "OpenAPI", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
                         action("query", "Query", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
+                        action("enable", "Enable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
+                        action("disable", "Disable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
                         action("tree", "Tree", EntityActionLevel.LIST, EntityActionStyle.NORMAL)
                 )
         );
@@ -127,6 +129,27 @@ class DynamicOpenApiGeneratorTest {
                 .singleElement()
                 .extracting(DynamicOpenApiDocument.Operation::actionCode)
                 .isNull();
+    }
+
+    @Test
+    void shouldExposeEnableWebOperationsOnlyWhenMainEntitySupportsEnable() {
+        DynamicOpenApiDocument plain = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()))));
+        DynamicOpenApiDocument enabled = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(enabledEntity()))));
+
+        assertThat(plain.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .doesNotContain("/sales.contract/enable/{id}", "/sales.contract/disable/{id}");
+        assertThat(enabled.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .contains("/sales.contract/enable/{id}", "/sales.contract/disable/{id}");
+        assertThat(enabled.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/enable/{id}"))
+                .findFirst())
+                .get()
+                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
+                .isEqualTo("WebCountResponse");
     }
 
     @Test
@@ -382,5 +405,12 @@ class DynamicOpenApiGeneratorTest {
                 FieldDefinition.parentId(),
                 FieldDefinition.sortOrder()
         )).withCapabilities(EntityCapability.TREE);
+    }
+
+    private EntityDefinition enabledEntity() {
+        return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.enabled()
+        )).withCapabilities(EntityCapability.ENABLE);
     }
 }
