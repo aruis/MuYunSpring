@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -31,7 +32,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
     @ActionEndpoint(PlatformAction.TREE)
     default WebListResponse<?> tree(@RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
-            List<T> roots = service().children(TreeAbility.ROOT_ID);
+            List<T> roots = treeChildren(TreeAbility.ROOT_ID);
             if (flat) {
                 List<T> rows = new ArrayList<>();
                 for (T root : roots) {
@@ -50,7 +51,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
                                     @RequestParam(defaultValue = "false") boolean flat,
                                     @RequestParam(defaultValue = "true") boolean includeSelf) {
         return webScope(() -> {
-            T root = service().select(id);
+            T root = treeSelect(id);
             if (root == null) {
                 return new WebListResponse<>(List.of());
             }
@@ -58,7 +59,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
                 if (includeSelf) {
                     return new WebListResponse<>(List.of(treeNode(root)));
                 }
-                return new WebListResponse<>(service().children(root.getId()).stream().map(this::treeNode).toList());
+                return new WebListResponse<>(treeChildren(root.getId()).stream().map(this::treeNode).toList());
             }
             List<T> rows = new ArrayList<>();
             if (includeSelf) {
@@ -70,14 +71,34 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
     }
 
     private void appendDescendants(String parentId, List<T> rows) {
-        for (T child : service().children(parentId)) {
+        for (T child : treeChildren(parentId)) {
             rows.add(child);
             appendDescendants(child.getId(), rows);
         }
     }
 
     private WebTreeNode<T> treeNode(T record) {
-        return new WebTreeNode<>(record, service().children(record.getId()).stream().map(this::treeNode).toList());
+        return new WebTreeNode<>(record, treeChildren(record.getId()).stream().map(this::treeNode).toList());
+    }
+
+    private T treeSelect(String id) {
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            @SuppressWarnings("unchecked")
+            T record = (T) dataScopeAbility.selectForAction(PlatformAction.TREE, id);
+            return record;
+        }
+        return service().select(id);
+    }
+
+    private List<T> treeChildren(String parentId) {
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            @SuppressWarnings("unchecked")
+            List<T> records = (List<T>) dataScopeAbility.childrenForAction(PlatformAction.TREE, parentId);
+            return records;
+        }
+        return service().children(parentId);
     }
 
     private void requireSortInput(TreeSortWebRequest request) {

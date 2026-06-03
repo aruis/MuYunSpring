@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -21,6 +22,13 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     default PageResult<T> queryRecords(WebQueryRequest request) {
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            @SuppressWarnings("unchecked")
+            PageResult<T> result = (PageResult<T>) dataScopeAbility.pageQueryForAction(
+                    PlatformAction.QUERY, queryCriteria(request), pageRequest, querySorts(request));
+            return result;
+        }
         return service().pageQuery(queryCriteria(request), pageRequest, querySorts(request));
     }
 
@@ -50,7 +58,15 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     @GetMapping("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
     default T view(@PathVariable String id) {
-        return webScope(() -> service().select(id));
+        return webScope(() -> {
+            if (service() instanceof DataScopeAbility<?>) {
+                DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+                @SuppressWarnings("unchecked")
+                T record = (T) dataScopeAbility.selectForAction(PlatformAction.VIEW, id);
+                return record;
+            }
+            return service().select(id);
+        });
     }
 
     @PostMapping("/insert")
