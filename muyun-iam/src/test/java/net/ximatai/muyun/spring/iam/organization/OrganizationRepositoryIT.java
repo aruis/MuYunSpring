@@ -137,7 +137,8 @@ class OrganizationRepositoryIT {
 
         @Bean
         OrganizationService organizationService(OrganizationDao organizationDao) {
-            return new OrganizationService(organizationDao);
+            return new OrganizationService(organizationDao, tenantId -> {
+            });
         }
 
         @Bean

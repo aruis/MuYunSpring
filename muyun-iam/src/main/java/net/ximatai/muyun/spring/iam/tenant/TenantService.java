@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.GlobalScopedAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.SystemManagedAbility;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +14,8 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         SystemManagedAbility<Tenant>,
         GlobalScopedAbility<Tenant>,
         EnableAbility<Tenant>,
-        SortAbility<Tenant> {
+        SortAbility<Tenant>,
+        ActiveTenantVerifier {
 
     public static final String MODULE_ALIAS = "iam.tenant";
 
@@ -30,6 +32,11 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     public Tenant requireActiveTenant(String tenantAlias) {
         String alias = requireTenantAlias(tenantAlias);
         return requireEnabled(alias, "Tenant is not active: " + alias);
+    }
+
+    @Override
+    public void verifyActiveTenant(String tenantId) {
+        requireActiveTenant(tenantId);
     }
 
     private String requireTenantAlias(String alias) {

@@ -56,7 +56,7 @@ class ScopedMutationAbilityTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             String id = service.insert(new DemoPlainRecord("Tenant"));
-            assertThat(service.verifiedTenantId).isEqualTo("tenant-a");
+            assertThat(service.verifiedTenantId()).isEqualTo("tenant-a");
             assertThat(service.select(id).getTenantId()).isEqualTo("tenant-a");
         }
     }
@@ -124,18 +124,29 @@ class ScopedMutationAbilityTest {
         }
     }
 
-    private static final class TenantScopedDemoService extends AbstractAbilityService<DemoPlainRecord> implements
-            TenantActiveScopedAbility<DemoPlainRecord> {
-
-        private String verifiedTenantId;
+    private static final class TenantScopedDemoService extends TenantActiveScopedService<DemoPlainRecord> {
+        private final CapturingTenantVerifier tenantVerifier;
 
         private TenantScopedDemoService() {
-            super("demo.tenantScoped", DemoPlainRecord.class, new InMemoryBaseDao<>());
+            this(new CapturingTenantVerifier());
         }
+
+        private TenantScopedDemoService(CapturingTenantVerifier tenantVerifier) {
+            super("demo.tenantScoped", DemoPlainRecord.class, new InMemoryBaseDao<>(), tenantVerifier);
+            this.tenantVerifier = tenantVerifier;
+        }
+
+        private String verifiedTenantId() {
+            return tenantVerifier.tenantId;
+        }
+    }
+
+    private static final class CapturingTenantVerifier implements net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier {
+        private String tenantId;
 
         @Override
         public void verifyActiveTenant(String tenantId) {
-            verifiedTenantId = tenantId;
+            this.tenantId = tenantId;
         }
     }
 }

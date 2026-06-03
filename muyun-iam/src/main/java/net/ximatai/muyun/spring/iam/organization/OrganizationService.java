@@ -1,19 +1,17 @@
 package net.ximatai.muyun.spring.iam.organization;
 
-import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
-import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
+import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
-public class OrganizationService extends AbstractAbilityService<Organization> implements
-        TenantActiveScopedAbility<Organization>,
+public class OrganizationService extends TenantActiveScopedService<Organization> implements
         SoftDeleteAbility<Organization>,
         EnableAbility<Organization>,
         TreeAbility<Organization>,
@@ -21,27 +19,13 @@ public class OrganizationService extends AbstractAbilityService<Organization> im
 
     public static final String MODULE_ALIAS = "iam.organization";
 
-    private final TenantService tenantService;
-
     @Autowired
-    public OrganizationService(OrganizationDao organizationDao, TenantService tenantService) {
-        super(MODULE_ALIAS, Organization.class, organizationDao);
-        this.tenantService = tenantService;
-    }
-
-    OrganizationService(OrganizationDao organizationDao) {
-        this(organizationDao, null);
+    public OrganizationService(OrganizationDao organizationDao, ActiveTenantVerifier activeTenantVerifier) {
+        super(MODULE_ALIAS, Organization.class, organizationDao, activeTenantVerifier);
     }
 
     @Override
     public void normalizeBeforeMutation(Organization organization) {
         organization.setCode(Preconditions.requireText(organization.getCode(), "organizationCode"));
-    }
-
-    @Override
-    public void verifyActiveTenant(String tenantId) {
-        if (tenantService != null) {
-            tenantService.requireActiveTenant(tenantId);
-        }
     }
 }

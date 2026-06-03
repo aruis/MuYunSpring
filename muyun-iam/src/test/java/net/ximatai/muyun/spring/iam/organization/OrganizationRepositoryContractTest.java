@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,7 +59,7 @@ class OrganizationRepositoryContractTest {
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
 
-        OrganizationService service = new OrganizationService(repository(operations));
+        OrganizationService service = organizationService(operations);
         Organization organization = new Organization();
         organization.setCode("HQ");
         organization.setTitle("Headquarters");
@@ -151,7 +152,7 @@ class OrganizationRepositoryContractTest {
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("org-1", "Headquarters", 10)));
 
-        OrganizationService service = new OrganizationService(repository(operations));
+        OrganizationService service = organizationService(operations);
 
         assertThat(service.list(Criteria.of().eq("parentId", TreeAbility.ROOT_ID), PageRequest.of(1, 10)))
                 .extracting(Organization::getTitle)
@@ -185,7 +186,7 @@ class OrganizationRepositoryContractTest {
         IDatabaseOperations<Object> operations = mockedOperations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("org-1", "Headquarters", 10, 2)));
         when(operations.patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap())).thenReturn(1);
-        OrganizationService service = new OrganizationService(repository(operations));
+        OrganizationService service = organizationService(operations);
         Organization update = new Organization();
         update.setId("org-1");
         update.setCode("HQ");
@@ -205,6 +206,15 @@ class OrganizationRepositoryContractTest {
 
     private OrganizationDao repository(IDatabaseOperations<Object> operations) {
         return repository(operations, OrganizationDao.class);
+    }
+
+    private OrganizationService organizationService(IDatabaseOperations<Object> operations) {
+        return new OrganizationService(repository(operations), acceptActiveTenant());
+    }
+
+    private ActiveTenantVerifier acceptActiveTenant() {
+        return tenantId -> {
+        };
     }
 
     private <T> T repository(IDatabaseOperations<Object> operations, Class<T> daoType) {

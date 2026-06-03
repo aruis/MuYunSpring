@@ -2,9 +2,10 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
-public interface TenantActiveScopedAbility<T extends EntityContract> extends CrudAbility<T> {
+public interface TenantActiveScopedAbility<T extends EntityContract> extends CrudAbility<T>, ActiveTenantVerifier {
     @Override
     default void beforePrepareInsert(T entity) {
         requireActiveTenantMutationContext();
@@ -32,5 +33,4 @@ public interface TenantActiveScopedAbility<T extends EntityContract> extends Cru
         return tenantId;
     }
 
-    void verifyActiveTenant(String tenantId);
 }

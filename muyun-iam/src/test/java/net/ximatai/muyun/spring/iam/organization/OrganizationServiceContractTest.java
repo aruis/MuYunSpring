@@ -1,15 +1,15 @@
 package net.ximatai.muyun.spring.iam.organization;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.iam.tenant.Tenant;
-import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 class OrganizationServiceContractTest {
     @Test
     void shouldExposeStableModuleAlias() {
-        OrganizationService service = new OrganizationService(mock(OrganizationDao.class));
+        OrganizationService service = new OrganizationService(mock(OrganizationDao.class), activeTenantVerifier());
 
         assertThat(service.getModuleAlias()).isEqualTo("iam.organization");
     }
@@ -26,8 +26,8 @@ class OrganizationServiceContractTest {
     void shouldFillOrganizationDefaultsThroughCrudAbility() {
         OrganizationDao dao = mock(OrganizationDao.class);
         when(dao.insert(any())).thenReturn("org-1");
-        TenantService tenantService = activeTenantService("tenant_a");
-        OrganizationService service = new OrganizationService(dao, tenantService);
+        ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
+        OrganizationService service = new OrganizationService(dao, tenantVerifier);
         Organization organization = organization("HQ", "Headquarters");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
@@ -37,12 +37,12 @@ class OrganizationServiceContractTest {
         assertThat(organization.getEnabled()).isTrue();
         assertThat(organization.getParentId()).isEqualTo(TreeAbility.ROOT_ID);
         assertThat(organization.getTenantId()).isEqualTo("tenant_a");
-        verify(tenantService).requireActiveTenant("tenant_a");
+        verify(tenantVerifier).verifyActiveTenant("tenant_a");
     }
 
     @Test
     void shouldRequireTenantContextForOrganizationMutation() {
-        OrganizationService service = new OrganizationService(mock(OrganizationDao.class), activeTenantService("tenant_a"));
+        OrganizationService service = new OrganizationService(mock(OrganizationDao.class), activeTenantVerifier());
 
         assertThatThrownBy(() -> service.insert(organization("HQ", "Headquarters")))
                 .isInstanceOf(PlatformException.class)
@@ -57,10 +57,10 @@ class OrganizationServiceContractTest {
 
     @Test
     void shouldRejectInactiveTenantForOrganizationMutation() {
-        TenantService tenantService = mock(TenantService.class);
-        when(tenantService.requireActiveTenant("tenant_a"))
-                .thenThrow(new PlatformException("Tenant is not active: tenant_a"));
-        OrganizationService service = new OrganizationService(mock(OrganizationDao.class), tenantService);
+        ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
+        doThrow(new PlatformException("Tenant is not active: tenant_a"))
+                .when(tenantVerifier).verifyActiveTenant("tenant_a");
+        OrganizationService service = new OrganizationService(mock(OrganizationDao.class), tenantVerifier);
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.insert(organization("HQ", "Headquarters")))
@@ -73,7 +73,7 @@ class OrganizationServiceContractTest {
     void shouldRequireOrganizationCodeButAllowBusinessCodeShape() {
         OrganizationDao dao = mock(OrganizationDao.class);
         when(dao.insert(any())).thenReturn("org-1");
-        OrganizationService service = new OrganizationService(dao, activeTenantService("tenant_a"));
+        OrganizationService service = new OrganizationService(dao, activeTenantVerifier());
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             Organization branch = organization("BR-001", "Branch");
@@ -93,13 +93,7 @@ class OrganizationServiceContractTest {
         return organization;
     }
 
-    private TenantService activeTenantService(String tenantAlias) {
-        TenantService tenantService = mock(TenantService.class);
-        Tenant tenant = new Tenant();
-        tenant.setAlias(tenantAlias);
-        tenant.setTitle(tenantAlias);
-        tenant.setEnabled(Boolean.TRUE);
-        when(tenantService.requireActiveTenant(tenantAlias)).thenReturn(tenant);
-        return tenantService;
+    private ActiveTenantVerifier activeTenantVerifier() {
+        return mock(ActiveTenantVerifier.class);
     }
 }
