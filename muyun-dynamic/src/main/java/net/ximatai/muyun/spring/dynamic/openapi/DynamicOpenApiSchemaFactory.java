@@ -24,9 +24,6 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
         schemas.put("WebPageRequest", pageRequestSchema("WebPageRequest"));
         schemas.put("WebSort", sortSchema("WebSort"));
-        schemas.put("DynamicWebQueryCondition", queryConditionSchema("DynamicWebQueryCondition"));
-        schemas.put("DynamicWebPageRequest", pageRequestSchema("DynamicWebPageRequest"));
-        schemas.put("DynamicWebSort", sortSchema("DynamicWebSort"));
         schemas.put("DynamicWebActionRequest", actionRequestSchema());
         schemas.put("DynamicWebReferenceRequest", referenceRequestSchema());
         schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
@@ -443,9 +440,9 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("beforeId", stringProperty(true));
         properties.put("afterId", stringProperty(true));
         properties.put("parentId", stringProperty(true));
-        properties.put("conditions", arrayProperty("DynamicWebQueryCondition"));
-        properties.put("page", objectProperty("DynamicWebPageRequest"));
-        properties.put("sorts", arrayProperty("DynamicWebSort"));
+        properties.put("conditions", arrayProperty("WebQueryCondition"));
+        properties.put("page", objectProperty("WebPageRequest"));
+        properties.put("sorts", arrayProperty("WebSort"));
         properties.put("fieldNames", arrayProperty("string"));
         properties.put("payload", objectProperty("object"));
         return new DynamicOpenApiDocument.Schema("DynamicWebActionRequest", "object", null, List.of(), properties, null);
@@ -457,8 +454,8 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("matchMode", stringProperty(true));
         properties.put("fuzzy", stringProperty(true));
         properties.put("values", arrayProperty("object"));
-        properties.put("conditions", arrayProperty("DynamicWebQueryCondition"));
-        properties.put("page", objectProperty("DynamicWebPageRequest"));
+        properties.put("conditions", arrayProperty("WebQueryCondition"));
+        properties.put("page", objectProperty("WebPageRequest"));
         properties.put("includeProjections", new DynamicOpenApiDocument.Property("boolean", null, false, true,
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema("DynamicWebReferenceRequest", "object", null, List.of(), properties, null);

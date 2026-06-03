@@ -222,12 +222,19 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("DynamicWebActionResultBody");
         assertThat(document.schemas().get("DynamicWebActionAvailabilityList").items().type())
                 .isEqualTo("DynamicWebActionAvailabilityResponse");
-        assertThat(document.schemas().get("DynamicWebPageRequest").properties())
-                .containsKeys("pageNum", "pageSize")
-                .doesNotContainKeys("offset", "limit");
         assertThat(document.schemas().get("WebPageRequest").properties())
                 .containsKeys("pageNum", "pageSize")
                 .doesNotContainKeys("offset", "limit");
+        assertThat(document.schemas().get("DynamicWebActionRequest").properties().get("conditions").itemType())
+                .isEqualTo("WebQueryCondition");
+        assertThat(document.schemas().get("DynamicWebActionRequest").properties().get("page").type())
+                .isEqualTo("WebPageRequest");
+        assertThat(document.schemas().get("DynamicWebActionRequest").properties().get("sorts").itemType())
+                .isEqualTo("WebSort");
+        assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("conditions").itemType())
+                .isEqualTo("WebQueryCondition");
+        assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("page").type())
+                .isEqualTo("WebPageRequest");
         assertThat(document.schemas().get("DynamicReferenceResolveResponse").properties())
                 .containsKeys("options", "results", "offset", "limit", "total")
                 .doesNotContainKeys("pageNum", "pageSize");

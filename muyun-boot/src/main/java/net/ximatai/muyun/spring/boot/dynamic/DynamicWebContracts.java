@@ -2,8 +2,10 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
@@ -31,31 +33,6 @@ record DynamicRecordPayload(String id, Integer version, Map<String, Object> valu
     }
 }
 
-record DynamicWebQueryCondition(String fieldName, DynamicQueryOperator operator, List<Object> values) {
-    DynamicWebQueryCondition {
-        values = values == null ? List.of() : List.copyOf(values);
-    }
-}
-
-record DynamicWebPageRequest(int pageNum, int pageSize) {
-    static final DynamicWebPageRequest DEFAULT = new DynamicWebPageRequest(1, 20);
-
-    DynamicWebPageRequest {
-        if (pageNum <= 0) {
-            pageNum = DEFAULT.pageNum();
-        }
-        if (pageSize <= 0) {
-            pageSize = DEFAULT.pageSize();
-        }
-        if (pageSize > 500) {
-            pageSize = 500;
-        }
-    }
-}
-
-record DynamicWebSort(String field, boolean desc) {
-}
-
 record DynamicWebActionRequest(String recordId,
                                DynamicRecordPayload record,
                                List<String> ids,
@@ -63,9 +40,9 @@ record DynamicWebActionRequest(String recordId,
                                String beforeId,
                                String afterId,
                                String parentId,
-                               List<DynamicWebQueryCondition> conditions,
-                               DynamicWebPageRequest page,
-                               List<DynamicWebSort> sorts,
+                               List<WebQueryCondition> conditions,
+                               WebPageRequest page,
+                               List<WebSort> sorts,
                                List<String> fieldNames,
                                Map<String, Object> payload) {
     DynamicWebActionRequest {
@@ -87,8 +64,8 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
                                   DynamicReferenceMatchMode matchMode,
                                   String fuzzy,
                                   List<Object> values,
-                                  List<DynamicWebQueryCondition> conditions,
-                                  DynamicWebPageRequest page,
+                                  List<WebQueryCondition> conditions,
+                                  WebPageRequest page,
                                   Boolean includeProjections) {
     DynamicWebReferenceRequest {
         values = values == null ? List.of() : List.copyOf(values);
@@ -98,7 +75,7 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
 
     static DynamicWebReferenceRequest empty() {
         return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(),
-                DynamicWebPageRequest.DEFAULT, true);
+                WebPageRequest.DEFAULT, true);
     }
 }
 

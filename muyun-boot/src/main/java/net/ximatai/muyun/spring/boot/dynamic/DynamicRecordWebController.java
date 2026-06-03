@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -67,7 +68,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         if (request == null || request.conditions().isEmpty()) {
             return Criteria.of();
         }
-        return service().queryCriteria(DynamicWebQueryMapper.queryConditionsFromWeb(request.conditions()));
+        return service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
     }
 
     @Override
@@ -75,7 +76,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         if (request == null || request.sorts().isEmpty()) {
             return new Sort[0];
         }
-        return DynamicWebQueryMapper.sortsFromWeb(request.sorts());
+        return DynamicWebQueryMapper.sorts(request.sorts());
     }
 
     @PostMapping("/describe")
@@ -224,7 +225,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         return action.get();
     }
 
-    private Criteria criteria(String moduleAlias, String entityAlias, List<DynamicWebQueryCondition> conditions) {
+    private Criteria criteria(String moduleAlias, String entityAlias, List<WebQueryCondition> conditions) {
         List<DynamicQueryCondition> queryConditions = DynamicWebQueryMapper.queryConditions(conditions);
         if (queryConditions.isEmpty()) {
             return Criteria.of();
