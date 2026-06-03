@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
@@ -398,6 +399,60 @@ class DynamicRecordServiceTest {
                     assertThat(event.payload()).containsEntry("executorType", "SERVICE")
                             .containsEntry("resultType", "VALUE")
                             .containsEntry("result", "submitted:contract-1");
+                });
+    }
+
+    @Test
+    void shouldExposeTenantContextToServiceActionAndActionEvent() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            result = service.entity(MODULE, "contract")
+                    .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+        }
+
+        assertThat(result.context().tenantId()).isEqualTo("tenant-a");
+        assertThat(result.context().systemContext()).isFalse();
+        assertThat(executor.context().tenantId()).isEqualTo("tenant-a");
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.tenantId()).isEqualTo("tenant-a");
+                    assertThat(event.systemContext()).isFalse();
+                    assertThat(event.traceId()).isEqualTo(result.context().traceId());
+                });
+    }
+
+    @Test
+    void shouldExposeSystemContextToServiceActionAndActionEvent() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionService(operations(), events, executor);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        DynamicActionExecutionResult result;
+        try (TenantContext.Scope ignored = TenantContext.system()) {
+            result = service.entity(MODULE, "contract")
+                    .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+        }
+
+        assertThat(result.context().tenantId()).isNull();
+        assertThat(result.context().systemContext()).isTrue();
+        assertThat(executor.context().systemContext()).isTrue();
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.tenantId()).isNull();
+                    assertThat(event.systemContext()).isTrue();
+                    assertThat(event.traceId()).isEqualTo(result.context().traceId());
                 });
     }
 
