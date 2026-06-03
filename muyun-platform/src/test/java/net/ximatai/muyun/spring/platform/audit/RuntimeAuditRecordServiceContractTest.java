@@ -85,6 +85,10 @@ class RuntimeAuditRecordServiceContractTest {
                 .isEqualTo("approve");
         assertThat(service.list(service.eventTypeCriteria(RuntimeEventType.ACTION_EXECUTED), PageRequest.of(1, 10)))
                 .hasSize(2);
+        assertThat(service.list(service.resultTypeCriteria("RECORD_ID"), PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getEventId)
+                .isEqualTo("event-2");
         assertThat(service.list(service.recordCriteria("sales.contract", "contract", "contract-2"), PageRequest.of(1, 10)))
                 .singleElement()
                 .extracting(RuntimeAuditRecord::getTraceId)
@@ -111,6 +115,10 @@ class RuntimeAuditRecordServiceContractTest {
                 .singleElement()
                 .extracting(RuntimeAuditRecord::getFailureStage)
                 .isEqualTo("execute");
+        assertThat(service.actionResults("VALUE", PageRequest.of(1, 10)))
+                .singleElement()
+                .extracting(RuntimeAuditRecord::getEventId)
+                .isEqualTo("event-1");
     }
 
     @Test
@@ -121,6 +129,9 @@ class RuntimeAuditRecordServiceContractTest {
         assertThatThrownBy(() -> service.recordTimeline("sales.contract", " ", "contract-1", PageRequest.of(1, 10)))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("entityAlias must not be blank");
+        assertThatThrownBy(() -> service.actionResults(" ", PageRequest.of(1, 10)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("resultType must not be blank");
     }
 
     @Test

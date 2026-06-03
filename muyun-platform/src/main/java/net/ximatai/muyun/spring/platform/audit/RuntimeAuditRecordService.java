@@ -99,6 +99,12 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
                 .eq("eventType", RuntimeEventType.ACTION_FAILED);
     }
 
+    public Criteria resultTypeCriteria(String resultType) {
+        return Criteria.of()
+                .eq("eventType", RuntimeEventType.ACTION_EXECUTED)
+                .eq("resultType", requireText(resultType, "resultType"));
+    }
+
     public List<RuntimeAuditRecord> traceEvents(String traceId, PageRequest pageRequest) {
         return list(traceCriteria(traceId), pageRequest, Sort.asc("occurredAt"));
     }
@@ -116,6 +122,10 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
 
     public List<RuntimeAuditRecord> failedActions(String moduleAlias, PageRequest pageRequest) {
         return list(failedActionCriteria(moduleAlias), pageRequest, Sort.desc("occurredAt"));
+    }
+
+    public List<RuntimeAuditRecord> actionResults(String resultType, PageRequest pageRequest) {
+        return list(resultTypeCriteria(resultType), pageRequest, Sort.desc("occurredAt"));
     }
 
     @Override
