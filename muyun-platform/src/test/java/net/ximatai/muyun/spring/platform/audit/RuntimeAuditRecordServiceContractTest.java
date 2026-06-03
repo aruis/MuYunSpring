@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.audit;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
@@ -44,7 +45,7 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getResultText()).isEqualTo("approved");
         assertThat(record.getSystemContext()).isFalse();
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
-        assertThat(record.getPayloadText()).contains("available=true");
+        assertThat(record.getPayloadText()).contains("resultType=VALUE");
         assertThat(record.getOccurredAt()).isEqualTo(Instant.parse("2026-06-02T04:00:00Z"));
     }
 
@@ -158,6 +159,18 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getResultText()).isNull();
     }
 
+    @Test
+    void shouldPersistInteractionOnlyActionAsPayloadSnapshot() {
+        String id = service.record(dialogActionEvent());
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
+        assertThat(record.getExecutorType()).isEqualTo("DIALOG");
+        assertThat(record.getResultType()).isEqualTo("DIALOG");
+        assertThat(record.getResultText()).isNull();
+        assertThat(record.getPayloadText()).contains("interactionOnly=true");
+    }
+
     private RuntimeEvent event() {
         return new RuntimeEvent(
                 "event-1",
@@ -170,15 +183,8 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                Map.of(
-                        "available", true,
-                        "executorType", "SERVICE",
-                        "resultType", "VALUE",
-                        "message", "审批通过",
-                        "refresh", true,
-                        "redirectTo", "/contracts/contract-1",
-                        "result", "approved"
-                ),
+                ActionEventPayload.executed("SERVICE", "VALUE", "审批通过",
+                        true, "/contracts/contract-1", false, "approved"),
                 Instant.parse("2026-06-02T04:00:00Z")
         );
     }
@@ -195,7 +201,7 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                Map.of("executorType", "STANDARD", "resultType", "RECORD_ID", "result", "contract-2"),
+                ActionEventPayload.executed("STANDARD", "RECORD_ID", null, false, null, false, "contract-2"),
                 Instant.parse("2026-06-02T04:05:00Z")
         );
     }
@@ -254,6 +260,24 @@ class RuntimeAuditRecordServiceContractTest {
                         "errorType", IllegalStateException.class.getName()
                 ),
                 Instant.parse("2026-06-02T04:15:00Z")
+        );
+    }
+
+    private RuntimeEvent dialogActionEvent() {
+        return new RuntimeEvent(
+                "dialog-action-event",
+                "dialog-trace",
+                RuntimeEventType.ACTION_EXECUTED,
+                "sales.contract",
+                "contract",
+                "contract-1",
+                "submitDialog",
+                "tenant-1",
+                false,
+                RuntimeMutationSource.ACTION,
+                ActionEventPayload.executed("DIALOG", "DIALOG", null,
+                        false, null, true, null),
+                Instant.parse("2026-06-02T04:20:00Z")
         );
     }
 }

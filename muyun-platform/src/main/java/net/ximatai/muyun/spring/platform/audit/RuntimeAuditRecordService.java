@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -52,19 +53,19 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
 
     private void fillActionPayload(RuntimeAuditRecord record, RuntimeEvent event) {
         if (event.eventType() == RuntimeEventType.ACTION_EXECUTED) {
-            record.setExecutorType(textPayload(event.payload(), "executorType"));
-            record.setResultType(textPayload(event.payload(), "resultType"));
-            record.setResultMessage(textPayload(event.payload(), "message"));
-            record.setRefreshRequested(booleanPayload(event.payload(), "refresh"));
-            record.setRedirectTo(textPayload(event.payload(), "redirectTo"));
-            record.setResultText(textPayload(event.payload(), "result"));
+            record.setExecutorType(ActionEventPayload.text(event.payload(), ActionEventPayload.EXECUTOR_TYPE));
+            record.setResultType(ActionEventPayload.text(event.payload(), ActionEventPayload.RESULT_TYPE));
+            record.setResultMessage(ActionEventPayload.text(event.payload(), ActionEventPayload.MESSAGE));
+            record.setRefreshRequested(ActionEventPayload.bool(event.payload(), ActionEventPayload.REFRESH));
+            record.setRedirectTo(ActionEventPayload.text(event.payload(), ActionEventPayload.REDIRECT_TO));
+            record.setResultText(ActionEventPayload.text(event.payload(), ActionEventPayload.RESULT));
             return;
         }
         if (event.eventType() == RuntimeEventType.ACTION_FAILED) {
-            record.setExecutorType(textPayload(event.payload(), "executorType"));
-            record.setFailureStage(textPayload(event.payload(), "failureStage"));
-            record.setErrorMessage(textPayload(event.payload(), "errorMessage"));
-            record.setErrorType(textPayload(event.payload(), "errorType"));
+            record.setExecutorType(ActionEventPayload.text(event.payload(), ActionEventPayload.EXECUTOR_TYPE));
+            record.setFailureStage(ActionEventPayload.text(event.payload(), ActionEventPayload.FAILURE_STAGE));
+            record.setErrorMessage(ActionEventPayload.text(event.payload(), ActionEventPayload.ERROR_MESSAGE));
+            record.setErrorType(ActionEventPayload.text(event.payload(), ActionEventPayload.ERROR_TYPE));
         }
     }
 
@@ -147,28 +148,6 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
 
     private String payloadText(Map<String, Object> payload) {
         return payload == null || payload.isEmpty() ? null : payload.toString();
-    }
-
-    private String textPayload(Map<String, Object> payload, String key) {
-        if (payload == null || !payload.containsKey(key)) {
-            return null;
-        }
-        Object value = payload.get(key);
-        return value == null ? null : String.valueOf(value);
-    }
-
-    private Boolean booleanPayload(Map<String, Object> payload, String key) {
-        if (payload == null || !payload.containsKey(key)) {
-            return null;
-        }
-        Object value = payload.get(key);
-        if (value instanceof Boolean booleanValue) {
-            return booleanValue;
-        }
-        if (value instanceof String stringValue) {
-            return Boolean.parseBoolean(stringValue);
-        }
-        return null;
     }
 
     private String requireText(String value, String fieldName) {

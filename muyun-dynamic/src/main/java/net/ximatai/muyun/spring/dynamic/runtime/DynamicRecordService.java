@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
+import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
@@ -718,43 +719,28 @@ public class DynamicRecordService {
     }
 
     private Map<String, Object> actionPayload(DynamicActionExecutionContext context, DynamicActionResultBody body) {
-        Map<String, Object> payload = new java.util.LinkedHashMap<>();
-        payload.put("executorType", context.action().executorType().name());
-        payload.put("available", context.availability().available());
-        payload.put("resultType", body.type().name());
-        if (isInteractionOnlyAction(context.action())) {
-            payload.put("interactionOnly", true);
-        }
-        if (body.message() != null) {
-            payload.put("message", body.message());
-        }
-        if (body.refresh()) {
-            payload.put("refresh", true);
-        }
-        if (body.redirectTo() != null) {
-            payload.put("redirectTo", body.redirectTo());
-        }
-        if (body.value() != null && isSimpleEventValue(body.value())) {
-            payload.put("result", body.value());
-        }
-        return payload;
+        return ActionEventPayload.executed(
+                context.action().executorType().name(),
+                body.type().name(),
+                body.message(),
+                body.refresh(),
+                body.redirectTo(),
+                isInteractionOnlyAction(context.action()),
+                isSimpleEventValue(body.value()) ? body.value() : null
+        );
     }
 
     private Map<String, Object> actionFailurePayload(DynamicActionExecutionContext context,
                                                      String failureStage,
                                                      String errorMessage,
                                                      Throwable cause) {
-        Map<String, Object> payload = new java.util.LinkedHashMap<>();
-        payload.put("executorType", context.action().executorType().name());
-        payload.put("available", context.availability().available());
-        payload.put("failureStage", failureStage);
-        if (errorMessage != null && !errorMessage.isBlank()) {
-            payload.put("errorMessage", errorMessage);
-        }
-        if (cause != null) {
-            payload.put("errorType", cause.getClass().getName());
-        }
-        return payload;
+        return ActionEventPayload.failed(
+                context.action().executorType().name(),
+                context.availability().available(),
+                failureStage,
+                errorMessage,
+                cause == null ? null : cause.getClass().getName()
+        );
     }
 
     private Throwable failureError(DynamicActionExecutionException exception) {
