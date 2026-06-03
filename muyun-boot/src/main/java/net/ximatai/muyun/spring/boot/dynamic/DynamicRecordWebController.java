@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.dynamic;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.boot.web.ActionWeb;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
@@ -48,7 +49,12 @@ import java.util.function.Supplier;
 public class DynamicRecordWebController implements
         CrudWeb<DynamicRecord, DynamicEntityOperations>,
         EnableWeb<DynamicRecord, DynamicEntityOperations>,
-        TreeWeb<DynamicRecord, DynamicEntityOperations> {
+        TreeWeb<DynamicRecord, DynamicEntityOperations>,
+        ActionWeb<DynamicEntityOperations,
+                DynamicWebActionRequest,
+                DynamicActionDescriptor,
+                DynamicWebActionAvailabilityResponse,
+                DynamicWebActionExecutionResponse> {
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
@@ -95,64 +101,54 @@ public class DynamicRecordWebController implements
         return tenantScope(moduleAlias, () -> recordService.openApi(moduleAlias));
     }
 
-    @PostMapping("/actions")
-    public List<DynamicActionDescriptor> mainEntityActions(@PathVariable String moduleAlias) {
-        return tenantScope(moduleAlias, () -> recordService.actions(moduleAlias));
+    @Override
+    public List<DynamicActionDescriptor> listActions() {
+        return recordService.actions(DynamicWebRequest.moduleAlias());
     }
 
-    @PostMapping("/actions/{recordId}")
-    public List<DynamicWebActionAvailabilityResponse> mainEntityRecordActions(@PathVariable String moduleAlias,
-                                                                              @PathVariable String recordId) {
-        return tenantScope(moduleAlias, () -> {
-            String entityAlias = mainEntityAlias(moduleAlias);
-            DynamicRecord record = recordService.select(moduleAlias, entityAlias, recordId);
-            if (record == null) {
-                throw new IllegalArgumentException("dynamic record does not exist: " + recordId);
-            }
-            return recordService.actions(moduleAlias).stream()
-                    .filter(DynamicRecordWebController::isRecordAction)
-                    .map(action -> DynamicWebActionAvailabilityResponse.from(action,
-                            recordService.actionAvailability(moduleAlias, action.code(), record)))
-                    .toList();
-        });
+    @Override
+    public List<DynamicWebActionAvailabilityResponse> listRecordActions(String recordId) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        String entityAlias = mainEntityAlias(moduleAlias);
+        DynamicRecord record = recordService.select(moduleAlias, entityAlias, recordId);
+        if (record == null) {
+            throw new IllegalArgumentException("dynamic record does not exist: " + recordId);
+        }
+        return recordService.actions(moduleAlias).stream()
+                .filter(DynamicRecordWebController::isRecordAction)
+                .map(action -> DynamicWebActionAvailabilityResponse.from(action,
+                        recordService.actionAvailability(moduleAlias, action.code(), record)))
+                .toList();
     }
 
-    @PostMapping("/{actionCode}")
-    public DynamicWebActionExecutionResponse executeListAction(@PathVariable String moduleAlias,
-                                                               @PathVariable String actionCode,
-                                                               @RequestBody(required = false) DynamicWebActionRequest request) {
-        return tenantScope(moduleAlias, () -> {
-            requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
-                    "dynamic action does not support list path: ");
-            return executeAction(moduleAlias, actionCode, null, request);
-        });
+    @Override
+    public DynamicWebActionExecutionResponse executeListAction(String actionCode, DynamicWebActionRequest request) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.LIST, EntityActionLevel.ANY),
+                "dynamic action does not support list path: ");
+        return executeAction(moduleAlias, actionCode, null, request);
     }
 
-    @PostMapping("/{actionCode}/batch")
-    public DynamicWebActionExecutionResponse executeBatchAction(@PathVariable String moduleAlias,
-                                                                @PathVariable String actionCode,
-                                                                @RequestBody(required = false) DynamicWebActionRequest request) {
-        return tenantScope(moduleAlias, () -> {
-            DynamicWebActionRequest normalized = request == null ? DynamicWebActionRequest.empty() : request;
-            if (normalized.ids().isEmpty()) {
-                throw new IllegalArgumentException("batch action requires ids");
-            }
-            requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.BATCH, EntityActionLevel.ANY),
-                    "dynamic action does not support batch path: ");
-            return executeAction(moduleAlias, actionCode, null, normalized);
-        });
+    @Override
+    public DynamicWebActionExecutionResponse executeBatchAction(String actionCode, DynamicWebActionRequest request) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        DynamicWebActionRequest normalized = request == null ? DynamicWebActionRequest.empty() : request;
+        if (normalized.ids().isEmpty()) {
+            throw new IllegalArgumentException("batch action requires ids");
+        }
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.BATCH, EntityActionLevel.ANY),
+                "dynamic action does not support batch path: ");
+        return executeAction(moduleAlias, actionCode, null, normalized);
     }
 
-    @PostMapping("/{actionCode}/{recordId}")
-    public DynamicWebActionExecutionResponse executeRecordAction(@PathVariable String moduleAlias,
-                                                                 @PathVariable String actionCode,
-                                                                 @PathVariable String recordId,
-                                                                 @RequestBody(required = false) DynamicWebActionRequest request) {
-        return tenantScope(moduleAlias, () -> {
-            requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.RECORD, EntityActionLevel.ANY),
-                    "dynamic action does not support record path: ");
-            return executeAction(moduleAlias, actionCode, recordId, request);
-        });
+    @Override
+    public DynamicWebActionExecutionResponse executeRecordAction(String actionCode,
+                                                                 String recordId,
+                                                                 DynamicWebActionRequest request) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.RECORD, EntityActionLevel.ANY),
+                "dynamic action does not support record path: ");
+        return executeAction(moduleAlias, actionCode, recordId, request);
     }
 
     private DynamicWebActionExecutionResponse executeAction(String moduleAlias,
