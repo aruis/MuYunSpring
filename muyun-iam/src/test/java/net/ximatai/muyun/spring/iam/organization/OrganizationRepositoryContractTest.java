@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.env.MockEnvironment;
@@ -62,17 +63,22 @@ class OrganizationRepositoryContractTest {
         organization.setCode("HQ");
         organization.setTitle("Headquarters");
 
-        String id = service.insert(organization);
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            id = service.insert(organization);
+        }
 
         assertThat(id).hasSize(32);
         assertThat(organization.getParentId()).isEqualTo(TreeAbility.ROOT_ID);
         assertThat(organization.getEnabled()).isTrue();
+        assertThat(organization.getTenantId()).isEqualTo("tenant_a");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
         assertThat(body.getValue())
                 .containsEntry("id", id)
                 .containsEntry("code", "HQ")
+                .containsEntry("tenant_id", "tenant_a")
                 .containsEntry("title", "Headquarters")
                 .containsEntry("parent_id", TreeAbility.ROOT_ID)
                 .containsEntry("enabled", Boolean.TRUE)
@@ -186,8 +192,10 @@ class OrganizationRepositoryContractTest {
         update.setTitle("Headquarters Updated");
         update.setVersion(2);
 
-        assertThat(service.update(update)).isEqualTo(1);
-        assertThat(service.delete("org-1")).isEqualTo(1);
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.update(update)).isEqualTo(1);
+            assertThat(service.delete("org-1")).isEqualTo(1);
+        }
 
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
         verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), where.capture());
