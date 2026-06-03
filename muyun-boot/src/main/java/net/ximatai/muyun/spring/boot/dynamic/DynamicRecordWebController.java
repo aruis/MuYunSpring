@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.ActionWeb;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
@@ -54,7 +55,10 @@ public class DynamicRecordWebController implements
                 DynamicWebActionRequest,
                 DynamicActionDescriptor,
                 DynamicWebActionAvailabilityResponse,
-                DynamicWebActionExecutionResponse> {
+                DynamicWebActionExecutionResponse>,
+        ReferenceWeb<DynamicEntityOperations,
+                DynamicWebReferenceRequest,
+                DynamicReferenceResolveResponse> {
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
@@ -151,6 +155,13 @@ public class DynamicRecordWebController implements
         return executeAction(moduleAlias, actionCode, recordId, request);
     }
 
+    @Override
+    @PostMapping("/references/{fieldName}/resolve")
+    public DynamicReferenceResolveResponse reference(@PathVariable String fieldName,
+                                                     @RequestBody(required = false) DynamicWebReferenceRequest request) {
+        return ReferenceWeb.super.reference(fieldName, request);
+    }
+
     private DynamicWebActionExecutionResponse executeAction(String moduleAlias,
                                                             String actionCode,
                                                             String pathRecordId,
@@ -160,23 +171,20 @@ public class DynamicRecordWebController implements
                 moduleAlias, actionCode, actionRequest(moduleAlias, entityAlias, pathRecordId, request)));
     }
 
-    @PostMapping("/references/{fieldName}/resolve")
-    public DynamicReferenceResolveResponse resolveReference(@PathVariable String moduleAlias,
-                                                            @PathVariable String fieldName,
-                                                            @RequestBody(required = false) DynamicWebReferenceRequest request) {
-        return tenantScope(moduleAlias, () -> {
-            String entityAlias = mainEntityAlias(moduleAlias);
-            DynamicWebReferenceRequest normalized = request == null ? DynamicWebReferenceRequest.empty() : request;
-            return recordService.resolveFieldReference(moduleAlias, entityAlias, fieldName, new DynamicReferenceResolveRequest(
-                    normalized.mode(),
-                    normalized.matchMode(),
-                    normalized.fuzzy(),
-                    normalized.values(),
-                    criteria(moduleAlias, entityAlias, normalized.conditions()),
-                    DynamicWebQueryMapper.page(normalized.page()),
-                    normalized.includeProjections()
-            ));
-        });
+    @Override
+    public DynamicReferenceResolveResponse resolveReference(String fieldName, DynamicWebReferenceRequest request) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        String entityAlias = mainEntityAlias(moduleAlias);
+        DynamicWebReferenceRequest normalized = request == null ? DynamicWebReferenceRequest.empty() : request;
+        return recordService.resolveFieldReference(moduleAlias, entityAlias, fieldName, new DynamicReferenceResolveRequest(
+                normalized.mode(),
+                normalized.matchMode(),
+                normalized.fuzzy(),
+                normalized.values(),
+                criteria(moduleAlias, entityAlias, normalized.conditions()),
+                DynamicWebQueryMapper.page(normalized.page()),
+                normalized.includeProjections()
+        ));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, ModuleDefinitionException.class, PlatformException.class})
