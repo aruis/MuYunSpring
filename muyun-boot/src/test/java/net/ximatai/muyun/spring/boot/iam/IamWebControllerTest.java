@@ -6,8 +6,10 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.boot.web.TenantContextWebFilter;
+import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationDao;
@@ -39,10 +41,12 @@ class IamWebControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private TenantDao tenantDao;
     private OrganizationDao organizationDao;
+    private CurrentUser currentUser;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
+        currentUser = null;
         tenantDao = mock(TenantDao.class);
         organizationDao = mock(OrganizationDao.class);
         TenantService tenantService = new TenantService(tenantDao);
@@ -57,13 +61,14 @@ class IamWebControllerTest {
                         organizationController
                 )
                 .setControllerAdvice(new IamWebExceptionHandler())
-                .addFilters(new TenantContextWebFilter())
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.ofNullable(currentUser)))
                 .build();
     }
 
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+        CurrentUserContext.clear();
     }
 
     @Test
@@ -93,6 +98,7 @@ class IamWebControllerTest {
 
     @Test
     void shouldExposeOrganizationTreeUnderTenantScope() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any()))
                 .thenAnswer(invocation -> {
@@ -103,8 +109,7 @@ class IamWebControllerTest {
                     return List.of(organization);
                 });
 
-        mvc.perform(post("/iam.organization/tree")
-                        .header(TenantContextWebFilter.TENANT_HEADER, "tenant_a"))
+        mvc.perform(post("/iam.organization/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("org-1"))
                 .andExpect(jsonPath("$.records[0].tenantId").value("tenant_a"))
@@ -113,6 +118,7 @@ class IamWebControllerTest {
 
     @Test
     void shouldCreateOrganizationUnderTenantScope() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
         when(organizationDao.insert(any())).thenAnswer(invocation -> {
             assertThat(TenantContext.currentTenantId()).contains("tenant_a");
@@ -124,7 +130,6 @@ class IamWebControllerTest {
                 .thenReturn(List.of(organization("org-1", "HQ", "Headquarters")));
 
         mvc.perform(post("/iam.organization/insert")
-                        .header(TenantContextWebFilter.TENANT_HEADER, "tenant_a")
                         .contentType("application/json")
                         .content(json(organization(null, "HQ", "Headquarters"))))
                 .andExpect(status().isCreated())
@@ -133,18 +138,18 @@ class IamWebControllerTest {
 
     @Test
     void shouldRejectOrganizationAccessWhenTenantIsInactive() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         doThrow(new PlatformException("Tenant is not active: tenant_a"))
                 .when(tenantDao).query(any(Criteria.class), any(PageRequest.class));
 
-        mvc.perform(post("/iam.organization/tree")
-                        .header(TenantContextWebFilter.TENANT_HEADER, "tenant_a"))
+        mvc.perform(post("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Tenant is not active: tenant_a"));
     }
 
     @Test
-    void shouldRequireTenantHeaderForOrganizationAccess() throws Exception {
+    void shouldRequireCurrentUserTenantForOrganizationAccess() throws Exception {
         mvc.perform(post("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
