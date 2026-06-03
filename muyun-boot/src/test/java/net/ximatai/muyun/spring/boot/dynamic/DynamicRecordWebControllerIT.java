@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
@@ -82,7 +83,7 @@ class DynamicRecordWebControllerIT {
 
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
-        DynamicRecordService.EntityOperations mainEntity = mock(DynamicRecordService.EntityOperations.class);
+        DynamicEntityOperations mainEntity = mock(DynamicEntityOperations.class);
         when(recordService.mainEntity(MODULE)).thenReturn(mainEntity);
         when(mainEntity.select("contract-1")).thenReturn(record);
 

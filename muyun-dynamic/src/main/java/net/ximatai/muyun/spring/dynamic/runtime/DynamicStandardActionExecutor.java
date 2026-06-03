@@ -8,7 +8,7 @@ final class DynamicStandardActionExecutor {
     private final DynamicRecordService service;
     private final String moduleAlias;
     private final String entityAlias;
-    private final DynamicRecordService.EntityOperations operations;
+    private final DynamicEntityOperations operations;
     private final String traceId;
 
     DynamicStandardActionExecutor(DynamicRecordService service, String moduleAlias, String entityAlias, String traceId) {

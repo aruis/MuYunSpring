@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -45,9 +46,9 @@ import java.util.function.Supplier;
 @RestController
 @RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
 public class DynamicRecordWebController implements
-        CrudWeb<DynamicRecord, DynamicRecordService.EntityOperations>,
-        EnableWeb<DynamicRecord, DynamicRecordService.EntityOperations>,
-        TreeWeb<DynamicRecord, DynamicRecordService.EntityOperations> {
+        CrudWeb<DynamicRecord, DynamicEntityOperations>,
+        EnableWeb<DynamicRecord, DynamicEntityOperations>,
+        TreeWeb<DynamicRecord, DynamicEntityOperations> {
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
@@ -59,7 +60,7 @@ public class DynamicRecordWebController implements
     }
 
     @Override
-    public DynamicRecordService.EntityOperations service() {
+    public DynamicEntityOperations service() {
         return recordService.mainEntity(DynamicWebRequest.moduleAlias());
     }
 

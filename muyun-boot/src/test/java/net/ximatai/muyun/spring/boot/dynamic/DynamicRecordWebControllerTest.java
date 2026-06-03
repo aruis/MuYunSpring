@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionDialog;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -75,14 +76,14 @@ class DynamicRecordWebControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private DynamicRecordService service;
-    private DynamicRecordService.EntityOperations mainEntity;
+    private DynamicEntityOperations mainEntity;
     private ActiveTenantVerifier activeTenantVerifier;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(DynamicRecordService.class);
-        mainEntity = mock(DynamicRecordService.EntityOperations.class);
+        mainEntity = mock(DynamicEntityOperations.class);
         activeTenantVerifier = mock(ActiveTenantVerifier.class);
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
         when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));

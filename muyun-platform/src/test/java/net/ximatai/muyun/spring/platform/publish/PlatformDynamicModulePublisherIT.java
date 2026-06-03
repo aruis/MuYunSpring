@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -176,7 +177,7 @@ class PlatformDynamicModulePublisherIT {
 
         publisher.publish("crm.customer");
         DynamicRecordService runtimeService = new DynamicRecordService(runtime);
-        DynamicRecordService.EntityOperations customer = runtimeService.entity("crm.customer", "customer");
+        DynamicEntityOperations customer = runtimeService.entity("crm.customer", "customer");
         DynamicRecord contact = runtime.newRecord("crm.customer", "customer_contact")
                 .setValue("title", "张三")
                 .setValue("quantity", 3);

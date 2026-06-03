@@ -101,7 +101,7 @@ class DynamicRecordServiceTest {
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
         DynamicRecordService service = service(operations, contractEntity());
-        DynamicRecordService.EntityOperations contracts = service.entity(MODULE, "contract");
+        DynamicEntityOperations contracts = service.entity(MODULE, "contract");
         DynamicRecord record = contracts.newRecord()
                 .setValue("code", "C-001")
                 .setValue("amount", BigDecimal.TEN);
@@ -132,7 +132,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldKeepCapabilityGatesThroughBoundEntityOperations() {
         DynamicRecordService service = service(operations(), contractEntity());
-        DynamicRecordService.EntityOperations contracts = service.entity(MODULE, "contract");
+        DynamicEntityOperations contracts = service.entity(MODULE, "contract");
 
         assertThatThrownBy(() -> contracts.enable("contract-1"))
                 .isInstanceOf(PlatformException.class)
@@ -1313,7 +1313,7 @@ class DynamicRecordServiceTest {
     void shouldRejectSoftDeletedTargetWhenSavingReference() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
-        DynamicRecordService.EntityOperations lines = referenceResolvingService(operations).entity(MODULE, "line");
+        DynamicEntityOperations lines = referenceResolvingService(operations).entity(MODULE, "line");
         DynamicRecord line = lines.newRecord()
                 .setValue("contractId", "deleted-contract")
                 .setValue("summary", "should fail");
@@ -1593,7 +1593,7 @@ class DynamicRecordServiceTest {
         };
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, validator)
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(dictionaryEntity())));
-        DynamicRecordService.EntityOperations contracts = new DynamicRecordService(runtime).entity(MODULE, "contract");
+        DynamicEntityOperations contracts = new DynamicRecordService(runtime).entity(MODULE, "contract");
         DynamicRecord record = contracts.newRecord()
                 .setValue("code", "C-001")
                 .setValue("status", "active");

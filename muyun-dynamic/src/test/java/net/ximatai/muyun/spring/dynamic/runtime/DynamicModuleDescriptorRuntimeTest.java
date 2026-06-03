@@ -80,7 +80,7 @@ class DynamicModuleDescriptorRuntimeTest {
         DynamicRecordService service = new DynamicRecordService(runtime);
 
         DynamicRecordService.ModuleOperations moduleApi = service.module("sales.contract");
-        DynamicRecordService.EntityOperations contractApi = moduleApi.entity("contract");
+        DynamicEntityOperations contractApi = moduleApi.entity("contract");
 
         assertThat(moduleApi.describe().moduleAlias()).isEqualTo("sales.contract");
         assertThat(moduleApi.actions()).extracting(action -> action.code()).contains("create");
@@ -96,7 +96,7 @@ class DynamicModuleDescriptorRuntimeTest {
         assertThat(contractApi.action("create").actionAuth()).isTrue();
         assertThat(contractApi.view(EntityViewType.FORM).title()).isEqualTo("Contract form");
         assertThat(contractApi.associationView("lines").targetEntityAlias()).isEqualTo("line");
-        DynamicRecordService.EntityOperations lineApi = service.entity("sales.contract", "line");
+        DynamicEntityOperations lineApi = service.entity("sales.contract", "line");
         assertThat(lineApi.actions()).extracting(action -> action.code()).contains("exportLine");
         assertThat(lineApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
         assertThat(lineApi.reference("contractId").targetEntityAlias()).isEqualTo("contract");
@@ -134,7 +134,7 @@ class DynamicModuleDescriptorRuntimeTest {
                 List.of(EntityReferenceDefinition.to("line", "contractId", "sales.contract.contract")
                         .withProjection("code", "contractCode"))
         );
-        DynamicRecordService.EntityOperations lineApi = new DynamicRecordService(
+        DynamicEntityOperations lineApi = new DynamicRecordService(
                 new DynamicRecordRuntime(operations).publish(module)).entity("sales.contract", "line");
 
         DynamicReferenceResolveResponse response = lineApi.resolveFieldReference("contractId",
