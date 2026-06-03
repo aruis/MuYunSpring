@@ -64,6 +64,7 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.requestSchema()).isEqualTo("DynamicWebActionRequest");
                     assertThat(operation.responseSchema()).isEqualTo("DynamicWebActionExecutionResponse");
                     assertThat(operation.actionCode()).isEqualTo("submit");
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:submit");
                     assertThat(operation.errorCodes()).contains("DYNAMIC_ACTION_FAILED", "DYNAMIC_CONFLICT");
                 });
         assertThat(document.operations().stream()
@@ -74,6 +75,7 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.requestSchema()).isEqualTo("DynamicRecordPayload");
                     assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.CREATE.code());
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:create");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/update/{id}"))

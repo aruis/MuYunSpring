@@ -7,6 +7,9 @@ import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
@@ -190,6 +193,44 @@ class DynamicModuleDescriptorTest {
                     assertThat(fieldReference.targetModuleAlias()).isEqualTo("crm.customer");
                     assertThat(fieldReference.targetEntityAlias()).isEqualTo("customer");
                 });
+    }
+
+    @Test
+    void shouldExposeDerivedPermissionMountForDynamicActions() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        FieldDefinition.titleField()
+                ))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(
+                        new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                                "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                                EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                                true, true, "view", null, null,
+                                EntityActionExecutorType.SERVICE, "contractSubmit")
+                )
+        );
+
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(module);
+
+        assertThat(descriptor.actions().stream()
+                .filter(action -> action.code().equals("view"))
+                .findFirst())
+                .get()
+                .satisfies(action -> assertThat(action.permission())
+                        .isEqualTo(new ActionPermissionDescriptor("sales.contract:view", true, false, null, null)));
+        assertThat(descriptor.actions().stream()
+                .filter(action -> action.code().equals("submit"))
+                .findFirst())
+                .get()
+                .satisfies(action -> assertThat(action.permission())
+                        .isEqualTo(new ActionPermissionDescriptor("sales.contract:submit", true, true,
+                                "view", "sales.contract:view")));
     }
 
     @Test

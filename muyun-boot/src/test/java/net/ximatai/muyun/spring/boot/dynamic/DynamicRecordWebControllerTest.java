@@ -317,8 +317,12 @@ class DynamicRecordWebControllerTest {
         mvc.perform(get("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("export"))
+                .andExpect(jsonPath("$[0].permission.permissionCode").value(MODULE + ":export"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
                 .andExpect(jsonPath("$[1].authInheritActionCode").value("view"))
+                .andExpect(jsonPath("$[1].permission.permissionCode").value(MODULE + ":submit"))
+                .andExpect(jsonPath("$[1].permission.inheritActionCode").value("view"))
+                .andExpect(jsonPath("$[1].permission.inheritPermissionCode").value(MODULE + ":view"))
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
@@ -976,7 +980,7 @@ class DynamicRecordWebControllerTest {
         return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "Submit", true,
                 EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
-                EntityActionExecutorType.SERVICE, "submitExecutor");
+                EntityActionExecutorType.SERVICE, "submitExecutor").withPermission(MODULE);
     }
 
     private DynamicActionDescriptor dialogAction(String code, EntityActionLevel level) {

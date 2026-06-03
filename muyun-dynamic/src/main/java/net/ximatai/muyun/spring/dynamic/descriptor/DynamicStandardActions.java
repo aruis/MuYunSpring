@@ -34,7 +34,7 @@ final class DynamicStandardActions {
                                                   DynamicActionDescriptor standard) {
         DynamicActionKind kind = standard == null ? DynamicActionKind.from(configured.kind()) : standard.kind();
         EntityActionDefinition execution = standard == null ? configured : null;
-        return new DynamicActionDescriptor(
+        DynamicActionDescriptor descriptor = new DynamicActionDescriptor(
                 configured.actionCode(),
                 kind,
                 configured.title(),
@@ -51,6 +51,10 @@ final class DynamicStandardActions {
                 execution == null ? standard.executorType() : execution.executorType(),
                 execution == null ? standard.executorKey() : execution.executorKey()
         );
+        if (moduleAlias == null) {
+            return descriptor;
+        }
+        return descriptor.withPermission(moduleAlias);
     }
 
     private static void put(Map<String, DynamicActionDescriptor> actions, DynamicActionDescriptor action) {

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.openapi;
 
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.common.platform.PlatformPermissionCode;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -50,42 +51,42 @@ public class DynamicOpenApiGenerator {
                                                               DynamicEntityDescriptor mainEntity,
                                                               String basePath) {
         List<DynamicOpenApiDocument.Operation> operations = new ArrayList<>();
-        operations.add(getOperation(basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
+        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
                 "Describe " + descriptor.title(), null, "DynamicModuleDescriptor", null));
-        operations.add(getOperation(basePath + "/openapi", operationId(descriptor, "openApi"),
+        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/openapi", operationId(descriptor, "openApi"),
                 "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
-        operations.add(operation(basePath + "/query", operationId(descriptor, "query"),
+        operations.add(operation(descriptor.moduleAlias(), basePath + "/query", operationId(descriptor, "query"),
                 "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));
-        operations.add(getOperation(basePath + "/view/{id}", operationId(descriptor, "view"),
+        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
                 "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
-        operations.add(operation(basePath + "/insert", operationId(descriptor, "insert"),
+        operations.add(operation(descriptor.moduleAlias(), basePath + "/insert", operationId(descriptor, "insert"),
                 "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.CREATE.code()));
-        operations.add(operation(basePath + "/update/{id}", operationId(descriptor, "update"),
+        operations.add(operation(descriptor.moduleAlias(), basePath + "/update/{id}", operationId(descriptor, "update"),
                 "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
-        operations.add(operation(basePath + "/delete/{id}", operationId(descriptor, "delete"),
+        operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
                 "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())) {
-            operations.add(operation(basePath + "/enable/{id}", operationId(descriptor, "enable"),
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/enable/{id}", operationId(descriptor, "enable"),
                     "Enable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.ENABLE.code()));
-            operations.add(operation(basePath + "/disable/{id}", operationId(descriptor, "disable"),
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/disable/{id}", operationId(descriptor, "disable"),
                     "Disable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DISABLE.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.SORT.name())) {
             String sortRequestSchema = mainEntity.capabilities().contains(EntityCapability.TREE.name())
                     ? "TreeSortWebRequest"
                     : "SortWebRequest";
-            operations.add(operation(basePath + "/sort/{id}", operationId(descriptor, "sort"),
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/sort/{id}", operationId(descriptor, "sort"),
                     "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", PlatformAction.SORT.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
-            operations.add(getOperation(basePath + "/tree", operationId(descriptor, "tree"),
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/tree", operationId(descriptor, "tree"),
                     "Tree " + mainEntity.title(), null, "WebListResponse", PlatformAction.TREE.code()));
-            operations.add(getOperation(basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
                     "Tree node " + mainEntity.title(), null, "WebListResponse", PlatformAction.TREE.code()));
         }
-        operations.add(getOperation(basePath + "/actions", operationId(descriptor, "actions"),
+        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/actions", operationId(descriptor, "actions"),
                 "List module actions", null, "DynamicActionDescriptorList", null));
-        operations.add(getOperation(basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),
+        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),
                 "List record actions", null, "DynamicWebActionAvailabilityList", null));
         descriptor.actions().stream()
                 .filter(DynamicActionDescriptor::enabled)
@@ -95,7 +96,7 @@ public class DynamicOpenApiGenerator {
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
         mainEntity.fields().stream()
                 .filter(field -> field.reference() != null)
-                .forEach(field -> operations.add(operation(basePath + "/references/" + field.fieldName() + "/resolve",
+                .forEach(field -> operations.add(operation(descriptor.moduleAlias(), basePath + "/references/" + field.fieldName() + "/resolve",
                         operationId(descriptor, "resolve" + upperName(field.fieldName())),
                         "Resolve reference " + field.title(),
                         "DynamicWebReferenceRequest",
@@ -123,7 +124,7 @@ public class DynamicOpenApiGenerator {
                                                             DynamicActionDescriptor action,
                                                             String path,
                                                             String scope) {
-        return operation(path,
+        return operation(descriptor.moduleAlias(), path,
                 operationId(descriptor, scope + upperName(action.code())),
                 action.title(),
                 "DynamicWebActionRequest",
@@ -131,25 +132,28 @@ public class DynamicOpenApiGenerator {
                 action.code());
     }
 
-    private DynamicOpenApiDocument.Operation operation(String path,
+    private DynamicOpenApiDocument.Operation operation(String moduleAlias,
+                                                       String path,
                                                        String operationId,
                                                        String summary,
                                                        String requestSchema,
                                                        String responseSchema,
                                                        String actionCode) {
-        return operation(METHOD_POST, path, operationId, summary, requestSchema, responseSchema, actionCode);
+        return operation(METHOD_POST, moduleAlias, path, operationId, summary, requestSchema, responseSchema, actionCode);
     }
 
-    private DynamicOpenApiDocument.Operation getOperation(String path,
+    private DynamicOpenApiDocument.Operation getOperation(String moduleAlias,
+                                                          String path,
                                                           String operationId,
                                                           String summary,
                                                           String requestSchema,
                                                           String responseSchema,
                                                           String actionCode) {
-        return operation(METHOD_GET, path, operationId, summary, requestSchema, responseSchema, actionCode);
+        return operation(METHOD_GET, moduleAlias, path, operationId, summary, requestSchema, responseSchema, actionCode);
     }
 
     private DynamicOpenApiDocument.Operation operation(String method,
+                                                       String moduleAlias,
                                                        String path,
                                                        String operationId,
                                                        String summary,
@@ -164,6 +168,7 @@ public class DynamicOpenApiGenerator {
                 requestSchema,
                 responseSchema,
                 actionCode,
+                actionCode == null ? null : PlatformPermissionCode.action(moduleAlias, actionCode),
                 DEFAULT_ERRORS
         );
     }

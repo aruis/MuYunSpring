@@ -34,6 +34,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicReferenceResolveResponse", referenceResolveResponseSchema());
         schemas.put("DynamicModuleDescriptor", moduleDescriptorSchema());
         schemas.put("DynamicActionDescriptor", actionDescriptorSchema());
+        schemas.put("ActionPermissionDescriptor", actionPermissionDescriptorSchema());
         schemas.put("DynamicEntityDescriptor", entityDescriptorSchema());
         schemas.put("DynamicFieldDescriptor", fieldDescriptorSchema());
         schemas.put("DynamicFieldCompanionDescriptor", fieldCompanionDescriptorSchema());
@@ -177,8 +178,20 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("unavailableMessage", stringProperty(true));
         properties.put("executorType", stringProperty(false));
         properties.put("executorKey", stringProperty(true));
+        properties.put("permission", objectProperty("ActionPermissionDescriptor"));
         return new DynamicOpenApiDocument.Schema("DynamicActionDescriptor", "object", null,
                 List.of("code", "kind", "title", "enabled", "actionLevel", "executorType"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionPermissionDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("permissionCode", stringProperty(false));
+        properties.put("actionAuth", booleanProperty(false));
+        properties.put("dataAuth", booleanProperty(false));
+        properties.put("inheritActionCode", stringProperty(true));
+        properties.put("inheritPermissionCode", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("ActionPermissionDescriptor", "object", null,
+                List.of("permissionCode", "actionAuth", "dataAuth"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema entityDescriptorSchema() {
@@ -350,6 +363,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("requestSchema", stringProperty(true));
         properties.put("responseSchema", stringProperty(true));
         properties.put("actionCode", stringProperty(true));
+        properties.put("permissionCode", stringProperty(true));
         properties.put("errorCodes", arrayProperty("string"));
         return new DynamicOpenApiDocument.Schema("DynamicOpenApiOperation", "object", null,
                 List.of("method", "path", "operationId"), properties, null);

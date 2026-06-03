@@ -25,6 +25,7 @@ public record DynamicOpenApiDocument(
             String requestSchema,
             String responseSchema,
             String actionCode,
+            String permissionCode,
             List<String> errorCodes
     ) {
         public Operation {
