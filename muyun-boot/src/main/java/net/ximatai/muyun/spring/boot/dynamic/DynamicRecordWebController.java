@@ -1,11 +1,9 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
-import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -13,7 +11,6 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
@@ -37,7 +34,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,9 +67,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         if (request == null || request.conditions().isEmpty()) {
             return Criteria.of();
         }
-        return service().queryCriteria(request.conditions().stream()
-                .map(this::dynamicQueryCondition)
-                .toList());
+        return service().queryCriteria(DynamicWebQueryMapper.queryConditionsFromWeb(request.conditions()));
     }
 
     @Override
@@ -81,9 +75,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         if (request == null || request.sorts().isEmpty()) {
             return new Sort[0];
         }
-        return request.sorts().stream()
-                .map(sort -> sort.desc() ? Sort.desc(sort.field()) : Sort.asc(sort.field()))
-                .toArray(Sort[]::new);
+        return DynamicWebQueryMapper.sortsFromWeb(request.sorts());
     }
 
     @PostMapping("/describe")
@@ -178,7 +170,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
                     normalized.fuzzy(),
                     normalized.values(),
                     criteria(moduleAlias, entityAlias, normalized.conditions()),
-                    page(normalized.page()),
+                    DynamicWebQueryMapper.page(normalized.page()),
                     normalized.includeProjections()
             ));
         });
@@ -232,31 +224,12 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         return action.get();
     }
 
-    private Criteria criteria(String moduleAlias, String entityAlias, Collection<DynamicWebQueryCondition> conditions) {
-        if (conditions == null || conditions.isEmpty()) {
+    private Criteria criteria(String moduleAlias, String entityAlias, List<DynamicWebQueryCondition> conditions) {
+        List<DynamicQueryCondition> queryConditions = DynamicWebQueryMapper.queryConditions(conditions);
+        if (queryConditions.isEmpty()) {
             return Criteria.of();
         }
-        return recordService.queryCriteria(moduleAlias, entityAlias, conditions.stream()
-                .map(condition -> new DynamicQueryCondition(
-                        condition.fieldName(),
-                        condition.operator(),
-                        condition.values()
-                ))
-                .toList());
-    }
-
-    private PageRequest page(DynamicWebPageRequest request) {
-        DynamicWebPageRequest normalized = request == null ? DynamicWebPageRequest.DEFAULT : request;
-        return PageRequest.of(normalized.pageNum(), normalized.pageSize());
-    }
-
-    private Sort[] sorts(List<DynamicWebSort> sorts) {
-        if (sorts == null || sorts.isEmpty()) {
-            return new Sort[0];
-        }
-        return sorts.stream()
-                .map(sort -> sort.desc() ? Sort.desc(sort.field()) : Sort.asc(sort.field()))
-                .toArray(Sort[]::new);
+        return recordService.queryCriteria(moduleAlias, entityAlias, queryConditions);
     }
 
     private DynamicActionExecutionRequest actionRequest(String moduleAlias,
@@ -273,7 +246,7 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
                 .withAfterId(normalized.afterId())
                 .withParentId(normalized.parentId())
                 .withFieldNames(normalized.fieldNames())
-                .withQueryConditions(queryConditions(normalized.conditions()))
+                .withQueryConditions(DynamicWebQueryMapper.queryConditions(normalized.conditions()))
                 .withPayload(normalized.payload());
         if (normalized.record() != null && entityAlias != null) {
             actionRequest = actionRequest.withRecord(actionRecord(moduleAlias, entityAlias, recordId, normalized.record()));
@@ -282,10 +255,10 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
             actionRequest = actionRequest.withCriteria(criteria(moduleAlias, entityAlias, normalized.conditions()));
         }
         if (normalized.page() != null) {
-            actionRequest = actionRequest.withPageRequest(page(normalized.page()));
+            actionRequest = actionRequest.withPageRequest(DynamicWebQueryMapper.page(normalized.page()));
         }
         if (!normalized.sorts().isEmpty()) {
-            actionRequest = actionRequest.withSorts(List.of(sorts(normalized.sorts())));
+            actionRequest = actionRequest.withSorts(List.of(DynamicWebQueryMapper.sorts(normalized.sorts())));
         }
         return actionRequest;
     }
@@ -331,30 +304,6 @@ public class DynamicRecordWebController implements CrudWeb<DynamicRecord, Dynami
         }
         record.setId(recordId);
         return record;
-    }
-
-    private List<DynamicQueryCondition> queryConditions(Collection<DynamicWebQueryCondition> conditions) {
-        if (conditions == null || conditions.isEmpty()) {
-            return List.of();
-        }
-        return conditions.stream()
-                .map(condition -> new DynamicQueryCondition(
-                        condition.fieldName(),
-                        condition.operator(),
-                        condition.values()
-                ))
-                .toList();
-    }
-
-    private DynamicQueryCondition dynamicQueryCondition(WebQueryCondition condition) {
-        DynamicQueryOperator operator = condition.operator() == null || condition.operator().isBlank()
-                ? null
-                : DynamicQueryOperator.valueOf(condition.operator());
-        return new DynamicQueryCondition(
-                condition.fieldName(),
-                operator,
-                condition.values()
-        );
     }
 
     private String rootMessage(Throwable throwable) {
