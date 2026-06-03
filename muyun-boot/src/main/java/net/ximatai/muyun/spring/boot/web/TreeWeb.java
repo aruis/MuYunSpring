@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.boot.web;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +16,7 @@ import java.util.List;
 
 public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeAbility<T>> extends ScopedWeb<S> {
     @PostMapping("/sort/{id}")
+    @ActionEndpoint(PlatformAction.SORT)
     default WebCountResponse sort(@PathVariable String id,
                                   @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -25,6 +28,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
     }
 
     @GetMapping("/tree")
+    @ActionEndpoint(PlatformAction.TREE)
     default WebListResponse<?> tree(@RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
             List<T> roots = service().children(TreeAbility.ROOT_ID);
@@ -41,6 +45,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
     }
 
     @GetMapping("/tree/{id}")
+    @ActionEndpoint(PlatformAction.TREE)
     default WebListResponse<?> tree(@PathVariable String id,
                                     @RequestParam(defaultValue = "false") boolean flat,
                                     @RequestParam(defaultValue = "true") boolean includeSelf) {

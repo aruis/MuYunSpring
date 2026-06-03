@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;

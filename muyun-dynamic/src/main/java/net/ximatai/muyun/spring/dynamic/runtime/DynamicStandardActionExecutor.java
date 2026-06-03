@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 final class DynamicStandardActionExecutor {
     private final DynamicRecordService service;
@@ -20,47 +21,57 @@ final class DynamicStandardActionExecutor {
     }
 
     DynamicActionResultBody execute(String actionCode, DynamicActionExecutionRequest request) {
-        return switch (actionCode) {
-            case "create" -> DynamicActionResultBody.createdRecordId(
+        PlatformAction action = PlatformAction.fromCode(actionCode)
+                .orElseThrow(() -> new IllegalArgumentException("unknown standard dynamic action: "
+                        + moduleAlias + "." + entityAlias + "." + actionCode));
+        return switch (action) {
+            case CREATE -> DynamicActionResultBody.createdRecordId(
                     service.createFromAction(moduleAlias, entityAlias, requireRecord(request, actionCode), traceId));
-            case "select" -> DynamicActionResultBody.of(operations.select(requireRecordId(request, actionCode)));
-            case "update" -> countResult(service.updateFromAction(moduleAlias, entityAlias, requireRecord(request, actionCode), traceId));
-            case "delete" -> countResult(service.deleteFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
-            case "list" -> DynamicActionResultBody.of(operations.list(criteria(request), requirePageRequest(request, actionCode), sorts(request)));
-            case "page" -> DynamicActionResultBody.of(operations.page(criteria(request), requirePageRequest(request, actionCode), sorts(request)));
-            case "count" -> new DynamicActionResultBody(DynamicActionResultType.COUNT,
-                    operations.count(criteria(request)), null, false, null);
-            case "queryCriteria" -> DynamicActionResultBody.of(operations.queryCriteria(request.queryConditions()));
-            case "sortedList" -> DynamicActionResultBody.of(operations.sortedList(criteria(request)));
-            case "reorder" -> {
-                service.reorderFromAction(moduleAlias, entityAlias, request.orderedIds(), traceId);
-                yield DynamicActionResultBody.refreshed();
-            }
-            case "moveBefore" -> {
-                service.moveBeforeFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode),
-                        requireText(request.beforeId(), "beforeId"), traceId);
-                yield DynamicActionResultBody.refreshed();
-            }
-            case "moveAfter" -> {
+            case VIEW -> DynamicActionResultBody.of(operations.select(requireRecordId(request, actionCode)));
+            case UPDATE -> countResult(service.updateFromAction(moduleAlias, entityAlias, requireRecord(request, actionCode), traceId));
+            case DELETE -> countResult(service.deleteFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
+            case QUERY -> DynamicActionResultBody.of(operations.page(criteria(request), requirePageRequest(request, actionCode), sorts(request)));
+            case SORT -> {
+                SortIntent intent = sortIntent(request, actionCode);
+                if (intent == SortIntent.REORDER) {
+                    service.reorderFromAction(moduleAlias, entityAlias, request.orderedIds(), traceId);
+                    yield DynamicActionResultBody.refreshed();
+                }
+                if (intent == SortIntent.MOVE_BEFORE) {
+                    service.moveBeforeFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode),
+                            request.beforeId(), traceId);
+                    yield DynamicActionResultBody.refreshed();
+                }
                 service.moveAfterFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode),
-                        requireText(request.afterId(), "afterId"), traceId);
+                        request.afterId(), traceId);
                 yield DynamicActionResultBody.refreshed();
             }
-            case "children" -> DynamicActionResultBody.of(operations.children(request.parentId()));
-            case "ancestorIds" -> DynamicActionResultBody.of(operations.ancestorIds(requireRecordId(request, actionCode)));
-            case "ancestorIdsAndSelf" -> DynamicActionResultBody.of(operations.ancestorIdsAndSelf(requireRecordId(request, actionCode)));
-            case "descendantIds" -> DynamicActionResultBody.of(operations.descendantIds(requireRecordId(request, actionCode)));
-            case "title" -> DynamicActionResultBody.of(operations.title(requireRecordId(request, actionCode)));
-            case "titles" -> DynamicActionResultBody.of(operations.titles(request.ids()));
-            case "projections" -> DynamicActionResultBody.of(operations.projections(request.ids(), request.fieldNames()));
-            case "referenceOptions" -> DynamicActionResultBody.of(operations.referenceOptions(criteria(request), requirePageRequest(request, actionCode)));
-            case "enable" -> countResult(service.enableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
-            case "disable" -> countResult(service.disableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
-            case "isEnabled" -> DynamicActionResultBody.of(operations.isEnabled(requireRecordId(request, actionCode)));
-            case "enabledCriteria" -> DynamicActionResultBody.of(operations.enabledCriteria(criteria(request)));
-            default -> throw new IllegalArgumentException("unknown standard dynamic action: "
-                    + moduleAlias + "." + entityAlias + "." + actionCode);
+            case TREE, REFERENCE -> throw new IllegalArgumentException(
+                    "standard action is only exposed through web endpoint: " + actionCode);
+            case ENABLE -> countResult(service.enableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
+            case DISABLE -> countResult(service.disableFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
         };
+    }
+
+    private SortIntent sortIntent(DynamicActionExecutionRequest request, String actionCode) {
+        int intents = 0;
+        SortIntent intent = null;
+        if (!request.orderedIds().isEmpty()) {
+            intents++;
+            intent = SortIntent.REORDER;
+        }
+        if (request.beforeId() != null && !request.beforeId().isBlank()) {
+            intents++;
+            intent = SortIntent.MOVE_BEFORE;
+        }
+        if (request.afterId() != null && !request.afterId().isBlank()) {
+            intents++;
+            intent = SortIntent.MOVE_AFTER;
+        }
+        if (intents != 1) {
+            throw new IllegalArgumentException("dynamic action requires exactly one sort intent: " + actionCode);
+        }
+        return intent;
     }
 
     private DynamicActionResultBody countResult(int count) {
@@ -84,13 +95,6 @@ final class DynamicStandardActionExecutor {
         throw new IllegalArgumentException("dynamic action requires recordId: " + actionCode);
     }
 
-    private String requireText(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("dynamic action requires " + fieldName);
-        }
-        return value;
-    }
-
     private Criteria criteria(DynamicActionExecutionRequest request) {
         return request.criteria() == null ? Criteria.of() : request.criteria();
     }
@@ -104,5 +108,11 @@ final class DynamicStandardActionExecutor {
 
     private Sort[] sorts(DynamicActionExecutionRequest request) {
         return request.sorts().toArray(Sort[]::new);
+    }
+
+    private enum SortIntent {
+        REORDER,
+        MOVE_BEFORE,
+        MOVE_AFTER
     }
 }

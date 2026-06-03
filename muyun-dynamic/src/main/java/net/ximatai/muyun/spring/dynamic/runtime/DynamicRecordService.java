@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
@@ -576,7 +577,7 @@ public class DynamicRecordService {
         if ((recordId == null || recordId.isBlank()) && request.record() != null) {
             recordId = request.record().getId();
         }
-        if ((recordId == null || recordId.isBlank()) && "create".equals(action.code()) && value instanceof String id) {
+        if ((recordId == null || recordId.isBlank()) && PlatformAction.CREATE.matches(action.code()) && value instanceof String id) {
             recordId = id;
         }
         return new DynamicActionExecutionContext(

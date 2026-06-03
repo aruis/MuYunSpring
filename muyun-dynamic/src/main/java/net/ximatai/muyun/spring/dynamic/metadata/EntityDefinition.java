@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+
 import java.util.EnumSet;
 import java.util.Comparator;
 import java.util.List;

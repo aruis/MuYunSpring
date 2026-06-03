@@ -3,10 +3,11 @@ package net.ximatai.muyun.spring.dynamic.openapi;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,33 +55,33 @@ public class DynamicOpenApiGenerator {
         operations.add(getOperation(basePath + "/openapi", operationId(descriptor, "openApi"),
                 "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
         operations.add(operation(basePath + "/query", operationId(descriptor, "query"),
-                "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", null));
+                "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));
         operations.add(getOperation(basePath + "/view/{id}", operationId(descriptor, "view"),
-                "View " + mainEntity.title(), null, "DynamicRecordResponse", null));
+                "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
         operations.add(operation(basePath + "/insert", operationId(descriptor, "insert"),
-                "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
+                "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.CREATE.code()));
         operations.add(operation(basePath + "/update/{id}", operationId(descriptor, "update"),
-                "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
+                "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
         operations.add(operation(basePath + "/delete/{id}", operationId(descriptor, "delete"),
-                "Delete " + mainEntity.title(), null, "WebCountResponse", null));
+                "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())) {
             operations.add(operation(basePath + "/enable/{id}", operationId(descriptor, "enable"),
-                    "Enable " + mainEntity.title(), null, "WebCountResponse", null));
+                    "Enable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.ENABLE.code()));
             operations.add(operation(basePath + "/disable/{id}", operationId(descriptor, "disable"),
-                    "Disable " + mainEntity.title(), null, "WebCountResponse", null));
+                    "Disable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DISABLE.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.SORT.name())) {
             String sortRequestSchema = mainEntity.capabilities().contains(EntityCapability.TREE.name())
                     ? "TreeSortWebRequest"
                     : "SortWebRequest";
             operations.add(operation(basePath + "/sort/{id}", operationId(descriptor, "sort"),
-                    "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", null));
+                    "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", PlatformAction.SORT.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
             operations.add(getOperation(basePath + "/tree", operationId(descriptor, "tree"),
-                    "Tree " + mainEntity.title(), null, "WebListResponse", null));
+                    "Tree " + mainEntity.title(), null, "WebListResponse", PlatformAction.TREE.code()));
             operations.add(getOperation(basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
-                    "Tree node " + mainEntity.title(), null, "WebListResponse", null));
+                    "Tree node " + mainEntity.title(), null, "WebListResponse", PlatformAction.TREE.code()));
         }
         operations.add(getOperation(basePath + "/actions", operationId(descriptor, "actions"),
                 "List module actions", null, "DynamicActionDescriptorList", null));
@@ -99,7 +100,7 @@ public class DynamicOpenApiGenerator {
                         "Resolve reference " + field.title(),
                         "DynamicWebReferenceRequest",
                         "DynamicReferenceResolveResponse",
-                        null)));
+                        PlatformAction.REFERENCE.code())));
         return List.copyOf(operations);
     }
 

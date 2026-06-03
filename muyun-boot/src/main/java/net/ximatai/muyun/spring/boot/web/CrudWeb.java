@@ -7,6 +7,8 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,16 +42,19 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     }
 
     @PostMapping("/query")
+    @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> WebPageResponse.from(queryRecords(request)));
     }
 
     @GetMapping("/view/{id}")
+    @ActionEndpoint(PlatformAction.VIEW)
     default T view(@PathVariable String id) {
         return webScope(() -> service().select(id));
     }
 
     @PostMapping("/insert")
+    @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
     default T insert(@RequestBody T record) {
         return webScope(() -> {
@@ -59,6 +64,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     }
 
     @PostMapping("/update/{id}")
+    @ActionEndpoint(PlatformAction.UPDATE)
     default T update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return webScope(() -> {
@@ -68,6 +74,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     }
 
     @PostMapping("/delete/{id}")
+    @ActionEndpoint(PlatformAction.DELETE)
     default WebCountResponse delete(@PathVariable String id) {
         return webScope(() -> new WebCountResponse(service().delete(id)));
     }

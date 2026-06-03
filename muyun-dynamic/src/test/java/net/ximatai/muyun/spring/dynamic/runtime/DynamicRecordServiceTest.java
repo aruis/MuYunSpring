@@ -21,7 +21,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -301,19 +301,31 @@ class DynamicRecordServiceTest {
         DynamicRecordService service = service(operations, sortableEntity(), events);
 
         DynamicActionExecutionResult reorder = service.entity(MODULE, "contract")
-                .executeAction("reorder", DynamicActionExecutionRequest.empty()
+                .executeAction("sort", DynamicActionExecutionRequest.empty()
                         .withOrderedIds(List.of("first", "second", "third")));
         DynamicActionExecutionResult moveBefore = service.entity(MODULE, "contract")
-                .executeAction("moveBefore", DynamicActionExecutionRequest.id("third").withBeforeId("first"));
+                .executeAction("sort", DynamicActionExecutionRequest.id("third").withBeforeId("first"));
 
         assertThat(reorder.body().refresh()).isTrue();
         assertThat(moveBefore.body().refresh()).isTrue();
-        assertActionTrace(events.events().get(0), events.events().get(1), RuntimeEventType.AFTER_UPDATE, "reorder");
-        assertActionTrace(events.events().get(2), events.events().get(3), RuntimeEventType.AFTER_UPDATE, "moveBefore");
+        assertActionTrace(events.events().get(0), events.events().get(1), RuntimeEventType.AFTER_UPDATE, "sort");
+        assertActionTrace(events.events().get(2), events.events().get(3), RuntimeEventType.AFTER_UPDATE, "sort");
         assertThat(events.events().get(0).payload()).containsEntry("operation", "reorder");
         assertThat(events.events().get(2).payload()).containsEntry("operation", "moveBefore");
         assertThat(events.events().get(1).traceId()).isEqualTo(reorder.context().traceId());
         assertThat(events.events().get(3).traceId()).isEqualTo(moveBefore.context().traceId());
+    }
+
+    @Test
+    void shouldRejectAmbiguousSortActionIntent() {
+        DynamicRecordService service = service(operations(), sortableEntity());
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("sort", DynamicActionExecutionRequest.id("third")
+                        .withBeforeId("first")
+                        .withAfterId("second")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one sort intent");
     }
 
     @Test
@@ -1529,32 +1541,13 @@ class DynamicRecordServiceTest {
     }
 
     @Test
-    void shouldExecuteReferenceOptionsActionWithExplicitPageRequest() {
-        IDatabaseOperations<Object> operations = operations();
-        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
-        when(operations.query(anyString(), anyMap())).thenReturn(List.of(referenceRow("contract-1", "Contract One")));
-        DynamicRecordService service = service(operations, referenceEntity());
-
-        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
-                .executeAction("referenceOptions", DynamicActionExecutionRequest.empty()
-                        .withCriteria(Criteria.of().eq("code", "CONTRACT-1"))
-                        .withPageRequest(PageRequest.of(1, 10)));
-
-        assertThat(result.value()).isInstanceOf(net.ximatai.muyun.database.core.orm.PageResult.class);
-        @SuppressWarnings("unchecked")
-        net.ximatai.muyun.database.core.orm.PageResult<ReferenceOption> options =
-                (net.ximatai.muyun.database.core.orm.PageResult<ReferenceOption>) result.value();
-        assertThat(options.getRecords()).containsExactly(new ReferenceOption("contract-1", "Contract One"));
-    }
-
-    @Test
-    void shouldRequirePageRequestForPagedActionExecution() {
+    void shouldRejectWebOnlyStandardActionsFromGenericActionExecutor() {
         DynamicRecordService service = service(operations(), referenceEntity());
 
         assertThatThrownBy(() -> service.entity(MODULE, "contract")
-                .executeAction("referenceOptions", DynamicActionExecutionRequest.empty()))
+                .executeAction("reference", DynamicActionExecutionRequest.empty()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("pageRequest");
+                .hasMessageContaining("only exposed through web endpoint");
     }
 
     @Test

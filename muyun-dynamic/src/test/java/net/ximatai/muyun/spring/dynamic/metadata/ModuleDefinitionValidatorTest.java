@@ -28,6 +28,24 @@ class ModuleDefinitionValidatorTest {
     }
 
     @Test
+    void shouldRejectCustomActionThatConflictsWithPlatformStandardAction() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(customAction("create"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("custom action conflicts with platform standard action: contract.create");
+    }
+
+    @Test
     void shouldRejectConfiguredStandardActionWithCustomCategoryOnReservedPath() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.contract",
@@ -46,6 +64,48 @@ class ModuleDefinitionValidatorTest {
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("custom action conflicts with reserved web action path: contract.delete");
+    }
+
+    @Test
+    void shouldRejectStandardActionConfiguredWithCustomExecutor() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "query", EntityActionKind.COLLECTION,
+                        "Query", true, EntityActionLevel.LIST, EntityActionStyle.NORMAL,
+                        EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, null, null, null, EntityActionExecutorType.SERVICE, "queryExecutor"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("standard action executor must be STANDARD: contract.query");
+    }
+
+    @Test
+    void shouldRejectStandardCategoryWhenActionIsNotPlatformStandardAction() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("standard action is not supported by entity: contract.submit");
     }
 
     @Test

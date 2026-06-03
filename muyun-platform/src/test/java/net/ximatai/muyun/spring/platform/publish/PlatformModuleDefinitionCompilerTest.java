@@ -14,7 +14,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
@@ -499,7 +499,7 @@ class PlatformModuleDefinitionCompilerTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        actionService.insert(metadataAction(relationId, "reorder", EntityActionKind.SORT));
+        actionService.insert(metadataAction(relationId, "sort", EntityActionKind.SORT));
 
         assertThatThrownBy(() -> compiler.compile("crm.customer"))
                 .isInstanceOf(net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException.class)

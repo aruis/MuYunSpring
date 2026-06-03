@@ -6,7 +6,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;

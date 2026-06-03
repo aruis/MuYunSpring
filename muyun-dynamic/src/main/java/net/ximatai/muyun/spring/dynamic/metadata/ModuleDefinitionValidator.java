@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaEvaluationException;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -361,9 +363,18 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("custom action conflicts with reserved web action path: "
                     + entity.alias() + "." + action.actionCode());
         }
+        if (action.category() != EntityActionCategory.STANDARD
+                && PlatformAction.fromCode(action.actionCode()).isPresent()) {
+            throw new ModuleDefinitionException("custom action conflicts with platform standard action: "
+                    + entity.alias() + "." + action.actionCode());
+        }
         validateActionAccessPolicy(action);
         validateActionAvailability(action, entity, entities, relations);
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
+        if (standardKind == null && action.category() == EntityActionCategory.STANDARD) {
+            throw new ModuleDefinitionException("standard action is not supported by entity: "
+                    + entity.alias() + "." + action.actionCode());
+        }
         if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
             throw new ModuleDefinitionException("standard action is not supported by entity: "
                     + entity.alias() + "." + action.actionCode());
@@ -374,6 +385,14 @@ public class ModuleDefinitionValidator {
         }
         if (standardKind != null && standardKind != action.kind()) {
             throw new ModuleDefinitionException("standard action kind mismatch: "
+                    + entity.alias() + "." + action.actionCode());
+        }
+        if (standardKind != null && action.executorType() != EntityActionExecutorType.STANDARD) {
+            throw new ModuleDefinitionException("standard action executor must be STANDARD: "
+                    + entity.alias() + "." + action.actionCode());
+        }
+        if (standardKind != null && action.executorKey() != null) {
+            throw new ModuleDefinitionException("standard action executor key must be empty: "
                     + entity.alias() + "." + action.actionCode());
         }
     }

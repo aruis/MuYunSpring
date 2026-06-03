@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.metadata;
+package net.ximatai.muyun.spring.common.platform;
 
 public enum EntityCapability {
     CRUD(CapabilityKind.BASELINE),

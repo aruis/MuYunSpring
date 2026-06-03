@@ -18,7 +18,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;

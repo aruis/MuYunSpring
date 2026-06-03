@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

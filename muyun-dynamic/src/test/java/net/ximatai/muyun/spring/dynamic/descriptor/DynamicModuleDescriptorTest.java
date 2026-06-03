@@ -11,7 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -115,8 +115,7 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.mainEntityAlias()).isEqualTo("customer");
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
-                .contains("create", "select", "update", "delete", "list", "page", "count",
-                        "queryCriteria", "title", "titles", "projections", "referenceOptions");
+                .contains("create", "view", "update", "delete", "query", "reference");
         assertThat(descriptor.entities()).extracting(DynamicEntityDescriptor::entityAlias)
                 .containsExactly("customer", "contact");
         assertThat(descriptor.entities().getFirst().capabilities()).contains("CRUD", "REFERENCE");
@@ -130,8 +129,7 @@ class DynamicModuleDescriptorTest {
                 });
         assertThat(descriptor.entities().getFirst().actions())
                 .extracting(DynamicActionDescriptor::code)
-                .contains("create", "select", "update", "delete", "list", "page", "count",
-                        "queryCriteria", "title", "titles", "projections", "referenceOptions");
+                .contains("create", "view", "update", "delete", "query", "reference");
         assertThat(descriptor.entities().getFirst().actions().stream()
                 .filter(action -> action.code().equals("create"))
                 .findFirst())
@@ -226,7 +224,7 @@ class DynamicModuleDescriptorTest {
                 .doesNotContain("exportContact");
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
-                .contains("list", "page", "count");
+                .contains("query");
         assertThat(descriptor.actions().stream().filter(action -> action.code().equals("create")).findFirst())
                 .get()
                 .extracting(DynamicActionDescriptor::title)
@@ -302,11 +300,9 @@ class DynamicModuleDescriptorTest {
 
         assertThat(entity.actions())
                 .extracting(DynamicActionDescriptor::code)
-                .contains("children", "ancestorIds", "descendantIds",
-                        "sortedList", "reorder", "moveBefore", "moveAfter",
-                        "enable", "disable", "isEnabled", "enabledCriteria");
+                .contains("tree", "sort", "enable", "disable");
         assertThat(entity.actions().stream()
-                .filter(action -> action.code().equals("children"))
+                .filter(action -> action.code().equals("tree"))
                 .findFirst())
                 .get()
                 .extracting(DynamicActionDescriptor::kind)

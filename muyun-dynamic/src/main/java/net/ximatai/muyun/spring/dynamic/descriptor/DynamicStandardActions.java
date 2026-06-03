@@ -33,6 +33,7 @@ final class DynamicStandardActions {
                                                   EntityActionDefinition configured,
                                                   DynamicActionDescriptor standard) {
         DynamicActionKind kind = standard == null ? DynamicActionKind.from(configured.kind()) : standard.kind();
+        EntityActionDefinition execution = standard == null ? configured : null;
         return new DynamicActionDescriptor(
                 configured.actionCode(),
                 kind,
@@ -47,8 +48,8 @@ final class DynamicStandardActions {
                 configured.authInheritActionCode(),
                 configured.hasAvailabilityCondition(),
                 configured.unavailableMessage(),
-                configured.executorType(),
-                configured.executorKey()
+                execution == null ? standard.executorType() : execution.executorType(),
+                execution == null ? standard.executorKey() : execution.executorKey()
         );
     }
 

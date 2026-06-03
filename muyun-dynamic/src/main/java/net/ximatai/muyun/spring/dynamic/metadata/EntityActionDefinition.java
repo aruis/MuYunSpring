@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
+
 public record EntityActionDefinition(
         String entityAlias,
         String actionCode,
@@ -59,7 +61,7 @@ public record EntityActionDefinition(
     }
 
     public static EntityActionLevel defaultLevel(String actionCode, EntityActionKind kind) {
-        if ("create".equals(actionCode)) {
+        if (PlatformAction.CREATE.matches(actionCode)) {
             return EntityActionLevel.LIST;
         }
         if (kind == EntityActionKind.RECORD || kind == EntityActionKind.STATE) {

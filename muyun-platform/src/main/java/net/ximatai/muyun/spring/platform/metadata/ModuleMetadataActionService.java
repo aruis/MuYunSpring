@@ -83,11 +83,11 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
         if (action.getActionCode() == null || !action.getActionCode().matches("[a-z][A-Za-z0-9]{0,63}")) {
             throw new PlatformException("Module metadata action requires valid actionCode: " + action.getActionCode());
         }
-        if (action.getCategory() == null) {
-            action.setCategory(EntityActionCategory.STANDARD);
-        }
         if (action.getActionKind() == null) {
             throw new PlatformException("Metadata action requires actionKind");
+        }
+        if (action.getCategory() == null) {
+            action.setCategory(EntityActionDefinition.defaultCategory(action.getActionKind()));
         }
         if (action.getActionLevel() == null) {
             action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getActionKind()));

@@ -16,7 +16,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -301,7 +301,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.delete("contract-1")).thenReturn(1);
         when(service.actions(MODULE)).thenReturn(List.of(
                 action("export", EntityActionLevel.LIST),
-                action("submit", EntityActionLevel.RECORD, "select"),
+                action("submit", EntityActionLevel.RECORD, "view"),
                 action("archive", EntityActionLevel.BATCH)
         ));
 
@@ -318,7 +318,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("export"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
-                .andExpect(jsonPath("$[1].authInheritActionCode").value("select"))
+                .andExpect(jsonPath("$[1].authInheritActionCode").value("view"))
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
@@ -718,13 +718,7 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
-    void shouldRejectActionsThatWouldExposeInternalCriteria() throws Exception {
-        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "queryCriteria")
-                        .contentType("application/json")
-                        .content(json(Map.of())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic web action is not exposed: queryCriteria"));
-
+    void shouldRejectActionResponseThatWouldExposeInternalCriteria() throws Exception {
         Criteria criteria = Criteria.of().eq("code", "C-001");
         when(service.action(MODULE, "customCriteria")).thenReturn(action("customCriteria", EntityActionLevel.ANY));
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
@@ -748,6 +742,14 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldRejectReservedSortAsActionPath() throws Exception {
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "sort")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectReservedReferenceAsActionPath() throws Exception {
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "reference")
                         .contentType("application/json")
                         .content(json(Map.of())))
                 .andExpect(status().isNotFound());

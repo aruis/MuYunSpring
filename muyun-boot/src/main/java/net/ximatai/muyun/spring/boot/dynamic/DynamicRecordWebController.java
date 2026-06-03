@@ -13,13 +13,15 @@ import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
@@ -63,7 +65,6 @@ public class DynamicRecordWebController implements
         ReferenceWeb<DynamicEntityOperations,
                 DynamicWebReferenceRequest,
                 DynamicReferenceResolveResponse> {
-    private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
 
@@ -101,6 +102,7 @@ public class DynamicRecordWebController implements
 
     @Override
     @PostMapping("/sort/{id}")
+    @ActionEndpoint(PlatformAction.SORT)
     public WebCountResponse sort(@PathVariable String id,
                                  @RequestBody(required = false) TreeSortWebRequest request) {
         return webScope(() -> {
@@ -192,6 +194,7 @@ public class DynamicRecordWebController implements
 
     @Override
     @PostMapping("/references/{fieldName}/resolve")
+    @ActionEndpoint(PlatformAction.REFERENCE)
     public DynamicReferenceResolveResponse reference(@PathVariable String fieldName,
                                                      @RequestBody(required = false) DynamicWebReferenceRequest request) {
         return ReferenceWeb.super.reference(fieldName, request);
@@ -320,8 +323,7 @@ public class DynamicRecordWebController implements
     private void requireActionLevel(String moduleAlias,
                                     String actionCode,
                                     Set<EntityActionLevel> allowed,
-                                    String messagePrefix) {
-        rejectInternalResultAction(actionCode);
+        String messagePrefix) {
         rejectReservedActionPath(actionCode);
         EntityActionLevel level = recordService.action(moduleAlias, actionCode).actionLevel();
         if (!allowed.contains(level)) {
@@ -366,12 +368,6 @@ public class DynamicRecordWebController implements
             current = current.getCause();
         }
         return current.getMessage();
-    }
-
-    private void rejectInternalResultAction(String actionCode) {
-        if (INTERNAL_RESULT_ACTIONS.contains(actionCode)) {
-            throw new IllegalArgumentException("dynamic web action is not exposed: " + actionCode);
-        }
     }
 
     private static boolean isRecordAction(DynamicActionDescriptor action) {

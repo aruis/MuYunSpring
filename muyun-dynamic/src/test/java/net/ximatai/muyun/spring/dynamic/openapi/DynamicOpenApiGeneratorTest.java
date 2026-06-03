@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.openapi;
 
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -9,7 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -72,6 +73,7 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.requestSchema()).isEqualTo("DynamicRecordPayload");
                     assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.CREATE.code());
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/update/{id}"))
@@ -86,7 +88,12 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.method()).isEqualTo("GET");
                     assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.VIEW.code());
                 });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/query")))
+                .singleElement()
+                .satisfies(operation -> assertThat(operation.actionCode()).isEqualTo(PlatformAction.QUERY.code()));
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/actions")))
                 .singleElement()
@@ -165,6 +172,7 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.requestSchema()).isEqualTo("SortWebRequest");
                     assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.SORT.code());
                 });
         assertThat(sortable.schemas().get("SortWebRequest").properties())
                 .containsKeys("previousId", "nextId")
@@ -197,8 +205,10 @@ class DynamicOpenApiGeneratorTest {
                 .filter(operation -> operation.path().equals("/sales.contract/enable/{id}"))
                 .findFirst())
                 .get()
-                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
-                .isEqualTo("WebCountResponse");
+                .satisfies(operation -> {
+                    assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.ENABLE.code());
+                });
     }
 
     @Test
@@ -218,8 +228,10 @@ class DynamicOpenApiGeneratorTest {
                 .filter(operation -> operation.path().equals("/sales.contract/tree"))
                 .findFirst())
                 .get()
-                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
-                .isEqualTo("WebListResponse");
+                .satisfies(operation -> {
+                    assertThat(operation.responseSchema()).isEqualTo("WebListResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.TREE.code());
+                });
         assertThat(tree.schemas().get("WebListResponse").properties().get("records").itemType())
                 .isEqualTo("DynamicRecordResponse");
     }

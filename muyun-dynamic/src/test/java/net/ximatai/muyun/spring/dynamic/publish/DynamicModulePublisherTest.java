@@ -254,8 +254,8 @@ class DynamicModulePublisherTest {
                                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                                 FieldDefinition.titleField()
                         )
-                ).withCapabilities(net.ximatai.muyun.spring.dynamic.metadata.EntityCapability.CRUD,
-                        net.ximatai.muyun.spring.dynamic.metadata.EntityCapability.REFERENCE))
+                ).withCapabilities(net.ximatai.muyun.spring.common.platform.EntityCapability.CRUD,
+                        net.ximatai.muyun.spring.common.platform.EntityCapability.REFERENCE))
         );
     }
 
