@@ -22,4 +22,7 @@ public class Metadata extends StandardEnabledSortableEntity {
 
     @Column(name = "table_name", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Physical table name")
     private String tableName;
+
+    @Column(name = "data_scope_enabled", type = ColumnType.BOOLEAN, comment = "Data scope enabled")
+    private Boolean dataScopeEnabled;
 }

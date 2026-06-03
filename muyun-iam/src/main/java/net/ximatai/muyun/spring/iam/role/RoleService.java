@@ -146,18 +146,20 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public boolean hasActionPermission(String userId, String moduleAlias, String actionCode) {
+        return !effectiveActionGrants(userId, moduleAlias, actionCode).isEmpty();
+    }
+
+    public List<RoleAction> effectiveActionGrants(String userId, String moduleAlias, String actionCode) {
         Set<String> roleIds = effectiveRoleIds(userId);
         if (roleIds.isEmpty()) {
-            return false;
+            return List.of();
         }
-        String validModuleAlias = requireModuleAlias(moduleAlias);
-        String validActionCode = requireActionCode(actionCode);
         return roleActionDao.query(Criteria.of()
                         .in("roleId", List.copyOf(roleIds))
-                        .eq("moduleAlias", validModuleAlias)
-                        .eq("actionCode", validActionCode)
+                        .eq("moduleAlias", requireModuleAlias(moduleAlias))
+                        .eq("actionCode", requireActionCode(actionCode))
                         .eq("enabled", Boolean.TRUE),
-                new PageRequest(0, 1)).stream().findFirst().isPresent();
+                ALL);
     }
 
     public Set<String> effectiveRoleIds(String userId) {

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.runtime.mapping;
 
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -29,6 +31,12 @@ public final class DynamicRecordMapping {
         columns.put(StandardEntitySchema.UPDATED_BY_COLUMN, StandardEntitySchema.UPDATED_BY_COLUMN);
         columns.put(StandardEntitySchema.UPDATED_AT_FIELD, StandardEntitySchema.UPDATED_AT_COLUMN);
         columns.put(StandardEntitySchema.UPDATED_AT_COLUMN, StandardEntitySchema.UPDATED_AT_COLUMN);
+        if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            PlatformDataScopeSchema.fieldToColumn().forEach((field, column) -> {
+                columns.put(field, column);
+                columns.put(column, column);
+            });
+        }
         for (FieldDefinition field : entity.fields()) {
             columns.put(field.code(), field.columnName());
             columns.put(field.columnName(), field.columnName());

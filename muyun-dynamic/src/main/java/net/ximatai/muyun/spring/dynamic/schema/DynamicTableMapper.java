@@ -5,10 +5,13 @@ import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.PlatformTableValidator;
 import net.ximatai.muyun.spring.common.schema.PlatformUniqueIndexes;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,7 +26,7 @@ public class DynamicTableMapper {
                 .setComment(entity.name())
                 .setPrimaryKey(StandardEntitySchema.idColumn());
         StandardEntitySchema.auditColumns().forEach(table::addColumn);
-        for (FieldDefinition field : entity.fields()) {
+        for (FieldDefinition field : tableFields(entity)) {
             table.addColumn(toColumn(field));
             if (field.isUnique()) {
                 PlatformUniqueIndexes.addTenantUniqueIndex(table, field.columnName());
@@ -41,14 +44,23 @@ public class DynamicTableMapper {
             return table;
         }
         validator.validateEntity(previousEntity);
-        Set<String> targetColumns = entity.fields().stream()
+        Set<String> targetColumns = tableFields(entity).stream()
                 .map(FieldDefinition::columnName)
                 .collect(Collectors.toSet());
-        previousEntity.fields().stream()
+        tableFields(previousEntity).stream()
                 .map(FieldDefinition::columnName)
                 .filter(column -> !targetColumns.contains(column))
                 .forEach(table::dropColumn);
         return table;
+    }
+
+    private List<FieldDefinition> tableFields(EntityDefinition entity) {
+        java.util.ArrayList<FieldDefinition> fields = new java.util.ArrayList<>();
+        if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            fields.addAll(DynamicAbilityFields.dataScopeFields());
+        }
+        fields.addAll(entity.fields());
+        return List.copyOf(fields);
     }
 
     private Column toColumn(FieldDefinition field) {

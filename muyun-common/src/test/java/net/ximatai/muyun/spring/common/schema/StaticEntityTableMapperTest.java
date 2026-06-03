@@ -4,7 +4,9 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
+import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardTreeEntity;
@@ -69,6 +71,15 @@ class StaticEntityTableMapperTest {
                 .contains("title", "sort_order", "parent_id", "enabled");
     }
 
+    @Test
+    void shouldMapStandardDataScopedEntityInheritedAbilityColumns() {
+        TableWrapper table = mapper.toTable(DemoStandardDataScoped.class);
+
+        assertThat(DataScopeCapable.class).isAssignableFrom(DemoStandardDataScoped.class);
+        assertThat(columnNames(table))
+                .contains("auth_user_id", "auth_assignee_ids", "auth_member_ids", "auth_organization_id", "auth_module_alias");
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -99,6 +110,10 @@ class StaticEntityTableMapperTest {
 
     @Table(name = "demo_standard_enabled_tree")
     private static class DemoStandardEnabledTree extends StandardEnabledTreeEntity {
+    }
+
+    @Table(name = "demo_standard_data_scoped")
+    private static class DemoStandardDataScoped extends StandardDataScopedEntity {
     }
 
     @Table(name = "not_platform_model")

@@ -326,6 +326,11 @@ public class DynamicEntityService implements
         return treeRuntime().children(parentId).stream().map(DynamicTreeRecord::record).toList();
     }
 
+    public List<DynamicRecord> children(Criteria scopeCriteria, String parentId) {
+        requireCapability(EntityCapability.TREE);
+        return treeRuntime().children(scopeCriteria, parentId).stream().map(DynamicTreeRecord::record).toList();
+    }
+
     @Override
     public List<DynamicRecord> selectChildRows(Criteria criteria) {
         List<DynamicRecord> rows;

@@ -57,6 +57,9 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
             metadata.setTableName(applicationAlias + "_" + alias);
         }
         PlatformNameRules.requireDatabaseName(metadata.getTableName(), "tableName");
+        if (metadata.getDataScopeEnabled() == null) {
+            metadata.setDataScopeEnabled(Boolean.FALSE);
+        }
         rejectDuplicateMetadataAlias(metadata);
         rejectDuplicatePhysicalTable(metadata);
     }

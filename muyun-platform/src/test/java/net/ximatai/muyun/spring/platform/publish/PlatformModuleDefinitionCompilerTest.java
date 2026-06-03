@@ -362,7 +362,9 @@ class PlatformModuleDefinitionCompilerTest {
     @Test
     void shouldCompileConfiguredActionsIntoModuleDefinition() {
         moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
-        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        Metadata metadata = metadata("crm", "customer");
+        metadata.setDataScopeEnabled(true);
+        String metadataId = metadataService.insert(metadata);
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
         ModuleMetadataAction create = metadataAction(relationId, "create", EntityActionKind.RECORD);
@@ -389,6 +391,7 @@ class PlatformModuleDefinitionCompilerTest {
 
         ModuleDefinition definition = compiler.compile("crm.customer");
 
+        assertThat(definition.entities().getFirst().supports(EntityCapability.DATA_SCOPE)).isTrue();
         assertThat(definition.actions())
                 .extracting(action -> action.actionCode())
                 .containsExactly("create", "delete", "exportData");
@@ -424,6 +427,24 @@ class PlatformModuleDefinitionCompilerTest {
                     assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
                     assertThat(action.executorKey()).isEqualTo("customerExportDialog");
                 });
+    }
+
+    @Test
+    void shouldRejectDataAuthActionWhenMetadataDataScopeIsDisabled() {
+        moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        fieldService.insert(titleField(metadataId));
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        ModuleMetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
+        export.setTitle("导出");
+        export.setDataAuth(true);
+        export.setExecutorType(EntityActionExecutorType.SERVICE);
+        export.setExecutorKey("exportService");
+        actionService.insert(export);
+
+        assertThatThrownBy(() -> compiler.compile("crm.customer"))
+                .isInstanceOf(net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException.class)
+                .hasMessageContaining("data auth action requires DATA_SCOPE capability");
     }
 
     @Test

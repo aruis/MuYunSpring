@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
@@ -26,6 +27,8 @@ public class ModuleDefinitionValidator {
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
     private static final Set<String> STANDARD_COLUMNS = Set.copyOf(StandardEntitySchema.columnNames());
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
+    private static final Set<String> DATA_SCOPE_COLUMNS = Set.copyOf(PlatformDataScopeSchema.columnNames());
+    private static final Set<String> DATA_SCOPE_FIELDS = Set.copyOf(PlatformDataScopeSchema.fieldNames());
     private final FormulaEngine formulaEngine = new FormulaEngine();
 
     public void validate(ModuleDefinition module) {
@@ -224,6 +227,9 @@ public class ModuleDefinitionValidator {
         if (STANDARD_FIELDS.contains(field.fieldName())) {
             throw new ModuleDefinitionException("field name conflicts with standard field: " + field.fieldName());
         }
+        if (DATA_SCOPE_FIELDS.contains(field.fieldName())) {
+            throw new ModuleDefinitionException("field name conflicts with data scope ability field: " + field.fieldName());
+        }
         requireIdentifier(field.columnName(), "column name");
         requireText(field.name(), "field title");
         if (field.type() == null) {
@@ -240,6 +246,9 @@ public class ModuleDefinitionValidator {
         }
         if (STANDARD_COLUMNS.contains(field.columnName())) {
             throw new ModuleDefinitionException("field column conflicts with standard column: " + field.columnName());
+        }
+        if (DATA_SCOPE_COLUMNS.contains(field.columnName())) {
+            throw new ModuleDefinitionException("field column conflicts with data scope ability column: " + field.columnName());
         }
         if (field.length() != null && field.length() <= 0) {
             throw new ModuleDefinitionException("field length must be positive: " + field.code());
@@ -369,6 +378,10 @@ public class ModuleDefinitionValidator {
                     + entity.alias() + "." + action.actionCode());
         }
         validateActionAccessPolicy(action);
+        if (action.dataAuth() && !entity.supports(EntityCapability.DATA_SCOPE)) {
+            throw new ModuleDefinitionException("data auth action requires DATA_SCOPE capability: "
+                    + entity.alias() + "." + action.actionCode());
+        }
         validateActionAvailability(action, entity, entities, relations);
         EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
         if (standardKind == null && action.category() == EntityActionCategory.STANDARD) {

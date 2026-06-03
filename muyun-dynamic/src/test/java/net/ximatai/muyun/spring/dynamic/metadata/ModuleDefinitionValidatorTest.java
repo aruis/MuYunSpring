@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -127,6 +128,46 @@ class ModuleDefinitionValidatorTest {
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("dialog action requires executor key: submitDialog");
+    }
+
+    @Test
+    void shouldRequireDataScopeCapabilityForDataAuthAction() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("data auth action requires DATA_SCOPE capability: contract.submit");
+    }
+
+    @Test
+    void shouldAllowDataAuthActionWhenEntitySupportsDataScope() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity().withCapabilities(EntityCapability.DATA_SCOPE)),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
+        );
+
+        validator.validate(module);
     }
 
     private EntityActionDefinition customAction(String actionCode) {

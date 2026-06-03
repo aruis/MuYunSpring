@@ -128,6 +128,30 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldKeepDataScopeColumnsWhenDiffingDynamicFields() {
+        EntityDefinition previous = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("removedName", "Removed Name").column("removed_name").length(128)
+                )
+        ).withCapabilities(EntityCapability.DATA_SCOPE);
+        EntityDefinition next = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("code", "Code").length(64))
+        ).withCapabilities(EntityCapability.DATA_SCOPE);
+
+        TableWrapper table = mapper.toTable(next, previous);
+
+        assertThat(table.getDroppedColumns()).containsExactly("removed_name");
+        assertThat(table.getDroppedColumns()).doesNotContain("auth_user_id", "auth_assignee_ids");
+    }
+
+    @Test
     void shouldRejectUnsafeIdentifiersAndDuplicateColumns() {
         assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
                 "contract",
@@ -166,6 +190,14 @@ class DynamicTableMapperTest {
                 List.of(FieldDefinition.string("tenantId", "Tenant"))
         ))).isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("standard field");
+
+        assertThatThrownBy(() -> mapper.toTable(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(FieldDefinition.string("authUserId", "Auth User").column("auth_user_id"))
+        ).withCapabilities(EntityCapability.DATA_SCOPE))).isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("data scope ability field");
     }
 
     @Test
@@ -264,12 +296,25 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldAddDataScopeColumnsFromCapability() {
+        EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
+
+        TableWrapper table = mapper.toTable(entity);
+
+        assertThat(entity.supports(EntityCapability.DATA_SCOPE)).isTrue();
+        assertThat(columnNames(table))
+                .contains("auth_user_id", "auth_assignee_ids", "auth_member_ids", "auth_organization_id", "auth_module_alias")
+                .contains("code", "name");
+    }
+
+    @Test
     void shouldClassifyBaselineFieldAndDefinitionCapabilitiesInSameCatalog() {
         assertThat(EntityCapability.CRUD.isBaseline()).isTrue();
         assertThat(EntityCapability.SOFT_DELETE.isBaseline()).isTrue();
         assertThat(EntityCapability.TREE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.REFERENCE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.ENABLE.isDeclaredByEntityFields()).isTrue();
+        assertThat(EntityCapability.DATA_SCOPE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.CHILD_RELATION.isDeclaredByDefinition()).isTrue();
         assertThat(EntityCapability.REFERENCE_DEPENDENCY.isDeclaredByDefinition()).isTrue();
 

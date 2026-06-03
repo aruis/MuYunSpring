@@ -173,6 +173,9 @@ public class PlatformModuleDefinitionCompiler {
         if (relations.stream().anyMatch(child -> metadata.getId().equals(child.getParentMetadataId()))) {
             capabilities.add(EntityCapability.CHILD_RELATION);
         }
+        if (Boolean.TRUE.equals(metadata.getDataScopeEnabled())) {
+            capabilities.add(EntityCapability.DATA_SCOPE);
+        }
         return new EntityDefinition(metadata.getAlias(),
                 metadata.getSchemaName(),
                 metadata.getTableName(),
@@ -361,7 +364,8 @@ public class PlatformModuleDefinitionCompiler {
         ).toList();
     }
 
-    private List<EntityActionDefinition> actions(List<ModuleMetadataRelation> relations, Map<String, Metadata> metadataById) {
+    private List<EntityActionDefinition> actions(List<ModuleMetadataRelation> relations,
+                                                 Map<String, Metadata> metadataById) {
         Map<String, ModuleMetadataRelation> relationById = relations.stream()
                 .collect(java.util.stream.Collectors.toMap(ModuleMetadataRelation::getId, relation -> relation));
         return actionService.listByRelationIds(relations.stream().map(ModuleMetadataRelation::getId).toList()).stream()

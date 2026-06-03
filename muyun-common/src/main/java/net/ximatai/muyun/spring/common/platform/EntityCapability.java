@@ -9,6 +9,7 @@ public enum EntityCapability {
     SORT(CapabilityKind.FIELD_DECLARATION),
     REFERENCE(CapabilityKind.FIELD_DECLARATION),
     ENABLE(CapabilityKind.FIELD_DECLARATION),
+    DATA_SCOPE(CapabilityKind.FIELD_DECLARATION),
     CHILD_RELATION(CapabilityKind.DEFINITION_DECLARATION),
     REFERENCE_DEPENDENCY(CapabilityKind.DEFINITION_DECLARATION);
 

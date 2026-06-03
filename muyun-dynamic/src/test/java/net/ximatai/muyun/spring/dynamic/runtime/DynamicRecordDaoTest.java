@@ -96,6 +96,54 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldWriteAndReadDynamicDataScopeAbilityFields() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.ofEntries(
+                Map.entry("id", "contract-1"),
+                Map.entry("tenant_id", "tenant-a"),
+                Map.entry("version", 0),
+                Map.entry("deleted", Boolean.FALSE),
+                Map.entry("auth_user_id", "user-1"),
+                Map.entry("auth_assignee_ids", "user-2,user-3"),
+                Map.entry("auth_member_ids", "user-4"),
+                Map.entry("auth_organization_id", "org-1"),
+                Map.entry("auth_module_alias", "sales.contract"),
+                Map.entry("code", "C-001"),
+                Map.entry("amount", BigDecimal.TEN)
+        )));
+        DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+        record.setTenantId("tenant-a");
+        record.setAuthUserId("user-1");
+        record.setAuthAssigneeIds("user-2,user-3");
+        record.setAuthMemberIds("user-4");
+        record.setAuthOrganizationId("org-1");
+        record.setAuthModuleAlias("sales.contract");
+
+        service.insert(record);
+        DynamicRecord selected = service.select("contract-1");
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue())
+                .containsEntry("auth_user_id", "user-1")
+                .containsEntry("auth_assignee_ids", "user-2,user-3")
+                .containsEntry("auth_member_ids", "user-4")
+                .containsEntry("auth_organization_id", "org-1")
+                .containsEntry("auth_module_alias", "sales.contract");
+        assertThat(selected.getAuthUserId()).isEqualTo("user-1");
+        assertThat(selected.getAuthAssigneeIds()).isEqualTo("user-2,user-3");
+        assertThat(selected.getAuthMemberIds()).isEqualTo("user-4");
+        assertThat(selected.getAuthOrganizationId()).isEqualTo("org-1");
+        assertThat(selected.getAuthModuleAlias()).isEqualTo("sales.contract");
+    }
+
+    @Test
     void shouldRunLifecycleHooksAroundCrudOperations() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))

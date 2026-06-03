@@ -9,8 +9,10 @@ import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
@@ -19,6 +21,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.mapping.DynamicRecordMapping;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -173,7 +176,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         body.put(StandardEntitySchema.CREATED_AT_COLUMN, record.getCreatedAt());
         body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
         body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
-        for (FieldDefinition field : entity.fields()) {
+        for (FieldDefinition field : recordFields()) {
             if (record.getValues().containsKey(field.code())) {
                 body.put(field.columnName(), record.getValues().get(field.code()));
             }
@@ -194,7 +197,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         if (record.getDeleted() != null) {
             body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
         }
-        for (FieldDefinition field : entity.fields()) {
+        for (FieldDefinition field : recordFields()) {
             if (record.getValues().containsKey(field.code())) {
                 body.put(field.columnName(), record.getValues().get(field.code()));
             }
@@ -234,10 +237,19 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         record.setCreatedAt(instantValue(row.get(StandardEntitySchema.CREATED_AT_COLUMN)));
         record.setUpdatedBy(stringValue(row.get(StandardEntitySchema.UPDATED_BY_COLUMN)));
         record.setUpdatedAt(instantValue(row.get(StandardEntitySchema.UPDATED_AT_COLUMN)));
-        for (FieldDefinition field : entity.fields()) {
+        for (FieldDefinition field : recordFields()) {
             record.putLoadedValue(field.code(), row.get(field.columnName()));
         }
         return record;
+    }
+
+    private List<FieldDefinition> recordFields() {
+        List<FieldDefinition> fields = new ArrayList<>();
+        if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            fields.addAll(DynamicAbilityFields.dataScopeFields());
+        }
+        fields.addAll(entity.fields());
+        return fields;
     }
 
     private StringBuilder selectSql(String whereSql) {

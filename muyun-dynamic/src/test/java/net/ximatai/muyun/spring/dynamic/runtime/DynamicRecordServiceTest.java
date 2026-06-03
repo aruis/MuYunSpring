@@ -18,6 +18,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -51,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -1751,6 +1754,73 @@ class DynamicRecordServiceTest {
         verify(operations, org.mockito.Mockito.times(3)).query(anyString(), anyMap());
     }
 
+    @Test
+    void shouldKeepFullSelectPathAfterRestrictedDataScopeVisibilityCheck() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap()))
+                .thenReturn(List.of(row("contract-1", "C-001", 0, false)))
+                .thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        DataScopeCriteriaService dataScope = new DataScopeCriteriaService() {
+            @Override
+            public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                            String actionCode,
+                                                            Criteria criteria,
+                                                            java.util.Optional<CurrentUser> currentUser) {
+                return DataScopeCriteriaResult.restricted(criteria);
+            }
+
+            @Override
+            public Criteria applyReadScope(String moduleAlias,
+                                           String actionCode,
+                                           Criteria criteria,
+                                           java.util.Optional<CurrentUser> currentUser) {
+                return criteria;
+            }
+        };
+        DynamicRecordService service = service(operations, contractEntity(), RuntimeEventPublisher.noop(), dataScope);
+
+        DynamicRecord selected = service.select(MODULE, "contract", "contract-1");
+
+        assertThat(selected).isNotNull();
+        assertThat(selected.getValue("code")).isEqualTo("C-001");
+        verify(operations, org.mockito.Mockito.times(2)).query(anyString(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeToReferenceResolveTargetModule() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
+        when(dataScope.resolveReadScope(eq(MODULE), eq("reference"), any(Criteria.class), any()))
+                .thenAnswer(invocation -> DataScopeCriteriaResult.unrestricted(invocation.getArgument(2)));
+        DynamicRecordService service = referenceResolvingService(operations, dataScope);
+
+        service.resolveReference(MODULE, "line", "contractId", DynamicReferenceResolveRequest.query("C-001"));
+
+        verify(dataScope).resolveReadScope(eq(MODULE), eq("reference"), any(Criteria.class), any());
+    }
+
+    @Test
+    void shouldApplyDataScopeToTreeChildrenRead() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of());
+        DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
+        when(dataScope.resolveReadScope(eq(MODULE), eq("tree"), any(Criteria.class), any()))
+                .thenAnswer(invocation -> DataScopeCriteriaResult.restricted(invocation.getArgument(2)));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
+                .register(new ModuleDefinition(MODULE, "Contract", List.of(treeEntity())));
+        DynamicRecordService service = new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                dataScope
+        );
+
+        service.children(MODULE, "contract", "root");
+
+        verify(dataScope).resolveReadScope(eq(MODULE), eq("tree"), any(Criteria.class), any());
+    }
+
     @SuppressWarnings("unchecked")
     private IDatabaseOperations<Object> operations() {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
@@ -1767,6 +1837,14 @@ class DynamicRecordServiceTest {
     private DynamicRecordService service(IDatabaseOperations<Object> operations,
                                          EntityDefinition entity,
                                          RuntimeEventPublisher eventPublisher) {
+        return service(operations, entity, eventPublisher,
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+    }
+
+    private DynamicRecordService service(IDatabaseOperations<Object> operations,
+                                         EntityDefinition entity,
+                                         RuntimeEventPublisher eventPublisher,
+                                         DataScopeCriteriaService dataScopeCriteriaService) {
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(
                 operations,
                 new DynamicModuleRegistry(),
@@ -1774,7 +1852,11 @@ class DynamicRecordServiceTest {
                 eventPublisher
         )
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(entity)));
-        return new DynamicRecordService(runtime);
+        return new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                dataScopeCriteriaService
+        );
     }
 
     private DynamicRecordService actionService(IDatabaseOperations<Object> operations) {
@@ -1938,6 +2020,12 @@ class DynamicRecordServiceTest {
     }
 
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
+        return referenceResolvingService(operations,
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+    }
+
+    private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations,
+                                                           DataScopeCriteriaService dataScopeCriteriaService) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1947,7 +2035,11 @@ class DynamicRecordServiceTest {
                         .withAutoTitle("contractTitle")
                         .withProjection("code", "contractCode"))
         );
-        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
+        return new DynamicRecordService(
+                new DynamicRecordRuntime(operations).register(module),
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                dataScopeCriteriaService
+        );
     }
 
     private EntityDefinition contractEntity() {
@@ -2072,6 +2164,19 @@ class DynamicRecordServiceTest {
                         FieldDefinition.sortOrder()
                 )
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.SORT);
+    }
+
+    private EntityDefinition treeEntity() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.parentId(),
+                        FieldDefinition.sortOrder()
+                )
+        ).withCapabilities(EntityCapability.TREE);
     }
 
     private EntityDefinition referenceEntity() {

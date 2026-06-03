@@ -2,11 +2,13 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
+import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
@@ -28,7 +30,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapable, TitledCapable {
+public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapable, TitledCapable, DataScopeCapable {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -51,7 +53,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     public DynamicRecord(EntityDefinition entity) {
         new ModuleDefinitionValidator().validateEntity(entity);
         this.entity = entity;
-        this.fields = entity.fields().stream()
+        this.fields = recordFields(entity).stream()
                 .collect(Collectors.toUnmodifiableMap(FieldDefinition::code, Function.identity()));
         this.companionFields = FieldCompanionRules.companionsByField(entity);
     }
@@ -254,6 +256,56 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         enabled(enabled);
     }
 
+    @Override
+    public String getAuthUserId() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_USER_FIELD);
+    }
+
+    @Override
+    public void setAuthUserId(String authUserId) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_USER_FIELD, authUserId);
+    }
+
+    @Override
+    public String getAuthAssigneeIds() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_ASSIGNEE_FIELD);
+    }
+
+    @Override
+    public void setAuthAssigneeIds(String authAssigneeIds) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_ASSIGNEE_FIELD, authAssigneeIds);
+    }
+
+    @Override
+    public String getAuthMemberIds() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_MEMBER_FIELD);
+    }
+
+    @Override
+    public void setAuthMemberIds(String authMemberIds) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_MEMBER_FIELD, authMemberIds);
+    }
+
+    @Override
+    public String getAuthOrganizationId() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD);
+    }
+
+    @Override
+    public void setAuthOrganizationId(String authOrganizationId) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, authOrganizationId);
+    }
+
+    @Override
+    public String getAuthModuleAlias() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_MODULE_FIELD);
+    }
+
+    @Override
+    public void setAuthModuleAlias(String authModuleAlias) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_MODULE_FIELD, authModuleAlias);
+    }
+
     Set<String> fieldCodes() {
         return fields.keySet();
     }
@@ -337,6 +389,28 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
 
     private boolean hasField(String fieldCode) {
         return fields.containsKey(fieldCode);
+    }
+
+    private static List<FieldDefinition> recordFields(EntityDefinition entity) {
+        List<FieldDefinition> values = new ArrayList<>();
+        if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            values.addAll(DynamicAbilityFields.dataScopeFields());
+        }
+        values.addAll(entity.fields());
+        return List.copyOf(values);
+    }
+
+    private String dataScopeValue(String fieldCode) {
+        if (!entity.supports(EntityCapability.DATA_SCOPE) || !hasField(fieldCode)) {
+            return null;
+        }
+        return stringValue(values.get(fieldCode));
+    }
+
+    private void setDataScopeValue(String fieldCode, String value) {
+        if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            setPlatformValueIfPresent(fieldCode, value);
+        }
     }
 
     private void setPlatformValueIfPresent(String fieldCode, Object value) {
