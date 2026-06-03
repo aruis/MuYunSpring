@@ -12,6 +12,11 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -24,7 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -35,7 +42,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = DynamicRecordWebController.class)
-@Import(DynamicRecordWebControllerIT.StaticContractController.class)
+@Import({
+        DynamicRecordWebControllerIT.StaticContractController.class,
+        CurrentUserWebFilter.class,
+        DynamicRecordJacksonConfiguration.class
+})
 class DynamicRecordWebControllerIT {
     private static final String MODULE = "sales.contract";
     private static final String ENTITY = "contract";
@@ -45,9 +56,21 @@ class DynamicRecordWebControllerIT {
     @MockitoBean
     private DynamicRecordService recordService;
 
+    @MockitoBean
+    private CurrentUserProvider currentUserProvider;
+
+    @MockitoBean
+    private ActiveTenantVerifier activeTenantVerifier;
+
     @Autowired
     DynamicRecordWebControllerIT(MockMvc mvc) {
         this.mvc = mvc;
+    }
+
+    @BeforeEach
+    void setUpCurrentUser() {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
     }
 
     @Test
@@ -59,8 +82,9 @@ class DynamicRecordWebControllerIT {
 
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
-        when(recordService.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(recordService.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
+        DynamicRecordService.EntityOperations mainEntity = mock(DynamicRecordService.EntityOperations.class);
+        when(recordService.mainEntity(MODULE)).thenReturn(mainEntity);
+        when(mainEntity.select("contract-1")).thenReturn(record);
 
         mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())

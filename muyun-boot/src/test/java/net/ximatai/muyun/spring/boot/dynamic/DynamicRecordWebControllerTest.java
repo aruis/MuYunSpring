@@ -36,6 +36,10 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
+import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -70,13 +74,24 @@ class DynamicRecordWebControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private DynamicRecordService service;
+    private DynamicRecordService.EntityOperations mainEntity;
+    private ActiveTenantVerifier activeTenantVerifier;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         service = mock(DynamicRecordService.class);
+        mainEntity = mock(DynamicRecordService.EntityOperations.class);
+        activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        when(service.mainEntity(MODULE)).thenReturn(mainEntity);
+        when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));
+        objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
+                .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service))
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
     }
 
@@ -89,6 +104,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.mainEntityAlias").value(ENTITY))
                 .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY));
+        verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
     }
 
     @Test
@@ -115,7 +131,10 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldAllowStaticControllerToTakeOverSameAliasUrl() throws Exception {
         MockMvc takeoverMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service), new StaticContractController())
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier), new StaticContractController())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
 
         takeoverMvc.perform(post("/{moduleAlias}/query", MODULE)
@@ -127,8 +146,8 @@ class DynamicRecordWebControllerTest {
 
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
+        when(service.mainEntity(MODULE)).thenReturn(mainEntity);
+        when(mainEntity.select("contract-1")).thenReturn(record);
 
         takeoverMvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
@@ -137,19 +156,24 @@ class DynamicRecordWebControllerTest {
 
     @Test
     void shouldCreateAndUpdateMainEntityThroughAliasRootContract() throws Exception {
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
-        when(service.create(eq(MODULE), eq(ENTITY), any(DynamicRecord.class))).thenReturn("contract-1");
-        when(service.update(eq(MODULE), eq(ENTITY), any(DynamicRecord.class))).thenReturn(1);
+        DynamicRecord created = new DynamicRecord(entity()).setValue("code", "C-001").setValue("amount", 12);
+        created.setId("contract-1");
+        DynamicRecord updated = new DynamicRecord(entity()).setValue("amount", BigDecimal.TEN);
+        updated.setId("contract-1");
+        updated.setVersion(4);
+        when(mainEntity.insert(any(DynamicRecord.class))).thenReturn("contract-1");
+        when(mainEntity.select("contract-1")).thenReturn(created, updated);
+        when(mainEntity.update(any(DynamicRecord.class))).thenReturn(1);
 
         mvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")
                         .content(json(Map.of("values", Map.of("code", "C-001", "amount", 12)))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("contract-1"));
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.values.code").value("C-001"));
 
         ArgumentCaptor<DynamicRecord> createRecord = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(service).create(eq(MODULE), eq(ENTITY), createRecord.capture());
+        verify(mainEntity).insert(createRecord.capture());
         assertThat(createRecord.getValue().getValue("code")).isEqualTo("C-001");
         assertThat(createRecord.getValue().getValue("amount")).isEqualTo(12);
 
@@ -157,10 +181,11 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("version", 3, "values", Map.of("amount", BigDecimal.TEN)))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(1));
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.version").value(4));
 
         ArgumentCaptor<DynamicRecord> updateRecord = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(service).update(eq(MODULE), eq(ENTITY), updateRecord.capture());
+        verify(mainEntity).update(updateRecord.capture());
         assertThat(updateRecord.getValue().getId()).isEqualTo("contract-1");
         assertThat(updateRecord.getValue().getVersion()).isEqualTo(3);
         assertThat(updateRecord.getValue().getValue("amount")).isEqualTo(10);
@@ -171,9 +196,8 @@ class DynamicRecordWebControllerTest {
         Criteria criteria = Criteria.of().eq("code", "C-001");
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.queryCriteria(eq(MODULE), eq(ENTITY), any())).thenReturn(criteria);
-        when(service.page(eq(MODULE), eq(ENTITY), eq(criteria), any(PageRequest.class), any(Sort[].class)))
+        when(mainEntity.queryCriteria(any())).thenReturn(criteria);
+        when(mainEntity.pageQuery(eq(criteria), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(2, 30)));
 
         mvc.perform(post("/{moduleAlias}/query", MODULE)
@@ -196,13 +220,37 @@ class DynamicRecordWebControllerTest {
         ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<PageRequest> page = ArgumentCaptor.forClass(PageRequest.class);
         ArgumentCaptor<Sort[]> sorts = ArgumentCaptor.forClass(Sort[].class);
-        verify(service).queryCriteria(eq(MODULE), eq(ENTITY), conditions.capture());
-        verify(service).page(eq(MODULE), eq(ENTITY), eq(criteria), page.capture(), sorts.capture());
+        verify(mainEntity).queryCriteria(conditions.capture());
+        verify(mainEntity).pageQuery(eq(criteria), page.capture(), sorts.capture());
         assertThat(conditions.getValue().getFirst().operator()).isEqualTo(DynamicQueryOperator.EQ);
         assertThat(conditions.getValue().getFirst().values()).isEqualTo(List.of("C-001"));
         assertThat(page.getValue().getOffset()).isEqualTo(30);
         assertThat(page.getValue().getLimit()).isEqualTo(30);
         assertThat(sorts.getValue()[0].getField()).isEqualTo("amount");
+    }
+
+    @Test
+    void shouldKeepDynamicDefaultQueryOperatorWhenWebQueryOmitsOperator() throws Exception {
+        Criteria criteria = Criteria.of().like("code", "C-001");
+        when(mainEntity.queryCriteria(any())).thenReturn(criteria);
+        when(mainEntity.pageQuery(eq(criteria), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(), 0, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "code",
+                                        "values", List.of("C-001")
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
+        verify(mainEntity).queryCriteria(conditions.capture());
+        assertThat(conditions.getValue().getFirst().operator()).isNull();
     }
 
     @Test
@@ -212,10 +260,9 @@ class DynamicRecordWebControllerTest {
                 .setValue("signedDate", LocalDate.parse("2026-06-01"))
                 .setValue("signedAt", Instant.parse("2026-06-01T02:03:04Z"));
         record.setId("contract-1");
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
-        when(service.queryCriteria(eq(MODULE), eq(ENTITY), any())).thenReturn(criteria);
-        when(service.page(eq(MODULE), eq(ENTITY), eq(criteria), any(PageRequest.class), any(Sort[].class)))
+        when(mainEntity.select("contract-1")).thenReturn(record);
+        when(mainEntity.queryCriteria(any())).thenReturn(criteria);
+        when(mainEntity.pageQuery(eq(criteria), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
 
         mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
@@ -238,7 +285,7 @@ class DynamicRecordWebControllerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
-        verify(service).queryCriteria(eq(MODULE), eq(ENTITY), conditions.capture());
+        verify(mainEntity).queryCriteria(conditions.capture());
         assertThat(conditions.getValue().getFirst().values()).isEqualTo(List.of("2026-06-01"));
     }
 
@@ -246,9 +293,8 @@ class DynamicRecordWebControllerTest {
     void shouldExposeMainEntityViewDeleteAndActionsThroughAliasRootContract() throws Exception {
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
-        when(service.delete(MODULE, ENTITY, "contract-1")).thenReturn(1);
+        when(mainEntity.select("contract-1")).thenReturn(record);
+        when(mainEntity.delete("contract-1")).thenReturn(1);
         when(service.actions(MODULE)).thenReturn(List.of(
                 action("export", EntityActionLevel.LIST),
                 action("submit", EntityActionLevel.RECORD, "select"),
@@ -272,9 +318,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())
                 .andExpect(jsonPath("$[2].code").value("archive"));
 
-        verify(service, times(2)).mainEntityAlias(MODULE);
-        verify(service).select(MODULE, ENTITY, "contract-1");
-        verify(service).delete(MODULE, ENTITY, "contract-1");
+        verify(mainEntity).select("contract-1");
+        verify(mainEntity).delete("contract-1");
         verify(service).actions(MODULE);
     }
 
@@ -679,10 +724,25 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldReturnStableBadRequestWhenTenantContextIsMissing() throws Exception {
+        MockMvc noTenantMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(java.util.Optional::empty))
+                .build();
+
+        noTenantMvc.perform(post("/{moduleAlias}/describe", MODULE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(MODULE + " requires tenant context"));
+
+        verifyNoInteractions(activeTenantVerifier);
+    }
+
+    @Test
     void shouldReturnConflictForOptimisticLockFailure() throws Exception {
-        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
-        when(service.update(eq(MODULE), eq(ENTITY), any(DynamicRecord.class)))
+        when(mainEntity.update(any(DynamicRecord.class)))
                 .thenThrow(new OptimisticLockException("record version conflict: contract-1"));
 
         mvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
@@ -692,6 +752,17 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.code").value("DYNAMIC_CONFLICT"))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("record version conflict: contract-1"));
+    }
+
+    @Test
+    void shouldReturnStableBadRequestWhenDynamicRecordPayloadCannotBeDecoded() throws Exception {
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of("values", Map.of("unknown", "C-001")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("unknown dynamic field: unknown"));
     }
 
     private String json(Object value) throws Exception {

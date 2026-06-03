@@ -13,9 +13,13 @@ public interface ScopedWeb<S> {
     S service();
 
     default <T> T webScope(Supplier<T> action) {
+        return webScope(webScopeName(), true, action);
+    }
+
+    private <T> T webScope(String scopeName, boolean verifyActiveTenant, Supplier<T> action) {
         String tenantId = TenantContext.currentTenantId()
-                .orElseThrow(() -> new PlatformException(webScopeName() + " requires tenant context"));
-        if (service() instanceof ActiveTenantVerifier activeTenantVerifier) {
+                .orElseThrow(() -> new PlatformException(scopeName + " requires tenant context"));
+        if (verifyActiveTenant && service() instanceof ActiveTenantVerifier activeTenantVerifier) {
             activeTenantVerifier.verifyActiveTenant(tenantId);
         }
         return action.get();

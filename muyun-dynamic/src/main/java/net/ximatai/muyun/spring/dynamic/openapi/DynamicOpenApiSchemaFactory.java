@@ -20,13 +20,17 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put(schemaName(entity.entityAlias(), "Record"), recordSchema(entity));
         schemas.put("DynamicRecordPayload", recordPayloadSchema(entity));
         schemas.put("DynamicRecordResponse", recordResponseSchema(entity));
-        schemas.put("DynamicQueryRequest", queryRequestSchema());
-        schemas.put("DynamicWebQueryCondition", queryConditionSchema());
-        schemas.put("DynamicWebPageRequest", pageRequestSchema());
-        schemas.put("DynamicWebSort", sortSchema());
+        schemas.put("WebQueryRequest", queryRequestSchema("WebQueryRequest", "WebQueryCondition", "WebPageRequest", "WebSort"));
+        schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
+        schemas.put("WebPageRequest", pageRequestSchema("WebPageRequest"));
+        schemas.put("WebSort", sortSchema("WebSort"));
+        schemas.put("DynamicWebQueryCondition", queryConditionSchema("DynamicWebQueryCondition"));
+        schemas.put("DynamicWebPageRequest", pageRequestSchema("DynamicWebPageRequest"));
+        schemas.put("DynamicWebSort", sortSchema("DynamicWebSort"));
         schemas.put("DynamicWebActionRequest", actionRequestSchema());
         schemas.put("DynamicWebReferenceRequest", referenceRequestSchema());
-        schemas.put("DynamicPageResponse", pageResponseSchema());
+        schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
+        schemas.put("DynamicPageResponse", pageResponseSchema("DynamicPageResponse"));
         schemas.put("DynamicWebActionExecutionResponse", actionExecutionResponseSchema());
         schemas.put("DynamicReferenceResolveResponse", referenceResolveResponseSchema());
         schemas.put("DynamicModuleDescriptor", moduleDescriptorSchema());
@@ -55,8 +59,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicActionDialog", actionDialogSchema());
         schemas.put("DynamicReferenceResolveItem", referenceResolveItemSchema());
         schemas.put("DynamicReferenceResolveResult", referenceResolveResultSchema());
-        schemas.put("RecordIdResponse", recordIdResponseSchema());
-        schemas.put("CountResponse", countResponseSchema());
+        schemas.put("WebCountResponse", countResponseSchema("WebCountResponse"));
         schemas.put("DynamicWebError", errorSchema("DynamicWebError", false));
         schemas.put("DynamicWebActionError", errorSchema("DynamicWebActionError", true));
         return Map.copyOf(schemas);
@@ -395,37 +398,40 @@ final class DynamicOpenApiSchemaFactory {
                 List.of("code", "status", "schemaName"), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema queryRequestSchema() {
+    private DynamicOpenApiDocument.Schema queryRequestSchema(String name,
+                                                             String conditionSchema,
+                                                             String pageSchema,
+                                                             String sortSchema) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
-        properties.put("conditions", arrayProperty("DynamicWebQueryCondition"));
-        properties.put("page", objectProperty("DynamicWebPageRequest"));
-        properties.put("sorts", arrayProperty("DynamicWebSort"));
-        return new DynamicOpenApiDocument.Schema("DynamicQueryRequest", "object", null, List.of(), properties, null);
+        properties.put("conditions", arrayProperty(conditionSchema));
+        properties.put("page", objectProperty(pageSchema));
+        properties.put("sorts", arrayProperty(sortSchema));
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema queryConditionSchema() {
+    private DynamicOpenApiDocument.Schema queryConditionSchema(String name) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("fieldName", stringProperty(false));
-        properties.put("operator", stringProperty(false));
+        properties.put("operator", stringProperty(true));
         properties.put("values", arrayProperty("object"));
-        return new DynamicOpenApiDocument.Schema("DynamicWebQueryCondition", "object", null, List.of(), properties, null);
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema pageRequestSchema() {
+    private DynamicOpenApiDocument.Schema pageRequestSchema(String name) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("pageNum", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("pageSize", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
-        return new DynamicOpenApiDocument.Schema("DynamicWebPageRequest", "object", null, List.of(), properties, null);
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema sortSchema() {
+    private DynamicOpenApiDocument.Schema sortSchema(String name) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("field", stringProperty(false));
         properties.put("desc", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
-        return new DynamicOpenApiDocument.Schema("DynamicWebSort", "object", null, List.of(), properties, null);
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionRequestSchema() {
@@ -458,7 +464,7 @@ final class DynamicOpenApiSchemaFactory {
         return new DynamicOpenApiDocument.Schema("DynamicWebReferenceRequest", "object", null, List.of(), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema pageResponseSchema() {
+    private DynamicOpenApiDocument.Schema pageResponseSchema(String name) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("records", arrayProperty("DynamicRecordResponse"));
         properties.put("total", new DynamicOpenApiDocument.Property("integer", "int64", false, false,
@@ -471,7 +477,7 @@ final class DynamicOpenApiSchemaFactory {
                 false, null, null, null, null, null, List.of()));
         properties.put("totalKnown", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
-        return new DynamicOpenApiDocument.Schema("DynamicPageResponse", "object", null, List.of(), properties, null);
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionExecutionResponseSchema() {
@@ -575,18 +581,11 @@ final class DynamicOpenApiSchemaFactory {
                 List.of("status"), properties, null);
     }
 
-    private DynamicOpenApiDocument.Schema recordIdResponseSchema() {
-        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
-        properties.put("id", stringProperty(false));
-        return new DynamicOpenApiDocument.Schema("RecordIdResponse", "object", null,
-                List.of("id"), properties, null);
-    }
-
-    private DynamicOpenApiDocument.Schema countResponseSchema() {
+    private DynamicOpenApiDocument.Schema countResponseSchema(String name) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("count", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
-        return new DynamicOpenApiDocument.Schema("CountResponse", "object", null,
+        return new DynamicOpenApiDocument.Schema(name, "object", null,
                 List.of("count"), properties, null);
     }
 

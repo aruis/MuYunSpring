@@ -52,15 +52,15 @@ public class DynamicOpenApiGenerator {
         operations.add(operation(basePath + "/openapi", operationId(descriptor, "openApi"),
                 "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
         operations.add(operation(basePath + "/query", operationId(descriptor, "query"),
-                "Query " + mainEntity.title(), "DynamicQueryRequest", "DynamicPageResponse", null));
-        operations.add(operation(basePath + "/view/{recordId}", operationId(descriptor, "view"),
+                "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", null));
+        operations.add(operation(basePath + "/view/{id}", operationId(descriptor, "view"),
                 "View " + mainEntity.title(), null, "DynamicRecordResponse", null));
         operations.add(operation(basePath + "/insert", operationId(descriptor, "insert"),
-                "Insert " + mainEntity.title(), "DynamicRecordPayload", "RecordIdResponse", null));
-        operations.add(operation(basePath + "/update/{recordId}", operationId(descriptor, "update"),
-                "Update " + mainEntity.title(), "DynamicRecordPayload", "CountResponse", null));
-        operations.add(operation(basePath + "/delete/{recordId}", operationId(descriptor, "delete"),
-                "Delete " + mainEntity.title(), null, "CountResponse", null));
+                "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
+        operations.add(operation(basePath + "/update/{id}", operationId(descriptor, "update"),
+                "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
+        operations.add(operation(basePath + "/delete/{id}", operationId(descriptor, "delete"),
+                "Delete " + mainEntity.title(), null, "WebCountResponse", null));
         operations.add(operation(basePath + "/actions", operationId(descriptor, "actions"),
                 "List module actions", null, "DynamicActionDescriptorList", null));
         operations.add(operation(basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),

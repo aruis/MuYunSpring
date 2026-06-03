@@ -31,19 +31,6 @@ record DynamicRecordPayload(String id, Integer version, Map<String, Object> valu
     }
 }
 
-record DynamicQueryRequest(List<DynamicWebQueryCondition> conditions,
-                           DynamicWebPageRequest page,
-                           List<DynamicWebSort> sorts) {
-    DynamicQueryRequest {
-        conditions = conditions == null ? List.of() : List.copyOf(conditions);
-        sorts = sorts == null ? List.of() : List.copyOf(sorts);
-    }
-
-    static DynamicQueryRequest empty() {
-        return new DynamicQueryRequest(List.of(), DynamicWebPageRequest.DEFAULT, List.of());
-    }
-}
-
 record DynamicWebQueryCondition(String fieldName, DynamicQueryOperator operator, List<Object> values) {
     DynamicWebQueryCondition {
         values = values == null ? List.of() : List.copyOf(values);
@@ -52,6 +39,18 @@ record DynamicWebQueryCondition(String fieldName, DynamicQueryOperator operator,
 
 record DynamicWebPageRequest(int pageNum, int pageSize) {
     static final DynamicWebPageRequest DEFAULT = new DynamicWebPageRequest(1, 20);
+
+    DynamicWebPageRequest {
+        if (pageNum <= 0) {
+            pageNum = DEFAULT.pageNum();
+        }
+        if (pageSize <= 0) {
+            pageSize = DEFAULT.pageSize();
+        }
+        if (pageSize > 500) {
+            pageSize = 500;
+        }
+    }
 }
 
 record DynamicWebSort(String field, boolean desc) {
@@ -101,12 +100,6 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
         return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(),
                 DynamicWebPageRequest.DEFAULT, true);
     }
-}
-
-record RecordIdResponse(String id) {
-}
-
-record CountResponse(int count) {
 }
 
 record DynamicRecordResponse(String id,

@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
@@ -61,6 +63,10 @@ public class DynamicRecordService {
 
     public EntityOperations entity(String moduleAlias, String entityAlias) {
         return new EntityOperations(this, moduleAlias, entityAlias);
+    }
+
+    public EntityOperations mainEntity(String moduleAlias) {
+        return entity(moduleAlias, mainEntityAlias(moduleAlias));
     }
 
     public DynamicEntityDescriptor entityDescriptor(String moduleAlias, String entityAlias) {
@@ -845,7 +851,7 @@ public class DynamicRecordService {
         }
     }
 
-    public static final class EntityOperations {
+    public static final class EntityOperations implements CrudAbility<DynamicRecord> {
         private final DynamicRecordService service;
         private final String moduleAlias;
         private final String entityAlias;
@@ -854,6 +860,16 @@ public class DynamicRecordService {
             this.service = service;
             this.moduleAlias = moduleAlias;
             this.entityAlias = entityAlias;
+        }
+
+        @Override
+        public BaseDao<DynamicRecord, String> getDao() {
+            return service.entityService(moduleAlias, entityAlias).getDao();
+        }
+
+        @Override
+        public String getModuleAlias() {
+            return moduleAlias;
         }
 
         public DynamicRecord newRecord() {
@@ -908,6 +924,12 @@ public class DynamicRecordService {
             return service.create(moduleAlias, entityAlias, record);
         }
 
+        @Override
+        public String insert(DynamicRecord record) {
+            return create(record);
+        }
+
+        @Override
         public DynamicRecord select(String id) {
             return service.select(moduleAlias, entityAlias, id);
         }
@@ -916,14 +938,17 @@ public class DynamicRecordService {
             return service.selectIgnoreSoftDelete(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public int update(DynamicRecord record) {
             return service.update(moduleAlias, entityAlias, record);
         }
 
+        @Override
         public int delete(String id) {
             return service.delete(moduleAlias, entityAlias, id);
         }
 
+        @Override
         public int deleteBatch(Collection<String> ids) {
             return service.deleteBatch(moduleAlias, entityAlias, ids);
         }
@@ -936,6 +961,12 @@ public class DynamicRecordService {
             return service.page(moduleAlias, entityAlias, criteria, pageRequest, sorts);
         }
 
+        @Override
+        public PageResult<DynamicRecord> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+            return page(criteria, pageRequest, sorts);
+        }
+
+        @Override
         public long count(Criteria criteria) {
             return service.count(moduleAlias, entityAlias, criteria);
         }

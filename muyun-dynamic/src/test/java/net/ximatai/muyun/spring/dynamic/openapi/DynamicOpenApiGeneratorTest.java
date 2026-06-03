@@ -38,10 +38,10 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/describe",
                         "/sales.contract/openapi",
                         "/sales.contract/query",
-                        "/sales.contract/view/{recordId}",
+                        "/sales.contract/view/{id}",
                         "/sales.contract/insert",
-                        "/sales.contract/update/{recordId}",
-                        "/sales.contract/delete/{recordId}",
+                        "/sales.contract/update/{id}",
+                        "/sales.contract/delete/{id}",
                         "/sales.contract/actions",
                         "/sales.contract/actions/{recordId}",
                         "/sales.contract/export",
@@ -70,10 +70,16 @@ class DynamicOpenApiGeneratorTest {
                 .get()
                 .satisfies(operation -> {
                     assertThat(operation.requestSchema()).isEqualTo("DynamicRecordPayload");
-                    assertThat(operation.responseSchema()).isEqualTo("RecordIdResponse");
+                    assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
                 });
         assertThat(document.operations().stream()
-                .filter(operation -> operation.path().equals("/sales.contract/view/{recordId}"))
+                .filter(operation -> operation.path().equals("/sales.contract/update/{id}"))
+                .findFirst())
+                .get()
+                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
+                .isEqualTo("DynamicRecordResponse");
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}"))
                 .findFirst())
                 .get()
                 .extracting(DynamicOpenApiDocument.Operation::responseSchema)
@@ -169,10 +175,10 @@ class DynamicOpenApiGeneratorTest {
     void shouldExposeDynamicWebErrorSchemas() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
 
-        assertThat(document.schemas().get("DynamicQueryRequest").properties().get("conditions"))
+        assertThat(document.schemas().get("WebQueryRequest").properties().get("conditions"))
                 .satisfies(property -> {
                     assertThat(property.type()).isEqualTo("array");
-                    assertThat(property.itemType()).isEqualTo("DynamicWebQueryCondition");
+                    assertThat(property.itemType()).isEqualTo("WebQueryCondition");
                     assertThat(property.companionFields()).isEmpty();
                 });
         assertThat(document.errors())
@@ -190,9 +196,7 @@ class DynamicOpenApiGeneratorTest {
     void shouldExposeWebResponseSchemasForActionAndCrudContracts() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
 
-        assertThat(document.schemas().get("RecordIdResponse").properties().get("id").type())
-                .isEqualTo("string");
-        assertThat(document.schemas().get("CountResponse").properties().get("count"))
+        assertThat(document.schemas().get("WebCountResponse").properties().get("count"))
                 .satisfies(property -> {
                     assertThat(property.type()).isEqualTo("integer");
                     assertThat(property.format()).isEqualTo("int32");
@@ -219,6 +223,9 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("DynamicWebActionAvailabilityList").items().type())
                 .isEqualTo("DynamicWebActionAvailabilityResponse");
         assertThat(document.schemas().get("DynamicWebPageRequest").properties())
+                .containsKeys("pageNum", "pageSize")
+                .doesNotContainKeys("offset", "limit");
+        assertThat(document.schemas().get("WebPageRequest").properties())
                 .containsKeys("pageNum", "pageSize")
                 .doesNotContainKeys("offset", "limit");
         assertThat(document.schemas().get("DynamicReferenceResolveResponse").properties())
