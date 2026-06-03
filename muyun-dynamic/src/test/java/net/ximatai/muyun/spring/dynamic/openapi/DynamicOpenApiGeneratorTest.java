@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -110,7 +111,8 @@ class DynamicOpenApiGeneratorTest {
                 List.of(),
                 List.of(
                         action("openapi", "OpenAPI", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
-                        action("query", "Query", EntityActionLevel.LIST, EntityActionStyle.NORMAL)
+                        action("query", "Query", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
+                        action("tree", "Tree", EntityActionLevel.LIST, EntityActionStyle.NORMAL)
                 )
         );
 
@@ -125,6 +127,29 @@ class DynamicOpenApiGeneratorTest {
                 .singleElement()
                 .extracting(DynamicOpenApiDocument.Operation::actionCode)
                 .isNull();
+    }
+
+    @Test
+    void shouldExposeTreeWebOperationsOnlyWhenMainEntitySupportsTree() {
+        DynamicOpenApiDocument plain = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()))));
+        DynamicOpenApiDocument tree = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(treeEntity()))));
+
+        assertThat(plain.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .doesNotContain("/sales.contract/tree", "/sales.contract/tree/{id}");
+        assertThat(tree.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .contains("/sales.contract/tree", "/sales.contract/tree/{id}");
+        assertThat(tree.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/tree"))
+                .findFirst())
+                .get()
+                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
+                .isEqualTo("WebListResponse");
+        assertThat(tree.schemas().get("WebListResponse").properties().get("records").itemType())
+                .isEqualTo("DynamicRecordResponse");
     }
 
     @Test
@@ -349,5 +374,13 @@ class DynamicOpenApiGeneratorTest {
                 FieldDefinition.string("productName", "Product").length(128).required(),
                 FieldDefinition.decimal("quantity", "Quantity").precision(18, 2)
         ));
+    }
+
+    private EntityDefinition treeEntity() {
+        return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.parentId(),
+                FieldDefinition.sortOrder()
+        )).withCapabilities(EntityCapability.TREE);
     }
 }

@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 
@@ -61,6 +62,12 @@ public class DynamicOpenApiGenerator {
                 "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
         operations.add(operation(basePath + "/delete/{id}", operationId(descriptor, "delete"),
                 "Delete " + mainEntity.title(), null, "WebCountResponse", null));
+        if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
+            operations.add(operation(basePath + "/tree", operationId(descriptor, "tree"),
+                    "Tree " + mainEntity.title(), null, "WebListResponse", null));
+            operations.add(operation(basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
+                    "Tree node " + mainEntity.title(), null, "WebListResponse", null));
+        }
         operations.add(operation(basePath + "/actions", operationId(descriptor, "actions"),
                 "List module actions", null, "DynamicActionDescriptorList", null));
         operations.add(operation(basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),

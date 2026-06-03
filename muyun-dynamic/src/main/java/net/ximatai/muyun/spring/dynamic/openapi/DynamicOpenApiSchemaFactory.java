@@ -49,6 +49,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicOpenApiProperty", openApiPropertySchema());
         schemas.put("DynamicOpenApiErrorResponse", openApiErrorResponseSchema());
         schemas.put("DynamicActionDescriptorList", arraySchema("DynamicActionDescriptorList", "DynamicActionDescriptor"));
+        schemas.put("WebListResponse", listResponseSchema("WebListResponse"));
         schemas.put("DynamicWebActionAvailabilityList", arraySchema("DynamicWebActionAvailabilityList", "DynamicWebActionAvailabilityResponse"));
         schemas.put("DynamicWebActionAvailabilityResponse", actionAvailabilityResponseSchema());
         schemas.put("DynamicWebActionContext", actionContextSchema());
@@ -474,6 +475,12 @@ final class DynamicOpenApiSchemaFactory {
                 false, null, null, null, null, null, List.of()));
         properties.put("totalKnown", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
+        return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema listResponseSchema(String name) {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("records", arrayProperty("DynamicRecordResponse"));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 

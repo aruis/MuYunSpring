@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -623,7 +624,7 @@ public class DynamicEntityService implements
 
     private void requireCapability(EntityCapability capability) {
         if (!dao.getEntity().supports(capability)) {
-            throw new IllegalStateException("dynamic entity does not support capability: " + capability);
+            throw new PlatformException("dynamic entity does not support capability: " + capability);
         }
     }
 

@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
+import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -42,7 +43,9 @@ import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
-public class DynamicRecordWebController implements CrudWeb<DynamicRecord, DynamicRecordService.EntityOperations> {
+public class DynamicRecordWebController implements
+        CrudWeb<DynamicRecord, DynamicRecordService.EntityOperations>,
+        TreeWeb<DynamicRecord, DynamicRecordService.EntityOperations> {
     private static final Set<String> INTERNAL_RESULT_ACTIONS = Set.of("queryCriteria", "enabledCriteria");
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;

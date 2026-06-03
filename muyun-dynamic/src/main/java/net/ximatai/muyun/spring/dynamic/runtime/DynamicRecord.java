@@ -2,6 +2,9 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
@@ -25,7 +28,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract {
+public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapable, TitledCapable {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -203,7 +206,7 @@ public class DynamicRecord implements EntityContract {
     }
 
     Boolean enabled() {
-        if (!hasField(PlatformAbilityFields.ENABLED_FIELD)) {
+        if (!entity.supports(EntityCapability.ENABLE) || !hasField(PlatformAbilityFields.ENABLED_FIELD)) {
             return null;
         }
         Object value = values.get(PlatformAbilityFields.ENABLED_FIELD);
@@ -211,7 +214,44 @@ public class DynamicRecord implements EntityContract {
     }
 
     void enabled(Boolean enabled) {
-        setPlatformValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
+        if (entity.supports(EntityCapability.ENABLE)) {
+            setPlatformValueIfPresent(PlatformAbilityFields.ENABLED_FIELD, enabled);
+        }
+    }
+
+    @Override
+    public String getParentId() {
+        return parentId();
+    }
+
+    @Override
+    public void setParentId(String parentId) {
+        parentId(parentId);
+    }
+
+    @Override
+    public Integer getSortOrder() {
+        return sortOrder();
+    }
+
+    @Override
+    public void setSortOrder(Integer sortOrder) {
+        sortOrder(sortOrder);
+    }
+
+    @Override
+    public String getTitle() {
+        return title();
+    }
+
+    @Override
+    public Boolean getEnabled() {
+        return enabled();
+    }
+
+    @Override
+    public void setEnabled(Boolean enabled) {
+        enabled(enabled);
     }
 
     Set<String> fieldCodes() {

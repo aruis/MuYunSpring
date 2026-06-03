@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
@@ -851,7 +852,7 @@ public class DynamicRecordService {
         }
     }
 
-    public static final class EntityOperations implements CrudAbility<DynamicRecord> {
+    public static final class EntityOperations implements TreeAbility<DynamicRecord> {
         private final DynamicRecordService service;
         private final String moduleAlias;
         private final String entityAlias;

@@ -36,6 +36,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
@@ -321,6 +322,62 @@ class DynamicRecordWebControllerTest {
         verify(mainEntity).select("contract-1");
         verify(mainEntity).delete("contract-1");
         verify(service).actions(MODULE);
+    }
+
+    @Test
+    void shouldExposeMainEntityTreeThroughStandardTreeWebContract() throws Exception {
+        DynamicRecord first = new DynamicRecord(treeEntity()).setValue("code", "A");
+        first.setId("A");
+        first.setParentId("root");
+        first.setSortOrder(1);
+        DynamicRecord second = new DynamicRecord(treeEntity()).setValue("code", "B");
+        second.setId("B");
+        second.setParentId("root");
+        second.setSortOrder(2);
+        when(mainEntity.children("root")).thenReturn(List.of(first, second));
+
+        mvc.perform(post("/{moduleAlias}/tree", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("A"))
+                .andExpect(jsonPath("$.records[0].values.code").value("A"))
+                .andExpect(jsonPath("$.records[0].values.parentId").value("root"))
+                .andExpect(jsonPath("$.records[1].id").value("B"));
+
+        verify(mainEntity).children("root");
+    }
+
+    @Test
+    void shouldExposeDynamicTreeNodeThroughStandardTreeWebContract() throws Exception {
+        DynamicRecord root = new DynamicRecord(treeEntity()).setValue("code", "A");
+        root.setId("A");
+        root.setParentId("root");
+        DynamicRecord child = new DynamicRecord(treeEntity()).setValue("code", "A-1");
+        child.setId("A-1");
+        child.setParentId("A");
+        when(mainEntity.select("A")).thenReturn(root);
+        when(mainEntity.children("A")).thenReturn(List.of(child));
+        when(mainEntity.children("A-1")).thenReturn(List.of());
+
+        mvc.perform(post("/{moduleAlias}/tree/{recordId}", MODULE, "A"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("A"))
+                .andExpect(jsonPath("$.records[1].id").value("A-1"))
+                .andExpect(jsonPath("$.records[1].values.parentId").value("A"));
+
+        verify(mainEntity).select("A");
+        verify(mainEntity).children("A");
+        verify(mainEntity).children("A-1");
+    }
+
+    @Test
+    void shouldRejectTreeWebWhenDynamicMainEntityDoesNotSupportTree() throws Exception {
+        when(mainEntity.children("root"))
+                .thenThrow(new PlatformException("dynamic entity does not support capability: TREE"));
+
+        mvc.perform(post("/{moduleAlias}/tree", MODULE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: TREE"));
     }
 
     @Test
@@ -798,6 +855,14 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
         ));
+    }
+
+    private EntityDefinition treeEntity() {
+        return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.parentId(),
+                FieldDefinition.sortOrder()
+        )).withCapabilities(net.ximatai.muyun.spring.dynamic.metadata.EntityCapability.TREE);
     }
 
     @RestController

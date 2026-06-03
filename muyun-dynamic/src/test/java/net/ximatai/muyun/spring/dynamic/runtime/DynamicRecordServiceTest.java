@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -134,7 +135,7 @@ class DynamicRecordServiceTest {
         DynamicRecordService.EntityOperations contracts = service.entity(MODULE, "contract");
 
         assertThatThrownBy(() -> contracts.enable("contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("ENABLE");
     }
 
@@ -1563,19 +1564,19 @@ class DynamicRecordServiceTest {
         DynamicRecordService service = service(operations(), contractEntity());
 
         assertThatThrownBy(() -> service.enable(MODULE, "contract", "contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("ENABLE");
         assertThatThrownBy(() -> service.disable(MODULE, "contract", "contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("ENABLE");
         assertThatThrownBy(() -> service.isEnabled(MODULE, "contract", "contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("ENABLE");
         assertThatThrownBy(() -> service.enabledCriteria(MODULE, "contract", Criteria.of()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("ENABLE");
         assertThatThrownBy(() -> service.projections(MODULE, "contract", List.of("contract-1"), List.of("code")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("REFERENCE");
     }
 

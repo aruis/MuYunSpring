@@ -1005,7 +1005,7 @@ class DynamicRecordDaoTest {
 
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .sortedList(Criteria.of()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: SORT");
     }
 
@@ -1020,7 +1020,8 @@ class DynamicRecordDaoTest {
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, referenceEntity()), "sales.contract");
         DynamicRecord record = new DynamicRecord(referenceEntity()).setValue("title", "Contract");
 
-        assertThat(record).isNotInstanceOf(TitledCapable.class);
+        assertThat(record).isInstanceOf(TitledCapable.class);
+        assertThat(record.getTitle()).isEqualTo("Contract");
         assertThat(entityService).isNotInstanceOf(ReferenceAbility.class);
         assertThat(entityService.title("contract-1")).isEqualTo("Contract One");
         assertThat(entityService.titles(List.of("contract-1", "contract-2")))
@@ -1067,7 +1068,7 @@ class DynamicRecordDaoTest {
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
         DynamicRecord record = new DynamicRecord(treeEntity()).setValue("code", "C");
 
-        assertThat(record).isNotInstanceOf(TreeCapable.class);
+        assertThat(record).isInstanceOf(TreeCapable.class);
         assertThat(entityService).isNotInstanceOf(TreeAbility.class);
         assertThat(entityService.children("root").stream().map(DynamicRecord::getId))
                 .containsExactly("A", "B");
@@ -1194,7 +1195,7 @@ class DynamicRecordDaoTest {
         DynamicRecord record = new DynamicRecord(entity).setValue("code", "C");
         record.setId("C");
 
-        assertThat(record).isNotInstanceOf(EnabledCapable.class);
+        assertThat(record).isInstanceOf(EnabledCapable.class);
         assertThat(entityService).isNotInstanceOf(EnableAbility.class);
         entityService.insert(record);
 
@@ -1250,16 +1251,16 @@ class DynamicRecordDaoTest {
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract");
 
         assertThatThrownBy(() -> entityService.enable("contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: ENABLE");
         assertThatThrownBy(() -> entityService.disable("contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: ENABLE");
         assertThatThrownBy(() -> entityService.isEnabled("contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: ENABLE");
         assertThatThrownBy(() -> entityService.enabledCriteria(Criteria.of()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: ENABLE");
     }
 
@@ -1267,7 +1268,7 @@ class DynamicRecordDaoTest {
     void shouldRejectReferenceMethodsWithoutTitleField() {
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .title("contract-1"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: REFERENCE");
     }
 
@@ -1275,7 +1276,7 @@ class DynamicRecordDaoTest {
     void shouldRejectSortMethodsWithoutSortCapability() {
         assertThatThrownBy(() -> new DynamicEntityService(new DynamicRecordDao(operations(), contractEntity()), "sales.contract")
                 .sortedList(Criteria.of()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("does not support capability: SORT");
     }
 
