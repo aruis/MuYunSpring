@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
@@ -224,6 +225,35 @@ public class DynamicEntityService implements
         if (dao.getEntity().supports(EntityCapability.ENABLE) && record.enabled() == null) {
             record.enabled(Boolean.TRUE);
         }
+        if (dao.getEntity().supports(EntityCapability.SORT) && record.sortOrder() == null) {
+            record.sortOrder(nextSortOrder(record));
+        }
+    }
+
+    private int nextSortOrder(DynamicRecord record) {
+        Criteria scope = sortScope(record);
+        int maxOrder = sortedList(scope).stream()
+                .map(DynamicRecord::sortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+        if (maxOrder > Integer.MAX_VALUE - SortAbility.SORT_STEP) {
+            List<String> orderedIds = sortedList(scope).stream()
+                    .map(DynamicRecord::getId)
+                    .toList();
+            if (!orderedIds.isEmpty()) {
+                reorder(orderedIds);
+                maxOrder = sortedList(scope).stream()
+                        .map(DynamicRecord::sortOrder)
+                        .filter(Objects::nonNull)
+                        .max(Integer::compareTo)
+                        .orElse(0);
+            }
+        }
+        if (maxOrder > Integer.MAX_VALUE - SortAbility.SORT_STEP) {
+            throw new PlatformException("Cannot allocate dynamic sort order; sort scope is too large");
+        }
+        return maxOrder + SortAbility.SORT_STEP;
     }
 
     public int enable(String id) {

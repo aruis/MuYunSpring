@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -30,6 +31,7 @@ public interface CrudAbility<T extends EntityContract> {
         EntityLifecycle.prepareInsert(entity, Instant.now());
         prepareAbilityDefaults(entity);
         beforeInsert(entity);
+        prepareSortDefault(entity);
         validateTreePlacementIfNeeded(entity);
         String id = getDao().insert(entity);
         PlatformAbilityDispatcher.afterInsert(this, id, entity);
@@ -246,6 +248,13 @@ public interface CrudAbility<T extends EntityContract> {
                 && shouldPrepareEnabledDefault(entity)
                 && enabled.getEnabled() == null) {
             enabled.setEnabled(Boolean.TRUE);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void prepareSortDefault(T entity) {
+        if (entity instanceof SortCapable && this instanceof SortAbility sortAbility) {
+            sortAbility.prepareSortOrderForInsert((SortCapable) entity);
         }
     }
 

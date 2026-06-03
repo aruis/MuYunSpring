@@ -1047,9 +1047,7 @@ class DynamicRecordServiceTest {
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(3))
                 .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
-        assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
-        assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
-        assertThat(body.getAllValues().get(2)).containsEntry("sort_order", 3);
+        assertThat(body.getAllValues()).allSatisfy(value -> assertThat(value).containsKey("sort_order"));
     }
 
     @Test

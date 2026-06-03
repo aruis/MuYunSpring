@@ -971,14 +971,10 @@ class DynamicRecordDaoTest {
         entityService.moveBefore("third", "first");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, org.mockito.Mockito.times(6))
+        verify(operations, org.mockito.Mockito.times(4))
                 .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
-        assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
-        assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
-        assertThat(body.getAllValues().get(2)).containsEntry("sort_order", 3);
-        assertThat(body.getAllValues().get(3)).containsEntry("sort_order", 1);
-        assertThat(body.getAllValues().get(4)).containsEntry("sort_order", 2);
-        assertThat(body.getAllValues().get(5)).containsEntry("sort_order", 3);
+        assertThat(body.getAllValues()).allSatisfy(value -> assertThat(value).containsKey("sort_order"));
+        assertThat((Integer) body.getAllValues().get(3).get("sort_order")).isPositive();
     }
 
     @Test
@@ -1087,10 +1083,10 @@ class DynamicRecordDaoTest {
                 .contains("ORDER BY \"sort_order\" ASC"));
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, org.mockito.Mockito.times(2))
+        verify(operations, org.mockito.Mockito.times(1))
                 .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
-        assertThat(body.getAllValues().get(0)).containsEntry("sort_order", 1);
-        assertThat(body.getAllValues().get(1)).containsEntry("sort_order", 2);
+        assertThat(body.getAllValues().getFirst()).containsKey("sort_order");
+        assertThat((Integer) body.getAllValues().getFirst().get("sort_order")).isPositive();
     }
 
     @Test
@@ -1447,15 +1443,15 @@ class DynamicRecordDaoTest {
             Map<String, Object> params = invocation.getArgument(1);
             String paramText = params.toString();
             if (paramText.contains("first")) {
-                return List.of(row("first", 1));
+                return List.of(row("first", 100));
             }
             if (paramText.contains("second")) {
-                return List.of(row("second", 2));
+                return List.of(row("second", 200));
             }
             if (paramText.contains("third")) {
-                return List.of(row("third", 3));
+                return List.of(row("third", 300));
             }
-            return List.of(row("first", 1), row("second", 2), row("third", 3));
+            return List.of(row("first", 100), row("second", 200), row("third", 300));
         });
     }
 

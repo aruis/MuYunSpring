@@ -7,7 +7,9 @@ import net.ximatai.muyun.spring.boot.web.ActionWeb;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
+import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
+import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -17,6 +19,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
@@ -93,6 +96,37 @@ public class DynamicRecordWebController implements
             return new Sort[0];
         }
         return DynamicWebQueryMapper.sorts(request.sorts());
+    }
+
+    @Override
+    @PostMapping("/sort/{id}")
+    public WebCountResponse sort(@PathVariable String id,
+                                 @RequestBody(required = false) TreeSortWebRequest request) {
+        return webScope(() -> {
+            TreeSortWebRequest normalized = request == null ? new TreeSortWebRequest(null, null, null) : request;
+            DynamicEntityOperations operations = service();
+            Set<String> capabilities = operations.describe().capabilities();
+            if (capabilities.contains(EntityCapability.TREE.name())) {
+                requireSortInput(normalized);
+                operations.moveInTree(id, normalized.previousId(), normalized.nextId(), normalized.parentId());
+                return new WebCountResponse(1);
+            }
+            if (!capabilities.contains(EntityCapability.SORT.name())) {
+                throw new PlatformException("dynamic entity does not support capability: SORT");
+            }
+            if (normalized.parentId() != null && !normalized.parentId().isBlank()) {
+                throw new IllegalArgumentException("sort parentId requires TREE capability");
+            }
+            if (normalized.previousId() != null && !normalized.previousId().isBlank()) {
+                operations.moveAfter(id, normalized.previousId());
+                return new WebCountResponse(1);
+            }
+            if (normalized.nextId() != null && !normalized.nextId().isBlank()) {
+                operations.moveBefore(id, normalized.nextId());
+                return new WebCountResponse(1);
+            }
+            throw new IllegalArgumentException("sort requires previousId or nextId");
+        });
     }
 
     @PostMapping("/describe")
@@ -226,6 +260,14 @@ public class DynamicRecordWebController implements
 
     private String mainEntityAlias(String moduleAlias) {
         return recordService.mainEntityAlias(moduleAlias);
+    }
+
+    private void requireSortInput(TreeSortWebRequest request) {
+        if ((request.previousId() == null || request.previousId().isBlank())
+                && (request.nextId() == null || request.nextId().isBlank())
+                && (request.parentId() == null || request.parentId().isBlank())) {
+            throw new IllegalArgumentException("tree sort requires previousId, nextId, or parentId");
+        }
     }
 
     private <T> T tenantScope(String moduleAlias, Supplier<T> action) {

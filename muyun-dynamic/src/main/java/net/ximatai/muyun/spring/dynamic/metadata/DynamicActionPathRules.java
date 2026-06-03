@@ -4,7 +4,7 @@ import java.util.Set;
 
 public final class DynamicActionPathRules {
     private static final Set<String> RESERVED_WEB_ACTION_CODES = Set.of(
-            "actions", "delete", "describe", "disable", "enable", "entities", "insert", "openapi", "query", "references", "tree", "update", "view"
+            "actions", "delete", "describe", "disable", "enable", "entities", "insert", "openapi", "query", "references", "sort", "tree", "update", "view"
     );
 
     private DynamicActionPathRules() {

@@ -114,6 +114,7 @@ class DynamicOpenApiGeneratorTest {
                         action("query", "Query", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
                         action("enable", "Enable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
                         action("disable", "Disable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
+                        action("sort", "Sort", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
                         action("tree", "Tree", EntityActionLevel.LIST, EntityActionStyle.NORMAL)
                 )
         );
@@ -129,6 +130,40 @@ class DynamicOpenApiGeneratorTest {
                 .singleElement()
                 .extracting(DynamicOpenApiDocument.Operation::actionCode)
                 .isNull();
+    }
+
+    @Test
+    void shouldExposeSortWebOperationOnlyWhenMainEntitySupportsSort() {
+        DynamicOpenApiDocument plain = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()))));
+        DynamicOpenApiDocument sortable = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(sortableEntity()))));
+        DynamicOpenApiDocument tree = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(treeEntity()))));
+
+        assertThat(plain.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .doesNotContain("/sales.contract/sort/{id}");
+        assertThat(sortable.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/sort/{id}"))
+                .findFirst())
+                .get()
+                .satisfies(operation -> {
+                    assertThat(operation.requestSchema()).isEqualTo("SortWebRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
+                });
+        assertThat(sortable.schemas().get("SortWebRequest").properties())
+                .containsKeys("previousId", "nextId")
+                .doesNotContainKey("parentId")
+                .doesNotContainKey("orderedIds");
+        assertThat(tree.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/sort/{id}"))
+                .findFirst())
+                .get()
+                .satisfies(operation -> assertThat(operation.requestSchema()).isEqualTo("TreeSortWebRequest"));
+        assertThat(tree.schemas().get("TreeSortWebRequest").properties())
+                .containsKeys("previousId", "nextId", "parentId")
+                .doesNotContainKey("orderedIds");
     }
 
     @Test
@@ -405,6 +440,13 @@ class DynamicOpenApiGeneratorTest {
                 FieldDefinition.parentId(),
                 FieldDefinition.sortOrder()
         )).withCapabilities(EntityCapability.TREE);
+    }
+
+    private EntityDefinition sortableEntity() {
+        return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.sortOrder()
+        )).withCapabilities(EntityCapability.SORT);
     }
 
     private EntityDefinition enabledEntity() {

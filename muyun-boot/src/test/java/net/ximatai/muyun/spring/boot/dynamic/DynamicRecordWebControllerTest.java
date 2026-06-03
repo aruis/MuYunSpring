@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -15,6 +16,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -336,8 +338,10 @@ class DynamicRecordWebControllerTest {
         second.setParentId("root");
         second.setSortOrder(2);
         when(mainEntity.children("root")).thenReturn(List.of(first, second));
+        when(mainEntity.children("A")).thenReturn(List.of());
+        when(mainEntity.children("B")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree", MODULE))
+        mvc.perform(post("/{moduleAlias}/tree?flat=true", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("A"))
                 .andExpect(jsonPath("$.records[0].values.code").value("A"))
@@ -345,6 +349,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.records[1].id").value("B"));
 
         verify(mainEntity).children("root");
+        verify(mainEntity).children("A");
+        verify(mainEntity).children("B");
     }
 
     @Test
@@ -359,7 +365,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("A")).thenReturn(List.of(child));
         when(mainEntity.children("A-1")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree/{recordId}", MODULE, "A"))
+        mvc.perform(post("/{moduleAlias}/tree/{recordId}?flat=true", MODULE, "A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("A"))
                 .andExpect(jsonPath("$.records[1].id").value("A-1"))
@@ -368,6 +374,103 @@ class DynamicRecordWebControllerTest {
         verify(mainEntity).select("A");
         verify(mainEntity).children("A");
         verify(mainEntity).children("A-1");
+    }
+
+    @Test
+    void shouldExposeDynamicNestedTreeByDefault() throws Exception {
+        DynamicRecord root = new DynamicRecord(treeEntity()).setValue("code", "A");
+        root.setId("A");
+        root.setParentId("root");
+        DynamicRecord child = new DynamicRecord(treeEntity()).setValue("code", "A-1");
+        child.setId("A-1");
+        child.setParentId("A");
+        when(mainEntity.select("A")).thenReturn(root);
+        when(mainEntity.children("A")).thenReturn(List.of(child));
+        when(mainEntity.children("A-1")).thenReturn(List.of());
+
+        mvc.perform(post("/{moduleAlias}/tree/{recordId}", MODULE, "A"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("A"))
+                .andExpect(jsonPath("$.records[0].record.values.code").value("A"))
+                .andExpect(jsonPath("$.records[0].children[0].record.id").value("A-1"))
+                .andExpect(jsonPath("$.records[0].children[0].record.values.parentId").value("A"))
+                .andExpect(jsonPath("$.records[0].children[0].children").isArray());
+
+        verify(mainEntity).select("A");
+        verify(mainEntity).children("A");
+        verify(mainEntity).children("A-1");
+    }
+
+    @Test
+    void shouldExcludeEntryNodeWhenIncludeSelfDisabled() throws Exception {
+        DynamicRecord root = new DynamicRecord(treeEntity()).setValue("code", "A");
+        root.setId("A");
+        DynamicRecord child = new DynamicRecord(treeEntity()).setValue("code", "A-1");
+        child.setId("A-1");
+        child.setParentId("A");
+        when(mainEntity.select("A")).thenReturn(root);
+        when(mainEntity.children("A")).thenReturn(List.of(child));
+        when(mainEntity.children("A-1")).thenReturn(List.of());
+
+        mvc.perform(post("/{moduleAlias}/tree/{recordId}?includeSelf=false", MODULE, "A"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("A-1"))
+                .andExpect(jsonPath("$.records[0].children").isArray());
+
+        verify(mainEntity).select("A");
+        verify(mainEntity).children("A");
+        verify(mainEntity).children("A-1");
+    }
+
+    @Test
+    void shouldExposeDynamicTreeSortThroughStandardSortWebContract() throws Exception {
+        when(mainEntity.describe()).thenReturn(DynamicEntityDescriptor.from(treeEntity()));
+
+        mvc.perform(post("/{moduleAlias}/sort/{recordId}", MODULE, "A")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "previousId", "B",
+                                "parentId", "P"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(mainEntity).moveInTree("A", "B", null, "P");
+    }
+
+    @Test
+    void shouldRejectEmptyDynamicTreeSortRequest() throws Exception {
+        when(mainEntity.describe()).thenReturn(DynamicEntityDescriptor.from(treeEntity()));
+
+        mvc.perform(post("/{moduleAlias}/sort/{recordId}", MODULE, "A")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("tree sort requires previousId, nextId, or parentId"));
+    }
+
+    @Test
+    void shouldExposeDynamicSortOnlyEntityThroughStandardSortWebContract() throws Exception {
+        when(mainEntity.describe()).thenReturn(DynamicEntityDescriptor.from(sortableEntity()));
+
+        mvc.perform(post("/{moduleAlias}/sort/{recordId}", MODULE, "A")
+                        .contentType("application/json")
+                        .content(json(Map.of("previousId", "B"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(mainEntity).moveAfter("A", "B");
+    }
+
+    @Test
+    void shouldRejectParentIdWhenDynamicEntityOnlySupportsSort() throws Exception {
+        when(mainEntity.describe()).thenReturn(DynamicEntityDescriptor.from(sortableEntity()));
+
+        mvc.perform(post("/{moduleAlias}/sort/{recordId}", MODULE, "A")
+                        .contentType("application/json")
+                        .content(json(Map.of("parentId", "P"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("sort parentId requires TREE capability"));
     }
 
     @Test
@@ -644,6 +747,15 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldRejectReservedSortAsActionPath() throws Exception {
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "sort")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: sort"));
+    }
+
+    @Test
     void shouldExecuteListAndBatchActionsThroughStaticLikePaths() throws Exception {
         DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
         DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
@@ -890,7 +1002,14 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.string("code", "Code").length(64).required(),
                 FieldDefinition.parentId(),
                 FieldDefinition.sortOrder()
-        )).withCapabilities(net.ximatai.muyun.spring.dynamic.metadata.EntityCapability.TREE);
+        )).withCapabilities(EntityCapability.TREE);
+    }
+
+    private EntityDefinition sortableEntity() {
+        return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.sortOrder()
+        )).withCapabilities(EntityCapability.SORT);
     }
 
     @RestController

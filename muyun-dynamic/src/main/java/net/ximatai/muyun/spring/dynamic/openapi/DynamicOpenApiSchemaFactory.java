@@ -24,6 +24,8 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
         schemas.put("WebPageRequest", pageRequestSchema("WebPageRequest"));
         schemas.put("WebSort", sortSchema("WebSort"));
+        schemas.put("SortWebRequest", sortRequestSchema());
+        schemas.put("TreeSortWebRequest", treeSortRequestSchema());
         schemas.put("DynamicWebActionRequest", actionRequestSchema());
         schemas.put("DynamicWebReferenceRequest", referenceRequestSchema());
         schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
@@ -430,6 +432,21 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("desc", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema sortRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("previousId", stringProperty(true));
+        properties.put("nextId", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("SortWebRequest", "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema treeSortRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("previousId", stringProperty(true));
+        properties.put("nextId", stringProperty(true));
+        properties.put("parentId", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("TreeSortWebRequest", "object", null, List.of(), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionRequestSchema() {

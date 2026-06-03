@@ -73,6 +73,109 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         }
     }
 
+    default void moveInTree(String id, String previousId, String nextId, String parentId) {
+        T moving = select(id);
+        if (moving == null) {
+            throw new PlatformException("Cannot move missing tree record: " + id);
+        }
+        rejectSelfNeighbor(id, previousId);
+        rejectSelfNeighbor(id, nextId);
+        String oldParentId = moving.getParentId();
+        String targetParentId = resolveMoveParentId(moving, previousId, nextId, parentId);
+        if (!SortAbility.sameValue(oldParentId, targetParentId)) {
+            moving.setParentId(targetParentId);
+            validateTreePlacement(moving);
+            update(moving);
+        }
+        List<T> siblings = children(targetParentId);
+        List<String> orderedIds = new ArrayList<>();
+        for (T sibling : siblings) {
+            if (!sibling.getId().equals(id)) {
+                orderedIds.add(sibling.getId());
+            }
+        }
+        T previous = previousId == null || previousId.isBlank() ? lastSibling(orderedIds) : select(previousId);
+        T next = nextId == null || nextId.isBlank() ? null : select(nextId);
+        if (moveBetween(moving, previous, next)) {
+            return;
+        }
+        int insertIndex = resolveInsertIndex(orderedIds, previousId, nextId);
+        orderedIds.add(insertIndex, id);
+        reorder(orderedIds);
+    }
+
+    private T lastSibling(List<String> orderedIds) {
+        return orderedIds.isEmpty() ? null : select(orderedIds.getLast());
+    }
+
+    private void rejectSelfNeighbor(String id, String neighborId) {
+        if (neighborId != null && !neighborId.isBlank() && neighborId.equals(id)) {
+            throw new PlatformException("Tree move neighbor cannot be moving record: " + id);
+        }
+    }
+
+    private String resolveMoveParentId(T moving, String previousId, String nextId, String parentId) {
+        String targetParentId = normalizeParentId(parentId);
+        if (targetParentId == null) {
+            targetParentId = neighborParentId(previousId);
+        }
+        if (targetParentId == null) {
+            targetParentId = neighborParentId(nextId);
+        }
+        if (targetParentId == null) {
+            targetParentId = normalizeParentId(moving.getParentId());
+        }
+        if (targetParentId == null) {
+            targetParentId = ROOT_ID;
+        }
+        requireNeighborInParent(previousId, targetParentId);
+        requireNeighborInParent(nextId, targetParentId);
+        return targetParentId;
+    }
+
+    private String normalizeParentId(String parentId) {
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    private String neighborParentId(String neighborId) {
+        if (neighborId == null || neighborId.isBlank()) {
+            return null;
+        }
+        T neighbor = select(neighborId);
+        if (neighbor == null) {
+            throw new PlatformException("Cannot move relative to missing tree record: " + neighborId);
+        }
+        return normalizeParentId(neighbor.getParentId());
+    }
+
+    private void requireNeighborInParent(String neighborId, String parentId) {
+        if (neighborId == null || neighborId.isBlank()) {
+            return;
+        }
+        T neighbor = select(neighborId);
+        if (neighbor == null || !SortAbility.sameValue(normalizeParentId(neighbor.getParentId()), parentId)) {
+            throw new PlatformException("Tree move neighbor must belong to target parent: " + neighborId);
+        }
+    }
+
+    private int resolveInsertIndex(List<String> orderedIds, String previousId, String nextId) {
+        if (previousId != null && !previousId.isBlank()) {
+            int previousIndex = orderedIds.indexOf(previousId);
+            if (previousIndex < 0) {
+                throw new PlatformException("Cannot move after missing previous record: " + previousId);
+            }
+            return previousIndex + 1;
+        }
+        if (nextId != null && !nextId.isBlank()) {
+            int nextIndex = orderedIds.indexOf(nextId);
+            if (nextIndex < 0) {
+                throw new PlatformException("Cannot move before missing next record: " + nextId);
+            }
+            return nextIndex;
+        }
+        return orderedIds.size();
+    }
+
     default List<String> ancestorIds(String id) {
         T current = select(id);
         if (current == null) {

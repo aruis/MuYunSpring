@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
@@ -14,5 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class TenantWebController extends WebSupport<TenantService> implements
         CrudWeb<Tenant, TenantService>,
         EnableWeb<Tenant, TenantService>,
+        SortWeb<Tenant, TenantService>,
         SystemScope<TenantService> {
 }

@@ -68,6 +68,13 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(basePath + "/disable/{id}", operationId(descriptor, "disable"),
                     "Disable " + mainEntity.title(), null, "WebCountResponse", null));
         }
+        if (mainEntity.capabilities().contains(EntityCapability.SORT.name())) {
+            String sortRequestSchema = mainEntity.capabilities().contains(EntityCapability.TREE.name())
+                    ? "TreeSortWebRequest"
+                    : "SortWebRequest";
+            operations.add(operation(basePath + "/sort/{id}", operationId(descriptor, "sort"),
+                    "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", null));
+        }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
             operations.add(operation(basePath + "/tree", operationId(descriptor, "tree"),
                     "Tree " + mainEntity.title(), null, "WebListResponse", null));

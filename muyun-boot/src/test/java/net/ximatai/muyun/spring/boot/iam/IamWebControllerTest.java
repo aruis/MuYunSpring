@@ -123,13 +123,37 @@ class IamWebControllerTest {
                     organization.setTenantId("tenant_a");
                     organization.setParentId(TreeAbility.ROOT_ID);
                     return List.of(organization);
-                });
+                })
+                .thenReturn(List.of());
 
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(post("/iam.organization/tree?flat=true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("org-1"))
                 .andExpect(jsonPath("$.records[0].tenantId").value("tenant_a"))
                 .andExpect(jsonPath("$.records[0].code").value("HQ"));
+    }
+
+    @Test
+    void shouldExposeOrganizationNestedTreeByDefault() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+        Organization root = organization("org-1", "HQ", "Headquarters");
+        root.setTenantId("tenant_a");
+        root.setParentId(TreeAbility.ROOT_ID);
+        Organization child = organization("org-2", "BR", "Branch");
+        child.setTenantId("tenant_a");
+        child.setParentId("org-1");
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(root), List.of(child));
+        when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any()))
+                .thenReturn(List.of(root), List.of(child), List.of());
+
+        mvc.perform(post("/iam.organization/tree"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("org-1"))
+                .andExpect(jsonPath("$.records[0].record.tenantId").value("tenant_a"))
+                .andExpect(jsonPath("$.records[0].children[0].record.id").value("org-2"))
+                .andExpect(jsonPath("$.records[0].children[0].children").isArray());
     }
 
     @Test

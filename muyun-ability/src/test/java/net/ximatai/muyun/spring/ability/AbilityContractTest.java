@@ -1295,7 +1295,13 @@ class AbilityContractTest {
         String second = service.insert(new DemoOrganization("Second", TreeAbility.ROOT_ID));
         String third = service.insert(new DemoOrganization("Third", TreeAbility.ROOT_ID));
 
+        assertThat(service.children(TreeAbility.ROOT_ID).stream().map(DemoOrganization::getId))
+                .containsExactly(first, second, third);
+
         service.reorder(List.of(first, second, third));
+        assertThat(service.children(TreeAbility.ROOT_ID).stream().map(DemoOrganization::getId))
+                .containsExactly(first, second, third);
+
         service.moveBefore(third, first);
 
         assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
@@ -1305,6 +1311,27 @@ class AbilityContractTest {
 
         assertThat(service.sortedList(Criteria.of()).stream().map(DemoOrganization::getId))
                 .containsExactly(third, second, first);
+
+        String fourth = service.insert(new DemoOrganization("Fourth", TreeAbility.ROOT_ID));
+        assertThat(service.children(TreeAbility.ROOT_ID).stream().map(DemoOrganization::getId))
+                .containsExactly(third, second, first, fourth);
+    }
+
+    @Test
+    void sortAbilityShouldNormalizeWhenMovingAfterNearIntegerLimit() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String first = service.insert(new DemoOrganization("First", TreeAbility.ROOT_ID));
+        String second = service.insert(new DemoOrganization("Second", TreeAbility.ROOT_ID));
+        DemoOrganization secondRecord = service.select(second);
+        secondRecord.setSortOrder(Integer.MAX_VALUE - 10);
+        service.update(secondRecord);
+
+        service.moveAfter(first, second);
+
+        assertThat(service.children(TreeAbility.ROOT_ID).stream().map(DemoOrganization::getId))
+                .containsExactly(second, first);
+        assertThat(service.children(TreeAbility.ROOT_ID).stream().map(DemoOrganization::getSortOrder))
+                .allSatisfy(order -> assertThat(order).isPositive());
     }
 
     @Test
@@ -1369,6 +1396,36 @@ class AbilityContractTest {
         assertThatThrownBy(() -> service.moveBefore(firstChild, secondChild))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
+    }
+
+    @Test
+    void treeAbilityShouldMoveRecordAcrossParentsWhenSortingInTree() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String firstParent = service.insert(new DemoOrganization("First Parent", TreeAbility.ROOT_ID));
+        String secondParent = service.insert(new DemoOrganization("Second Parent", TreeAbility.ROOT_ID));
+        String firstChild = service.insert(new DemoOrganization("First Child", firstParent));
+        String secondChild = service.insert(new DemoOrganization("Second Child", secondParent));
+
+        service.moveInTree(firstChild, secondChild, null, secondParent);
+
+        assertThat(service.select(firstChild).getParentId()).isEqualTo(secondParent);
+        assertThat(service.children(firstParent)).isEmpty();
+        assertThat(service.children(secondParent).stream().map(DemoOrganization::getId))
+                .containsExactly(secondChild, firstChild);
+    }
+
+    @Test
+    void treeAbilityShouldRejectSelfNeighborWhenSortingInTree() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        String parent = service.insert(new DemoOrganization("Parent", TreeAbility.ROOT_ID));
+        String child = service.insert(new DemoOrganization("Child", parent));
+
+        assertThatThrownBy(() -> service.moveInTree(child, child, null, parent))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("neighbor cannot be moving record");
+        assertThatThrownBy(() -> service.moveInTree(child, null, child, parent))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("neighbor cannot be moving record");
     }
 
     @Test
