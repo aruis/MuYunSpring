@@ -38,11 +38,24 @@ public record DynamicOpenApiDocument(
             String format,
             List<String> required,
             Map<String, Property> properties,
-            Property items
+            Property items,
+            Map<String, String> valueShapeByResultType
     ) {
         public Schema {
             required = required == null ? List.of() : List.copyOf(required);
             properties = properties == null ? Map.of() : Map.copyOf(properties);
+            valueShapeByResultType = valueShapeByResultType == null
+                    ? Map.of()
+                    : Map.copyOf(valueShapeByResultType);
+        }
+
+        public Schema(String name,
+                      String type,
+                      String format,
+                      List<String> required,
+                      Map<String, Property> properties,
+                      Property items) {
+            this(name, type, format, required, properties, items, Map.of());
         }
     }
 

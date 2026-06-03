@@ -199,6 +199,11 @@ class DynamicOpenApiGeneratorTest {
                 .containsKeys("moduleAlias", "actionCode", "recordId", "traceId");
         assertThat(document.schemas().get("DynamicWebActionResultBody").properties())
                 .containsKeys("type", "value", "message", "refresh", "redirectTo");
+        assertThat(document.schemas().get("DynamicWebActionResultBody").valueShapeByResultType())
+                .containsEntry("DIALOG", "DynamicActionDialog")
+                .containsEntry("RECORD", "DynamicRecordResponse")
+                .containsEntry("PAGE", "DynamicPageResponse")
+                .containsEntry("COUNT", "integer");
         assertThat(document.schemas().get("DynamicActionDialog").required())
                 .containsExactly("dialogKey");
         assertThat(document.schemas().get("DynamicActionDialog").properties())
@@ -229,6 +234,8 @@ class DynamicOpenApiGeneratorTest {
                 .containsKeys("type", "format", "required", "nullable", "multiple",
                         "optionSourceType", "optionSource", "referenceModuleAlias",
                         "referenceEntityAlias", "itemType", "companionFields");
+        assertThat(document.schemas().get("DynamicOpenApiSchema").properties())
+                .containsKey("valueShapeByResultType");
         assertThat(document.schemas().get("DynamicOpenApiErrorResponse").required())
                 .containsExactly("code", "status", "schemaName");
     }

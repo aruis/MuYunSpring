@@ -301,6 +301,7 @@ public class DynamicOpenApiGenerator {
         properties.put("required", arrayProperty("string"));
         properties.put("properties", objectProperty("DynamicOpenApiProperty"));
         properties.put("items", objectProperty("DynamicOpenApiProperty"));
+        properties.put("valueShapeByResultType", objectProperty("string"));
         return new DynamicOpenApiDocument.Schema("DynamicOpenApiSchema", "object", null,
                 List.of("name", "type"), properties, null);
     }
@@ -441,7 +442,7 @@ public class DynamicOpenApiGenerator {
                 false, null, null, null, null, null, List.of()));
         properties.put("redirectTo", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicWebActionResultBody", "object", null,
-                List.of("type", "refresh"), properties, null);
+                List.of("type", "refresh"), properties, null, actionResultValueShapeByType());
     }
 
     private DynamicOpenApiDocument.Schema actionDialogSchema() {
@@ -450,6 +451,20 @@ public class DynamicOpenApiGenerator {
         properties.put("title", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicActionDialog", "object", null,
                 List.of("dialogKey"), properties, null);
+    }
+
+    private Map<String, String> actionResultValueShapeByType() {
+        return Map.of(
+                "VALUE", "scalar",
+                "RECORD_ID", "string",
+                "RECORD", "DynamicRecordResponse",
+                "LIST", "array",
+                "PAGE", "DynamicPageResponse",
+                "COUNT", "integer",
+                "OBJECT", "object",
+                "DIALOG", "DynamicActionDialog",
+                "NONE", "null"
+        );
     }
 
     private DynamicOpenApiDocument.Schema actionAvailabilityResponseSchema() {
