@@ -135,7 +135,8 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldAllowStaticControllerToTakeOverSameAliasUrl() throws Exception {
         MockMvc takeoverMvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier), new StaticContractController())
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier),
+                        new StaticContractController())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))

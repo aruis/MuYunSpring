@@ -7,6 +7,10 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
@@ -23,9 +27,11 @@ import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public class DynamicRecordService {
@@ -33,10 +39,18 @@ public class DynamicRecordService {
 
     private final DynamicRecordRuntime runtime;
     private final DynamicRecordEventPublisher eventPublisher;
+    private final ActionExecutionPolicyService actionExecutionPolicyService;
 
     public DynamicRecordService(DynamicRecordRuntime runtime) {
+        this(runtime, new AllowAllActionExecutionPolicyService());
+    }
+
+    public DynamicRecordService(DynamicRecordRuntime runtime,
+                                ActionExecutionPolicyService actionExecutionPolicyService) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventPublisher = new DynamicRecordEventPublisher(runtime.eventPublisher());
+        this.actionExecutionPolicyService = Objects.requireNonNull(actionExecutionPolicyService,
+                "actionExecutionPolicyService must not be null");
     }
 
     public DynamicRecord newRecord(String moduleAlias, String entityAlias) {
@@ -384,6 +398,12 @@ public class DynamicRecordService {
                                                        DynamicActionDescriptor action,
                                                        DynamicActionExecutionRequest request) {
         DynamicActionExecutionRequest normalized = request == null ? DynamicActionExecutionRequest.empty() : request;
+        actionExecutionPolicyService.requireAuthorized(ActionExecutionContext.ofActionCode(
+                moduleAlias,
+                action.code(),
+                actionRecordIds(normalized),
+                CurrentUserContext.currentUser()
+        ));
         DynamicRecord availabilityRecord = availabilityRecord(moduleAlias, entityAlias, normalized);
         DynamicActionAvailability availability = actionAvailability(moduleAlias, entityAlias, action.code(), availabilityRecord);
         String traceId = UUID.randomUUID().toString();
@@ -416,6 +436,22 @@ public class DynamicRecordService {
         }
         eventPublisher.actionExecuted(result.context(), result.body());
         return result;
+    }
+
+    private Set<String> actionRecordIds(DynamicActionExecutionRequest request) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        collectId(ids, request.recordId());
+        if (request.record() != null) {
+            collectId(ids, request.record().getId());
+        }
+        request.ids().forEach(id -> collectId(ids, id));
+        return Set.copyOf(ids);
+    }
+
+    private void collectId(Set<String> ids, String id) {
+        if (id != null && !id.isBlank()) {
+            ids.add(id.trim());
+        }
     }
 
     private RuntimeException afterCommitFailure(RuntimeException error) {

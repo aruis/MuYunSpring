@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
@@ -57,8 +59,10 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime) {
-        return new DynamicRecordService(runtime);
+    DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime,
+                                              ObjectProvider<ActionExecutionPolicyService> actionExecutionPolicyService) {
+        return new DynamicRecordService(runtime,
+                actionExecutionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new));
     }
 
     @Bean

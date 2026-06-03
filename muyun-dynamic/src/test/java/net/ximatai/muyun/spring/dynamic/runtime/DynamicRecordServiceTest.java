@@ -14,6 +14,10 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -326,6 +330,30 @@ class DynamicRecordServiceTest {
                         .withAfterId("second")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one sort intent");
+    }
+
+    @Test
+    void shouldAuthorizeDynamicActionAtServiceBoundary() {
+        RecordingActionPolicyService policyService = new RecordingActionPolicyService();
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(),
+                new TestActionExecutor("contractSubmit"), submitActionWithoutAvailability("contractSubmit"),
+                DynamicActionTransactionOperator.none(), policyService);
+        DynamicRecord draft = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("status", "draft");
+        draft.setId("contract-1");
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.record(draft));
+        }
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo(MODULE);
+            assertThat(context.actionCode()).isEqualTo("submit");
+            assertThat(context.permissionCode()).isEqualTo(MODULE + ":submit");
+            assertThat(context.recordIds()).containsExactly("contract-1");
+            assertThat(context.currentUser()).get().extracting(CurrentUser::userId).isEqualTo("user-1");
+        });
     }
 
     @Test
@@ -1779,6 +1807,15 @@ class DynamicRecordServiceTest {
                                                DynamicActionExecutor executor,
                                                EntityActionDefinition submitAction,
                                                DynamicActionTransactionOperator transactionOperator) {
+        return actionService(operations, eventPublisher, executor, submitAction, transactionOperator, null);
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations,
+                                               RuntimeEventPublisher eventPublisher,
+                                               DynamicActionExecutor executor,
+                                               EntityActionDefinition submitAction,
+                                               DynamicActionTransactionOperator transactionOperator,
+                                               ActionExecutionPolicyService actionExecutionPolicyService) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1798,7 +1835,9 @@ class DynamicRecordServiceTest {
                 eventPublisher,
                 executorRegistry,
                 transactionOperator
-        ).register(module));
+        ).register(module), actionExecutionPolicyService == null
+                ? new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService()
+                : actionExecutionPolicyService);
     }
 
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
@@ -2319,6 +2358,15 @@ class DynamicRecordServiceTest {
         @Override
         public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
             return null;
+        }
+    }
+
+    private static final class RecordingActionPolicyService implements ActionExecutionPolicyService {
+        private ActionExecutionContext context;
+
+        @Override
+        public void requireAuthorized(ActionExecutionContext context) {
+            this.context = context;
         }
     }
 
