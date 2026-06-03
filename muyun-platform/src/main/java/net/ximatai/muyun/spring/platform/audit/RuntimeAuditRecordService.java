@@ -54,6 +54,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
     private void fillActionPayload(RuntimeAuditRecord record, RuntimeEvent event) {
         if (event.eventType() == RuntimeEventType.ACTION_EXECUTED) {
             record.setExecutorType(ActionEventPayload.text(event.payload(), ActionEventPayload.EXECUTOR_TYPE));
+            record.setActionLevel(ActionEventPayload.text(event.payload(), ActionEventPayload.ACTION_LEVEL));
             record.setResultType(ActionEventPayload.text(event.payload(), ActionEventPayload.RESULT_TYPE));
             record.setResultMessage(ActionEventPayload.text(event.payload(), ActionEventPayload.MESSAGE));
             record.setRefreshRequested(ActionEventPayload.bool(event.payload(), ActionEventPayload.REFRESH));
@@ -63,6 +64,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         }
         if (event.eventType() == RuntimeEventType.ACTION_FAILED) {
             record.setExecutorType(ActionEventPayload.text(event.payload(), ActionEventPayload.EXECUTOR_TYPE));
+            record.setActionLevel(ActionEventPayload.text(event.payload(), ActionEventPayload.ACTION_LEVEL));
             record.setFailureStage(ActionEventPayload.text(event.payload(), ActionEventPayload.FAILURE_STAGE));
             record.setErrorMessage(ActionEventPayload.text(event.payload(), ActionEventPayload.ERROR_MESSAGE));
             record.setErrorType(ActionEventPayload.text(event.payload(), ActionEventPayload.ERROR_TYPE));

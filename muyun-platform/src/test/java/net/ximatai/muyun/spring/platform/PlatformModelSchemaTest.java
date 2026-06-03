@@ -132,8 +132,8 @@ class PlatformModelSchemaTest {
         assertThat(table.getName()).isEqualTo("platform_runtime_audit_record");
         assertThat(columnNames(table))
                 .contains("id", "tenant_id", "event_id", "trace_id", "event_type", "module_alias",
-                        "entity_alias", "record_id", "action_code", "executor_type", "result_type",
-                        "result_message", "refresh_requested", "redirect_to", "result_text",
+                        "entity_alias", "record_id", "action_code", "executor_type", "action_level",
+                        "result_type", "result_message", "refresh_requested", "redirect_to", "result_text",
                         "failure_stage", "error_message", "error_type", "system_context",
                         "mutation_source", "payload_text", "occurred_at");
         assertThat(uniqueIndexes(table)).contains(List.of("tenant_id", "event_id"));

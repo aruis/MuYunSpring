@@ -262,6 +262,7 @@ class DynamicRecordServiceTest {
         assertThat(action.recordId()).isEqualTo("contract-1");
         assertThat(action.actionCode()).isEqualTo("create");
         assertThat(action.payload()).containsEntry("executorType", "STANDARD")
+                .containsEntry("actionLevel", "LIST")
                 .containsEntry("resultType", "RECORD_ID")
                 .containsEntry("refresh", true)
                 .containsEntry("result", "contract-1");
@@ -337,6 +338,7 @@ class DynamicRecordServiceTest {
                     assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
                     assertThat(event.actionCode()).isEqualTo("submit");
                     assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("actionLevel", "ANY")
                             .containsEntry("available", false)
                             .containsEntry("failureStage", "availability")
                             .containsEntry("errorMessage", "只有草稿合同可以提交");
@@ -366,6 +368,7 @@ class DynamicRecordServiceTest {
                 .satisfies(event -> {
                     assertThat(event.eventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
                     assertThat(event.payload()).containsEntry("failureStage", "execute")
+                            .containsEntry("actionLevel", "ANY")
                             .containsEntry("errorType", IllegalArgumentException.class.getName());
                 });
     }
@@ -397,6 +400,7 @@ class DynamicRecordServiceTest {
                     assertThat(event.actionCode()).isEqualTo("submit");
                     assertThat(event.traceId()).isEqualTo(result.context().traceId());
                     assertThat(event.payload()).containsEntry("executorType", "SERVICE")
+                            .containsEntry("actionLevel", "RECORD")
                             .containsEntry("resultType", "VALUE")
                             .containsEntry("result", "submitted:contract-1");
                 });
@@ -482,6 +486,7 @@ class DynamicRecordServiceTest {
                     assertThat(event.recordId()).isEqualTo("contract-1");
                     assertThat(event.actionCode()).isEqualTo("submitDialog");
                     assertThat(event.payload()).containsEntry("executorType", "DIALOG")
+                            .containsEntry("actionLevel", "RECORD")
                             .containsEntry("resultType", "DIALOG")
                             .containsEntry("interactionOnly", true);
                     assertThat(event.payload()).doesNotContainKey("result");

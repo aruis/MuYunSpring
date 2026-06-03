@@ -721,6 +721,7 @@ public class DynamicRecordService {
     private Map<String, Object> actionPayload(DynamicActionExecutionContext context, DynamicActionResultBody body) {
         return ActionEventPayload.executed(
                 context.action().executorType().name(),
+                context.action().actionLevel().name(),
                 body.type().name(),
                 body.message(),
                 body.refresh(),
@@ -736,6 +737,7 @@ public class DynamicRecordService {
                                                      Throwable cause) {
         return ActionEventPayload.failed(
                 context.action().executorType().name(),
+                context.action().actionLevel().name(),
                 context.availability().available(),
                 failureStage,
                 errorMessage,

@@ -46,6 +46,9 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "executor_type", type = ColumnType.VARCHAR, length = 32, comment = "Action executor type")
     private String executorType;
 
+    @Column(name = "action_level", type = ColumnType.VARCHAR, length = 32, comment = "Action level")
+    private String actionLevel;
+
     @Column(name = "result_type", type = ColumnType.VARCHAR, length = 32, comment = "Action result type")
     private String resultType;
 

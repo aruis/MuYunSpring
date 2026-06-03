@@ -78,6 +78,7 @@ class RuntimeAuditRecordRepositoryIT {
         assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
         assertThat(record.getActionCode()).isEqualTo("submit");
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getResultType()).isEqualTo("VALUE");
         assertThat(record.getResultMessage()).isEqualTo("提交成功");
         assertThat(record.getRefreshRequested()).isTrue();
@@ -98,6 +99,7 @@ class RuntimeAuditRecordRepositoryIT {
         assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
         assertThat(record.getActionCode()).isEqualTo("submit");
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getFailureStage()).isEqualTo("execute");
         assertThat(record.getErrorMessage()).isEqualTo("submit failed");
         assertThat(record.getErrorType()).isEqualTo(IllegalStateException.class.getName());
@@ -144,6 +146,7 @@ class RuntimeAuditRecordRepositoryIT {
                 RuntimeMutationSource.ACTION,
                 Map.of(
                         "executorType", "SERVICE",
+                        "actionLevel", "RECORD",
                         "resultType", "VALUE",
                         "message", "提交成功",
                         "refresh", true,
@@ -168,6 +171,7 @@ class RuntimeAuditRecordRepositoryIT {
                 RuntimeMutationSource.ACTION,
                 Map.of(
                         "executorType", "SERVICE",
+                        "actionLevel", "RECORD",
                         "available", true,
                         "failureStage", "execute",
                         "errorMessage", "submit failed",

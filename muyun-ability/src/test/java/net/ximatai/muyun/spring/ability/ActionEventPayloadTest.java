@@ -12,6 +12,7 @@ class ActionEventPayloadTest {
     void shouldBuildSuccessfulActionPayloadWithOnlyPlatformSummary() {
         Map<String, Object> payload = ActionEventPayload.executed(
                 "DIALOG",
+                "RECORD",
                 "DIALOG",
                 null,
                 false,
@@ -22,6 +23,7 @@ class ActionEventPayloadTest {
 
         assertThat(payload)
                 .containsEntry(ActionEventPayload.EXECUTOR_TYPE, "DIALOG")
+                .containsEntry(ActionEventPayload.ACTION_LEVEL, "RECORD")
                 .containsEntry(ActionEventPayload.RESULT_TYPE, "DIALOG")
                 .containsEntry(ActionEventPayload.INTERACTION_ONLY, true)
                 .doesNotContainKeys(ActionEventPayload.AVAILABLE, ActionEventPayload.RESULT);
@@ -31,6 +33,7 @@ class ActionEventPayloadTest {
     void shouldBuildFailedActionPayloadWithFailureContext() {
         Map<String, Object> payload = ActionEventPayload.failed(
                 "SERVICE",
+                "RECORD",
                 true,
                 "execute",
                 "submit failed",
@@ -39,6 +42,7 @@ class ActionEventPayloadTest {
 
         assertThat(payload)
                 .containsEntry(ActionEventPayload.EXECUTOR_TYPE, "SERVICE")
+                .containsEntry(ActionEventPayload.ACTION_LEVEL, "RECORD")
                 .containsEntry(ActionEventPayload.AVAILABLE, true)
                 .containsEntry(ActionEventPayload.FAILURE_STAGE, "execute")
                 .containsEntry(ActionEventPayload.ERROR_MESSAGE, "submit failed")

@@ -5,6 +5,7 @@ import java.util.Map;
 
 public final class ActionEventPayload {
     public static final String EXECUTOR_TYPE = "executorType";
+    public static final String ACTION_LEVEL = "actionLevel";
     public static final String AVAILABLE = "available";
     public static final String RESULT_TYPE = "resultType";
     public static final String INTERACTION_ONLY = "interactionOnly";
@@ -26,8 +27,20 @@ public final class ActionEventPayload {
                                                String redirectTo,
                                                boolean interactionOnly,
                                                Object simpleResult) {
+        return executed(executorType, null, resultType, message, refresh, redirectTo, interactionOnly, simpleResult);
+    }
+
+    public static Map<String, Object> executed(String executorType,
+                                               String actionLevel,
+                                               String resultType,
+                                               String message,
+                                               boolean refresh,
+                                               String redirectTo,
+                                               boolean interactionOnly,
+                                               Object simpleResult) {
         Map<String, Object> payload = new LinkedHashMap<>();
         putText(payload, EXECUTOR_TYPE, executorType);
+        putText(payload, ACTION_LEVEL, actionLevel);
         putText(payload, RESULT_TYPE, resultType);
         if (interactionOnly) {
             payload.put(INTERACTION_ONLY, true);
@@ -48,8 +61,18 @@ public final class ActionEventPayload {
                                              String failureStage,
                                              String errorMessage,
                                              String errorType) {
+        return failed(executorType, null, available, failureStage, errorMessage, errorType);
+    }
+
+    public static Map<String, Object> failed(String executorType,
+                                             String actionLevel,
+                                             boolean available,
+                                             String failureStage,
+                                             String errorMessage,
+                                             String errorType) {
         Map<String, Object> payload = new LinkedHashMap<>();
         putText(payload, EXECUTOR_TYPE, executorType);
+        putText(payload, ACTION_LEVEL, actionLevel);
         payload.put(AVAILABLE, available);
         putText(payload, FAILURE_STAGE, failureStage);
         putText(payload, ERROR_MESSAGE, errorMessage);

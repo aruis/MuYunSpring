@@ -38,6 +38,7 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getRecordId()).isEqualTo("contract-1");
         assertThat(record.getActionCode()).isEqualTo("approve");
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getResultType()).isEqualTo("VALUE");
         assertThat(record.getResultMessage()).isEqualTo("审批通过");
         assertThat(record.getRefreshRequested()).isTrue();
@@ -163,6 +164,7 @@ class RuntimeAuditRecordServiceContractTest {
         RuntimeAuditRecord record = service.select(id);
         assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_FAILED);
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
+        assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getFailureStage()).isEqualTo("execute");
         assertThat(record.getErrorMessage()).isEqualTo("submit failed");
         assertThat(record.getErrorType()).isEqualTo(IllegalStateException.class.getName());
@@ -177,6 +179,7 @@ class RuntimeAuditRecordServiceContractTest {
         RuntimeAuditRecord record = service.select(id);
         assertThat(record.getEventType()).isEqualTo(RuntimeEventType.ACTION_EXECUTED);
         assertThat(record.getExecutorType()).isEqualTo("DIALOG");
+        assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getResultType()).isEqualTo("DIALOG");
         assertThat(record.getResultText()).isNull();
         assertThat(record.getPayloadText()).contains("interactionOnly=true");
@@ -194,7 +197,7 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                ActionEventPayload.executed("SERVICE", "VALUE", "审批通过",
+                ActionEventPayload.executed("SERVICE", "RECORD", "VALUE", "审批通过",
                         true, "/contracts/contract-1", false, "approved"),
                 Instant.parse("2026-06-02T04:00:00Z")
         );
@@ -212,7 +215,8 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                ActionEventPayload.executed("STANDARD", "RECORD_ID", null, false, null, false, "contract-2"),
+                ActionEventPayload.executed("STANDARD", "RECORD", "RECORD_ID", null,
+                        false, null, false, "contract-2"),
                 Instant.parse("2026-06-02T04:05:00Z")
         );
     }
@@ -265,6 +269,7 @@ class RuntimeAuditRecordServiceContractTest {
                 RuntimeMutationSource.ACTION,
                 Map.of(
                         "executorType", "SERVICE",
+                        "actionLevel", "RECORD",
                         "available", true,
                         "failureStage", "execute",
                         "errorMessage", "submit failed",
@@ -286,7 +291,7 @@ class RuntimeAuditRecordServiceContractTest {
                 "tenant-1",
                 false,
                 RuntimeMutationSource.ACTION,
-                ActionEventPayload.executed("DIALOG", "DIALOG", null,
+                ActionEventPayload.executed("DIALOG", "RECORD", "DIALOG", null,
                         false, null, true, null),
                 Instant.parse("2026-06-02T04:20:00Z")
         );
