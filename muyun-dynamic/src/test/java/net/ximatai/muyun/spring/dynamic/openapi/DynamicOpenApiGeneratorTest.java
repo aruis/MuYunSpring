@@ -196,7 +196,9 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(property.format()).isEqualTo("int32");
                 });
         assertThat(document.schemas().get("DynamicWebActionContext").properties())
-                .containsKeys("moduleAlias", "actionCode", "recordId", "traceId");
+                .containsKeys("moduleAlias", "actionCode", "actionLevel", "executorType", "recordId", "traceId");
+        assertThat(document.schemas().get("DynamicWebActionContext").required())
+                .containsExactly("moduleAlias", "actionCode", "actionLevel", "executorType");
         assertThat(document.schemas().get("DynamicWebActionResultBody").properties())
                 .containsKeys("type", "value", "message", "refresh", "redirectTo");
         assertThat(document.schemas().get("DynamicWebActionResultBody").valueShapeByResultType())

@@ -427,10 +427,12 @@ public class DynamicOpenApiGenerator {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("moduleAlias", stringProperty(false));
         properties.put("actionCode", stringProperty(false));
+        properties.put("actionLevel", stringProperty(false));
+        properties.put("executorType", stringProperty(false));
         properties.put("recordId", stringProperty(true));
         properties.put("traceId", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicWebActionContext", "object", null,
-                List.of("moduleAlias", "actionCode"), properties, null);
+                List.of("moduleAlias", "actionCode", "actionLevel", "executorType"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionResultBodySchema() {

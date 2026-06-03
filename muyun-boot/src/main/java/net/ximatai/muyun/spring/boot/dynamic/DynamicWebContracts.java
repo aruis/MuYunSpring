@@ -154,6 +154,8 @@ record DynamicWebActionExecutionResponse(DynamicWebActionContext context, Dynami
 
 record DynamicWebActionContext(String moduleAlias,
                                String actionCode,
+                               String actionLevel,
+                               String executorType,
                                String recordId,
                                String traceId) {
     static DynamicWebActionContext from(DynamicActionExecutionContext context) {
@@ -163,6 +165,8 @@ record DynamicWebActionContext(String moduleAlias,
         return new DynamicWebActionContext(
                 context.moduleAlias(),
                 context.actionCode(),
+                context.action().actionLevel().name(),
+                context.action().executorType().name(),
                 context.recordId(),
                 context.traceId()
         );

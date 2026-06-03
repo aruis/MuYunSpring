@@ -305,6 +305,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.context.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.context.traceId").value("trace-1"))
                 .andExpect(jsonPath("$.context.entityAlias").doesNotExist())
@@ -342,6 +344,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.context.actionCode").value("submitDialog"))
+                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.context.executorType").value("DIALOG"))
                 .andExpect(jsonPath("$.context.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.body.type").value("DIALOG"))
                 .andExpect(jsonPath("$.body.value.dialogKey").value("contractSubmitDialog"))
@@ -389,6 +393,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.traceId").value("trace-1"))
                 .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.context.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.context.traceId").value("trace-1"));
     }
@@ -414,7 +420,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.message").value("submit failed"))
                 .andExpect(jsonPath("$.failureStage").value("execute"))
                 .andExpect(jsonPath("$.traceId").value("trace-2"))
-                .andExpect(jsonPath("$.context.actionCode").value("submit"));
+                .andExpect(jsonPath("$.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"));
     }
 
     @Test
@@ -467,15 +475,26 @@ class DynamicRecordWebControllerTest {
 
     @Test
     void shouldExecuteListAndBatchActionsThroughStaticLikePaths() throws Exception {
-        when(service.action(MODULE, "export")).thenReturn(action("export", EntityActionLevel.LIST));
-        when(service.action(MODULE, "archive")).thenReturn(action("archive", EntityActionLevel.BATCH));
-        when(service.action(MODULE, "refreshSelected")).thenReturn(action("refreshSelected", EntityActionLevel.ANY));
+        DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
+        DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
+        DynamicActionDescriptor refreshSelected = action("refreshSelected", EntityActionLevel.ANY);
+        when(service.action(MODULE, "export")).thenReturn(export);
+        when(service.action(MODULE, "archive")).thenReturn(archive);
+        when(service.action(MODULE, "refreshSelected")).thenReturn(refreshSelected);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.executeAction(eq(MODULE), eq("export"), any(DynamicActionExecutionRequest.class)))
-                .thenReturn(new DynamicActionExecutionResult(null, "ok",
+                .thenReturn(new DynamicActionExecutionResult(
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "export", export,
+                                null, "trace-list", "tenant-1", false,
+                                DynamicActionAvailability.available("export")),
+                        "ok",
                         DynamicActionResultBody.redirect("/exports/contract.xlsx", "导出已生成")));
         when(service.executeAction(eq(MODULE), eq("archive"), any(DynamicActionExecutionRequest.class)))
-                .thenReturn(new DynamicActionExecutionResult(null, 2,
+                .thenReturn(new DynamicActionExecutionResult(
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "archive", archive,
+                                null, "trace-batch", "tenant-1", false,
+                                DynamicActionAvailability.available("archive")),
+                        2,
                         DynamicActionResultBody.changedCount(2, "已归档 2 条")));
         when(service.executeAction(eq(MODULE), eq("refreshSelected"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
@@ -485,6 +504,8 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("payload", Map.of("format", "xlsx")))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.actionLevel").value("LIST"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.body.type").value("NONE"))
                 .andExpect(jsonPath("$.body.value").doesNotExist())
                 .andExpect(jsonPath("$.body.message").value("导出已生成"))
@@ -495,6 +516,8 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.actionLevel").value("BATCH"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.body.type").value("COUNT"))
                 .andExpect(jsonPath("$.body.value").value(2))
                 .andExpect(jsonPath("$.body.message").value("已归档 2 条"))
