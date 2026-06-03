@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
@@ -45,6 +46,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -200,6 +203,43 @@ class DynamicRecordWebControllerTest {
         assertThat(page.getValue().getOffset()).isEqualTo(30);
         assertThat(page.getValue().getLimit()).isEqualTo(30);
         assertThat(sorts.getValue()[0].getField()).isEqualTo("amount");
+    }
+
+    @Test
+    void shouldExposeDateAndTimestampValuesAsStableWebStrings() throws Exception {
+        Criteria criteria = Criteria.of().eq("signedDate", LocalDate.parse("2026-06-01"));
+        DynamicRecord record = new DynamicRecord(entity())
+                .setValue("signedDate", LocalDate.parse("2026-06-01"))
+                .setValue("signedAt", Instant.parse("2026-06-01T02:03:04Z"));
+        record.setId("contract-1");
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(record);
+        when(service.queryCriteria(eq(MODULE), eq(ENTITY), any())).thenReturn(criteria);
+        when(service.page(eq(MODULE), eq(ENTITY), eq(criteria), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.values.signedDate").value("2026-06-01"))
+                .andExpect(jsonPath("$.values.signedAt").value("2026-06-01T02:03:04Z"));
+
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "signedDate",
+                                        "operator", "EQ",
+                                        "values", List.of("2026-06-01")
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].values.signedDate").value("2026-06-01"))
+                .andExpect(jsonPath("$.records[0].values.signedAt").value("2026-06-01T02:03:04Z"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
+        verify(service).queryCriteria(eq(MODULE), eq(ENTITY), conditions.capture());
+        assertThat(conditions.getValue().getFirst().values()).isEqualTo(List.of("2026-06-01"));
     }
 
     @Test
@@ -683,7 +723,9 @@ class DynamicRecordWebControllerTest {
     private EntityDefinition entity() {
         return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").length(64).required(),
-                FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
+                FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
         ));
     }
 

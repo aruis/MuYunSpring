@@ -135,7 +135,8 @@ class PlatformModelSchemaTest {
                         "entity_alias", "record_id", "action_code", "executor_type", "action_level",
                         "result_type", "result_message", "refresh_requested", "redirect_to", "result_text",
                         "failure_stage", "error_message", "error_type", "system_context",
-                        "mutation_source", "payload_text", "occurred_at");
+                        "operator_id", "operator_type", "authorization_decision", "mutation_source",
+                        "payload_text", "occurred_at");
         assertThat(uniqueIndexes(table)).contains(List.of("tenant_id", "event_id"));
         assertThat(indexes(table)).contains(
                 List.of("trace_id"),

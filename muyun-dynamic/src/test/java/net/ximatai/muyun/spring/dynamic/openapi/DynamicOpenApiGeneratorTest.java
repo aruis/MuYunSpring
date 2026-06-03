@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -216,6 +218,12 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("DynamicWebActionResultBody");
         assertThat(document.schemas().get("DynamicWebActionAvailabilityList").items().type())
                 .isEqualTo("DynamicWebActionAvailabilityResponse");
+        assertThat(document.schemas().get("DynamicWebPageRequest").properties())
+                .containsKeys("pageNum", "pageSize")
+                .doesNotContainKeys("offset", "limit");
+        assertThat(document.schemas().get("DynamicReferenceResolveResponse").properties())
+                .containsKeys("options", "results", "offset", "limit", "total")
+                .doesNotContainKeys("pageNum", "pageSize");
     }
 
     @Test
@@ -240,6 +248,43 @@ class DynamicOpenApiGeneratorTest {
                 .containsKey("valueShapeByResultType");
         assertThat(document.schemas().get("DynamicOpenApiErrorResponse").required())
                 .containsExactly("code", "status", "schemaName");
+    }
+
+    @Test
+    void shouldDefineEveryReferencedSchema() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
+        Set<String> primitives = Set.of("string", "object", "array", "integer", "number", "boolean",
+                "scalar", "null");
+
+        for (DynamicOpenApiDocument.Operation operation : document.operations()) {
+            assertResolvableSchema(operation.requestSchema(), document.schemas(), primitives);
+            assertResolvableSchema(operation.responseSchema(), document.schemas(), primitives);
+        }
+        for (DynamicOpenApiDocument.Schema schema : document.schemas().values()) {
+            assertResolvableSchema(schema.type(), document.schemas(), primitives);
+            if (schema.items() != null) {
+                assertResolvableSchema(schema.items().type(), document.schemas(), primitives);
+                assertResolvableSchema(schema.items().itemType(), document.schemas(), primitives);
+            }
+            for (DynamicOpenApiDocument.Property property : schema.properties().values()) {
+                assertResolvableSchema(property.type(), document.schemas(), primitives);
+                assertResolvableSchema(property.itemType(), document.schemas(), primitives);
+            }
+            for (String shape : schema.valueShapeByResultType().values()) {
+                assertResolvableSchema(shape, document.schemas(), primitives);
+            }
+        }
+    }
+
+    private void assertResolvableSchema(String schemaName,
+                                        Map<String, DynamicOpenApiDocument.Schema> schemas,
+                                        Set<String> primitives) {
+        if (schemaName == null || primitives.contains(schemaName)) {
+            return;
+        }
+        assertThat(schemas)
+                .as("schema reference must be defined: %s", schemaName)
+                .containsKey(schemaName);
     }
 
     private ModuleDefinition module() {

@@ -16,10 +16,29 @@ public record RuntimeEvent(
         String actionCode,
         String tenantId,
         boolean systemContext,
+        String operatorId,
+        String operatorType,
+        String authorizationDecision,
         RuntimeMutationSource mutationSource,
         Map<String, Object> payload,
         Instant occurredAt
 ) {
+    public RuntimeEvent(String eventId,
+                        String traceId,
+                        RuntimeEventType eventType,
+                        String moduleAlias,
+                        String entityAlias,
+                        String recordId,
+                        String actionCode,
+                        String tenantId,
+                        boolean systemContext,
+                        RuntimeMutationSource mutationSource,
+                        Map<String, Object> payload,
+                        Instant occurredAt) {
+        this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
+                null, null, null, mutationSource, payload, occurredAt);
+    }
+
     public RuntimeEvent {
         Objects.requireNonNull(eventType, "eventType must not be null");
         requireText(moduleAlias, "moduleAlias");
@@ -46,7 +65,7 @@ public record RuntimeEvent(
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
         return new RuntimeEvent(null, null, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, mutationSource, payload, null);
+                tenantId, systemContext, null, null, null, mutationSource, payload, null);
     }
 
     public static RuntimeEvent of(String traceId,
@@ -60,7 +79,7 @@ public record RuntimeEvent(
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
         return new RuntimeEvent(null, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, mutationSource, payload, null);
+                tenantId, systemContext, null, null, null, mutationSource, payload, null);
     }
 
     private static void requireText(String value, String fieldName) {

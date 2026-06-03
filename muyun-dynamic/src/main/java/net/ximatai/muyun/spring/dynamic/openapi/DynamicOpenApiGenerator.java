@@ -150,6 +150,18 @@ public class DynamicOpenApiGenerator {
         schemas.put("DynamicWebActionExecutionResponse", actionExecutionResponseSchema());
         schemas.put("DynamicReferenceResolveResponse", referenceResolveResponseSchema());
         schemas.put("DynamicModuleDescriptor", moduleDescriptorSchema());
+        schemas.put("DynamicActionDescriptor", actionDescriptorSchema());
+        schemas.put("DynamicEntityDescriptor", entityDescriptorSchema());
+        schemas.put("DynamicFieldDescriptor", fieldDescriptorSchema());
+        schemas.put("DynamicFieldCompanionDescriptor", fieldCompanionDescriptorSchema());
+        schemas.put("DynamicFieldQueryDescriptor", fieldQueryDescriptorSchema());
+        schemas.put("DynamicFormulaRuleDescriptor", formulaRuleDescriptorSchema());
+        schemas.put("DynamicRelationDescriptor", relationDescriptorSchema());
+        schemas.put("DynamicReferenceDescriptor", referenceDescriptorSchema());
+        schemas.put("DynamicReferenceProjectionDescriptor", referenceProjectionDescriptorSchema());
+        schemas.put("DynamicAssociationViewDescriptor", associationViewDescriptorSchema());
+        schemas.put("DynamicViewDescriptor", viewDescriptorSchema());
+        schemas.put("DynamicViewFieldDescriptor", viewFieldDescriptorSchema());
         schemas.put("DynamicOpenApiDocument", openApiDocumentSchema());
         schemas.put("DynamicOpenApiOperation", openApiOperationSchema());
         schemas.put("DynamicOpenApiSchema", openApiSchemaSchema());
@@ -161,6 +173,8 @@ public class DynamicOpenApiGenerator {
         schemas.put("DynamicWebActionContext", actionContextSchema());
         schemas.put("DynamicWebActionResultBody", actionResultBodySchema());
         schemas.put("DynamicActionDialog", actionDialogSchema());
+        schemas.put("DynamicReferenceResolveItem", referenceResolveItemSchema());
+        schemas.put("DynamicReferenceResolveResult", referenceResolveResultSchema());
         schemas.put("RecordIdResponse", recordIdResponseSchema());
         schemas.put("CountResponse", countResponseSchema());
         schemas.put("DynamicWebError", errorSchema("DynamicWebError", false));
@@ -265,6 +279,175 @@ public class DynamicOpenApiGenerator {
         properties.put("associationViews", arrayProperty("DynamicAssociationViewDescriptor"));
         return new DynamicOpenApiDocument.Schema("DynamicModuleDescriptor", "object", null,
                 List.of("moduleAlias", "title", "mainEntityAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("code", stringProperty(false));
+        properties.put("kind", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("enabled", booleanProperty(false));
+        properties.put("style", stringProperty(false));
+        properties.put("actionLevel", stringProperty(false));
+        properties.put("category", stringProperty(false));
+        properties.put("accessMode", stringProperty(false));
+        properties.put("actionAuth", booleanProperty(false));
+        properties.put("dataAuth", booleanProperty(false));
+        properties.put("authInheritActionCode", stringProperty(true));
+        properties.put("availabilityCondition", booleanProperty(false));
+        properties.put("unavailableMessage", stringProperty(true));
+        properties.put("executorType", stringProperty(false));
+        properties.put("executorKey", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicActionDescriptor", "object", null,
+                List.of("code", "kind", "title", "enabled", "actionLevel", "executorType"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema entityDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("entityAlias", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("capabilities", arrayProperty("string"));
+        properties.put("fields", arrayProperty("DynamicFieldDescriptor"));
+        properties.put("formulaRules", arrayProperty("DynamicFormulaRuleDescriptor"));
+        properties.put("actions", arrayProperty("DynamicActionDescriptor"));
+        properties.put("views", arrayProperty("DynamicViewDescriptor"));
+        properties.put("associationViews", arrayProperty("DynamicAssociationViewDescriptor"));
+        return new DynamicOpenApiDocument.Schema("DynamicEntityDescriptor", "object", null,
+                List.of("entityAlias", "title"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema fieldDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("fieldName", stringProperty(false));
+        properties.put("type", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("required", booleanProperty(false));
+        properties.put("unique", booleanProperty(false));
+        properties.put("indexed", booleanProperty(false));
+        properties.put("sortable", booleanProperty(false));
+        properties.put("titleField", booleanProperty(false));
+        properties.put("length", integerProperty(true));
+        properties.put("precision", integerProperty(true));
+        properties.put("scale", integerProperty(true));
+        properties.put("optionBinding", objectProperty("object"));
+        properties.put("selectionMode", stringProperty(true));
+        properties.put("reference", objectProperty("DynamicReferenceDescriptor"));
+        properties.put("companions", arrayProperty("DynamicFieldCompanionDescriptor"));
+        properties.put("query", objectProperty("DynamicFieldQueryDescriptor"));
+        properties.put("defaultValue", stringProperty(true));
+        properties.put("validationRegex", stringProperty(true));
+        properties.put("copyable", booleanProperty(false));
+        properties.put("writeProtected", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicFieldDescriptor", "object", null,
+                List.of("fieldName", "type", "title"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema fieldCompanionDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("fieldName", stringProperty(false));
+        properties.put("kind", stringProperty(false));
+        properties.put("role", stringProperty(false));
+        properties.put("requiredWhenOwnerPresent", booleanProperty(false));
+        properties.put("requiredWhenOwnerUpdated", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicFieldCompanionDescriptor", "object", null,
+                List.of("fieldName", "kind", "role"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema fieldQueryDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("queryable", booleanProperty(false));
+        properties.put("defaultOperator", stringProperty(true));
+        properties.put("operators", arrayProperty("string"));
+        return new DynamicOpenApiDocument.Schema("DynamicFieldQueryDescriptor", "object", null,
+                List.of("queryable"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema formulaRuleDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("code", stringProperty(false));
+        properties.put("expression", stringProperty(false));
+        properties.put("kind", stringProperty(false));
+        properties.put("phase", stringProperty(false));
+        properties.put("targetField", stringProperty(true));
+        properties.put("severity", stringProperty(false));
+        properties.put("messageTemplate", stringProperty(true));
+        properties.put("stopOnError", booleanProperty(false));
+        properties.put("enabled", booleanProperty(false));
+        properties.put("sortOrder", integerProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicFormulaRuleDescriptor", "object", null,
+                List.of("code", "expression", "kind", "phase"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema relationDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("code", stringProperty(false));
+        properties.put("parentEntityAlias", stringProperty(false));
+        properties.put("childEntityAlias", stringProperty(false));
+        properties.put("childForeignKeyField", stringProperty(false));
+        properties.put("autoPopulate", booleanProperty(false));
+        properties.put("autoDeleteWithParent", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicRelationDescriptor", "object", null,
+                List.of("code", "parentEntityAlias", "childEntityAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema referenceDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("sourceEntityAlias", stringProperty(false));
+        properties.put("sourceField", stringProperty(false));
+        properties.put("targetModuleAlias", stringProperty(false));
+        properties.put("targetEntityAlias", stringProperty(false));
+        properties.put("cardinality", stringProperty(false));
+        properties.put("autoTitle", booleanProperty(false));
+        properties.put("titleOutputField", stringProperty(true));
+        properties.put("projections", arrayProperty("DynamicReferenceProjectionDescriptor"));
+        return new DynamicOpenApiDocument.Schema("DynamicReferenceDescriptor", "object", null,
+                List.of("sourceEntityAlias", "sourceField", "targetModuleAlias", "targetEntityAlias"),
+                properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema referenceProjectionDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("targetField", stringProperty(false));
+        properties.put("outputField", stringProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicReferenceProjectionDescriptor", "object", null,
+                List.of("targetField", "outputField"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationViewDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("code", stringProperty(false));
+        properties.put("sourceEntityAlias", stringProperty(false));
+        properties.put("targetModuleAlias", stringProperty(false));
+        properties.put("targetEntityAlias", stringProperty(false));
+        properties.put("displayMode", stringProperty(false));
+        properties.put("relationCode", stringProperty(true));
+        properties.put("referenceField", stringProperty(true));
+        properties.put("viewType", stringProperty(true));
+        properties.put("queryable", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicAssociationViewDescriptor", "object", null,
+                List.of("code", "sourceEntityAlias", "targetModuleAlias", "targetEntityAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema viewDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("viewType", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("fields", arrayProperty("DynamicViewFieldDescriptor"));
+        return new DynamicOpenApiDocument.Schema("DynamicViewDescriptor", "object", null,
+                List.of("viewType", "title"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema viewFieldDescriptorSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("fieldName", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("visible", booleanProperty(false));
+        properties.put("controlType", stringProperty(false));
+        properties.put("companions", arrayProperty("DynamicFieldCompanionDescriptor"));
+        properties.put("readOnly", booleanProperty(false));
+        properties.put("required", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicViewFieldDescriptor", "object", null,
+                List.of("fieldName", "title", "visible", "controlType"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema openApiDocumentSchema() {
@@ -483,16 +666,37 @@ public class DynamicOpenApiGenerator {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("status", stringProperty(false));
         properties.put("mode", stringProperty(true));
-        properties.put("options", arrayProperty("ReferenceOption"));
-        properties.put("records", arrayProperty("DynamicRecordResponse"));
-        properties.put("pageNum", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
+        properties.put("options", arrayProperty("DynamicReferenceResolveItem"));
+        properties.put("results", arrayProperty("DynamicReferenceResolveResult"));
+        properties.put("offset", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
-        properties.put("pageSize", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
+        properties.put("limit", new DynamicOpenApiDocument.Property("integer", "int32", false, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("total", new DynamicOpenApiDocument.Property("integer", "int64", false, false,
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveResponse", "object", null,
                 List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema referenceResolveItemSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("id", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("matchedBy", stringProperty(true));
+        properties.put("projections", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveItem", "object", null,
+                List.of("id", "title"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema referenceResolveResultSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("input", objectProperty("object"));
+        properties.put("status", stringProperty(false));
+        properties.put("matchedBy", stringProperty(true));
+        properties.put("item", objectProperty("DynamicReferenceResolveItem"));
+        properties.put("candidates", arrayProperty("DynamicReferenceResolveItem"));
+        return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveResult", "object", null,
+                List.of("status"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema recordIdResponseSchema() {
@@ -518,6 +722,16 @@ public class DynamicOpenApiGenerator {
 
     private DynamicOpenApiDocument.Property stringProperty(boolean nullable) {
         return new DynamicOpenApiDocument.Property("string", null, false, nullable,
+                false, null, null, null, null, null, List.of());
+    }
+
+    private DynamicOpenApiDocument.Property booleanProperty(boolean nullable) {
+        return new DynamicOpenApiDocument.Property("boolean", null, false, nullable,
+                false, null, null, null, null, null, List.of());
+    }
+
+    private DynamicOpenApiDocument.Property integerProperty(boolean nullable) {
+        return new DynamicOpenApiDocument.Property("integer", "int32", false, nullable,
                 false, null, null, null, null, null, List.of());
     }
 

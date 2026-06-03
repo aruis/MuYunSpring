@@ -40,6 +40,9 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         record.setActionCode(event.actionCode());
         fillActionPayload(record, event);
         record.setSystemContext(event.systemContext());
+        record.setOperatorId(event.operatorId());
+        record.setOperatorType(event.operatorType());
+        record.setAuthorizationDecision(event.authorizationDecision());
         record.setMutationSource(event.mutationSource());
         record.setPayloadText(payloadText(event.payload()));
         record.setOccurredAt(event.occurredAt());

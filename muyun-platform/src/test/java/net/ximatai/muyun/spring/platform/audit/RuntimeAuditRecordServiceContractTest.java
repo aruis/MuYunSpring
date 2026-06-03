@@ -45,6 +45,9 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getRedirectTo()).isEqualTo("/contracts/contract-1");
         assertThat(record.getResultText()).isEqualTo("approved");
         assertThat(record.getSystemContext()).isFalse();
+        assertThat(record.getOperatorId()).isEqualTo("user-1");
+        assertThat(record.getOperatorType()).isEqualTo("USER");
+        assertThat(record.getAuthorizationDecision()).isEqualTo("ALLOW");
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
         assertThat(record.getPayloadText()).contains("resultType=VALUE");
         assertThat(record.getOccurredAt()).isEqualTo(Instant.parse("2026-06-02T04:00:00Z"));
@@ -196,6 +199,9 @@ class RuntimeAuditRecordServiceContractTest {
                 "approve",
                 "tenant-1",
                 false,
+                "user-1",
+                "USER",
+                "ALLOW",
                 RuntimeMutationSource.ACTION,
                 ActionEventPayload.executed("SERVICE", "RECORD", "VALUE", "审批通过",
                         true, "/contracts/contract-1", false, "approved"),

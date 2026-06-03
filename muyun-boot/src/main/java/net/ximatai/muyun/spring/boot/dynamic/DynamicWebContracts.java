@@ -14,6 +14,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 
 import java.util.Collection;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +124,9 @@ record DynamicRecordResponse(String id,
                                 ? List.of()
                                 : entry.getValue().stream().map(DynamicRecordResponse::from).toList()
                 ));
-        return new DynamicRecordResponse(record.getId(), record.getVersion(), record.getValues(), childResponses);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> values = (Map<String, Object>) DynamicWebValues.webValue(record.getValues());
+        return new DynamicRecordResponse(record.getId(), record.getVersion(), values, childResponses);
     }
 }
 
@@ -251,6 +256,12 @@ final class DynamicWebValues {
             LinkedHashMap<String, Object> converted = new LinkedHashMap<>();
             map.forEach((key, item) -> converted.put(String.valueOf(key), webValue(item)));
             return converted;
+        }
+        if (value instanceof LocalDate date) {
+            return date.toString();
+        }
+        if (value instanceof Instant instant) {
+            return instant.truncatedTo(ChronoUnit.SECONDS).toString();
         }
         return value;
     }

@@ -465,21 +465,32 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
-    void shouldRejectChildTargetFieldForCalculationFormulaRule() {
+    void shouldCompileChildFieldAssignmentFormulaRule() {
         moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
         String invoiceId = metadataService.insert(metadata("sales", "invoice"));
         String lineId = metadataService.insert(metadata("sales", "invoice_line"));
         fieldService.insert(field(invoiceId, "amount", "amount", FieldType.INTEGER));
+        fieldService.insert(field(lineId, "quantity", "quantity", FieldType.INTEGER));
+        fieldService.insert(field(lineId, "price", "price", FieldType.INTEGER));
         fieldService.insert(field(lineId, "lineAmount", "line_amount", FieldType.INTEGER));
+        fieldService.insert(field(lineId, "invoiceId", "invoice_id", FieldType.STRING));
         String relationId = relationService.insert(mainRelation("sales.invoice", invoiceId));
         relationService.insert(childRelation("sales.invoice", lineId, invoiceId));
-        ModuleMetadataFormulaRule rule = formulaRule(relationId, "lineAmountCalc", "{amount}");
+        ModuleMetadataFormulaRule rule = formulaRule(relationId, "lineAmountCalc",
+                "SUM({lines.lineAmount} = {lines.quantity} * {lines.price})");
         rule.setRuleKind(FormulaRuleKind.CALCULATION);
-        rule.setTargetField("lines.lineAmount");
+        formulaRuleService.insert(rule);
 
-        assertThatThrownBy(() -> formulaRuleService.insert(rule))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("targetField cannot be child field");
+        ModuleDefinition definition = compiler.compile("sales.invoice");
+
+        assertThat(definition.entities().getFirst().formulaRules())
+                .singleElement()
+                .satisfies(formula -> {
+                    assertThat(formula.code()).isEqualTo("lineAmountCalc");
+                    assertThat(formula.targetField()).isNull();
+                    assertThat(formula.expression()).isEqualTo(
+                            "SUM({lines.lineAmount} = {lines.quantity} * {lines.price})");
+                });
     }
 
     @Test

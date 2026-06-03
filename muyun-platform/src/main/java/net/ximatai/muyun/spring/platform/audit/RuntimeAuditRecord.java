@@ -76,6 +76,15 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "system_context", type = ColumnType.BOOLEAN, nullable = false, comment = "System context flag")
     private Boolean systemContext;
 
+    @Column(name = "operator_id", type = ColumnType.VARCHAR, length = 64, comment = "Runtime operator id")
+    private String operatorId;
+
+    @Column(name = "operator_type", type = ColumnType.VARCHAR, length = 32, comment = "Runtime operator type")
+    private String operatorType;
+
+    @Column(name = "authorization_decision", type = ColumnType.VARCHAR, length = 32, comment = "Authorization decision")
+    private String authorizationDecision;
+
     @Column(name = "mutation_source", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Mutation source")
     private RuntimeMutationSource mutationSource;
 
