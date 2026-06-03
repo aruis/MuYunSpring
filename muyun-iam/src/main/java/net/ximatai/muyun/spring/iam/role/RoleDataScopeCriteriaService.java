@@ -7,18 +7,28 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
 public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     private final RoleService roleService;
+    private final Optional<OrganizationService> organizationService;
 
     public RoleDataScopeCriteriaService(RoleService roleService) {
-        this.roleService = roleService;
+        this(roleService, Optional.empty());
+    }
+
+    @Autowired
+    public RoleDataScopeCriteriaService(RoleService roleService, Optional<OrganizationService> organizationService) {
+        this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
+        this.organizationService = organizationService == null ? Optional.empty() : organizationService;
     }
 
     @Override
@@ -74,14 +84,25 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                     scope.orEq(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, user.organizationId());
                 }
             }
-            case ORGANIZATION_AND_CHILDREN ->
-                    throw new PlatformException("organization children data scope requires organization hierarchy support");
+            case ORGANIZATION_AND_CHILDREN -> appendOrganizationAndChildrenScope(scope, user);
             case CUSTOM ->
                     throw new PlatformException("custom data scope condition is not supported yet");
             case REFERENCE_DEPENDENCY ->
                     throw new PlatformException("reference dependency data scope is not supported yet");
             case NONE, ALL -> {
             }
+        }
+    }
+
+    private void appendOrganizationAndChildrenScope(Criteria scope, CurrentUser user) {
+        if (user.organizationId() == null) {
+            return;
+        }
+        OrganizationService service = organizationService.orElseThrow(() ->
+                new PlatformException("organization children data scope requires organization hierarchy support"));
+        List<String> organizationIds = service.organizationAndDescendantIds(user.organizationId());
+        if (!organizationIds.isEmpty()) {
+            scope.orIn(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, organizationIds);
         }
     }
 
