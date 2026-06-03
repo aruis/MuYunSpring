@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,7 +44,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
         return webScope(() -> WebPageResponse.from(queryRecords(request)));
     }
 
-    @PostMapping("/view/{id}")
+    @GetMapping("/view/{id}")
     default T view(@PathVariable String id) {
         return webScope(() -> service().select(id));
     }

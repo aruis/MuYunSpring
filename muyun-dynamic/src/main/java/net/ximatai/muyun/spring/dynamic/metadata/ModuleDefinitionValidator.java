@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 
 import java.util.Optional;
 import java.util.HashSet;
@@ -356,7 +357,7 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("dialog action requires executor key: " + action.actionCode());
         }
         if (action.category() != EntityActionCategory.STANDARD
-                && DynamicActionPathRules.isReservedWebActionCode(action.actionCode())) {
+                && PlatformWebPathRules.isReservedWebActionCode(action.actionCode())) {
             throw new ModuleDefinitionException("custom action conflicts with reserved web action path: "
                     + entity.alias() + "." + action.actionCode());
         }

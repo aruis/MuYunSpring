@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.web;
 
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,29 +19,29 @@ public interface ActionWeb<S, Q, D, A, R> extends ScopedWeb<S> {
 
     R executeRecordAction(String actionCode, String recordId, Q request);
 
-    @PostMapping("/actions")
+    @GetMapping("/actions")
     default List<D> actions() {
         return webScope(this::listActions);
     }
 
-    @PostMapping("/actions/{recordId}")
+    @GetMapping("/actions/{recordId}")
     default List<A> recordActions(@PathVariable String recordId) {
         return webScope(() -> listRecordActions(recordId));
     }
 
-    @PostMapping("/{actionCode}")
+    @PostMapping("/" + PlatformWebPathRules.ACTION_CODE_PATH)
     default R listAction(@PathVariable String actionCode,
                          @RequestBody(required = false) Q request) {
         return webScope(() -> executeListAction(actionCode, request));
     }
 
-    @PostMapping("/{actionCode}/batch")
+    @PostMapping("/" + PlatformWebPathRules.ACTION_CODE_PATH + "/batch")
     default R batchAction(@PathVariable String actionCode,
                           @RequestBody(required = false) Q request) {
         return webScope(() -> executeBatchAction(actionCode, request));
     }
 
-    @PostMapping("/{actionCode}/{recordId}")
+    @PostMapping("/" + PlatformWebPathRules.ACTION_CODE_PATH + "/{recordId}")
     default R recordAction(@PathVariable String actionCode,
                            @PathVariable String recordId,
                            @RequestBody(required = false) Q request) {

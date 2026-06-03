@@ -83,8 +83,20 @@ class DynamicOpenApiGeneratorTest {
                 .filter(operation -> operation.path().equals("/sales.contract/view/{id}"))
                 .findFirst())
                 .get()
-                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
-                .isEqualTo("DynamicRecordResponse");
+                .satisfies(operation -> {
+                    assertThat(operation.method()).isEqualTo("GET");
+                    assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/actions")))
+                .singleElement()
+                .extracting(DynamicOpenApiDocument.Operation::method)
+                .isEqualTo("GET");
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/actions/{recordId}")))
+                .singleElement()
+                .extracting(DynamicOpenApiDocument.Operation::method)
+                .isEqualTo("GET");
     }
 
     @Test
@@ -128,8 +140,10 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/openapi")))
                 .singleElement()
-                .extracting(DynamicOpenApiDocument.Operation::actionCode)
-                .isNull();
+                .satisfies(operation -> {
+                    assertThat(operation.method()).isEqualTo("GET");
+                    assertThat(operation.actionCode()).isNull();
+                });
     }
 
     @Test

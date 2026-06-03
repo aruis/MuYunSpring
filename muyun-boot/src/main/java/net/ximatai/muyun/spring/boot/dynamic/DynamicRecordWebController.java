@@ -15,9 +15,9 @@ import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
@@ -36,6 +36,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -129,12 +130,12 @@ public class DynamicRecordWebController implements
         });
     }
 
-    @PostMapping("/describe")
+    @GetMapping("/describe")
     public DynamicModuleDescriptor describeModule(@PathVariable String moduleAlias) {
         return tenantScope(moduleAlias, () -> recordService.describe(moduleAlias));
     }
 
-    @PostMapping("/openapi")
+    @GetMapping("/openapi")
     public DynamicOpenApiDocument openApi(@PathVariable String moduleAlias) {
         return tenantScope(moduleAlias, () -> recordService.openApi(moduleAlias));
     }
@@ -329,7 +330,7 @@ public class DynamicRecordWebController implements
     }
 
     private void rejectReservedActionPath(String actionCode) {
-        if (DynamicActionPathRules.isReservedWebActionCode(actionCode)) {
+        if (PlatformWebPathRules.isReservedWebActionCode(actionCode)) {
             throw new IllegalArgumentException("dynamic action path is reserved: " + actionCode);
         }
     }

@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,7 +57,7 @@ class IamWebControllerIT {
         when(organizationService.children(TreeAbility.ROOT_ID)).thenReturn(List.of(organization));
         when(organizationService.children("org-1")).thenReturn(List.of());
 
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("org-1"))
                 .andExpect(jsonPath("$.records[0].children").isArray());
@@ -95,10 +96,16 @@ class IamWebControllerIT {
     }
 
     @Test
+    void shouldRejectPostForReadOnlyTreeEndpointInRealMvcContext() throws Exception {
+        mvc.perform(post("/iam.organization/tree"))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
     void shouldApplyAdviceWhenCurrentUserTenantIsMissingInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser()).thenReturn(Optional.empty());
 
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));

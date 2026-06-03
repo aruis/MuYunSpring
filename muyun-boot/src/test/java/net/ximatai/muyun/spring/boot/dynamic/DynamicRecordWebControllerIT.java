@@ -87,7 +87,7 @@ class DynamicRecordWebControllerIT {
         when(recordService.mainEntity(MODULE)).thenReturn(mainEntity);
         when(mainEntity.select("contract-1")).thenReturn(record);
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+        mvc.perform(get("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contract-1"))
                 .andExpect(jsonPath("$.values.code").value("C-001"));
@@ -110,10 +110,20 @@ class DynamicRecordWebControllerIT {
         when(recordService.actionAvailability(eq(MODULE), eq("submit"), any(DynamicRecord.class)))
                 .thenReturn(DynamicActionAvailability.available("submit"));
 
-        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
+        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].action.code").value("submit"))
                 .andExpect(jsonPath("$[0].available").value(true));
+    }
+
+    @Test
+    void shouldRejectPostForReadOnlyDynamicEndpointsInRealMvcMapping() throws Exception {
+        mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/{moduleAlias}/describe", MODULE))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     private EntityDefinition entity() {

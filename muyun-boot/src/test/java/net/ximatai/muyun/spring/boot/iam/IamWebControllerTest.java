@@ -33,6 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -126,7 +127,7 @@ class IamWebControllerTest {
                 })
                 .thenReturn(List.of());
 
-        mvc.perform(post("/iam.organization/tree?flat=true"))
+        mvc.perform(get("/iam.organization/tree?flat=true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("org-1"))
                 .andExpect(jsonPath("$.records[0].tenantId").value("tenant_a"))
@@ -148,7 +149,7 @@ class IamWebControllerTest {
         when(organizationDao.query(any(Criteria.class), any(PageRequest.class), any()))
                 .thenReturn(List.of(root), List.of(child), List.of());
 
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("org-1"))
                 .andExpect(jsonPath("$.records[0].record.tenantId").value("tenant_a"))
@@ -182,7 +183,7 @@ class IamWebControllerTest {
         doThrow(new PlatformException("Tenant is not active: tenant_a"))
                 .when(tenantDao).query(any(Criteria.class), any(PageRequest.class));
 
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Tenant is not active: tenant_a"));
@@ -190,7 +191,7 @@ class IamWebControllerTest {
 
     @Test
     void shouldRequireCurrentUserTenantForOrganizationAccess() throws Exception {
-        mvc.perform(post("/iam.organization/tree"))
+        mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));

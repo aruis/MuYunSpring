@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.dynamic.openapi;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
-import net.ximatai.muyun.spring.dynamic.metadata.DynamicActionPathRules;
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class DynamicOpenApiGenerator {
+    private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
     private static final List<String> DEFAULT_ERRORS = List.of(
             "DYNAMIC_BAD_REQUEST",
@@ -48,13 +49,13 @@ public class DynamicOpenApiGenerator {
                                                               DynamicEntityDescriptor mainEntity,
                                                               String basePath) {
         List<DynamicOpenApiDocument.Operation> operations = new ArrayList<>();
-        operations.add(operation(basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
+        operations.add(getOperation(basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
                 "Describe " + descriptor.title(), null, "DynamicModuleDescriptor", null));
-        operations.add(operation(basePath + "/openapi", operationId(descriptor, "openApi"),
+        operations.add(getOperation(basePath + "/openapi", operationId(descriptor, "openApi"),
                 "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
         operations.add(operation(basePath + "/query", operationId(descriptor, "query"),
                 "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", null));
-        operations.add(operation(basePath + "/view/{id}", operationId(descriptor, "view"),
+        operations.add(getOperation(basePath + "/view/{id}", operationId(descriptor, "view"),
                 "View " + mainEntity.title(), null, "DynamicRecordResponse", null));
         operations.add(operation(basePath + "/insert", operationId(descriptor, "insert"),
                 "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", null));
@@ -76,19 +77,19 @@ public class DynamicOpenApiGenerator {
                     "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", null));
         }
         if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
-            operations.add(operation(basePath + "/tree", operationId(descriptor, "tree"),
+            operations.add(getOperation(basePath + "/tree", operationId(descriptor, "tree"),
                     "Tree " + mainEntity.title(), null, "WebListResponse", null));
-            operations.add(operation(basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
+            operations.add(getOperation(basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
                     "Tree node " + mainEntity.title(), null, "WebListResponse", null));
         }
-        operations.add(operation(basePath + "/actions", operationId(descriptor, "actions"),
+        operations.add(getOperation(basePath + "/actions", operationId(descriptor, "actions"),
                 "List module actions", null, "DynamicActionDescriptorList", null));
-        operations.add(operation(basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),
+        operations.add(getOperation(basePath + "/actions/{recordId}", operationId(descriptor, "recordActions"),
                 "List record actions", null, "DynamicWebActionAvailabilityList", null));
         descriptor.actions().stream()
                 .filter(DynamicActionDescriptor::enabled)
                 .filter(action -> action.category() != EntityActionCategory.STANDARD)
-                .filter(action -> !DynamicActionPathRules.isReservedWebActionCode(action.code()))
+                .filter(action -> !PlatformWebPathRules.isReservedWebActionCode(action.code()))
                 .filter(action -> action.actionLevel() != null)
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
         mainEntity.fields().stream()
@@ -135,8 +136,27 @@ public class DynamicOpenApiGenerator {
                                                        String requestSchema,
                                                        String responseSchema,
                                                        String actionCode) {
+        return operation(METHOD_POST, path, operationId, summary, requestSchema, responseSchema, actionCode);
+    }
+
+    private DynamicOpenApiDocument.Operation getOperation(String path,
+                                                          String operationId,
+                                                          String summary,
+                                                          String requestSchema,
+                                                          String responseSchema,
+                                                          String actionCode) {
+        return operation(METHOD_GET, path, operationId, summary, requestSchema, responseSchema, actionCode);
+    }
+
+    private DynamicOpenApiDocument.Operation operation(String method,
+                                                       String path,
+                                                       String operationId,
+                                                       String summary,
+                                                       String requestSchema,
+                                                       String responseSchema,
+                                                       String actionCode) {
         return new DynamicOpenApiDocument.Operation(
-                METHOD_POST,
+                method,
                 path,
                 operationId,
                 summary,

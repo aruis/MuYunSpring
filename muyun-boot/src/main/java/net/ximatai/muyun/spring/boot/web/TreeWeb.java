@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.web;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,7 +24,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
         });
     }
 
-    @PostMapping("/tree")
+    @GetMapping("/tree")
     default WebListResponse<?> tree(@RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
             List<T> roots = service().children(TreeAbility.ROOT_ID);
@@ -39,7 +40,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
         });
     }
 
-    @PostMapping("/tree/{id}")
+    @GetMapping("/tree/{id}")
     default WebListResponse<?> tree(@PathVariable String id,
                                     @RequestParam(defaultValue = "false") boolean flat,
                                     @RequestParam(defaultValue = "true") boolean includeSelf) {

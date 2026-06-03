@@ -103,7 +103,7 @@ class DynamicRecordWebControllerTest {
     void shouldExposeModuleDescriptor() throws Exception {
         when(service.describe(MODULE)).thenReturn(DynamicModuleDescriptor.from(module()));
 
-        mvc.perform(post("/{moduleAlias}/describe", MODULE))
+        mvc.perform(get("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.mainEntityAlias").value(ENTITY))
@@ -117,7 +117,7 @@ class DynamicRecordWebControllerTest {
                 .generate(DynamicModuleDescriptor.from(module()));
         when(service.openApi(MODULE)).thenReturn(document);
 
-        mvc.perform(post("/{moduleAlias}/openapi", MODULE))
+        mvc.perform(get("/{moduleAlias}/openapi", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.basePath").value("/" + MODULE))
@@ -153,7 +153,7 @@ class DynamicRecordWebControllerTest {
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
         when(mainEntity.select("contract-1")).thenReturn(record);
 
-        takeoverMvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+        takeoverMvc.perform(get("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contract-1"));
     }
@@ -269,7 +269,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.pageQuery(eq(criteria), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+        mvc.perform(get("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.values.signedDate").value("2026-06-01"))
                 .andExpect(jsonPath("$.values.signedAt").value("2026-06-01T02:03:04Z"));
@@ -305,7 +305,7 @@ class DynamicRecordWebControllerTest {
                 action("archive", EntityActionLevel.BATCH)
         ));
 
-        mvc.perform(post("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+        mvc.perform(get("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contract-1"))
                 .andExpect(jsonPath("$.values.code").value("C-001"));
@@ -314,7 +314,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        mvc.perform(post("/{moduleAlias}/actions", MODULE))
+        mvc.perform(get("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("export"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
@@ -341,7 +341,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("A")).thenReturn(List.of());
         when(mainEntity.children("B")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree?flat=true", MODULE))
+        mvc.perform(get("/{moduleAlias}/tree?flat=true", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("A"))
                 .andExpect(jsonPath("$.records[0].values.code").value("A"))
@@ -365,7 +365,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("A")).thenReturn(List.of(child));
         when(mainEntity.children("A-1")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree/{recordId}?flat=true", MODULE, "A"))
+        mvc.perform(get("/{moduleAlias}/tree/{recordId}?flat=true", MODULE, "A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("A"))
                 .andExpect(jsonPath("$.records[1].id").value("A-1"))
@@ -388,7 +388,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("A")).thenReturn(List.of(child));
         when(mainEntity.children("A-1")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree/{recordId}", MODULE, "A"))
+        mvc.perform(get("/{moduleAlias}/tree/{recordId}", MODULE, "A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("A"))
                 .andExpect(jsonPath("$.records[0].record.values.code").value("A"))
@@ -412,7 +412,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("A")).thenReturn(List.of(child));
         when(mainEntity.children("A-1")).thenReturn(List.of());
 
-        mvc.perform(post("/{moduleAlias}/tree/{recordId}?includeSelf=false", MODULE, "A"))
+        mvc.perform(get("/{moduleAlias}/tree/{recordId}?includeSelf=false", MODULE, "A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("A-1"))
                 .andExpect(jsonPath("$.records[0].children").isArray());
@@ -478,7 +478,7 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.children("root"))
                 .thenThrow(new PlatformException("dynamic entity does not support capability: TREE"));
 
-        mvc.perform(post("/{moduleAlias}/tree", MODULE))
+        mvc.perform(get("/{moduleAlias}/tree", MODULE))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: TREE"));
@@ -527,7 +527,7 @@ class DynamicRecordWebControllerTest {
         when(service.actionAvailability(eq(MODULE), eq("preview"), any(DynamicRecord.class)))
                 .thenReturn(DynamicActionAvailability.available("preview"));
 
-        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
+        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].action.code").value("submit"))
                 .andExpect(jsonPath("$[0].available").value(false))
@@ -545,7 +545,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectRecordActionAvailabilityWhenRecordDoesNotExist() throws Exception {
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
 
-        mvc.perform(post("/{moduleAlias}/actions/{recordId}", MODULE, "missing"))
+        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "missing"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic record does not exist: missing"));
     }
@@ -742,8 +742,7 @@ class DynamicRecordWebControllerTest {
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "openapi", "contract-1")
                         .contentType("application/json")
                         .content(json(Map.of())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: openapi"));
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -751,8 +750,7 @@ class DynamicRecordWebControllerTest {
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "sort")
                         .contentType("application/json")
                         .content(json(Map.of())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: sort"));
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -853,9 +851,7 @@ class DynamicRecordWebControllerTest {
     void shouldTreatActionsPathAsRecordActionQueryInsteadOfExecution() throws Exception {
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
 
-        mvc.perform(post("/{moduleAlias}/actions/{actionCode}", MODULE, "submit")
-                        .contentType("application/json")
-                        .content(json(Map.of())))
+        mvc.perform(get("/{moduleAlias}/actions/{actionCode}", MODULE, "submit"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic record does not exist: submit"));
     }
@@ -912,7 +908,7 @@ class DynamicRecordWebControllerTest {
     void shouldReturnStableBadRequestBody() throws Exception {
         when(service.describe(MODULE)).thenThrow(new ModuleDefinitionException("unknown module alias: " + MODULE));
 
-        mvc.perform(post("/{moduleAlias}/describe", MODULE))
+        mvc.perform(get("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
                 .andExpect(jsonPath("$.status").value(400))
@@ -928,7 +924,7 @@ class DynamicRecordWebControllerTest {
                 .addFilters(new CurrentUserWebFilter(java.util.Optional::empty))
                 .build();
 
-        noTenantMvc.perform(post("/{moduleAlias}/describe", MODULE))
+        noTenantMvc.perform(get("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
                 .andExpect(jsonPath("$.status").value(400))
