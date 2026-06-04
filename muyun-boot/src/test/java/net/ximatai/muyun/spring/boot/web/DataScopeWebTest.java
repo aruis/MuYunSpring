@@ -9,15 +9,22 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +40,7 @@ class DataScopeWebTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+        ActionExecutionContextHolder.clear();
     }
 
     @Test
@@ -49,6 +57,56 @@ class DataScopeWebTest {
             assertThat(service.queryAction).isEqualTo(PlatformAction.QUERY);
             assertThat(service.viewAction).isEqualTo(PlatformAction.VIEW);
         }
+    }
+
+    @Test
+    void crudWebShouldRequireDataScopeBeforeRecordMutationWhenAvailable() {
+        DataScopedCrudService service = new DataScopedCrudService();
+        DataScopedCrudController controller = new DataScopedCrudController(service);
+        DataScopedRecord record = new DataScopedRecord();
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            controller.update("record-1", record);
+            controller.delete("record-2");
+        }
+
+        assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE, PlatformAction.DELETE);
+        assertThat(service.scopedIdCalls).containsExactly(List.of("record-1"), List.of("record-2"));
+        assertThat(service.scopedDataAuth).containsExactly(true, true);
+        assertThat(service.viewAction).isEqualTo(PlatformAction.VIEW);
+    }
+
+    @Test
+    void crudWebShouldUseCurrentActionPolicyForDataScopeMutationCheck() {
+        DataScopedCrudService service = new DataScopedCrudService();
+        DataScopedCrudController controller = new DataScopedCrudController(service);
+        DataScopedRecord record = new DataScopedRecord();
+        ActionExecutionPolicy actionPolicy = new ActionExecutionPolicy("update", PlatformActionLevel.RECORD,
+                ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null);
+        ActionExecutionContext context = ActionExecutionContext.ofPolicy(
+                service.getModuleAlias(), actionPolicy, java.util.Set.of("record-1"), java.util.Optional.empty());
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(context)) {
+            controller.update("record-1", record);
+        }
+
+        assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE);
+        assertThat(service.scopedDataAuth).containsExactly(false);
+    }
+
+    @Test
+    void enableWebShouldRequireDataScopeBeforeRecordMutationWhenAvailable() {
+        DataScopedEnabledService service = new DataScopedEnabledService();
+        DataScopedEnabledController controller = new DataScopedEnabledController(service);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            controller.enable("record-1");
+            controller.disable("record-2");
+        }
+
+        assertThat(service.scopedActions).containsExactly(PlatformAction.ENABLE, PlatformAction.DISABLE);
+        assertThat(service.scopedIdCalls).containsExactly(List.of("record-1"), List.of("record-2"));
     }
 
     @Test
@@ -112,8 +170,17 @@ class DataScopeWebTest {
         private Integer sortOrder;
     }
 
+    @Getter
+    @Setter
+    private static final class DataScopedEnabledRecord extends DataScopedRecord implements EnabledCapable {
+        private Boolean enabled;
+    }
+
     private static final class DataScopedCrudService extends AbstractAbilityService<DataScopedRecord>
             implements DataScopeAbility<DataScopedRecord> {
+        private final java.util.ArrayList<PlatformAction> scopedActions = new java.util.ArrayList<>();
+        private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
+        private final java.util.ArrayList<Boolean> scopedDataAuth = new java.util.ArrayList<>();
         private PlatformAction queryAction;
         private PlatformAction viewAction;
 
@@ -143,6 +210,56 @@ class DataScopeWebTest {
             DataScopedRecord record = new DataScopedRecord();
             record.setTitle("View " + id);
             return record;
+        }
+
+        @Override
+        public DataScopeCriteriaResult requireRecordScopeResult(ActionExecutionPolicy policy, Collection<String> ids) {
+            scopedActions.add(PlatformAction.fromCode(policy.actionCode()).orElseThrow());
+            scopedIdCalls.add(List.copyOf(ids));
+            scopedDataAuth.add(policy.requiresDataScope());
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+
+        @Override
+        public int update(DataScopedRecord record) {
+            return 1;
+        }
+
+        @Override
+        public int delete(String id) {
+            return 1;
+        }
+    }
+
+    private static final class DataScopedEnabledService extends AbstractAbilityService<DataScopedEnabledRecord>
+            implements EnableAbility<DataScopedEnabledRecord>, DataScopeAbility<DataScopedEnabledRecord> {
+        private final java.util.ArrayList<PlatformAction> scopedActions = new java.util.ArrayList<>();
+        private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
+
+        private DataScopedEnabledService() {
+            super("demo.dataScopedEnabled", DataScopedEnabledRecord.class, dao());
+        }
+
+        @Override
+        public DataScopeCriteriaService getDataScopeCriteriaService() {
+            return new AllowAllDataScopeCriteriaService();
+        }
+
+        @Override
+        public DataScopeCriteriaResult requireRecordScopeResult(ActionExecutionPolicy policy, Collection<String> ids) {
+            scopedActions.add(PlatformAction.fromCode(policy.actionCode()).orElseThrow());
+            scopedIdCalls.add(List.copyOf(ids));
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+
+        @Override
+        public int enable(String id) {
+            return 1;
+        }
+
+        @Override
+        public int disable(String id) {
+            return 1;
         }
     }
 
@@ -241,6 +358,13 @@ class DataScopeWebTest {
     private static final class DataScopedCrudController extends WebSupport<DataScopedCrudService>
             implements CrudWeb<DataScopedRecord, DataScopedCrudService> {
         private DataScopedCrudController(DataScopedCrudService service) {
+            this.service = service;
+        }
+    }
+
+    private static final class DataScopedEnabledController extends WebSupport<DataScopedEnabledService>
+            implements EnableWeb<DataScopedEnabledRecord, DataScopedEnabledService> {
+        private DataScopedEnabledController(DataScopedEnabledService service) {
             this.service = service;
         }
     }

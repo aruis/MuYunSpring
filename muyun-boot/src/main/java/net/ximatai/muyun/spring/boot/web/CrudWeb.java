@@ -9,6 +9,9 @@ import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import org.springframework.http.HttpStatus;
@@ -58,15 +61,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     @GetMapping("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
     default T view(@PathVariable String id) {
-        return webScope(() -> {
-            if (service() instanceof DataScopeAbility<?>) {
-                DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
-                @SuppressWarnings("unchecked")
-                T record = (T) dataScopeAbility.selectForAction(PlatformAction.VIEW, id);
-                return record;
-            }
-            return service().select(id);
-        });
+        return webScope(() -> selectForAction(PlatformAction.VIEW, id));
     }
 
     @PostMapping("/insert")
@@ -84,14 +79,42 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     default T update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return webScope(() -> {
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
-            return service().select(id);
+            return selectForAction(PlatformAction.VIEW, id);
         });
     }
 
     @PostMapping("/delete/{id}")
     @ActionEndpoint(PlatformAction.DELETE)
     default WebCountResponse delete(@PathVariable String id) {
-        return webScope(() -> new WebCountResponse(service().delete(id)));
+        return webScope(() -> {
+            requireDataScopeRecord(PlatformAction.DELETE, id);
+            return new WebCountResponse(service().delete(id));
+        });
+    }
+
+    private T selectForAction(PlatformAction action, String id) {
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            @SuppressWarnings("unchecked")
+            T record = (T) dataScopeAbility.selectForAction(action, id);
+            return record;
+        }
+        return service().select(id);
+    }
+
+    private void requireDataScopeRecord(PlatformAction action, String id) {
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            dataScopeAbility.requireRecordScope(actionPolicy(action), java.util.List.of(id));
+        }
+    }
+
+    private ActionExecutionPolicy actionPolicy(PlatformAction fallback) {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> context.moduleAlias().equals(webScopeName()))
+                .map(ActionExecutionContext::actionPolicy)
+                .orElseGet(fallback::executionPolicy);
     }
 }
