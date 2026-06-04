@@ -5,17 +5,21 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class OrganizationService extends TenantActiveScopedService<Organization> implements
         SoftDeleteAbility<Organization>,
         EnableAbility<Organization>,
         TreeAbility<Organization>,
-        ReferenceAbility<Organization> {
+        ReferenceAbility<Organization>,
+        OrganizationHierarchyService {
 
     public static final String MODULE_ALIAS = "iam.organization";
 
@@ -27,6 +31,11 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
     @Override
     public void normalizeBeforeMutation(Organization organization) {
         organization.setCode(Preconditions.requireText(organization.getCode(), "organizationCode"));
+    }
+
+    @Override
+    public List<String> organizationIdsFromSelfToRoot(String organizationId) {
+        return ancestorIdsAndSelf(organizationId).reversed();
     }
 
 }

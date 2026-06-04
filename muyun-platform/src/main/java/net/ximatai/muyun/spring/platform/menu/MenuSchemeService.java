@@ -1,22 +1,25 @@
 package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Objects;
 import java.util.List;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implements
@@ -25,9 +28,19 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         SortAbility<MenuScheme> {
     public static final String MODULE_ALIAS = "platform.menuScheme";
     public static final String SYSTEM_SCOPE_ID = "system";
+    private final Optional<OrganizationHierarchyService> organizationHierarchyService;
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao) {
+        this(schemeDao, Optional.empty());
+    }
+
+    @Autowired
+    public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
+                             Optional<OrganizationHierarchyService> organizationHierarchyService) {
         super(MODULE_ALIAS, MenuScheme.class, schemeDao);
+        this.organizationHierarchyService = organizationHierarchyService == null
+                ? Optional.empty()
+                : organizationHierarchyService;
     }
 
     @Override
@@ -144,13 +157,32 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
             throw new PlatformException("current user tenant is required");
         }
         if (user.organizationId() != null && !user.organizationId().isBlank()) {
-            MenuScheme organizationScheme = firstEnabledScheme(
-                    MenuScopeType.ORGANIZATION, user.tenantId(), user.organizationId());
+            MenuScheme organizationScheme = firstOrganizationScheme(user.tenantId(), user.organizationId());
             if (organizationScheme != null) {
                 return organizationScheme;
             }
         }
         return requireFirstEnabledScheme(MenuScopeType.TENANT, user.tenantId(), user.tenantId());
+    }
+
+    private MenuScheme firstOrganizationScheme(String tenantId, String organizationId) {
+        for (String candidateId : organizationCandidateIds(organizationId)) {
+            MenuScheme scheme = firstEnabledScheme(MenuScopeType.ORGANIZATION, tenantId, candidateId);
+            if (scheme != null) {
+                return scheme;
+            }
+        }
+        return null;
+    }
+
+    private List<String> organizationCandidateIds(String organizationId) {
+        if (organizationId == null || organizationId.isBlank()) {
+            return List.of();
+        }
+        return organizationHierarchyService
+                .map(service -> service.organizationIdsFromSelfToRoot(organizationId))
+                .filter(ids -> ids != null && !ids.isEmpty())
+                .orElseGet(() -> List.of(organizationId));
     }
 
     private MenuScheme requireFirstEnabledScheme(MenuScopeType scopeType, String tenantId, String scopeId) {

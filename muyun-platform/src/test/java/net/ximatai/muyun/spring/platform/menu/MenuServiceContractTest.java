@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
+import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -325,6 +326,93 @@ class MenuServiceContractTest {
             assertThat(scopedMenuService.currentUserVisibleRootMenus())
                     .extracting(Menu::getId)
                     .doesNotContain(tenantMenuId);
+        }
+    }
+
+    @Test
+    void shouldInheritCurrentUserMenuSchemeFromAncestorOrganization() {
+        OrganizationHierarchyService organizationHierarchy = organizationId -> {
+            if ("dept-1".equals(organizationId)) {
+                return List.of("dept-1", "group-1", "root-org");
+            }
+            return List.of(organizationId);
+        };
+        MenuSchemeService hierarchySchemeService = new MenuSchemeService(schemeDao, Optional.of(organizationHierarchy));
+        MenuService scopedMenuService = new MenuService(menuDao, hierarchySchemeService, moduleService,
+                Optional.of((moduleAlias, currentUser) -> true));
+        String tenantSchemeId;
+        String ancestorSchemeId;
+        String ancestorMenuId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantSchemeId = hierarchySchemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            scopedMenuService.insert(moduleMenu(tenantSchemeId, "客户", TreeAbility.ROOT_ID, "crm.customer"));
+            MenuScheme ancestorScheme = scheme("group_default", MenuScopeType.ORGANIZATION, "group-1");
+            ancestorScheme.setTenantId("tenant-a");
+            ancestorSchemeId = hierarchySchemeService.insert(ancestorScheme);
+            ancestorMenuId = scopedMenuService.insert(moduleMenu(
+                    ancestorSchemeId, "合同", TreeAbility.ROOT_ID, "crm.contract"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "User", "tenant-a", "dept-1"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .containsExactly(ancestorMenuId);
+        }
+    }
+
+    @Test
+    void shouldPreferCurrentOrganizationSchemeBeforeAncestorAndTenantSchemes() {
+        OrganizationHierarchyService organizationHierarchy = organizationId -> List.of("dept-1", "group-1", "root-org");
+        MenuSchemeService hierarchySchemeService = new MenuSchemeService(schemeDao, Optional.of(organizationHierarchy));
+        MenuService scopedMenuService = new MenuService(menuDao, hierarchySchemeService, moduleService,
+                Optional.of((moduleAlias, currentUser) -> true));
+        String currentMenuId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String tenantSchemeId = hierarchySchemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            scopedMenuService.insert(moduleMenu(tenantSchemeId, "租户客户", TreeAbility.ROOT_ID, "crm.customer"));
+
+            MenuScheme ancestorScheme = scheme("group_default", MenuScopeType.ORGANIZATION, "group-1");
+            ancestorScheme.setTenantId("tenant-a");
+            String ancestorSchemeId = hierarchySchemeService.insert(ancestorScheme);
+            scopedMenuService.insert(moduleMenu(ancestorSchemeId, "上级合同", TreeAbility.ROOT_ID, "crm.contract"));
+
+            MenuScheme currentScheme = scheme("dept_default", MenuScopeType.ORGANIZATION, "dept-1");
+            currentScheme.setTenantId("tenant-a");
+            String currentSchemeId = hierarchySchemeService.insert(currentScheme);
+            currentMenuId = scopedMenuService.insert(moduleMenu(
+                    currentSchemeId, "本部门客户", TreeAbility.ROOT_ID, "crm.customer"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "User", "tenant-a", "dept-1"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .containsExactly(currentMenuId);
+        }
+    }
+
+    @Test
+    void shouldFallbackToTenantMenuSchemeWhenOrganizationChainHasNoScheme() {
+        OrganizationHierarchyService organizationHierarchy = organizationId -> List.of("dept-1", "group-1", "root-org");
+        MenuSchemeService hierarchySchemeService = new MenuSchemeService(schemeDao, Optional.of(organizationHierarchy));
+        MenuService scopedMenuService = new MenuService(menuDao, hierarchySchemeService, moduleService,
+                Optional.of((moduleAlias, currentUser) -> true));
+        String tenantMenuId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String tenantSchemeId = hierarchySchemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            tenantMenuId = scopedMenuService.insert(moduleMenu(
+                    tenantSchemeId, "租户客户", TreeAbility.ROOT_ID, "crm.customer"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "User", "tenant-a", "dept-1"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .containsExactly(tenantMenuId);
         }
     }
 

@@ -6,12 +6,16 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 class OrganizationServiceContractTest {
@@ -84,6 +88,15 @@ class OrganizationServiceContractTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("organizationCode");
         }
+    }
+
+    @Test
+    void shouldResolveOrganizationIdsFromSelfToRoot() {
+        OrganizationService service = spy(new OrganizationService(mock(OrganizationDao.class), activeTenantVerifier()));
+        doReturn(List.of("group-1", "dept-1")).when(service).ancestorIdsAndSelf("dept-1");
+
+        assertThat(service.organizationIdsFromSelfToRoot("dept-1"))
+                .containsExactly("dept-1", "group-1");
     }
 
     private Organization organization(String code, String title) {
