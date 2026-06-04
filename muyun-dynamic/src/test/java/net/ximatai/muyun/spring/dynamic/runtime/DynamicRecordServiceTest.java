@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -490,6 +491,69 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("record data permission denied");
 
         verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldPassScopedCriteriaToConditionBasedDynamicActionExecutor() {
+        IDatabaseOperations<Object> operations = operations();
+        RecordingCriteriaActionExecutor executor = new RecordingCriteriaActionExecutor();
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                executor, dataAuthListAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new VisibleOnlyDataScopeCriteriaService());
+
+        service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.empty()
+                .withCriteria(Criteria.of().eq("status", "draft")));
+
+        assertThat(executor.request.criteria()).isNotNull();
+        String sql = new CriteriaSqlCompiler()
+                .compile(executor.request.criteria(), field -> field, DBInfo.Type.POSTGRESQL)
+                .getSql();
+        assertThat(sql)
+                .contains("\"status\" =")
+                .contains("\"id\" =");
+    }
+
+    @Test
+    void shouldIntersectExplicitIdsWhenPassingScopedCriteriaToDynamicActionExecutor() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible")
+                    ? List.of(actionRow("visible", "C-001", "draft"))
+                    : List.of();
+        });
+        RecordingCriteriaActionExecutor executor = new RecordingCriteriaActionExecutor();
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                executor, dataAuthListAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new CrossTenantAllDataScopeCriteriaService());
+
+        service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.empty()
+                .withIds(List.of("visible"))
+                .withCriteria(Criteria.of().eq("status", "draft")));
+
+        var compiled = new CriteriaSqlCompiler()
+                .compile(executor.request.criteria(), field -> field, DBInfo.Type.POSTGRESQL);
+        assertThat(compiled.getSql())
+                .contains("\"status\" =")
+                .contains("\"id\" =");
+        assertThat(compiled.getParams()).containsValue("draft").containsValue("visible");
+    }
+
+    @Test
+    void shouldUseCriteriaScopeTenantModeWhenExecutingConditionBasedDynamicAction() {
+        IDatabaseOperations<Object> operations = operations();
+        RecordingCriteriaActionExecutor executor = new RecordingCriteriaActionExecutor();
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                executor, dataAuthListAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new CrossTenantAllDataScopeCriteriaService());
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.empty()
+                    .withCriteria(Criteria.of().eq("status", "draft")));
+        }
+
+        assertThat(executor.tenantFilterBypassed).isTrue();
     }
 
     @Test
@@ -2392,6 +2456,13 @@ class DynamicRecordServiceTest {
         );
     }
 
+    private EntityActionDefinition dataAuthListAction(String executorKey) {
+        return new EntityActionDefinition("contract", "submit", "提交", true, EntityActionLevel.LIST,
+                EntityActionCategory.CUSTOM, null, true, true, null,
+                null, null, EntityActionExecutorType.SERVICE, executorKey
+        );
+    }
+
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
         return referenceResolvingService(operations,
                 new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
@@ -2871,6 +2942,23 @@ class DynamicRecordServiceTest {
 
         DynamicActionExecutionRequest request() {
             return request;
+        }
+    }
+
+    private static final class RecordingCriteriaActionExecutor implements DynamicActionExecutor {
+        private DynamicActionExecutionRequest request;
+        private boolean tenantFilterBypassed;
+
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            this.request = request;
+            this.tenantFilterBypassed = TenantContext.tenantFilterBypassed();
+            return DynamicActionResultBody.changedCount(0);
         }
     }
 

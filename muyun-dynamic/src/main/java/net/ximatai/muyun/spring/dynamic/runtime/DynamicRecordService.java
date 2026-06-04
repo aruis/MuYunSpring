@@ -845,13 +845,19 @@ public class DynamicRecordService {
                 actionRecordIds(normalized),
                 CurrentUserContext.currentUser()
         ));
-        DataScopeCriteriaResult actionScope = requireActionRecordDataScope(moduleAlias, entityAlias, policy, actionRecordIds(normalized));
+        Set<String> recordIds = actionRecordIds(normalized);
+        DataScopeCriteriaResult recordScope = requireActionRecordDataScope(moduleAlias, entityAlias, policy, recordIds);
+        DataScopeCriteriaResult criteriaScope = actionCriteriaDataScope(moduleAlias, entityAlias, policy, normalized, recordIds);
+        DataScopeCriteriaResult actionScope = criteriaScope == null ? recordScope : criteriaScope;
+        DynamicActionExecutionRequest scopedRequest = criteriaScope == null
+                ? normalized
+                : normalized.withCriteria(criteriaScope.criteria());
         DynamicActionAvailability availability = withTenantScope(actionScope, () -> {
-            DynamicRecord availabilityRecord = availabilityRecord(moduleAlias, entityAlias, normalized);
+            DynamicRecord availabilityRecord = availabilityRecord(moduleAlias, entityAlias, scopedRequest);
             return actionAvailability(moduleAlias, entityAlias, action.code(), availabilityRecord);
         });
         String traceId = UUID.randomUUID().toString();
-        DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized,
+        DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, scopedRequest,
                 availability, null, traceId, authorization);
         if (!availability.available()) {
             eventPublisher.actionFailed(context, DynamicActionExecutionException.STAGE_AVAILABILITY, availability.message(), null);
@@ -862,10 +868,10 @@ public class DynamicRecordService {
         try {
             result = withTenantScope(actionScope, () -> runtime.actionTransactionOperator().executeResult(context, () -> {
                 if (!isInteractionOnlyAction(action)) {
-                    validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
+                    validateBeforeActionExecute(moduleAlias, entityAlias, scopedRequest, context);
                 }
-                DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId, policy);
-                DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized,
+                DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, scopedRequest, context, traceId, policy);
+                DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, scopedRequest,
                         availability, body.value(), traceId, authorization);
                 return new DynamicActionExecutionResult(completed, body.value(), body);
             }));
@@ -896,6 +902,34 @@ public class DynamicRecordService {
         collectId(ids, request.afterId());
         collectId(ids, request.parentId());
         return java.util.Collections.unmodifiableSet(ids);
+    }
+
+    private DataScopeCriteriaResult actionCriteriaDataScope(String moduleAlias,
+                                                           String entityAlias,
+                                                           ActionExecutionPolicy policy,
+                                                           DynamicActionExecutionRequest request,
+                                                           Collection<String> recordIds) {
+        if (!supportsCapability(moduleAlias, entityAlias, EntityCapability.DATA_SCOPE)
+                || !policy.requiresDataScope()
+                || (request.criteria() == null && !normalizeRecordIds(recordIds).isEmpty())) {
+            return null;
+        }
+        return readScope(moduleAlias, policy, actionExecutionCriteria(request.criteria(), recordIds));
+    }
+
+    private Criteria actionExecutionCriteria(Criteria criteria, Collection<String> recordIds) {
+        Criteria scoped = Criteria.of();
+        if (criteria != null && !criteria.isEmpty()) {
+            scoped.andGroup(criteria.getRoot());
+        }
+        Set<String> normalized = normalizeRecordIds(recordIds);
+        if (normalized.isEmpty()) {
+            return scoped;
+        }
+        if (normalized.size() == 1) {
+            return scoped.eq("id", normalized.iterator().next());
+        }
+        return scoped.in("id", List.copyOf(normalized));
     }
 
     private ActionExecutionPolicy actionPolicy(DynamicActionDescriptor action) {
