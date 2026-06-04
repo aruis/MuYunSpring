@@ -9,6 +9,7 @@ public record RolePermissionAction(
         boolean dataAuth,
         boolean granted,
         DataScopePolicy dataScopePolicy,
+        TenantScopePolicy tenantScopePolicy,
         String scopeCondition,
         String referenceFieldId,
         String referenceActionCode
@@ -24,6 +25,9 @@ public record RolePermissionAction(
                 action.dataAuth(),
                 granted,
                 grant == null || grant.getDataScopePolicy() == null ? DataScopePolicy.NONE : grant.getDataScopePolicy(),
+                grant == null || grant.getTenantScopePolicy() == null
+                        ? TenantScopePolicy.CURRENT_TENANT
+                        : grant.getTenantScopePolicy(),
                 grant == null ? null : grant.getScopeCondition(),
                 grant == null ? null : grant.getReferenceFieldId(),
                 grant == null ? null : grant.getReferenceActionCode()

@@ -38,7 +38,6 @@ class RoleServiceContractTest {
         }
 
         assertThat(group.getRoleKind()).isEqualTo(RoleKind.GROUP);
-        assertThat(group.getTenantScopePolicy()).isEqualTo(TenantScopePolicy.CURRENT_TENANT);
         assertThat(group.getMemberRoleIds()).isEqualTo("r1,r2");
         assertThat(group.getEnabled()).isTrue();
     }
@@ -83,10 +82,32 @@ class RoleServiceContractTest {
                 action.getId() != null
                         && "tenant_a".equals(action.getTenantId())
                         && "view".equals(action.getActionCode())
+                        && action.getTenantScopePolicy() == TenantScopePolicy.CURRENT_TENANT
                         && Boolean.TRUE.equals(action.getEnabled())));
         verify(actionDao).updateById(argThat(action ->
                 "tenant_a".equals(action.getTenantId())
                         && Boolean.FALSE.equals(action.getEnabled())));
+    }
+
+    @Test
+    void shouldStoreTenantScopePolicyOnActionGrant() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("ra1");
+        RoleService service = service(roleDao, mock(RoleUserDao.class), actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantAction("r1", "sales.contract", "query",
+                    DataScopePolicy.ALL, TenantScopePolicy.ALL_TENANTS)).isEqualTo(1);
+        }
+
+        verify(actionDao).insert(argThat(action ->
+                "view".equals(action.getActionCode())
+                        && action.getDataScopePolicy() == DataScopePolicy.ALL
+                        && action.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS
+                        && Boolean.TRUE.equals(action.getEnabled())));
     }
 
     @Test
@@ -127,24 +148,6 @@ class RoleServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThat(service.effectiveRoleIds("user-1")).containsExactly("group-1", "r1");
             assertThat(service.hasActionPermission("user-1", "sales.contract", "query")).isTrue();
-        }
-    }
-
-    @Test
-    void shouldResolveAllTenantScopeFromEffectiveRoles() {
-        RoleDao roleDao = mock(RoleDao.class);
-        RoleUserDao roleUserDao = mock(RoleUserDao.class);
-        Role allTenantRole = standardRole("r1");
-        allTenantRole.setTenantScopePolicy(TenantScopePolicy.ALL_TENANTS);
-        when(roleUserDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(roleUser("r1", "user-1")));
-        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(allTenantRole))
-                .thenReturn(List.of(allTenantRole));
-        RoleService service = service(roleDao, roleUserDao, mock(RoleActionDao.class));
-
-        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThat(service.hasAllTenantScope("user-1")).isTrue();
         }
     }
 
@@ -236,8 +239,10 @@ class RoleServiceContractTest {
                                     RolePermissionAction::permissionActionCode,
                                     RolePermissionAction::granted,
                                     RolePermissionAction::dataScopePolicy,
+                                    RolePermissionAction::tenantScopePolicy,
                                     RolePermissionAction::dataAuth)
-                            .containsExactly("view", "view", true, DataScopePolicy.OWNER, true);
+                            .containsExactly("view", "view", true, DataScopePolicy.OWNER,
+                                    TenantScopePolicy.CURRENT_TENANT, true);
                     assertThat(module.actions().get(1))
                             .extracting(RolePermissionAction::actionCode,
                                     RolePermissionAction::permissionActionCode,
@@ -320,6 +325,7 @@ class RoleServiceContractTest {
         action.setModuleAlias(moduleAlias);
         action.setActionCode(actionCode);
         action.setTenantId("tenant_a");
+        action.setTenantScopePolicy(TenantScopePolicy.CURRENT_TENANT);
         action.setEnabled(Boolean.TRUE);
         return action;
     }

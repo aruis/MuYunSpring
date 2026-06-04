@@ -150,6 +150,20 @@ class PlatformModelSchemaTest {
         assertThat(columnType(table, "error_message")).isEqualTo(ColumnType.TEXT);
     }
 
+    @Test
+    void shouldMapStablePlatformDefaults() {
+        assertThat(columnDefault(mapper.toTable(PlatformModule.class), "module_kind")).isEqualTo("'static'");
+        assertThat(columnDefault(mapper.toTable(Menu.class), "menu_type")).isEqualTo("'group'");
+        assertThat(columnDefault(mapper.toTable(ModuleMetadataRelation.class), "relation_role")).isEqualTo("'main'");
+        assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "cardinality")).isEqualTo("'ONE'");
+        assertThat(columnDefault(mapper.toTable(ModuleMetadataAction.class), "access_mode")).isEqualTo("'AUTH_REQUIRED'");
+        assertThat(columnDefault(mapper.toTable(ModuleMetadataAction.class), "action_auth")).isNull();
+        assertThat(columnDefault(mapper.toTable(MetadataFieldConfig.class), "queryable")).isNull();
+        assertThat(columnDefault(mapper.toTable(MetadataField.class), "required")).isEqualTo("FALSE");
+        assertThat(columnDefault(mapper.toTable(MetadataViewField.class), "visible")).isEqualTo("TRUE");
+        assertThat(columnDefault(mapper.toTable(RuntimeAuditRecord.class), "system_context")).isEqualTo("FALSE");
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -178,5 +192,13 @@ class PlatformModelSchemaTest {
                 .findFirst()
                 .orElseThrow()
                 .getType();
+    }
+
+    private String columnDefault(TableWrapper table, String columnName) {
+        return table.getColumns().stream()
+                .filter(column -> columnName.equals(column.getName()))
+                .findFirst()
+                .orElseThrow()
+                .getDefaultValue();
     }
 }

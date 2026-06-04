@@ -4,7 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -34,11 +36,13 @@ public class ModuleMetadataAction extends StandardEnabledSortableEntity {
     @Column(name = "action_level", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action execution level")
     private EntityActionLevel actionLevel;
 
-    @Column(name = "action_style", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action display style")
-    private EntityActionStyle actionStyle;
+    @Column(name = "action_style", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Action display style", defaultVal = @Default(varchar = "NORMAL"))
+    private EntityActionStyle actionStyle = EntityActionStyle.NORMAL;
 
-    @Column(name = "access_mode", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action access mode")
-    private EntityActionAccessMode accessMode;
+    @Column(name = "access_mode", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Action access mode", defaultVal = @Default(varchar = "AUTH_REQUIRED"))
+    private EntityActionAccessMode accessMode = EntityActionAccessMode.AUTH_REQUIRED;
 
     @Column(name = "action_auth", comment = "Whether action permission applies")
     private Boolean actionAuth;
@@ -67,6 +71,7 @@ public class ModuleMetadataAction extends StandardEnabledSortableEntity {
     @Column(name = "config_id", type = ColumnType.VARCHAR, length = 32, comment = "Managed config id")
     private String configId;
 
-    @Column(name = "system_managed", comment = "Whether action is managed by platform")
-    private Boolean systemManaged;
+    @Column(name = "system_managed", comment = "Whether action is managed by platform",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean systemManaged = Boolean.FALSE;
 }

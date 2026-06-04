@@ -3,7 +3,9 @@ package net.ximatai.muyun.spring.platform.metadata;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 
@@ -17,8 +19,9 @@ public class ModuleMetadataRelation extends StandardSortableEntity {
     @Column(name = "metadata_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata id")
     private String metadataId;
 
-    @Column(name = "relation_role", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Relation role")
-    private RelationRole relationRole;
+    @Column(name = "relation_role", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Relation role",
+            defaultVal = @Default(varchar = "main"))
+    private RelationRole relationRole = RelationRole.MAIN;
 
     @Column(name = "parent_metadata_id", type = ColumnType.VARCHAR, length = 32, comment = "Parent metadata id")
     private String parentMetadataId;
@@ -29,9 +32,11 @@ public class ModuleMetadataRelation extends StandardSortableEntity {
     @Column(name = "relation_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Relation alias")
     private String relationAlias;
 
-    @Column(name = "auto_populate", type = ColumnType.BOOLEAN, comment = "Auto populate child records")
-    private Boolean autoPopulate;
+    @Column(name = "auto_populate", type = ColumnType.BOOLEAN, comment = "Auto populate child records",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean autoPopulate = Boolean.FALSE;
 
-    @Column(name = "cascade_delete", type = ColumnType.BOOLEAN, comment = "Cascade delete child records")
-    private Boolean cascadeDelete;
+    @Column(name = "cascade_delete", type = ColumnType.BOOLEAN, comment = "Cascade delete child records",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean cascadeDelete = Boolean.FALSE;
 }

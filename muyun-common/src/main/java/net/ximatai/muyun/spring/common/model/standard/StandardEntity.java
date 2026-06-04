@@ -3,7 +3,9 @@ package net.ximatai.muyun.spring.common.model.standard;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Id;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
@@ -22,11 +24,13 @@ public abstract class StandardEntity implements EntityContract {
     @Column(name = "tenant_id", type = ColumnType.VARCHAR, length = 64, comment = "Tenant id")
     private String tenantId;
 
-    @Column(name = "version", type = ColumnType.INT, comment = "Optimistic lock version")
-    private Integer version;
+    @Column(name = "version", type = ColumnType.INT, comment = "Optimistic lock version",
+            defaultVal = @Default(number = 0))
+    private Integer version = 0;
 
-    @Column(name = "deleted", type = ColumnType.BOOLEAN, comment = "Soft delete flag")
-    private Boolean deleted;
+    @Column(name = "deleted", type = ColumnType.BOOLEAN, comment = "Soft delete flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean deleted = Boolean.FALSE;
 
     @Column(name = "deleted_at", type = ColumnType.TIMESTAMP, comment = "Deleted at")
     private Instant deletedAt;

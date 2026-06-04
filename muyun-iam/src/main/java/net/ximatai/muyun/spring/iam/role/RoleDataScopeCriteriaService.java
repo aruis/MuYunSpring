@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
@@ -50,43 +49,37 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         if (grants.isEmpty()) {
             return DataScopeCriteriaResult.restricted(combine(base, denied()));
         }
-        Set<String> crossTenantRoleIds = roleService.allTenantScopeRoleIds(grants.stream()
-                .map(RoleAction::getRoleId)
-                .toList());
-        boolean hasCrossTenantRole = !crossTenantRoleIds.isEmpty();
-        boolean crossTenant = false;
-        Criteria scope = Criteria.of();
+        return combineGrantedScopes(base, user, grants);
+    }
+
+    private DataScopeCriteriaResult combineGrantedScopes(Criteria base, CurrentUser user, List<RoleAction> grants) {
+        boolean hasCrossTenantGrant = grants.stream().anyMatch(this::allowsCrossTenant);
+        Criteria combinedScope = Criteria.of();
+        boolean contributedCrossTenantScope = false;
+
         for (RoleAction grant : grants) {
-            boolean grantCrossTenant = crossTenantRoleIds.contains(grant.getRoleId());
-            DataScopePolicy policy = normalizePolicy(grant);
-            if (policy == DataScopePolicy.ALL) {
-                if (grantCrossTenant) {
-                    return DataScopeCriteriaResult.crossTenantUnrestricted(base);
+            GrantScope grantScope = resolveGrantScope(grant, user);
+            if (grantScope.allData()) {
+                DataScopeCriteriaResult result = resolveAllScope(base, grantScope.crossTenant(), hasCrossTenantGrant);
+                if (result != null) {
+                    return result;
                 }
-                if (hasCrossTenantRole) {
-                    appendCurrentTenantScope(scope, user);
-                } else {
-                    return DataScopeCriteriaResult.unrestricted(base);
-                }
+                appendCurrentTenantScope(combinedScope, user);
                 continue;
             }
-            Criteria grantScope = Criteria.of();
-            appendScope(grantScope, grant, user);
-            if (grantScope.isEmpty()) {
+            if (!grantScope.contributes()) {
                 continue;
             }
-            if (hasCrossTenantRole && !grantCrossTenant) {
-                scope.orGroup(currentTenantScoped(grantScope, user).getRoot());
-            } else {
-                crossTenant = crossTenant || grantCrossTenant;
-                scope.orGroup(grantScope.getRoot());
-            }
+            appendGrantScope(combinedScope, grantScope, user, hasCrossTenantGrant);
+            contributedCrossTenantScope = contributedCrossTenantScope || grantScope.crossTenant();
         }
-        if (scope.isEmpty()) {
+
+        if (combinedScope.isEmpty()) {
             return DataScopeCriteriaResult.restricted(combine(base, denied()));
         }
-        Criteria scoped = combine(base, scope);
-        return crossTenant
+
+        Criteria scoped = combine(base, combinedScope);
+        return contributedCrossTenantScope
                 ? DataScopeCriteriaResult.crossTenantRestricted(scoped)
                 : DataScopeCriteriaResult.restricted(scoped);
     }
@@ -99,8 +92,46 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         return resolveReadScope(moduleAlias, actionCode, criteria, currentUser).criteria();
     }
 
-    private void appendScope(Criteria scope, RoleAction grant, CurrentUser user) {
-        switch (normalizePolicy(grant)) {
+    private DataScopeCriteriaResult resolveAllScope(Criteria base,
+                                                    boolean grantCrossTenant,
+                                                    boolean hasCrossTenantGrant) {
+        if (grantCrossTenant) {
+            return DataScopeCriteriaResult.crossTenantUnrestricted(base);
+        }
+        if (!hasCrossTenantGrant) {
+            return DataScopeCriteriaResult.unrestricted(base);
+        }
+        return null;
+    }
+
+    private void appendGrantScope(Criteria combinedScope,
+                                  GrantScope grantScope,
+                                  CurrentUser user,
+                                  boolean hasCrossTenantGrant) {
+        if (hasCrossTenantGrant && !grantScope.crossTenant()) {
+            combinedScope.orGroup(currentTenantScoped(grantScope.criteria(), user).getRoot());
+            return;
+        }
+        combinedScope.orGroup(grantScope.criteria().getRoot());
+    }
+
+    private GrantScope resolveGrantScope(RoleAction grant, CurrentUser user) {
+        DataScopePolicy policy = normalizePolicy(grant);
+        if (policy == DataScopePolicy.ALL) {
+            return GrantScope.all(allowsCrossTenant(grant));
+        }
+        Criteria criteria = criteriaForPolicy(policy, user);
+        return GrantScope.restricted(criteria, allowsCrossTenant(grant));
+    }
+
+    private Criteria criteriaForPolicy(DataScopePolicy policy, CurrentUser user) {
+        Criteria scope = Criteria.of();
+        appendScope(scope, policy, user);
+        return scope;
+    }
+
+    private void appendScope(Criteria scope, DataScopePolicy policy, CurrentUser user) {
+        switch (normalizePolicy(policy)) {
             case OWNER -> scope.orEq(PlatformAbilityFields.AUTH_USER_FIELD, user.userId());
             case ASSIGNEE -> scope.orRaw(csvContains(PlatformAbilityFields.AUTH_ASSIGNEE_COLUMN, "userId", user.userId()));
             case MEMBER -> scope.orRaw(csvContains(PlatformAbilityFields.AUTH_MEMBER_COLUMN, "userId", user.userId()));
@@ -152,6 +183,14 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         return grant.getDataScopePolicy() == null ? DataScopePolicy.NONE : grant.getDataScopePolicy();
     }
 
+    private DataScopePolicy normalizePolicy(DataScopePolicy policy) {
+        return policy == null ? DataScopePolicy.NONE : policy;
+    }
+
+    private boolean allowsCrossTenant(RoleAction grant) {
+        return grant != null && grant.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS;
+    }
+
     private SqlRawCondition csvContains(String columnName, String paramName, String value) {
         return SqlRawCondition.of(
                 "CONCAT(',', " + columnName + ", ',') LIKE :" + paramName,
@@ -173,5 +212,23 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         return Criteria.of()
                 .andGroup(base.getRoot())
                 .andGroup(scope.getRoot());
+    }
+
+    private record GrantScope(Criteria criteria, boolean allData, boolean crossTenant) {
+        private GrantScope {
+            criteria = criteria == null ? Criteria.of() : criteria;
+        }
+
+        static GrantScope all(boolean crossTenant) {
+            return new GrantScope(Criteria.of(), true, crossTenant);
+        }
+
+        static GrantScope restricted(Criteria criteria, boolean crossTenant) {
+            return new GrantScope(criteria, false, crossTenant);
+        }
+
+        boolean contributes() {
+            return allData || !criteria.isEmpty();
+        }
     }
 }

@@ -4,7 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
@@ -25,6 +27,10 @@ public class RoleAction extends StandardEntity {
     @Column(name = "data_scope_policy", type = ColumnType.VARCHAR, length = 32, comment = "Data scope policy")
     private DataScopePolicy dataScopePolicy;
 
+    @Column(name = "tenant_scope_policy", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Tenant scope policy", defaultVal = @Default(varchar = "currentTenant"))
+    private TenantScopePolicy tenantScopePolicy = TenantScopePolicy.CURRENT_TENANT;
+
     @Column(name = "scope_condition", type = ColumnType.TEXT, comment = "Custom data scope condition")
     private String scopeCondition;
 
@@ -34,6 +40,7 @@ public class RoleAction extends StandardEntity {
     @Column(name = "reference_action_code", type = ColumnType.VARCHAR, length = 64, comment = "Reference action code")
     private String referenceActionCode;
 
-    @Column(name = "enabled", type = ColumnType.BOOLEAN, nullable = false, comment = "Enabled flag")
-    private Boolean enabled;
+    @Column(name = "enabled", type = ColumnType.BOOLEAN, nullable = false, comment = "Enabled flag",
+            defaultVal = @Default(bool = TrueOrFalse.TRUE))
+    private Boolean enabled = Boolean.TRUE;
 }

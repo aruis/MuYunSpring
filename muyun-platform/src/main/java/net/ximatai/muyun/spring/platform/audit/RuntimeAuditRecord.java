@@ -4,7 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
@@ -73,8 +75,9 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "error_type", type = ColumnType.VARCHAR, length = 256, comment = "Action failure error type")
     private String errorType;
 
-    @Column(name = "system_context", type = ColumnType.BOOLEAN, nullable = false, comment = "System context flag")
-    private Boolean systemContext;
+    @Column(name = "system_context", type = ColumnType.BOOLEAN, nullable = false, comment = "System context flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean systemContext = Boolean.FALSE;
 
     @Column(name = "system_reason", type = ColumnType.VARCHAR, length = 256, comment = "System context reason")
     private String systemReason;

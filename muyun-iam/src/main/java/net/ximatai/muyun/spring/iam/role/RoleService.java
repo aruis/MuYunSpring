@@ -64,9 +64,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getRoleKind() == null) {
             role.setRoleKind(RoleKind.STANDARD);
         }
-        if (role.getTenantScopePolicy() == null) {
-            role.setTenantScopePolicy(TenantScopePolicy.CURRENT_TENANT);
-        }
         if (role.getPublicRole() == null) {
             role.setPublicRole(false);
         }
@@ -76,32 +73,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             role.setMemberRoleIds(normalizeRoleIdCsv(role.getMemberRoleIds()));
             validateGroupMembers(role.getMemberRoleIds());
         }
-    }
-
-    public boolean hasAllTenantScope(String userId) {
-        return effectiveRoleIds(userId).stream()
-                .map(this::select)
-                .filter(Objects::nonNull)
-                .anyMatch(role -> role.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS);
-    }
-
-    public boolean hasAllTenantScopeByRoleIds(java.util.Collection<String> roleIds) {
-        return !allTenantScopeRoleIds(roleIds).isEmpty();
-    }
-
-    public Set<String> allTenantScopeRoleIds(java.util.Collection<String> roleIds) {
-        if (roleIds == null || roleIds.isEmpty()) {
-            return Set.of();
-        }
-        return roleIds.stream()
-                .filter(roleId -> roleId != null && !roleId.isBlank())
-                .map(String::trim)
-                .distinct()
-                .filter(roleId -> {
-                    Role role = select(roleId);
-                    return role != null && role.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS;
-                })
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     public String bindUser(String roleId, String userId) {
@@ -125,13 +96,23 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public int grantAction(String roleId, String moduleAlias, String actionCode) {
-        return grantAction(roleId, moduleAlias, actionCode, null, null, null, null);
+        return grantAction(roleId, moduleAlias, actionCode, null,
+                TenantScopePolicy.CURRENT_TENANT, null, null, null);
     }
 
     public int grantAction(String roleId,
                            String moduleAlias,
                            String actionCode,
                            DataScopePolicy dataScopePolicy,
+                           TenantScopePolicy tenantScopePolicy) {
+        return grantAction(roleId, moduleAlias, actionCode, dataScopePolicy, tenantScopePolicy, null, null, null);
+    }
+
+    public int grantAction(String roleId,
+                           String moduleAlias,
+                           String actionCode,
+                           DataScopePolicy dataScopePolicy,
+                           TenantScopePolicy tenantScopePolicy,
                            String scopeCondition,
                            String referenceFieldId,
                            String referenceActionCode) {
@@ -151,6 +132,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             roleAction.setActionCode(validActionCode);
         }
         roleAction.setDataScopePolicy(normalizeDataScopePolicy(dataScopePolicy, scopeCondition, referenceFieldId));
+        roleAction.setTenantScopePolicy(normalizeTenantScopePolicy(tenantScopePolicy));
         roleAction.setScopeCondition(normalizeBlank(scopeCondition));
         roleAction.setReferenceFieldId(normalizeBlank(referenceFieldId));
         roleAction.setReferenceActionCode(normalizeBlank(referenceActionCode));
@@ -399,6 +381,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             Preconditions.requireText(referenceFieldId, "referenceFieldId");
         }
         return policy;
+    }
+
+    private TenantScopePolicy normalizeTenantScopePolicy(TenantScopePolicy tenantScopePolicy) {
+        return tenantScopePolicy == null ? TenantScopePolicy.CURRENT_TENANT : tenantScopePolicy;
     }
 
     private String normalizeRoleIdCsv(String value) {

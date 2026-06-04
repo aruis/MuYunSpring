@@ -4,7 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.CompositeIndex;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
@@ -30,11 +32,13 @@ public class MetadataFieldReferenceConfig extends StandardEntity {
     @Column(name = "target_metadata_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Target metadata id")
     private String targetMetadataId;
 
-    @Column(name = "cardinality", type = ColumnType.VARCHAR, length = 16, nullable = false, comment = "Reference cardinality")
-    private ReferenceCardinality cardinality;
+    @Column(name = "cardinality", type = ColumnType.VARCHAR, length = 16, nullable = false,
+            comment = "Reference cardinality", defaultVal = @Default(varchar = "ONE"))
+    private ReferenceCardinality cardinality = ReferenceCardinality.ONE;
 
-    @Column(name = "auto_title", type = ColumnType.BOOLEAN, comment = "Auto populate title")
-    private Boolean autoTitle;
+    @Column(name = "auto_title", type = ColumnType.BOOLEAN, comment = "Auto populate title",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean autoTitle = Boolean.FALSE;
 
     @Column(name = "title_output_field", type = ColumnType.VARCHAR, length = 64, comment = "Title output field")
     private String titleOutputField;

@@ -3,7 +3,9 @@ package net.ximatai.muyun.spring.platform.metadata;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 
@@ -23,6 +25,7 @@ public class Metadata extends StandardEnabledSortableEntity {
     @Column(name = "table_name", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Physical table name")
     private String tableName;
 
-    @Column(name = "data_scope_enabled", type = ColumnType.BOOLEAN, comment = "Data scope enabled")
-    private Boolean dataScopeEnabled;
+    @Column(name = "data_scope_enabled", type = ColumnType.BOOLEAN, comment = "Data scope enabled",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean dataScopeEnabled = Boolean.FALSE;
 }

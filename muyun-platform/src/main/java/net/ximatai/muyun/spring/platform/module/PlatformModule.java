@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.module;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
@@ -22,8 +23,9 @@ public class PlatformModule extends StandardEnabledTreeEntity {
     @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Application alias")
     private String applicationAlias;
 
-    @Column(name = "module_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module kind")
-    private ModuleKind moduleKind;
+    @Column(name = "module_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module kind",
+            defaultVal = @Default(varchar = "static"))
+    private ModuleKind moduleKind = ModuleKind.STATIC;
 
     public String getAlias() {
         return getId();
