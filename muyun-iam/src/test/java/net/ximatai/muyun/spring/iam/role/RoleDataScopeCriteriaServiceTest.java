@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopePlan;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -460,7 +462,7 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
-    void shouldDefaultReferenceDependencyActionToQuery() {
+    void shouldDefaultReferenceDependencyActionToReference() {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
                 referenceGrant("studentId", null)
@@ -468,10 +470,11 @@ class RoleDataScopeCriteriaServiceTest {
         when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.OWNER)
         ));
+        AtomicReference<String> requestedAction = new AtomicReference<>();
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
                 roleService,
                 Optional.empty(),
-                Optional.of(referenceResolver("studentId", "school.student", "student"))
+                Optional.of(referenceResolver("studentId", "school.student", "student", requestedAction))
         );
 
         Criteria scoped = service.applyReadScope(
@@ -482,6 +485,7 @@ class RoleDataScopeCriteriaServiceTest {
         );
 
         assertThat(compile(scoped).getSql()).contains("\"studentId\" IN (SELECT \"id\"");
+        assertThat(requestedAction).hasValue(PlatformAction.REFERENCE.code());
     }
 
     @Test
@@ -559,7 +563,15 @@ class RoleDataScopeCriteriaServiceTest {
     private ReferenceDependencyScopeResolver referenceResolver(String sourceField,
                                                               String targetModuleAlias,
                                                               String targetEntityAlias) {
+        return referenceResolver(sourceField, targetModuleAlias, targetEntityAlias, new AtomicReference<>());
+    }
+
+    private ReferenceDependencyScopeResolver referenceResolver(String sourceField,
+                                                              String targetModuleAlias,
+                                                              String targetEntityAlias,
+                                                              AtomicReference<String> requestedAction) {
         return request -> {
+            requestedAction.set(request.referenceActionCode());
             if (!sourceField.equals(request.referenceFieldId())) {
                 return Optional.empty();
             }

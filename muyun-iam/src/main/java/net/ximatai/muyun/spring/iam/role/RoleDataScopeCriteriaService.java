@@ -374,7 +374,7 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
 
     private String normalizeReferenceActionCode(RoleAction grant) {
         String actionCode = grant == null ? null : grant.getReferenceActionCode();
-        return actionCode == null || actionCode.isBlank() ? PlatformAction.QUERY.code() : actionCode.trim();
+        return actionCode == null || actionCode.isBlank() ? PlatformAction.REFERENCE.code() : actionCode.trim();
     }
 
     private String where(CompiledCriteria criteria) {
