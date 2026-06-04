@@ -3,16 +3,22 @@ package net.ximatai.muyun.spring.platform.menu;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class MenuService extends AbstractAbilityService<Menu> implements
@@ -23,11 +29,21 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private final MenuSchemeService schemeService;
     private final PlatformModuleService moduleService;
+    private final MenuVisibilityPolicyService visibilityPolicyService;
 
     public MenuService(BaseDao<Menu, String> menuDao, MenuSchemeService schemeService, PlatformModuleService moduleService) {
+        this(menuDao, schemeService, moduleService, Optional.empty());
+    }
+
+    @Autowired
+    public MenuService(BaseDao<Menu, String> menuDao,
+                       MenuSchemeService schemeService,
+                       PlatformModuleService moduleService,
+                       Optional<MenuVisibilityPolicyService> visibilityPolicyService) {
         super(MODULE_ALIAS, Menu.class, menuDao);
         this.schemeService = schemeService;
         this.moduleService = moduleService;
+        this.visibilityPolicyService = visibilityPolicyService.orElseGet(MenuVisibilityPolicyService::denyAll);
     }
 
     @Override
@@ -71,6 +87,41 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             return List.of();
         }
         return TreeAbility.super.children(schemeScope(schemeId), parentId);
+    }
+
+    public List<Menu> visibleRootMenus(String schemeId) {
+        return visibleChildren(schemeId, TreeAbility.ROOT_ID, new LinkedHashSet<>());
+    }
+
+    public List<Menu> visibleChildren(String schemeId, String parentId) {
+        return visibleChildren(schemeId, parentId, new LinkedHashSet<>());
+    }
+
+    private List<Menu> visibleChildren(String schemeId, String parentId, Set<String> visiting) {
+        return children(schemeId, parentId).stream()
+                .filter(menu -> isVisibleMenu(schemeId, menu, visiting))
+                .toList();
+    }
+
+    private boolean isVisibleMenu(String schemeId, Menu menu, Set<String> visiting) {
+        if (menu == null || !Boolean.TRUE.equals(menu.getEnabled())) {
+            return false;
+        }
+        if (!visiting.add(menu.getId())) {
+            return false;
+        }
+        MenuType type = menu.getMenuType() == null ? MenuType.GROUP : menu.getMenuType();
+        try {
+            if (type == MenuType.MODULE) {
+                return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
+            }
+            if (type == MenuType.GROUP) {
+                return !visibleChildren(schemeId, menu.getId(), visiting).isEmpty();
+            }
+            return true;
+        } finally {
+            visiting.remove(menu.getId());
+        }
     }
 
     private void normalizeAndValidate(Menu menu) {

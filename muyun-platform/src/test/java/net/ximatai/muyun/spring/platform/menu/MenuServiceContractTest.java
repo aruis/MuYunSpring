@@ -2,14 +2,19 @@ package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,6 +33,12 @@ class MenuServiceContractTest {
             insertModule("crm.customer");
             insertModule("crm.contract");
         }
+    }
+
+    @AfterEach
+    void tearDown() {
+        CurrentUserContext.clear();
+        TenantContext.clear();
     }
 
     @Test
@@ -229,6 +240,57 @@ class MenuServiceContractTest {
             assertThat(menuService.rootMenus(schemeId))
                     .extracting(Menu::getId)
                     .containsExactly(secondId, firstId);
+        }
+    }
+
+    @Test
+    void shouldPruneMenuTreeByModuleVisibilityWithoutChangingMenuModel() {
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.customer".equals(moduleAlias);
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
+        String schemeId;
+        String rootId;
+        String customerId;
+        String contractId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            rootId = scopedMenuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
+            customerId = scopedMenuService.insert(moduleMenu(schemeId, "客户", rootId, "crm.customer"));
+            contractId = scopedMenuService.insert(moduleMenu(schemeId, "合同", rootId, "crm.contract"));
+
+            assertThat(scopedMenuService.visibleRootMenus(schemeId)).extracting(Menu::getId).containsExactly(rootId);
+            assertThat(scopedMenuService.visibleChildren(schemeId, rootId)).extracting(Menu::getId).containsExactly(customerId);
+            assertThat(scopedMenuService.children(schemeId, rootId)).extracting(Menu::getId)
+                    .containsExactly(customerId, contractId);
+        }
+    }
+
+    @Test
+    void shouldFailClosedForModuleMenusWhenNoVisibilityPolicyExists() {
+        String schemeId;
+        String rootId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            rootId = menuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
+            menuService.insert(moduleMenu(schemeId, "客户", rootId, "crm.customer"));
+
+            assertThat(menuService.visibleRootMenus(schemeId)).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldHideGroupWhenAllDescendantsArePruned() {
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> false;
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
+        String schemeId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            String rootId = scopedMenuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
+            scopedMenuService.insert(moduleMenu(schemeId, "客户", rootId, "crm.customer"));
+
+            assertThat(scopedMenuService.visibleRootMenus(schemeId)).isEmpty();
         }
     }
 
