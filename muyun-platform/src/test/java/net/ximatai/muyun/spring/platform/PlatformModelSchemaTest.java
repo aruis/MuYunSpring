@@ -10,7 +10,6 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
@@ -91,14 +90,9 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(MetadataViewField.class)))
                 .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "read_only",
                         "required_override", "title", "enabled", "sort_order");
-        assertThat(columnNames(mapper.toTable(ModuleMetadataAction.class)))
-                .contains("id", "relation_id", "action_code", "category", "action_level",
-                        "access_mode", "action_auth", "data_auth", "auth_inherit_action_code",
-                        "available_expression", "unavailable_message", "executor_type", "executor_key",
-                        "target_metadata_id", "config_id", "system_managed", "title", "enabled", "sort_order")
-                .doesNotContain("permission_code", "alias");
         assertThat(columnNames(mapper.toTable(PlatformModuleAction.class)))
-                .contains("id", "module_alias", "action_code", "permission_action_code", "title",
+                .contains("id", "module_alias", "entity_alias", "action_code", "permission_action_code", "title",
+                        "category", "available_expression", "unavailable_message", "executor_type", "executor_key",
                         "action_level", "access_mode", "action_auth", "data_auth", "default_grant_policy",
                         "system_managed", "enabled", "sort_order")
                 .doesNotContain("relation_id", "permission_code", "alias");
@@ -168,8 +162,6 @@ class PlatformModelSchemaTest {
         assertThat(columnDefault(mapper.toTable(Menu.class), "menu_type")).isEqualTo("'group'");
         assertThat(columnDefault(mapper.toTable(ModuleMetadataRelation.class), "relation_role")).isEqualTo("'main'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "cardinality")).isEqualTo("'ONE'");
-        assertThat(columnDefault(mapper.toTable(ModuleMetadataAction.class), "access_mode")).isEqualTo("'AUTH_REQUIRED'");
-        assertThat(columnDefault(mapper.toTable(ModuleMetadataAction.class), "action_auth")).isNull();
         assertThat(columnDefault(mapper.toTable(MetadataFieldConfig.class), "queryable")).isNull();
         assertThat(columnDefault(mapper.toTable(MetadataField.class), "required")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(MetadataViewField.class), "visible")).isEqualTo("TRUE");

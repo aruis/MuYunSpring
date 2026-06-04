@@ -30,8 +30,6 @@ import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
@@ -53,6 +51,8 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -144,9 +144,9 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewField statusViewField = metadataViewField(formViewId, status.getId());
         statusViewField.setControlType(ViewControlType.SELECT);
         services.viewFieldService.insert(statusViewField);
-        ModuleMetadataAction createAction = metadataAction(mainRelationId, "create");
+        PlatformModuleAction createAction = moduleAction("crm.customer", "customer", "create");
         services.actionService.insert(createAction);
-        ModuleMetadataAction submitAction = metadataAction(mainRelationId, "submit");
+        PlatformModuleAction submitAction = moduleAction("crm.customer", "customer", "submit");
         submitAction.setAvailableExpression("{title} != ''");
         submitAction.setUnavailableMessage("客户名称不能为空");
         services.actionService.insert(submitAction);
@@ -287,7 +287,7 @@ class PlatformDynamicModulePublisherIT {
         TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataView> viewDao = new TestMemoryDao<>();
         TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
-        TestMemoryDao<ModuleMetadataAction> actionDao = new TestMemoryDao<>();
+        TestMemoryDao<PlatformModuleAction> actionDao = new TestMemoryDao<>();
         TestMemoryDao<ModuleMetadataFormulaRule> formulaRuleDao = new TestMemoryDao<>();
         TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
         TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
@@ -316,7 +316,7 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
         MetadataViewFieldService viewFieldService =
                 new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
-        ModuleMetadataActionService actionService = new ModuleMetadataActionService(actionDao, relationService, fieldService);
+        PlatformModuleActionService actionService = new PlatformModuleActionService(actionDao, moduleService);
         ModuleMetadataFormulaRuleService formulaRuleService =
                 new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
         MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
@@ -397,9 +397,10 @@ class PlatformDynamicModulePublisherIT {
         return viewField;
     }
 
-    private ModuleMetadataAction metadataAction(String relationId, String alias) {
-        ModuleMetadataAction action = new ModuleMetadataAction();
-        action.setRelationId(relationId);
+    private PlatformModuleAction moduleAction(String moduleAlias, String entityAlias, String alias) {
+        PlatformModuleAction action = new PlatformModuleAction();
+        action.setModuleAlias(moduleAlias);
+        action.setEntityAlias(entityAlias);
         action.setActionCode(alias);
         return action;
     }
@@ -492,7 +493,7 @@ class PlatformDynamicModulePublisherIT {
                                     DictionaryItemService itemService,
                                     MetadataViewService viewService,
                                     MetadataViewFieldService viewFieldService,
-                                    ModuleMetadataActionService actionService,
+                                    PlatformModuleActionService actionService,
                                     ModuleMetadataFormulaRuleService formulaRuleService) {
     }
 

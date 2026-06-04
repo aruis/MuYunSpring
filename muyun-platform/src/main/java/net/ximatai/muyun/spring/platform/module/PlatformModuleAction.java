@@ -11,6 +11,8 @@ import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 
 @Getter
@@ -24,12 +26,18 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity {
     @Column(name = "action_code", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Action code")
     private String actionCode;
 
+    @Column(name = "entity_alias", type = ColumnType.VARCHAR, length = 64, comment = "Target entity alias")
+    private String entityAlias;
+
     @Column(name = "permission_action_code", type = ColumnType.VARCHAR, length = 64,
             comment = "Permission action code")
     private String permissionActionCode;
 
     @Column(name = "title", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Action title")
     private String title;
+
+    @Column(name = "category", type = ColumnType.VARCHAR, length = 32, comment = "Action category")
+    private EntityActionCategory category;
 
     @Column(name = "action_level", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Action execution level")
@@ -50,6 +58,18 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity {
     @Column(name = "default_grant_policy", type = ColumnType.VARCHAR, length = 32,
             comment = "Default action grant policy")
     private ActionDefaultGrantPolicy defaultGrantPolicy;
+
+    @Column(name = "available_expression", type = ColumnType.TEXT, comment = "Availability expression")
+    private String availableExpression;
+
+    @Column(name = "unavailable_message", type = ColumnType.VARCHAR, length = 256, comment = "Unavailable message")
+    private String unavailableMessage;
+
+    @Column(name = "executor_type", type = ColumnType.VARCHAR, length = 32, comment = "Action executor type")
+    private EntityActionExecutorType executorType;
+
+    @Column(name = "executor_key", type = ColumnType.VARCHAR, length = 128, comment = "Action executor key")
+    private String executorKey;
 
     @Column(name = "system_managed", comment = "Whether action is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))

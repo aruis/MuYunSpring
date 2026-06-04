@@ -13,7 +13,7 @@ import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -86,18 +86,26 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
         action.setModuleAlias(moduleAlias);
         action.setActionCode(PlatformNameRules.requireActionCode(action.getActionCode(), "actionCode"));
+        if (action.getEntityAlias() != null && action.getEntityAlias().isBlank()) {
+            action.setEntityAlias(null);
+        }
+        if (action.getEntityAlias() != null) {
+            action.setEntityAlias(PlatformNameRules.requireIdentifier(action.getEntityAlias(), "entityAlias"));
+        }
         if (action.getPermissionActionCode() != null && action.getPermissionActionCode().isBlank()) {
             action.setPermissionActionCode(null);
         }
-        if (action.getPermissionActionCode() != null) {
-            action.setPermissionActionCode(PlatformNameRules.requireActionCode(
-                    action.getPermissionActionCode(), "permissionActionCode"));
-        }
+        action.setPermissionActionCode(action.getPermissionActionCode() == null
+                ? action.getActionCode()
+                : PlatformNameRules.requireActionCode(action.getPermissionActionCode(), "permissionActionCode"));
         if (action.getTitle() == null || action.getTitle().isBlank()) {
             action.setTitle(action.getActionCode());
         }
+        if (action.getCategory() == null) {
+            action.setCategory(EntityActionDefinition.defaultCategory(action.getActionCode()));
+        }
         if (action.getActionLevel() == null) {
-            action.setActionLevel(EntityActionLevel.ANY);
+            action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getCategory()));
         }
         if (action.getAccessMode() == null) {
             action.setAccessMode(EntityActionAccessMode.AUTH_REQUIRED);
@@ -107,6 +115,21 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
         if (action.getDataAuth() == null) {
             action.setDataAuth(false);
+        }
+        if (action.getDefaultGrantPolicy() == null) {
+            action.setDefaultGrantPolicy(net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy.NONE);
+        }
+        if (action.getAvailableExpression() != null && action.getAvailableExpression().isBlank()) {
+            action.setAvailableExpression(null);
+        }
+        if (action.getUnavailableMessage() != null && action.getUnavailableMessage().isBlank()) {
+            action.setUnavailableMessage(null);
+        }
+        if (action.getExecutorType() == null) {
+            action.setExecutorType(EntityActionDefinition.defaultExecutorType(action.getCategory()));
+        }
+        if (action.getExecutorKey() != null && action.getExecutorKey().isBlank()) {
+            action.setExecutorKey(null);
         }
         if (action.getSystemManaged() == null) {
             action.setSystemManaged(false);

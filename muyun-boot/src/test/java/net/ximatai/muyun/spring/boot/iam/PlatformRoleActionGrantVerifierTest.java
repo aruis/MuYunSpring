@@ -1,13 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -19,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,8 +24,7 @@ class PlatformRoleActionGrantVerifierTest {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                mock(ModuleMetadataRelationService.class),
-                mock(ModuleMetadataActionService.class)
+                mock(PlatformModuleActionService.class)
         );
 
         assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
@@ -41,33 +33,30 @@ class PlatformRoleActionGrantVerifierTest {
     }
 
     @Test
-    void shouldAllowStandardPlatformActionForExistingModule() {
+    void shouldAllowStandardPlatformActionForStaticModuleWithoutRegisteredActions() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        when(moduleService.resolveVisibleModule("sales.contract")).thenReturn(new PlatformModule());
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                relationService,
-                mock(ModuleMetadataActionService.class)
+                moduleActionService
         );
 
         verifier.requireGrantable("sales.contract", "query");
-
-        verify(relationService, never()).list(any(Criteria.class), any(PageRequest.class));
     }
 
     @Test
-    void shouldRejectUndeclaredPlatformActionForStaticModule() {
+    void shouldRejectUndeclaredPlatformActionForStaticModuleWithoutRegisteredActions() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         when(moduleService.resolveVisibleModule("sales.contract"))
                 .thenReturn(module("sales.contract", ModuleKind.STATIC));
-        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                relationService,
-                actionService,
+                moduleActionService,
                 new StaticModuleActionRegistry(Map.of("sales.contract", List.of(PlatformAction.QUERY)))
         );
 
@@ -78,47 +67,8 @@ class PlatformRoleActionGrantVerifierTest {
     }
 
     @Test
-    void shouldAllowConfiguredCustomAction() {
-        PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
-        when(moduleService.resolveVisibleModule("sales.contract")).thenReturn(new PlatformModule());
-        when(relationService.list(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(relation("rel-1")));
-        when(actionService.listByRelationIds(List.of("rel-1")))
-                .thenReturn(List.of(action("submit", true, true)));
-        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
-                moduleService,
-                relationService,
-                actionService
-        );
-
-        verifier.requireGrantable("sales.contract", "submit");
-    }
-
-    @Test
-    void shouldRequireConfiguredActionForDynamicModuleEvenWhenActionIsPlatformStandard() {
-        PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
-        when(moduleService.resolveVisibleModule("sales.contract"))
-                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
-        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
-        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
-                moduleService,
-                relationService,
-                actionService
-        );
-
-        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("configured module action");
-    }
-
-    @Test
     void shouldAllowRegisteredModuleAction() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         when(moduleService.resolveVisibleModule("iam.user"))
                 .thenReturn(module("iam.user", ModuleKind.STATIC));
@@ -126,21 +76,16 @@ class PlatformRoleActionGrantVerifierTest {
                 .thenReturn(List.of(moduleAction("changePassword", true)));
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                relationService,
-                mock(ModuleMetadataActionService.class),
                 moduleActionService,
                 new StaticModuleActionRegistry(Map.of("iam.user", List.of()))
         );
 
         verifier.requireGrantable("iam.user", "changePassword");
-
-        verify(relationService, never()).list(any(Criteria.class), any(PageRequest.class));
     }
 
     @Test
     void shouldRejectStaticActionMissingFromRegisteredModuleActions() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         when(moduleService.resolveVisibleModule("iam.user"))
                 .thenReturn(module("iam.user", ModuleKind.STATIC));
@@ -148,8 +93,6 @@ class PlatformRoleActionGrantVerifierTest {
                 .thenReturn(List.of(moduleAction("query", true)));
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                relationService,
-                mock(ModuleMetadataActionService.class),
                 moduleActionService,
                 new StaticModuleActionRegistry(Map.of("iam.user", List.of(PlatformAction.TREE)))
         );
@@ -158,62 +101,61 @@ class PlatformRoleActionGrantVerifierTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
 
-        verify(relationService, never()).list(any(Criteria.class), any(PageRequest.class));
+        verify(moduleActionService).listByModuleAliases(List.of("iam.user"));
     }
 
     @Test
-    void shouldAllowConfiguredPlatformActionForDynamicModule() {
+    void shouldRequireRegisteredActionForDynamicModuleEvenWhenActionIsPlatformStandard() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         when(moduleService.resolveVisibleModule("sales.contract"))
                 .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
-        when(relationService.list(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(relation("rel-1")));
-        when(actionService.listByRelationIds(List.of("rel-1")))
-                .thenReturn(List.of(action("query", true, true)));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract"))).thenReturn(List.of());
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
                 moduleService,
-                relationService,
-                actionService
+                moduleActionService
         );
 
-        verifier.requireGrantable("sales.contract", "query");
+        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("configured module action");
     }
 
     @Test
-    void shouldRejectCustomActionThatDoesNotParticipateInActionAuth() {
+    void shouldRejectRegisteredActionThatDoesNotParticipateInActionAuth() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
-        when(moduleService.resolveVisibleModule("sales.contract")).thenReturn(new PlatformModule());
-        when(relationService.list(any(Criteria.class), any(PageRequest.class)))
-                .thenReturn(List.of(relation("rel-1")));
-        when(actionService.listByRelationIds(List.of("rel-1")))
-                .thenReturn(List.of(action("submit", false, true)));
-        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
-                moduleService,
-                relationService,
-                actionService
-        );
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract")))
+                .thenReturn(List.of(moduleAction("submit", false)));
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(moduleService, moduleActionService);
 
         assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "submit"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
     }
 
-    private ModuleMetadataRelation relation(String id) {
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId(id);
-        return relation;
-    }
+    @Test
+    void shouldNotUseStaticFallbackWhenRegisteredActionsExist() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        when(moduleService.resolveVisibleModule("iam.user"))
+                .thenReturn(module("iam.user", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("iam.user")))
+                .thenReturn(List.of(moduleAction("query", true)));
+        StaticModuleActionRegistry registry = mock(StaticModuleActionRegistry.class);
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
+                moduleService,
+                moduleActionService,
+                registry
+        );
 
-    private ModuleMetadataAction action(String actionCode, Boolean actionAuth, Boolean enabled) {
-        ModuleMetadataAction action = new ModuleMetadataAction();
-        action.setActionCode(actionCode);
-        action.setActionAuth(actionAuth);
-        action.setEnabled(enabled);
-        return action;
+        assertThatThrownBy(() -> verifier.requireGrantable("iam.user", "tree"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("configured module action");
+
+        verify(registry, never()).isGrantable("iam.user", PlatformAction.TREE);
     }
 
     private PlatformModuleAction moduleAction(String actionCode, boolean actionAuth) {
