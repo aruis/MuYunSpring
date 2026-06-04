@@ -32,7 +32,7 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     @PostMapping("/changePassword/{id}")
-    @CustomActionEndpoint(value = UserAccountStaticActions.CHANGE_PASSWORD, title = "修改密码",
+    @CustomActionEndpoint(value = "changePassword", title = "修改密码",
             level = PlatformActionLevel.RECORD, dataAuth = true)
     public WebCountResponse changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {

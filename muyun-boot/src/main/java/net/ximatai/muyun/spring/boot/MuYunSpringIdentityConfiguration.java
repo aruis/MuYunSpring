@@ -1,7 +1,6 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
-import net.ximatai.muyun.spring.boot.iam.UserAccountStaticActions;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
