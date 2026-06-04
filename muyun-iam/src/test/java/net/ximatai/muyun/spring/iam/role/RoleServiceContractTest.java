@@ -130,6 +130,79 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldGrantWildcardDataScopeActionOnlyOnWildcardRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("ra1");
+        RoleService service = service(roleDao, mock(RoleUserDao.class), actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantWildcardDataScopeAction(
+                    "scope-1", "query", DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT)).isEqualTo(1);
+        }
+
+        verify(actionDao).insert(argThat(action ->
+                RoleService.WILDCARD_DATA_SCOPE_MODULE_ALIAS.equals(action.getModuleAlias())
+                        && "view".equals(action.getActionCode())
+                        && action.getDataScopePolicy() == DataScopePolicy.OWNER
+                        && Boolean.TRUE.equals(action.getEnabled())));
+    }
+
+    @Test
+    void shouldRejectNestedWildcardPolicyOnWildcardDataScopeRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        RoleService service = service(roleDao, mock(RoleUserDao.class), mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantWildcardDataScopeAction(
+                    "scope-1", "query", DataScopePolicy.WILDCARD, TenantScopePolicy.CURRENT_TENANT))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("standard data scope");
+        }
+    }
+
+    @Test
+    void shouldRejectBusinessActionGrantOnWildcardDataScopeRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        RoleService service = service(roleDao, mock(RoleUserDao.class), mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantAction(
+                    "scope-1", "sales.contract", "query", DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("cannot be granted business action directly");
+        }
+    }
+
+    @Test
+    void shouldAllowCustomActionCodeForWildcardDataScopeTemplate() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("ra1");
+        RoleService service = service(roleDao, mock(RoleUserDao.class), actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantWildcardDataScopeAction(
+                    "scope-1", "approve", DataScopePolicy.ORGANIZATION, TenantScopePolicy.CURRENT_TENANT)).isEqualTo(1);
+        }
+
+        verify(actionDao).insert(argThat(action ->
+                RoleService.WILDCARD_DATA_SCOPE_MODULE_ALIAS.equals(action.getModuleAlias())
+                        && "approve".equals(action.getActionCode())
+                        && action.getDataScopePolicy() == DataScopePolicy.ORGANIZATION));
+    }
+
+    @Test
     void shouldAuthorizeThroughRoleGroupMembers() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleUserDao roleUserDao = mock(RoleUserDao.class);
@@ -148,6 +221,27 @@ class RoleServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThat(service.effectiveRoleIds("user-1")).containsExactly("group-1", "r1");
             assertThat(service.hasActionPermission("user-1", "sales.contract", "query")).isTrue();
+        }
+    }
+
+    @Test
+    void shouldResolveEffectiveWildcardDataScopeGrantFromBoundWildcardRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleUserDao roleUserDao = mock(RoleUserDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleUserDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(roleUser("scope-1", "user-1")));
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        RoleAction grant = enabledAction("ra1", "scope-1", RoleService.WILDCARD_DATA_SCOPE_MODULE_ALIAS, "view");
+        grant.setDataScopePolicy(DataScopePolicy.OWNER);
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(grant));
+        RoleService service = service(roleDao, roleUserDao, actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            RoleAction resolved = service.effectiveWildcardDataScopeGrant("user-1", "query");
+            assertThat(resolved).isSameAs(grant);
         }
     }
 

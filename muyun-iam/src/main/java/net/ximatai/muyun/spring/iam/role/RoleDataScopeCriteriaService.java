@@ -204,11 +204,37 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         if (policy == DataScopePolicy.ALL) {
             return GrantScope.all(allowsCrossTenant(grant));
         }
+        if (policy == DataScopePolicy.WILDCARD) {
+            return resolveWildcardScope(moduleAlias, grant, user, visiting);
+        }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             return resolveReferenceDependencyScope(moduleAlias, grant, user, visiting);
         }
         Criteria criteria = criteriaForPolicy(policy, user);
         return GrantScope.restricted(criteria, allowsCrossTenant(grant));
+    }
+
+    private GrantScope resolveWildcardScope(String moduleAlias,
+                                            RoleAction grant,
+                                            CurrentUser user,
+                                            Set<String> visiting) {
+        RoleAction wildcardGrant = roleService.effectiveWildcardDataScopeGrant(user.userId(), grant.getActionCode());
+        if (wildcardGrant == null) {
+            return GrantScope.none();
+        }
+        DataScopePolicy wildcardPolicy = normalizePolicy(wildcardGrant);
+        if (wildcardPolicy == DataScopePolicy.WILDCARD
+                || wildcardPolicy == DataScopePolicy.CUSTOM
+                || wildcardPolicy == DataScopePolicy.REFERENCE_DEPENDENCY) {
+            return GrantScope.none();
+        }
+        GrantScope resolved = resolveGrantScope(moduleAlias, wildcardGrant, user, visiting);
+        if (!resolved.contributes()) {
+            return GrantScope.none();
+        }
+        return resolved.crossTenant() && !allowsCrossTenant(grant)
+                ? new GrantScope(resolved.criteria(), resolved.allData(), false)
+                : resolved;
     }
 
     private GrantScope resolveReferenceDependencyScope(String moduleAlias,
@@ -286,6 +312,7 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
             case ORGANIZATION_AND_CHILDREN -> appendOrganizationAndChildrenScope(scope, user);
             case CUSTOM ->
                     throw new PlatformException("custom data scope condition is not supported yet");
+            case WILDCARD -> throw new PlatformException("wildcard data scope must be resolved before append scope");
             case REFERENCE_DEPENDENCY -> {
             }
             case NONE, ALL -> {

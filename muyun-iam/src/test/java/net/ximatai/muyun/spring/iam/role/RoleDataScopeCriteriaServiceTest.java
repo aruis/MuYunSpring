@@ -364,6 +364,70 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
+    void shouldResolveWildcardDataScopeThroughBoundWildcardRole() {
+        RoleService roleService = mock(RoleService.class);
+        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
+        wildcard.setActionCode("view");
+        RoleAction actual = grant(DataScopePolicy.OWNER);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authUserId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "user-1");
+    }
+
+    @Test
+    void shouldNotLetWildcardGrantWidenTenantScopeBeyondOriginalGrant() {
+        RoleService roleService = mock(RoleService.class);
+        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
+        wildcard.setActionCode("view");
+        RoleAction actual = grant(DataScopePolicy.ALL, "scope-role", TenantScopePolicy.ALL_TENANTS);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.crossTenant()).isFalse();
+        assertThat(compiled.getSql()).isEqualTo("\"status\" = :p0");
+    }
+
+    @Test
+    void shouldDenyWildcardDataScopeWhenNoWildcardRoleGrantExists() {
+        RoleService roleService = mock(RoleService.class);
+        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
+        wildcard.setActionCode("view");
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        assertThat(compile(scoped).getSql()).contains("1 = 0");
+    }
+
+    @Test
     void shouldApplyReferenceDependencyScopeAsTargetPermissionSubquery() {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(

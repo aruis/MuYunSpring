@@ -33,6 +33,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         SortAbility<Role>,
         ReferenceAbility<Role> {
     public static final String MODULE_ALIAS = "iam.role";
+    public static final String WILDCARD_DATA_SCOPE_MODULE_ALIAS = "iam.data_scope";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -167,12 +168,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                            String scopeCondition,
                            String referenceFieldId,
                            String referenceActionCode) {
-        requireConfigurableRole(roleId);
+        Role role = requireStandardRoleForActionGrant(roleId);
 
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String requestedActionCode = requireActionCode(actionCode);
         grantVerifier.requireGrantable(validModuleAlias, requestedActionCode);
         String validActionCode = permissionActionCode(requestedActionCode);
+        DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(dataScopePolicy, scopeCondition, referenceFieldId);
+        validateRoleActionDataScopePolicy(role, validDataScopePolicy);
 
         RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
         boolean exists = roleAction != null;
@@ -182,13 +185,51 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             roleAction.setModuleAlias(validModuleAlias);
             roleAction.setActionCode(validActionCode);
         }
-        roleAction.setDataScopePolicy(normalizeDataScopePolicy(dataScopePolicy, scopeCondition, referenceFieldId));
+        roleAction.setDataScopePolicy(validDataScopePolicy);
         roleAction.setTenantScopePolicy(normalizeTenantScopePolicy(tenantScopePolicy));
         roleAction.setScopeCondition(normalizeBlank(scopeCondition));
         roleAction.setReferenceFieldId(normalizeBlank(referenceFieldId));
         roleAction.setReferenceActionCode(normalizeBlank(referenceActionCode));
         roleAction.setEnabled(true);
 
+        if (exists) {
+            prepareChildUpdate(roleAction);
+            return roleActionDao.updateById(roleAction);
+        }
+        prepareChildInsert(roleAction);
+        roleActionDao.insert(roleAction);
+        return 1;
+    }
+
+    public int grantWildcardDataScopeAction(String roleId,
+                                            String actionCode,
+                                            DataScopePolicy dataScopePolicy,
+                                            TenantScopePolicy tenantScopePolicy) {
+        Role role = requireEnabledRole(roleId);
+        if (role.getRoleKind() != RoleKind.WILDCARD_DATA_SCOPE) {
+            throw new PlatformException("role is not wildcard data scope role: " + roleId);
+        }
+        String requestedActionCode = requireActionCode(actionCode);
+        PlatformAction platformAction = PlatformAction.fromCode(requestedActionCode).orElse(null);
+        if (platformAction != null && !platformAction.dataAuth()) {
+            throw new PlatformException("wildcard data scope action must support data auth: " + actionCode);
+        }
+        DataScopePolicy validPolicy = normalizeWildcardDataScopePolicy(dataScopePolicy);
+        String validActionCode = permissionActionCode(requestedActionCode);
+        RoleAction roleAction = findRoleAction(role.getId(), WILDCARD_DATA_SCOPE_MODULE_ALIAS, validActionCode);
+        boolean exists = roleAction != null;
+        if (!exists) {
+            roleAction = new RoleAction();
+            roleAction.setRoleId(role.getId());
+            roleAction.setModuleAlias(WILDCARD_DATA_SCOPE_MODULE_ALIAS);
+            roleAction.setActionCode(validActionCode);
+        }
+        roleAction.setDataScopePolicy(validPolicy);
+        roleAction.setTenantScopePolicy(normalizeTenantScopePolicy(tenantScopePolicy));
+        roleAction.setScopeCondition(null);
+        roleAction.setReferenceFieldId(null);
+        roleAction.setReferenceActionCode(null);
+        roleAction.setEnabled(true);
         if (exists) {
             prepareChildUpdate(roleAction);
             return roleActionDao.updateById(roleAction);
@@ -224,6 +265,32 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         .eq("actionCode", permissionActionCode)
                         .eq("enabled", Boolean.TRUE),
                 ALL);
+    }
+
+    public RoleAction effectiveWildcardDataScopeGrant(String userId, String actionCode) {
+        Set<String> roleIds = effectiveRoleIds(userId);
+        if (roleIds.isEmpty()) {
+            return null;
+        }
+        List<Role> wildcardRoles = roleIds.stream()
+                .map(this::select)
+                .filter(Objects::nonNull)
+                .filter(role -> role.getRoleKind() == RoleKind.WILDCARD_DATA_SCOPE)
+                .filter(role -> Boolean.TRUE.equals(role.getEnabled()))
+                .toList();
+        if (wildcardRoles.isEmpty()) {
+            return null;
+        }
+        if (wildcardRoles.size() > 1) {
+            throw new PlatformException("user has more than one wildcard data scope role: " + userId);
+        }
+        String validActionCode = permissionActionCode(actionCode);
+        return roleActionDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("roleId", wildcardRoles.get(0).getId())
+                        .eq("moduleAlias", WILDCARD_DATA_SCOPE_MODULE_ALIAS)
+                        .eq("actionCode", validActionCode)
+                        .eq("enabled", Boolean.TRUE)),
+                new PageRequest(0, 1)).stream().findFirst().orElse(null);
     }
 
     public Set<String> effectiveRoleIds(String userId) {
@@ -339,6 +406,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return role;
     }
 
+    private Role requireStandardRoleForActionGrant(String roleId) {
+        Role role = requireConfigurableRole(roleId);
+        if (role.getRoleKind() == RoleKind.WILDCARD_DATA_SCOPE) {
+            throw new PlatformException("wildcard data scope role cannot be granted business action directly: " + roleId);
+        }
+        return role;
+    }
+
     private void validateGroupMembers(String memberRoleIds) {
         for (String memberRoleId : parseRoleIds(memberRoleIds)) {
             Role member = select(memberRoleId);
@@ -432,6 +507,25 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             Preconditions.requireText(referenceFieldId, "referenceFieldId");
         }
         return policy;
+    }
+
+    private DataScopePolicy normalizeWildcardDataScopePolicy(DataScopePolicy dataScopePolicy) {
+        DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
+        if (policy == DataScopePolicy.WILDCARD
+                || policy == DataScopePolicy.CUSTOM
+                || policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
+            throw new PlatformException("wildcard data scope role only supports standard data scope policy");
+        }
+        return policy;
+    }
+
+    private void validateRoleActionDataScopePolicy(Role role, DataScopePolicy policy) {
+        if (role.getRoleKind() == RoleKind.WILDCARD_DATA_SCOPE
+                && (policy == DataScopePolicy.WILDCARD
+                || policy == DataScopePolicy.CUSTOM
+                || policy == DataScopePolicy.REFERENCE_DEPENDENCY)) {
+            throw new PlatformException("wildcard data scope role only supports standard data scope policy");
+        }
     }
 
     private TenantScopePolicy normalizeTenantScopePolicy(TenantScopePolicy tenantScopePolicy) {

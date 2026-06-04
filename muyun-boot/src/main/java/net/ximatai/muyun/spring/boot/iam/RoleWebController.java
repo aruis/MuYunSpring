@@ -69,6 +69,18 @@ public class RoleWebController extends WebSupport<RoleService> implements
         )));
     }
 
+    @PostMapping("/wildcard-data-scope/{roleId}/grant")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public WebCountResponse grantWildcardDataScopeAction(@PathVariable String roleId,
+                                                         @RequestBody GrantWildcardDataScopeRequest request) {
+        return webScope(() -> new WebCountResponse(service().grantWildcardDataScopeAction(
+                roleId,
+                request.actionCode(),
+                request.dataScopePolicy(),
+                request.tenantScopePolicy()
+        )));
+    }
+
     @PostMapping("/revoke/{roleId}")
     @ActionEndpoint(PlatformAction.UPDATE)
     public WebCountResponse revokeAction(@PathVariable String roleId,
@@ -104,6 +116,13 @@ public class RoleWebController extends WebSupport<RoleService> implements
     public record RevokeActionRequest(
             String moduleAlias,
             String actionCode
+    ) {
+    }
+
+    public record GrantWildcardDataScopeRequest(
+            String actionCode,
+            DataScopePolicy dataScopePolicy,
+            TenantScopePolicy tenantScopePolicy
     ) {
     }
 

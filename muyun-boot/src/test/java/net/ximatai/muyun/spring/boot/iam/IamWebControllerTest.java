@@ -234,6 +234,8 @@ class IamWebControllerTest {
         when(roleService.grantAction("role-1", "sales.contract", "query",
                 DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
                 null, null, null)).thenReturn(1);
+        when(roleService.grantWildcardDataScopeAction("scope-1", "query",
+                DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT)).thenReturn(1);
         when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
 
         mvc.perform(post("/iam.role/users/{roleId}/bind", "role-1")
@@ -263,6 +265,17 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content("""
                                 {"moduleAlias":"sales.contract","actionCode":"query"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.role/wildcard-data-scope/{roleId}/grant", "scope-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "actionCode":"query",
+                                  "dataScopePolicy":"OWNER",
+                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
