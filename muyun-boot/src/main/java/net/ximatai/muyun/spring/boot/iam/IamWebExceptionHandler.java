@@ -9,7 +9,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = {
         TenantWebController.class,
-        OrganizationWebController.class
+        OrganizationWebController.class,
+        RoleWebController.class
 })
 public class IamWebExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})

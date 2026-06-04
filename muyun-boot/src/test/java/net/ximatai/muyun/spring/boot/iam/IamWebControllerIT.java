@@ -2,10 +2,17 @@ package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
+import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
+import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {
         TenantWebController.class,
-        OrganizationWebController.class
+        OrganizationWebController.class,
+        RoleWebController.class
 })
 @Import({
         CurrentUserWebFilter.class,
@@ -41,6 +49,12 @@ class IamWebControllerIT {
 
     @MockitoBean
     private OrganizationService organizationService;
+
+    @MockitoBean
+    private RoleService roleService;
+
+    @MockitoBean
+    private RoleGrantableActionResolver roleGrantableActionResolver;
 
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
@@ -109,5 +123,107 @@ class IamWebControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));
+    }
+
+    @Test
+    void shouldBindRoleManagementEndpointsInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(roleService.bindUsers("role-1", List.of("user-2", "user-3"))).thenReturn(2);
+        when(roleService.userIds("role-1")).thenReturn(List.of("user-2", "user-3"));
+        when(roleService.grantAction("role-1", "sales.contract", "query",
+                DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
+                null, null, null)).thenReturn(1);
+        when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
+
+        mvc.perform(post("/iam.role/users/{roleId}/bind", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"userIds":["user-2","user-3"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2));
+
+        mvc.perform(get("/iam.role/users/{roleId}", "role-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("user-2"))
+                .andExpect(jsonPath("$[1]").value("user-3"));
+
+        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "moduleAlias":"sales.contract",
+                                  "actionCode":"query",
+                                  "dataScopePolicy":"OWNER",
+                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        mvc.perform(post("/iam.role/revoke/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"moduleAlias":"sales.contract","actionCode":"query"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void shouldResolveRolePermissionMatrixInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        List<GrantableAction> grantableActions = List.of(
+                new GrantableAction("sales.contract", "query", "view", "Query", true, true)
+        );
+        when(roleGrantableActionResolver.resolve(List.of("sales.contract"))).thenReturn(grantableActions);
+        when(roleService.permissionMatrix("role-1", grantableActions)).thenReturn(new RolePermissionMatrix(
+                "role-1",
+                List.of(new RolePermissionMatrix.Module(
+                        "sales.contract",
+                        List.of(new RolePermissionAction(
+                                "sales.contract", "query", "view", "Query",
+                                true, true, true, DataScopePolicy.OWNER,
+                                TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                ))
+        ));
+
+        mvc.perform(post("/iam.role/permissionMatrix/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"moduleAliases":["sales.contract"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleId").value("role-1"))
+                .andExpect(jsonPath("$.modules[0].moduleAlias").value("sales.contract"))
+                .andExpect(jsonPath("$.modules[0].actions[0].permissionActionCode").value("view"))
+                .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
+    }
+
+    @Test
+    void shouldApplyIamAdviceWhenRoleGrantRejectsUnsupportedCustomDataScope() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(roleService.grantAction("role-1", "sales.contract", "query",
+                DataScopePolicy.CUSTOM, TenantScopePolicy.CURRENT_TENANT,
+                "authUserId = ${userId}", null, null))
+                .thenThrow(new PlatformException("custom data scope policy is not supported yet"));
+
+        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "moduleAlias":"sales.contract",
+                                  "actionCode":"query",
+                                  "dataScopePolicy":"CUSTOM",
+                                  "tenantScopePolicy":"CURRENT_TENANT",
+                                  "scopeCondition":"authUserId = ${userId}"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("custom data scope policy is not supported yet"));
     }
 }

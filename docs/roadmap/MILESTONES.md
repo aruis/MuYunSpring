@@ -209,10 +209,37 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 | M5-02 | 组织机构管理 | 在租户下建立组织机构树，作为用户、菜单方案和数据权限的组织边界 | 机构归属租户，支持树、排序、启停；写入必须处于活动租户上下文；机构编码在租户下唯一 | P0 | 已完成 |
 | M5-03 | 角色模型与用户绑定 | 建立标准角色、角色组、数据权限通配角色和用户绑定事实 | 角色归属租户；角色组只能包含标准角色；用户最多绑定一个数据权限通配角色；支持批量绑定、解绑和查询绑定用户 | P0 | 已完成 |
 | M5-04 | 动作授权配置 | 建立角色到模块动作的授权事实和授权回显矩阵 | 授权按模块别名和权限动作落表；撤权软失效；标准动作和模块配置动作能合并成授权矩阵；动作继承统一落到权限动作 | P0 | 已完成 |
-| M5-05 | 数据权限策略 | 建立动作授权上的数据范围策略 | 支持无权限、全部、本人负责、负责人、相关人、机构、机构及下级、自定义条件和引用依赖；租户范围与数据范围分离；引用依赖 fail closed | P0 | 已完成 |
+| M5-05 | 数据权限策略 | 建立动作授权上的数据范围策略 | 支持无权限、全部、本人负责、负责人、相关人、机构、机构及下级、通配和引用依赖；租户范围与数据范围分离；引用依赖 fail closed；自定义条件保留字段但当前拒绝授权 | P0 | 已完成 |
 | M5-06 | 权限执行接入 | 将动作权限和数据权限接入静态与动态运行入口 | 静态 Web、动态 Web 和动作执行入口复用同一套动作策略；静态标准 Web 已对查询、查看、更新、删除、启停接入数据权限；动态标准读写和动作执行由动态服务统一接入数据权限；动态动作列表和记录动作可用性已接入动作授权与记录级数据权限 | P0 | 推进中 |
 | M5-07 | 菜单剪枝 | 基于权限结果对菜单树做可见性剪枝 | 菜单自身仍按租户和方案管理；权限只影响返回树，不改变菜单模型；后端服务层已支持按模块 `view` 权限剪枝 | P1 | 已完成 |
 | M5-08 | 审计上下文 | 将权限判定结果进入动作执行和审计上下文 | 授权服务已返回轻量判定结果；静态 Web action context 和动态动作执行上下文已可携带操作者与判定口径；动态动作审计事件已下沉 operator、authorizationDecision、permissionCode 和 permissionActionCode；不替代业务专题流水 | P1 | 推进中 |
+
+### M5 权限功能校准
+
+权限领域当前以后端闭环为准，不建设完整管理端 UI。已确认的功能边界如下：
+
+| 领域 | 当前能力 | 证据口径 | 状态 |
+| --- | --- | --- | --- |
+| 角色维护 | 标准角色、角色组、数据权限通配角色可通过统一 RoleService 维护；角色组只聚合标准角色 | `RoleServiceContractTest` 覆盖默认类型、角色组成员校验和非配置角色拒绝授权 | 已闭环 |
+| 用户绑定 | 角色支持批量绑定、解绑、查询绑定用户；用户最多绑定一个数据权限通配角色 | `RoleServiceContractTest` 和 `IamWebControllerTest` 覆盖绑定去重、解绑、唯一通配角色约束和 Web contract | 已闭环 |
+| 动作授权 | 角色到模块动作按 `moduleAlias + permissionActionCode` 落表，撤权软失效；动作继承统一落到权限动作 | `RoleServiceContractTest` 覆盖授权、撤权、继承动作归并和授权矩阵 | 已闭环 |
+| 授权矩阵 | 后端可按模块别名解析标准动作和配置动作，返回已授权、未授权和数据权限策略 | `RoleGrantableActionResolverTest`、`RoleServiceContractTest` 和 Web contract 覆盖 | 已闭环 |
+| 数据权限策略 | 支持 NONE、ALL、OWNER、ASSIGNEE、MEMBER、ORGANIZATION、ORGANIZATION_AND_CHILDREN、WILDCARD、REFERENCE_DEPENDENCY；CUSTOM 保留字段但当前授权入口拒绝，避免产生不可执行权限事实 | `RoleDataScopeCriteriaServiceTest` 覆盖并集、无权限、跨租户、组织及下级、通配、引用依赖和默认策略；`RoleServiceContractTest` 覆盖 CUSTOM 拒绝授权 | 已闭环 |
+| 租户范围 | 数据范围与租户基线分离；普通授权默认当前租户，明确授权可跨租户；系统用户绕过数据范围 | `DataScopeAbilityTest`、`RoleDataScopeCriteriaServiceTest` 和动态运行态测试覆盖 | 已闭环 |
+| 静态接入 | 静态 Web 标准 CRUD、启停、树、排序等入口复用 `@ActionEndpoint`；实现 `DataScopeAbility` 的静态服务接入同一数据范围语义 | `ActionEndpointInterceptorTest`、`DataScopeWebTest` 和 `IamWebControllerIT` 覆盖 | 主体完成 |
+| 动态接入 | 动态主元数据标准 CRUD、动作执行、动作列表和记录动作可用性接入同一动作/数据权限服务 | `DynamicRecordServiceTest`、`DynamicRecordWebControllerTest` 和 `DynamicRecordWebControllerIT` 覆盖 | 主体完成 |
+| 菜单剪枝 | 菜单模型不承载权限事实，返回菜单树时按模块查看权限剪枝 | `RoleMenuVisibilityPolicyServiceTest` 覆盖 | 已闭环 |
+| 审计上下文 | 动态动作审计记录轻量保存操作者、判定结果和权限动作；静态 Web 保留请求内授权上下文 | 动态审计相关测试和 ActionEndpoint 上下文测试覆盖 | 可收口 |
+
+本阶段明确后移或暂不扩展的事项：
+
+1. 自定义数据权限条件暂不开放 SQL/DSL 执行，只保留模型字段和授权入口 fail-fast 边界，等真实场景出现后再做安全表达式设计。
+2. 跨模块共用同一物理表时的记录权限归属字段暂不进入 M5 P0。当前模块入口统一按当前 `moduleAlias` 判权；若后续出现同表多业务归属并存，再补“记录归属模块”能力。
+3. 动态 descriptor/OpenAPI 当前按模块配置输出完整结构，动作执行与动作列表已经鉴权；若 descriptor 面向普通终端用户，应在后续补动作裁剪或区分配置端/运行端 descriptor。
+4. 条件型动态动作的批量数据范围契约暂不扩展；当前记录级动作按显式记录 ID 校验，未来出现按条件批量执行动作时，再把受数据范围裁剪后的 criteria 纳入 executor 上下文。
+5. 静态授权矩阵当前按静态模块默认平台动作回显，不感知具体静态 service 是否实现树、排序、启停等能力；若配置噪音影响管理端体验，再接入静态模块能力声明。
+6. 静态业务专题流水不并入平台动作审计。平台审计只记录必要动作上下文，工作流、导入导出等专题自行维护业务流水。
+7. 管理端 UI 编排不进入 M5。M5 只保证模型、服务、Web contract 和测试证据可支撑后续 UI。
 
 ## M6 工作流与任务闭环
 

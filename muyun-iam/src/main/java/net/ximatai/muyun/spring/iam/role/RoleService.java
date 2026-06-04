@@ -501,7 +501,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                                      String referenceFieldId) {
         DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
         if (policy == DataScopePolicy.CUSTOM) {
-            Preconditions.requireText(scopeCondition, "scopeCondition");
+            throw new PlatformException("custom data scope policy is not supported yet");
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             Preconditions.requireText(referenceFieldId, "referenceFieldId");

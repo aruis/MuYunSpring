@@ -111,6 +111,26 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldRejectCustomDataScopeBeforeGrantIsSaved() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        RoleService service = service(roleDao, mock(RoleUserDao.class), actionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantAction(
+                    "r1", "sales.contract", "query",
+                    DataScopePolicy.CUSTOM, TenantScopePolicy.CURRENT_TENANT,
+                    "authUserId = ${userId}", null, null))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("custom data scope policy is not supported yet");
+        }
+
+        verify(actionDao, org.mockito.Mockito.never()).insert(any());
+        verify(actionDao, org.mockito.Mockito.never()).updateById(any());
+    }
+
+    @Test
     void shouldStoreMergedPermissionActionWhenGrantingInheritedPlatformActions() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleActionDao actionDao = mock(RoleActionDao.class);
