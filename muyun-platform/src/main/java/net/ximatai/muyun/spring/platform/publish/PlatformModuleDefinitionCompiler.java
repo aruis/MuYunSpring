@@ -394,6 +394,7 @@ public class PlatformModuleDefinitionCompiler {
                 action.getAccessMode(),
                 action.getActionAuth(),
                 action.getDataAuth(),
+                action.getDefaultGrantPolicy(),
                 action.getAuthInheritActionCode(),
                 action.getAvailableExpression(),
                 action.getUnavailableMessage(),

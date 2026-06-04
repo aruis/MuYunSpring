@@ -27,7 +27,7 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
     default DataScopeCriteriaResult readScope(PlatformAction action, Criteria criteria) {
         return getDataScopeCriteriaService().resolveReadScope(
                 getModuleAlias(),
-                action.permissionActionCode(),
+                action.executionPolicy(),
                 criteria == null ? Criteria.of() : criteria,
                 CurrentUserContext.currentUser()
         );
@@ -99,7 +99,7 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
         java.util.Objects.requireNonNull(policy, "policy must not be null");
         return getDataScopeCriteriaService().resolveReadScope(
                 getModuleAlias(),
-                policy.permissionActionCode(),
+                policy,
                 criteria == null ? Criteria.of() : criteria,
                 CurrentUserContext.currentUser()
         );

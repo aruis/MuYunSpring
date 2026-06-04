@@ -6,7 +6,11 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.Test;
 
@@ -297,6 +301,64 @@ class RoleDataScopeCriteriaServiceTest {
         assertThat(compiled.getParams().values()).containsOnly("%,user-1,%");
     }
 
+    @Test
+    void shouldApplyDefaultOwnerScopeWithoutRoleGrant() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "follow")).thenReturn(List.of());
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                policy("follow", ActionDefaultGrantPolicy.OWNER),
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.restricted()).isTrue();
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authUserId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "user-1");
+    }
+
+    @Test
+    void shouldExpandDefaultMemberScopeToOwnerAssigneeAndMember() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "follow")).thenReturn(List.of());
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.resolveReadScope(
+                "sales.contract",
+                policy("follow", ActionDefaultGrantPolicy.MEMBER),
+                Criteria.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        ).criteria();
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"authUserId\" = :p0")
+                .contains("CONCAT(',', auth_assignee_ids, ',') LIKE")
+                .contains("CONCAT(',', auth_member_ids, ',') LIKE");
+    }
+
+    @Test
+    void shouldNotTreatAnyLoginUserDefaultGrantAsDataScope() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of());
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.resolveReadScope(
+                "sales.contract",
+                policy("query", ActionDefaultGrantPolicy.ANY_LOGIN_USER),
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        ).criteria();
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql()).contains("\"status\" = :p0").contains("1 = 0");
+    }
+
     private RoleAction grant(DataScopePolicy policy) {
         return grant(policy, "role-1");
     }
@@ -316,5 +378,17 @@ class RoleDataScopeCriteriaServiceTest {
 
     private CompiledCriteria compile(Criteria criteria) {
         return compiler.compile(criteria, field -> field, DBInfo.Type.POSTGRESQL);
+    }
+
+    private ActionExecutionPolicy policy(String actionCode, ActionDefaultGrantPolicy defaultGrantPolicy) {
+        return new ActionExecutionPolicy(
+                actionCode,
+                PlatformActionLevel.RECORD,
+                ActionAccessMode.AUTH_REQUIRED,
+                true,
+                true,
+                defaultGrantPolicy,
+                null
+        );
     }
 }

@@ -16,7 +16,9 @@ import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
@@ -356,6 +358,7 @@ class DynamicRecordServiceTest {
                     .isEqualTo(net.ximatai.muyun.spring.common.platform.ActionAccessMode.AUTH_REQUIRED);
             assertThat(context.actionPolicy().actionAuth()).isTrue();
             assertThat(context.actionPolicy().dataAuth()).isFalse();
+            assertThat(context.actionPolicy().defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.NONE);
             assertThat(context.actionPolicy().permissionActionCode()).isEqualTo("submit");
             assertThat(context.recordIds()).containsExactly("contract-1");
             assertThat(context.currentUser()).get().extracting(CurrentUser::userId).isEqualTo("user-1");
@@ -2027,11 +2030,11 @@ class DynamicRecordServiceTest {
             }
 
             @Override
-            public Criteria applyReadScope(String moduleAlias,
-                                           String actionCode,
-                                           Criteria criteria,
-                                           java.util.Optional<CurrentUser> currentUser) {
-                return criteria;
+            public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                            ActionExecutionPolicy policy,
+                                                            Criteria criteria,
+                                                            java.util.Optional<CurrentUser> currentUser) {
+                return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
             }
         };
         DynamicRecordService service = service(operations, contractEntity(), RuntimeEventPublisher.noop(), dataScope);
@@ -2090,13 +2093,13 @@ class DynamicRecordServiceTest {
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
-        when(dataScope.resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any()))
+        when(dataScope.resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
                 .thenAnswer(invocation -> DataScopeCriteriaResult.unrestricted(invocation.getArgument(2)));
         DynamicRecordService service = referenceResolvingService(operations, dataScope);
 
         service.resolveReference(MODULE, "line", "contractId", DynamicReferenceResolveRequest.query("C-001"));
 
-        verify(dataScope).resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any());
+        verify(dataScope).resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any());
     }
 
     @Test
@@ -2104,7 +2107,7 @@ class DynamicRecordServiceTest {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
-        when(dataScope.resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any()))
+        when(dataScope.resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
                 .thenAnswer(invocation -> DataScopeCriteriaResult.restricted(invocation.getArgument(2)));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(treeEntity())));
@@ -2116,7 +2119,7 @@ class DynamicRecordServiceTest {
 
         service.children(MODULE, "contract", "root");
 
-        verify(dataScope).resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any());
+        verify(dataScope).resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any());
     }
 
     @SuppressWarnings("unchecked")
@@ -2878,6 +2881,22 @@ class DynamicRecordServiceTest {
 
     private static final class VisibleOnlyDataScopeCriteriaService implements DataScopeCriteriaService {
         @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return DataScopeCriteriaResult.restricted(applyReadScope(moduleAlias, actionCode, criteria, currentUser));
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
+        }
+
+        @Override
         public Criteria applyReadScope(String moduleAlias,
                                        String actionCode,
                                        Criteria criteria,
@@ -2901,11 +2920,11 @@ class DynamicRecordServiceTest {
         }
 
         @Override
-        public Criteria applyReadScope(String moduleAlias,
-                                       String actionCode,
-                                       Criteria criteria,
-                                       java.util.Optional<CurrentUser> currentUser) {
-            return criteria == null ? Criteria.of() : criteria;
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
     }
 
@@ -2914,6 +2933,22 @@ class DynamicRecordServiceTest {
 
         private AllowIdsDataScopeCriteriaService(String... ids) {
             this.ids = List.of(ids);
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return DataScopeCriteriaResult.restricted(applyReadScope(moduleAlias, actionCode, criteria, currentUser));
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
 
         @Override
@@ -2948,6 +2983,14 @@ class DynamicRecordServiceTest {
                     criteria,
                     currentUser
             ));
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
 
         @Override

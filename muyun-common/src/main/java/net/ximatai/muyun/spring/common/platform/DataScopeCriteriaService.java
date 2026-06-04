@@ -6,16 +6,20 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import java.util.Optional;
 
 public interface DataScopeCriteriaService {
-    default DataScopeCriteriaResult resolveReadScope(String moduleAlias,
-                                                     String actionCode,
-                                                     Criteria criteria,
-                                                     Optional<CurrentUser> currentUser) {
-        Criteria scoped = applyReadScope(moduleAlias, actionCode, criteria, currentUser);
-        return new DataScopeCriteriaResult(scoped, scoped != criteria);
-    }
+    DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                             String actionCode,
+                                             Criteria criteria,
+                                             Optional<CurrentUser> currentUser);
 
-    Criteria applyReadScope(String moduleAlias,
-                            String actionCode,
-                            Criteria criteria,
-                            Optional<CurrentUser> currentUser);
+    DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                             ActionExecutionPolicy policy,
+                                             Criteria criteria,
+                                             Optional<CurrentUser> currentUser);
+
+    default Criteria applyReadScope(String moduleAlias,
+                                    String actionCode,
+                                    Criteria criteria,
+                                    Optional<CurrentUser> currentUser) {
+        return resolveReadScope(moduleAlias, actionCode, criteria, currentUser).criteria();
+    }
 }

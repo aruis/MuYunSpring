@@ -3,9 +3,9 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
-import net.ximatai.muyun.spring.common.platform.ActionDefaultPolicy;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -31,7 +31,7 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
         }
         if (context.actionPolicy().accessMode() == ActionAccessMode.LOGIN_REQUIRED
                 || !context.actionPolicy().actionAuth()
-                || context.actionPolicy().defaultPolicy() == ActionDefaultPolicy.AUTHENTICATED_USER) {
+                || grantsAuthenticatedUser(context.actionPolicy().defaultGrantPolicy())) {
             return;
         }
         String permissionActionCode = context.actionPolicy().permissionActionCode();
@@ -39,5 +39,9 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
             return;
         }
         throw new PlatformException("action permission denied: " + context.permissionCode());
+    }
+
+    private boolean grantsAuthenticatedUser(ActionDefaultGrantPolicy policy) {
+        return policy != null && policy.grantsAuthenticatedUser();
     }
 }

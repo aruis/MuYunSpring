@@ -6,20 +6,23 @@ public record ActionExecutionPolicy(
         ActionAccessMode accessMode,
         boolean actionAuth,
         boolean dataAuth,
-        ActionDefaultPolicy defaultPolicy,
+        ActionDefaultGrantPolicy defaultGrantPolicy,
         String inheritActionCode
 ) {
     public ActionExecutionPolicy {
         actionCode = requireText(actionCode, "actionCode");
         level = level == null ? PlatformActionLevel.DEFAULT : level;
         accessMode = accessMode == null ? ActionAccessMode.AUTH_REQUIRED : accessMode;
-        defaultPolicy = defaultPolicy == null ? ActionDefaultPolicy.NONE : defaultPolicy;
+        defaultGrantPolicy = defaultGrantPolicy == null ? ActionDefaultGrantPolicy.NONE : defaultGrantPolicy;
         inheritActionCode = normalizeBlank(inheritActionCode);
         if (accessMode == ActionAccessMode.ANONYMOUS_ALLOWED && (actionAuth || dataAuth || inheritActionCode != null)) {
             throw new IllegalArgumentException("anonymous action cannot require auth or data scope: " + actionCode);
         }
         if (accessMode == ActionAccessMode.LOGIN_REQUIRED && (actionAuth || dataAuth || inheritActionCode != null)) {
             throw new IllegalArgumentException("login-only action cannot require action auth or data scope: " + actionCode);
+        }
+        if (defaultGrantPolicy.requiresDataScope() && !dataAuth) {
+            throw new IllegalArgumentException("scoped default grant requires dataAuth: " + actionCode);
         }
         if (!actionAuth && inheritActionCode != null) {
             throw new IllegalArgumentException("action inherit requires actionAuth: " + actionCode);
@@ -34,7 +37,7 @@ public record ActionExecutionPolicy(
                 action.accessMode(),
                 action.actionAuth(),
                 action.dataAuth(),
-                action.defaultPolicy(),
+                action.defaultGrantPolicy(),
                 action.inheritActionCode()
         );
     }

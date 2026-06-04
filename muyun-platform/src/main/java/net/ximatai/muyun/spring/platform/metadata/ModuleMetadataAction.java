@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -40,6 +41,10 @@ public class ModuleMetadataAction extends StandardEnabledSortableEntity {
 
     @Column(name = "data_auth", comment = "Whether data permission applies")
     private Boolean dataAuth;
+
+    @Column(name = "default_grant_policy", type = ColumnType.VARCHAR, length = 32,
+            comment = "Default action grant policy")
+    private ActionDefaultGrantPolicy defaultGrantPolicy;
 
     @Column(name = "auth_inherit_action_code", type = ColumnType.VARCHAR, length = 64, comment = "Inherited action code")
     private String authInheritActionCode;

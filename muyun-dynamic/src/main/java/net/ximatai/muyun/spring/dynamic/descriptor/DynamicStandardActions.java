@@ -42,6 +42,7 @@ final class DynamicStandardActions {
                 standard == null ? configured.accessMode() : standard.accessMode(),
                 standard == null ? configured.actionAuth() : standard.actionAuth(),
                 standard == null ? configured.dataAuth() : standard.dataAuth(),
+                configured.defaultGrantPolicy(),
                 standard == null ? configured.authInheritActionCode() : standard.authInheritActionCode(),
                 configured.hasAvailabilityCondition(),
                 configured.unavailableMessage(),

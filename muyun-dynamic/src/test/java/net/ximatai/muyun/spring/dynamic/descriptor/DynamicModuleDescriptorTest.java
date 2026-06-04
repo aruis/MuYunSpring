@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
@@ -485,5 +486,62 @@ class DynamicModuleDescriptorTest {
 
         assertThat(formView.fields().getFirst().required()).isTrue();
         assertThat(formView.fields().get(1).required()).isTrue();
+    }
+
+    @Test
+    void shouldExposeDynamicActionDefaultGrantPolicy() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                        FieldDefinition.titleField()
+                ), Set.of(EntityCapability.DATA_SCOPE))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("customer", "follow", "关注", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, true, ActionDefaultGrantPolicy.OWNER, null, null, null,
+                        EntityActionExecutorType.SERVICE, "followExecutor"))
+        );
+
+        DynamicActionDescriptor action = DynamicModuleDescriptor.from(module)
+                .entities().getFirst()
+                .actions().stream()
+                .filter(item -> item.code().equals("follow"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(action.defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.OWNER);
+    }
+
+    @Test
+    void shouldExposeConfiguredStandardActionDefaultGrantPolicy() {
+        ModuleDefinition module = new ModuleDefinition(
+                "crm.customer",
+                "Customer",
+                List.of(new EntityDefinition("customer", "crm_customer", "Customer", List.of(
+                        FieldDefinition.titleField()
+                ), Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("customer", "view", "查看", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, true, ActionDefaultGrantPolicy.OWNER, null, null, null,
+                        EntityActionExecutorType.STANDARD, null))
+        );
+
+        DynamicActionDescriptor action = DynamicModuleDescriptor.from(module)
+                .entities().getFirst()
+                .actions().stream()
+                .filter(item -> item.code().equals("view"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(action.defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.OWNER);
+        assertThat(action.dataAuth()).isTrue();
     }
 }

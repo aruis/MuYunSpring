@@ -114,7 +114,7 @@ public record ActionExecutionContext(
                 ActionAccessMode.AUTH_REQUIRED,
                 true,
                 false,
-                ActionDefaultPolicy.NONE,
+                ActionDefaultGrantPolicy.NONE,
                 null
         );
     }

@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaEvaluationException;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -402,14 +403,16 @@ public class ModuleDefinitionValidator {
 
     private void validateActionAccessPolicy(EntityActionDefinition action) {
         if (action.accessMode() == EntityActionAccessMode.ANONYMOUS_ALLOWED) {
-            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null
+                    || action.defaultGrantPolicy() != ActionDefaultGrantPolicy.NONE) {
                 throw new ModuleDefinitionException("anonymous action must not require auth policy: "
                         + action.entityAlias() + "." + action.actionCode());
             }
             return;
         }
         if (action.accessMode() == EntityActionAccessMode.LOGIN_REQUIRED) {
-            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null) {
+            if (action.actionAuth() || action.dataAuth() || action.authInheritActionCode() != null
+                    || action.defaultGrantPolicy() != ActionDefaultGrantPolicy.NONE) {
                 throw new ModuleDefinitionException("login-only action must not require auth policy: "
                         + action.entityAlias() + "." + action.actionCode());
             }
@@ -421,6 +424,10 @@ public class ModuleDefinitionValidator {
         }
         if (action.authInheritActionCode() != null && !action.actionAuth()) {
             throw new ModuleDefinitionException("action auth inherit requires action auth: "
+                    + action.entityAlias() + "." + action.actionCode());
+        }
+        if (action.defaultGrantPolicy().requiresDataScope() && !action.dataAuth()) {
+            throw new ModuleDefinitionException("scoped default grant requires data auth: "
                     + action.entityAlias() + "." + action.actionCode());
         }
     }

@@ -15,10 +15,10 @@ public class AllowAllDataScopeCriteriaService implements DataScopeCriteriaServic
     }
 
     @Override
-    public Criteria applyReadScope(String moduleAlias,
-                                   String actionCode,
-                                   Criteria criteria,
-                                   Optional<CurrentUser> currentUser) {
-        return criteria == null ? Criteria.of() : criteria;
+    public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                    ActionExecutionPolicy policy,
+                                                    Criteria criteria,
+                                                    Optional<CurrentUser> currentUser) {
+        return DataScopeCriteriaResult.unrestricted(criteria == null ? Criteria.of() : criteria);
     }
 }

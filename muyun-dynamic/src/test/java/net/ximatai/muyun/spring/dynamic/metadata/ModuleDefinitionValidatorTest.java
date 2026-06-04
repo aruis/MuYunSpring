@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +106,48 @@ class ModuleDefinitionValidatorTest {
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("standard action level must match platform action: contract.delete");
+    }
+
+    @Test
+    void shouldRejectScopedDefaultGrantWithoutDataAuth() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "follow", "Follow", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, ActionDefaultGrantPolicy.OWNER, null, null, null,
+                        EntityActionExecutorType.SERVICE, "followExecutor"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("scoped default grant requires data auth: contract.follow");
+    }
+
+    @Test
+    void shouldRejectLoginOnlyActionWithDefaultGrantPolicy() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "profile", "Profile", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.LOGIN_REQUIRED,
+                        false, false, ActionDefaultGrantPolicy.ANY_LOGIN_USER, null, null, null,
+                        EntityActionExecutorType.SERVICE, "profileExecutor"))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("login-only action must not require auth policy: contract.profile");
     }
 
     @Test

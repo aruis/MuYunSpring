@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
-import net.ximatai.muyun.spring.common.platform.ActionDefaultPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
@@ -155,7 +155,7 @@ class DataScopeAbilityTest {
                 ActionAccessMode.AUTH_REQUIRED,
                 true,
                 false,
-                ActionDefaultPolicy.NONE,
+                ActionDefaultGrantPolicy.NONE,
                 null
         );
         try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
@@ -263,6 +263,22 @@ class DataScopeAbilityTest {
 
     private static final class OwnerDataScopeCriteriaService implements DataScopeCriteriaService {
         @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return DataScopeCriteriaResult.restricted(applyReadScope(moduleAlias, actionCode, criteria, currentUser));
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
+        }
+
+        @Override
         public Criteria applyReadScope(String moduleAlias,
                                        String actionCode,
                                        Criteria criteria,
@@ -286,11 +302,11 @@ class DataScopeAbilityTest {
         }
 
         @Override
-        public Criteria applyReadScope(String moduleAlias,
-                                       String actionCode,
-                                       Criteria criteria,
-                                       java.util.Optional<CurrentUser> currentUser) {
-            return criteria == null ? Criteria.of() : criteria;
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
     }
 
@@ -304,11 +320,11 @@ class DataScopeAbilityTest {
         }
 
         @Override
-        public Criteria applyReadScope(String moduleAlias,
-                                       String actionCode,
-                                       Criteria criteria,
-                                       java.util.Optional<CurrentUser> currentUser) {
-            return criteria == null ? Criteria.of() : criteria;
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
     }
 
@@ -319,6 +335,14 @@ class DataScopeAbilityTest {
                                                         Criteria criteria,
                                                         java.util.Optional<CurrentUser> currentUser) {
             return DataScopeCriteriaResult.unrestricted(applyReadScope(moduleAlias, actionCode, criteria, currentUser));
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return resolveReadScope(moduleAlias, policy.permissionActionCode(), criteria, currentUser);
         }
 
         @Override

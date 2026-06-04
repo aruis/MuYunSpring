@@ -35,7 +35,8 @@ final class PlatformActionResolver {
         return new EntityActionDefinition(entity.alias(), action.code(),
                 action.title(), true, level,
                 null, toAccessMode(action.accessMode()), action.actionAuth(),
-                action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE), action.inheritActionCode(),
+                action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE),
+                action.defaultGrantPolicy(), action.inheritActionCode(),
                 null, null, null, null);
     }
 

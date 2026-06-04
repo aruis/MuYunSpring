@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
-import net.ximatai.muyun.spring.common.platform.ActionDefaultPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
@@ -71,7 +71,7 @@ class RoleActionExecutionPolicyServiceTest {
         policy.requireAuthorized(ActionExecutionContext.ofPolicy(
                 "sales.contract",
                 new ActionExecutionPolicy("publicSearch", PlatformActionLevel.LIST,
-                        ActionAccessMode.ANONYMOUS_ALLOWED, false, false, ActionDefaultPolicy.NONE, null),
+                        ActionAccessMode.ANONYMOUS_ALLOWED, false, false, ActionDefaultGrantPolicy.NONE, null),
                 Set.of(),
                 Optional.empty()
         ));
@@ -87,7 +87,7 @@ class RoleActionExecutionPolicyServiceTest {
         policy.requireAuthorized(ActionExecutionContext.ofPolicy(
                 "sales.contract",
                 new ActionExecutionPolicy("profile", PlatformActionLevel.RECORD,
-                        ActionAccessMode.LOGIN_REQUIRED, false, false, ActionDefaultPolicy.NONE, null),
+                        ActionAccessMode.LOGIN_REQUIRED, false, false, ActionDefaultGrantPolicy.NONE, null),
                 Set.of("contract-1"),
                 Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
         ));
@@ -104,12 +104,28 @@ class RoleActionExecutionPolicyServiceTest {
         policy.requireAuthorized(ActionExecutionContext.ofPolicy(
                 "sales.contract",
                 new ActionExecutionPolicy("export", PlatformActionLevel.LIST,
-                        ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, "view"),
+                        ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, "view"),
                 Set.of(),
                 Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
         ));
 
         verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldAllowDefaultAuthenticatedGrantWithoutRoleLookup() {
+        RoleService roleService = mock(RoleService.class);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        policy.requireAuthorized(ActionExecutionContext.ofPolicy(
+                "sales.contract",
+                new ActionExecutionPolicy("follow", PlatformActionLevel.RECORD,
+                        ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.OWNER, null),
+                Set.of("contract-1"),
+                Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
+        ));
+
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "follow");
     }
 
     private ActionExecutionContext context(CurrentUser user) {

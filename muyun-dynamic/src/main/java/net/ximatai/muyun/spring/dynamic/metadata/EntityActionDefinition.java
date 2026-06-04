@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 public record EntityActionDefinition(
@@ -12,6 +13,7 @@ public record EntityActionDefinition(
         EntityActionAccessMode accessMode,
         Boolean actionAuth,
         Boolean dataAuth,
+        ActionDefaultGrantPolicy defaultGrantPolicy,
         String authInheritActionCode,
         String availableExpression,
         String unavailableMessage,
@@ -24,7 +26,27 @@ public record EntityActionDefinition(
         accessMode = accessMode == null ? EntityActionAccessMode.AUTH_REQUIRED : accessMode;
         actionAuth = actionAuth == null ? accessMode == EntityActionAccessMode.AUTH_REQUIRED : actionAuth;
         dataAuth = dataAuth != null && dataAuth;
+        defaultGrantPolicy = defaultGrantPolicy == null ? ActionDefaultGrantPolicy.NONE : defaultGrantPolicy;
         executorType = executorType == null ? defaultExecutorType(category) : executorType;
+    }
+
+    public EntityActionDefinition(String entityAlias,
+                                  String actionCode,
+                                  String title,
+                                  boolean enabled,
+                                  EntityActionLevel level,
+                                  EntityActionCategory category,
+                                  EntityActionAccessMode accessMode,
+                                  Boolean actionAuth,
+                                  Boolean dataAuth,
+                                  String authInheritActionCode,
+                                  String availableExpression,
+                                  String unavailableMessage,
+                                  EntityActionExecutorType executorType,
+                                  String executorKey) {
+        this(entityAlias, actionCode, title, enabled, level, category, accessMode,
+                actionAuth, dataAuth, ActionDefaultGrantPolicy.NONE, authInheritActionCode,
+                availableExpression, unavailableMessage, executorType, executorKey);
     }
 
     public EntityActionDefinition(String entityAlias,
@@ -56,7 +78,8 @@ public record EntityActionDefinition(
 
     public EntityActionDefinition availableWhen(String expression, String message) {
         return new EntityActionDefinition(entityAlias, actionCode, title, enabled, level, category,
-                accessMode, actionAuth, dataAuth, authInheritActionCode, expression, message, executorType, executorKey);
+                accessMode, actionAuth, dataAuth, defaultGrantPolicy, authInheritActionCode,
+                expression, message, executorType, executorKey);
     }
 
     public boolean hasAvailabilityCondition() {

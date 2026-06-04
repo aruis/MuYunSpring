@@ -8,38 +8,38 @@ import java.util.Optional;
 public enum PlatformAction {
     CREATE(PlatformActionGroup.CRUD, "create", "Create",
             PlatformActionLevel.LIST, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
     VIEW(PlatformActionGroup.CRUD, "view", "View",
             PlatformActionLevel.RECORD, 20,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     UPDATE(PlatformActionGroup.CRUD, "update", "Update",
             PlatformActionLevel.RECORD, 30,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     DELETE(PlatformActionGroup.CRUD, "delete", "Delete",
             PlatformActionLevel.RECORD, 40,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     QUERY(PlatformActionGroup.CRUD, "query", "Query",
             PlatformActionLevel.LIST, 50,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
     SORT(PlatformActionGroup.SORT, "sort", "Sort",
             PlatformActionLevel.RECORD, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
 
     TREE(PlatformActionGroup.TREE, "tree", "Tree",
             PlatformActionLevel.LIST, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
     REFERENCE(PlatformActionGroup.REFERENCE, "reference", "Reference",
             PlatformActionLevel.LIST, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW),
 
     ENABLE(PlatformActionGroup.ENABLE, "enable", "Enable",
             PlatformActionLevel.RECORD, 10,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     DISABLE(PlatformActionGroup.ENABLE, "disable", "Disable",
             PlatformActionLevel.RECORD, 20,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, ENABLE);
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, ENABLE);
 
     private final PlatformActionGroup group;
     private final String code;
@@ -49,7 +49,7 @@ public enum PlatformAction {
     private final ActionAccessMode accessMode;
     private final boolean actionAuth;
     private final boolean dataAuth;
-    private final ActionDefaultPolicy defaultPolicy;
+    private final ActionDefaultGrantPolicy defaultGrantPolicy;
     private final PlatformAction permissionAction;
 
     PlatformAction(PlatformActionGroup group,
@@ -58,7 +58,7 @@ public enum PlatformAction {
                    PlatformActionLevel level,
                    int order) {
         this(group, code, title, level, order,
-                ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, null);
+                ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null);
     }
 
     PlatformAction(PlatformActionGroup group,
@@ -69,7 +69,7 @@ public enum PlatformAction {
                    ActionAccessMode accessMode,
                    boolean actionAuth,
                    boolean dataAuth,
-                   ActionDefaultPolicy defaultPolicy,
+                   ActionDefaultGrantPolicy defaultGrantPolicy,
                    PlatformAction permissionAction) {
         this.group = group;
         this.code = code;
@@ -79,7 +79,7 @@ public enum PlatformAction {
         this.accessMode = accessMode;
         this.actionAuth = actionAuth;
         this.dataAuth = dataAuth;
-        this.defaultPolicy = defaultPolicy;
+        this.defaultGrantPolicy = defaultGrantPolicy;
         this.permissionAction = permissionAction;
     }
 
@@ -115,8 +115,8 @@ public enum PlatformAction {
         return dataAuth;
     }
 
-    public ActionDefaultPolicy defaultPolicy() {
-        return defaultPolicy;
+    public ActionDefaultGrantPolicy defaultGrantPolicy() {
+        return defaultGrantPolicy;
     }
 
     public String permissionActionCode() {

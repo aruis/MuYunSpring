@@ -14,7 +14,7 @@ import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
-import net.ximatai.muyun.spring.common.platform.ActionDefaultPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
@@ -539,11 +539,16 @@ public class DynamicRecordService {
     }
 
     private DataScopeCriteriaResult readScope(String moduleAlias, PlatformAction action, Criteria criteria) {
-        return readScope(moduleAlias, action.permissionActionCode(), criteria);
+        return readScope(moduleAlias, action.executionPolicy(), criteria);
     }
 
     private DataScopeCriteriaResult readScope(String moduleAlias, String actionCode, Criteria criteria) {
-        return dataScopeCriteriaService.resolveReadScope(moduleAlias, actionCode,
+        return readScope(moduleAlias, ActionExecutionContext.ofActionCode(
+                moduleAlias, actionCode, Set.of(), CurrentUserContext.currentUser()).actionPolicy(), criteria);
+    }
+
+    private DataScopeCriteriaResult readScope(String moduleAlias, ActionExecutionPolicy policy, Criteria criteria) {
+        return dataScopeCriteriaService.resolveReadScope(moduleAlias, policy,
                 criteria == null ? Criteria.of() : criteria,
                 CurrentUserContext.currentUser());
     }
@@ -740,7 +745,7 @@ public class DynamicRecordService {
         Criteria idCriteria = normalized.size() == 1
                 ? Criteria.of().eq("id", normalized.iterator().next())
                 : Criteria.of().in("id", List.copyOf(normalized));
-        DataScopeCriteriaResult scope = readScope(moduleAlias, policy.permissionActionCode(), idCriteria);
+        DataScopeCriteriaResult scope = readScope(moduleAlias, policy, idCriteria);
         long visible = withTenantScope(scope, () -> entityService(moduleAlias, entityAlias)
                 .list(scope.criteria(), new PageRequest(0, normalized.size()))
                 .stream()
@@ -860,7 +865,7 @@ public class DynamicRecordService {
                 toAccessMode(action.accessMode()),
                 action.actionAuth(),
                 action.dataAuth(),
-                ActionDefaultPolicy.NONE,
+                action.defaultGrantPolicy(),
                 action.authInheritActionCode()
         );
     }
