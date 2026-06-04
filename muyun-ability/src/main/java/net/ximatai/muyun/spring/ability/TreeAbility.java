@@ -214,6 +214,16 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         return result;
     }
 
+    default List<String> selfAndDescendantIds(String id) {
+        if (id == null || id.isBlank()) {
+            return List.of();
+        }
+        List<String> ids = new ArrayList<>();
+        ids.add(id);
+        ids.addAll(descendantIds(id));
+        return List.copyOf(ids);
+    }
+
     default void validateTreePlacement(T entity) {
         String id = entity.getId();
         String parentId = entity.getParentId();

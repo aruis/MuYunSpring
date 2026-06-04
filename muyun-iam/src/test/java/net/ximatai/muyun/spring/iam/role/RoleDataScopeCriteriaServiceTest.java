@@ -230,7 +230,7 @@ class RoleDataScopeCriteriaServiceTest {
         when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
         ));
-        when(organizationService.organizationAndDescendantIds("org-1")).thenReturn(List.of("org-1", "org-1-1"));
+        when(organizationService.selfAndDescendantIds("org-1")).thenReturn(List.of("org-1", "org-1-1"));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService, Optional.of(organizationService));
 
         Criteria scoped = service.applyReadScope(

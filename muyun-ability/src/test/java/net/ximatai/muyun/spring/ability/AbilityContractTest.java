@@ -1194,6 +1194,8 @@ class AbilityContractTest {
         assertThat(service.ancestorIdsAndSelf(leafId)).containsExactly(regionId, leafId);
         assertThat(service.ancestorIds(subLeafId)).containsExactly(regionId, leafId);
         assertThat(service.descendantIds(regionId)).containsExactly(leafId, subLeafId);
+        assertThat(service.selfAndDescendantIds(regionId)).containsExactly(regionId, leafId, subLeafId);
+        assertThat(service.selfAndDescendantIds("")).isEmpty();
         assertThat(service.ancestorIdsAndSelf("missing")).isEmpty();
     }
 

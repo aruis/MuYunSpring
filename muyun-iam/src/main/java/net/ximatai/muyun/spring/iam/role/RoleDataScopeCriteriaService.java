@@ -343,7 +343,7 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         }
         OrganizationService service = organizationService.orElseThrow(() ->
                 new PlatformException("organization children data scope requires organization hierarchy support"));
-        List<String> organizationIds = service.organizationAndDescendantIds(user.organizationId());
+        List<String> organizationIds = service.selfAndDescendantIds(user.organizationId());
         if (!organizationIds.isEmpty()) {
             scope.orIn(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, organizationIds);
         }

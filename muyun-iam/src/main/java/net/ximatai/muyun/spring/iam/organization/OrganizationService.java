@@ -1,8 +1,5 @@
 package net.ximatai.muyun.spring.iam.organization;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -32,13 +29,4 @@ public class OrganizationService extends TenantActiveScopedService<Organization>
         organization.setCode(Preconditions.requireText(organization.getCode(), "organizationCode"));
     }
 
-    public List<String> organizationAndDescendantIds(String organizationId) {
-        if (organizationId == null || organizationId.isBlank()) {
-            return List.of();
-        }
-        List<String> ids = new ArrayList<>();
-        ids.add(organizationId);
-        ids.addAll(descendantIds(organizationId));
-        return List.copyOf(ids);
-    }
 }
