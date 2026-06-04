@@ -16,6 +16,7 @@ public final class ActionEventPayload {
     public static final String FAILURE_STAGE = "failureStage";
     public static final String ERROR_MESSAGE = "errorMessage";
     public static final String ERROR_TYPE = "errorType";
+    public static final String SYSTEM_REASON = "systemReason";
 
     private ActionEventPayload() {
     }
@@ -100,6 +101,18 @@ public final class ActionEventPayload {
             return Boolean.parseBoolean(stringValue);
         }
         return null;
+    }
+
+    public static Map<String, Object> withSystemReason(Map<String, Object> payload, String systemReason) {
+        if (systemReason == null || systemReason.isBlank()) {
+            return payload == null ? Map.of() : payload;
+        }
+        Map<String, Object> enriched = new LinkedHashMap<>();
+        if (payload != null) {
+            enriched.putAll(payload);
+        }
+        enriched.put(SYSTEM_REASON, systemReason);
+        return Map.copyOf(enriched);
     }
 
     private static void putText(Map<String, Object> payload, String key, String value) {

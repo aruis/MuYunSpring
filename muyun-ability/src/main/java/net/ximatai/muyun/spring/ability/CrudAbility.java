@@ -9,6 +9,11 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 
@@ -16,6 +21,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 
 public interface CrudAbility<T extends EntityContract> {
     BaseDao<T, String> getDao();
@@ -68,26 +74,29 @@ public interface CrudAbility<T extends EntityContract> {
     }
 
     default int update(T entity) {
-        T existing = selectExistingForScopedMutation(entity);
-        if (TenantContext.currentTenantId().isPresent() && existing == null) {
-            return 0;
-        }
-        if (existing != null) {
-            entity.setTenantId(existing.getTenantId());
-        }
-        Integer expectedVersion = expectedVersionForUpdate(entity);
-        EntityLifecycle.prepareUpdate(entity, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
-        beforeUpdate(entity);
-        validateTreePlacementIfNeeded(entity);
-        int updated = getDao().updateByIdAndVersion(entity, expectedVersion);
-        if (updated <= 0) {
-            throw new OptimisticLockException("record version conflict: " + entity.getId());
-        }
-        PlatformAbilityDispatcher.afterUpdate(this, entity, updated);
-        afterUpdate(entity, updated);
-        afterChanged(entity);
-        CacheInvalidationSupport.clearAfterChanged(this, entity);
-        return updated;
+        DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.UPDATE, entity == null ? null : entity.getId());
+        return withTenantScope(mutationScope, () -> {
+            T existing = selectExistingForScopedMutation(entity);
+            if (TenantContext.currentTenantId().isPresent() && existing == null) {
+                return 0;
+            }
+            if (existing != null) {
+                entity.setTenantId(existing.getTenantId());
+            }
+            Integer expectedVersion = expectedVersionForUpdate(entity);
+            EntityLifecycle.prepareUpdate(entity, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
+            beforeUpdate(entity);
+            validateTreePlacementIfNeeded(entity);
+            int updated = getDao().updateByIdAndVersion(entity, expectedVersion);
+            if (updated <= 0) {
+                throw new OptimisticLockException("record version conflict: " + entity.getId());
+            }
+            PlatformAbilityDispatcher.afterUpdate(this, entity, updated);
+            afterUpdate(entity, updated);
+            afterChanged(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
+            return updated;
+        });
     }
 
     default int delete(String id) {
@@ -103,31 +112,37 @@ public interface CrudAbility<T extends EntityContract> {
 
     default int delete(String id, Integer expectedVersion) {
         beforeDelete(id);
-        T entity = selectActiveRaw(id);
-        if (entity == null) {
-            return 0;
-        }
-        Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
-        int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
-        if (deleted <= 0) {
-            throw new OptimisticLockException("record version conflict: " + id);
-        }
-        PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
-        afterDelete(id, entity, deleted);
-        afterChanged(entity);
-        CacheInvalidationSupport.clearAfterChanged(this, entity);
-        return deleted;
+        DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.DELETE, id);
+        return withTenantScope(mutationScope, () -> {
+            T entity = selectActiveRaw(id);
+            if (entity == null) {
+                return 0;
+            }
+            Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
+            int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
+            if (deleted <= 0) {
+                throw new OptimisticLockException("record version conflict: " + id);
+            }
+            PlatformAbilityDispatcher.afterDelete(this, id, entity, deleted);
+            afterDelete(id, entity, deleted);
+            afterChanged(entity);
+            CacheInvalidationSupport.clearAfterChanged(this, entity);
+            return deleted;
+        });
     }
 
     default int deleteBatch(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
-        int count = 0;
-        for (String id : ids) {
-            count += delete(id);
-        }
-        return count;
+        DataScopeCriteriaResult mutationScope = mutationRecordScope(PlatformAction.DELETE, ids);
+        return withTenantScope(mutationScope, () -> {
+            int count = 0;
+            for (String id : ids) {
+                count += delete(id);
+            }
+            return count;
+        });
     }
 
     default PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -213,8 +228,10 @@ public interface CrudAbility<T extends EntityContract> {
         if (criteria != null && !criteria.isEmpty()) {
             scoped.andGroup(criteria.getRoot());
         }
-        TenantContext.currentTenantId()
-                .ifPresent(tenantId -> scoped.eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId));
+        if (!TenantContext.tenantFilterBypassed()) {
+            TenantContext.currentTenantId()
+                    .ifPresent(tenantId -> scoped.eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId));
+        }
         return scoped;
     }
 
@@ -235,6 +252,44 @@ public interface CrudAbility<T extends EntityContract> {
         return TenantContext.currentTenantId().isPresent() || TenantContext.isSystem()
                 ? selectActiveRaw(entity.getId())
                 : null;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private DataScopeCriteriaResult mutationRecordScope(PlatformAction action, String id) {
+        if (id == null || id.isBlank()) {
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+        if (this instanceof DataScopeAbility dataScopeAbility) {
+            return dataScopeAbility.requireRecordScopeResult(mutationPolicy(action), List.of(id));
+        }
+        return DataScopeCriteriaResult.unrestricted(Criteria.of());
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private DataScopeCriteriaResult mutationRecordScope(PlatformAction action, Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+        if (this instanceof DataScopeAbility dataScopeAbility) {
+            return dataScopeAbility.requireRecordScopeResult(mutationPolicy(action), ids);
+        }
+        return DataScopeCriteriaResult.unrestricted(Criteria.of());
+    }
+
+    private ActionExecutionPolicy mutationPolicy(PlatformAction fallback) {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> context.moduleAlias().equals(getModuleAlias()))
+                .map(ActionExecutionContext::actionPolicy)
+                .orElseGet(fallback::executionPolicy);
+    }
+
+    private <R> R withTenantScope(DataScopeCriteriaResult scope, Supplier<R> supplier) {
+        if (scope != null && scope.crossTenant()) {
+            try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("data scope allows cross-tenant mutation")) {
+                return supplier.get();
+            }
+        }
+        return supplier.get();
     }
 
     private void prepareAbilityDefaults(T entity) {

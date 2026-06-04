@@ -1,14 +1,14 @@
 package net.ximatai.muyun.spring.dynamic.openapi;
 
-import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformPermissionCode;
+import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
-import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.EntityCapability;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -124,12 +124,23 @@ public class DynamicOpenApiGenerator {
                                                             DynamicActionDescriptor action,
                                                             String path,
                                                             String scope) {
-        return operation(descriptor.moduleAlias(), path,
+        return operationWithPermissionCode(descriptor.moduleAlias(), path,
                 operationId(descriptor, scope + upperName(action.code())),
                 action.title(),
                 "DynamicWebActionRequest",
                 "DynamicWebActionExecutionResponse",
-                action.code());
+                action.code(),
+                actionPermissionCode(descriptor.moduleAlias(), action));
+    }
+
+    private String actionPermissionCode(String moduleAlias, DynamicActionDescriptor action) {
+        if (action.permission() != null) {
+            return action.permission().permissionCode();
+        }
+        String permissionActionCode = action.authInheritActionCode() == null
+                ? PlatformAction.permissionActionCodeOf(action.code())
+                : PlatformAction.permissionActionCodeOf(action.authInheritActionCode());
+        return PlatformPermissionCode.action(moduleAlias, permissionActionCode);
     }
 
     private DynamicOpenApiDocument.Operation operation(String moduleAlias,
@@ -160,6 +171,34 @@ public class DynamicOpenApiGenerator {
                                                        String requestSchema,
                                                        String responseSchema,
                                                        String actionCode) {
+        return operationWithPermissionCode(method, moduleAlias, path, operationId, summary, requestSchema, responseSchema,
+                actionCode, null);
+    }
+
+    private DynamicOpenApiDocument.Operation operationWithPermissionCode(String moduleAlias,
+                                                                         String path,
+                                                                         String operationId,
+                                                                         String summary,
+                                                                         String requestSchema,
+                                                                         String responseSchema,
+                                                                         String actionCode,
+                                                                         String permissionCode) {
+        return operationWithPermissionCode(METHOD_POST, moduleAlias, path, operationId, summary, requestSchema,
+                responseSchema, actionCode, permissionCode);
+    }
+
+    private DynamicOpenApiDocument.Operation operationWithPermissionCode(String method,
+                                                                         String moduleAlias,
+                                                                         String path,
+                                                                         String operationId,
+                                                                         String summary,
+                                                                         String requestSchema,
+                                                                         String responseSchema,
+                                                                         String actionCode,
+                                                                         String permissionCode) {
+        String effectivePermissionCode = permissionCode == null && actionCode != null
+                ? PlatformPermissionCode.action(moduleAlias, PlatformAction.permissionActionCodeOf(actionCode))
+                : permissionCode;
         return new DynamicOpenApiDocument.Operation(
                 method,
                 path,
@@ -168,7 +207,7 @@ public class DynamicOpenApiGenerator {
                 requestSchema,
                 responseSchema,
                 actionCode,
-                actionCode == null ? null : PlatformPermissionCode.action(moduleAlias, actionCode),
+                effectivePermissionCode,
                 DEFAULT_ERRORS
         );
     }

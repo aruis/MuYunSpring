@@ -321,7 +321,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$[0].permission.permissionCode").value(MODULE + ":export"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
                 .andExpect(jsonPath("$[1].authInheritActionCode").value("view"))
-                .andExpect(jsonPath("$[1].permission.permissionCode").value(MODULE + ":submit"))
+                .andExpect(jsonPath("$[1].permission.permissionCode").value(MODULE + ":view"))
                 .andExpect(jsonPath("$[1].permission.inheritActionCode").value("view"))
                 .andExpect(jsonPath("$[1].permission.inheritPermissionCode").value(MODULE + ":view"))
                 .andExpect(jsonPath("$[1].authInheritActionAlias").doesNotExist())

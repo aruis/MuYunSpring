@@ -95,7 +95,10 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/query")))
                 .singleElement()
-                .satisfies(operation -> assertThat(operation.actionCode()).isEqualTo(PlatformAction.QUERY.code()));
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.QUERY.code());
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:view");
+                });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/actions")))
                 .singleElement()
@@ -210,6 +213,13 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.responseSchema()).isEqualTo("WebCountResponse");
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.ENABLE.code());
+                });
+        assertThat(enabled.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/disable/{id}")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.DISABLE.code());
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:enable");
                 });
     }
 

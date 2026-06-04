@@ -11,9 +11,9 @@ public final class TenantContext {
         SYSTEM
     }
 
-    private record State(Mode mode, String tenantId) {
+    private record State(Mode mode, String tenantId, String systemReason, boolean tenantFilterBypassed) {
         private static State none() {
-            return new State(Mode.NONE, null);
+            return new State(Mode.NONE, null, null, false);
         }
     }
 
@@ -31,6 +31,15 @@ public final class TenantContext {
         return CURRENT.get().mode() == Mode.SYSTEM;
     }
 
+    public static Optional<String> systemReason() {
+        State state = CURRENT.get();
+        return state.mode() == Mode.SYSTEM ? Optional.ofNullable(state.systemReason()) : Optional.empty();
+    }
+
+    public static boolean tenantFilterBypassed() {
+        return CURRENT.get().tenantFilterBypassed();
+    }
+
     public static boolean hasContext() {
         return CURRENT.get().mode() != Mode.NONE;
     }
@@ -40,7 +49,7 @@ public final class TenantContext {
             CURRENT.set(State.none());
             return;
         }
-        CURRENT.set(new State(Mode.TENANT, tenantId));
+        CURRENT.set(new State(Mode.TENANT, tenantId, null, false));
     }
 
     public static Scope use(String tenantId) {
@@ -49,9 +58,16 @@ public final class TenantContext {
         return new Scope(previous);
     }
 
-    public static Scope system() {
+    public static Scope system(String reason) {
         State previous = CURRENT.get();
-        CURRENT.set(new State(Mode.SYSTEM, null));
+        CURRENT.set(new State(Mode.SYSTEM, null, requireReason(reason), false));
+        return new Scope(previous);
+    }
+
+    public static Scope bypassTenantFilter(String reason) {
+        State previous = CURRENT.get();
+        requireBypassReason(reason);
+        CURRENT.set(new State(previous.mode(), previous.tenantId(), previous.systemReason(), true));
         return new Scope(previous);
     }
 
@@ -70,6 +86,9 @@ public final class TenantContext {
         if (entity == null) {
             return false;
         }
+        if (tenantFilterBypassed()) {
+            return true;
+        }
         return currentTenantId()
                 .map(tenantId -> tenantId.equals(entity.getTenantId()))
                 .orElse(true);
@@ -86,5 +105,19 @@ public final class TenantContext {
         public void close() {
             CURRENT.set(previous);
         }
+    }
+
+    private static String requireReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("system context requires reason");
+        }
+        return reason.trim();
+    }
+
+    private static String requireBypassReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("tenant filter bypass requires reason");
+        }
+        return reason.trim();
     }
 }

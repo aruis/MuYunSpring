@@ -83,7 +83,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
     }
 
     private PlatformModule selectGlobalModule(String moduleAlias) {
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("select global platform module")) {
             return getDao().query(activeCriteria(Criteria.of()
                             .eq("id", moduleAlias)),
                     new PageRequest(0, 1))

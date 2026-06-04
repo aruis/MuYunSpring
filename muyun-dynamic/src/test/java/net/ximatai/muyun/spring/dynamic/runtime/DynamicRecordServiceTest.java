@@ -354,9 +354,269 @@ class DynamicRecordServiceTest {
             assertThat(context.moduleAlias()).isEqualTo(MODULE);
             assertThat(context.actionCode()).isEqualTo("submit");
             assertThat(context.permissionCode()).isEqualTo(MODULE + ":submit");
+            assertThat(context.actionPolicy().accessMode())
+                    .isEqualTo(net.ximatai.muyun.spring.common.platform.ActionAccessMode.AUTH_REQUIRED);
+            assertThat(context.actionPolicy().actionAuth()).isTrue();
+            assertThat(context.actionPolicy().dataAuth()).isFalse();
+            assertThat(context.actionPolicy().permissionActionCode()).isEqualTo("submit");
             assertThat(context.recordIds()).containsExactly("contract-1");
             assertThat(context.currentUser()).get().extracting(CurrentUser::userId).isEqualTo("user-1");
         });
+    }
+
+    @Test
+    void shouldAuthorizeDynamicCreateAtServiceBoundary() {
+        IDatabaseOperations<Object> operations = operations();
+        ActionExecutionPolicyService policyService = context -> {
+            if ("create".equals(context.actionCode())) {
+                throw new PlatformException("create denied");
+            }
+        };
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
+                .register(new ModuleDefinition(MODULE, "Contract", List.of(contractEntity())));
+        DynamicRecordService service = new DynamicRecordService(
+                runtime,
+                policyService,
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService()
+        );
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+
+        assertThatThrownBy(() -> service.create(MODULE, "contract", record))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("create denied");
+
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeBeforeExecutingDynamicAction() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(actionRow("visible", "C-001", "draft"))
+                    : List.of();
+        });
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                new WritingActionExecutor(), dataAuthSubmitAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new VisibleOnlyDataScopeCriteriaService());
+        DynamicRecord hidden = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002")
+                .setValue("status", "draft");
+        hidden.setId("hidden");
+
+        assertThatThrownBy(() -> service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.record(hidden)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeToServiceActionInternalMutation() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(actionRow("visible", "C-001", "draft"))
+                    : List.of();
+        });
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                new CrossRecordWritingActionExecutor(), dataAuthSubmitAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new VisibleOnlyDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.module(MODULE).executeAction("submit", DynamicActionExecutionRequest.id("visible")))
+                .isInstanceOf(DynamicActionExecutionException.class)
+                .hasMessageContaining("record data permission denied");
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeToStandardDynamicUpdateAction() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(actionRow("visible", "C-001", "draft"))
+                    : List.of();
+        });
+        DynamicRecordService service = service(operations, dataScopedActionEntity(),
+                RuntimeEventPublisher.noop(), new VisibleOnlyDataScopeCriteriaService());
+        DynamicRecord hidden = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002")
+                .setValue("status", "submitted");
+        hidden.setId("hidden");
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("update", DynamicActionExecutionRequest.record(hidden)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeToDynamicSortMutations() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(sortableRow("visible", 1000))
+                    : List.of();
+        });
+        DynamicRecordService service = service(operations, dataScopedSortableEntity(),
+                RuntimeEventPublisher.noop(), new VisibleOnlyDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.reorder(MODULE, "contract", List.of("visible", "hidden")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+        assertThatThrownBy(() -> service.moveBefore(MODULE, "contract", "hidden", "visible"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyDataScopeToDynamicTreeSortMutations() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(treeRow("visible", "root", 1000))
+                    : List.of();
+        });
+        DynamicRecordService service = service(operations, dataScopedTreeEntity(),
+                RuntimeEventPublisher.noop(), new VisibleOnlyDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.moveInTree(MODULE, "contract", "hidden", "visible", null, "root"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+
+        service.moveInTree(MODULE, "contract", "visible", null, null, "root");
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyFullSortScopeDataScopeToStandardSortAction() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("hidden")) {
+                return List.of(sortableRow("visible", 1000), sortableRow("target", 2000));
+            }
+            if (params.containsValue("visible")) {
+                return List.of(sortableRow("visible", 1000));
+            }
+            if (params.containsValue("target")) {
+                return List.of(sortableRow("target", 2000));
+            }
+            return List.of(sortableRow("visible", 1000), sortableRow("target", 2000), sortableRow("hidden", 3000));
+        });
+        DynamicRecordService service = service(operations, dataScopedSortableEntity(),
+                RuntimeEventPublisher.noop(), new AllowIdsDataScopeCriteriaService("visible", "target"));
+
+        assertThatThrownBy(() -> service.module(MODULE)
+                .executeAction("sort", DynamicActionExecutionRequest.id("visible").withBeforeId("target")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldApplyFullSortScopeDataScopeWhenCrossTenantRoleAllowsBypass() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("hidden")) {
+                return List.of(sortableRow("visible", 1000), sortableRow("target", 2000));
+            }
+            if (params.containsValue("visible")) {
+                return List.of(sortableRow("visible", 1000));
+            }
+            if (params.containsValue("target")) {
+                return List.of(sortableRow("target", 2000));
+            }
+            return List.of(sortableRow("visible", 1000), sortableRow("target", 2000), sortableRow("hidden", 3000));
+        });
+        DynamicRecordService service = service(operations, dataScopedSortableEntity(),
+                RuntimeEventPublisher.noop(), new CrossTenantAllowIdsDataScopeCriteriaService("visible", "target"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> service.module(MODULE)
+                    .executeAction("sort", DynamicActionExecutionRequest.id("visible").withBeforeId("target")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("record data permission denied");
+            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+            assertThat(TenantContext.tenantFilterBypassed()).isFalse();
+        }
+
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+    }
+
+    @Test
+    void shouldFilterTreeDescendantIdsByDataScope() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            if (sql.contains("parent_id") && params.containsValue("parent")) {
+                return List.of(treeRow("visible", "parent", 1000), treeRow("hidden", "parent", 2000));
+            }
+            if (sql.contains("parent_id") && (params.containsValue("visible") || params.containsValue("hidden"))) {
+                return List.of();
+            }
+            if (params.containsValue("visible") && params.containsValue("hidden")) {
+                return List.of(treeRow("visible", "parent", 1000));
+            }
+            if (params.containsValue("parent")) {
+                return List.of(treeRow("parent", "root", 1000));
+            }
+            if (params.containsValue("visible")) {
+                return List.of(treeRow("visible", "parent", 1000));
+            }
+            if (params.containsValue("hidden")) {
+                return List.of(treeRow("hidden", "parent", 2000));
+            }
+            return List.of();
+        });
+        DynamicRecordService service = service(operations, dataScopedTreeEntity(),
+                RuntimeEventPublisher.noop(), new AllowIdsDataScopeCriteriaService("parent", "visible"));
+
+        assertThat(service.descendantIds(MODULE, "contract", "parent")).containsExactly("visible");
+    }
+
+    @Test
+    void shouldApplyDataScopeToDynamicEnableMutations() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(enabledRow("visible", false))
+                    : List.of();
+        });
+        DynamicRecordService service = service(operations, dataScopedEnabledEntity(),
+                RuntimeEventPublisher.noop(), new VisibleOnlyDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.enable(MODULE, "contract", "hidden"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("record data permission denied");
+
+        assertThat(service.enable(MODULE, "contract", "visible")).isEqualTo(1);
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
     }
 
     @Test
@@ -488,19 +748,22 @@ class DynamicRecordServiceTest {
         draft.setId("contract-1");
 
         DynamicActionExecutionResult result;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("system action replay")) {
             result = service.entity(MODULE, "contract")
                     .executeAction("submit", DynamicActionExecutionRequest.record(draft));
         }
 
         assertThat(result.context().tenantId()).isNull();
         assertThat(result.context().systemContext()).isTrue();
+        assertThat(result.context().systemReason()).isEqualTo("system action replay");
         assertThat(executor.context().systemContext()).isTrue();
+        assertThat(executor.context().systemReason()).isEqualTo("system action replay");
         assertThat(events.events()).singleElement()
                 .satisfies(event -> {
                     assertThat(event.tenantId()).isNull();
                     assertThat(event.systemContext()).isTrue();
                     assertThat(event.traceId()).isEqualTo(result.context().traceId());
+                    assertThat(event.payload()).containsEntry("systemReason", "system action replay");
                 });
     }
 
@@ -1751,7 +2014,7 @@ class DynamicRecordServiceTest {
         DynamicRecord third = service.select(MODULE, "contract", "contract-1");
 
         assertThat(third.getValue("code")).isEqualTo("C-002");
-        verify(operations, org.mockito.Mockito.times(3)).query(anyString(), anyMap());
+        verify(operations, org.mockito.Mockito.atLeast(3)).query(anyString(), anyMap());
     }
 
     @Test
@@ -1787,18 +2050,59 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldBypassTenantScopeWhenDynamicDataScopeAllowsCrossTenantData() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        DynamicRecordService service = service(operations, contractEntity(), RuntimeEventPublisher.noop(),
+                new CrossTenantAllDataScopeCriteriaService());
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.list(MODULE, "contract", Criteria.of(), PageRequest.of(1, 10)))
+                    .extracting(DynamicRecord::getId)
+                    .containsExactly("contract-1");
+            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+            assertThat(TenantContext.tenantFilterBypassed()).isFalse();
+        }
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(operations).query(sql.capture(), anyMap());
+        assertThat(sql.getValue()).doesNotContain("tenant_id");
+    }
+
+    @Test
+    void shouldBypassTenantScopeWhenUpdatingDynamicRecordWithCrossTenantDataScope() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false, "tenant-b")));
+        DynamicRecordService service = service(operations, contractEntity(), RuntimeEventPublisher.noop(),
+                new CrossTenantAllDataScopeCriteriaService());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002")
+                .setValue("amount", BigDecimal.TEN);
+        record.setId("contract-1");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(service.update(MODULE, "contract", record)).isEqualTo(1);
+            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+            assertThat(TenantContext.tenantFilterBypassed()).isFalse();
+        }
+
+        verify(operations).patchUpdateItemWhere(anyString(), anyString(), anyMap(),
+                org.mockito.ArgumentMatchers.argThat(where -> "tenant-b".equals(where.get("tenant_id"))));
+    }
+
+    @Test
     void shouldApplyDataScopeToReferenceResolveTargetModule() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
-        when(dataScope.resolveReadScope(eq(MODULE), eq("reference"), any(Criteria.class), any()))
+        when(dataScope.resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any()))
                 .thenAnswer(invocation -> DataScopeCriteriaResult.unrestricted(invocation.getArgument(2)));
         DynamicRecordService service = referenceResolvingService(operations, dataScope);
 
         service.resolveReference(MODULE, "line", "contractId", DynamicReferenceResolveRequest.query("C-001"));
 
-        verify(dataScope).resolveReadScope(eq(MODULE), eq("reference"), any(Criteria.class), any());
+        verify(dataScope).resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any());
     }
 
     @Test
@@ -1806,7 +2110,7 @@ class DynamicRecordServiceTest {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
         DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
-        when(dataScope.resolveReadScope(eq(MODULE), eq("tree"), any(Criteria.class), any()))
+        when(dataScope.resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any()))
                 .thenAnswer(invocation -> DataScopeCriteriaResult.restricted(invocation.getArgument(2)));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
                 .register(new ModuleDefinition(MODULE, "Contract", List.of(treeEntity())));
@@ -1818,7 +2122,7 @@ class DynamicRecordServiceTest {
 
         service.children(MODULE, "contract", "root");
 
-        verify(dataScope).resolveReadScope(eq(MODULE), eq("tree"), any(Criteria.class), any());
+        verify(dataScope).resolveReadScope(eq(MODULE), eq("view"), any(Criteria.class), any());
     }
 
     @SuppressWarnings("unchecked")
@@ -1898,10 +2202,22 @@ class DynamicRecordServiceTest {
                                                EntityActionDefinition submitAction,
                                                DynamicActionTransactionOperator transactionOperator,
                                                ActionExecutionPolicyService actionExecutionPolicyService) {
+        return actionService(operations, eventPublisher, executor, submitAction,
+                transactionOperator, actionExecutionPolicyService,
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+    }
+
+    private DynamicRecordService actionService(IDatabaseOperations<Object> operations,
+                                               RuntimeEventPublisher eventPublisher,
+                                               DynamicActionExecutor executor,
+                                               EntityActionDefinition submitAction,
+                                               DynamicActionTransactionOperator transactionOperator,
+                                               ActionExecutionPolicyService actionExecutionPolicyService,
+                                               DataScopeCriteriaService dataScopeCriteriaService) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
-                List.of(actionEntity()),
+                List.of(submitAction.dataAuth() ? dataScopedActionEntity() : actionEntity()),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -1919,7 +2235,8 @@ class DynamicRecordServiceTest {
                 transactionOperator
         ).register(module), actionExecutionPolicyService == null
                 ? new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService()
-                : actionExecutionPolicyService);
+                : actionExecutionPolicyService,
+                dataScopeCriteriaService);
     }
 
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
@@ -2019,6 +2336,14 @@ class DynamicRecordServiceTest {
         );
     }
 
+    private EntityActionDefinition dataAuthSubmitAction(String executorKey) {
+        return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
+                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                EntityActionCategory.CUSTOM, null, true, true, null,
+                null, null, EntityActionExecutorType.SERVICE, executorKey
+        );
+    }
+
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations) {
         return referenceResolvingService(operations,
                 new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
@@ -2064,6 +2389,23 @@ class DynamicRecordServiceTest {
                         FieldDefinition.string("status", "Status").length(32)
                 )
         );
+    }
+
+    private EntityDefinition dataScopedActionEntity() {
+        return actionEntity().withCapabilities(EntityCapability.CRUD, EntityCapability.DATA_SCOPE);
+    }
+
+    private EntityDefinition dataScopedSortableEntity() {
+        return sortableEntity().withCapabilities(EntityCapability.CRUD, EntityCapability.SORT, EntityCapability.DATA_SCOPE);
+    }
+
+    private EntityDefinition dataScopedTreeEntity() {
+        return treeEntity().withCapabilities(EntityCapability.CRUD, EntityCapability.TREE, EntityCapability.SORT,
+                EntityCapability.DATA_SCOPE);
+    }
+
+    private EntityDefinition dataScopedEnabledEntity() {
+        return enabledEntity().withCapabilities(EntityCapability.CRUD, EntityCapability.ENABLE, EntityCapability.DATA_SCOPE);
     }
 
     private EntityDefinition actionRuleEntity() {
@@ -2225,6 +2567,17 @@ class DynamicRecordServiceTest {
         );
     }
 
+    private Map<String, Object> row(String id, String code, int version, boolean deleted, String tenantId) {
+        return Map.of(
+                "id", id,
+                "tenant_id", tenantId,
+                "code", code,
+                "amount", BigDecimal.TEN,
+                "deleted", deleted,
+                "version", version
+        );
+    }
+
     private Map<String, Object> actionRow(String id, String code, String status) {
         return Map.of(
                 "id", id,
@@ -2250,6 +2603,17 @@ class DynamicRecordServiceTest {
         return Map.of(
                 "id", id,
                 "code", id.toUpperCase(),
+                "sort_order", sortOrder,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> treeRow(String id, String parentId, int sortOrder) {
+        return Map.of(
+                "id", id,
+                "code", id.toUpperCase(),
+                "parent_id", parentId,
                 "sort_order", sortOrder,
                 "deleted", Boolean.FALSE,
                 "version", 0
@@ -2291,6 +2655,9 @@ class DynamicRecordServiceTest {
         when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             Map<String, Object> params = invocation.getArgument(1);
+            if (params.containsValue("first") && params.containsValue("second")) {
+                return List.of(sortableRow("first", 1), sortableRow("second", 2));
+            }
             if (params.containsValue("first")) {
                 return List.of(sortableRow("first", 1));
             }
@@ -2493,6 +2860,112 @@ class DynamicRecordServiceTest {
             DynamicRecord record = request.record();
             record.setValue("status", "submitted");
             return DynamicActionResultBody.changedCount(operations.update(record));
+        }
+    }
+
+    private static final class CrossRecordWritingActionExecutor implements DynamicActionExecutor {
+        @Override
+        public String executorKey() {
+            return "contractSubmit";
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
+            throw new UnsupportedOperationException("cross-record action requires dynamic action operations");
+        }
+
+        @Override
+        public Object execute(DynamicActionExecutionContext context,
+                              DynamicActionExecutionRequest request,
+                              DynamicActionOperations operations) {
+            DynamicRecord record = operations.newRecord();
+            record.setId("hidden");
+            record.setValue("code", "C-002");
+            record.setValue("status", "submitted");
+            return DynamicActionResultBody.changedCount(operations.update(record));
+        }
+    }
+
+    private static final class VisibleOnlyDataScopeCriteriaService implements DataScopeCriteriaService {
+        @Override
+        public Criteria applyReadScope(String moduleAlias,
+                                       String actionCode,
+                                       Criteria criteria,
+                                       java.util.Optional<CurrentUser> currentUser) {
+            Criteria scoped = Criteria.of();
+            if (criteria != null && !criteria.isEmpty()) {
+                scoped.andGroup(criteria.getRoot());
+            }
+            scoped.eq("id", "visible");
+            return scoped;
+        }
+    }
+
+    private static final class CrossTenantAllDataScopeCriteriaService implements DataScopeCriteriaService {
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return DataScopeCriteriaResult.crossTenantUnrestricted(criteria == null ? Criteria.of() : criteria);
+        }
+
+        @Override
+        public Criteria applyReadScope(String moduleAlias,
+                                       String actionCode,
+                                       Criteria criteria,
+                                       java.util.Optional<CurrentUser> currentUser) {
+            return criteria == null ? Criteria.of() : criteria;
+        }
+    }
+
+    private static final class AllowIdsDataScopeCriteriaService implements DataScopeCriteriaService {
+        private final List<String> ids;
+
+        private AllowIdsDataScopeCriteriaService(String... ids) {
+            this.ids = List.of(ids);
+        }
+
+        @Override
+        public Criteria applyReadScope(String moduleAlias,
+                                       String actionCode,
+                                       Criteria criteria,
+                                       java.util.Optional<CurrentUser> currentUser) {
+            Criteria scoped = Criteria.of();
+            if (criteria != null && !criteria.isEmpty()) {
+                scoped.andGroup(criteria.getRoot());
+            }
+            scoped.in("id", ids);
+            return scoped;
+        }
+    }
+
+    private static final class CrossTenantAllowIdsDataScopeCriteriaService implements DataScopeCriteriaService {
+        private final AllowIdsDataScopeCriteriaService delegate;
+
+        private CrossTenantAllowIdsDataScopeCriteriaService(String... ids) {
+            this.delegate = new AllowIdsDataScopeCriteriaService(ids);
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            return DataScopeCriteriaResult.crossTenantRestricted(delegate.applyReadScope(
+                    moduleAlias,
+                    actionCode,
+                    criteria,
+                    currentUser
+            ));
+        }
+
+        @Override
+        public Criteria applyReadScope(String moduleAlias,
+                                       String actionCode,
+                                       Criteria criteria,
+                                       java.util.Optional<CurrentUser> currentUser) {
+            return delegate.applyReadScope(moduleAlias, actionCode, criteria, currentUser);
         }
     }
 

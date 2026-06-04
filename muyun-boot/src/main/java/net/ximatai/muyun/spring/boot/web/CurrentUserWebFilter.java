@@ -39,7 +39,7 @@ public class CurrentUserWebFilter extends OncePerRequestFilter {
                                          HttpServletResponse response,
                                          FilterChain filterChain) throws ServletException, IOException {
         if (currentUser.system()) {
-            try (TenantContext.Scope ignored = TenantContext.system()) {
+            try (TenantContext.Scope ignored = TenantContext.system("system user web request")) {
                 filterChain.doFilter(request, response);
             }
             return;

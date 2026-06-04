@@ -22,7 +22,7 @@ class ScopedMutationAbilityTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("system context");
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             String id = service.insert(new DemoEnabledRecord("System"));
             assertThat(service.select(id).getTitle()).isEqualTo("System");
         }
@@ -32,7 +32,7 @@ class ScopedMutationAbilityTest {
     void systemManagedAbilityShouldRequireSystemContextForUpdateAndDelete() {
         SystemManagedDemoService service = new SystemManagedDemoService();
         String id;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             id = service.insert(new DemoEnabledRecord("System"));
         }
 
@@ -83,7 +83,7 @@ class ScopedMutationAbilityTest {
     void globalScopedAbilityShouldKeepSoftDeleteButIgnoreTenantScope() {
         SystemManagedDemoService service = new SystemManagedDemoService();
         String id;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             id = service.insert(new DemoEnabledRecord("Global"));
         }
 
@@ -91,7 +91,7 @@ class ScopedMutationAbilityTest {
             assertThat(service.select(id)).isNotNull();
         }
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             service.delete(id);
         }
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
@@ -104,7 +104,7 @@ class ScopedMutationAbilityTest {
     void enableAbilityShouldRequireEnabledRecord() {
         SystemManagedDemoService service = new SystemManagedDemoService();
         String id;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             id = service.insert(new DemoEnabledRecord("Enabled"));
             service.disable(id);
         }

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionGroup;
 import net.ximatai.muyun.spring.common.platform.PlatformActionKind;
@@ -34,7 +36,9 @@ final class PlatformActionResolver {
         EntityActionLevel level = toLevel(action.level());
         return new EntityActionDefinition(entity.alias(), action.code(), toKind(action.kind()),
                 action.title(), true, level, toStyle(action.style()),
-                null, null, null, null, null, null, null, null, null);
+                null, toAccessMode(action.accessMode()), action.actionAuth(),
+                action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE), action.inheritActionCode(),
+                null, null, null, null);
     }
 
     private static List<PlatformActionGroup> actionGroupOrder() {
@@ -69,6 +73,14 @@ final class PlatformActionResolver {
             case PRIMARY -> EntityActionStyle.PRIMARY;
             case NORMAL -> EntityActionStyle.NORMAL;
             case DANGER -> EntityActionStyle.DANGER;
+        };
+    }
+
+    private static EntityActionAccessMode toAccessMode(ActionAccessMode value) {
+        return switch (value) {
+            case AUTH_REQUIRED -> EntityActionAccessMode.AUTH_REQUIRED;
+            case LOGIN_REQUIRED -> EntityActionAccessMode.LOGIN_REQUIRED;
+            case ANONYMOUS_ALLOWED -> EntityActionAccessMode.ANONYMOUS_ALLOWED;
         };
     }
 }

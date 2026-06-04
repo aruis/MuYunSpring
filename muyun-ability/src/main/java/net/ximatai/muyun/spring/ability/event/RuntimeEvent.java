@@ -16,6 +16,7 @@ public record RuntimeEvent(
         String actionCode,
         String tenantId,
         boolean systemContext,
+        String systemReason,
         String operatorId,
         String operatorType,
         String authorizationDecision,
@@ -32,11 +33,47 @@ public record RuntimeEvent(
                         String actionCode,
                         String tenantId,
                         boolean systemContext,
+                        String systemReason,
                         RuntimeMutationSource mutationSource,
                         Map<String, Object> payload,
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
-                null, null, null, mutationSource, payload, occurredAt);
+                systemReason, null, null, null, mutationSource, payload, occurredAt);
+    }
+
+    public RuntimeEvent(String eventId,
+                        String traceId,
+                        RuntimeEventType eventType,
+                        String moduleAlias,
+                        String entityAlias,
+                        String recordId,
+                        String actionCode,
+                        String tenantId,
+                        boolean systemContext,
+                        String operatorId,
+                        String operatorType,
+                        String authorizationDecision,
+                        RuntimeMutationSource mutationSource,
+                        Map<String, Object> payload,
+                        Instant occurredAt) {
+        this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
+                null, operatorId, operatorType, authorizationDecision, mutationSource, payload, occurredAt);
+    }
+
+    public RuntimeEvent(String eventId,
+                        String traceId,
+                        RuntimeEventType eventType,
+                        String moduleAlias,
+                        String entityAlias,
+                        String recordId,
+                        String actionCode,
+                        String tenantId,
+                        boolean systemContext,
+                        RuntimeMutationSource mutationSource,
+                        Map<String, Object> payload,
+                        Instant occurredAt) {
+        this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
+                null, null, null, null, mutationSource, payload, occurredAt);
     }
 
     public RuntimeEvent {
@@ -51,6 +88,7 @@ public record RuntimeEvent(
         }
         eventId = eventId == null || eventId.isBlank() ? UUID.randomUUID().toString() : eventId;
         traceId = traceId == null || traceId.isBlank() ? eventId : traceId;
+        systemReason = systemReason == null || systemReason.isBlank() ? null : systemReason.trim();
         payload = payload == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(payload));
         occurredAt = occurredAt == null ? Instant.now() : occurredAt;
     }
@@ -62,10 +100,39 @@ public record RuntimeEvent(
                                   String actionCode,
                                   String tenantId,
                                   boolean systemContext,
+                                  String systemReason,
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
         return new RuntimeEvent(null, null, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, null, null, null, mutationSource, payload, null);
+                tenantId, systemContext, systemReason, null, null, null, mutationSource, payload, null);
+    }
+
+    public static RuntimeEvent of(String traceId,
+                                  RuntimeEventType eventType,
+                                  String moduleAlias,
+                                  String entityAlias,
+                                  String recordId,
+                                  String actionCode,
+                                  String tenantId,
+                                  boolean systemContext,
+                                  String systemReason,
+                                  RuntimeMutationSource mutationSource,
+                                  Map<String, Object> payload) {
+        return new RuntimeEvent(null, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode,
+                tenantId, systemContext, systemReason, null, null, null, mutationSource, payload, null);
+    }
+
+    public static RuntimeEvent of(RuntimeEventType eventType,
+                                  String moduleAlias,
+                                  String entityAlias,
+                                  String recordId,
+                                  String actionCode,
+                                  String tenantId,
+                                  boolean systemContext,
+                                  RuntimeMutationSource mutationSource,
+                                  Map<String, Object> payload) {
+        return of(eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
+                null, mutationSource, payload);
     }
 
     public static RuntimeEvent of(String traceId,
@@ -78,8 +145,8 @@ public record RuntimeEvent(
                                   boolean systemContext,
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
-        return new RuntimeEvent(null, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, null, null, null, mutationSource, payload, null);
+        return of(traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
+                null, mutationSource, payload);
     }
 
     private static void requireText(String value, String fieldName) {

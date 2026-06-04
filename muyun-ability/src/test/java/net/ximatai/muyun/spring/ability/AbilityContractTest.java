@@ -102,7 +102,7 @@ class AbilityContractTest {
             tenantBId = service.insert(new DemoPlainRecord("Tenant B"));
         }
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThat(TenantContext.isSystem()).isTrue();
             assertThat(TenantContext.currentTenantId()).isEmpty();
             assertThat(service.count(Criteria.of())).isEqualTo(2);
@@ -119,7 +119,7 @@ class AbilityContractTest {
             tenantAId = service.insert(new DemoPlainRecord("Tenant A"));
         }
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             DemoPlainRecord update = new DemoPlainRecord("System Updated");
             update.setId(tenantAId);
             service.update(update);
@@ -141,7 +141,7 @@ class AbilityContractTest {
             service.update(record);
         }
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             DemoPlainRecord staleUpdate = new DemoPlainRecord("Stale system update");
             staleUpdate.setId(tenantAId);
             staleUpdate.setVersion(0);
@@ -265,7 +265,7 @@ class AbilityContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
             assertThat(service.isEnabled(tenantAId)).isTrue();
         }
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThat(service.disable(tenantAId)).isEqualTo(1);
         }
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
@@ -933,7 +933,7 @@ class AbilityContractTest {
                     .extracting(DemoPlainRecord::getTitle)
                     .containsExactly("Tenant A");
         }
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThat(service.selectAllWithCache())
                     .extracting(DemoPlainRecord::getTitle)
                     .containsExactly("Tenant A behind cache", "Tenant B");
@@ -955,7 +955,7 @@ class AbilityContractTest {
                     .extracting(DemoPlainRecord::getTitle)
                     .containsExactly("Tenant B updated");
         }
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThat(service.selectAllWithCache())
                     .extracting(DemoPlainRecord::getTitle)
                     .containsExactly("Tenant A behind cache", "Tenant B updated");

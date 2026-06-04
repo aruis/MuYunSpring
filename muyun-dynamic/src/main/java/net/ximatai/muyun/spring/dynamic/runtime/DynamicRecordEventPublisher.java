@@ -49,6 +49,19 @@ final class DynamicRecordEventPublisher {
                 Map.of("afterId", afterId, "operation", "moveAfter"));
     }
 
+    void movedInTree(DynamicRecordEventContext context,
+                     String recordId,
+                     String previousId,
+                     String nextId,
+                     String parentId) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("operation", "moveInTree");
+        putIfPresent(payload, "previousId", previousId);
+        putIfPresent(payload, "nextId", nextId);
+        putIfPresent(payload, "parentId", parentId);
+        recordChanged(RuntimeEventType.AFTER_UPDATE, context, recordId, payload);
+    }
+
     void enabled(DynamicRecordEventContext context, String recordId) {
         recordChanged(RuntimeEventType.AFTER_UPDATE, context, recordId, Map.of("operation", "enable"));
     }
@@ -67,8 +80,9 @@ final class DynamicRecordEventPublisher {
                 context.actionCode(),
                 context.tenantId(),
                 context.systemContext(),
+                context.systemReason(),
                 RuntimeMutationSource.ACTION,
-                ActionEventPayload.executed(
+                actionPayload(context, ActionEventPayload.executed(
                         context.action().executorType().name(),
                         context.action().actionLevel().name(),
                         body.type().name(),
@@ -77,7 +91,7 @@ final class DynamicRecordEventPublisher {
                         body.redirectTo(),
                         context.action().executorType() == EntityActionExecutorType.DIALOG,
                         isSimpleEventValue(body.value()) ? body.value() : null
-                )
+                ))
         ));
     }
 
@@ -95,15 +109,16 @@ final class DynamicRecordEventPublisher {
                     context.actionCode(),
                     context.tenantId(),
                     context.systemContext(),
+                    context.systemReason(),
                     RuntimeMutationSource.ACTION,
-                    ActionEventPayload.failed(
+                    actionPayload(context, ActionEventPayload.failed(
                             context.action().executorType().name(),
                             context.action().actionLevel().name(),
                             context.availability().available(),
                             failureStage,
                             errorMessage,
                             cause == null ? null : cause.getClass().getName()
-                    )
+                    ))
             ));
         } catch (RuntimeException ignored) {
             // Failure audit must not replace the original action failure.
@@ -123,9 +138,28 @@ final class DynamicRecordEventPublisher {
                 null,
                 context.tenantId(),
                 context.systemContext(),
+                context.systemReason(),
                 context.mutationSource(),
-                payload
+                recordPayload(context, payload)
         ));
+    }
+
+    private Map<String, Object> actionPayload(DynamicActionExecutionContext context, Map<String, Object> payload) {
+        return context.systemContext()
+                ? ActionEventPayload.withSystemReason(payload, context.systemReason())
+                : payload;
+    }
+
+    private Map<String, Object> recordPayload(DynamicRecordEventContext context, Map<String, Object> payload) {
+        return context.systemContext()
+                ? ActionEventPayload.withSystemReason(payload, context.systemReason())
+                : payload;
+    }
+
+    private void putIfPresent(Map<String, Object> payload, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            payload.put(key, value);
+        }
     }
 
     private boolean isSimpleEventValue(Object value) {
@@ -138,6 +172,7 @@ final class DynamicRecordEventPublisher {
             String traceId,
             String tenantId,
             boolean systemContext,
+            String systemReason,
             RuntimeMutationSource mutationSource
     ) {
     }

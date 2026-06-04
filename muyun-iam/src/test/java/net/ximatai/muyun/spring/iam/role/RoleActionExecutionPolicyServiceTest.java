@@ -2,7 +2,11 @@ package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -22,18 +26,18 @@ class RoleActionExecutionPolicyServiceTest {
 
         policy.requireAuthorized(context(CurrentUser.systemUser("system", "System")));
 
-        verify(roleService, never()).hasActionPermission("system", "sales.contract", "query");
+        verify(roleService, never()).hasActionPermission("system", "sales.contract", "view");
     }
 
     @Test
     void shouldAllowWhenRoleActionIsEnabled() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.hasActionPermission("user-1", "sales.contract", "query")).thenReturn(true);
+        when(roleService.hasActionPermission("user-1", "sales.contract", "view")).thenReturn(true);
         RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
 
         policy.requireAuthorized(context(CurrentUser.tenantUser("user-1", "Alice", "tenant_a")));
 
-        verify(roleService).hasActionPermission("user-1", "sales.contract", "query");
+        verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
     }
 
     @Test
@@ -43,7 +47,7 @@ class RoleActionExecutionPolicyServiceTest {
 
         assertThatThrownBy(() -> policy.requireAuthorized(context(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("sales.contract:query");
+                .hasMessageContaining("sales.contract:view");
     }
 
     @Test
@@ -57,6 +61,55 @@ class RoleActionExecutionPolicyServiceTest {
                 Optional.empty()
         ))).isInstanceOf(PlatformException.class)
                 .hasMessageContaining("current user");
+    }
+
+    @Test
+    void shouldAllowAnonymousPolicyWithoutCurrentUser() {
+        RoleService roleService = mock(RoleService.class);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        policy.requireAuthorized(ActionExecutionContext.ofPolicy(
+                "sales.contract",
+                new ActionExecutionPolicy("publicSearch", PlatformActionLevel.LIST,
+                        ActionAccessMode.ANONYMOUS_ALLOWED, false, false, ActionDefaultPolicy.NONE, null),
+                Set.of(),
+                Optional.empty()
+        ));
+
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "publicSearch");
+    }
+
+    @Test
+    void shouldAllowLoginOnlyPolicyWithoutRoleLookup() {
+        RoleService roleService = mock(RoleService.class);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        policy.requireAuthorized(ActionExecutionContext.ofPolicy(
+                "sales.contract",
+                new ActionExecutionPolicy("profile", PlatformActionLevel.RECORD,
+                        ActionAccessMode.LOGIN_REQUIRED, false, false, ActionDefaultPolicy.NONE, null),
+                Set.of("contract-1"),
+                Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
+        ));
+
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "profile");
+    }
+
+    @Test
+    void shouldUseInheritedActionCodeForRoleLookup() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.hasActionPermission("user-1", "sales.contract", "view")).thenReturn(true);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        policy.requireAuthorized(ActionExecutionContext.ofPolicy(
+                "sales.contract",
+                new ActionExecutionPolicy("export", PlatformActionLevel.LIST,
+                        ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, "view"),
+                Set.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
+        ));
+
+        verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
     }
 
     private ActionExecutionContext context(CurrentUser user) {

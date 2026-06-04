@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +30,7 @@ class ActionEndpointInterceptorTest {
     @AfterEach
     void tearDown() {
         CurrentUserContext.clear();
+        ActionExecutionContextHolder.clear();
     }
 
     @Test
@@ -43,10 +45,14 @@ class ActionEndpointInterceptorTest {
                 assertThat(context.moduleAlias()).isEqualTo("iam.organization");
                 assertThat(context.platformAction()).isEqualTo(PlatformAction.QUERY);
                 assertThat(context.actionCode()).isEqualTo("query");
-                assertThat(context.permissionCode()).isEqualTo("iam.organization:query");
+                assertThat(context.permissionCode()).isEqualTo("iam.organization:view");
                 assertThat(context.recordIds()).isEmpty();
                 assertThat(context.currentUser()).get().extracting(CurrentUser::userId).isEqualTo("u1");
             });
+            assertThat(ActionExecutionContextHolder.current()).contains(policyService.context);
+            interceptor.afterCompletion(request, new MockHttpServletResponse(),
+                    handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class)), null);
+            assertThat(ActionExecutionContextHolder.current()).isEmpty();
         }
     }
 
@@ -69,6 +75,21 @@ class ActionEndpointInterceptorTest {
             assertThat(context.recordIds()).containsExactlyInAnyOrder("contract-1", "contract-2", "contract-3");
         });
     }
+
+    @Test
+    void shouldClearActionContextWhenAsyncHandlingStarts() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/update/org-1");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("id", "org-1"));
+        HandlerMethod handler = handler(new StaticScopedWeb(), CrudWeb.class.getMethod("update", String.class, EntityContract.class));
+
+        interceptor.preHandle(request, new MockHttpServletResponse(), handler);
+        assertThat(ActionExecutionContextHolder.current()).contains(policyService.context);
+
+        interceptor.afterConcurrentHandlingStarted(request, new MockHttpServletResponse(), handler);
+
+        assertThat(ActionExecutionContextHolder.current()).isEmpty();
+    }
+
 
     @Test
     void shouldIgnoreEndpointWithoutActionAnnotation() throws Exception {

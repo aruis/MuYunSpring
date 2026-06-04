@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
@@ -18,8 +19,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -61,6 +64,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getRoleKind() == null) {
             role.setRoleKind(RoleKind.STANDARD);
         }
+        if (role.getTenantScopePolicy() == null) {
+            role.setTenantScopePolicy(TenantScopePolicy.CURRENT_TENANT);
+        }
         if (role.getPublicRole() == null) {
             role.setPublicRole(false);
         }
@@ -70,6 +76,32 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             role.setMemberRoleIds(normalizeRoleIdCsv(role.getMemberRoleIds()));
             validateGroupMembers(role.getMemberRoleIds());
         }
+    }
+
+    public boolean hasAllTenantScope(String userId) {
+        return effectiveRoleIds(userId).stream()
+                .map(this::select)
+                .filter(Objects::nonNull)
+                .anyMatch(role -> role.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS);
+    }
+
+    public boolean hasAllTenantScopeByRoleIds(java.util.Collection<String> roleIds) {
+        return !allTenantScopeRoleIds(roleIds).isEmpty();
+    }
+
+    public Set<String> allTenantScopeRoleIds(java.util.Collection<String> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
+            return Set.of();
+        }
+        return roleIds.stream()
+                .filter(roleId -> roleId != null && !roleId.isBlank())
+                .map(String::trim)
+                .distinct()
+                .filter(roleId -> {
+                    Role role = select(roleId);
+                    return role != null && role.getTenantScopePolicy() == TenantScopePolicy.ALL_TENANTS;
+                })
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     public String bindUser(String roleId, String userId) {
@@ -103,14 +135,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                            String scopeCondition,
                            String referenceFieldId,
                            String referenceActionCode) {
-        Role role = requireEnabledRole(roleId);
-        if (role.getRoleKind() == RoleKind.GROUP) {
-            throw new PlatformException("role group cannot be granted directly: " + roleId);
-        }
+        requireConfigurableRole(roleId);
 
         String validModuleAlias = requireModuleAlias(moduleAlias);
-        String validActionCode = requireActionCode(actionCode);
-        grantVerifier.requireGrantable(validModuleAlias, validActionCode);
+        String requestedActionCode = requireActionCode(actionCode);
+        grantVerifier.requireGrantable(validModuleAlias, requestedActionCode);
+        String validActionCode = permissionActionCode(requestedActionCode);
 
         RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
         boolean exists = roleAction != null;
@@ -136,7 +166,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public int revokeAction(String roleId, String moduleAlias, String actionCode) {
-        RoleAction roleAction = findRoleAction(roleId, moduleAlias, actionCode);
+        RoleAction roleAction = findRoleAction(roleId, moduleAlias, permissionActionCode(actionCode));
         if (roleAction == null) {
             return 0;
         }
@@ -154,10 +184,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (roleIds.isEmpty()) {
             return List.of();
         }
+        String permissionActionCode = permissionActionCode(actionCode);
         return roleActionDao.query(Criteria.of()
                         .in("roleId", List.copyOf(roleIds))
                         .eq("moduleAlias", requireModuleAlias(moduleAlias))
-                        .eq("actionCode", requireActionCode(actionCode))
+                        .eq("actionCode", permissionActionCode)
                         .eq("enabled", Boolean.TRUE),
                 ALL);
     }
@@ -201,6 +232,55 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .toList();
     }
 
+    public RolePermissionMatrix permissionMatrix(String roleId, List<GrantableAction> actions) {
+        Role role = requireConfigurableRole(roleId);
+        String validRoleId = role.getId();
+        if (actions == null || actions.isEmpty()) {
+            return new RolePermissionMatrix(validRoleId, List.of());
+        }
+        LinkedHashMap<String, GrantableAction> actionByKey = new LinkedHashMap<>();
+        for (GrantableAction action : actions) {
+            if (action == null) {
+                continue;
+            }
+            String key = actionKey(action.moduleAlias(), action.permissionActionCode());
+            GrantableAction existing = actionByKey.get(key);
+            if (existing == null || action.actionCode().equals(action.permissionActionCode())) {
+                actionByKey.put(key, action);
+            }
+        }
+        if (actionByKey.isEmpty()) {
+            return new RolePermissionMatrix(validRoleId, List.of());
+        }
+
+        List<String> moduleAliases = actionByKey.values().stream()
+                .map(GrantableAction::moduleAlias)
+                .distinct()
+                .toList();
+        List<String> actionCodes = actionByKey.values().stream()
+                .map(GrantableAction::permissionActionCode)
+                .distinct()
+                .toList();
+        Map<String, RoleAction> configuredByKey = new LinkedHashMap<>();
+        roleActionDao.query(scopedChildCriteria(Criteria.of()
+                                .eq("roleId", validRoleId)
+                                .in("moduleAlias", moduleAliases)
+                                .in("actionCode", actionCodes)),
+                        ALL,
+                        Sort.asc("moduleAlias"),
+                        Sort.asc("actionCode"))
+                .forEach(action -> configuredByKey.put(actionKey(action.getModuleAlias(), action.getActionCode()), action));
+
+        LinkedHashMap<String, List<RolePermissionAction>> actionsByModule = new LinkedHashMap<>();
+        actionByKey.values().forEach(action -> actionsByModule
+                .computeIfAbsent(action.moduleAlias(), ignored -> new java.util.ArrayList<>())
+                .add(RolePermissionAction.of(action, configuredByKey.get(actionKey(action.moduleAlias(), action.permissionActionCode())))));
+        List<RolePermissionMatrix.Module> modules = actionsByModule.entrySet().stream()
+                .map(entry -> new RolePermissionMatrix.Module(entry.getKey(), entry.getValue()))
+                .toList();
+        return new RolePermissionMatrix(validRoleId, modules);
+    }
+
     @Override
     public void afterDelete(String id, Role role, int deleted) {
         roleUserDao.query(scopedChildCriteria(Criteria.of().eq("roleId", id)), ALL)
@@ -214,6 +294,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         Role role = requireEnabled(Preconditions.requireText(roleId, "roleId"), "role is not active: " + roleId);
         if (role.getRoleKind() == null) {
             role.setRoleKind(RoleKind.STANDARD);
+        }
+        return role;
+    }
+
+    private Role requireConfigurableRole(String roleId) {
+        Role role = requireEnabledRole(roleId);
+        if (role.getRoleKind() == RoleKind.GROUP) {
+            throw new PlatformException("role group cannot be granted directly: " + roleId);
         }
         return role;
     }
@@ -296,6 +384,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return action;
     }
 
+    private String actionKey(String moduleAlias, String actionCode) {
+        return moduleAlias + ":" + actionCode;
+    }
+
     private DataScopePolicy normalizeDataScopePolicy(DataScopePolicy dataScopePolicy,
                                                      String scopeCondition,
                                                      String referenceFieldId) {
@@ -332,6 +424,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private String requireActionCode(String actionCode) {
         return Preconditions.requireText(actionCode, "actionCode");
+    }
+
+    private String permissionActionCode(String actionCode) {
+        return PlatformAction.permissionActionCodeOf(requireActionCode(actionCode));
     }
 
     private String normalizeBlank(String value) {

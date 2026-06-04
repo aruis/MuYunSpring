@@ -53,7 +53,7 @@ class PlatformModuleServiceContractTest {
     @Test
     void shouldResolveGlobalModuleFromTenantContext() {
         PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             service.insert(module("crm.customer", "crm"));
         }
 

@@ -45,6 +45,7 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getRedirectTo()).isEqualTo("/contracts/contract-1");
         assertThat(record.getResultText()).isEqualTo("approved");
         assertThat(record.getSystemContext()).isFalse();
+        assertThat(record.getSystemReason()).isNull();
         assertThat(record.getOperatorId()).isEqualTo("user-1");
         assertThat(record.getOperatorType()).isEqualTo("USER");
         assertThat(record.getAuthorizationDecision()).isEqualTo("ALLOW");
@@ -145,7 +146,10 @@ class RuntimeAuditRecordServiceContractTest {
             id = service.record(eventWithoutTenant());
         }
 
-        assertThat(service.select(id).getTenantId()).isNull();
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getTenantId()).isNull();
+        assertThat(record.getSystemContext()).isTrue();
+        assertThat(record.getSystemReason()).isEqualTo("module bootstrap");
     }
 
     @Test
@@ -238,6 +242,7 @@ class RuntimeAuditRecordServiceContractTest {
                 null,
                 null,
                 true,
+                "module bootstrap",
                 RuntimeMutationSource.SYSTEM,
                 Map.of(),
                 Instant.parse("2026-06-02T04:00:00Z")

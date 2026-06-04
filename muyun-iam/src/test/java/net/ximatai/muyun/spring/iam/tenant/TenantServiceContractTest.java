@@ -24,7 +24,7 @@ class TenantServiceContractTest {
         tenant.setTenantId("should-be-cleared");
 
         String id;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             id = service.insert(tenant);
         }
 
@@ -53,7 +53,7 @@ class TenantServiceContractTest {
     void shouldRejectInvalidTenantAlias() {
         TenantService service = new TenantService(mock(TenantDao.class));
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThatThrownBy(() -> service.insert(tenant("tenant-a", "Tenant A")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("tenantAlias");

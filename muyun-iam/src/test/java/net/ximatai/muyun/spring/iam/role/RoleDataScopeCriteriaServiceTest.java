@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.Test;
 
@@ -56,7 +57,8 @@ class RoleDataScopeCriteriaServiceTest {
         CompiledCriteria compiled = compile(scoped);
         assertThat(compiled.getSql())
                 .contains("\"status\" = :p0")
-                .contains("(\"authUserId\" = :p1 OR \"authOrganizationId\" = :p2)");
+                .contains("\"authUserId\" = :p1")
+                .contains("\"authOrganizationId\" = :p2");
         assertThat(compiled.getParams()).containsEntry("p1", "user-1").containsEntry("p2", "org-1");
     }
 
@@ -78,6 +80,142 @@ class RoleDataScopeCriteriaServiceTest {
 
         CompiledCriteria compiled = compile(scoped);
         assertThat(compiled.getSql()).isEqualTo("\"status\" = :p0");
+    }
+
+    @Test
+    void shouldMarkAllDataScopeAsCrossTenantWhenRoleAllowsAllTenants() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.ALL, "role-cross")
+        ));
+        when(roleService.allTenantScopeRoleIds(List.of("role-cross"))).thenReturn(java.util.Set.of("role-cross"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        assertThat(result.restricted()).isFalse();
+        assertThat(result.crossTenant()).isTrue();
+        assertThat(compile(result.criteria()).getSql()).isEqualTo("\"status\" = :p0");
+    }
+
+    @Test
+    void shouldNotMarkCrossTenantWhenAllTenantRoleDoesNotContributeActionGrant() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.ALL, "role-current")
+        ));
+        when(roleService.allTenantScopeRoleIds(List.of("role-current"))).thenReturn(java.util.Set.of());
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        assertThat(result.restricted()).isFalse();
+        assertThat(result.crossTenant()).isFalse();
+        assertThat(compile(result.criteria()).getSql()).isEqualTo("\"status\" = :p0");
+    }
+
+    @Test
+    void shouldKeepCurrentTenantAllScopedWhenMixedWithCrossTenantRestrictedGrant() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.ALL, "role-current"),
+                grant(DataScopePolicy.OWNER, "role-cross")
+        ));
+        when(roleService.allTenantScopeRoleIds(List.of("role-current", "role-cross"))).thenReturn(java.util.Set.of("role-cross"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.restricted()).isTrue();
+        assertThat(result.crossTenant()).isTrue();
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"tenantId\" = :p1")
+                .contains("\"authUserId\" = :p2");
+        assertThat(compiled.getParams()).containsEntry("p1", "tenant-a").containsEntry("p2", "user-1");
+    }
+
+    @Test
+    void shouldNotMarkCrossTenantWhenAllTenantGrantContributesNoScope() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.ALL, "role-current"),
+                grant(DataScopePolicy.NONE, "role-cross")
+        ));
+        when(roleService.allTenantScopeRoleIds(List.of("role-current", "role-cross"))).thenReturn(java.util.Set.of("role-cross"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.restricted()).isTrue();
+        assertThat(result.crossTenant()).isFalse();
+        assertThat(compiled.getSql()).contains("\"tenantId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "tenant-a");
+    }
+
+    @Test
+    void shouldKeepBusinessScopeWhenRoleAllowsAllTenants() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.OWNER, "role-cross")
+        ));
+        when(roleService.allTenantScopeRoleIds(List.of("role-cross"))).thenReturn(java.util.Set.of("role-cross"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.restricted()).isTrue();
+        assertThat(result.crossTenant()).isTrue();
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authUserId\" = :p1");
+    }
+
+    @Test
+    void shouldDenyWhenOnlyGrantHasNoDataScope() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+                grant(DataScopePolicy.NONE)
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql()).contains("\"status\" = :p0").contains("1 = 0");
     }
 
     @Test
@@ -165,7 +303,12 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     private RoleAction grant(DataScopePolicy policy) {
+        return grant(policy, "role-1");
+    }
+
+    private RoleAction grant(DataScopePolicy policy, String roleId) {
         RoleAction action = new RoleAction();
+        action.setRoleId(roleId);
         action.setDataScopePolicy(policy);
         action.setEnabled(Boolean.TRUE);
         return action;

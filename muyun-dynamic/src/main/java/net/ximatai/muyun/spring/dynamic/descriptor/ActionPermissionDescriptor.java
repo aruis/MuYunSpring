@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformPermissionCode;
 
 import java.util.Objects;
@@ -27,9 +28,12 @@ public record ActionPermissionDescriptor(
         Objects.requireNonNull(action, "action must not be null");
         String inheritPermissionCode = action.authInheritActionCode() == null
                 ? null
-                : PlatformPermissionCode.action(moduleAlias, action.authInheritActionCode());
+                : PlatformPermissionCode.action(moduleAlias, PlatformAction.permissionActionCodeOf(action.authInheritActionCode()));
+        String permissionActionCode = action.authInheritActionCode() == null
+                ? PlatformAction.permissionActionCodeOf(action.code())
+                : PlatformAction.permissionActionCodeOf(action.authInheritActionCode());
         return new ActionPermissionDescriptor(
-                PlatformPermissionCode.action(moduleAlias, action.code()),
+                PlatformPermissionCode.action(moduleAlias, permissionActionCode),
                 action.actionAuth(),
                 action.dataAuth(),
                 action.authInheritActionCode(),

@@ -66,6 +66,8 @@ class RuntimeAuditRecordRepositoryIT {
         assertThat(record.getEntityAlias()).isNull();
         assertThat(record.getPayloadText()).contains("changed=true");
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
+        assertThat(record.getSystemContext()).isTrue();
+        assertThat(record.getSystemReason()).isEqualTo("repository bootstrap");
     }
 
     @Test
@@ -126,6 +128,7 @@ class RuntimeAuditRecordRepositoryIT {
                 null,
                 "tenant-it",
                 true,
+                "repository bootstrap",
                 RuntimeMutationSource.SYSTEM,
                 Map.of("changed", true),
                 Instant.parse("2026-06-02T05:00:00Z")

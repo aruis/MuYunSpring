@@ -88,7 +88,7 @@ class DynamicModulePublisherTest {
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime(events));
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             publisher.publish(contractModule());
         }
 

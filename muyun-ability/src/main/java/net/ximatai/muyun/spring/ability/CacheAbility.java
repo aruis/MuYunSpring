@@ -128,6 +128,9 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
     }
 
     private String tenantScopeKey() {
+        if (TenantContext.tenantFilterBypassed()) {
+            return "all-tenants";
+        }
         return TenantContext.currentTenantId()
                 .map(tenantId -> "tenant:" + tenantId)
                 .orElseGet(() -> TenantContext.isSystem() ? "system" : "none");

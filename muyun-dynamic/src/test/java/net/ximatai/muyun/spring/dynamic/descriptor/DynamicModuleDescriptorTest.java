@@ -229,8 +229,15 @@ class DynamicModuleDescriptorTest {
                 .findFirst())
                 .get()
                 .satisfies(action -> assertThat(action.permission())
-                        .isEqualTo(new ActionPermissionDescriptor("sales.contract:submit", true, true,
+                        .isEqualTo(new ActionPermissionDescriptor("sales.contract:view", true, true,
                                 "view", "sales.contract:view")));
+        assertThat(ActionPermissionDescriptor.of("sales.contract",
+                new DynamicActionDescriptor("customExport", DynamicActionKind.CUSTOM, "Export", true,
+                        EntityActionStyle.NORMAL, EntityActionLevel.LIST, EntityActionCategory.CUSTOM,
+                        EntityActionAccessMode.AUTH_REQUIRED, true, false, "query", false, null,
+                        EntityActionExecutorType.SERVICE, "customExport")))
+                .isEqualTo(new ActionPermissionDescriptor("sales.contract:view", true, false,
+                        "query", "sales.contract:view"));
     }
 
     @Test
@@ -242,7 +249,8 @@ class DynamicModuleDescriptorTest {
                         new EntityDefinition("contact", "crm_contact", "Contact",
                                 List.of(FieldDefinition.titleField())),
                         new EntityDefinition("customer", "crm_customer", "Customer",
-                                List.of(FieldDefinition.titleField()))
+                                List.of(FieldDefinition.titleField()),
+                                Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
                 ),
                 List.of(EntityRelationDefinition.child("contacts", "customer", "contact", "customerId")),
                 List.of(),
@@ -299,7 +307,8 @@ class DynamicModuleDescriptorTest {
                         new EntityDefinition("contact", "crm_contact", "Contact",
                                 List.of(FieldDefinition.titleField())),
                         new EntityDefinition("customer", "crm_customer", "Customer",
-                                List.of(FieldDefinition.titleField()))
+                                List.of(FieldDefinition.titleField()),
+                                Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
                 ),
                 List.of(),
                 List.of(),
@@ -371,7 +380,8 @@ class DynamicModuleDescriptorTest {
                 "Customer",
                 List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer",
-                                List.of(FieldDefinition.titleField()))
+                                List.of(FieldDefinition.titleField()),
+                                Set.of(EntityCapability.CRUD, EntityCapability.DATA_SCOPE))
                 ),
                 List.of(),
                 List.of(),
@@ -403,6 +413,8 @@ class DynamicModuleDescriptorTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.enabled()).isFalse();
+                    assertThat(action.actionAuth()).isTrue();
+                    assertThat(action.dataAuth()).isTrue();
                     assertThat(action.availabilityCondition()).isTrue();
                     assertThat(action.unavailableMessage()).isEqualTo("只有草稿客户可删除");
                 });

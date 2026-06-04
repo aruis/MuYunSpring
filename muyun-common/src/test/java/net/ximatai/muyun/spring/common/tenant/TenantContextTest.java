@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TenantContextTest {
     @AfterEach
@@ -39,15 +40,60 @@ class TenantContextTest {
     @Test
     void shouldUseSystemScopeAndRestoreTenantContext() {
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            try (TenantContext.Scope system = TenantContext.system()) {
+            try (TenantContext.Scope system = TenantContext.system("bootstrap tenant catalog")) {
                 assertThat(TenantContext.hasContext()).isTrue();
                 assertThat(TenantContext.isSystem()).isTrue();
                 assertThat(TenantContext.currentTenantId()).isEmpty();
+                assertThat(TenantContext.systemReason()).contains("bootstrap tenant catalog");
             }
 
             assertThat(TenantContext.isSystem()).isFalse();
             assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+            assertThat(TenantContext.systemReason()).isEmpty();
         }
+    }
+
+    @Test
+    void shouldBypassTenantFilterAndRestoreTenantContext() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            try (TenantContext.Scope bypass = TenantContext.bypassTenantFilter("cross tenant data scope")) {
+                assertThat(TenantContext.hasContext()).isTrue();
+                assertThat(TenantContext.isSystem()).isFalse();
+                assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+                assertThat(TenantContext.tenantFilterBypassed()).isTrue();
+            }
+
+            assertThat(TenantContext.currentTenantId()).contains("tenant-a");
+            assertThat(TenantContext.tenantFilterBypassed()).isFalse();
+        }
+    }
+
+    @Test
+    void shouldMatchAnyTenantWhenTenantFilterIsBypassed() {
+        TestEntity entity = new TestEntity();
+        entity.setTenantId("tenant-b");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(TenantContext.matchesCurrentTenant(entity)).isFalse();
+
+            try (TenantContext.Scope bypass = TenantContext.bypassTenantFilter("cross tenant data scope")) {
+                assertThat(TenantContext.matchesCurrentTenant(entity)).isTrue();
+            }
+        }
+    }
+
+    @Test
+    void shouldRequireSystemScopeReason() {
+        assertThatThrownBy(() -> TenantContext.system(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("system context requires reason");
+    }
+
+    @Test
+    void shouldRequireBypassTenantFilterReason() {
+        assertThatThrownBy(() -> TenantContext.bypassTenantFilter(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tenant filter bypass requires reason");
     }
 
     @Test
@@ -57,5 +103,8 @@ class TenantContextTest {
 
         assertThat(TenantContext.hasContext()).isFalse();
         assertThat(TenantContext.currentTenantId()).isEmpty();
+    }
+
+    private static final class TestEntity extends net.ximatai.muyun.spring.common.model.standard.StandardEntity {
     }
 }

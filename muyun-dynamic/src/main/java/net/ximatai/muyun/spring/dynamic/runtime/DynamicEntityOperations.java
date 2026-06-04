@@ -161,7 +161,7 @@ public final class DynamicEntityOperations implements
     }
 
     public void moveInTree(String id, String previousId, String nextId, String parentId) {
-        TreeAbility.super.moveInTree(id, previousId, nextId, parentId);
+        service.moveInTree(moduleAlias, entityAlias, id, previousId, nextId, parentId);
     }
 
     public List<DynamicRecord> children(String parentId) {

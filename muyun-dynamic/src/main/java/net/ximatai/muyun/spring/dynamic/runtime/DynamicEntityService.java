@@ -321,6 +321,11 @@ public class DynamicEntityService implements
         sortRuntime().moveAfter(id, afterId);
     }
 
+    public void moveInTree(String id, String previousId, String nextId, String parentId) {
+        requireCapability(EntityCapability.TREE);
+        treeRuntime().moveInTree(id, previousId, nextId, parentId);
+    }
+
     public List<DynamicRecord> children(String parentId) {
         requireCapability(EntityCapability.TREE);
         return treeRuntime().children(parentId).stream().map(DynamicTreeRecord::record).toList();

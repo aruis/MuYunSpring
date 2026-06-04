@@ -45,14 +45,42 @@ class PlatformActionResolverTest {
                 .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD, PlatformActionGroup.ENABLE));
     }
 
+    @Test
+    void shouldDeriveStandardActionPermissionPolicyFromPlatformActionAndEntityCapabilities() {
+        List<EntityActionDefinition> plainActions = EntityStandardActionCatalog.from(entityWith(EntityCapability.CRUD));
+        List<EntityActionDefinition> dataScopedActions =
+                EntityStandardActionCatalog.from(entityWith(EntityCapability.DATA_SCOPE));
+        List<EntityActionDefinition> allCapabilityActions =
+                EntityStandardActionCatalog.from(entityWith(EntityCapability.DATA_SCOPE, EntityCapability.TREE,
+                        EntityCapability.REFERENCE, EntityCapability.ENABLE));
+
+        assertThat(action(plainActions, PlatformAction.UPDATE).actionAuth()).isTrue();
+        assertThat(action(plainActions, PlatformAction.UPDATE).dataAuth()).isFalse();
+        assertThat(action(dataScopedActions, PlatformAction.CREATE).dataAuth()).isFalse();
+        assertThat(action(dataScopedActions, PlatformAction.UPDATE).dataAuth()).isTrue();
+        assertThat(action(dataScopedActions, PlatformAction.DELETE).dataAuth()).isTrue();
+        assertThat(action(dataScopedActions, PlatformAction.QUERY).dataAuth()).isTrue();
+        assertThat(action(dataScopedActions, PlatformAction.QUERY).authInheritActionCode()).isEqualTo("view");
+        assertThat(action(allCapabilityActions, PlatformAction.TREE).authInheritActionCode()).isEqualTo("view");
+        assertThat(action(allCapabilityActions, PlatformAction.REFERENCE).authInheritActionCode()).isEqualTo("view");
+        assertThat(action(allCapabilityActions, PlatformAction.DISABLE).authInheritActionCode()).isEqualTo("enable");
+    }
+
     private EntityDefinition entityWith(EntityCapability capability) {
+        return entityWith(capability, new EntityCapability[0]);
+    }
+
+    private EntityDefinition entityWith(EntityCapability capability, EntityCapability... capabilities) {
+        Set<EntityCapability> values = new java.util.LinkedHashSet<>();
+        values.add(capability);
+        values.addAll(List.of(capabilities));
         return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code"),
                 FieldDefinition.titleField(),
                 FieldDefinition.parentId(),
                 FieldDefinition.sortOrder(),
                 FieldDefinition.enabled()
-        )).withCapabilities(capability);
+        )).withCapabilities(values.toArray(EntityCapability[]::new));
     }
 
     private List<String> actionCodes(EntityDefinition entity) {
@@ -69,5 +97,12 @@ class PlatformActionResolverTest {
                 .filter(action -> groups.contains(action.group()))
                 .map(PlatformAction::code)
                 .toList();
+    }
+
+    private EntityActionDefinition action(List<EntityActionDefinition> actions, PlatformAction action) {
+        return actions.stream()
+                .filter(item -> item.actionCode().equals(action.code()))
+                .findFirst()
+                .orElseThrow();
     }
 }

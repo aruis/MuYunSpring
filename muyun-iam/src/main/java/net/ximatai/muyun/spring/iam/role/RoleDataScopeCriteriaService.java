@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
@@ -48,17 +50,45 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         if (grants.isEmpty()) {
             return DataScopeCriteriaResult.restricted(combine(base, denied()));
         }
-        if (grants.stream().anyMatch(this::allowsAllData)) {
-            return DataScopeCriteriaResult.unrestricted(base);
-        }
+        Set<String> crossTenantRoleIds = roleService.allTenantScopeRoleIds(grants.stream()
+                .map(RoleAction::getRoleId)
+                .toList());
+        boolean hasCrossTenantRole = !crossTenantRoleIds.isEmpty();
+        boolean crossTenant = false;
         Criteria scope = Criteria.of();
         for (RoleAction grant : grants) {
-            appendScope(scope, grant, user);
+            boolean grantCrossTenant = crossTenantRoleIds.contains(grant.getRoleId());
+            DataScopePolicy policy = normalizePolicy(grant);
+            if (policy == DataScopePolicy.ALL) {
+                if (grantCrossTenant) {
+                    return DataScopeCriteriaResult.crossTenantUnrestricted(base);
+                }
+                if (hasCrossTenantRole) {
+                    appendCurrentTenantScope(scope, user);
+                } else {
+                    return DataScopeCriteriaResult.unrestricted(base);
+                }
+                continue;
+            }
+            Criteria grantScope = Criteria.of();
+            appendScope(grantScope, grant, user);
+            if (grantScope.isEmpty()) {
+                continue;
+            }
+            if (hasCrossTenantRole && !grantCrossTenant) {
+                scope.orGroup(currentTenantScoped(grantScope, user).getRoot());
+            } else {
+                crossTenant = crossTenant || grantCrossTenant;
+                scope.orGroup(grantScope.getRoot());
+            }
         }
         if (scope.isEmpty()) {
             return DataScopeCriteriaResult.restricted(combine(base, denied()));
         }
-        return DataScopeCriteriaResult.restricted(combine(base, scope));
+        Criteria scoped = combine(base, scope);
+        return crossTenant
+                ? DataScopeCriteriaResult.crossTenantRestricted(scoped)
+                : DataScopeCriteriaResult.restricted(scoped);
     }
 
     @Override
@@ -67,11 +97,6 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                                    Criteria criteria,
                                    Optional<CurrentUser> currentUser) {
         return resolveReadScope(moduleAlias, actionCode, criteria, currentUser).criteria();
-    }
-
-    private boolean allowsAllData(RoleAction grant) {
-        DataScopePolicy policy = normalizePolicy(grant);
-        return policy == DataScopePolicy.NONE || policy == DataScopePolicy.ALL;
     }
 
     private void appendScope(Criteria scope, RoleAction grant, CurrentUser user) {
@@ -92,6 +117,23 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
             case NONE, ALL -> {
             }
         }
+    }
+
+    private void appendCurrentTenantScope(Criteria scope, CurrentUser user) {
+        if (user.tenantId() == null) {
+            scope.orGroup(denied().getRoot());
+            return;
+        }
+        scope.orEq(StandardEntitySchema.TENANT_ID_FIELD, user.tenantId());
+    }
+
+    private Criteria currentTenantScoped(Criteria grantScope, CurrentUser user) {
+        if (user.tenantId() == null) {
+            return denied();
+        }
+        return Criteria.of()
+                .eq(StandardEntitySchema.TENANT_ID_FIELD, user.tenantId())
+                .andGroup(grantScope.getRoot());
     }
 
     private void appendOrganizationAndChildrenScope(Criteria scope, CurrentUser user) {

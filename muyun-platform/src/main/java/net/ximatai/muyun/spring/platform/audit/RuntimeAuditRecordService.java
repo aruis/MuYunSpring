@@ -40,6 +40,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         record.setActionCode(event.actionCode());
         fillActionPayload(record, event);
         record.setSystemContext(event.systemContext());
+        record.setSystemReason(event.systemReason());
         record.setOperatorId(event.operatorId());
         record.setOperatorType(event.operatorType());
         record.setAuthorizationDecision(event.authorizationDecision());
@@ -47,7 +48,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         record.setPayloadText(payloadText(event.payload()));
         record.setOccurredAt(event.occurredAt());
         if (event.tenantId() == null) {
-            try (TenantContext.Scope ignored = TenantContext.system()) {
+            try (TenantContext.Scope ignored = TenantContext.system("runtime audit persist")) {
                 return insert(record);
             }
         }

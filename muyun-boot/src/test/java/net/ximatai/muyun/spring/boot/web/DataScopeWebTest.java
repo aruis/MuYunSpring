@@ -9,10 +9,14 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
+import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -20,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -62,6 +67,32 @@ class DataScopeWebTest {
         }
     }
 
+    @Test
+    void sortWebShouldRequireFullSortScopeWhenDataScopeAbilityIsAvailable() {
+        DataScopedSortService service = new DataScopedSortService();
+        DataScopedSortController controller = new DataScopedSortController(service);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            controller.sort("moving", new SortWebRequest("previous", null));
+        }
+
+        assertThat(service.scopedIdCalls).anySatisfy(ids ->
+                assertThat(ids).containsExactly("moving", "previous", "hidden"));
+    }
+
+    @Test
+    void treeWebShouldRequireFullTreeSortScopeWhenDataScopeAbilityIsAvailable() {
+        DataScopedTreeService service = new DataScopedTreeService();
+        DataScopedTreeController controller = new DataScopedTreeController(service);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            controller.sort("moving", new TreeSortWebRequest("previous", null, "parent"));
+        }
+
+        assertThat(service.scopedIdCalls).anySatisfy(ids ->
+                assertThat(ids).containsExactly("moving", "previous", "parent", "hidden"));
+    }
+
     @Getter
     @Setter
     private static class DataScopedRecord extends StandardDataScopedEntity {
@@ -72,6 +103,12 @@ class DataScopeWebTest {
     @Setter
     private static final class DataScopedTreeRecord extends DataScopedRecord implements TreeCapable {
         private String parentId;
+        private Integer sortOrder;
+    }
+
+    @Getter
+    @Setter
+    private static final class DataScopedSortRecord extends DataScopedRecord implements SortCapable {
         private Integer sortOrder;
     }
 
@@ -112,6 +149,7 @@ class DataScopeWebTest {
     private static final class DataScopedTreeService extends AbstractAbilityService<DataScopedTreeRecord>
             implements TreeAbility<DataScopedTreeRecord>, DataScopeAbility<DataScopedTreeRecord> {
         private final java.util.ArrayList<PlatformAction> childrenActions = new java.util.ArrayList<>();
+        private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
         private PlatformAction viewAction;
 
         private DataScopedTreeService() {
@@ -140,6 +178,64 @@ class DataScopeWebTest {
             }
             return List.of();
         }
+
+        @Override
+        public DataScopeCriteriaResult requireRecordScopeResult(ActionExecutionPolicy policy, Collection<String> ids) {
+            scopedIdCalls.add(List.copyOf(ids));
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+
+        @Override
+        public DataScopedTreeRecord select(String id) {
+            return switch (id) {
+                case "moving" -> treeRecord("moving", "Moving", "parent");
+                case "previous" -> treeRecord("previous", "Previous", "parent");
+                case "parent" -> treeRecord("parent", "Parent", TreeAbility.ROOT_ID);
+                default -> null;
+            };
+        }
+
+        @Override
+        public List<DataScopedTreeRecord> children(String parentId) {
+            if ("parent".equals(parentId)) {
+                return List.of(
+                        treeRecord("moving", "Moving", "parent"),
+                        treeRecord("previous", "Previous", "parent"),
+                        treeRecord("hidden", "Hidden", "parent")
+                );
+            }
+            return List.of();
+        }
+    }
+
+    private static final class DataScopedSortService extends AbstractAbilityService<DataScopedSortRecord>
+            implements SortAbility<DataScopedSortRecord>, DataScopeAbility<DataScopedSortRecord> {
+        private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
+
+        private DataScopedSortService() {
+            super("demo.dataScopedSort", DataScopedSortRecord.class, dao());
+        }
+
+        @Override
+        public DataScopeCriteriaService getDataScopeCriteriaService() {
+            return new AllowAllDataScopeCriteriaService();
+        }
+
+        @Override
+        public DataScopeCriteriaResult requireRecordScopeResult(ActionExecutionPolicy policy, Collection<String> ids) {
+            scopedIdCalls.add(List.copyOf(ids));
+            return DataScopeCriteriaResult.unrestricted(Criteria.of());
+        }
+
+        @Override
+        public DataScopedSortRecord select(String id) {
+            return sortRecord(id);
+        }
+
+        @Override
+        public List<DataScopedSortRecord> sortedList(Criteria criteria) {
+            return List.of(sortRecord("moving"), sortRecord("previous"), sortRecord("hidden"));
+        }
     }
 
     private static final class DataScopedCrudController extends WebSupport<DataScopedCrudService>
@@ -156,11 +252,26 @@ class DataScopeWebTest {
         }
     }
 
+    private static final class DataScopedSortController extends WebSupport<DataScopedSortService>
+            implements SortWeb<DataScopedSortRecord, DataScopedSortService> {
+        private DataScopedSortController(DataScopedSortService service) {
+            this.service = service;
+        }
+    }
+
     private static DataScopedTreeRecord treeRecord(String id, String title, String parentId) {
         DataScopedTreeRecord record = new DataScopedTreeRecord();
         record.setId(id);
         record.setTitle(title);
         record.setParentId(parentId);
+        return record;
+    }
+
+    private static DataScopedSortRecord sortRecord(String id) {
+        DataScopedSortRecord record = new DataScopedSortRecord();
+        record.setId(id);
+        record.setTitle(id);
+        record.setSortOrder(100);
         return record;
     }
 

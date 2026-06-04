@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | `SoftDeleteAbility` | 统一软删除写入、默认过滤和忽略软删读取 | `EntityContract.deleted/deletedAt` | 默认读写隐藏已删除数据；确需读取已删除数据时使用明确的 RAW/ignore 入口。 |
 | `EnableAbility` | 统一启用、停用、启用校验和启用条件构造 | `EnabledCapable.enabled` | 启停不是默认过滤条件；业务需要时显式调用 `enabledCriteria` 或 `requireEnabled`。 |
-| `SystemManagedAbility` | 限制系统级配置只能在系统态维护 | `TenantContext.system()` | 适合租户、应用、平台模块等系统态配置；写入前可做 `normalizeBeforeMutation`。 |
+| `SystemManagedAbility` | 限制系统级配置只能在系统态维护 | `TenantContext.system(reason)` | 适合租户、应用、平台模块等系统态配置；写入前可做 `normalizeBeforeMutation`。 |
 | `TenantActiveScopedAbility` | 限制租户内业务写入必须处于有效租户上下文 | `TenantContext.currentTenantId()`、`ActiveTenantVerifier` | 写入前会要求租户上下文并校验租户有效；适合组织、部门等租户内业务。 |
 | `TenantActiveScopedService` | 收口租户内业务 Service 对 `ActiveTenantVerifier` 的样板依赖 | `AbstractAbilityService`、`TenantActiveScopedAbility` | 后续租户内静态 Service 优先继承它，而不是重复声明 verifier 字段和转发方法。 |
 | `GlobalScopedAbility` | 表达不受当前租户过滤影响的全局配置读取 | `SoftDeleteAbility` | 适合租户自身、平台全局配置等；不要用于普通租户业务绕过隔离。 |

@@ -11,6 +11,7 @@ public record DynamicActionExecutionContext(
         String traceId,
         String tenantId,
         boolean systemContext,
+        String systemReason,
         String operatorId,
         String operatorType,
         String authorizationDecision,
@@ -24,8 +25,22 @@ public record DynamicActionExecutionContext(
                                          String traceId,
                                          String tenantId,
                                          boolean systemContext,
+                                         String systemReason,
                                          DynamicActionAvailability availability) {
         this(moduleAlias, entityAlias, actionCode, action, recordId, traceId, tenantId, systemContext,
-                null, null, null, availability);
+                systemReason, null, null, null, availability);
+    }
+
+    public DynamicActionExecutionContext(String moduleAlias,
+                                         String entityAlias,
+                                         String actionCode,
+                                         DynamicActionDescriptor action,
+                                         String recordId,
+                                         String traceId,
+                                         String tenantId,
+                                         boolean systemContext,
+                                         DynamicActionAvailability availability) {
+        this(moduleAlias, entityAlias, actionCode, action, recordId, traceId, tenantId, systemContext,
+                null, null, null, null, availability);
     }
 }

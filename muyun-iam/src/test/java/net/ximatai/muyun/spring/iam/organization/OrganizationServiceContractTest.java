@@ -52,7 +52,7 @@ class OrganizationServiceContractTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("tenant context");
 
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             assertThatThrownBy(() -> service.insert(organization("HQ", "Headquarters")))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("tenant context");

@@ -16,6 +16,9 @@ public class Role extends StandardEnabledSortableEntity {
     @Column(name = "role_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role kind")
     private RoleKind roleKind;
 
+    @Column(name = "tenant_scope_policy", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Tenant scope policy")
+    private TenantScopePolicy tenantScopePolicy;
+
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;
 

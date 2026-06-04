@@ -24,7 +24,7 @@ class MenuServiceContractTest {
 
     @BeforeEach
     void setUpModules() {
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             insertModule("crm.customer");
             insertModule("crm.contract");
         }
@@ -62,7 +62,7 @@ class MenuServiceContractTest {
     @Test
     void shouldCreateSystemSchemeWithoutTenant() {
         String schemeId;
-        try (TenantContext.Scope ignored = TenantContext.system()) {
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
             schemeId = schemeService.insert(scheme("admin_default", MenuScopeType.SYSTEM, null));
         }
 
