@@ -7,4 +7,10 @@ public class AllowAllActionExecutionPolicyService implements ActionExecutionPoli
             throw new IllegalArgumentException("action execution context must not be null");
         }
     }
+
+    @Override
+    public ActionAuthorizationResult authorize(ActionExecutionContext context) {
+        requireAuthorized(context);
+        return ActionAuthorizationResult.allowed(context, "ALLOW_ALL");
+    }
 }

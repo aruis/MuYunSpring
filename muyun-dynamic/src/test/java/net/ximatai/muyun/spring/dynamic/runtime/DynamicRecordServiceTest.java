@@ -258,7 +258,9 @@ class DynamicRecordServiceTest {
                 .setValue("status", "draft");
         record.setId("contract-1");
 
-        service.module(MODULE).executeAction("create", DynamicActionExecutionRequest.record(record));
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))) {
+            service.module(MODULE).executeAction("create", DynamicActionExecutionRequest.record(record));
+        }
 
         assertThat(events.events()).extracting(RuntimeEvent::eventType)
                 .containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
@@ -269,6 +271,11 @@ class DynamicRecordServiceTest {
         assertThat(action.entityAlias()).isEqualTo("contract");
         assertThat(action.recordId()).isEqualTo("contract-1");
         assertThat(action.actionCode()).isEqualTo("create");
+        assertThat(action.operatorId()).isEqualTo("user-1");
+        assertThat(action.operatorType()).isEqualTo("USER");
+        assertThat(action.authorizationDecision()).isEqualTo("ALLOW_ALL");
+        assertThat(action.authorizationPermissionCode()).isEqualTo(MODULE + ":create");
+        assertThat(action.authorizationPermissionActionCode()).isEqualTo("create");
         assertThat(action.payload()).containsEntry("executorType", "STANDARD")
                 .containsEntry("actionLevel", "LIST")
                 .containsEntry("resultType", "RECORD_ID")

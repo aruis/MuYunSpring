@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
@@ -43,8 +44,9 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
         }
         ActionExecutionContext resolved = context.get();
-        policyService.requireAuthorized(resolved);
-        request.setAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE, ActionExecutionContextHolder.use(resolved));
+        ActionAuthorizationResult authorization = policyService.authorize(resolved);
+        request.setAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE,
+                ActionExecutionContextHolder.use(resolved.withAuthorizationResult(authorization)));
         return true;
     }
 

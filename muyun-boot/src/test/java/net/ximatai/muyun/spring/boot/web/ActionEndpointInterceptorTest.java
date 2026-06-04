@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.web;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
@@ -49,6 +50,8 @@ class ActionEndpointInterceptorTest {
                 assertThat(context.permissionCode()).isEqualTo("iam.organization:view");
                 assertThat(context.recordIds()).isEmpty();
                 assertThat(context.currentUser()).get().extracting(CurrentUser::userId).isEqualTo("u1");
+                assertThat(context.authorizationResult()).isNotNull();
+                assertThat(context.authorizationResult().operatorId()).isEqualTo("u1");
             });
             assertThat(ActionExecutionContextHolder.current()).contains(policyService.context);
             interceptor.afterCompletion(request, new MockHttpServletResponse(),
@@ -139,6 +142,13 @@ class ActionEndpointInterceptorTest {
         @Override
         public void requireAuthorized(ActionExecutionContext context) {
             this.context = context;
+        }
+
+        @Override
+        public ActionAuthorizationResult authorize(ActionExecutionContext context) {
+            ActionAuthorizationResult result = ActionAuthorizationResult.allowed(context, "TEST_ALLOWED");
+            this.context = context.withAuthorizationResult(result);
+            return result;
         }
     }
 

@@ -13,7 +13,8 @@ public record ActionExecutionContext(
         ActionExecutionPolicy actionPolicy,
         String permissionCode,
         Set<String> recordIds,
-        Optional<CurrentUser> currentUser
+        Optional<CurrentUser> currentUser,
+        ActionAuthorizationResult authorizationResult
 ) {
     public ActionExecutionContext {
         moduleAlias = requireText(moduleAlias, "moduleAlias");
@@ -39,7 +40,8 @@ public record ActionExecutionContext(
                 policy,
                 PlatformPermissionCode.action(moduleAlias, policy.permissionActionCode()),
                 normalizeRecordIds(recordIds),
-                currentUser
+                currentUser,
+                null
         );
     }
 
@@ -56,7 +58,8 @@ public record ActionExecutionContext(
                 policy,
                 PlatformPermissionCode.action(moduleAlias, policy.permissionActionCode()),
                 normalizeRecordIds(recordIds),
-                currentUser
+                currentUser,
+                null
         );
     }
 
@@ -72,7 +75,8 @@ public record ActionExecutionContext(
                 policy,
                 PlatformPermissionCode.action(moduleAlias, policy.permissionActionCode()),
                 normalizeRecordIds(recordIds),
-                currentUser
+                currentUser,
+                null
         );
     }
 
@@ -88,7 +92,21 @@ public record ActionExecutionContext(
                 actionPolicy,
                 permissionCode,
                 normalizeRecordIds(recordIds),
-                currentUser
+                currentUser,
+                authorizationResult
+        );
+    }
+
+    public ActionExecutionContext withAuthorizationResult(ActionAuthorizationResult authorizationResult) {
+        return new ActionExecutionContext(
+                moduleAlias,
+                actionCode,
+                platformAction,
+                actionPolicy,
+                permissionCode,
+                recordIds,
+                currentUser,
+                authorizationResult
         );
     }
 

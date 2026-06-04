@@ -37,6 +37,11 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getEntityAlias()).isEqualTo("contract");
         assertThat(record.getRecordId()).isEqualTo("contract-1");
         assertThat(record.getActionCode()).isEqualTo("approve");
+        assertThat(record.getOperatorId()).isEqualTo("user-1");
+        assertThat(record.getOperatorType()).isEqualTo("USER");
+        assertThat(record.getAuthorizationDecision()).isEqualTo("ROLE_GRANTED");
+        assertThat(record.getAuthorizationPermissionCode()).isEqualTo("sales.contract:view");
+        assertThat(record.getAuthorizationPermissionActionCode()).isEqualTo("view");
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
         assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getResultType()).isEqualTo("VALUE");
@@ -46,9 +51,6 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getResultText()).isEqualTo("approved");
         assertThat(record.getSystemContext()).isFalse();
         assertThat(record.getSystemReason()).isNull();
-        assertThat(record.getOperatorId()).isEqualTo("user-1");
-        assertThat(record.getOperatorType()).isEqualTo("USER");
-        assertThat(record.getAuthorizationDecision()).isEqualTo("ALLOW");
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
         assertThat(record.getPayloadText()).contains("resultType=VALUE");
         assertThat(record.getOccurredAt()).isEqualTo(Instant.parse("2026-06-02T04:00:00Z"));
@@ -205,7 +207,9 @@ class RuntimeAuditRecordServiceContractTest {
                 false,
                 "user-1",
                 "USER",
-                "ALLOW",
+                "ROLE_GRANTED",
+                "sales.contract:view",
+                "view",
                 RuntimeMutationSource.ACTION,
                 ActionEventPayload.executed("SERVICE", "RECORD", "VALUE", "审批通过",
                         true, "/contracts/contract-1", false, "approved"),

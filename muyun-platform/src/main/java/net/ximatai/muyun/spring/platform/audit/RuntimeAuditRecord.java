@@ -91,6 +91,14 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "authorization_decision", type = ColumnType.VARCHAR, length = 32, comment = "Authorization decision")
     private String authorizationDecision;
 
+    @Column(name = "authorization_permission_code", type = ColumnType.VARCHAR, length = 192,
+            comment = "Authorization permission code")
+    private String authorizationPermissionCode;
+
+    @Column(name = "authorization_permission_action_code", type = ColumnType.VARCHAR, length = 64,
+            comment = "Authorization permission action code")
+    private String authorizationPermissionActionCode;
+
     @Column(name = "mutation_source", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Mutation source")
     private RuntimeMutationSource mutationSource;
 

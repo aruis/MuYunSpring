@@ -71,7 +71,8 @@ final class DynamicRecordEventPublisher {
     }
 
     void actionExecuted(DynamicActionExecutionContext context, DynamicActionResultBody body) {
-        publisher.publishAfterCommit(RuntimeEvent.of(
+        publisher.publishAfterCommit(new RuntimeEvent(
+                null,
                 context.traceId(),
                 RuntimeEventType.ACTION_EXECUTED,
                 context.moduleAlias(),
@@ -81,6 +82,11 @@ final class DynamicRecordEventPublisher {
                 context.tenantId(),
                 context.systemContext(),
                 context.systemReason(),
+                context.operatorId(),
+                context.operatorType(),
+                context.authorizationDecision(),
+                context.authorizationPermissionCode(),
+                context.authorizationPermissionActionCode(),
                 RuntimeMutationSource.ACTION,
                 actionPayload(context, ActionEventPayload.executed(
                         context.action().executorType().name(),
@@ -91,7 +97,8 @@ final class DynamicRecordEventPublisher {
                         body.redirectTo(),
                         context.action().executorType() == EntityActionExecutorType.DIALOG,
                         isSimpleEventValue(body.value()) ? body.value() : null
-                ))
+                )),
+                null
         ));
     }
 
@@ -100,7 +107,8 @@ final class DynamicRecordEventPublisher {
                       String errorMessage,
                       Throwable cause) {
         try {
-            publisher.publish(RuntimeEvent.of(
+            publisher.publish(new RuntimeEvent(
+                    null,
                     context.traceId(),
                     RuntimeEventType.ACTION_FAILED,
                     context.moduleAlias(),
@@ -110,6 +118,11 @@ final class DynamicRecordEventPublisher {
                     context.tenantId(),
                     context.systemContext(),
                     context.systemReason(),
+                    context.operatorId(),
+                    context.operatorType(),
+                    context.authorizationDecision(),
+                    context.authorizationPermissionCode(),
+                    context.authorizationPermissionActionCode(),
                     RuntimeMutationSource.ACTION,
                     actionPayload(context, ActionEventPayload.failed(
                             context.action().executorType().name(),
@@ -118,7 +131,8 @@ final class DynamicRecordEventPublisher {
                             failureStage,
                             errorMessage,
                             cause == null ? null : cause.getClass().getName()
-                    ))
+                    )),
+                    null
             ));
         } catch (RuntimeException ignored) {
             // Failure audit must not replace the original action failure.

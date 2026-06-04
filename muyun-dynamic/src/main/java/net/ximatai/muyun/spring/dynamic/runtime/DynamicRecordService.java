@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
@@ -801,7 +802,7 @@ public class DynamicRecordService {
                                                        DynamicActionExecutionRequest request) {
         DynamicActionExecutionRequest normalized = request == null ? DynamicActionExecutionRequest.empty() : request;
         ActionExecutionPolicy policy = actionPolicy(action);
-        actionExecutionPolicyService.requireAuthorized(ActionExecutionContext.ofPolicy(
+        ActionAuthorizationResult authorization = actionExecutionPolicyService.authorize(ActionExecutionContext.ofPolicy(
                 moduleAlias,
                 policy,
                 actionRecordIds(normalized),
@@ -813,7 +814,8 @@ public class DynamicRecordService {
             return actionAvailability(moduleAlias, entityAlias, action.code(), availabilityRecord);
         });
         String traceId = UUID.randomUUID().toString();
-        DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized, availability, null, traceId);
+        DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, normalized,
+                availability, null, traceId, authorization);
         if (!availability.available()) {
             eventPublisher.actionFailed(context, DynamicActionExecutionException.STAGE_AVAILABILITY, availability.message(), null);
             throw new DynamicActionExecutionException(availability.message(), context,
@@ -826,7 +828,8 @@ public class DynamicRecordService {
                     validateBeforeActionExecute(moduleAlias, entityAlias, normalized, context);
                 }
                 DynamicActionResultBody body = executeActionValue(moduleAlias, entityAlias, action, normalized, context, traceId, policy);
-                DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized, availability, body.value(), traceId);
+                DynamicActionExecutionContext completed = executionContext(moduleAlias, entityAlias, action, normalized,
+                        availability, body.value(), traceId, authorization);
                 return new DynamicActionExecutionResult(completed, body.value(), body);
             }));
         } catch (DynamicActionExecutionException e) {
@@ -1051,7 +1054,7 @@ public class DynamicRecordService {
                                                            DynamicActionDescriptor action,
                                                            DynamicActionExecutionRequest request,
                                                            DynamicActionAvailability availability) {
-        return executionContext(moduleAlias, entityAlias, action, request, availability, null, UUID.randomUUID().toString());
+        return executionContext(moduleAlias, entityAlias, action, request, availability, null, UUID.randomUUID().toString(), null);
     }
 
     private DynamicActionExecutionContext executionContext(String moduleAlias,
@@ -1060,7 +1063,8 @@ public class DynamicRecordService {
                                                            DynamicActionExecutionRequest request,
                                                            DynamicActionAvailability availability,
                                                            Object value,
-                                                           String traceId) {
+                                                           String traceId,
+                                                           ActionAuthorizationResult authorization) {
         String recordId = request.recordId();
         if ((recordId == null || recordId.isBlank()) && request.record() != null) {
             recordId = request.record().getId();
@@ -1078,6 +1082,11 @@ public class DynamicRecordService {
                 TenantContext.currentTenantId().orElse(null),
                 TenantContext.isSystem(),
                 TenantContext.systemReason().orElse(null),
+                authorization == null ? null : authorization.operatorId(),
+                authorization == null ? null : authorization.operatorType(),
+                authorization == null ? null : authorization.decision(),
+                authorization == null ? null : authorization.permissionCode(),
+                authorization == null ? null : authorization.permissionActionCode(),
                 availability
         );
     }

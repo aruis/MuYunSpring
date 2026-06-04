@@ -15,6 +15,8 @@ public record DynamicActionExecutionContext(
         String operatorId,
         String operatorType,
         String authorizationDecision,
+        String authorizationPermissionCode,
+        String authorizationPermissionActionCode,
         DynamicActionAvailability availability
 ) {
     public DynamicActionExecutionContext(String moduleAlias,
@@ -28,7 +30,7 @@ public record DynamicActionExecutionContext(
                                          String systemReason,
                                          DynamicActionAvailability availability) {
         this(moduleAlias, entityAlias, actionCode, action, recordId, traceId, tenantId, systemContext,
-                systemReason, null, null, null, availability);
+                systemReason, null, null, null, null, null, availability);
     }
 
     public DynamicActionExecutionContext(String moduleAlias,
@@ -41,6 +43,6 @@ public record DynamicActionExecutionContext(
                                          boolean systemContext,
                                          DynamicActionAvailability availability) {
         this(moduleAlias, entityAlias, actionCode, action, recordId, traceId, tenantId, systemContext,
-                null, null, null, null, availability);
+                null, null, null, null, null, null, availability);
     }
 }
