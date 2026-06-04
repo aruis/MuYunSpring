@@ -10,9 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -367,18 +365,16 @@ class PlatformModuleDefinitionCompilerTest {
         String metadataId = metadataService.insert(metadata);
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        ModuleMetadataAction create = metadataAction(relationId, "create", EntityActionKind.RECORD);
+        ModuleMetadataAction create = metadataAction(relationId, "create");
         create.setTitle("新建客户");
-        create.setActionStyle(ActionStyle.PRIMARY);
         create.setAvailableExpression("{title} != ''");
         create.setUnavailableMessage("客户名称不能为空");
         actionService.insert(create);
-        ModuleMetadataAction delete = metadataAction(relationId, "delete", EntityActionKind.RECORD);
+        ModuleMetadataAction delete = metadataAction(relationId, "delete");
         delete.setEnabled(false);
         delete.setTitle("删除客户");
-        delete.setActionStyle(ActionStyle.DANGER);
         actionService.insert(delete);
-        ModuleMetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
+        ModuleMetadataAction export = metadataAction(relationId, "exportData");
         export.setTitle("导出");
         export.setCategory(EntityActionCategory.DIALOG);
         export.setActionLevel(EntityActionLevel.LIST);
@@ -401,7 +397,6 @@ class PlatformModuleDefinitionCompilerTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.title()).isEqualTo("新建客户");
-                    assertThat(action.style()).isEqualTo(ActionStyle.PRIMARY);
                     assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
                     assertThat(action.availabilityCondition()).isTrue();
                     assertThat(action.unavailableMessage()).isEqualTo("客户名称不能为空");
@@ -411,13 +406,10 @@ class PlatformModuleDefinitionCompilerTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.enabled()).isFalse();
-                    assertThat(action.style()).isEqualTo(ActionStyle.DANGER);
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
                 .get()
-                .satisfies(action -> {
-                    assertThat(action.kind()).isEqualTo(net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind.CUSTOM);
-                    assertThat(action.title()).isEqualTo("导出");
+                .satisfies(action -> {                    assertThat(action.title()).isEqualTo("导出");
                     assertThat(action.category()).isEqualTo(EntityActionCategory.DIALOG);
                     assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
                     assertThat(action.accessMode()).isEqualTo(EntityActionAccessMode.AUTH_REQUIRED);
@@ -435,7 +427,7 @@ class PlatformModuleDefinitionCompilerTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        ModuleMetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
+        ModuleMetadataAction export = metadataAction(relationId, "exportData");
         export.setTitle("导出");
         export.setDataAuth(true);
         export.setExecutorType(EntityActionExecutorType.SERVICE);
@@ -520,7 +512,7 @@ class PlatformModuleDefinitionCompilerTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        actionService.insert(metadataAction(relationId, "sort", EntityActionKind.SORT));
+        actionService.insert(metadataAction(relationId, "sort"));
 
         assertThatThrownBy(() -> compiler.compile("crm.customer"))
                 .isInstanceOf(net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException.class)
@@ -635,11 +627,10 @@ class PlatformModuleDefinitionCompilerTest {
         return viewField;
     }
 
-    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+    private ModuleMetadataAction metadataAction(String relationId, String alias) {
         ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
         action.setActionCode(alias);
-        action.setActionKind(kind);
         return action;
     }
 

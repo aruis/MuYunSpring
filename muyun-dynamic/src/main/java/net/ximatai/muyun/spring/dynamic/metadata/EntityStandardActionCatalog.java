@@ -10,12 +10,11 @@ public final class EntityStandardActionCatalog {
         return PlatformActionResolver.standardActions(entity);
     }
 
-    public static EntityActionKind standardKind(EntityDefinition entity, String actionCode) {
+    public static boolean supportsStandardAction(EntityDefinition entity, String actionCode) {
         return from(entity).stream()
                 .filter(action -> action.actionCode().equals(actionCode))
-                .map(EntityActionDefinition::kind)
                 .findFirst()
-                .orElse(null);
+                .isPresent();
     }
 
 }

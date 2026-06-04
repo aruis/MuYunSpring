@@ -13,7 +13,6 @@ import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -556,7 +555,7 @@ class PlatformMetadataServiceContractTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        ModuleMetadataAction action = metadataAction(relationId, "submit", EntityActionKind.CUSTOM);
+        ModuleMetadataAction action = metadataAction(relationId, "submit");
         action.setAvailableExpression("{title} = 'updated'");
 
         assertThatThrownBy(() -> actionService.insert(action))
@@ -570,7 +569,7 @@ class PlatformMetadataServiceContractTest {
         String metadataId = metadataService.insert(metadata("crm", "customer"));
         fieldService.insert(titleField(metadataId));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
-        ModuleMetadataAction action = metadataAction(relationId, "submit", EntityActionKind.CUSTOM);
+        ModuleMetadataAction action = metadataAction(relationId, "submit");
         action.setAvailableExpression("{missingStatus} == 'active'");
 
         assertThatThrownBy(() -> actionService.insert(action))
@@ -587,7 +586,7 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(field(profileMetadataId, "score", "score", FieldType.INTEGER));
         String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
         relationService.insert(childRelation("crm.customer", profileMetadataId, customerMetadataId));
-        ModuleMetadataAction action = metadataAction(relationId, "scoreAudit", EntityActionKind.CUSTOM);
+        ModuleMetadataAction action = metadataAction(relationId, "scoreAudit");
         action.setAvailableExpression("SUM({profile.score}) > 0");
 
         assertThat(actionService.insert(action)).isNotBlank();
@@ -779,11 +778,10 @@ class PlatformMetadataServiceContractTest {
         return relation;
     }
 
-    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+    private ModuleMetadataAction metadataAction(String relationId, String alias) {
         ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
         action.setActionCode(alias);
-        action.setActionKind(kind);
         return action;
     }
 

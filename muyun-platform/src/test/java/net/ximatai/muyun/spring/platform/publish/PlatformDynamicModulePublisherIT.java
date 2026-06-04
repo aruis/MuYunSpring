@@ -4,7 +4,6 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -145,9 +144,9 @@ class PlatformDynamicModulePublisherIT {
         MetadataViewField statusViewField = metadataViewField(formViewId, status.getId());
         statusViewField.setControlType(ViewControlType.SELECT);
         services.viewFieldService.insert(statusViewField);
-        ModuleMetadataAction createAction = metadataAction(mainRelationId, "create", EntityActionKind.RECORD);
+        ModuleMetadataAction createAction = metadataAction(mainRelationId, "create");
         services.actionService.insert(createAction);
-        ModuleMetadataAction submitAction = metadataAction(mainRelationId, "submit", EntityActionKind.CUSTOM);
+        ModuleMetadataAction submitAction = metadataAction(mainRelationId, "submit");
         submitAction.setAvailableExpression("{title} != ''");
         submitAction.setUnavailableMessage("客户名称不能为空");
         services.actionService.insert(submitAction);
@@ -398,11 +397,10 @@ class PlatformDynamicModulePublisherIT {
         return viewField;
     }
 
-    private ModuleMetadataAction metadataAction(String relationId, String alias, EntityActionKind kind) {
+    private ModuleMetadataAction metadataAction(String relationId, String alias) {
         ModuleMetadataAction action = new ModuleMetadataAction();
         action.setRelationId(relationId);
         action.setActionCode(alias);
-        action.setActionKind(kind);
         return action;
     }
 

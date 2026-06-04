@@ -32,16 +32,13 @@ final class DynamicStandardActions {
                                                   String entityAlias,
                                                   EntityActionDefinition configured,
                                                   DynamicActionDescriptor standard) {
-        DynamicActionKind kind = standard == null ? DynamicActionKind.from(configured.kind()) : standard.kind();
         EntityActionDefinition execution = standard == null ? configured : null;
         DynamicActionDescriptor descriptor = new DynamicActionDescriptor(
                 configured.actionCode(),
-                kind,
                 configured.title(),
                 configured.enabled(),
-                configured.style(),
-                configured.level(),
-                configured.category(),
+                standard == null ? configured.level() : standard.actionLevel(),
+                standard == null ? configured.category() : standard.category(),
                 standard == null ? configured.accessMode() : standard.accessMode(),
                 standard == null ? configured.actionAuth() : standard.actionAuth(),
                 standard == null ? configured.dataAuth() : standard.dataAuth(),

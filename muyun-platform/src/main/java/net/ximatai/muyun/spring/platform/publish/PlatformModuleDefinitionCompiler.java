@@ -387,11 +387,9 @@ public class PlatformModuleDefinitionCompiler {
         return new EntityActionDefinition(
                 metadata.getAlias(),
                 action.getActionCode(),
-                action.getActionKind(),
                 action.getTitle(),
                 Boolean.TRUE.equals(action.getEnabled()),
                 action.getActionLevel(),
-                action.getActionStyle(),
                 action.getCategory(),
                 action.getAccessMode(),
                 action.getActionAuth(),

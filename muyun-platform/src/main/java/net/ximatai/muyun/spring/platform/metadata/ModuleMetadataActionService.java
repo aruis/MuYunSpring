@@ -15,9 +15,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -83,17 +81,11 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
         if (action.getActionCode() == null || !action.getActionCode().matches("[a-z][A-Za-z0-9]{0,63}")) {
             throw new PlatformException("Module metadata action requires valid actionCode: " + action.getActionCode());
         }
-        if (action.getActionKind() == null) {
-            throw new PlatformException("Metadata action requires actionKind");
-        }
         if (action.getCategory() == null) {
-            action.setCategory(EntityActionDefinition.defaultCategory(action.getActionKind()));
+            action.setCategory(EntityActionDefinition.defaultCategory(action.getActionCode()));
         }
         if (action.getActionLevel() == null) {
-            action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getActionKind()));
-        }
-        if (action.getActionStyle() == null) {
-            action.setActionStyle(ActionStyle.NORMAL);
+            action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getCategory()));
         }
         if (action.getAccessMode() == null) {
             action.setAccessMode(EntityActionAccessMode.AUTH_REQUIRED);

@@ -1,6 +1,5 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
@@ -58,8 +57,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "delete", EntityActionKind.RECORD,
-                        "Delete", true, EntityActionLevel.RECORD, ActionStyle.DANGER,
+                List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.SERVICE, "deleteExecutor"))
         );
@@ -79,8 +77,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "query", EntityActionKind.COLLECTION,
-                        "Query", true, EntityActionLevel.LIST, ActionStyle.NORMAL,
+                List.of(new EntityActionDefinition("contract", "query", "Query", true, EntityActionLevel.LIST,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.SERVICE, "queryExecutor"))
         );
@@ -88,6 +85,26 @@ class ModuleDefinitionValidatorTest {
         assertThatThrownBy(() -> validator.validate(module))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("standard action executor must be STANDARD: contract.query");
+    }
+
+    @Test
+    void shouldRejectStandardActionConfiguredWithWrongLevel() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(contractEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("contract", "delete", "Delete", true, EntityActionLevel.LIST,
+                        EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("standard action level must match platform action: contract.delete");
     }
 
     @Test
@@ -100,8 +117,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
+                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
         );
@@ -121,8 +137,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
-                        "Submit Dialog", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
+                List.of(new EntityActionDefinition("contract", "submitDialog", "Submit Dialog", true, EntityActionLevel.RECORD,
                         EntityActionCategory.DIALOG, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.DIALOG, null))
         );
@@ -142,8 +157,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
+                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
         );
@@ -163,8 +177,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
+                List.of(new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
         );
@@ -173,8 +186,7 @@ class ModuleDefinitionValidatorTest {
     }
 
     private EntityActionDefinition customAction(String actionCode) {
-        return new EntityActionDefinition("contract", actionCode, EntityActionKind.CUSTOM,
-                "Custom " + actionCode, true, EntityActionLevel.LIST, ActionStyle.NORMAL,
+        return new EntityActionDefinition("contract", actionCode, "Custom " + actionCode, true, EntityActionLevel.LIST,
                 EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                 true, false, null, null, null, EntityActionExecutorType.SERVICE, actionCode + "Executor");
     }

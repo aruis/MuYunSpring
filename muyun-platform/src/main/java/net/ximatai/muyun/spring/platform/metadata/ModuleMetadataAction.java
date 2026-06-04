@@ -12,9 +12,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 
 @Getter
 @Setter
@@ -30,15 +28,8 @@ public class ModuleMetadataAction extends StandardEnabledSortableEntity {
     @Column(name = "category", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action category")
     private EntityActionCategory category;
 
-    @Column(name = "action_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action kind")
-    private EntityActionKind actionKind;
-
     @Column(name = "action_level", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Action execution level")
     private EntityActionLevel actionLevel;
-
-    @Column(name = "action_style", type = ColumnType.VARCHAR, length = 32, nullable = false,
-            comment = "Action display style", defaultVal = @Default(varchar = "NORMAL"))
-    private ActionStyle actionStyle = ActionStyle.NORMAL;
 
     @Column(name = "access_mode", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Action access mode", defaultVal = @Default(varchar = "AUTH_REQUIRED"))

@@ -10,9 +10,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -208,8 +206,7 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                                "Submit", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
+                        new EntityActionDefinition("contract", "submit", "Submit", true, EntityActionLevel.RECORD,
                                 EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                                 true, true, "view", null, null,
                                 EntityActionExecutorType.SERVICE, "contractSubmit")
@@ -232,8 +229,7 @@ class DynamicModuleDescriptorTest {
                         .isEqualTo(new ActionPermissionDescriptor("sales.contract:view", true, true,
                                 "view", "sales.contract:view")));
         assertThat(ActionPermissionDescriptor.of("sales.contract",
-                new DynamicActionDescriptor("customExport", DynamicActionKind.CUSTOM, "Export", true,
-                        ActionStyle.NORMAL, EntityActionLevel.LIST, EntityActionCategory.CUSTOM,
+                new DynamicActionDescriptor("customExport", "Export", true, EntityActionLevel.LIST, EntityActionCategory.CUSTOM,
                         EntityActionAccessMode.AUTH_REQUIRED, true, false, "query", false, null,
                         EntityActionExecutorType.SERVICE, "customExport")))
                 .isEqualTo(new ActionPermissionDescriptor("sales.contract:view", true, false,
@@ -257,10 +253,8 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
-                                "新建客户", true, ActionStyle.PRIMARY),
-                        new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
-                                "导出联系人", true, ActionStyle.NORMAL)
+                        new EntityActionDefinition("customer", "create", "新建客户", true),
+                        new EntityActionDefinition("contact", "exportContact", "导出联系人", true)
                 ),
                 "customer"
         );
@@ -315,10 +309,8 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        new EntityActionDefinition("contact", "exportContact", EntityActionKind.CUSTOM,
-                                "导出联系人", true, ActionStyle.NORMAL),
-                        new EntityActionDefinition("customer", "approveCustomer", EntityActionKind.CUSTOM,
-                                "审核客户", true, ActionStyle.PRIMARY)
+                        new EntityActionDefinition("contact", "exportContact", "导出联系人", true),
+                        new EntityActionDefinition("customer", "approveCustomer", "审核客户", true)
                 ),
                 "customer"
         );
@@ -352,17 +344,10 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicActionDescriptor::code)
                 .contains("tree", "sort", "enable", "disable");
         assertThat(entity.actions().stream()
-                .filter(action -> action.code().equals("tree"))
-                .findFirst())
-                .get()
-                .extracting(DynamicActionDescriptor::kind)
-                .isEqualTo(DynamicActionKind.TREE);
-        assertThat(entity.actions().stream()
                 .filter(action -> action.code().equals("delete"))
                 .findFirst())
                 .get()
                 .satisfies(action -> {
-                    assertThat(action.style()).isEqualTo(ActionStyle.DANGER);
                     assertThat(action.actionLevel()).isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.RECORD);
                 });
         assertThat(entity.actions().stream()
@@ -387,15 +372,11 @@ class DynamicModuleDescriptorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        new EntityActionDefinition("customer", "create", EntityActionKind.RECORD,
-                                "新建客户", true, ActionStyle.PRIMARY),
-                        new EntityActionDefinition("customer", "delete", EntityActionKind.RECORD,
-                                "删除客户", false, ActionStyle.DANGER)
+                        new EntityActionDefinition("customer", "create", "新建客户", true),
+                        new EntityActionDefinition("customer", "delete", "删除客户", false)
                                 .availableWhen("{status} == 'draft'", "只有草稿客户可删除"),
-                        new EntityActionDefinition("customer", "exportData", EntityActionKind.CUSTOM,
-                                "导出", true, ActionStyle.NORMAL),
-                        new EntityActionDefinition("customer", "archiveSelected", EntityActionKind.CUSTOM,
-                                "批量归档", true, EntityActionLevel.BATCH, ActionStyle.NORMAL,
+                        new EntityActionDefinition("customer", "exportData", "导出", true),
+                        new EntityActionDefinition("customer", "archiveSelected", "批量归档", true, EntityActionLevel.BATCH,
                                 null, null, null, null, null, null, null, null, null)
                 )
         );
@@ -407,7 +388,6 @@ class DynamicModuleDescriptorTest {
                 .satisfies(action -> {
                     assertThat(action.title()).isEqualTo("新建客户");
                     assertThat(action.enabled()).isTrue();
-                    assertThat(action.style()).isEqualTo(ActionStyle.PRIMARY);
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("delete")).findFirst())
                 .get()
@@ -420,9 +400,7 @@ class DynamicModuleDescriptorTest {
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
                 .get()
-                .satisfies(action -> {
-                    assertThat(action.kind()).isEqualTo(DynamicActionKind.CUSTOM);
-                    assertThat(action.category().name()).isEqualTo("CUSTOM");
+                .satisfies(action -> {                    assertThat(action.category().name()).isEqualTo("CUSTOM");
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("archiveSelected")).findFirst())
                 .get()

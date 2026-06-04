@@ -164,10 +164,8 @@ final class DynamicOpenApiSchemaFactory {
     private DynamicOpenApiDocument.Schema actionDescriptorSchema() {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("code", stringProperty(false));
-        properties.put("kind", stringProperty(false));
         properties.put("title", stringProperty(false));
         properties.put("enabled", booleanProperty(false));
-        properties.put("style", stringProperty(false));
         properties.put("actionLevel", stringProperty(false));
         properties.put("category", stringProperty(false));
         properties.put("accessMode", stringProperty(false));
@@ -180,7 +178,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("executorKey", stringProperty(true));
         properties.put("permission", objectProperty("ActionPermissionDescriptor"));
         return new DynamicOpenApiDocument.Schema("DynamicActionDescriptor", "object", null,
-                List.of("code", "kind", "title", "enabled", "actionLevel", "executorType"), properties, null);
+                List.of("code", "title", "enabled", "actionLevel", "executorType"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionPermissionDescriptorSchema() {

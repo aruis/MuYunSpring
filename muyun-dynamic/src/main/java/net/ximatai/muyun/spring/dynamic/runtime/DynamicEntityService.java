@@ -23,7 +23,6 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -618,8 +617,7 @@ public class DynamicEntityService implements
         if (configured != null) {
             return configured;
         }
-        EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, actionCode);
-        if (standardKind == null) {
+        if (!EntityStandardActionCatalog.supportsStandardAction(entity, actionCode)) {
             throw new IllegalArgumentException("unknown dynamic action: " + moduleAlias + "." + entity.alias() + "." + actionCode);
         }
         return EntityStandardActionCatalog.from(entity).stream()

@@ -343,14 +343,8 @@ public class ModuleDefinitionValidator {
         EntityDefinition entity = requireEntity(entities, action.entityAlias(), "action entity");
         requireActionCode(action.actionCode(), "action code");
         requireText(action.title(), "action title");
-        if (action.kind() == null) {
-            throw new ModuleDefinitionException("action kind must not be null: " + action.actionCode());
-        }
         if (action.level() == null) {
             throw new ModuleDefinitionException("action level must not be null: " + action.actionCode());
-        }
-        if (action.style() == null) {
-            throw new ModuleDefinitionException("action style must not be null: " + action.actionCode());
         }
         if (action.category() == null) {
             throw new ModuleDefinitionException("action category must not be null: " + action.actionCode());
@@ -383,28 +377,24 @@ public class ModuleDefinitionValidator {
                     + entity.alias() + "." + action.actionCode());
         }
         validateActionAvailability(action, entity, entities, relations);
-        EntityActionKind standardKind = EntityStandardActionCatalog.standardKind(entity, action.actionCode());
-        if (standardKind == null && action.category() == EntityActionCategory.STANDARD) {
+        boolean standardAction = EntityStandardActionCatalog.supportsStandardAction(entity, action.actionCode());
+        if (!standardAction && action.category() == EntityActionCategory.STANDARD) {
             throw new ModuleDefinitionException("standard action is not supported by entity: "
                     + entity.alias() + "." + action.actionCode());
         }
-        if (standardKind == null && action.kind() != EntityActionKind.CUSTOM) {
-            throw new ModuleDefinitionException("standard action is not supported by entity: "
-                    + entity.alias() + "." + action.actionCode());
-        }
-        if (standardKind != null && action.kind() == EntityActionKind.CUSTOM) {
+        if (standardAction && action.category() != EntityActionCategory.STANDARD) {
             throw new ModuleDefinitionException("custom action conflicts with standard action: "
                     + entity.alias() + "." + action.actionCode());
         }
-        if (standardKind != null && standardKind != action.kind()) {
-            throw new ModuleDefinitionException("standard action kind mismatch: "
+        if (standardAction && action.level() != EntityActionDefinition.defaultLevel(action.actionCode(), EntityActionCategory.STANDARD)) {
+            throw new ModuleDefinitionException("standard action level must match platform action: "
                     + entity.alias() + "." + action.actionCode());
         }
-        if (standardKind != null && action.executorType() != EntityActionExecutorType.STANDARD) {
+        if (standardAction && action.executorType() != EntityActionExecutorType.STANDARD) {
             throw new ModuleDefinitionException("standard action executor must be STANDARD: "
                     + entity.alias() + "." + action.actionCode());
         }
-        if (standardKind != null && action.executorKey() != null) {
+        if (standardAction && action.executorKey() != null) {
             throw new ModuleDefinitionException("standard action executor key must be empty: "
                     + entity.alias() + "." + action.actionCode());
         }
@@ -519,7 +509,7 @@ public class ModuleDefinitionValidator {
                                  Map<String, Set<String>> configuredByEntity) {
         EntityDefinition entity = entities.get(entityAlias);
         return configuredByEntity.getOrDefault(entityAlias, Set.of()).contains(actionCode)
-                || EntityStandardActionCatalog.standardKind(entity, actionCode) != null;
+                || EntityStandardActionCatalog.supportsStandardAction(entity, actionCode);
     }
 
     private void detectActionAuthInheritCycle(EntityActionDefinition start,

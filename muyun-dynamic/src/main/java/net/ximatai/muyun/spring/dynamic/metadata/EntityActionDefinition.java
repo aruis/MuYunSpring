@@ -1,16 +1,13 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 public record EntityActionDefinition(
         String entityAlias,
         String actionCode,
-        EntityActionKind kind,
         String title,
         boolean enabled,
         EntityActionLevel level,
-        ActionStyle style,
         EntityActionCategory category,
         EntityActionAccessMode accessMode,
         Boolean actionAuth,
@@ -22,9 +19,8 @@ public record EntityActionDefinition(
         String executorKey
 ) {
     public EntityActionDefinition {
-        level = level == null ? defaultLevel(actionCode, kind) : level;
-        style = style == null ? ActionStyle.NORMAL : style;
-        category = category == null ? defaultCategory(kind) : category;
+        category = category == null ? defaultCategory(actionCode) : category;
+        level = level == null ? defaultLevel(actionCode, category) : level;
         accessMode = accessMode == null ? EntityActionAccessMode.AUTH_REQUIRED : accessMode;
         actionAuth = actionAuth == null ? accessMode == EntityActionAccessMode.AUTH_REQUIRED : actionAuth;
         dataAuth = dataAuth != null && dataAuth;
@@ -33,19 +29,25 @@ public record EntityActionDefinition(
 
     public EntityActionDefinition(String entityAlias,
                                   String actionCode,
-                                  EntityActionKind kind,
                                   String title,
                                   boolean enabled,
-                                  ActionStyle style) {
-        this(entityAlias, actionCode, kind, title, enabled, null, style, null, null,
+                                  EntityActionCategory category) {
+        this(entityAlias, actionCode, title, enabled, null, category, null,
                 null, null, null, null, null, null, null);
+    }
+
+    public EntityActionDefinition(String entityAlias,
+                                  String actionCode,
+                                  String title,
+                                  boolean enabled) {
+        this(entityAlias, actionCode, title, enabled,
+                PlatformAction.fromCode(actionCode).isPresent() ? EntityActionCategory.STANDARD : EntityActionCategory.CUSTOM);
     }
 
     public static EntityActionDefinition enabled(String entityAlias,
                                                  String actionCode,
-                                                 EntityActionKind kind,
                                                  String title) {
-        return new EntityActionDefinition(entityAlias, actionCode, kind, title, true, ActionStyle.NORMAL);
+        return new EntityActionDefinition(entityAlias, actionCode, title, true);
     }
 
     public EntityActionDefinition availableWhen(String expression) {
@@ -53,7 +55,7 @@ public record EntityActionDefinition(
     }
 
     public EntityActionDefinition availableWhen(String expression, String message) {
-        return new EntityActionDefinition(entityAlias, actionCode, kind, title, enabled, level, style, category,
+        return new EntityActionDefinition(entityAlias, actionCode, title, enabled, level, category,
                 accessMode, actionAuth, dataAuth, authInheritActionCode, expression, message, executorType, executorKey);
     }
 
@@ -61,21 +63,25 @@ public record EntityActionDefinition(
         return availableExpression != null && !availableExpression.isBlank();
     }
 
-    public static EntityActionLevel defaultLevel(String actionCode, EntityActionKind kind) {
-        if (PlatformAction.CREATE.matches(actionCode)) {
-            return EntityActionLevel.LIST;
+    public static EntityActionLevel defaultLevel(String actionCode, EntityActionCategory category) {
+        PlatformAction platformAction = PlatformAction.fromCode(actionCode).orElse(null);
+        if (platformAction != null) {
+            return switch (platformAction.level()) {
+                case DEFAULT -> EntityActionLevel.LIST;
+                case LIST -> EntityActionLevel.LIST;
+                case RECORD -> EntityActionLevel.RECORD;
+                case BATCH -> EntityActionLevel.BATCH;
+                case ANY -> EntityActionLevel.ANY;
+            };
         }
-        if (kind == EntityActionKind.RECORD || kind == EntityActionKind.STATE) {
-            return EntityActionLevel.RECORD;
-        }
-        if (kind == EntityActionKind.CUSTOM) {
+        if (category != EntityActionCategory.STANDARD) {
             return EntityActionLevel.ANY;
         }
         return EntityActionLevel.LIST;
     }
 
-    public static EntityActionCategory defaultCategory(EntityActionKind kind) {
-        return kind == EntityActionKind.CUSTOM ? EntityActionCategory.CUSTOM : EntityActionCategory.STANDARD;
+    public static EntityActionCategory defaultCategory(String actionCode) {
+        return PlatformAction.fromCode(actionCode).isPresent() ? EntityActionCategory.STANDARD : EntityActionCategory.CUSTOM;
     }
 
     public static EntityActionExecutorType defaultExecutorType(EntityActionCategory category) {

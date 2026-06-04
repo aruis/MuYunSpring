@@ -4,7 +4,6 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -70,10 +69,8 @@ class DynamicModuleDescriptorRuntimeTest {
                                 "contract", "contractId")
                 ),
                 List.of(
-                        new EntityActionDefinition("contract", "create", EntityActionKind.RECORD,
-                                "Create contract", true, null),
-                        new EntityActionDefinition("line", "exportLine", EntityActionKind.CUSTOM,
-                                "Export line", true, null)
+                        new EntityActionDefinition("contract", "create", "Create contract", true, null),
+                        new EntityActionDefinition("line", "exportLine", "Export line", true, null)
                 )
         );
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations()).publish(module);

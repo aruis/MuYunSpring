@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionGroup;
-import net.ximatai.muyun.spring.common.platform.PlatformActionKind;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 
 import java.util.ArrayList;
@@ -33,8 +32,8 @@ final class PlatformActionResolver {
 
     private static EntityActionDefinition action(EntityDefinition entity, PlatformAction action) {
         EntityActionLevel level = toLevel(action.level());
-        return new EntityActionDefinition(entity.alias(), action.code(), toKind(action.kind()),
-                action.title(), true, level, action.style(),
+        return new EntityActionDefinition(entity.alias(), action.code(),
+                action.title(), true, level,
                 null, toAccessMode(action.accessMode()), action.actionAuth(),
                 action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE), action.inheritActionCode(),
                 null, null, null, null);
@@ -42,19 +41,6 @@ final class PlatformActionResolver {
 
     private static List<PlatformActionGroup> actionGroupOrder() {
         return Arrays.asList(PlatformActionGroup.values());
-    }
-
-    private static EntityActionKind toKind(PlatformActionKind value) {
-        return switch (value) {
-            case RECORD -> EntityActionKind.RECORD;
-            case COLLECTION -> EntityActionKind.COLLECTION;
-            case QUERY -> EntityActionKind.QUERY;
-            case TREE -> EntityActionKind.TREE;
-            case SORT -> EntityActionKind.SORT;
-            case REFERENCE -> EntityActionKind.REFERENCE;
-            case STATE -> EntityActionKind.STATE;
-            case CUSTOM -> EntityActionKind.CUSTOM;
-        };
     }
 
     private static EntityActionLevel toLevel(PlatformActionLevel value) {

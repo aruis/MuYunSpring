@@ -4,14 +4,11 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.common.platform.ActionStyle;
 
 public record DynamicActionDescriptor(
         String code,
-        DynamicActionKind kind,
         String title,
         boolean enabled,
-        ActionStyle style,
         EntityActionLevel actionLevel,
         EntityActionCategory category,
         EntityActionAccessMode accessMode,
@@ -25,10 +22,8 @@ public record DynamicActionDescriptor(
         ActionPermissionDescriptor permission
 ) {
     public DynamicActionDescriptor(String code,
-                                   DynamicActionKind kind,
                                    String title,
                                    boolean enabled,
-                                   ActionStyle style,
                                    EntityActionLevel actionLevel,
                                    EntityActionCategory category,
                                    EntityActionAccessMode accessMode,
@@ -39,12 +34,12 @@ public record DynamicActionDescriptor(
                                    String unavailableMessage,
                                    EntityActionExecutorType executorType,
                                    String executorKey) {
-        this(code, kind, title, enabled, style, actionLevel, category, accessMode, actionAuth, dataAuth,
+        this(code, title, enabled, actionLevel, category, accessMode, actionAuth, dataAuth,
                 authInheritActionCode, availabilityCondition, unavailableMessage, executorType, executorKey, null);
     }
 
     public DynamicActionDescriptor withPermission(String moduleAlias) {
-        return new DynamicActionDescriptor(code, kind, title, enabled, style, actionLevel, category, accessMode,
+        return new DynamicActionDescriptor(code, title, enabled, actionLevel, category, accessMode,
                 actionAuth, dataAuth, authInheritActionCode, availabilityCondition, unavailableMessage,
                 executorType, executorKey, ActionPermissionDescriptor.of(moduleAlias, this));
     }
