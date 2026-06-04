@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -19,8 +21,9 @@ public class ActionEndpointWebConfiguration {
     }
 
     @Bean
-    public ActionEndpointContextResolver actionEndpointContextResolver() {
-        return new ActionEndpointContextResolver();
+    public ActionEndpointContextResolver actionEndpointContextResolver(
+            ObjectProvider<PlatformModuleActionService> moduleActionService) {
+        return new ActionEndpointContextResolver(moduleActionService.getIfAvailable());
     }
 
     @Bean

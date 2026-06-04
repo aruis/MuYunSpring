@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
 
@@ -118,6 +120,65 @@ class RoleGrantableActionResolverTest {
                 .containsExactly("view", "delete");
     }
 
+    @Test
+    void shouldExposeRegisteredModuleActionsForPermissionGranting() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        when(moduleService.resolveVisibleModule("iam.user")).thenReturn(module("iam.user", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("iam.user")))
+                .thenReturn(List.of(moduleAction("changePassword", "修改密码", false)));
+        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        RoleGrantableActionResolver resolver = new RoleGrantableActionResolver(
+                moduleService,
+                relationService,
+                actionService,
+                moduleActionService,
+                new StaticModuleActionRegistry(Map.of("iam.user", List.of()))
+        );
+
+        List<GrantableAction> actions = resolver.resolve(List.of("iam.user"));
+
+        assertThat(actions).filteredOn(action -> "changePassword".equals(action.actionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.permissionActionCode()).isEqualTo("changePassword");
+                    assertThat(action.title()).isEqualTo("修改密码");
+                    assertThat(action.actionAuth()).isTrue();
+                    assertThat(action.dataAuth()).isFalse();
+                });
+    }
+
+    @Test
+    void shouldUseRegisteredModuleActionsAsStaticModuleGrantableSurface() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        when(moduleService.resolveVisibleModule("iam.user")).thenReturn(module("iam.user", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("iam.user")))
+                .thenReturn(List.of(
+                        moduleAction("query", "查询", true),
+                        moduleAction("changePassword", "修改密码", true)
+                ));
+        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        RoleGrantableActionResolver resolver = new RoleGrantableActionResolver(
+                moduleService,
+                relationService,
+                actionService,
+                moduleActionService,
+                new StaticModuleActionRegistry(Map.of("iam.user", List.of(PlatformAction.TREE, PlatformAction.REFERENCE)))
+        );
+
+        List<GrantableAction> actions = resolver.resolve(List.of("iam.user"));
+
+        assertThat(actions).extracting(GrantableAction::actionCode)
+                .containsExactly("query", "changePassword");
+        assertThat(actions).extracting(GrantableAction::actionCode)
+                .doesNotContain("tree", "reference");
+    }
+
     private PlatformModule module(String moduleAlias, ModuleKind moduleKind) {
         PlatformModule module = new PlatformModule();
         module.setAlias(moduleAlias);
@@ -137,6 +198,18 @@ class RoleGrantableActionResolverTest {
         action.setActionAuth(actionAuth);
         action.setDataAuth(true);
         action.setEnabled(enabled);
+        return action;
+    }
+
+    private PlatformModuleAction moduleAction(String actionCode, String title, boolean dataAuth) {
+        PlatformModuleAction action = new PlatformModuleAction();
+        action.setModuleAlias("iam.user");
+        action.setActionCode(actionCode);
+        action.setPermissionActionCode(actionCode);
+        action.setTitle(title);
+        action.setActionAuth(Boolean.TRUE);
+        action.setDataAuth(dataAuth);
+        action.setEnabled(Boolean.TRUE);
         return action;
     }
 }

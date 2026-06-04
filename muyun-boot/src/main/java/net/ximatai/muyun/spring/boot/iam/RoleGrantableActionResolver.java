@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,22 +27,32 @@ public class RoleGrantableActionResolver {
     private final PlatformModuleService moduleService;
     private final ModuleMetadataRelationService relationService;
     private final ModuleMetadataActionService actionService;
+    private final PlatformModuleActionService moduleActionService;
     private final StaticModuleActionRegistry staticModuleActionRegistry;
 
     public RoleGrantableActionResolver(PlatformModuleService moduleService,
                                        ModuleMetadataRelationService relationService,
                                        ModuleMetadataActionService actionService) {
-        this(moduleService, relationService, actionService, new StaticModuleActionRegistry());
+        this(moduleService, relationService, actionService, null, new StaticModuleActionRegistry());
+    }
+
+    public RoleGrantableActionResolver(PlatformModuleService moduleService,
+                                       ModuleMetadataRelationService relationService,
+                                       ModuleMetadataActionService actionService,
+                                       StaticModuleActionRegistry staticModuleActionRegistry) {
+        this(moduleService, relationService, actionService, null, staticModuleActionRegistry);
     }
 
     @Autowired
     public RoleGrantableActionResolver(PlatformModuleService moduleService,
                                        ModuleMetadataRelationService relationService,
                                        ModuleMetadataActionService actionService,
+                                       PlatformModuleActionService moduleActionService,
                                        StaticModuleActionRegistry staticModuleActionRegistry) {
         this.moduleService = moduleService;
         this.relationService = relationService;
         this.actionService = actionService;
+        this.moduleActionService = moduleActionService;
         this.staticModuleActionRegistry = staticModuleActionRegistry == null
                 ? new StaticModuleActionRegistry()
                 : staticModuleActionRegistry;
@@ -56,7 +68,12 @@ public class RoleGrantableActionResolver {
             if (module == null) {
                 continue;
             }
-            if (module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC) {
+            List<GrantableAction> registeredActions = registeredModuleActions(moduleAlias);
+            if (!registeredActions.isEmpty()) {
+                for (GrantableAction action : registeredActions) {
+                    put(actions, action);
+                }
+            } else if (module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC) {
                 for (PlatformAction action : staticModuleActionRegistry.grantableActions(moduleAlias)) {
                     put(actions, GrantableAction.ofPlatformDefaults(moduleAlias, action));
                 }
@@ -66,6 +83,28 @@ public class RoleGrantableActionResolver {
             }
         }
         return List.copyOf(actions.values());
+    }
+
+    private List<GrantableAction> registeredModuleActions(String moduleAlias) {
+        if (moduleActionService == null) {
+            return List.of();
+        }
+        return moduleActionService.listByModuleAliases(List.of(moduleAlias)).stream()
+                .filter(action -> Boolean.TRUE.equals(action.getEnabled()))
+                .filter(action -> action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()))
+                .map(action -> toGrantableAction(moduleAlias, action))
+                .toList();
+    }
+
+    private GrantableAction toGrantableAction(String moduleAlias, PlatformModuleAction action) {
+        return new GrantableAction(
+                moduleAlias,
+                action.getActionCode(),
+                action.getPermissionActionCode(),
+                action.getTitle(),
+                action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()),
+                Boolean.TRUE.equals(action.getDataAuth())
+        );
     }
 
     private List<GrantableAction> configuredActions(String moduleAlias) {

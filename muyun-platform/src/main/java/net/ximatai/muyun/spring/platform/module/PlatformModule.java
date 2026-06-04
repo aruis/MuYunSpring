@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 
@@ -26,6 +27,10 @@ public class PlatformModule extends StandardEnabledTreeEntity {
     @Column(name = "module_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module kind",
             defaultVal = @Default(varchar = "static"))
     private ModuleKind moduleKind = ModuleKind.STATIC;
+
+    @Column(name = "system_managed", comment = "Whether module is managed by platform",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean systemManaged = Boolean.FALSE;
 
     public String getAlias() {
         return getId();

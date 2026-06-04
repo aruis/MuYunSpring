@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.iam.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
@@ -27,5 +29,9 @@ public class UserAccount extends StandardEnabledSortableEntity {
 
     @Column(name = "password_hash", type = ColumnType.VARCHAR, length = 256, nullable = false,
             comment = "Password hash")
+    @JsonIgnore
     private String passwordHash;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private transient String password;
 }

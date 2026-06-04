@@ -22,6 +22,10 @@ import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.Tenant;
 import net.ximatai.muyun.spring.iam.tenant.TenantDao;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
+import net.ximatai.muyun.spring.iam.user.UserAccount;
+import net.ximatai.muyun.spring.iam.user.UserAccountDao;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +51,7 @@ class IamWebControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private TenantDao tenantDao;
     private OrganizationDao organizationDao;
+    private UserAccountDao userAccountDao;
     private RoleService roleService;
     private RoleGrantableActionResolver grantableActionResolver;
     private CurrentUser currentUser;
@@ -57,20 +62,26 @@ class IamWebControllerTest {
         currentUser = null;
         tenantDao = mock(TenantDao.class);
         organizationDao = mock(OrganizationDao.class);
+        userAccountDao = mock(UserAccountDao.class);
         roleService = mock(RoleService.class);
         grantableActionResolver = mock(RoleGrantableActionResolver.class);
         TenantService tenantService = new TenantService(tenantDao);
         OrganizationService organizationService = new OrganizationService(organizationDao, tenantService);
+        UserAccountService userAccountService = new UserAccountService(
+                userAccountDao, tenantService, new PasswordHashingService());
         TenantWebController tenantController = new TenantWebController();
         OrganizationWebController organizationController = new OrganizationWebController();
+        UserAccountWebController userAccountController = new UserAccountWebController(null);
         RoleWebController roleController = new RoleWebController(grantableActionResolver);
         ReflectionTestUtils.setField(tenantController, "service", tenantService);
         ReflectionTestUtils.setField(organizationController, "service", organizationService);
+        ReflectionTestUtils.setField(userAccountController, "service", userAccountService);
         ReflectionTestUtils.setField(roleController, "service", roleService);
         mvc = MockMvcBuilders
                 .standaloneSetup(
                         tenantController,
                         organizationController,
+                        userAccountController,
                         roleController
                 )
                 .setControllerAdvice(new IamWebExceptionHandler())
@@ -187,6 +198,71 @@ class IamWebControllerTest {
                         .content(json(organization(null, "HQ", "Headquarters"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("org-1"));
+    }
+
+    @Test
+    void shouldCreateUserThroughStandardCrudContractWithoutExposingPasswordMaterial() throws Exception {
+        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+        when(userAccountDao.insert(any())).thenAnswer(invocation -> {
+            assertThat(TenantContext.currentTenantId()).contains("tenant_a");
+            UserAccount user = invocation.getArgument(0);
+            assertThat(user.getTenantId()).isEqualTo("tenant_a");
+            assertThat(user.getPasswordHash()).startsWith("pbkdf2$");
+            assertThat(user.getPasswordHash()).isNotEqualTo("client-supplied-hash");
+            return "user-1";
+        });
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(), List.of(user("user-1", "alice", "Alice")));
+
+        mvc.perform(post("/iam.user/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {
+	                                  "username":"alice",
+	                                  "title":"Alice",
+	                                  "passwordHash":"client-supplied-hash",
+	                                  "password":"secret2"
+	                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("user-1"))
+                .andExpect(jsonPath("$.username").value("alice"))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void shouldKeepExistingPasswordHashWhenUpdatingUserThroughStandardCrudContract() throws Exception {
+        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+        UserAccount existing = user("user-1", "alice", "Alice");
+        existing.setTenantId("tenant_a");
+        existing.setVersion(3);
+        existing.setPasswordHash("pbkdf2$existing-hash");
+        when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(existing));
+        when(userAccountDao.updateByIdAndVersion(any(UserAccount.class), any())).thenAnswer(invocation -> {
+            UserAccount updated = invocation.getArgument(0);
+            assertThat(updated.getPasswordHash()).isEqualTo("pbkdf2$existing-hash");
+            assertThat(updated.getPasswordHash()).isNotEqualTo("client-supplied-hash");
+            assertThat(updated.getPassword()).isEqualTo("new-plain-password");
+            return 1;
+        });
+
+        mvc.perform(post("/iam.user/update/{id}", "user-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "username":"alice",
+                                  "title":"Alice Updated",
+                                  "passwordHash":"client-supplied-hash",
+                                  "password":"new-plain-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test
@@ -328,6 +404,16 @@ class IamWebControllerTest {
         organization.setEnabled(Boolean.TRUE);
         organization.setSortOrder(1);
         return organization;
+    }
+
+    private UserAccount user(String id, String username, String title) {
+        UserAccount user = new UserAccount();
+        user.setId(id);
+        user.setUsername(username);
+        user.setTitle(title);
+        user.setEnabled(Boolean.TRUE);
+        user.setSortOrder(1);
+        return user;
     }
 
     private String json(Object value) throws Exception {

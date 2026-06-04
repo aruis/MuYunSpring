@@ -4,7 +4,9 @@ import net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -48,14 +50,22 @@ class ActionEndpointAnnotationTest {
 
     @Test
     void shouldDescribeUserManagementEndpointActionSemantics() throws Exception {
-        assertThat(endpoint(UserAccountWebController.class, "create",
-                UserAccountWebController.CreateUserRequest.class).value()).isEqualTo(PlatformAction.CREATE);
-        assertThat(endpoint(UserAccountWebController.class, "changePassword",
-                String.class, UserAccountWebController.ChangePasswordRequest.class).value()).isEqualTo(PlatformAction.UPDATE);
+        CustomActionEndpoint endpoint = customEndpoint(UserAccountWebController.class, "changePassword",
+                String.class, UserAccountWebController.ChangePasswordRequest.class);
+        assertThat(endpoint.value()).isEqualTo("changePassword");
+        assertThat(endpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
+        assertThat(endpoint.dataAuth()).isFalse();
+        assertThat(endpoint.recordIdPathVariable()).isEqualTo("id");
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {
         Method method = type.getMethod(methodName, parameterTypes);
         return method.getAnnotation(ActionEndpoint.class);
+    }
+
+    private CustomActionEndpoint customEndpoint(Class<?> type, String methodName, Class<?>... parameterTypes)
+            throws Exception {
+        Method method = type.getMethod(methodName, parameterTypes);
+        return method.getAnnotation(CustomActionEndpoint.class);
     }
 }

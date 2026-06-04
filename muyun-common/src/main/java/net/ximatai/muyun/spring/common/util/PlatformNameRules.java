@@ -48,6 +48,14 @@ public final class PlatformNameRules {
         return requireIdentifier(value, name);
     }
 
+    public static String requireActionCode(String value, String name) {
+        requireText(value, name);
+        if (!value.matches("[a-z][A-Za-z0-9]{0,63}")) {
+            throw new IllegalArgumentException("invalid " + name + ": " + value);
+        }
+        return value;
+    }
+
     public static String requireDatabaseName(String value, String name) {
         return requireIdentifier(value, name);
     }

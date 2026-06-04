@@ -38,9 +38,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
 
     @Override
     public void beforeInsert(UserAccount user) {
-        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
-            throw new PlatformException("user password is required");
-        }
+        user.setPasswordHash(passwordHashingService.hash(user.getPassword()));
         rejectDuplicateUsername(user);
     }
 
@@ -54,7 +52,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     }
 
     public String createUser(UserAccount user, String password) {
-        user.setPasswordHash(passwordHashingService.hash(password));
+        user.setPassword(password);
         return insert(user);
     }
 

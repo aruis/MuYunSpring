@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.lang.NonNull;
 import org.springframework.web.method.HandlerMethod;
@@ -35,12 +36,20 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
             return true;
         }
         ActionEndpoint endpoint = AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getMethod(), ActionEndpoint.class);
-        if (endpoint == null) {
+        CustomActionEndpoint customEndpoint = AnnotatedElementUtils.findMergedAnnotation(
+                handlerMethod.getMethod(), CustomActionEndpoint.class);
+        if (endpoint != null && customEndpoint != null) {
+            throw new IllegalStateException("method cannot declare both standard and custom action endpoint: "
+                    + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
+        }
+        if (endpoint == null && customEndpoint == null) {
             return true;
         }
-        Optional<ActionExecutionContext> context = contextResolver.resolve(request, handlerMethod, endpoint);
+        Optional<ActionExecutionContext> context = endpoint == null
+                ? contextResolver.resolve(request, handlerMethod, customEndpoint)
+                : contextResolver.resolve(request, handlerMethod, endpoint);
         if (context.isEmpty()) {
-            throw new IllegalStateException("@ActionEndpoint requires module alias: "
+            throw new IllegalStateException("action endpoint requires module alias: "
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
         }
         ActionExecutionContext resolved = context.get();
