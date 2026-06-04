@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,5 +63,41 @@ class StaticModuleDefinitionRegistrarTest {
             assertThat(action.getSystemManaged()).isTrue();
             assertThat(action.getEnabled()).isTrue();
         });
+    }
+
+    @Test
+    void shouldRejectDuplicateStaticModuleDefinitions() {
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                mock(PlatformModuleService.class),
+                mock(PlatformModuleActionService.class),
+                List.of(
+                        definition("iam.user", List.of(StaticModuleActionDefinition.recordAction("changePassword", "修改密码"))),
+                        definition("iam.user", List.of(StaticModuleActionDefinition.recordAction("resetPassword", "重置密码")))
+                )
+        );
+
+        assertThatThrownBy(registrar::registerAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("duplicate static module definition: iam.user");
+    }
+
+    @Test
+    void shouldRejectDuplicateStaticModuleActionDefinitions() {
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                mock(PlatformModuleService.class),
+                mock(PlatformModuleActionService.class),
+                List.of(definition("iam.user", List.of(
+                        StaticModuleActionDefinition.recordAction("changePassword", "修改密码"),
+                        StaticModuleActionDefinition.recordAction("changePassword", "修改密码")
+                )))
+        );
+
+        assertThatThrownBy(registrar::registerAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("duplicate static module action definition: iam.user.changePassword");
+    }
+
+    private StaticModuleDefinition definition(String moduleAlias, List<StaticModuleActionDefinition> actions) {
+        return new StaticModuleDefinition("iam", moduleAlias, "用户管理", null, actions);
     }
 }

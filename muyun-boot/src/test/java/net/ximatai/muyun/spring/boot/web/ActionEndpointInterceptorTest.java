@@ -133,7 +133,7 @@ class ActionEndpointInterceptorTest {
             assertThat(context.platformAction()).isNull();
             assertThat(context.actionCode()).isEqualTo("changePassword");
             assertThat(context.permissionCode()).isEqualTo("iam.user:changePassword");
-            assertThat(context.actionPolicy().requiresDataScope()).isFalse();
+            assertThat(context.actionPolicy().requiresDataScope()).isTrue();
             assertThat(context.recordIds()).containsExactly("user-1");
         });
     }

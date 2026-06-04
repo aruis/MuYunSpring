@@ -54,7 +54,7 @@ class ActionEndpointAnnotationTest {
                 String.class, UserAccountWebController.ChangePasswordRequest.class);
         assertThat(endpoint.value()).isEqualTo("changePassword");
         assertThat(endpoint.level()).isEqualTo(PlatformActionLevel.RECORD);
-        assertThat(endpoint.dataAuth()).isFalse();
+        assertThat(endpoint.dataAuth()).isTrue();
         assertThat(endpoint.recordIdPathVariable()).isEqualTo("id");
     }
 

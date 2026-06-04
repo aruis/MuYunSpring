@@ -10,6 +10,8 @@ import java.lang.annotation.Target;
 public @interface CustomActionEndpoint {
     String value();
 
+    String title() default "";
+
     PlatformActionLevel level() default PlatformActionLevel.DEFAULT;
 
     boolean dataAuth() default false;

@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
@@ -30,7 +32,8 @@ public class UserAccountWebController extends WebSupport<UserAccountService> imp
     }
 
     @PostMapping("/changePassword/{id}")
-    @CustomActionEndpoint(value = UserAccountStaticActions.CHANGE_PASSWORD, level = PlatformActionLevel.RECORD)
+    @CustomActionEndpoint(value = UserAccountStaticActions.CHANGE_PASSWORD, title = "修改密码",
+            level = PlatformActionLevel.RECORD, dataAuth = true)
     public WebCountResponse changePassword(@PathVariable String id,
                                            @RequestBody ChangePasswordRequest request) {
         return webScope(() -> {
