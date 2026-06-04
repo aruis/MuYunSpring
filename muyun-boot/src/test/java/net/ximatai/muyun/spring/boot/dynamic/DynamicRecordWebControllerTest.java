@@ -59,6 +59,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -87,6 +88,10 @@ class DynamicRecordWebControllerTest {
         activeTenantVerifier = mock(ActiveTenantVerifier.class);
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
         when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));
+        when(service.actionAuthorizationAvailability(eq(MODULE), anyString(), any()))
+                .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(1)));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), anyString(), any()))
+                .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(2)));
         objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
                 .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
@@ -328,6 +333,34 @@ class DynamicRecordWebControllerTest {
         verify(mainEntity).select("contract-1");
         verify(mainEntity).delete("contract-1");
         verify(service).actions(MODULE);
+    }
+
+    @Test
+    void shouldHideUnauthorizedDynamicActionsFromActionLists() throws Exception {
+        DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
+        DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
+        DynamicRecord existing = new DynamicRecord(entity()).setValue("code", "C-001");
+        existing.setId("contract-1");
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.select(MODULE, ENTITY, "contract-1")).thenReturn(existing);
+        when(service.actions(MODULE)).thenReturn(List.of(export, submit, archive));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAvailability(eq(MODULE), eq("export"), any(DynamicRecord.class)))
+                .thenReturn(DynamicActionAvailability.available("export"));
+
+        mvc.perform(get("/{moduleAlias}/actions", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("export"))
+                .andExpect(jsonPath("$[1].code").value("archive"))
+                .andExpect(jsonPath("$[2]").doesNotExist());
+
+        mvc.perform(get("/{moduleAlias}/actions/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").doesNotExist());
     }
 
     @Test

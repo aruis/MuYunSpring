@@ -144,7 +144,10 @@ public class DynamicRecordWebController implements
 
     @Override
     public List<DynamicActionDescriptor> listActions() {
-        return recordService.actions(DynamicWebRequest.moduleAlias());
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        return recordService.actions(moduleAlias).stream()
+                .filter(action -> recordService.actionAuthorizationAvailability(moduleAlias, action.code(), Set.of()).available())
+                .toList();
     }
 
     @Override
@@ -157,6 +160,8 @@ public class DynamicRecordWebController implements
         }
         return recordService.actions(moduleAlias).stream()
                 .filter(DynamicRecordWebController::isRecordAction)
+                .filter(action -> recordService.actionAuthorizationAvailability(
+                        moduleAlias, entityAlias, action.code(), Set.of(recordId)).available())
                 .map(action -> DynamicWebActionAvailabilityResponse.from(action,
                         recordService.actionAvailability(moduleAlias, action.code(), record)))
                 .toList();

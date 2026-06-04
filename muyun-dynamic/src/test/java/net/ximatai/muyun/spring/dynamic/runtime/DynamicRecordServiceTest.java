@@ -399,6 +399,54 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeDynamicActionUnavailableWhenActionAuthorizationFails() {
+        ActionExecutionPolicyService policyService = context -> {
+            if ("submit".equals(context.actionCode())) {
+                throw new PlatformException("action denied");
+            }
+        };
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(),
+                new TestActionExecutor("contractSubmit"), submitActionWithoutAvailability("contractSubmit"),
+                DynamicActionTransactionOperator.none(), policyService);
+
+        DynamicActionAvailability availability = service.actionAuthorizationAvailability(MODULE, "submit", List.of("contract-1"));
+
+        assertThat(availability.available()).isFalse();
+        assertThat(availability.message()).isEqualTo("action denied");
+    }
+
+    @Test
+    void shouldExposeDynamicActionUnavailableWhenRecordDataScopeFails() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("visible") && !params.containsValue("hidden")
+                    ? List.of(actionRow("visible", "C-001", "draft"))
+                    : List.of();
+        });
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                new TestActionExecutor("contractSubmit"), dataAuthSubmitAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new VisibleOnlyDataScopeCriteriaService());
+
+        DynamicActionAvailability availability = service.actionAuthorizationAvailability(MODULE, "submit", List.of("hidden"));
+
+        assertThat(availability.available()).isFalse();
+        assertThat(availability.message()).contains("record data permission denied");
+    }
+
+    @Test
+    void shouldNotHideUnexpectedFailureWhenCheckingDynamicActionAuthorizationAvailability() {
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(),
+                new TestActionExecutor("contractSubmit"), dataAuthSubmitAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), null, new FailingDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.actionAuthorizationAvailability(MODULE, "submit", List.of("contract-1")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("data scope unavailable");
+    }
+
+    @Test
     void shouldApplyDataScopeBeforeExecutingDynamicAction() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
@@ -2839,6 +2887,24 @@ class DynamicRecordServiceTest {
         @Override
         public void requireAuthorized(ActionExecutionContext context) {
             this.context = context;
+        }
+    }
+
+    private static final class FailingDataScopeCriteriaService implements DataScopeCriteriaService {
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        String actionCode,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            throw new IllegalStateException("data scope unavailable");
+        }
+
+        @Override
+        public DataScopeCriteriaResult resolveReadScope(String moduleAlias,
+                                                        ActionExecutionPolicy policy,
+                                                        Criteria criteria,
+                                                        java.util.Optional<CurrentUser> currentUser) {
+            throw new IllegalStateException("data scope unavailable");
         }
     }
 

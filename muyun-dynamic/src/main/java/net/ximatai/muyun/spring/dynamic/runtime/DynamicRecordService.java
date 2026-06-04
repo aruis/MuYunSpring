@@ -122,6 +122,15 @@ public class DynamicRecordService {
                 .actionAvailability(actionCode, record);
     }
 
+    public DynamicActionAvailability actionAuthorizationAvailability(String moduleAlias,
+                                                                     String actionCode,
+                                                                     Collection<String> recordIds) {
+        DynamicModuleDescriptor module = describe(moduleAlias);
+        DynamicActionDescriptor action = findAction(module, actionCode);
+        String entityAlias = runtime.registry().requireModule(moduleAlias).mainEntityAlias();
+        return actionAuthorizationAvailability(moduleAlias, entityAlias, action, recordIds);
+    }
+
     public DynamicActionExecutionResult executeAction(String moduleAlias,
                                                       String actionCode,
                                                       DynamicActionExecutionRequest request) {
@@ -145,6 +154,14 @@ public class DynamicRecordService {
                                                         DynamicRecord record) {
         findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
         return entityService(moduleAlias, entityAlias).actionAvailability(actionCode, record);
+    }
+
+    public DynamicActionAvailability actionAuthorizationAvailability(String moduleAlias,
+                                                                     String entityAlias,
+                                                                     String actionCode,
+                                                                     Collection<String> recordIds) {
+        DynamicActionDescriptor action = findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
+        return actionAuthorizationAvailability(moduleAlias, entityAlias, action, recordIds);
     }
 
     public DynamicActionExecutionResult executeAction(String moduleAlias,
@@ -758,6 +775,26 @@ public class DynamicRecordService {
             throw new PlatformException("record data permission denied: " + moduleAlias + "." + policy.actionCode());
         }
         return scope;
+    }
+
+    private DynamicActionAvailability actionAuthorizationAvailability(String moduleAlias,
+                                                                      String entityAlias,
+                                                                      DynamicActionDescriptor action,
+                                                                      Collection<String> recordIds) {
+        ActionExecutionPolicy policy = actionPolicy(action);
+        Set<String> normalizedIds = normalizeRecordIds(recordIds);
+        try {
+            actionExecutionPolicyService.authorize(ActionExecutionContext.ofPolicy(
+                    moduleAlias,
+                    policy,
+                    normalizedIds,
+                    CurrentUserContext.currentUser()
+            ));
+            requireActionRecordDataScope(moduleAlias, entityAlias, policy, normalizedIds);
+            return DynamicActionAvailability.available(action.code());
+        } catch (PlatformException e) {
+            return DynamicActionAvailability.unavailable(action.code(), e.getMessage());
+        }
     }
 
     private Set<String> normalizeRecordIds(Collection<String> ids) {

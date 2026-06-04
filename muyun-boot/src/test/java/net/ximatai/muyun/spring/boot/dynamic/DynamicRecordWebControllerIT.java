@@ -33,6 +33,7 @@ import java.util.Optional;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -70,6 +71,10 @@ class DynamicRecordWebControllerIT {
     void setUpCurrentUser() {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(recordService.actionAuthorizationAvailability(eq(MODULE), anyString(), any()))
+                .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(1)));
+        when(recordService.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), anyString(), any()))
+                .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(2)));
     }
 
     @Test
