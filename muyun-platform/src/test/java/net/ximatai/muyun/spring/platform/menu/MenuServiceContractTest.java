@@ -294,6 +294,40 @@ class MenuServiceContractTest {
         }
     }
 
+    @Test
+    void shouldInferCurrentUserMenuSchemeWithoutFrontendInput() {
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.contract".equals(moduleAlias);
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
+        String tenantSchemeId;
+        String organizationSchemeId;
+        String tenantMenuId;
+        String organizationMenuId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantSchemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            tenantMenuId = scopedMenuService.insert(moduleMenu(tenantSchemeId, "客户", TreeAbility.ROOT_ID, "crm.customer"));
+            MenuScheme organizationScheme = scheme("org_default", MenuScopeType.ORGANIZATION, "org-1");
+            organizationScheme.setTenantId("tenant-a");
+            organizationSchemeId = schemeService.insert(organizationScheme);
+            organizationMenuId = scopedMenuService.insert(moduleMenu(
+                    organizationSchemeId, "合同", TreeAbility.ROOT_ID, "crm.contract"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-1"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .containsExactly(organizationMenuId);
+        }
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-2", "User", "tenant-a"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .doesNotContain(tenantMenuId);
+        }
+    }
+
     private MenuScheme scheme(String alias, MenuScopeType scopeType, String scopeId) {
         MenuScheme scheme = new MenuScheme();
         scheme.setAlias(alias);

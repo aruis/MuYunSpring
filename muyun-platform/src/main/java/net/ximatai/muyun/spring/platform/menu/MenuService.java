@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.menu;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.ability.BaseDao;
@@ -91,6 +92,13 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     public List<Menu> visibleRootMenus(String schemeId) {
         return visibleChildren(schemeId, TreeAbility.ROOT_ID, new LinkedHashSet<>());
+    }
+
+    public List<Menu> currentUserVisibleRootMenus() {
+        CurrentUser user = CurrentUserContext.currentUser()
+                .orElseThrow(() -> new PlatformException("current user is required"));
+        MenuScheme scheme = schemeService.resolveCurrentUserScheme(user);
+        return visibleRootMenus(scheme.getId());
     }
 
     public List<Menu> visibleChildren(String schemeId, String parentId) {
