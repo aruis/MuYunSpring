@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
+
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
@@ -126,7 +128,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
-                        "删除", true, EntityActionStyle.DANGER)
+                        "删除", true, ActionStyle.DANGER)
                         .availableWhen("{status} = 'draft'"))
         );
 
@@ -145,7 +147,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "delete", EntityActionKind.RECORD,
-                        "删除", true, EntityActionStyle.DANGER)
+                        "删除", true, ActionStyle.DANGER)
                         .availableWhen("{statsu} == 'draft'"))
         );
 
@@ -157,7 +159,7 @@ class EntityFormulaRuleDefinitionTest {
     @Test
     void shouldDefaultCreateActionToListLevel() {
         EntityActionDefinition action = new EntityActionDefinition("invoice", "create", EntityActionKind.RECORD,
-                "新建", true, EntityActionStyle.PRIMARY);
+                "新建", true, ActionStyle.PRIMARY);
 
         assertThat(action.level()).isEqualTo(EntityActionLevel.LIST);
     }
@@ -172,7 +174,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, EntityActionStyle.PRIMARY)
+                        "提交", true, ActionStyle.PRIMARY)
                         .availableWhen("SUM({items.lineAmount}) > 0"))
         );
 
@@ -189,7 +191,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                        "提交", true, null, ActionStyle.PRIMARY, null, null,
                         true, false, "approve", null, null, null, null))
         );
 
@@ -208,7 +210,7 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("invoice", "publicPreview", EntityActionKind.CUSTOM,
-                        "公开预览", true, null, EntityActionStyle.NORMAL, null,
+                        "公开预览", true, null, ActionStyle.NORMAL, null,
                         EntityActionAccessMode.ANONYMOUS_ALLOWED, true, false,
                         null, null, null, null, null))
         );
@@ -229,10 +231,10 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
-                                "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                                "提交", true, null, ActionStyle.PRIMARY, null, null,
                                 true, false, "preview", null, null, null, null),
                         new EntityActionDefinition("invoice", "preview", EntityActionKind.CUSTOM,
-                                "预览", true, null, EntityActionStyle.NORMAL, null,
+                                "预览", true, null, ActionStyle.NORMAL, null,
                                 EntityActionAccessMode.LOGIN_REQUIRED, false, false,
                                 null, null, null, null, null)
                 )
@@ -254,10 +256,10 @@ class EntityFormulaRuleDefinitionTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("invoice", "submit", EntityActionKind.CUSTOM,
-                                "提交", true, null, EntityActionStyle.PRIMARY, null, null,
+                                "提交", true, null, ActionStyle.PRIMARY, null, null,
                                 true, false, "approve", null, null, null, null),
                         new EntityActionDefinition("invoice", "approve", EntityActionKind.CUSTOM,
-                                "审核", true, null, EntityActionStyle.PRIMARY, null, null,
+                                "审核", true, null, ActionStyle.PRIMARY, null, null,
                                 true, false, "submit", null, null, null, null)
                 )
         );

@@ -6,7 +6,6 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionGroup;
 import net.ximatai.muyun.spring.common.platform.PlatformActionKind;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
-import net.ximatai.muyun.spring.common.platform.PlatformActionStyle;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +34,7 @@ final class PlatformActionResolver {
     private static EntityActionDefinition action(EntityDefinition entity, PlatformAction action) {
         EntityActionLevel level = toLevel(action.level());
         return new EntityActionDefinition(entity.alias(), action.code(), toKind(action.kind()),
-                action.title(), true, level, toStyle(action.style()),
+                action.title(), true, level, action.style(),
                 null, toAccessMode(action.accessMode()), action.actionAuth(),
                 action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE), action.inheritActionCode(),
                 null, null, null, null);
@@ -65,14 +64,6 @@ final class PlatformActionResolver {
             case RECORD -> EntityActionLevel.RECORD;
             case BATCH -> EntityActionLevel.BATCH;
             case ANY -> EntityActionLevel.ANY;
-        };
-    }
-
-    private static EntityActionStyle toStyle(PlatformActionStyle value) {
-        return switch (value) {
-            case PRIMARY -> EntityActionStyle.PRIMARY;
-            case NORMAL -> EntityActionStyle.NORMAL;
-            case DANGER -> EntityActionStyle.DANGER;
         };
     }
 

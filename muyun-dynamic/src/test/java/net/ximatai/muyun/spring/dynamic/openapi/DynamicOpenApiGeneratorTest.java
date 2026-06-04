@@ -9,7 +9,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -134,12 +134,12 @@ class DynamicOpenApiGeneratorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        action("openapi", "OpenAPI", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
-                        action("query", "Query", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
-                        action("enable", "Enable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
-                        action("disable", "Disable", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
-                        action("sort", "Sort", EntityActionLevel.RECORD, EntityActionStyle.NORMAL),
-                        action("tree", "Tree", EntityActionLevel.LIST, EntityActionStyle.NORMAL)
+                        action("openapi", "OpenAPI", EntityActionLevel.LIST, ActionStyle.NORMAL),
+                        action("query", "Query", EntityActionLevel.LIST, ActionStyle.NORMAL),
+                        action("enable", "Enable", EntityActionLevel.RECORD, ActionStyle.NORMAL),
+                        action("disable", "Disable", EntityActionLevel.RECORD, ActionStyle.NORMAL),
+                        action("sort", "Sort", EntityActionLevel.RECORD, ActionStyle.NORMAL),
+                        action("tree", "Tree", EntityActionLevel.LIST, ActionStyle.NORMAL)
                 )
         );
 
@@ -432,10 +432,10 @@ class DynamicOpenApiGeneratorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        action("export", "导出", EntityActionLevel.LIST, EntityActionStyle.NORMAL),
-                        action("submit", "提交", EntityActionLevel.RECORD, EntityActionStyle.PRIMARY),
-                        action("archive", "归档", EntityActionLevel.BATCH, EntityActionStyle.NORMAL),
-                        action("preview", "预览", EntityActionLevel.ANY, EntityActionStyle.NORMAL)
+                        action("export", "导出", EntityActionLevel.LIST, ActionStyle.NORMAL),
+                        action("submit", "提交", EntityActionLevel.RECORD, ActionStyle.PRIMARY),
+                        action("archive", "归档", EntityActionLevel.BATCH, ActionStyle.NORMAL),
+                        action("preview", "预览", EntityActionLevel.ANY, ActionStyle.NORMAL)
                 ),
                 "contract"
         );
@@ -444,7 +444,7 @@ class DynamicOpenApiGeneratorTest {
     private EntityActionDefinition action(String code,
                                           String title,
                                           EntityActionLevel level,
-                                          EntityActionStyle style) {
+                                          ActionStyle style) {
         return new EntityActionDefinition("contract", code, EntityActionKind.CUSTOM, title,
                 true, level, style, EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                 true, false, null, null, null, EntityActionExecutorType.SERVICE, code + "Executor");

@@ -12,7 +12,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
@@ -369,14 +369,14 @@ class PlatformModuleDefinitionCompilerTest {
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
         ModuleMetadataAction create = metadataAction(relationId, "create", EntityActionKind.RECORD);
         create.setTitle("新建客户");
-        create.setActionStyle(EntityActionStyle.PRIMARY);
+        create.setActionStyle(ActionStyle.PRIMARY);
         create.setAvailableExpression("{title} != ''");
         create.setUnavailableMessage("客户名称不能为空");
         actionService.insert(create);
         ModuleMetadataAction delete = metadataAction(relationId, "delete", EntityActionKind.RECORD);
         delete.setEnabled(false);
         delete.setTitle("删除客户");
-        delete.setActionStyle(EntityActionStyle.DANGER);
+        delete.setActionStyle(ActionStyle.DANGER);
         actionService.insert(delete);
         ModuleMetadataAction export = metadataAction(relationId, "exportData", EntityActionKind.CUSTOM);
         export.setTitle("导出");
@@ -401,7 +401,7 @@ class PlatformModuleDefinitionCompilerTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.title()).isEqualTo("新建客户");
-                    assertThat(action.style()).isEqualTo(EntityActionStyle.PRIMARY);
+                    assertThat(action.style()).isEqualTo(ActionStyle.PRIMARY);
                     assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
                     assertThat(action.availabilityCondition()).isTrue();
                     assertThat(action.unavailableMessage()).isEqualTo("客户名称不能为空");
@@ -411,7 +411,7 @@ class PlatformModuleDefinitionCompilerTest {
                 .get()
                 .satisfies(action -> {
                     assertThat(action.enabled()).isFalse();
-                    assertThat(action.style()).isEqualTo(EntityActionStyle.DANGER);
+                    assertThat(action.style()).isEqualTo(ActionStyle.DANGER);
                 });
         assertThat(actions.stream().filter(action -> action.code().equals("exportData")).findFirst())
                 .get()

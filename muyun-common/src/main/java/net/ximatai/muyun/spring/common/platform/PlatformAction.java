@@ -7,38 +7,38 @@ import java.util.Optional;
 
 public enum PlatformAction {
     CREATE(PlatformActionGroup.CRUD, "create", PlatformActionKind.RECORD, "Create",
-            PlatformActionLevel.LIST, PlatformActionStyle.PRIMARY, 10,
+            PlatformActionLevel.LIST, ActionStyle.PRIMARY, 10,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, null),
     VIEW(PlatformActionGroup.CRUD, "view", PlatformActionKind.RECORD, "View",
-            PlatformActionLevel.RECORD, PlatformActionStyle.NORMAL, 20,
+            PlatformActionLevel.RECORD, ActionStyle.NORMAL, 20,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
     UPDATE(PlatformActionGroup.CRUD, "update", PlatformActionKind.RECORD, "Update",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 30,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 30,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
     DELETE(PlatformActionGroup.CRUD, "delete", PlatformActionKind.RECORD, "Delete",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.DANGER, 40,
+            PlatformActionLevel.DEFAULT, ActionStyle.DANGER, 40,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
     QUERY(PlatformActionGroup.CRUD, "query", PlatformActionKind.COLLECTION, "Query",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 50,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 50,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
 
     SORT(PlatformActionGroup.SORT, "sort", PlatformActionKind.SORT, "Sort",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 10,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
 
     TREE(PlatformActionGroup.TREE, "tree", PlatformActionKind.TREE, "Tree",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 10,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
 
     REFERENCE(PlatformActionGroup.REFERENCE, "reference", PlatformActionKind.REFERENCE, "Reference",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 10,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, VIEW),
 
     ENABLE(PlatformActionGroup.ENABLE, "enable", PlatformActionKind.STATE, "Enable",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 10,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 10,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, null),
     DISABLE(PlatformActionGroup.ENABLE, "disable", PlatformActionKind.STATE, "Disable",
-            PlatformActionLevel.DEFAULT, PlatformActionStyle.NORMAL, 20,
+            PlatformActionLevel.DEFAULT, ActionStyle.NORMAL, 20,
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultPolicy.NONE, ENABLE);
 
     private final PlatformActionGroup group;
@@ -46,7 +46,7 @@ public enum PlatformAction {
     private final PlatformActionKind kind;
     private final String title;
     private final PlatformActionLevel level;
-    private final PlatformActionStyle style;
+    private final ActionStyle style;
     private final int order;
     private final ActionAccessMode accessMode;
     private final boolean actionAuth;
@@ -59,7 +59,7 @@ public enum PlatformAction {
                    PlatformActionKind kind,
                    String title,
                    PlatformActionLevel level,
-                   PlatformActionStyle style,
+                   ActionStyle style,
                    int order) {
         this(group, code, kind, title, level, style, order,
                 ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultPolicy.NONE, null);
@@ -70,7 +70,7 @@ public enum PlatformAction {
                    PlatformActionKind kind,
                    String title,
                    PlatformActionLevel level,
-                   PlatformActionStyle style,
+                   ActionStyle style,
                    int order,
                    ActionAccessMode accessMode,
                    boolean actionAuth,
@@ -111,7 +111,7 @@ public enum PlatformAction {
         return level;
     }
 
-    public PlatformActionStyle style() {
+    public ActionStyle style() {
         return style;
     }
 

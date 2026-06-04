@@ -17,7 +17,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -93,7 +93,7 @@ public class ModuleMetadataActionService extends AbstractAbilityService<ModuleMe
             action.setActionLevel(EntityActionDefinition.defaultLevel(action.getActionCode(), action.getActionKind()));
         }
         if (action.getActionStyle() == null) {
-            action.setActionStyle(EntityActionStyle.NORMAL);
+            action.setActionStyle(ActionStyle.NORMAL);
         }
         if (action.getAccessMode() == null) {
             action.setAccessMode(EntityActionAccessMode.AUTH_REQUIRED);

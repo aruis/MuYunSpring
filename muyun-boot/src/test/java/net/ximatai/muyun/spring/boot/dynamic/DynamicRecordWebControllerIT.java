@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionKind;
@@ -134,7 +134,7 @@ class DynamicRecordWebControllerIT {
 
     private DynamicActionDescriptor action(String code, EntityActionLevel level) {
         return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "Submit", true,
-                EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
+                ActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, null, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor");
     }

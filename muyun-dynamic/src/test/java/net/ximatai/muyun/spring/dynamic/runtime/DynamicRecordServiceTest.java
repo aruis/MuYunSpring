@@ -26,7 +26,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
@@ -772,7 +772,7 @@ class DynamicRecordServiceTest {
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = actionService(operations(), events, null,
                 new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
-                        "提交合同", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        "提交合同", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                         EntityActionCategory.DIALOG, null, null, null, null,
                         null, null, null, "contractSubmitDialog"
                 ));
@@ -805,7 +805,7 @@ class DynamicRecordServiceTest {
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = actionRuleService(operations(), events, null,
                 new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
-                        "提交合同", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        "提交合同", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                         EntityActionCategory.DIALOG, null, null, null, null,
                         null, null, EntityActionExecutorType.DIALOG, "contractSubmitDialog"
                 ));
@@ -1322,10 +1322,10 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(
                         new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                                "提交", true, EntityActionStyle.PRIMARY)
+                                "提交", true, ActionStyle.PRIMARY)
                                 .availableWhen("{status} == 'draft'"),
                         new EntityActionDefinition("line", "submit", EntityActionKind.CUSTOM,
-                                "提交行", true, EntityActionStyle.NORMAL)
+                                "提交行", true, ActionStyle.NORMAL)
                                 .availableWhen("{summary} != ''")
                 ),
                 "contract"
@@ -2170,7 +2170,7 @@ class DynamicRecordServiceTest {
     private DynamicRecordService actionService(IDatabaseOperations<Object> operations, RuntimeEventPublisher eventPublisher) {
         return actionService(operations, eventPublisher, null,
                 new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "提交", true, EntityActionStyle.PRIMARY)
+                        "提交", true, ActionStyle.PRIMARY)
                         .availableWhen("{status} == 'draft'", "只有草稿合同可以提交"));
     }
 
@@ -2321,7 +2321,7 @@ class DynamicRecordServiceTest {
 
     private EntityActionDefinition submitActionWithExecutorKey(String executorKey) {
         return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                "提交", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                 EntityActionCategory.CUSTOM, null, null, null, null,
                 "{status} == 'draft'", "只有草稿合同可以提交",
                 EntityActionExecutorType.SERVICE, executorKey
@@ -2330,7 +2330,7 @@ class DynamicRecordServiceTest {
 
     private EntityActionDefinition submitActionWithoutAvailability(String executorKey) {
         return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                "提交", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                 EntityActionCategory.CUSTOM, null, null, null, null,
                 null, null, EntityActionExecutorType.SERVICE, executorKey
         );
@@ -2338,7 +2338,7 @@ class DynamicRecordServiceTest {
 
     private EntityActionDefinition dataAuthSubmitAction(String executorKey) {
         return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                "提交", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                 EntityActionCategory.CUSTOM, null, true, true, null,
                 null, null, EntityActionExecutorType.SERVICE, executorKey
         );

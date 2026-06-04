@@ -4,14 +4,14 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 
 public record DynamicActionDescriptor(
         String code,
         DynamicActionKind kind,
         String title,
         boolean enabled,
-        EntityActionStyle style,
+        ActionStyle style,
         EntityActionLevel actionLevel,
         EntityActionCategory category,
         EntityActionAccessMode accessMode,
@@ -28,7 +28,7 @@ public record DynamicActionDescriptor(
                                    DynamicActionKind kind,
                                    String title,
                                    boolean enabled,
-                                   EntityActionStyle style,
+                                   ActionStyle style,
                                    EntityActionLevel actionLevel,
                                    EntityActionCategory category,
                                    EntityActionAccessMode accessMode,

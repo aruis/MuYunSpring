@@ -15,7 +15,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -979,14 +979,14 @@ class DynamicRecordWebControllerTest {
 
     private DynamicActionDescriptor action(String code, EntityActionLevel level, String authInheritActionCode) {
         return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "Submit", true,
-                EntityActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
+                ActionStyle.PRIMARY, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor").withPermission(MODULE);
     }
 
     private DynamicActionDescriptor dialogAction(String code, EntityActionLevel level) {
         return new DynamicActionDescriptor(code, DynamicActionKind.CUSTOM, "提交合同", true,
-                EntityActionStyle.PRIMARY, level, EntityActionCategory.DIALOG,
+                ActionStyle.PRIMARY, level, EntityActionCategory.DIALOG,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, null, false, null,
                 EntityActionExecutorType.DIALOG, "contractSubmitDialog");
     }

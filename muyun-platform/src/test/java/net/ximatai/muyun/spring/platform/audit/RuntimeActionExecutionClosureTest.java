@@ -11,7 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionKind;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
-import net.ximatai.muyun.spring.dynamic.metadata.EntityActionStyle;
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -209,7 +209,7 @@ class RuntimeActionExecutionClosureTest {
 
     private EntityActionDefinition submitAction() {
         return new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                "提交", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                "提交", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                 EntityActionCategory.CUSTOM, null, null, null, null,
                 "{status} == 'draft'", "只有草稿合同可以提交",
                 EntityActionExecutorType.SERVICE, "contractSubmit"

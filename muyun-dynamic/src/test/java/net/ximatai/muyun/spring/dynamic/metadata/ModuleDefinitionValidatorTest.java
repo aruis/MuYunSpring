@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
+
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +59,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "delete", EntityActionKind.RECORD,
-                        "Delete", true, EntityActionLevel.RECORD, EntityActionStyle.DANGER,
+                        "Delete", true, EntityActionLevel.RECORD, ActionStyle.DANGER,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.SERVICE, "deleteExecutor"))
         );
@@ -78,7 +80,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "query", EntityActionKind.COLLECTION,
-                        "Query", true, EntityActionLevel.LIST, EntityActionStyle.NORMAL,
+                        "Query", true, EntityActionLevel.LIST, ActionStyle.NORMAL,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.SERVICE, "queryExecutor"))
         );
@@ -99,7 +101,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
                         EntityActionCategory.STANDARD, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.STANDARD, null))
         );
@@ -120,7 +122,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "submitDialog", EntityActionKind.CUSTOM,
-                        "Submit Dialog", true, EntityActionLevel.RECORD, EntityActionStyle.PRIMARY,
+                        "Submit Dialog", true, EntityActionLevel.RECORD, ActionStyle.PRIMARY,
                         EntityActionCategory.DIALOG, EntityActionAccessMode.AUTH_REQUIRED,
                         true, false, null, null, null, EntityActionExecutorType.DIALOG, null))
         );
@@ -141,7 +143,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
         );
@@ -162,7 +164,7 @@ class ModuleDefinitionValidatorTest {
                 List.of(),
                 List.of(),
                 List.of(new EntityActionDefinition("contract", "submit", EntityActionKind.CUSTOM,
-                        "Submit", true, EntityActionLevel.RECORD, EntityActionStyle.NORMAL,
+                        "Submit", true, EntityActionLevel.RECORD, ActionStyle.NORMAL,
                         EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                         true, true, null, null, null, EntityActionExecutorType.SERVICE, "submitExecutor"))
         );
@@ -172,7 +174,7 @@ class ModuleDefinitionValidatorTest {
 
     private EntityActionDefinition customAction(String actionCode) {
         return new EntityActionDefinition("contract", actionCode, EntityActionKind.CUSTOM,
-                "Custom " + actionCode, true, EntityActionLevel.LIST, EntityActionStyle.NORMAL,
+                "Custom " + actionCode, true, EntityActionLevel.LIST, ActionStyle.NORMAL,
                 EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
                 true, false, null, null, null, EntityActionExecutorType.SERVICE, actionCode + "Executor");
     }

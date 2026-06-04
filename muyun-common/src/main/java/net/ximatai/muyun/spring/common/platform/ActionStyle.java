@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.common.platform;
 
-public enum PlatformActionStyle {
+public enum ActionStyle {
     PRIMARY,
     NORMAL,
     DANGER

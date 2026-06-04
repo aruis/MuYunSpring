@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.platform.ActionStyle;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 public record EntityActionDefinition(
@@ -9,7 +10,7 @@ public record EntityActionDefinition(
         String title,
         boolean enabled,
         EntityActionLevel level,
-        EntityActionStyle style,
+        ActionStyle style,
         EntityActionCategory category,
         EntityActionAccessMode accessMode,
         Boolean actionAuth,
@@ -22,7 +23,7 @@ public record EntityActionDefinition(
 ) {
     public EntityActionDefinition {
         level = level == null ? defaultLevel(actionCode, kind) : level;
-        style = style == null ? EntityActionStyle.NORMAL : style;
+        style = style == null ? ActionStyle.NORMAL : style;
         category = category == null ? defaultCategory(kind) : category;
         accessMode = accessMode == null ? EntityActionAccessMode.AUTH_REQUIRED : accessMode;
         actionAuth = actionAuth == null ? accessMode == EntityActionAccessMode.AUTH_REQUIRED : actionAuth;
@@ -35,7 +36,7 @@ public record EntityActionDefinition(
                                   EntityActionKind kind,
                                   String title,
                                   boolean enabled,
-                                  EntityActionStyle style) {
+                                  ActionStyle style) {
         this(entityAlias, actionCode, kind, title, enabled, null, style, null, null,
                 null, null, null, null, null, null, null);
     }
@@ -44,7 +45,7 @@ public record EntityActionDefinition(
                                                  String actionCode,
                                                  EntityActionKind kind,
                                                  String title) {
-        return new EntityActionDefinition(entityAlias, actionCode, kind, title, true, EntityActionStyle.NORMAL);
+        return new EntityActionDefinition(entityAlias, actionCode, kind, title, true, ActionStyle.NORMAL);
     }
 
     public EntityActionDefinition availableWhen(String expression) {
