@@ -240,6 +240,7 @@ class IamWebControllerTest {
         existing.setTenantId("tenant_a");
         existing.setVersion(3);
         existing.setPasswordHash("pbkdf2$existing-hash");
+        when(userAccountDao.count(any(Criteria.class))).thenReturn(1L);
         when(userAccountDao.query(any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(existing));
         when(userAccountDao.updateByIdAndVersion(any(UserAccount.class), any())).thenAnswer(invocation -> {
