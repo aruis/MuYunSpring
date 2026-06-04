@@ -6,6 +6,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import java.security.SecureRandom;
 import java.util.Base64;
+
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,15 +32,22 @@ public class PasswordHashingService {
         if (password == null || encoded == null || encoded.isBlank()) {
             return false;
         }
-        String[] parts = encoded.split("\\$");
-        if (parts.length != 4 || !"pbkdf2".equals(parts[0])) {
+        try {
+            String[] parts = encoded.split("\\$");
+            if (parts.length != 4 || !"pbkdf2".equals(parts[0])) {
+                return false;
+            }
+            int iterations = Integer.parseInt(parts[1]);
+            if (iterations < 10_000 || iterations > 1_000_000) {
+                return false;
+            }
+            byte[] salt = Base64.getDecoder().decode(parts[2]);
+            byte[] expected = Base64.getDecoder().decode(parts[3]);
+            byte[] actual = pbkdf2(password.toCharArray(), salt, iterations);
+            return java.security.MessageDigest.isEqual(expected, actual);
+        } catch (RuntimeException e) {
             return false;
         }
-        int iterations = Integer.parseInt(parts[1]);
-        byte[] salt = Base64.getDecoder().decode(parts[2]);
-        byte[] expected = Base64.getDecoder().decode(parts[3]);
-        byte[] actual = pbkdf2(password.toCharArray(), salt, iterations);
-        return java.security.MessageDigest.isEqual(expected, actual);
     }
 
     private String requirePassword(String password) {

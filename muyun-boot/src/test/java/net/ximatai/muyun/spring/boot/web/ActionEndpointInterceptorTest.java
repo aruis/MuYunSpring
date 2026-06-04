@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
+import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -108,6 +109,23 @@ class ActionEndpointInterceptorTest {
             assertThat(context.moduleAlias()).isEqualTo("iam.role");
             assertThat(context.platformAction()).isEqualTo(PlatformAction.UPDATE);
             assertThat(context.permissionCode()).isEqualTo("iam.role:update");
+        });
+    }
+
+    @Test
+    void shouldResolveUserManagementEndpointActionContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.user/password/user-1");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("userId", "user-1"));
+        UserAccountWebController controller = new UserAccountWebController(null);
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, UserAccountWebController.class.getMethod(
+                        "changePassword", String.class, UserAccountWebController.ChangePasswordRequest.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("iam.user");
+            assertThat(context.platformAction()).isEqualTo(PlatformAction.UPDATE);
+            assertThat(context.permissionCode()).isEqualTo("iam.user:update");
         });
     }
 

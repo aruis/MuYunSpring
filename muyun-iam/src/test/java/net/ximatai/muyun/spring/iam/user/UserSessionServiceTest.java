@@ -56,6 +56,24 @@ class UserSessionServiceTest {
     }
 
     @Test
+    void shouldDropSessionWhenUserIsNoLongerActive() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccount enabled = activeUser();
+        UserAccount disabled = activeUser();
+        disabled.setEnabled(Boolean.FALSE);
+        when(dao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(enabled))
+                .thenReturn(List.of(disabled));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionService sessionService = new UserSessionService(userService);
+
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
+
+        assertThat(sessionService.currentUser(login.token())).isEmpty();
+    }
+
+    @Test
     void shouldRejectInvalidPasswordWithoutIssuingSession() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccount user = new UserAccount();
@@ -73,5 +91,22 @@ class UserSessionServiceTest {
         assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "wrong-password"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("invalid username or password");
+    }
+
+    @Test
+    void shouldTreatMalformedPasswordHashAsNotMatched() {
+        assertThat(passwordHashingService.matches("secret1", "pbkdf2$bad$not-base64")).isFalse();
+        assertThat(passwordHashingService.matches("secret1", "pbkdf2$1$a$b")).isFalse();
+    }
+
+    private UserAccount activeUser() {
+        UserAccount user = new UserAccount();
+        user.setId("user-1");
+        user.setTenantId("tenant-a");
+        user.setUsername("alice");
+        user.setTitle("Alice");
+        user.setEnabled(Boolean.TRUE);
+        user.setPasswordHash(passwordHashingService.hash("secret1"));
+        return user;
     }
 }

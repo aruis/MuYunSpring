@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.boot.dynamic.DynamicRecordWebController;
+import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -43,6 +44,14 @@ class ActionEndpointAnnotationTest {
         Class<?> referenceRequestType = Class.forName("net.ximatai.muyun.spring.boot.dynamic.DynamicWebReferenceRequest");
         assertThat(endpoint(DynamicRecordWebController.class, "reference", String.class, referenceRequestType).value())
                 .isEqualTo(PlatformAction.REFERENCE);
+    }
+
+    @Test
+    void shouldDescribeUserManagementEndpointActionSemantics() throws Exception {
+        assertThat(endpoint(UserAccountWebController.class, "create",
+                UserAccountWebController.CreateUserRequest.class).value()).isEqualTo(PlatformAction.CREATE);
+        assertThat(endpoint(UserAccountWebController.class, "changePassword",
+                String.class, UserAccountWebController.ChangePasswordRequest.class).value()).isEqualTo(PlatformAction.UPDATE);
     }
 
     private ActionEndpoint endpoint(Class<?> type, String methodName, Class<?>... parameterTypes) throws Exception {
