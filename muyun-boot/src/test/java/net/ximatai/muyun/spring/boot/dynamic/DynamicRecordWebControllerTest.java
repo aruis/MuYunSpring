@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -116,9 +117,7 @@ class DynamicRecordWebControllerTest {
 
     @Test
     void shouldExposeDynamicOpenApiDocument() throws Exception {
-        DynamicOpenApiDocument document = new DynamicOpenApiGenerator()
-                .generate(DynamicModuleDescriptor.from(module()));
-        when(service.openApi(MODULE)).thenReturn(document);
+        when(service.describe(MODULE)).thenReturn(DynamicModuleDescriptor.from(module()));
 
         mvc.perform(get("/{moduleAlias}/openapi", MODULE))
                 .andExpect(status().isOk())
@@ -126,6 +125,47 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.basePath").value("/" + MODULE))
                 .andExpect(jsonPath("$.operations[0].path").value("/" + MODULE + "/describe"))
                 .andExpect(jsonPath("$.schemas.ContractRecord.type").value("object"));
+    }
+
+    @Test
+    void shouldHideUnauthorizedActionsFromRuntimeDescriptor() throws Exception {
+        when(service.describe(MODULE)).thenReturn(DynamicModuleDescriptor.from(actionModule()));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("delete"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("delete", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), eq("delete"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("delete", "action permission denied"));
+
+        mvc.perform(get("/{moduleAlias}/describe", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.actions[?(@.code == 'submit')]").isEmpty())
+                .andExpect(jsonPath("$.actions[?(@.code == 'delete')]").isEmpty())
+                .andExpect(jsonPath("$.entities[0].actions[?(@.code == 'submit')]").isEmpty())
+                .andExpect(jsonPath("$.entities[0].actions[?(@.code == 'delete')]").isEmpty())
+                .andExpect(jsonPath("$.actions[?(@.code == 'view')]").isNotEmpty())
+                .andExpect(jsonPath("$.entities[0].actions[?(@.code == 'view')]").isNotEmpty());
+    }
+
+    @Test
+    void shouldHideUnauthorizedActionPathsFromRuntimeOpenApi() throws Exception {
+        when(service.describe(MODULE)).thenReturn(DynamicModuleDescriptor.from(actionModule()));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("delete"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("delete", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), eq("submit"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("submit", "action permission denied"));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), eq("delete"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("delete", "action permission denied"));
+
+        mvc.perform(get("/{moduleAlias}/openapi", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/submit/{recordId}')]").isEmpty())
+                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/delete/{id}')]").isEmpty())
+                .andExpect(jsonPath("$.operations[?(@.path == '/sales.contract/view/{id}')]").isNotEmpty());
     }
 
     @Test
@@ -1002,6 +1042,21 @@ class DynamicRecordWebControllerTest {
 
     private ModuleDefinition module() {
         return new ModuleDefinition(MODULE, "Contract", List.of(entity()));
+    }
+
+    private ModuleDefinition actionModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(entity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition(ENTITY, "submit", "Submit", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
+                        true, false, null, null, null,
+                        EntityActionExecutorType.SERVICE, "submitExecutor"))
+        );
     }
 
     private DynamicActionDescriptor action(String code, EntityActionLevel level) {

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 public class DynamicOpenApiGenerator {
     private static final String METHOD_GET = "GET";
@@ -25,7 +26,13 @@ public class DynamicOpenApiGenerator {
     );
 
     public DynamicOpenApiDocument generate(DynamicModuleDescriptor descriptor) {
+        return generate(descriptor, action -> true);
+    }
+
+    public DynamicOpenApiDocument generate(DynamicModuleDescriptor descriptor,
+                                           Predicate<PlatformAction> standardActionVisible) {
         Objects.requireNonNull(descriptor, "descriptor must not be null");
+        Objects.requireNonNull(standardActionVisible, "standardActionVisible must not be null");
         DynamicEntityDescriptor mainEntity = requireMainEntity(descriptor);
         String basePath = "/" + descriptor.moduleAlias();
         Map<String, DynamicOpenApiDocument.Schema> schemas = schemas(mainEntity);
@@ -33,7 +40,7 @@ public class DynamicOpenApiGenerator {
                 descriptor.moduleAlias(),
                 descriptor.title(),
                 basePath,
-                operations(descriptor, mainEntity, basePath),
+                operations(descriptor, mainEntity, basePath, standardActionVisible),
                 schemas,
                 errors()
         );
@@ -49,36 +56,53 @@ public class DynamicOpenApiGenerator {
 
     private List<DynamicOpenApiDocument.Operation> operations(DynamicModuleDescriptor descriptor,
                                                               DynamicEntityDescriptor mainEntity,
-                                                              String basePath) {
+                                                              String basePath,
+                                                              Predicate<PlatformAction> standardActionVisible) {
         List<DynamicOpenApiDocument.Operation> operations = new ArrayList<>();
         operations.add(getOperation(descriptor.moduleAlias(), basePath + "/describe", "describe" + upperModuleName(descriptor.moduleAlias()),
                 "Describe " + descriptor.title(), null, "DynamicModuleDescriptor", null));
         operations.add(getOperation(descriptor.moduleAlias(), basePath + "/openapi", operationId(descriptor, "openApi"),
                 "OpenAPI " + descriptor.title(), null, "DynamicOpenApiDocument", null));
-        operations.add(operation(descriptor.moduleAlias(), basePath + "/query", operationId(descriptor, "query"),
-                "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));
-        operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
-                "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
-        operations.add(operation(descriptor.moduleAlias(), basePath + "/insert", operationId(descriptor, "insert"),
-                "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.CREATE.code()));
-        operations.add(operation(descriptor.moduleAlias(), basePath + "/update/{id}", operationId(descriptor, "update"),
-                "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
-        operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
-                "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
-        if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())) {
+        if (standardActionVisible.test(PlatformAction.QUERY)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/query", operationId(descriptor, "query"),
+                    "Query " + mainEntity.title(), "WebQueryRequest", "WebPageResponse", PlatformAction.QUERY.code()));
+        }
+        if (standardActionVisible.test(PlatformAction.VIEW)) {
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
+                    "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
+        }
+        if (standardActionVisible.test(PlatformAction.CREATE)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/insert", operationId(descriptor, "insert"),
+                    "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.CREATE.code()));
+        }
+        if (standardActionVisible.test(PlatformAction.UPDATE)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/update/{id}", operationId(descriptor, "update"),
+                    "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
+        }
+        if (standardActionVisible.test(PlatformAction.DELETE)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
+                    "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
+        }
+        if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
+                && standardActionVisible.test(PlatformAction.ENABLE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/enable/{id}", operationId(descriptor, "enable"),
                     "Enable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.ENABLE.code()));
+        }
+        if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
+                && standardActionVisible.test(PlatformAction.DISABLE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/disable/{id}", operationId(descriptor, "disable"),
                     "Disable " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DISABLE.code()));
         }
-        if (mainEntity.capabilities().contains(EntityCapability.SORT.name())) {
+        if (mainEntity.capabilities().contains(EntityCapability.SORT.name())
+                && standardActionVisible.test(PlatformAction.SORT)) {
             String sortRequestSchema = mainEntity.capabilities().contains(EntityCapability.TREE.name())
                     ? "TreeSortWebRequest"
                     : "SortWebRequest";
             operations.add(operation(descriptor.moduleAlias(), basePath + "/sort/{id}", operationId(descriptor, "sort"),
                     "Sort " + mainEntity.title(), sortRequestSchema, "WebCountResponse", PlatformAction.SORT.code()));
         }
-        if (mainEntity.capabilities().contains(EntityCapability.TREE.name())) {
+        if (mainEntity.capabilities().contains(EntityCapability.TREE.name())
+                && standardActionVisible.test(PlatformAction.TREE)) {
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/tree", operationId(descriptor, "tree"),
                     "Tree " + mainEntity.title(), null, "WebListResponse", PlatformAction.TREE.code()));
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/tree/{id}", operationId(descriptor, "treeNode"),
@@ -94,14 +118,16 @@ public class DynamicOpenApiGenerator {
                 .filter(action -> !PlatformWebPathRules.isReservedWebActionCode(action.code()))
                 .filter(action -> action.actionLevel() != null)
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
-        mainEntity.fields().stream()
-                .filter(field -> field.reference() != null)
-                .forEach(field -> operations.add(operation(descriptor.moduleAlias(), basePath + "/references/" + field.fieldName() + "/resolve",
-                        operationId(descriptor, "resolve" + upperName(field.fieldName())),
-                        "Resolve reference " + field.title(),
-                        "DynamicWebReferenceRequest",
-                        "DynamicReferenceResolveResponse",
-                        PlatformAction.REFERENCE.code())));
+        if (standardActionVisible.test(PlatformAction.REFERENCE)) {
+            mainEntity.fields().stream()
+                    .filter(field -> field.reference() != null)
+                    .forEach(field -> operations.add(operation(descriptor.moduleAlias(), basePath + "/references/" + field.fieldName() + "/resolve",
+                            operationId(descriptor, "resolve" + upperName(field.fieldName())),
+                            "Resolve reference " + field.title(),
+                            "DynamicWebReferenceRequest",
+                            "DynamicReferenceResolveResponse",
+                            PlatformAction.REFERENCE.code())));
+        }
         return List.copyOf(operations);
     }
 

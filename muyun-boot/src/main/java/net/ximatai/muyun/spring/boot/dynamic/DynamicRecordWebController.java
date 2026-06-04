@@ -20,10 +20,12 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
+import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
@@ -67,6 +69,7 @@ public class DynamicRecordWebController implements
                 DynamicReferenceResolveResponse> {
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
+    private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier) {
@@ -134,12 +137,15 @@ public class DynamicRecordWebController implements
 
     @GetMapping("/describe")
     public DynamicModuleDescriptor describeModule(@PathVariable String moduleAlias) {
-        return tenantScope(moduleAlias, () -> recordService.describe(moduleAlias));
+        return tenantScope(moduleAlias, () -> permissionScopedDescriptor(moduleAlias));
     }
 
     @GetMapping("/openapi")
     public DynamicOpenApiDocument openApi(@PathVariable String moduleAlias) {
-        return tenantScope(moduleAlias, () -> recordService.openApi(moduleAlias));
+        return tenantScope(moduleAlias, () -> openApiGenerator.generate(
+                permissionScopedDescriptor(moduleAlias),
+                action -> recordService.actionAuthorizationAvailability(
+                        moduleAlias, action.code(), Set.of()).available()));
     }
 
     @Override
@@ -269,6 +275,48 @@ public class DynamicRecordWebController implements
 
     private String mainEntityAlias(String moduleAlias) {
         return recordService.mainEntityAlias(moduleAlias);
+    }
+
+    private DynamicModuleDescriptor permissionScopedDescriptor(String moduleAlias) {
+        DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
+        return new DynamicModuleDescriptor(
+                descriptor.moduleAlias(),
+                descriptor.title(),
+                descriptor.mainEntityAlias(),
+                visibleModuleActions(moduleAlias, descriptor.actions()),
+                descriptor.entities().stream()
+                        .map(entity -> new DynamicEntityDescriptor(
+                                entity.entityAlias(),
+                                entity.title(),
+                                entity.capabilities(),
+                                entity.fields(),
+                                entity.formulaRules(),
+                                visibleEntityActions(moduleAlias, entity.entityAlias(), entity.actions()),
+                                entity.views(),
+                                entity.associationViews()
+                        ))
+                        .toList(),
+                descriptor.relations(),
+                descriptor.references(),
+                descriptor.associationViews()
+        );
+    }
+
+    private List<DynamicActionDescriptor> visibleModuleActions(String moduleAlias,
+                                                               List<DynamicActionDescriptor> actions) {
+        return actions.stream()
+                .filter(action -> recordService.actionAuthorizationAvailability(
+                        moduleAlias, action.code(), Set.of()).available())
+                .toList();
+    }
+
+    private List<DynamicActionDescriptor> visibleEntityActions(String moduleAlias,
+                                                               String entityAlias,
+                                                               List<DynamicActionDescriptor> actions) {
+        return actions.stream()
+                .filter(action -> recordService.actionAuthorizationAvailability(
+                        moduleAlias, entityAlias, action.code(), Set.of()).available())
+                .toList();
     }
 
     private void requireSortInput(TreeSortWebRequest request) {
