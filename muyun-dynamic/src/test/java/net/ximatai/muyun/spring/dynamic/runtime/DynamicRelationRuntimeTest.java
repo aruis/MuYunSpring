@@ -480,6 +480,43 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
+    void shouldResolveDynamicReferenceDependencyScopePlan() {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
+                .register(scoreModule())
+                .register(studentModule());
+        DynamicReferenceDependencyScopeResolver resolver = new DynamicReferenceDependencyScopeResolver(runtime);
+
+        assertThat(resolver.resolve(new net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest(
+                "sales.score", "score.studentId", "view")))
+                .get()
+                .satisfies(plan -> {
+                    assertThat(plan.sourceField()).isEqualTo("studentId");
+                    assertThat(plan.targetModuleAlias()).isEqualTo("school.student");
+                    assertThat(plan.targetEntityAlias()).isEqualTo("student");
+                    assertThat(plan.targetTableName()).isEqualTo("school_student");
+                    assertThat(plan.resolveTargetColumn("authUserId")).isEqualTo("auth_user_id");
+                });
+        assertThat(resolver.resolve(new net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest(
+                "sales.score", "studentId", "view"))).isPresent();
+        assertThat(resolver.resolve(new net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest(
+                "sales.score", "line.studentId", "view"))).isEmpty();
+    }
+
+    @Test
+    void shouldNotExposeDataScopeColumnsWhenReferenceTargetDoesNotSupportDataScope() {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
+                .register(scoreModule())
+                .register(studentModuleWithoutDataScope());
+        DynamicReferenceDependencyScopeResolver resolver = new DynamicReferenceDependencyScopeResolver(runtime);
+
+        assertThat(resolver.resolve(new net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest(
+                "sales.score", "studentId", "view")))
+                .get()
+                .satisfies(plan -> assertThatThrownBy(() -> plan.resolveTargetColumn("authUserId"))
+                        .isInstanceOf(IllegalArgumentException.class));
+    }
+
+    @Test
     void shouldCollectDynamicManyReferenceIdsByMetadata() {
         IDatabaseOperations<Object> operations = operations();
         DynamicEntityService lineService = new DynamicRecordRuntime(operations)
@@ -976,6 +1013,40 @@ class DynamicRelationRuntimeTest {
                 List.of(EntityReferenceDefinition.to("invoice_line", "invoiceId", ReferenceTarget.of("sales.invoice", "invoice"))
                         .withAutoTitle("invoiceTitle")
                         .withProjection("title", "invoiceDisplayTitle"))
+        );
+    }
+
+    private ModuleDefinition scoreModule() {
+        return new ModuleDefinition(
+                "sales.score",
+                "Score",
+                List.of(new EntityDefinition("score", "sales_score", "Score", List.of(
+                        FieldDefinition.titleField(),
+                        FieldDefinition.string("studentId", "Student").column("student_id")
+                ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE))),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("score", "studentId",
+                        ReferenceTarget.of("school.student", "student")))
+        );
+    }
+
+    private ModuleDefinition studentModule() {
+        return new ModuleDefinition(
+                "school.student",
+                "Student",
+                List.of(new EntityDefinition("student", "school_student", "Student", List.of(
+                        FieldDefinition.titleField()
+                ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE, EntityCapability.DATA_SCOPE)))
+        );
+    }
+
+    private ModuleDefinition studentModuleWithoutDataScope() {
+        return new ModuleDefinition(
+                "school.student",
+                "Student",
+                List.of(new EntityDefinition("student", "school_student", "Student", List.of(
+                        FieldDefinition.titleField()
+                ), Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)))
         );
     }
 

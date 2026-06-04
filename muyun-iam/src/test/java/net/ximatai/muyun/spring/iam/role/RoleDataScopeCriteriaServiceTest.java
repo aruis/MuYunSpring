@@ -11,10 +11,14 @@ import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopePlan;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +32,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDenyWhenUserHasNoActionGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of());
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of());
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -45,7 +49,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldUnionOwnerAndOrganizationScopes() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.OWNER),
                 grant(DataScopePolicy.ORGANIZATION)
         ));
@@ -69,7 +73,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldLeaveCriteriaUnrestrictedWhenAnyGrantAllowsAllData() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.OWNER),
                 grant(DataScopePolicy.ALL)
         ));
@@ -89,7 +93,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldMarkAllDataScopeAsCrossTenantWhenRoleAllowsAllTenants() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ALL, "role-cross", TenantScopePolicy.ALL_TENANTS)
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -109,7 +113,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldNotMarkCrossTenantWhenAllTenantRoleDoesNotContributeActionGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ALL, "role-current")
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -129,7 +133,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldKeepCurrentTenantAllScopedWhenMixedWithCrossTenantRestrictedGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ALL, "role-current"),
                 grant(DataScopePolicy.OWNER, "role-cross", TenantScopePolicy.ALL_TENANTS)
         ));
@@ -155,7 +159,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldNotMarkCrossTenantWhenAllTenantGrantContributesNoScope() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ALL, "role-current"),
                 grant(DataScopePolicy.NONE, "role-cross", TenantScopePolicy.ALL_TENANTS)
         ));
@@ -178,7 +182,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldKeepBusinessScopeWhenRoleAllowsAllTenants() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.OWNER, "role-cross", TenantScopePolicy.ALL_TENANTS)
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -201,7 +205,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDenyWhenOnlyGrantHasNoDataScope() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.NONE)
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -221,7 +225,7 @@ class RoleDataScopeCriteriaServiceTest {
     void shouldApplyOrganizationAndChildrenScope() {
         RoleService roleService = mock(RoleService.class);
         OrganizationService organizationService = mock(OrganizationService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
         ));
         when(organizationService.organizationAndDescendantIds("org-1")).thenReturn(List.of("org-1", "org-1-1"));
@@ -244,7 +248,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldFailFastWhenOrganizationAndChildrenScopeHasNoOrganizationService() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService, Optional.empty());
@@ -261,7 +265,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldMatchCsvAssigneeAndMemberFieldsInsideServiceOnly() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ASSIGNEE),
                 grant(DataScopePolicy.MEMBER)
         ));
@@ -284,7 +288,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldCompileCsvScopeForMysqlAsCurrentSupportedRawShape() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of(
+        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
                 grant(DataScopePolicy.ASSIGNEE)
         ));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
@@ -359,6 +363,111 @@ class RoleDataScopeCriteriaServiceTest {
         assertThat(compiled.getSql()).contains("\"status\" = :p0").contains("1 = 0");
     }
 
+    @Test
+    void shouldApplyReferenceDependencyScopeAsTargetPermissionSubquery() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+                referenceGrant("studentId", "view")
+        ));
+        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+                grant(DataScopePolicy.OWNER)
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
+                roleService,
+                Optional.empty(),
+                Optional.of(referenceResolver("studentId", "school.student", "student"))
+        );
+
+        Criteria scoped = service.applyReadScope(
+                "sales.score",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"studentId\" IN (SELECT \"id\" FROM \"public\".\"school_student\"")
+                .contains("\"auth_user_id\" =")
+                .contains("\"tenant_id\" =")
+                .contains("\"deleted\" =");
+        assertThat(compiled.getParams().values()).contains("OPEN", "user-1", "tenant-a", Boolean.FALSE);
+    }
+
+    @Test
+    void shouldDefaultReferenceDependencyActionToQuery() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+                referenceGrant("studentId", null)
+        ));
+        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+                grant(DataScopePolicy.OWNER)
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
+                roleService,
+                Optional.empty(),
+                Optional.of(referenceResolver("studentId", "school.student", "student"))
+        );
+
+        Criteria scoped = service.applyReadScope(
+                "sales.score",
+                "query",
+                Criteria.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        assertThat(compile(scoped).getSql()).contains("\"studentId\" IN (SELECT \"id\"");
+    }
+
+    @Test
+    void shouldKeepReferenceDependencyCurrentTenantWhenTargetScopeIsNotCrossTenant() {
+        RoleService roleService = mock(RoleService.class);
+        RoleAction sourceGrant = referenceGrant("studentId", "view");
+        sourceGrant.setTenantScopePolicy(TenantScopePolicy.ALL_TENANTS);
+        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(sourceGrant));
+        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+                grant(DataScopePolicy.OWNER)
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
+                roleService,
+                Optional.empty(),
+                Optional.of(referenceResolver("studentId", "school.student", "student"))
+        );
+
+        DataScopeCriteriaResult result = service.resolveReadScope(
+                "sales.score",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        CompiledCriteria compiled = compile(result.criteria());
+        assertThat(result.crossTenant()).isFalse();
+        assertThat(compiled.getSql())
+                .contains("\"tenantId\" =")
+                .contains("\"studentId\" IN (SELECT \"id\"");
+        assertThat(compiled.getParams().values()).contains("tenant-a");
+    }
+
+    @Test
+    void shouldDenyReferenceDependencyWhenResolverCannotResolve() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+                referenceGrant("missingField", "view")
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.score",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a"))
+        );
+
+        assertThat(compile(scoped).getSql()).contains("1 = 0");
+    }
+
     private RoleAction grant(DataScopePolicy policy) {
         return grant(policy, "role-1");
     }
@@ -374,6 +483,37 @@ class RoleDataScopeCriteriaServiceTest {
         action.setTenantScopePolicy(tenantScopePolicy);
         action.setEnabled(Boolean.TRUE);
         return action;
+    }
+
+    private RoleAction referenceGrant(String referenceFieldId, String referenceActionCode) {
+        RoleAction action = grant(DataScopePolicy.REFERENCE_DEPENDENCY);
+        action.setReferenceFieldId(referenceFieldId);
+        action.setReferenceActionCode(referenceActionCode);
+        return action;
+    }
+
+    private ReferenceDependencyScopeResolver referenceResolver(String sourceField,
+                                                              String targetModuleAlias,
+                                                              String targetEntityAlias) {
+        return request -> {
+            if (!sourceField.equals(request.referenceFieldId())) {
+                return Optional.empty();
+            }
+            return Optional.of(new ReferenceDependencyScopePlan(
+                    sourceField,
+                    targetModuleAlias,
+                    targetEntityAlias,
+                    "public",
+                    "school_student",
+                    Map.of(
+                            "id", "id",
+                            "tenantId", "tenant_id",
+                            "deleted", "deleted",
+                            "authUserId", "auth_user_id"
+                    ),
+                    DBInfo.Type.POSTGRESQL
+            ));
+        };
     }
 
     private CompiledCriteria compile(Criteria criteria) {

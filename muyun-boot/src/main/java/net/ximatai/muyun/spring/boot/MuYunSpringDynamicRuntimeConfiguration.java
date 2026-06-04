@@ -8,12 +8,14 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
@@ -67,6 +69,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
         return new DynamicRecordService(runtime,
                 actionExecutionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new),
                 dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    ReferenceDependencyScopeResolver dynamicReferenceDependencyScopeResolver(DynamicRecordRuntime runtime) {
+        return new DynamicReferenceDependencyScopeResolver(runtime);
     }
 
     @Bean

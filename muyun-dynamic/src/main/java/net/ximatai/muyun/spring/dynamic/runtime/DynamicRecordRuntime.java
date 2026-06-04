@@ -116,6 +116,10 @@ public class DynamicRecordRuntime implements AutoCloseable {
         return actionTransactionOperator;
     }
 
+    public IDatabaseOperations<?> operations() {
+        return operations;
+    }
+
     public DynamicEntityService entityService(String moduleAlias, String entityAlias) {
         return entityService(moduleAlias, entityAlias, DynamicRecordLifecycle.NONE);
     }
