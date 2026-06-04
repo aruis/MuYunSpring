@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier {
@@ -36,24 +37,26 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
     }
 
     @Override
-    public void requireGrantable(String moduleAlias, String actionCode) {
+    public String resolveGrantablePermissionActionCode(String moduleAlias, String actionCode) {
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
         if (module == null) {
             throw new PlatformException("role action requires existing module: " + moduleAlias);
         }
         List<PlatformModuleAction> registeredActions = registeredModuleActions(moduleAlias);
         if (!registeredActions.isEmpty()) {
-            if (registeredActions.stream().anyMatch(action -> actionCode.equals(action.getActionCode()))) {
-                return;
-            }
-            throw new PlatformException("role action requires configured module action: "
-                    + moduleAlias + "." + actionCode);
+            return registeredActions.stream()
+                    .filter(action -> actionCode.equals(action.getActionCode()))
+                    .map(this::permissionActionCode)
+                    .findFirst()
+                    .orElseThrow(() -> new PlatformException("role action requires configured module action: "
+                            + moduleAlias + "." + actionCode));
         }
-        if ((module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC)
-                && PlatformAction.fromCode(actionCode)
-                .filter(action -> staticModuleActionRegistry.isGrantable(moduleAlias, action))
-                .isPresent()) {
-            return;
+        if (module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC) {
+            return PlatformAction.fromCode(actionCode)
+                    .filter(action -> staticModuleActionRegistry.isGrantable(moduleAlias, action))
+                    .map(PlatformAction::permissionActionCode)
+                    .orElseThrow(() -> new PlatformException("role action requires configured module action: "
+                            + moduleAlias + "." + actionCode));
         }
         throw new PlatformException("role action requires configured module action: "
                 + moduleAlias + "." + actionCode);
@@ -64,5 +67,12 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
                 .filter(action -> Boolean.TRUE.equals(action.getEnabled()))
                 .filter(action -> action.getActionAuth() == null || Boolean.TRUE.equals(action.getActionAuth()))
                 .toList();
+    }
+
+    private String permissionActionCode(PlatformModuleAction action) {
+        String permissionActionCode = action.getPermissionActionCode();
+        return permissionActionCode == null || permissionActionCode.isBlank()
+                ? Objects.requireNonNull(action.getActionCode(), "actionCode must not be null")
+                : permissionActionCode;
     }
 }

@@ -150,6 +150,52 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldStorePermissionActionCodeReturnedByGrantVerifier() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(actionDao.insert(any())).thenReturn("ra1");
+        RoleActionGrantVerifier verifier = (moduleAlias, actionCode) -> {
+            assertThat(moduleAlias).isEqualTo("sales.contract");
+            assertThat(actionCode).isEqualTo("exportData");
+            return "create";
+        };
+        RoleService service = new RoleService(roleDao, mock(RoleUserDao.class), actionDao,
+                activeTenantVerifier(), verifier);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.grantAction("r1", "sales.contract", "exportData")).isEqualTo(1);
+        }
+
+        verify(actionDao).insert(argThat(action -> "create".equals(action.getActionCode())));
+    }
+
+    @Test
+    void shouldRevokeActionByPermissionActionCodeResolvedFromGrantVerifier() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao actionDao = mock(RoleActionDao.class);
+        when(actionDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(enabledAction("ra1", "r1", "sales.contract", "create")));
+        when(actionDao.updateById(any())).thenReturn(1);
+        RoleActionGrantVerifier verifier = (moduleAlias, actionCode) -> {
+            assertThat(moduleAlias).isEqualTo("sales.contract");
+            assertThat(actionCode).isEqualTo("exportData");
+            return "create";
+        };
+        RoleService service = new RoleService(roleDao, mock(RoleUserDao.class), actionDao,
+                activeTenantVerifier(), verifier);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.revokeAction("r1", "sales.contract", "exportData")).isEqualTo(1);
+        }
+
+        verify(actionDao).updateById(argThat(action ->
+                "create".equals(action.getActionCode())
+                        && Boolean.FALSE.equals(action.getEnabled())));
+    }
+
+    @Test
     void shouldGrantWildcardDataScopeActionOnlyOnWildcardRole() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleActionDao actionDao = mock(RoleActionDao.class);

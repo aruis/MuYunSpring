@@ -81,11 +81,9 @@ class DynamicModuleDescriptorRuntimeTest {
 
         assertThat(moduleApi.describe().moduleAlias()).isEqualTo("sales.contract");
         assertThat(moduleApi.actions()).extracting(action -> action.code()).contains("create");
-        assertThat(moduleApi.actions()).extracting(action -> action.code()).doesNotContain("exportLine");
+        assertThat(moduleApi.actions()).extracting(action -> action.code()).contains("exportLine");
         assertThat(moduleApi.action("create").actionAuth()).isTrue();
-        assertThatThrownBy(() -> moduleApi.action("exportLine"))
-                .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("sales.contract.exportLine");
+        assertThat(moduleApi.action("exportLine").actionAuth()).isTrue();
         assertThat(moduleApi.relations()).extracting(relation -> relation.code()).containsExactly("lines");
         assertThat(moduleApi.references()).extracting(reference -> reference.sourceField()).containsExactly("contractId");
         assertThat(moduleApi.associationViews()).extracting(view -> view.code()).containsExactly("lines", "contractId");

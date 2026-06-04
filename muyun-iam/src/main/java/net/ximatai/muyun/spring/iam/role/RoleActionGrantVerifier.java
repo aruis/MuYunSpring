@@ -3,13 +3,11 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 
 public interface RoleActionGrantVerifier {
-    void requireGrantable(String moduleAlias, String actionCode);
+    String resolveGrantablePermissionActionCode(String moduleAlias, String actionCode);
 
     static RoleActionGrantVerifier platformActionsOnly() {
-        return (moduleAlias, actionCode) -> {
-            if (PlatformAction.fromCode(actionCode).isEmpty()) {
-                throw new IllegalArgumentException("unsupported actionCode: " + actionCode);
-            }
-        };
+        return (moduleAlias, actionCode) -> PlatformAction.fromCode(actionCode)
+                .map(PlatformAction::permissionActionCode)
+                .orElseThrow(() -> new IllegalArgumentException("unsupported actionCode: " + actionCode));
     }
 }

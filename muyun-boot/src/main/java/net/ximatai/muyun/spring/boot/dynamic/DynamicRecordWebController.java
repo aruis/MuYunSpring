@@ -215,7 +215,7 @@ public class DynamicRecordWebController implements
                                                             String actionCode,
                                                             String pathRecordId,
                                                             DynamicWebActionRequest request) {
-        String entityAlias = mainEntityAlias(moduleAlias);
+        String entityAlias = recordService.actionEntityAlias(moduleAlias, actionCode);
         return DynamicWebActionExecutionResponse.from(recordService.executeAction(
                 moduleAlias, actionCode, actionRequest(moduleAlias, entityAlias, pathRecordId, request)));
     }

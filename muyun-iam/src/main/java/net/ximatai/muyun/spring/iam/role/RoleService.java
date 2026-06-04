@@ -172,8 +172,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
         String validModuleAlias = requireModuleAlias(moduleAlias);
         String requestedActionCode = requireActionCode(actionCode);
-        grantVerifier.requireGrantable(validModuleAlias, requestedActionCode);
-        String validActionCode = permissionActionCode(requestedActionCode);
+        String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, requestedActionCode);
         DataScopePolicy validDataScopePolicy = normalizeDataScopePolicy(dataScopePolicy, scopeCondition, referenceFieldId);
         validateRoleActionDataScopePolicy(role, validDataScopePolicy);
 
@@ -240,7 +239,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public int revokeAction(String roleId, String moduleAlias, String actionCode) {
-        RoleAction roleAction = findRoleAction(roleId, moduleAlias, permissionActionCode(actionCode));
+        String validModuleAlias = requireModuleAlias(moduleAlias);
+        String validActionCode = resolveGrantablePermissionActionCode(validModuleAlias, actionCode);
+        RoleAction roleAction = findRoleAction(roleId, validModuleAlias, validActionCode);
         if (roleAction == null) {
             return 0;
         }
@@ -559,6 +560,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private String permissionActionCode(String actionCode) {
         return PlatformAction.permissionActionCodeOf(requireActionCode(actionCode));
+    }
+
+    private String resolveGrantablePermissionActionCode(String moduleAlias, String actionCode) {
+        return requireActionCode(grantVerifier.resolveGrantablePermissionActionCode(moduleAlias, requireActionCode(actionCode)));
     }
 
     private String normalizeBlank(String value) {

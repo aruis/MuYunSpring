@@ -115,10 +115,27 @@ public class DynamicRecordService {
         return findAction(describe(moduleAlias), actionCode);
     }
 
+    public String actionEntityAlias(String moduleAlias, String actionCode) {
+        DynamicModuleDescriptor descriptor = describe(moduleAlias);
+        findAction(descriptor, actionCode);
+        DynamicEntityDescriptor mainEntity = findEntity(descriptor, descriptor.mainEntityAlias());
+        if (hasAction(mainEntity, actionCode)) {
+            return mainEntity.entityAlias();
+        }
+        return descriptor.entities().stream()
+                .filter(entity -> !entity.entityAlias().equals(descriptor.mainEntityAlias()))
+                .filter(entity -> entity.actions().stream().anyMatch(action -> action.code().equals(actionCode)))
+                .map(DynamicEntityDescriptor::entityAlias)
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic action entity: "
+                        + moduleAlias + "." + actionCode));
+    }
+
     public DynamicActionAvailability actionAvailability(String moduleAlias, String actionCode, DynamicRecord record) {
         DynamicModuleDescriptor descriptor = describe(moduleAlias);
         findAction(descriptor, actionCode);
-        return entityService(moduleAlias, runtime.registry().requireModule(moduleAlias).mainEntityAlias())
+        String entityAlias = actionEntityAlias(moduleAlias, actionCode);
+        return entityService(moduleAlias, entityAlias)
                 .actionAvailability(actionCode, record);
     }
 
@@ -127,7 +144,7 @@ public class DynamicRecordService {
                                                                      Collection<String> recordIds) {
         DynamicModuleDescriptor module = describe(moduleAlias);
         DynamicActionDescriptor action = findAction(module, actionCode);
-        String entityAlias = runtime.registry().requireModule(moduleAlias).mainEntityAlias();
+        String entityAlias = actionEntityAlias(moduleAlias, actionCode);
         return actionAuthorizationAvailability(moduleAlias, entityAlias, action, recordIds);
     }
 
@@ -136,7 +153,7 @@ public class DynamicRecordService {
                                                       DynamicActionExecutionRequest request) {
         DynamicModuleDescriptor module = describe(moduleAlias);
         DynamicActionDescriptor action = findAction(module, actionCode);
-        String entityAlias = runtime.registry().requireModule(moduleAlias).mainEntityAlias();
+        String entityAlias = actionEntityAlias(moduleAlias, actionCode);
         return executeAction(moduleAlias, entityAlias, action, request);
     }
 
@@ -1216,6 +1233,10 @@ public class DynamicRecordService {
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic action: "
                         + module.moduleAlias() + "." + actionCode));
+    }
+
+    private boolean hasAction(DynamicEntityDescriptor entity, String actionCode) {
+        return entity.actions().stream().anyMatch(action -> action.code().equals(actionCode));
     }
 
     private DynamicActionDescriptor findAction(String moduleAlias, DynamicEntityDescriptor entity, String actionCode) {

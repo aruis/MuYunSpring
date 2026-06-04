@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -27,7 +28,7 @@ class PlatformRoleActionGrantVerifierTest {
                 mock(PlatformModuleActionService.class)
         );
 
-        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("sales.contract", "query"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("existing module");
     }
@@ -44,7 +45,7 @@ class PlatformRoleActionGrantVerifierTest {
                 moduleActionService
         );
 
-        verifier.requireGrantable("sales.contract", "query");
+        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "query")).isEqualTo("view");
     }
 
     @Test
@@ -60,10 +61,10 @@ class PlatformRoleActionGrantVerifierTest {
                 new StaticModuleActionRegistry(Map.of("sales.contract", List.of(PlatformAction.QUERY)))
         );
 
-        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "delete"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("sales.contract", "delete"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
-        verifier.requireGrantable("sales.contract", "query");
+        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "query")).isEqualTo("view");
     }
 
     @Test
@@ -80,8 +81,25 @@ class PlatformRoleActionGrantVerifierTest {
                 new StaticModuleActionRegistry(Map.of("iam.user", List.of()))
         );
 
-        verifier.requireGrantable("iam.user", "changePassword");
+        assertThat(verifier.resolveGrantablePermissionActionCode("iam.user", "changePassword")).isEqualTo("changePassword");
     }
+
+    @Test
+    void shouldReturnRegisteredPermissionActionCode() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(moduleActionService.listByModuleAliases(List.of("sales.contract")))
+                .thenReturn(List.of(moduleAction("exportData", "create", true)));
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
+                moduleService,
+                moduleActionService
+        );
+
+        assertThat(verifier.resolveGrantablePermissionActionCode("sales.contract", "exportData")).isEqualTo("create");
+    }
+
 
     @Test
     void shouldRejectStaticActionMissingFromRegisteredModuleActions() {
@@ -97,7 +115,7 @@ class PlatformRoleActionGrantVerifierTest {
                 new StaticModuleActionRegistry(Map.of("iam.user", List.of(PlatformAction.TREE)))
         );
 
-        assertThatThrownBy(() -> verifier.requireGrantable("iam.user", "tree"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("iam.user", "tree"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
 
@@ -116,7 +134,7 @@ class PlatformRoleActionGrantVerifierTest {
                 moduleActionService
         );
 
-        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("sales.contract", "query"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
     }
@@ -131,7 +149,7 @@ class PlatformRoleActionGrantVerifierTest {
                 .thenReturn(List.of(moduleAction("submit", false)));
         PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(moduleService, moduleActionService);
 
-        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "submit"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("sales.contract", "submit"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
     }
@@ -151,7 +169,7 @@ class PlatformRoleActionGrantVerifierTest {
                 registry
         );
 
-        assertThatThrownBy(() -> verifier.requireGrantable("iam.user", "tree"))
+        assertThatThrownBy(() -> verifier.resolveGrantablePermissionActionCode("iam.user", "tree"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("configured module action");
 
@@ -159,9 +177,14 @@ class PlatformRoleActionGrantVerifierTest {
     }
 
     private PlatformModuleAction moduleAction(String actionCode, boolean actionAuth) {
+        return moduleAction(actionCode, actionCode, actionAuth);
+    }
+
+    private PlatformModuleAction moduleAction(String actionCode, String permissionActionCode, boolean actionAuth) {
         PlatformModuleAction action = new PlatformModuleAction();
         action.setModuleAlias("iam.user");
         action.setActionCode(actionCode);
+        action.setPermissionActionCode(permissionActionCode);
         action.setActionAuth(actionAuth);
         action.setEnabled(Boolean.TRUE);
         return action;

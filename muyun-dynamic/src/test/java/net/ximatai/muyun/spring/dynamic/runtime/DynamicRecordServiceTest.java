@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
@@ -831,6 +832,43 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExecuteChildEntityActionThroughModuleActionApi() {
+        RecordingActionExecutor executor = new RecordingActionExecutor();
+        DynamicRecordService service = childEntityActionService(executor);
+        DynamicRecord line = service.newRecord(MODULE, "line");
+        line.setId("line-1");
+
+        DynamicActionExecutionResult result = service.module(MODULE)
+                .executeAction("approveLine", DynamicActionExecutionRequest.record(line));
+
+        assertThat(service.actions(MODULE)).extracting(DynamicActionDescriptor::code)
+                .contains("approveLine");
+        assertThat(service.actionEntityAlias(MODULE, "approveLine")).isEqualTo("line");
+        assertThat(result.value()).isEqualTo("submitted:line-1");
+        assertThat(executor.context().entityAlias()).isEqualTo("line");
+        assertThat(executor.context().actionCode()).isEqualTo("approveLine");
+    }
+
+    @Test
+    void shouldResolveStandardModuleActionToExplicitMainEntityWhenChildEntityComesFirst() {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(lineEntity().withCapabilities(EntityCapability.CRUD), actionEntity().withCapabilities(EntityCapability.CRUD)),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                "contract"
+        );
+        DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(operations()).register(module));
+
+        assertThat(service.actionEntityAlias(MODULE, "create")).isEqualTo("contract");
+    }
+
+
+    @Test
     void shouldExposeTenantContextToServiceActionAndActionEvent() {
         RecordingActionExecutor executor = new RecordingActionExecutor();
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
@@ -1429,7 +1467,7 @@ class DynamicRecordServiceTest {
     }
 
     @Test
-    void shouldKeepNonMainEntityActionOutOfModuleActionAvailability() {
+    void shouldExposeExplicitChildEntityActionInModuleActionAvailability() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -1441,7 +1479,7 @@ class DynamicRecordServiceTest {
                 List.of(
                         new EntityActionDefinition("contract", "submit", "提交", true)
                                 .availableWhen("{status} == 'draft'"),
-                        new EntityActionDefinition("line", "submit", "提交行", true)
+                        new EntityActionDefinition("line", "submitLine", "提交行", true)
                                 .availableWhen("{summary} != ''")
                 ),
                 "contract"
@@ -1450,10 +1488,9 @@ class DynamicRecordServiceTest {
         DynamicRecord line = service.newRecord(MODULE, "line")
                 .setValue("summary", "ok");
 
-        assertThatThrownBy(() -> service.actionAvailability(MODULE, "submit", line))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dynamic record entity mismatch: line");
-        assertThat(service.entity(MODULE, "line").actionAvailability("submit", line).available()).isTrue();
+        assertThat(service.actionEntityAlias(MODULE, "submit")).isEqualTo("contract");
+        assertThat(service.actionEntityAlias(MODULE, "submitLine")).isEqualTo("line");
+        assertThat(service.actionAvailability(MODULE, "submitLine", line).available()).isTrue();
     }
 
     @Test
@@ -2431,6 +2468,27 @@ class DynamicRecordServiceTest {
                 DynamicFieldValueValidator.NONE,
                 eventPublisher,
                 executorRegistry
+        ).register(module));
+    }
+
+    private DynamicRecordService childEntityActionService(DynamicActionExecutor executor) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionEntity(), lineEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new EntityActionDefinition("line", "approveLine", "审核明细", true,
+                        EntityActionLevel.RECORD, EntityActionCategory.CUSTOM, null, true, false,
+                        null, null, null, null, EntityActionExecutorType.SERVICE, "contractSubmit"))
+        );
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations(),
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                RuntimeEventPublisher.noop(),
+                new DynamicActionExecutorRegistry(List.of(executor))
         ).register(module));
     }
 

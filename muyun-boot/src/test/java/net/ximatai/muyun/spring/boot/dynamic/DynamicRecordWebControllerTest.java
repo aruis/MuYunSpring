@@ -631,6 +631,7 @@ class DynamicRecordWebControllerTest {
         DynamicActionDescriptor submit = action("submit", EntityActionLevel.RECORD);
         when(service.action(MODULE, "submit")).thenReturn(submit);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.actionEntityAlias(MODULE, "submit")).thenReturn(ENTITY);
         when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
         when(service.executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(
@@ -706,6 +707,7 @@ class DynamicRecordWebControllerTest {
     void shouldRejectActionRecordIdMismatch() throws Exception {
         when(service.action(MODULE, "submit")).thenReturn(action("submit", EntityActionLevel.RECORD));
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.actionEntityAlias(MODULE, "submit")).thenReturn(ENTITY);
         when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")

@@ -265,7 +265,7 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("create")
-                .doesNotContain("exportContact");
+                .contains("exportContact");
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("query");
@@ -294,7 +294,7 @@ class DynamicModuleDescriptorTest {
     }
 
     @Test
-    void shouldNotInferModuleActionsFromFirstEntityWhenMainEntityIsExplicit() {
+    void shouldUseExplicitMainEntityAsModuleActionBaseAndExposeConfiguredChildActions() {
         ModuleDefinition module = new ModuleDefinition(
                 "crm.customer",
                 "Customer",
@@ -321,7 +321,7 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.actions())
                 .extracting(DynamicActionDescriptor::code)
                 .contains("approveCustomer")
-                .doesNotContain("exportContact");
+                .contains("exportContact");
     }
 
     @Test

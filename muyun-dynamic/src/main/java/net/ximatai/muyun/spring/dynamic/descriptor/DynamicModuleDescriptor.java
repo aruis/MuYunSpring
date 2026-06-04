@@ -1,10 +1,16 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public record DynamicModuleDescriptor(
         String moduleAlias,
@@ -30,7 +36,7 @@ public record DynamicModuleDescriptor(
                 module.moduleAlias(),
                 module.name(),
                 module.mainEntityAlias(),
-                mainEntityActions(module, moduleEntities),
+                moduleActions(module, moduleEntities),
                 moduleEntities.stream()
                         .map(entity -> DynamicEntityDescriptor.from(module.moduleAlias(), entity, module.references(),
                                 module.views(), module.associationViews(), module.actions()))
@@ -41,17 +47,48 @@ public record DynamicModuleDescriptor(
         );
     }
 
-    private static List<DynamicActionDescriptor> mainEntityActions(ModuleDefinition module,
-                                                                   List<EntityDefinition> entities) {
+    private static List<DynamicActionDescriptor> moduleActions(ModuleDefinition module,
+                                                               List<EntityDefinition> entities) {
         if (entities == null || entities.isEmpty()) {
             return List.of();
         }
-        EntityDefinition mainEntity = entities.stream()
-                .filter(entity -> entity.alias().equals(module.mainEntityAlias()))
-                .findFirst()
-                .orElseThrow(() -> new ModuleDefinitionException("module main entity not found: "
-                        + module.moduleAlias() + "." + module.mainEntityAlias()));
-        return DynamicEntityDescriptor.from(module.moduleAlias(), mainEntity, module.views(),
-                module.associationViews(), module.actions()).actions();
+        Map<String, EntityDefinition> entityByAlias = entities.stream()
+                .collect(LinkedHashMap::new, (map, entity) -> map.put(entity.alias(), entity), LinkedHashMap::putAll);
+        EntityDefinition mainEntity = requireEntity(module, entityByAlias, module.mainEntityAlias());
+        List<DynamicActionDescriptor> actions = new ArrayList<>(DynamicEntityDescriptor.from(module.moduleAlias(),
+                mainEntity, module.views(), module.associationViews(), module.actions()).actions());
+        Set<String> actionCodes = actions.stream()
+                .map(DynamicActionDescriptor::code)
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
+        for (EntityActionDefinition action : module.actions()) {
+            if (action.entityAlias().equals(module.mainEntityAlias())) {
+                continue;
+            }
+            EntityDefinition entity = requireEntity(module, entityByAlias, action.entityAlias());
+            DynamicEntityDescriptor entityDescriptor = DynamicEntityDescriptor.from(module.moduleAlias(),
+                    entity, module.views(), module.associationViews(), module.actions());
+            entityDescriptor.actions().stream()
+                    .filter(descriptor -> descriptor.code().equals(action.actionCode()))
+                    .findFirst()
+                    .ifPresent(descriptor -> {
+                        if (!actionCodes.add(descriptor.code())) {
+                            throw new ModuleDefinitionException("module action code duplicated: "
+                                    + module.moduleAlias() + "." + descriptor.code());
+                        }
+                        actions.add(descriptor);
+                    });
+        }
+        return List.copyOf(actions);
+    }
+
+    private static EntityDefinition requireEntity(ModuleDefinition module,
+                                                  Map<String, EntityDefinition> entityByAlias,
+                                                  String entityAlias) {
+        EntityDefinition entity = entityByAlias.get(entityAlias);
+        if (entity == null) {
+            throw new ModuleDefinitionException("module entity not found: "
+                    + module.moduleAlias() + "." + entityAlias);
+        }
+        return entity;
     }
 }
