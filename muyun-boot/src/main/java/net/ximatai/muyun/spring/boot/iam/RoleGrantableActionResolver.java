@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,13 +25,25 @@ public class RoleGrantableActionResolver {
     private final PlatformModuleService moduleService;
     private final ModuleMetadataRelationService relationService;
     private final ModuleMetadataActionService actionService;
+    private final StaticModuleActionRegistry staticModuleActionRegistry;
 
     public RoleGrantableActionResolver(PlatformModuleService moduleService,
                                        ModuleMetadataRelationService relationService,
                                        ModuleMetadataActionService actionService) {
+        this(moduleService, relationService, actionService, new StaticModuleActionRegistry());
+    }
+
+    @Autowired
+    public RoleGrantableActionResolver(PlatformModuleService moduleService,
+                                       ModuleMetadataRelationService relationService,
+                                       ModuleMetadataActionService actionService,
+                                       StaticModuleActionRegistry staticModuleActionRegistry) {
         this.moduleService = moduleService;
         this.relationService = relationService;
         this.actionService = actionService;
+        this.staticModuleActionRegistry = staticModuleActionRegistry == null
+                ? new StaticModuleActionRegistry()
+                : staticModuleActionRegistry;
     }
 
     public List<GrantableAction> resolve(List<String> moduleAliases) {
@@ -44,10 +57,8 @@ public class RoleGrantableActionResolver {
                 continue;
             }
             if (module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC) {
-                for (PlatformAction action : PlatformAction.values()) {
-                    if (action.actionAuth()) {
-                        put(actions, GrantableAction.ofPlatformDefaults(moduleAlias, action));
-                    }
+                for (PlatformAction action : staticModuleActionRegistry.grantableActions(moduleAlias)) {
+                    put(actions, GrantableAction.ofPlatformDefaults(moduleAlias, action));
                 }
             }
             for (GrantableAction action : configuredActions(moduleAlias)) {

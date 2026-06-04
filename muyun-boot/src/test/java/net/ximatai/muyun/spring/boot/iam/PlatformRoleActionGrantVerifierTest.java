@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.iam;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -13,6 +14,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,6 +52,27 @@ class PlatformRoleActionGrantVerifierTest {
         verifier.requireGrantable("sales.contract", "query");
 
         verify(relationService, never()).list(any(Criteria.class), any(PageRequest.class));
+    }
+
+    @Test
+    void shouldRejectUndeclaredPlatformActionForStaticModule() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.STATIC));
+        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
+                moduleService,
+                relationService,
+                actionService,
+                new StaticModuleActionRegistry(Map.of("sales.contract", List.of(PlatformAction.QUERY)))
+        );
+
+        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "delete"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("configured module action");
+        verifier.requireGrantable("sales.contract", "query");
     }
 
     @Test

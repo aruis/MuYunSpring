@@ -223,7 +223,7 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 | 角色维护 | 标准角色、角色组、数据权限通配角色可通过统一 RoleService 维护；角色组只聚合标准角色 | `RoleServiceContractTest` 覆盖默认类型、角色组成员校验和非配置角色拒绝授权 | 已闭环 |
 | 用户绑定 | 角色支持批量绑定、解绑、查询绑定用户；用户最多绑定一个数据权限通配角色 | `RoleServiceContractTest` 和 `IamWebControllerTest` 覆盖绑定去重、解绑、唯一通配角色约束和 Web contract | 已闭环 |
 | 动作授权 | 角色到模块动作按 `moduleAlias + permissionActionCode` 落表，撤权软失效；动作继承统一落到权限动作 | `RoleServiceContractTest` 覆盖授权、撤权、继承动作归并和授权矩阵 | 已闭环 |
-| 授权矩阵 | 后端可按模块别名解析标准动作和配置动作，返回已授权、未授权和数据权限策略 | `RoleGrantableActionResolverTest`、`RoleServiceContractTest` 和 Web contract 覆盖 | 已闭环 |
+| 授权矩阵 | 后端可按模块别名解析标准动作和配置动作，返回已授权、未授权和数据权限策略；静态模块可通过能力声明裁剪标准动作，避免暴露无效授权项 | `RoleGrantableActionResolverTest`、`RoleServiceContractTest` 和 Web contract 覆盖 | 已闭环 |
 | 数据权限策略 | 支持 NONE、ALL、OWNER、ASSIGNEE、MEMBER、ORGANIZATION、ORGANIZATION_AND_CHILDREN、WILDCARD、REFERENCE_DEPENDENCY；CUSTOM 保留字段但当前授权入口拒绝，避免产生不可执行权限事实 | `RoleDataScopeCriteriaServiceTest` 覆盖并集、无权限、跨租户、组织及下级、通配、引用依赖和默认策略；`RoleServiceContractTest` 覆盖 CUSTOM 拒绝授权 | 已闭环 |
 | 租户范围 | 数据范围与租户基线分离；普通授权默认当前租户，明确授权可跨租户；系统用户绕过数据范围 | `DataScopeAbilityTest`、`RoleDataScopeCriteriaServiceTest` 和动态运行态测试覆盖 | 已闭环 |
 | 静态接入 | 静态 Web 标准 CRUD、启停、树、排序等入口复用 `@ActionEndpoint`；实现 `DataScopeAbility` 的静态服务接入同一数据范围语义 | `ActionEndpointInterceptorTest`、`DataScopeWebTest` 和 `IamWebControllerIT` 覆盖 | 主体完成 |
@@ -235,9 +235,8 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 
 1. 自定义数据权限条件暂不开放 SQL/DSL 执行，只保留模型字段和授权入口 fail-fast 边界，等真实场景出现后再做安全表达式设计。
 2. 跨模块共用同一物理表时的记录权限归属字段暂不进入 M5 P0。当前模块入口统一按当前 `moduleAlias` 判权；若后续出现同表多业务归属并存，再补“记录归属模块”能力。
-3. 静态授权矩阵当前按静态模块默认平台动作回显，不感知具体静态 service 是否实现树、排序、启停等能力；若配置噪音影响管理端体验，再接入静态模块能力声明。
-4. 静态业务专题流水不并入平台动作审计。平台审计只记录必要动作上下文，工作流、导入导出等专题自行维护业务流水。
-5. 管理端 UI 编排不进入 M5。M5 只保证模型、服务、Web contract 和测试证据可支撑后续 UI。
+3. 静态业务专题流水不并入平台动作审计。平台审计只记录必要动作上下文，工作流、导入导出等专题自行维护业务流水。
+4. 管理端 UI 编排不进入 M5。M5 只保证模型、服务、Web contract 和测试证据可支撑后续 UI。
 
 ## M6 工作流与任务闭环
 

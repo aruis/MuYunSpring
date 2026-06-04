@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -23,13 +24,25 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
     private final PlatformModuleService moduleService;
     private final ModuleMetadataRelationService relationService;
     private final ModuleMetadataActionService actionService;
+    private final StaticModuleActionRegistry staticModuleActionRegistry;
 
     public PlatformRoleActionGrantVerifier(PlatformModuleService moduleService,
                                            ModuleMetadataRelationService relationService,
                                            ModuleMetadataActionService actionService) {
+        this(moduleService, relationService, actionService, new StaticModuleActionRegistry());
+    }
+
+    @Autowired
+    public PlatformRoleActionGrantVerifier(PlatformModuleService moduleService,
+                                           ModuleMetadataRelationService relationService,
+                                           ModuleMetadataActionService actionService,
+                                           StaticModuleActionRegistry staticModuleActionRegistry) {
         this.moduleService = moduleService;
         this.relationService = relationService;
         this.actionService = actionService;
+        this.staticModuleActionRegistry = staticModuleActionRegistry == null
+                ? new StaticModuleActionRegistry()
+                : staticModuleActionRegistry;
     }
 
     @Override
@@ -39,7 +52,9 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
             throw new PlatformException("role action requires existing module: " + moduleAlias);
         }
         if ((module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC)
-                && PlatformAction.fromCode(actionCode).isPresent()) {
+                && PlatformAction.fromCode(actionCode)
+                .filter(action -> staticModuleActionRegistry.isGrantable(moduleAlias, action))
+                .isPresent()) {
             return;
         }
         List<String> relationIds = relationService.list(Criteria.of().eq("moduleAlias", moduleAlias), ALL)

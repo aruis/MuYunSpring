@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot;
 
+import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -20,5 +21,11 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(CurrentUserWebFilter.class)
     public CurrentUserWebFilter currentUserWebFilter(CurrentUserProvider currentUserProvider) {
         return new CurrentUserWebFilter(currentUserProvider);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(StaticModuleActionRegistry.class)
+    public StaticModuleActionRegistry staticModuleActionRegistry() {
+        return new StaticModuleActionRegistry();
     }
 }
