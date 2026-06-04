@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Component;
 
@@ -32,10 +34,12 @@ public class PlatformRoleActionGrantVerifier implements RoleActionGrantVerifier 
 
     @Override
     public void requireGrantable(String moduleAlias, String actionCode) {
-        if (moduleService.resolveVisibleModule(moduleAlias) == null) {
+        PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
+        if (module == null) {
             throw new PlatformException("role action requires existing module: " + moduleAlias);
         }
-        if (PlatformAction.fromCode(actionCode).isPresent()) {
+        if ((module.getModuleKind() == null || module.getModuleKind() == ModuleKind.STATIC)
+                && PlatformAction.fromCode(actionCode).isPresent()) {
             return;
         }
         List<String> relationIds = relationService.list(Criteria.of().eq("moduleAlias", moduleAlias), ALL)

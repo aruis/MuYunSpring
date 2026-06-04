@@ -79,6 +79,10 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         Role role = requireEnabledRole(roleId);
         String validUserId = Preconditions.requireText(userId, "userId");
         ensureDataScopeRoleBindingValid(role.getId(), validUserId);
+        RoleUser existing = findRoleUser(role.getId(), validUserId);
+        if (existing != null) {
+            return existing.getId();
+        }
 
         RoleUser binding = new RoleUser();
         binding.setRoleId(role.getId());
@@ -87,12 +91,59 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return roleUserDao.insert(binding);
     }
 
+    public int bindUsers(String roleId, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        Role role = requireEnabledRole(roleId);
+        int changed = 0;
+        for (String userId : userIds.stream().filter(Objects::nonNull).distinct().toList()) {
+            String validUserId = Preconditions.requireText(userId, "userId");
+            ensureDataScopeRoleBindingValid(role.getId(), validUserId);
+            if (findRoleUser(role.getId(), validUserId) != null) {
+                continue;
+            }
+            RoleUser binding = new RoleUser();
+            binding.setRoleId(role.getId());
+            binding.setUserId(validUserId);
+            prepareChildInsert(binding);
+            roleUserDao.insert(binding);
+            changed++;
+        }
+        return changed;
+    }
+
     public int unbindUser(String roleId, String userId) {
-        RoleUser binding = findRoleUser(roleId, userId);
+        Role role = requireEnabledRole(roleId);
+        RoleUser binding = findRoleUser(role.getId(), userId);
         if (binding == null) {
             return 0;
         }
         return roleUserDao.deleteById(binding.getId());
+    }
+
+    public int unbindUsers(String roleId, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        Role role = requireEnabledRole(roleId);
+        int changed = 0;
+        for (String userId : userIds.stream().filter(Objects::nonNull).distinct().toList()) {
+            RoleUser binding = findRoleUser(role.getId(), userId);
+            if (binding != null) {
+                changed += roleUserDao.deleteById(binding.getId());
+            }
+        }
+        return changed;
+    }
+
+    public List<String> userIds(String roleId) {
+        Role role = requireEnabledRole(roleId);
+        return roleUserDao.query(scopedChildCriteria(Criteria.of().eq("roleId", role.getId())), ALL)
+                .stream()
+                .map(RoleUser::getUserId)
+                .distinct()
+                .toList();
     }
 
     public int grantAction(String roleId, String moduleAlias, String actionCode) {

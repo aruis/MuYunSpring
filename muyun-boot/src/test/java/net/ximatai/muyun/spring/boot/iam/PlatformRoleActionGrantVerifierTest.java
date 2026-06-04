@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataAction;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataActionService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,45 @@ class PlatformRoleActionGrantVerifierTest {
     }
 
     @Test
+    void shouldRequireConfiguredActionForDynamicModuleEvenWhenActionIsPlatformStandard() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(relationService.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
+                moduleService,
+                relationService,
+                actionService
+        );
+
+        assertThatThrownBy(() -> verifier.requireGrantable("sales.contract", "query"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("configured module action");
+    }
+
+    @Test
+    void shouldAllowConfiguredPlatformActionForDynamicModule() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataActionService actionService = mock(ModuleMetadataActionService.class);
+        when(moduleService.resolveVisibleModule("sales.contract"))
+                .thenReturn(module("sales.contract", ModuleKind.DYNAMIC));
+        when(relationService.list(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(relation("rel-1")));
+        when(actionService.listByRelationIds(List.of("rel-1")))
+                .thenReturn(List.of(action("query", true, true)));
+        PlatformRoleActionGrantVerifier verifier = new PlatformRoleActionGrantVerifier(
+                moduleService,
+                relationService,
+                actionService
+        );
+
+        verifier.requireGrantable("sales.contract", "query");
+    }
+
+    @Test
     void shouldRejectCustomActionThatDoesNotParticipateInActionAuth() {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
@@ -103,5 +143,12 @@ class PlatformRoleActionGrantVerifierTest {
         action.setActionAuth(actionAuth);
         action.setEnabled(enabled);
         return action;
+    }
+
+    private PlatformModule module(String moduleAlias, ModuleKind moduleKind) {
+        PlatformModule module = new PlatformModule();
+        module.setAlias(moduleAlias);
+        module.setModuleKind(moduleKind);
+        return module;
     }
 }

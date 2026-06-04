@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -88,6 +89,23 @@ class ActionEndpointInterceptorTest {
         interceptor.afterConcurrentHandlingStarted(request, new MockHttpServletResponse(), handler);
 
         assertThat(ActionExecutionContextHolder.current()).isEmpty();
+    }
+
+    @Test
+    void shouldResolveRoleCustomEndpointActionContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.role/grant/role-1");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("roleId", "role-1"));
+        RoleWebController controller = new RoleWebController(null);
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, RoleWebController.class.getMethod(
+                        "grantAction", String.class, RoleWebController.GrantActionRequest.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("iam.role");
+            assertThat(context.platformAction()).isEqualTo(PlatformAction.UPDATE);
+            assertThat(context.permissionCode()).isEqualTo("iam.role:update");
+        });
     }
 
 

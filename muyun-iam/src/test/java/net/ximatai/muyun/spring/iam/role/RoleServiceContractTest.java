@@ -171,6 +171,44 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldBindAndListRoleUsersWithoutDuplicatingExistingBindings() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleUserDao roleUserDao = mock(RoleUserDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
+        when(roleUserDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of())
+                .thenReturn(List.of())
+                .thenReturn(List.of())
+                .thenReturn(List.of(roleUser("r1", "user-2")))
+                .thenReturn(List.of(roleUser("r1", "user-1"), roleUser("r1", "user-2")));
+        when(roleUserDao.insert(any())).thenReturn("binding-1", "binding-2");
+        RoleService service = service(roleDao, roleUserDao, mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.bindUsers("r1", List.of("user-1", "user-2", "user-2"))).isEqualTo(1);
+            assertThat(service.userIds("r1")).containsExactly("user-1", "user-2");
+        }
+    }
+
+    @Test
+    void shouldUnbindRoleUsersInBatch() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleUserDao roleUserDao = mock(RoleUserDao.class);
+        RoleUser user1 = roleUser("r1", "user-1");
+        user1.setId("binding-1");
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("r1")));
+        when(roleUserDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(user1))
+                .thenReturn(List.of());
+        when(roleUserDao.deleteById("binding-1")).thenReturn(1);
+        RoleService service = service(roleDao, roleUserDao, mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.unbindUsers("r1", List.of("user-1", "user-2"))).isEqualTo(1);
+        }
+    }
+
+    @Test
     void shouldUseGrantVerifierBeforeSavingAction() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleActionDao actionDao = mock(RoleActionDao.class);
