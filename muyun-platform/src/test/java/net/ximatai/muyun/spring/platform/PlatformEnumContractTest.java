@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowMilestoneType;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskCompletionPolicy;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
@@ -62,6 +63,7 @@ class PlatformEnumContractTest {
         assertEnumContract(WorkflowTaskGuideKind.class);
         assertEnumContract(WorkflowTaskCheckKind.class);
         assertEnumContract(WorkflowTaskCheckStatus.class);
+        assertEnumContract(WorkflowModuleTaskCompletionPolicy.class);
     }
 
     private <E extends Enum<E> & CodeTitleEnum> void assertEnumContract(Class<E> enumType) {

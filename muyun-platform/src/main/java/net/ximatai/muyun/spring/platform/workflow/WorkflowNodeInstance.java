@@ -86,6 +86,9 @@ public class WorkflowNodeInstance extends StandardEntity {
             comment = "Rollback target node key")
     private String rollbackTargetNodeKey;
 
+    @Column(name = "task_definition_id", type = ColumnType.VARCHAR, length = 32, comment = "Task definition id")
+    private String taskDefinitionId;
+
     @Column(name = "allow_reject", type = ColumnType.BOOLEAN, comment = "Allow reject")
     private Boolean allowReject;
 

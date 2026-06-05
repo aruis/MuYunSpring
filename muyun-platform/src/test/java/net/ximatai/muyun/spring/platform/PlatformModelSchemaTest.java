@@ -216,7 +216,7 @@ class PlatformModelSchemaTest {
                         "enter_route_id", "branch_run_id", "converge_run_id",
                         "required_route_count", "arrived_route_count", "completed_route_count",
                         "required_task_count", "completed_task_count", "approved_task_count",
-                        "rejected_task_count", "rollback_target_node_key",
+                        "rejected_task_count", "rollback_target_node_key", "task_definition_id",
                         "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
                         "allow_rollback", "require_rollback_reason", "allow_terminate",
                         "require_terminate_reason", "allow_add_sign",

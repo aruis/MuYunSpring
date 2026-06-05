@@ -59,6 +59,7 @@ public class WorkflowInstanceSnapshotFactory {
             node.setMilestoneType(definition.getMilestoneType());
             node.setConvergeMode(definition.getConvergeMode());
             node.setConvergeRatio(definition.getConvergeRatio());
+            node.setTaskDefinitionId(definition.getTaskDefinitionId());
             node.setAllowReject(definition.getAllowReject());
             node.setRequireRejectReason(definition.getRequireRejectReason());
             node.setAllowRejectReturnToMe(definition.getAllowRejectReturnToMe());

@@ -38,6 +38,7 @@ class WorkflowInstanceSnapshotFactoryTest {
                     assertThat(node.getAllowTerminate()).isTrue();
                     assertThat(node.getRequireTerminateReason()).isTrue();
                     assertThat(node.getAllowAddSign()).isTrue();
+                    assertThat(node.getTaskDefinitionId()).isEqualTo("task-def-1");
                 });
         assertThat(snapshot.routes()).hasSize(1)
                 .first()
@@ -84,6 +85,7 @@ class WorkflowInstanceSnapshotFactoryTest {
             node.setAllowTerminate(Boolean.TRUE);
             node.setRequireTerminateReason(Boolean.TRUE);
             node.setAllowAddSign(Boolean.TRUE);
+            node.setTaskDefinitionId("task-def-1");
         }
         return node;
     }
