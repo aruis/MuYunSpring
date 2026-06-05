@@ -9,6 +9,10 @@ public interface WorkflowRuntimePlugin {
         return 0;
     }
 
+    default WorkflowRuntimePluginDispatchTiming dispatchTiming() {
+        return WorkflowRuntimePluginDispatchTiming.SYNCHRONOUS;
+    }
+
     default Set<WorkflowRuntimePluginEventType> eventTypes() {
         return Set.of();
     }
