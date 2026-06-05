@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
@@ -15,6 +16,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +31,7 @@ class StaticModuleDefinitionRegistrarTest {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
         when(moduleService.select("iam.user")).thenReturn(null);
+        when(actionService.findByModuleAliasAndActionCode("iam.user", "menu")).thenReturn(null);
         when(actionService.findByModuleAliasAndActionCode("iam.user", "changePassword")).thenReturn(null);
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
@@ -38,7 +41,10 @@ class StaticModuleDefinitionRegistrarTest {
                         "iam.user",
                         "用户管理",
                         null,
-                        List.of(StaticModuleActionDefinition.recordAction("changePassword", "修改密码"))
+                        List.of(
+                                StaticModuleActionDefinition.platformAction(PlatformAction.MENU),
+                                StaticModuleActionDefinition.recordAction("changePassword", "修改密码")
+                        )
                 ))
         );
 
@@ -54,15 +60,26 @@ class StaticModuleDefinitionRegistrarTest {
             assertThat(module.getSystemManaged()).isTrue();
         });
         ArgumentCaptor<PlatformModuleAction> actionCaptor = ArgumentCaptor.forClass(PlatformModuleAction.class);
-        verify(actionService).insert(actionCaptor.capture());
-        assertThat(actionCaptor.getValue()).satisfies(action -> {
-            assertThat(action.getModuleAlias()).isEqualTo("iam.user");
-            assertThat(action.getActionCode()).isEqualTo("changePassword");
-            assertThat(action.getPermissionActionCode()).isEqualTo("changePassword");
-            assertThat(action.getTitle()).isEqualTo("修改密码");
-            assertThat(action.getSystemManaged()).isTrue();
-            assertThat(action.getEnabled()).isTrue();
-        });
+        verify(actionService, times(2)).insert(actionCaptor.capture());
+        assertThat(actionCaptor.getAllValues()).filteredOn(action -> "menu".equals(action.getActionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.getModuleAlias()).isEqualTo("iam.user");
+                    assertThat(action.getPermissionActionCode()).isEqualTo("menu");
+                    assertThat(action.getDataAuth()).isFalse();
+                    assertThat(action.getSystemManaged()).isTrue();
+                    assertThat(action.getEnabled()).isTrue();
+                });
+        assertThat(actionCaptor.getAllValues()).filteredOn(action -> "changePassword".equals(action.getActionCode()))
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.getModuleAlias()).isEqualTo("iam.user");
+                    assertThat(action.getActionCode()).isEqualTo("changePassword");
+                    assertThat(action.getPermissionActionCode()).isEqualTo("changePassword");
+                    assertThat(action.getTitle()).isEqualTo("修改密码");
+                    assertThat(action.getSystemManaged()).isTrue();
+                    assertThat(action.getEnabled()).isTrue();
+                });
     }
 
     @Test

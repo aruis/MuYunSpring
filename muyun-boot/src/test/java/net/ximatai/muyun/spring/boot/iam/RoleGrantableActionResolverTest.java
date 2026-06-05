@@ -128,10 +128,16 @@ class RoleGrantableActionResolverTest {
         RolePermissionMatrix matrix = roleService.permissionMatrix("role-1", grantableActions);
 
         assertThat(grantableActions).extracting(GrantableAction::actionCode)
-                .contains("roleUsers", "rolePermissions");
+                .contains("menu", "roleUsers", "rolePermissions");
         assertThat(matrix.modules()).singleElement()
                 .satisfies(module -> {
                     assertThat(module.moduleAlias()).isEqualTo("iam.role");
+                    assertThat(module.actions()).filteredOn(action -> "menu".equals(action.actionCode()))
+                            .singleElement()
+                            .extracting(RolePermissionAction::permissionActionCode,
+                                    RolePermissionAction::granted,
+                                    RolePermissionAction::dataAuth)
+                            .containsExactly("menu", false, false);
                     assertThat(module.actions()).filteredOn(action -> "rolePermissions".equals(action.actionCode()))
                             .singleElement()
                             .extracting(RolePermissionAction::permissionActionCode,
