@@ -102,6 +102,7 @@ class WorkflowTaskActionServiceTest {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         task.setAssigneeId("manager-1");
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowRejectReturnToMe(true);
         WorkflowInstance instance = instance();
         instance.setApprovalEnabled(true);
         instance.setStartedBy("starter-1");
@@ -122,6 +123,40 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.instance().getRejectReturnOwnerId()).isEqualTo("manager-1");
         assertThat(result.createdTask().getDueAt()).isNull();
         assertThat(result.createdTask().getTaskKind()).isEqualTo(WorkflowTaskKind.RESUBMIT);
+    }
+
+    @Test
+    void shouldRejectReturnToMeWhenNodeDoesNotAllowIt() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowRejectReturnToMe(false);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> service.reject(WorkflowTaskActionRequest.reject(
+                "task-1", "user-1", WorkflowRejectResubmitMode.RETURN_TO_ME, "not ok")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("does not allow reject return to me");
+
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRejectApprovalRejectWhenNodeDoesNotAllowIt() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowReject(false);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> service.reject(WorkflowTaskActionRequest.reject(
+                "task-1", "user-1", WorkflowRejectResubmitMode.RESTART, "not ok")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("does not allow reject");
+
+        verifyNoInteractions(eventDao);
     }
 
     @Test
@@ -371,6 +406,7 @@ class WorkflowTaskActionServiceTest {
     void shouldRequireReasonForRiskTaskAction() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setRequireRejectReason(true);
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance());
         when(nodeDao.findById("node-1")).thenReturn(node);

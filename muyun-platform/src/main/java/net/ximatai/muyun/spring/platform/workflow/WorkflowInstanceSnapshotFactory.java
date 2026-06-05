@@ -59,6 +59,14 @@ public class WorkflowInstanceSnapshotFactory {
             node.setMilestoneType(definition.getMilestoneType());
             node.setConvergeMode(definition.getConvergeMode());
             node.setConvergeRatio(definition.getConvergeRatio());
+            node.setAllowReject(definition.getAllowReject());
+            node.setRequireRejectReason(definition.getRequireRejectReason());
+            node.setAllowRejectReturnToMe(definition.getAllowRejectReturnToMe());
+            node.setAllowRollback(definition.getAllowRollback());
+            node.setRequireRollbackReason(definition.getRequireRollbackReason());
+            node.setAllowTerminate(definition.getAllowTerminate());
+            node.setRequireTerminateReason(definition.getRequireTerminateReason());
+            node.setAllowAddSign(definition.getAllowAddSign());
             node.setNodeSnapshotText(definition.getNodeConfigText());
             result.add(node);
         }

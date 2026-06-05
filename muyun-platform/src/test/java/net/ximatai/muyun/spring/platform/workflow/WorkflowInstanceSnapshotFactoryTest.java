@@ -27,6 +27,18 @@ class WorkflowInstanceSnapshotFactoryTest {
                     assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
                     assertThat(node.getNodeRunId()).endsWith(":1");
                 });
+        assertThat(snapshot.nodes()).filteredOn(node -> "approve".equals(node.getNodeKey()))
+                .first()
+                .satisfies(node -> {
+                    assertThat(node.getAllowReject()).isTrue();
+                    assertThat(node.getRequireRejectReason()).isTrue();
+                    assertThat(node.getAllowRejectReturnToMe()).isTrue();
+                    assertThat(node.getAllowRollback()).isFalse();
+                    assertThat(node.getRequireRollbackReason()).isTrue();
+                    assertThat(node.getAllowTerminate()).isTrue();
+                    assertThat(node.getRequireTerminateReason()).isTrue();
+                    assertThat(node.getAllowAddSign()).isTrue();
+                });
         assertThat(snapshot.routes()).hasSize(1)
                 .first()
                 .satisfies(route -> {
@@ -63,6 +75,16 @@ class WorkflowInstanceSnapshotFactoryTest {
         WorkflowNodeDefinition node = new WorkflowNodeDefinition();
         node.setNodeKey(key);
         node.setNodeType(type);
+        if ("approve".equals(key)) {
+            node.setAllowReject(Boolean.TRUE);
+            node.setRequireRejectReason(Boolean.TRUE);
+            node.setAllowRejectReturnToMe(Boolean.TRUE);
+            node.setAllowRollback(Boolean.FALSE);
+            node.setRequireRollbackReason(Boolean.TRUE);
+            node.setAllowTerminate(Boolean.TRUE);
+            node.setRequireTerminateReason(Boolean.TRUE);
+            node.setAllowAddSign(Boolean.TRUE);
+        }
         return node;
     }
 

@@ -41,6 +41,31 @@ public class WorkflowNodeDefinition extends StandardSortableEntity {
     @Column(name = "task_definition_id", type = ColumnType.VARCHAR, length = 32, comment = "Task definition id")
     private String taskDefinitionId;
 
+    @Column(name = "allow_reject", type = ColumnType.BOOLEAN, comment = "Allow reject")
+    private Boolean allowReject;
+
+    @Column(name = "require_reject_reason", type = ColumnType.BOOLEAN, comment = "Require reject reason")
+    private Boolean requireRejectReason;
+
+    @Column(name = "allow_reject_return_to_me", type = ColumnType.BOOLEAN,
+            comment = "Allow reject return to me")
+    private Boolean allowRejectReturnToMe;
+
+    @Column(name = "allow_rollback", type = ColumnType.BOOLEAN, comment = "Allow rollback")
+    private Boolean allowRollback;
+
+    @Column(name = "require_rollback_reason", type = ColumnType.BOOLEAN, comment = "Require rollback reason")
+    private Boolean requireRollbackReason;
+
+    @Column(name = "allow_terminate", type = ColumnType.BOOLEAN, comment = "Allow terminate")
+    private Boolean allowTerminate;
+
+    @Column(name = "require_terminate_reason", type = ColumnType.BOOLEAN, comment = "Require terminate reason")
+    private Boolean requireTerminateReason;
+
+    @Column(name = "allow_add_sign", type = ColumnType.BOOLEAN, comment = "Allow add sign")
+    private Boolean allowAddSign;
+
     @Column(name = "participant_policy_text", type = ColumnType.TEXT, comment = "Participant policy")
     private String participantPolicyText;
 

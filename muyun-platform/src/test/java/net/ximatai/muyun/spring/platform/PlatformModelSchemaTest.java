@@ -182,7 +182,10 @@ class PlatformModelSchemaTest {
                         "published_by", "published_at");
         assertThat(columnNames(mapper.toTable(WorkflowNodeDefinition.class)))
                 .contains("id", "workflow_version_id", "node_key", "node_type", "approval_mode",
-                        "milestone_type", "converge_mode", "converge_ratio", "task_definition_id", "participant_policy_text",
+                        "milestone_type", "converge_mode", "converge_ratio", "task_definition_id",
+                        "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
+                        "allow_rollback", "require_rollback_reason", "allow_terminate",
+                        "require_terminate_reason", "allow_add_sign", "participant_policy_text",
                         "node_config_text", "sort_order");
         assertThat(columnNames(mapper.toTable(WorkflowLinkDefinition.class)))
                 .contains("id", "workflow_version_id", "route_key", "source_node_key", "target_node_key",
@@ -214,6 +217,9 @@ class PlatformModelSchemaTest {
                         "required_route_count", "arrived_route_count", "completed_route_count",
                         "required_task_count", "completed_task_count", "approved_task_count",
                         "rejected_task_count", "rollback_target_node_key",
+                        "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
+                        "allow_rollback", "require_rollback_reason", "allow_terminate",
+                        "require_terminate_reason", "allow_add_sign",
                         "overtime_status", "activated_at", "completed_at",
                         "node_snapshot_text");
         assertThat(columnNames(mapper.toTable(WorkflowRouteInstance.class)))

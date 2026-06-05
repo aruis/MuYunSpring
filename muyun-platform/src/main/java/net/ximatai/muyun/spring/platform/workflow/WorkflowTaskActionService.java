@@ -115,10 +115,13 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireTaskOperator(task, "reject", operatorId, request.reason());
+        actionPolicyService.requireNodeTaskAction(task, node, "reject", operatorId, request.reason());
         WorkflowRejectResubmitMode resubmitMode = request.rejectResubmitMode() == null
                 ? WorkflowRejectResubmitMode.RESTART
                 : request.rejectResubmitMode();
+        if (resubmitMode == WorkflowRejectResubmitMode.RETURN_TO_ME) {
+            actionPolicyService.requireRejectReturnToMe(node);
+        }
         task.setTaskStatus(WorkflowTaskStatus.REJECTED);
         task.setActualProcessorId(operatorId);
         task.setDecision("reject");
@@ -172,7 +175,7 @@ public class WorkflowTaskActionService {
         }
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireTaskOperator(task, "rollback", operatorId, request.reason());
+        actionPolicyService.requireNodeTaskAction(task, currentNode, "rollback", operatorId, request.reason());
         RollbackTarget target = previousApprovalNode(instance.getId(), currentNode);
         rejectRollbackWithOtherActiveNodes(instance.getId(), task);
 
@@ -333,7 +336,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireTaskOperator(task, "transfer", operatorId, request.reason());
+        actionPolicyService.requireTaskOperator(task, "transfer", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.TRANSFERRED);
         task.setTransferredBy(operatorId);
         task.setTransferredAt(now);
@@ -357,7 +360,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireTaskOperator(task, "invalidate", operatorId, request.reason());
+        actionPolicyService.requireTaskOperator(task, "invalidate", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.INVALIDATED);
         task.setActualProcessorId(operatorId);
         task.setDecision("invalidate");
@@ -375,7 +378,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireTaskOperator(task, "cancel", operatorId, request.reason());
+        actionPolicyService.requireTaskOperator(task, "cancel", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.CANCELED);
         task.setActualProcessorId(operatorId);
         task.setDecision("cancel");
