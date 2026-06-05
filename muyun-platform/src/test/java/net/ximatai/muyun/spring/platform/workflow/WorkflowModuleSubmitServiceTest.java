@@ -17,9 +17,25 @@ class WorkflowModuleSubmitServiceTest {
     }
 
     @Test
+    void shouldPassSelectedRouteForApprovalSubmit() {
+        service.submitApproval("sales.contract", "record-1", "leftRoute", "choose left");
+
+        verify(submitFacade).submit(WorkflowSubmitRequest.approval("sales.contract", "record-1")
+                .withSelectedRoute("leftRoute", "choose left"));
+    }
+
+    @Test
     void shouldSubmitWorkflowByDefinitionAliasThroughPlatformFacade() {
         service.submitWorkflow("sales.contract", "record-1", "sync");
 
         verify(submitFacade).submit(WorkflowSubmitRequest.workflow("sales.contract", "record-1", "sync"));
+    }
+
+    @Test
+    void shouldPassSelectedRouteForWorkflowSubmit() {
+        service.submitWorkflow("sales.contract", "record-1", "sync", "leftRoute", "choose left");
+
+        verify(submitFacade).submit(WorkflowSubmitRequest.workflow("sales.contract", "record-1", "sync")
+                .withSelectedRoute("leftRoute", "choose left"));
     }
 }

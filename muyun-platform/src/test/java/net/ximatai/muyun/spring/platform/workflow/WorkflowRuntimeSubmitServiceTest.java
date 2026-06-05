@@ -48,17 +48,32 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
         when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"))).thenReturn(draft);
+                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
 
         WorkflowSubmitDraft result = service.submit(definition, version, List.of(), List.of(),
                 "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
 
         assertThat(result).isEqualTo(draft);
         verify(draftService).build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"));
+                Instant.parse("2026-06-05T01:00:00Z"), null, null);
         verify(instanceDao).insert(draft.instance());
         verify(instanceService).beforeInsert(draft.instance());
         verifyNoMoreInteractions(draftService);
+    }
+
+    @Test
+    void shouldPassSelectedRouteToSubmitDraftBuild() {
+        WorkflowDefinition definition = new WorkflowDefinition();
+        WorkflowVersion version = new WorkflowVersion();
+        WorkflowSubmitDraft draft = draft();
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left")).thenReturn(draft);
+
+        service.submit(definition, version, List.of(), List.of(), "record-1", "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left");
+
+        verify(draftService).build(definition, version, List.of(), List.of(), "record-1", "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left");
     }
 
     @Test
@@ -71,7 +86,7 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
         when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"))).thenReturn(draft);
+                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
 
         pluginService.submit(definition, version, List.of(), List.of(),
                 "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
@@ -108,7 +123,7 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
         when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"))).thenReturn(draft);
+                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> pluginService.submit(definition, version,
                         List.of(), List.of(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))

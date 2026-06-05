@@ -59,8 +59,22 @@ public class WorkflowRuntimeSubmitService {
                                       String recordId,
                                       String operatorId,
                                       Instant operatedAt) {
+        return submit(definition, version, nodeDefinitions, linkDefinitions, recordId, operatorId, operatedAt,
+                null, null);
+    }
+
+    @Transactional
+    public WorkflowSubmitDraft submit(WorkflowDefinition definition,
+                                      WorkflowVersion version,
+                                      java.util.List<WorkflowNodeDefinition> nodeDefinitions,
+                                      java.util.List<WorkflowLinkDefinition> linkDefinitions,
+                                      String recordId,
+                                      String operatorId,
+                                      Instant operatedAt,
+                                      String selectedRouteKey,
+                                      String selectedReason) {
         WorkflowSubmitDraft draft = submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
-                recordId, operatorId, operatedAt);
+                recordId, operatorId, operatedAt, selectedRouteKey, selectedReason);
         dispatchSubmit(draft, WorkflowRuntimePluginEventType.BEFORE_SUBMIT, operatorId);
         persist(draft, operatedAt);
         dispatchSubmit(draft, WorkflowRuntimePluginEventType.AFTER_SUBMIT, operatorId);
@@ -76,8 +90,23 @@ public class WorkflowRuntimeSubmitService {
                                       String authOrgId,
                                       String operatorId,
                                       Instant operatedAt) {
+        return submit(definition, version, nodeDefinitions, linkDefinitions, recordId, authOrgId, operatorId,
+                operatedAt, null, null);
+    }
+
+    @Transactional
+    public WorkflowSubmitDraft submit(WorkflowDefinition definition,
+                                      WorkflowVersion version,
+                                      java.util.List<WorkflowNodeDefinition> nodeDefinitions,
+                                      java.util.List<WorkflowLinkDefinition> linkDefinitions,
+                                      String recordId,
+                                      String authOrgId,
+                                      String operatorId,
+                                      Instant operatedAt,
+                                      String selectedRouteKey,
+                                      String selectedReason) {
         WorkflowSubmitDraft draft = submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
-                recordId, authOrgId, operatorId, operatedAt);
+                recordId, authOrgId, operatorId, operatedAt, selectedRouteKey, selectedReason);
         dispatchSubmit(draft, WorkflowRuntimePluginEventType.BEFORE_SUBMIT, operatorId);
         persist(draft, operatedAt);
         dispatchSubmit(draft, WorkflowRuntimePluginEventType.AFTER_SUBMIT, operatorId);

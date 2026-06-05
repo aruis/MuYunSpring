@@ -47,7 +47,9 @@ public class WorkflowSubmitFacade {
                 selection.links(),
                 normalized.recordId(),
                 normalized.operatorId(),
-                normalized.operatedAt())
+                normalized.operatedAt(),
+                normalized.selectedRouteKey(),
+                normalized.selectedReason())
                 : runtimeSubmitService.submit(
                 selection.definition(),
                 selection.version(),
@@ -56,7 +58,9 @@ public class WorkflowSubmitFacade {
                 normalized.recordId(),
                 normalized.authOrgId(),
                 normalized.operatorId(),
-                normalized.operatedAt());
+                normalized.operatedAt(),
+                normalized.selectedRouteKey(),
+                normalized.selectedReason());
         boolean written = writeApprovalSummaryIfNeeded(normalized, draft);
         return new WorkflowSubmitResult(draft, written);
     }
@@ -96,8 +100,10 @@ public class WorkflowSubmitFacade {
         if (authOrgId != null && authOrgId.isBlank()) {
             authOrgId = null;
         }
+        String selectedRouteKey = textOrNull(request.selectedRouteKey());
+        String selectedReason = textOrNull(request.selectedReason());
         return new WorkflowSubmitRequest(moduleAlias, recordId, request.approvalRequired(),
-                request.definitionAlias(), authOrgId, operatorId, operatedAt);
+                request.definitionAlias(), authOrgId, operatorId, operatedAt, selectedRouteKey, selectedReason);
     }
 
     private String requireText(String value, String name) {
@@ -105,5 +111,9 @@ public class WorkflowSubmitFacade {
             throw new PlatformException(name + " must not be blank");
         }
         return value;
+    }
+
+    private String textOrNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

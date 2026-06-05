@@ -31,7 +31,7 @@ class WorkflowSubmitFacadeTest {
         WorkflowSubmitDraft draft = draft(true);
         when(selector.select(request)).thenReturn(selection);
         when(runtimeSubmitService.submit(selection.definition(), selection.version(), selection.nodes(),
-                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"), null, null))
                 .thenReturn(draft);
 
         WorkflowSubmitResult result = facade.submit(request);
@@ -42,7 +42,7 @@ class WorkflowSubmitFacadeTest {
         order.verify(recordGuard).beforeSubmit(request);
         order.verify(selector).select(request);
         order.verify(runtimeSubmitService).submit(selection.definition(), selection.version(), selection.nodes(),
-                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"), null, null);
         var captor = forClass(WorkflowApprovalSummary.class);
         verify(writer).writeSubmitted(captor.capture());
         assertThat(captor.getValue().approvalInstanceId()).isEqualTo("instance-1");
@@ -60,13 +60,39 @@ class WorkflowSubmitFacadeTest {
         WorkflowSubmitDraft draft = draft(false);
         when(selector.select(request)).thenReturn(selection);
         when(runtimeSubmitService.submit(selection.definition(), selection.version(), selection.nodes(),
-                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"), null, null))
                 .thenReturn(draft);
 
         WorkflowSubmitResult result = facade.submit(request);
 
         assertThat(result.approvalSummaryWritten()).isFalse();
         verifyNoInteractions(writer);
+    }
+
+    @Test
+    void shouldNormalizeAndPassSubmitRouteSelection() {
+        WorkflowSubmitRequest request = WorkflowSubmitRequest.workflow("sales.contract", "record-1", "sync")
+                .withOperator("user-1")
+                .withOperatedAt(Instant.parse("2026-06-05T01:00:00Z"))
+                .withSelectedRoute(" leftRoute ", " choose left ");
+        WorkflowDefinitionSelection selection = selection(false);
+        WorkflowSubmitDraft draft = draft(false);
+        WorkflowSubmitRequest normalized = WorkflowSubmitRequest.workflow("sales.contract", "record-1", "sync")
+                .withOperator("user-1")
+                .withOperatedAt(Instant.parse("2026-06-05T01:00:00Z"))
+                .withSelectedRoute(" leftRoute ", " choose left ");
+        when(selector.select(normalized)).thenReturn(selection);
+        when(runtimeSubmitService.submit(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                " leftRoute ", " choose left "))
+                .thenReturn(draft);
+
+        WorkflowSubmitResult result = facade.submit(request);
+
+        assertThat(result.draft()).isEqualTo(draft);
+        verify(runtimeSubmitService).submit(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                " leftRoute ", " choose left ");
     }
 
     private WorkflowDefinitionSelection selection(boolean approvalEnabled) {

@@ -14,7 +14,19 @@ public class WorkflowModuleSubmitService {
         return submitFacade.submit(WorkflowSubmitRequest.approval(moduleAlias, recordId));
     }
 
+    public WorkflowSubmitResult submitApproval(String moduleAlias, String recordId,
+                                               String selectedRouteKey, String selectedReason) {
+        return submitFacade.submit(WorkflowSubmitRequest.approval(moduleAlias, recordId)
+                .withSelectedRoute(selectedRouteKey, selectedReason));
+    }
+
     public WorkflowSubmitResult submitWorkflow(String moduleAlias, String recordId, String definitionAlias) {
         return submitFacade.submit(WorkflowSubmitRequest.workflow(moduleAlias, recordId, definitionAlias));
+    }
+
+    public WorkflowSubmitResult submitWorkflow(String moduleAlias, String recordId, String definitionAlias,
+                                               String selectedRouteKey, String selectedReason) {
+        return submitFacade.submit(WorkflowSubmitRequest.workflow(moduleAlias, recordId, definitionAlias)
+                .withSelectedRoute(selectedRouteKey, selectedReason));
     }
 }

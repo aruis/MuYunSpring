@@ -33,9 +33,23 @@ class DynamicWorkflowActionExecutorTest {
 
         Object result = executor.execute(context("submitApproval", "record-1"), request);
 
-        verify(submitService).submitApproval("sales.contract", "record-1");
+        verify(submitService).submitApproval("sales.contract", "record-1", null, null);
         assertThat(result).isInstanceOf(DynamicActionResultBody.class);
         assertThat(((DynamicActionResultBody) result).refresh()).isTrue();
+    }
+
+    @Test
+    void shouldMapSelectedDirectLinkKeyAliasForApprovalSubmit() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
+                .withPayload(Map.of(
+                        "workflowAction", "submitApproval",
+                        "selectedDirectLinkKey", "leftRoute",
+                        "selectedReason", "choose left"
+                ));
+
+        executor.execute(context("submitApproval", "record-1"), request);
+
+        verify(submitService).submitApproval("sales.contract", "record-1", "leftRoute", "choose left");
     }
 
     @Test
@@ -45,7 +59,7 @@ class DynamicWorkflowActionExecutorTest {
 
         executor.execute(context("submitWorkflow", "record-1"), request);
 
-        verify(submitService).submitWorkflow("sales.contract", "record-1", "sync");
+        verify(submitService).submitWorkflow("sales.contract", "record-1", "sync", null, null);
     }
 
     @Test
@@ -68,7 +82,7 @@ class DynamicWorkflowActionExecutorTest {
 
         executor.execute(context("syncWorkflow", "record-1"), request);
 
-        verify(submitService).submitWorkflow("sales.contract", "record-1", "sync");
+        verify(submitService).submitWorkflow("sales.contract", "record-1", "sync", null, null);
     }
 
     @Test

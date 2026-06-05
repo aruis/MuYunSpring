@@ -46,10 +46,12 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                 "workflow action code must not be blank");
         return switch (workflowAction) {
             case ACTION_SUBMIT_APPROVAL -> DynamicActionResultBody.refreshed(
-                    submitService.submitApproval(moduleAlias(context), recordId(context, request)));
+                    submitService.submitApproval(moduleAlias(context), recordId(context, request),
+                            selectedRouteKey(request), text(payload(request, "selectedReason"), null)));
             case ACTION_SUBMIT_WORKFLOW -> DynamicActionResultBody.refreshed(
                     submitService.submitWorkflow(moduleAlias(context), recordId(context, request),
-                            workflowDefinitionAlias(context, request)));
+                            workflowDefinitionAlias(context, request), selectedRouteKey(request),
+                            text(payload(request, "selectedReason"), null)));
             case ACTION_TASK_ACTION -> DynamicActionResultBody.refreshed(taskActionFacade.execute(
                     requireText(payload(request, "taskActionCode"), "workflow task action code must not be blank"),
                     taskRequest(request)));
@@ -68,7 +70,8 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
             throw new PlatformException("unsupported dynamic workflow action: " + workflowAction);
         }
         return DynamicActionResultBody.refreshed(
-                submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias));
+                submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias,
+                        selectedRouteKey(request), text(payload(request, "selectedReason"), null)));
     }
 
     private String workflowDefinitionAlias(DynamicActionExecutionContext context,

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WorkflowSubmitDraftServiceTest {
     private final WorkflowRuntimeEventFactory eventFactory = new WorkflowRuntimeEventFactory();
@@ -16,6 +17,7 @@ class WorkflowSubmitDraftServiceTest {
             instanceStateService,
             new WorkflowNodeInstanceStateService(),
             new WorkflowRouteInstanceStateService(),
+            new WorkflowRouteRuntimeService(),
             new WorkflowRuntimeTaskFactory(eventFactory)
     );
 
@@ -62,6 +64,51 @@ class WorkflowSubmitDraftServiceTest {
         assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("leftRoute"))
                 .first()
                 .satisfies(route -> assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANDIDATE));
+    }
+
+    @Test
+    void shouldUseSelectedRouteKeyForReachableInitialBranch() {
+        WorkflowSubmitDraft draft = service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        node("branch", WorkflowNodeType.BRANCH),
+                        node("leftTask", WorkflowNodeType.TASK),
+                        node("rightTask", WorkflowNodeType.TASK)),
+                List.of(link("toBranch", "start", "branch"),
+                        link("leftRoute", "branch", "leftTask"),
+                        defaultLink("rightRoute", "branch", "rightTask")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", "choose left");
+
+        assertThat(draft.activation().traversedRouteKeys()).containsExactly("toBranch", "leftRoute");
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("leftRoute"))
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+                    assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+                    assertThat(route.getSelectedBy()).isEqualTo("user-1");
+                });
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("rightRoute"))
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
+                    assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+                });
+    }
+
+    @Test
+    void shouldRejectSelectedRouteKeyWhenSubmitActivationCannotReachBranch() {
+        assertThatThrownBy(() -> service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        node("approve", WorkflowNodeType.APPROVAL),
+                        node("branch", WorkflowNodeType.BRANCH),
+                        node("leftTask", WorkflowNodeType.TASK)),
+                List.of(link("toApprove", "start", "approve"),
+                        link("toBranch", "approve", "branch"),
+                        link("leftRoute", "branch", "leftTask")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", null))
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("selected route is not candidate outgoing route");
     }
 
     @Test

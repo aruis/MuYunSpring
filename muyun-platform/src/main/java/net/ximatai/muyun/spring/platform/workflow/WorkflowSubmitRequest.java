@@ -9,7 +9,9 @@ public record WorkflowSubmitRequest(
         String definitionAlias,
         String authOrgId,
         String operatorId,
-        Instant operatedAt
+        Instant operatedAt,
+        String selectedRouteKey,
+        String selectedReason
 ) {
     public WorkflowSubmitRequest(String moduleAlias,
                                  String recordId,
@@ -17,29 +19,44 @@ public record WorkflowSubmitRequest(
                                  String definitionAlias,
                                  String operatorId,
                                  Instant operatedAt) {
-        this(moduleAlias, recordId, approvalRequired, definitionAlias, null, operatorId, operatedAt);
+        this(moduleAlias, recordId, approvalRequired, definitionAlias, null, operatorId, operatedAt, null, null);
+    }
+
+    public WorkflowSubmitRequest(String moduleAlias,
+                                 String recordId,
+                                 boolean approvalRequired,
+                                 String definitionAlias,
+                                 String authOrgId,
+                                 String operatorId,
+                                 Instant operatedAt) {
+        this(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId, operatorId, operatedAt, null, null);
     }
 
     public static WorkflowSubmitRequest approval(String moduleAlias, String recordId) {
-        return new WorkflowSubmitRequest(moduleAlias, recordId, true, null, null, null, null);
+        return new WorkflowSubmitRequest(moduleAlias, recordId, true, null, null, null, null, null, null);
     }
 
     public static WorkflowSubmitRequest workflow(String moduleAlias, String recordId, String definitionAlias) {
-        return new WorkflowSubmitRequest(moduleAlias, recordId, false, definitionAlias, null, null, null);
+        return new WorkflowSubmitRequest(moduleAlias, recordId, false, definitionAlias, null, null, null, null, null);
     }
 
     public WorkflowSubmitRequest withOperator(String operatorId) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt);
+                operatorId, operatedAt, selectedRouteKey, selectedReason);
     }
 
     public WorkflowSubmitRequest withAuthOrgId(String authOrgId) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt);
+                operatorId, operatedAt, selectedRouteKey, selectedReason);
     }
 
     public WorkflowSubmitRequest withOperatedAt(Instant operatedAt) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt);
+                operatorId, operatedAt, selectedRouteKey, selectedReason);
+    }
+
+    public WorkflowSubmitRequest withSelectedRoute(String selectedRouteKey, String selectedReason) {
+        return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
+                operatorId, operatedAt, selectedRouteKey, selectedReason);
     }
 }

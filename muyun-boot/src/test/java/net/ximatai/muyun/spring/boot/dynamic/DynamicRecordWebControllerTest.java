@@ -708,7 +708,10 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "syncWorkflow", "contract-1")
                         .contentType("application/json")
-                        .content(json(Map.of())))
+                        .content(json(Map.of("payload", Map.of(
+                                "selectedDirectLinkKey", "leftRoute",
+                                "selectedReason", "choose left"
+                        )))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.context.actionCode").value("syncWorkflow"))
                 .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
@@ -719,6 +722,8 @@ class DynamicRecordWebControllerTest {
         ArgumentCaptor<DynamicActionExecutionRequest> request = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
         verify(service).executeAction(eq(MODULE), eq("syncWorkflow"), request.capture());
         assertThat(request.getValue().recordId()).isEqualTo("contract-1");
+        assertThat(request.getValue().payload()).containsEntry("selectedDirectLinkKey", "leftRoute")
+                .containsEntry("selectedReason", "choose left");
     }
 
     @Test
