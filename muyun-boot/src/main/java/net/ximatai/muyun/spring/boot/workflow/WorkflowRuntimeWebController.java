@@ -22,6 +22,13 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskAvailableAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchCard;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchQueryRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchSort;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +38,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/workflow/runtime")
@@ -104,7 +114,7 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.todoCards(operatorId(normalized.operatorId()),
-                page(normalized.page())));
+                page(normalized.page()), normalized.toQueryRequest()));
     }
 
     @PostMapping("/workbench/done/query")
@@ -112,7 +122,7 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.doneCards(operatorId(normalized.operatorId()),
-                page(normalized.page())));
+                page(normalized.page()), normalized.toQueryRequest()));
     }
 
     @PostMapping("/workbench/notice/query")
@@ -120,7 +130,7 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.noticeCards(operatorId(normalized.operatorId()),
-                page(normalized.page())));
+                page(normalized.page()), normalized.toQueryRequest()));
     }
 
     @PostMapping("/workbench/tracking/query")
@@ -128,7 +138,15 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.trackingCards(operatorId(normalized.operatorId()),
-                page(normalized.page())));
+                page(normalized.page()), normalized.toQueryRequest()));
+    }
+
+    @PostMapping("/workbench/delegation/query")
+    public WebListResponse<WorkflowWorkbenchCard> delegationCards(
+            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+        WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
+        return new WebListResponse<>(runtimeReadFacade.delegationCards(operatorId(normalized.operatorId()),
+                page(normalized.page()), normalized.toQueryRequest()));
     }
 
     @GetMapping("/task/{taskId}/module-task/prepare")
@@ -152,7 +170,7 @@ public class WorkflowRuntimeWebController {
     }
 
     private WorkflowWorkbenchWebRequest normalizeWorkbenchRequest(WorkflowWorkbenchWebRequest request) {
-        return request == null ? new WorkflowWorkbenchWebRequest(null, WebPageRequest.DEFAULT) : request;
+        return request == null ? WorkflowWorkbenchWebRequest.empty() : request;
     }
 
     private PageRequest page(WebPageRequest request) {
@@ -201,7 +219,43 @@ record WorkflowTaskActionWebRequest(String operatorId,
                                     String reason) {
 }
 
-record WorkflowWorkbenchWebRequest(String operatorId, WebPageRequest page) {
+record WorkflowWorkbenchWebRequest(
+        String operatorId,
+        WebPageRequest page,
+        String moduleAlias,
+        String recordId,
+        String definitionId,
+        String workflowVersionId,
+        String definitionVersionId,
+        WorkflowInstanceStatus instanceStatus,
+        String nodeKey,
+        WorkflowTaskKind taskKind,
+        WorkflowTaskStatus taskStatus,
+        WorkflowAssignmentKind assignmentKind,
+        WorkflowOvertimeStatus overtimeStatus,
+        Instant startedFrom,
+        Instant startedTo,
+        Instant receivedFrom,
+        Instant receivedTo,
+        Instant completedFrom,
+        Instant completedTo,
+        Instant lastOperatedFrom,
+        Instant lastOperatedTo,
+        Instant dueFrom,
+        Instant dueTo,
+        List<WorkflowWorkbenchSort> sorts) {
+    static WorkflowWorkbenchWebRequest empty() {
+        return new WorkflowWorkbenchWebRequest(null, WebPageRequest.DEFAULT, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of());
+    }
+
+    WorkflowWorkbenchQueryRequest toQueryRequest() {
+        return new WorkflowWorkbenchQueryRequest(moduleAlias, recordId, definitionId, workflowVersionId,
+                definitionVersionId, instanceStatus, nodeKey, taskKind, taskStatus, assignmentKind, overtimeStatus,
+                startedFrom, startedTo, receivedFrom, receivedTo, completedFrom, completedTo, lastOperatedFrom,
+                lastOperatedTo, dueFrom, dueTo, sorts);
+    }
 }
 
 record WorkflowModuleTaskContinueWebRequest(String operatorId, String reason) {

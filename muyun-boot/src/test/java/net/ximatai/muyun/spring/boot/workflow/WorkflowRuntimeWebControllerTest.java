@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskAvailableAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskDefinition;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchQueryRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchCard;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,30 +124,53 @@ class WorkflowRuntimeWebControllerTest {
     @Test
     void shouldQueryWorkbenchCardsWithNormalizedPageAndCurrentUserFallback() throws Exception {
         WorkflowWorkbenchCard card = new WorkflowWorkbenchCard("TODO", "inst-1", "crm.contract", "record-1",
-                WorkflowInstanceStatus.RUNNING, WorkflowApprovalStatus.PROCESSING, "task-1",
+                "def-1", "ver-1", WorkflowInstanceStatus.RUNNING, WorkflowApprovalStatus.PROCESSING, "task-1",
                 WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, "visit", "visit", List.of("user-1"),
-                null, null, null, null, null, null, null, null, "user-1", Boolean.TRUE);
+                null, null, null, null, null, null, null, null, null, null, "user-1", Boolean.TRUE, null, null);
         ArgumentCaptor<PageRequest> pageCaptor = ArgumentCaptor.forClass(PageRequest.class);
-        when(runtimeReadFacade.todoCards(eq("user-1"), pageCaptor.capture())).thenReturn(List.of(card));
+        ArgumentCaptor<WorkflowWorkbenchQueryRequest> queryCaptor =
+                ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
+        when(runtimeReadFacade.todoCards(eq("user-1"), pageCaptor.capture(), queryCaptor.capture()))
+                .thenReturn(List.of(card));
 
         mvc.perform(post("/workflow/runtime/workbench/todo/query")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"page\":{\"pageNum\":2,\"pageSize\":30}}"))
+                        .content("""
+                                {
+                                  "page": {"pageNum": 2, "pageSize": 30},
+                                  "moduleAlias": "crm.contract",
+                                  "nodeKey": "visit",
+                                  "sorts": [
+                                    {"field": "receivedAt", "direction": "ASC"}
+                                  ]
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].boardType").value("TODO"))
                 .andExpect(jsonPath("$.records[0].taskId").value("task-1"));
 
         assertThat(pageCaptor.getValue().getOffset()).isEqualTo(30);
         assertThat(pageCaptor.getValue().getLimit()).isEqualTo(30);
+        assertThat(queryCaptor.getValue().moduleAlias()).isEqualTo("crm.contract");
+        assertThat(queryCaptor.getValue().nodeKey()).isEqualTo("visit");
+        assertThat(queryCaptor.getValue().sorts().getFirst().field()).isEqualTo("receivedAt");
     }
 
     @Test
     void shouldExposeDoneNoticeAndTrackingWorkbenchBoards() throws Exception {
-        when(runtimeReadFacade.doneCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class)))
+        when(runtimeReadFacade.doneCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+                org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class)))
+        when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+                org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.trackingCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class)))
+        when(runtimeReadFacade.delegationCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+                org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
+                .thenReturn(List.of());
+        ArgumentCaptor<WorkflowWorkbenchQueryRequest> trackingQueryCaptor =
+                ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
+        when(runtimeReadFacade.trackingCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+                trackingQueryCaptor.capture()))
                 .thenReturn(List.of());
 
         String request = "{\"operatorId\":\"operator-1\"}";
@@ -162,9 +186,16 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(jsonPath("$.records").isArray());
         mvc.perform(post("/workflow/runtime/workbench/tracking/query")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\",\"instanceStatus\":\"RUNNING\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records").isArray());
+        mvc.perform(post("/workflow/runtime/workbench/delegation/query")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records").isArray());
+
+        assertThat(trackingQueryCaptor.getValue().instanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
     }
 
     @Test

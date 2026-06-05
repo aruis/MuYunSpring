@@ -107,6 +107,81 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldFilterWorkbenchCardsByStableRequestFields() {
+        WorkflowTask matching = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        matching.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowTask skipped = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        skipped.setInstanceId("instance-2");
+        skipped.setNodeInstanceId("node-2");
+        skipped.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowInstance matchingInstance = instance("instance-1");
+        matchingInstance.setDefinitionId("definition-1");
+        matchingInstance.setWorkflowVersionId("version-1");
+        matchingInstance.setStartedAt(Instant.parse("2026-06-05T00:00:00Z"));
+        WorkflowInstance skippedInstance = instance("instance-2");
+        skippedInstance.setModuleAlias("sales.order");
+        skippedInstance.setRecordId("record-2");
+        skippedInstance.setDefinitionId("definition-2");
+        skippedInstance.setWorkflowVersionId("version-2");
+        WorkflowNodeInstance matchingNode = node("node-1", "visit");
+        matchingNode.setOvertimeStatus(WorkflowOvertimeStatus.WARNED);
+        WorkflowNodeInstance skippedNode = node("node-2", "approve");
+        skippedNode.setOvertimeStatus(WorkflowOvertimeStatus.NORMAL);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(matching, skipped));
+        when(instanceDao.findById("instance-1")).thenReturn(matchingInstance);
+        when(instanceDao.findById("instance-2")).thenReturn(skippedInstance);
+        when(nodeDao.findById("node-1")).thenReturn(matchingNode);
+        when(nodeDao.findById("node-2")).thenReturn(skippedNode);
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest("sales.contract", "record-1",
+                "definition-1", "version-1", null, WorkflowInstanceStatus.RUNNING, "visit",
+                WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, WorkflowAssignmentKind.NORMAL,
+                WorkflowOvertimeStatus.WARNED, Instant.parse("2026-06-04T00:00:00Z"),
+                Instant.parse("2026-06-06T00:00:00Z"), Instant.parse("2026-06-05T00:00:00Z"),
+                Instant.parse("2026-06-05T02:00:00Z"), null, null, null, null, null, null, List.of());
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().taskId()).isEqualTo("task-1");
+        assertThat(cards.getFirst().definitionId()).isEqualTo("definition-1");
+        assertThat(cards.getFirst().workflowVersionId()).isEqualTo("version-1");
+        assertThat(cards.getFirst().startedAt()).isEqualTo(Instant.parse("2026-06-05T00:00:00Z"));
+    }
+
+    @Test
+    void shouldSortWorkbenchCardsByWhitelistedField() {
+        WorkflowTask earlier = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        earlier.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowTask later = task("task-2", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        later.setCreatedAt(Instant.parse("2026-06-05T03:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(later, earlier));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "visit"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("receivedAt", WorkflowSortDirection.ASC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId).containsExactly("task-1", "task-2");
+    }
+
+    @Test
+    void shouldRejectUnsupportedWorkbenchSortField() {
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of());
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("rawSql", WorkflowSortDirection.ASC)));
+
+        assertThatThrownBy(() -> facade.todoCards("user-1", PageRequest.of(1, 20), request))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unsupported workflow workbench sort field");
+    }
+
+    @Test
     void shouldBuildTodoWorkbenchCardForPrincipalCanProcessDelegatedTask() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
@@ -130,6 +205,7 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(cards.getFirst().delegatedToUserId()).isEqualTo("delegate-1");
         assertThat(cards.getFirst().principalCanProcess()).isTrue();
         assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("delegate-1", "principal-1");
+        assertThat(cards.getFirst().delegationTaskCount()).isNull();
     }
 
     @Test
@@ -146,6 +222,26 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(cards.getFirst().boardType()).isEqualTo("TRACKING");
         assertThat(cards.getFirst().taskId()).isNull();
         assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("user-1");
+    }
+
+    @Test
+    void shouldBuildDelegationWorkbenchCardsWithDelegationTaskCount() {
+        WorkflowTask first = delegatedTask("task-1", "delegate-1");
+        first.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowTask second = delegatedTask("task-2", "delegate-2");
+        second.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(first, second));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+
+        List<WorkflowWorkbenchCard> cards = facade.delegationCards("principal-1", PageRequest.of(1, 20));
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().boardType()).isEqualTo("DELEGATION");
+        assertThat(cards.getFirst().delegationTaskCount()).isEqualTo(2);
+        assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("delegate-1", "delegate-2");
+        assertThat(cards.getFirst().delegatedFromUserId()).isEqualTo("principal-1");
     }
 
     @Test
@@ -170,6 +266,8 @@ class WorkflowRuntimeReadFacadeTest {
     private WorkflowInstance instance(String id) {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId(id);
+        instance.setDefinitionId("definition-1");
+        instance.setWorkflowVersionId("version-1");
         instance.setModuleAlias("sales.contract");
         instance.setRecordId("record-1");
         instance.setStartedBy("starter-1");
@@ -190,6 +288,18 @@ class WorkflowRuntimeReadFacadeTest {
         task.setAssigneeId("user-1");
         task.setOriginalAssigneeId("user-1");
         task.setAssignmentKind(WorkflowAssignmentKind.NORMAL);
+        return task;
+    }
+
+    private WorkflowTask delegatedTask(String id, String delegateId) {
+        WorkflowTask task = task(id, WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setOriginalAssigneeId("principal-1");
+        task.setAssigneeId(delegateId);
+        task.setDelegatedFromUserId("principal-1");
+        task.setDelegatedToUserId(delegateId);
+        task.setPrincipalCanProcess(false);
+        task.setDelegationPolicyId("delegation-1");
         return task;
     }
 

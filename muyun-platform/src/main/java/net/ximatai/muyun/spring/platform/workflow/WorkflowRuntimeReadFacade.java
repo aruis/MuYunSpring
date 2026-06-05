@@ -108,6 +108,11 @@ public class WorkflowRuntimeReadFacade {
     }
 
     public List<WorkflowWorkbenchCard> todoCards(String assigneeId, PageRequest pageRequest) {
+        return todoCards(assigneeId, pageRequest, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public List<WorkflowWorkbenchCard> todoCards(String assigneeId, PageRequest pageRequest,
+                                                 WorkflowWorkbenchQueryRequest request) {
         String validAssigneeId = requireText(assigneeId, "workflow assignee id must not be blank");
         List<WorkflowTask> tasks = taskDao.query(Criteria.of()
                         .eq("taskStatus", WorkflowTaskStatus.TODO)
@@ -116,40 +121,86 @@ public class WorkflowRuntimeReadFacade {
                 ALL, Sort.asc("dueAt"), Sort.desc("createdAt")).stream()
                 .filter(task -> assignmentPolicyService.canSeeTodo(task, validAssigneeId))
                 .toList();
-        tasks = pageItems(tasks, page(pageRequest));
-        return cards("TODO", tasks);
+        return pageItems(cards("TODO", tasks, request), page(pageRequest));
     }
 
     public List<WorkflowWorkbenchCard> doneCards(String processorId, PageRequest pageRequest) {
+        return doneCards(processorId, pageRequest, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public List<WorkflowWorkbenchCard> doneCards(String processorId, PageRequest pageRequest,
+                                                 WorkflowWorkbenchQueryRequest request) {
         String validProcessorId = requireText(processorId, "workflow processor id must not be blank");
         List<WorkflowTask> tasks = taskDao.query(Criteria.of()
                         .eq("actualProcessorId", validProcessorId)
                         .in("taskStatus", List.of(WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED,
                                 WorkflowTaskStatus.ROLLED_BACK, WorkflowTaskStatus.TRANSFERRED)),
-                page(pageRequest), Sort.desc("completedAt"), Sort.desc("updatedAt"));
-        return cards("DONE", tasks);
+                ALL, Sort.desc("completedAt"), Sort.desc("updatedAt"));
+        return pageItems(cards("DONE", tasks, request), page(pageRequest));
     }
 
     public List<WorkflowWorkbenchCard> noticeCards(String assigneeId, PageRequest pageRequest) {
+        return noticeCards(assigneeId, pageRequest, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public List<WorkflowWorkbenchCard> noticeCards(String assigneeId, PageRequest pageRequest,
+                                                   WorkflowWorkbenchQueryRequest request) {
         String validAssigneeId = requireText(assigneeId, "workflow assignee id must not be blank");
         List<WorkflowTask> tasks = taskDao.query(Criteria.of()
                         .eq("assigneeId", validAssigneeId)
                         .eq("taskKind", WorkflowTaskKind.NOTICE)
                         .in("taskStatus", List.of(WorkflowTaskStatus.TODO, WorkflowTaskStatus.NOTICED)),
-                page(pageRequest), Sort.desc("createdAt"));
-        return cards("NOTICE", tasks);
+                ALL, Sort.desc("createdAt"));
+        return pageItems(cards("NOTICE", tasks, request), page(pageRequest));
     }
 
     public List<WorkflowWorkbenchCard> trackingCards(String starterId, PageRequest pageRequest) {
+        return trackingCards(starterId, pageRequest, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public List<WorkflowWorkbenchCard> trackingCards(String starterId, PageRequest pageRequest,
+                                                     WorkflowWorkbenchQueryRequest request) {
         String validStarterId = requireText(starterId, "workflow starter id must not be blank");
         List<WorkflowInstance> instances = instanceDao.query(Criteria.of().eq("startedBy", validStarterId),
-                page(pageRequest), Sort.desc("startedAt"), Sort.desc("updatedAt"));
-        return instances.stream()
+                ALL, Sort.desc("startedAt"), Sort.desc("updatedAt"));
+        List<WorkflowWorkbenchCard> cards = instances.stream()
                 .map(instance -> card("TRACKING", instance, null, null, currentAssignees(instance.getId())))
+                .filter(card -> matches(card, request))
+                .sorted(sorter("TRACKING", request))
                 .toList();
+        return pageItems(cards, page(pageRequest));
+    }
+
+    public List<WorkflowWorkbenchCard> delegationCards(String principalId, PageRequest pageRequest) {
+        return delegationCards(principalId, pageRequest, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public List<WorkflowWorkbenchCard> delegationCards(String principalId, PageRequest pageRequest,
+                                                       WorkflowWorkbenchQueryRequest request) {
+        String validPrincipalId = requireText(principalId, "workflow delegation principal id must not be blank");
+        List<WorkflowTask> tasks = taskDao.query(Criteria.of()
+                        .eq("assignmentKind", WorkflowAssignmentKind.DELEGATED)
+                        .eq("delegatedFromUserId", validPrincipalId)
+                        .eq("taskStatus", WorkflowTaskStatus.TODO),
+                ALL, Sort.asc("dueAt"), Sort.desc("createdAt"));
+        Map<String, List<WorkflowTask>> tasksByInstance = new LinkedHashMap<>();
+        for (WorkflowTask task : tasks) {
+            tasksByInstance.computeIfAbsent(task.getInstanceId(), ignored -> new java.util.ArrayList<>()).add(task);
+        }
+        List<WorkflowWorkbenchCard> cards = tasksByInstance.values().stream()
+                .map(this::delegationCard)
+                .filter(card -> matches(card, request))
+                .sorted(sorter("DELEGATION", request))
+                .toList();
+        return pageItems(cards, page(pageRequest));
     }
 
     private List<WorkflowWorkbenchCard> cards(String boardType, List<WorkflowTask> tasks) {
+        return cards(boardType, tasks, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    private List<WorkflowWorkbenchCard> cards(String boardType, List<WorkflowTask> tasks,
+                                              WorkflowWorkbenchQueryRequest request) {
         Map<String, WorkflowInstance> instances = new LinkedHashMap<>();
         Map<String, WorkflowNodeInstance> nodes = new LinkedHashMap<>();
         for (WorkflowTask task : tasks) {
@@ -161,8 +212,8 @@ public class WorkflowRuntimeReadFacade {
         return tasks.stream()
                 .map(task -> card(boardType, instances.get(task.getInstanceId()), task,
                         nodes.get(task.getNodeInstanceId()), assigneeIds(task)))
-                .sorted(Comparator.comparing(WorkflowWorkbenchCard::lastOperatedAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .filter(card -> matches(card, request))
+                .sorted(sorter(boardType, request))
                 .toList();
     }
 
@@ -185,22 +236,62 @@ public class WorkflowRuntimeReadFacade {
                                        WorkflowTask task,
                                        WorkflowNodeInstance node,
                                        List<String> currentAssigneeIds) {
+        return card(boardType, instance, task, node, currentAssigneeIds, null);
+    }
+
+    private WorkflowWorkbenchCard delegationCard(List<WorkflowTask> tasks) {
+        WorkflowTask representative = tasks.stream()
+                .sorted(Comparator.comparing(WorkflowTask::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("workflow delegation task must not be empty"));
+        WorkflowInstance instance = instanceDao.findById(representative.getInstanceId());
+        WorkflowNodeInstance node = representative.getNodeInstanceId() == null
+                ? null
+                : nodeDao.findById(representative.getNodeInstanceId());
+        List<String> currentAssigneeIds = tasks.stream()
+                .flatMap(task -> assigneeIds(task).stream())
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+        return card("DELEGATION", instance, representative, node, currentAssigneeIds, tasks.size());
+    }
+
+    private WorkflowWorkbenchCard card(String boardType,
+                                       WorkflowInstance instance,
+                                       WorkflowTask task,
+                                       WorkflowNodeInstance node,
+                                       List<String> currentAssigneeIds,
+                                       Integer delegationTaskCount) {
         if (instance == null) {
             throw new PlatformException("workflow instance not found: " + (task == null ? null : task.getInstanceId()));
         }
         return new WorkflowWorkbenchCard(boardType, instance.getId(), instance.getModuleAlias(), instance.getRecordId(),
+                instance.getDefinitionId(), instance.getWorkflowVersionId(),
                 instance.getInstanceStatus(), instance.getApprovalStatus(), task == null ? null : task.getId(),
                 task == null ? null : task.getTaskKind(), task == null ? null : task.getTaskStatus(),
                 node == null ? null : node.getNodeKey(), instance.getCurrentNodeKeys(), currentAssigneeIds,
-                task == null ? instance.getStartedAt() : task.getCreatedAt(),
+                instance.getStartedAt(), task == null ? instance.getStartedAt() : task.getCreatedAt(),
                 task == null ? instance.getCompletedAt() : task.getCompletedAt(),
                 task == null ? instance.getLastActionCode() : task.getDecision(),
-                node == null ? null : node.getOvertimeStatus(),
+                node == null ? null : node.getOvertimeStatus(), task == null ? null : task.getDueAt(),
                 instance.getLastOperatedAt() == null ? instance.getStartedAt() : instance.getLastOperatedAt(),
                 task == null ? null : task.getAssignmentKind(), task == null ? null : task.getOriginalAssigneeId(),
                 task == null ? null : task.getDelegatedFromUserId(),
                 task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
-                task == null ? null : task.getPrincipalCanProcess());
+                task == null ? null : task.getPrincipalCanProcess(),
+                noticeSourceType(task), delegationTaskCount);
+    }
+
+    private String noticeSourceType(WorkflowTask task) {
+        if (task == null || task.getTaskKind() != WorkflowTaskKind.NOTICE) {
+            return null;
+        }
+        String snapshot = task.getAssignmentSnapshotText();
+        if (snapshot != null && snapshot.contains("DELEGATION_COMPLETED")) {
+            return "DELEGATION_COMPLETED";
+        }
+        return null;
     }
 
     private WorkflowTaskAvailableAction enrich(WorkflowTaskAvailableAction action, WorkflowTask task,
@@ -258,10 +349,161 @@ public class WorkflowRuntimeReadFacade {
         return pageRequest == null ? PageRequest.of(1, 20) : pageRequest;
     }
 
-    private List<WorkflowTask> pageItems(List<WorkflowTask> tasks, PageRequest pageRequest) {
-        int from = Math.min(pageRequest.getOffset(), tasks.size());
-        int to = Math.min(from + pageRequest.getLimit(), tasks.size());
-        return tasks.subList(from, to);
+    private boolean matches(WorkflowWorkbenchCard card, WorkflowWorkbenchQueryRequest request) {
+        WorkflowWorkbenchQueryRequest normalized = request == null ? WorkflowWorkbenchQueryRequest.empty() : request;
+        if (!sameText(normalized.moduleAlias(), card.moduleAlias())) {
+            return false;
+        }
+        if (!sameText(normalized.recordId(), card.recordId())) {
+            return false;
+        }
+        if (!sameText(normalized.definitionId(), card.definitionId())) {
+            return false;
+        }
+        if (!sameText(normalized.effectiveWorkflowVersionId(), card.workflowVersionId())) {
+            return false;
+        }
+        if (!same(normalized.instanceStatus(), card.instanceStatus())
+                || !same(normalized.taskKind(), card.taskKind())
+                || !same(normalized.taskStatus(), card.taskStatus())
+                || !same(normalized.assignmentKind(), card.assignmentKind())
+                || !same(normalized.overtimeStatus(), card.overtimeStatus())) {
+            return false;
+        }
+        if (!matchesNodeKey(normalized.nodeKey(), card)) {
+            return false;
+        }
+        return inRange(card.startedAt(), normalized.startedFrom(), normalized.startedTo())
+                && inRange(card.receivedAt(), normalized.receivedFrom(), normalized.receivedTo())
+                && inRange(card.completedAt(), normalized.completedFrom(), normalized.completedTo())
+                && inRange(card.lastOperatedAt(), normalized.lastOperatedFrom(), normalized.lastOperatedTo())
+                && inRange(card.dueAt(), normalized.dueFrom(), normalized.dueTo());
+    }
+
+    private Comparator<WorkflowWorkbenchCard> sorter(String boardType, WorkflowWorkbenchQueryRequest request) {
+        WorkflowWorkbenchQueryRequest normalized = request == null ? WorkflowWorkbenchQueryRequest.empty() : request;
+        List<WorkflowWorkbenchSort> sorts = normalized.sorts().isEmpty() ? defaultSorts(boardType) : normalized.sorts();
+        Comparator<WorkflowWorkbenchCard> comparator = null;
+        for (WorkflowWorkbenchSort sort : sorts) {
+            String field = requireText(sort == null ? null : sort.field(),
+                    "workflow workbench sort field must not be blank");
+            validateSortField(field);
+            WorkflowSortDirection direction = sort.direction() == null ? WorkflowSortDirection.DESC : sort.direction();
+            Comparator<WorkflowWorkbenchCard> fieldComparator = (left, right) ->
+                    compareSortValue(sortValue(left, field), sortValue(right, field), direction);
+            comparator = comparator == null ? fieldComparator : comparator.thenComparing(fieldComparator);
+        }
+        return comparator == null ? (left, right) -> 0 : comparator;
+    }
+
+    private void validateSortField(String field) {
+        switch (field) {
+            case "moduleAlias", "recordId", "definitionId", "workflowVersionId", "definitionVersionId",
+                    "instanceStatus", "nodeKey", "taskKind", "taskStatus", "assignmentKind", "overtimeStatus",
+                    "startedAt", "receivedAt", "completedAt", "lastOperatedAt", "dueAt" -> {
+            }
+            default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
+        }
+    }
+
+    private List<WorkflowWorkbenchSort> defaultSorts(String boardType) {
+        return switch (boardType) {
+            case "TODO" -> List.of(new WorkflowWorkbenchSort("dueAt", WorkflowSortDirection.ASC),
+                    new WorkflowWorkbenchSort("receivedAt", WorkflowSortDirection.DESC));
+            case "DONE" -> List.of(new WorkflowWorkbenchSort("completedAt", WorkflowSortDirection.DESC),
+                    new WorkflowWorkbenchSort("lastOperatedAt", WorkflowSortDirection.DESC));
+            case "NOTICE" -> List.of(new WorkflowWorkbenchSort("receivedAt", WorkflowSortDirection.DESC));
+            case "TRACKING" -> List.of(new WorkflowWorkbenchSort("startedAt", WorkflowSortDirection.DESC),
+                    new WorkflowWorkbenchSort("lastOperatedAt", WorkflowSortDirection.DESC));
+            case "DELEGATION" -> List.of(new WorkflowWorkbenchSort("dueAt", WorkflowSortDirection.ASC),
+                    new WorkflowWorkbenchSort("receivedAt", WorkflowSortDirection.DESC));
+            default -> List.of(new WorkflowWorkbenchSort("lastOperatedAt", WorkflowSortDirection.DESC));
+        };
+    }
+
+    private Comparable<?> sortValue(WorkflowWorkbenchCard card, String field) {
+        return switch (field) {
+            case "moduleAlias" -> card.moduleAlias();
+            case "recordId" -> card.recordId();
+            case "definitionId" -> card.definitionId();
+            case "workflowVersionId", "definitionVersionId" -> card.workflowVersionId();
+            case "instanceStatus" -> card.instanceStatus();
+            case "nodeKey" -> card.nodeKey();
+            case "taskKind" -> card.taskKind();
+            case "taskStatus" -> card.taskStatus();
+            case "assignmentKind" -> card.assignmentKind();
+            case "overtimeStatus" -> card.overtimeStatus();
+            case "startedAt" -> card.startedAt();
+            case "receivedAt" -> card.receivedAt();
+            case "completedAt" -> card.completedAt();
+            case "lastOperatedAt" -> card.lastOperatedAt();
+            case "dueAt" -> card.dueAt();
+            default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
+        };
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private int compareSortValue(Comparable left, Comparable right, WorkflowSortDirection direction) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        int compared = left.compareTo(right);
+        return direction == WorkflowSortDirection.ASC ? compared : -compared;
+    }
+
+    private boolean sameText(String expected, String actual) {
+        return expected == null || expected.isBlank() || expected.equals(actual);
+    }
+
+    private boolean same(Object expected, Object actual) {
+        return expected == null || expected.equals(actual);
+    }
+
+    private boolean matchesNodeKey(String expected, WorkflowWorkbenchCard card) {
+        if (expected == null || expected.isBlank()) {
+            return true;
+        }
+        if (expected.equals(card.nodeKey())) {
+            return true;
+        }
+        String currentNodeKeys = card.currentNodeKeys();
+        if (currentNodeKeys == null || currentNodeKeys.isBlank()) {
+            return false;
+        }
+        for (String nodeKey : currentNodeKeys.split("[,;\\s]+")) {
+            if (expected.equals(nodeKey)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean inRange(Comparable<?> value, Comparable<?> from, Comparable<?> to) {
+        if (from == null && to == null) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        return (from == null || compareRange(value, from) >= 0)
+                && (to == null || compareRange(value, to) < 0);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private int compareRange(Comparable value, Comparable bound) {
+        return value.compareTo(bound);
+    }
+
+    private <T> List<T> pageItems(List<T> items, PageRequest pageRequest) {
+        int from = Math.min(pageRequest.getOffset(), items.size());
+        int to = Math.min(from + pageRequest.getLimit(), items.size());
+        return items.subList(from, to);
     }
 
     private String firstText(String first, String second) {

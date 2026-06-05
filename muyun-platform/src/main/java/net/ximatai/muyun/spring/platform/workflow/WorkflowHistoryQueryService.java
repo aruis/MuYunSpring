@@ -7,6 +7,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class WorkflowHistoryQueryService {
@@ -39,8 +42,24 @@ public class WorkflowHistoryQueryService {
         return archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks();
     }
 
+    public List<WorkflowHistoryTaskView> taskViews(String historyInstanceId) {
+        return archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks().stream()
+                .map(WorkflowHistoryTaskView::from)
+                .toList();
+    }
+
     public List<WorkflowEvent> events(String historyInstanceId) {
         return archiveService.parseSnapshot(requireHistory(historyInstanceId)).events();
+    }
+
+    public List<WorkflowHistoryEventView> eventViews(String historyInstanceId) {
+        WorkflowHistorySnapshot snapshot = archiveService.parseSnapshot(requireHistory(historyInstanceId));
+        Map<String, WorkflowTask> tasksById = snapshot.tasks().stream()
+                .filter(task -> task.getId() != null)
+                .collect(Collectors.toMap(WorkflowTask::getId, Function.identity(), (left, right) -> left));
+        return snapshot.events().stream()
+                .map(event -> WorkflowHistoryEventView.from(event, tasksById.get(event.getTaskId())))
+                .toList();
     }
 
     private WorkflowHistoryInstance requireHistory(String historyInstanceId) {

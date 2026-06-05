@@ -5,8 +5,10 @@ import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryQueryService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryTaskView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import org.springframework.http.HttpStatus;
@@ -47,9 +49,19 @@ public class WorkflowHistoryWebController {
         return new WebListResponse<>(historyQueryService.tasks(historyInstanceId));
     }
 
+    @GetMapping("/{historyInstanceId}/tasks/view")
+    public WebListResponse<WorkflowHistoryTaskView> taskViews(@PathVariable String historyInstanceId) {
+        return new WebListResponse<>(historyQueryService.taskViews(historyInstanceId));
+    }
+
     @GetMapping("/{historyInstanceId}/events")
     public WebListResponse<WorkflowEvent> events(@PathVariable String historyInstanceId) {
         return new WebListResponse<>(historyQueryService.events(historyInstanceId));
+    }
+
+    @GetMapping("/{historyInstanceId}/events/view")
+    public WebListResponse<WorkflowHistoryEventView> eventViews(@PathVariable String historyInstanceId) {
+        return new WebListResponse<>(historyQueryService.eventViews(historyInstanceId));
     }
 
     @ExceptionHandler(PlatformException.class)

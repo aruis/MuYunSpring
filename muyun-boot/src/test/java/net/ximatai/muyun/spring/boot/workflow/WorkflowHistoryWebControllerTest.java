@@ -2,7 +2,13 @@ package net.ximatai.muyun.spring.boot.workflow;
 
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryQueryService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryTaskView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
@@ -56,6 +62,14 @@ class WorkflowHistoryWebControllerTest {
                 .thenReturn(new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of()));
         when(historyQueryService.tasks("history-1")).thenReturn(List.of());
         when(historyQueryService.events("history-1")).thenReturn(List.of());
+        when(historyQueryService.taskViews("history-1")).thenReturn(List.of(new WorkflowHistoryTaskView(
+                "task-1", "instance-1", "node-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE,
+                WorkflowAssignmentKind.DELEGATED, "delegate-1", "delegate-1", true, "principal-1", "principal-1",
+                "delegate-1", true, "delegation-1", "{}", false, false, "approve", null, null)));
+        when(historyQueryService.eventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
+                "event-1", "instance-1", "node-1", "task-1", WorkflowEventType.TASK_COMPLETED, "approve",
+                "delegate-1", "delegate-1", true, WorkflowAssignmentKind.DELEGATED, "principal-1", "principal-1",
+                "delegate-1", true, "delegation-1", "{}", false, false, null, null, null)));
 
         mvc.perform(get("/workflow/history/history-1/bundle"))
                 .andExpect(status().isOk())
@@ -63,8 +77,15 @@ class WorkflowHistoryWebControllerTest {
         mvc.perform(get("/workflow/history/history-1/tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records").isArray());
+        mvc.perform(get("/workflow/history/history-1/tasks/view"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].actualProcessUserId").value("delegate-1"))
+                .andExpect(jsonPath("$.records[0].processedByDelegation").value(true));
         mvc.perform(get("/workflow/history/history-1/events"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records").isArray());
+        mvc.perform(get("/workflow/history/history-1/events/view"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].delegationPolicyId").value("delegation-1"));
     }
 }

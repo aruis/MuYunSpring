@@ -8,6 +8,8 @@ public record WorkflowWorkbenchCard(
         String instanceId,
         String moduleAlias,
         String recordId,
+        String definitionId,
+        String workflowVersionId,
         WorkflowInstanceStatus instanceStatus,
         WorkflowApprovalStatus approvalStatus,
         String taskId,
@@ -16,16 +18,20 @@ public record WorkflowWorkbenchCard(
         String nodeKey,
         String currentNodeKeys,
         List<String> currentAssigneeIds,
+        Instant startedAt,
         Instant receivedAt,
         Instant completedAt,
         String actionCode,
         WorkflowOvertimeStatus overtimeStatus,
+        Instant dueAt,
         Instant lastOperatedAt,
         WorkflowAssignmentKind assignmentKind,
         String originalAssigneeId,
         String delegatedFromUserId,
         String delegatedToUserId,
-        Boolean principalCanProcess
+        Boolean principalCanProcess,
+        String noticeSourceType,
+        Integer delegationTaskCount
 ) {
     public WorkflowWorkbenchCard {
         currentAssigneeIds = currentAssigneeIds == null ? List.of() : List.copyOf(currentAssigneeIds);
