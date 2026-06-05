@@ -55,6 +55,7 @@ public class WorkflowInstanceSnapshotFactory {
             node.setNodeType(definition.getNodeType());
             node.setNodeStatus(WorkflowNodeStatus.WAITING);
             node.setApprovalMode(definition.getApprovalMode());
+            node.setApprovalRatio(definition.getApprovalRatio());
             node.setMilestoneType(definition.getMilestoneType());
             node.setConvergeMode(definition.getConvergeMode());
             node.setConvergeRatio(definition.getConvergeRatio());

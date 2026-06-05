@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -9,22 +11,104 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class WorkflowTaskActionService {
+    private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
+
     private final WorkflowTaskDao taskDao;
     private final WorkflowInstanceDao instanceDao;
+    private final WorkflowNodeInstanceDao nodeInstanceDao;
     private final WorkflowEventDao eventDao;
     private final WorkflowRuntimeEventFactory eventFactory;
+    private final WorkflowApprovalTaskPolicyService approvalTaskPolicyService;
 
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
                                      WorkflowInstanceDao instanceDao,
+                                     WorkflowNodeInstanceDao nodeInstanceDao,
                                      WorkflowEventDao eventDao,
-                                     WorkflowRuntimeEventFactory eventFactory) {
+                                     WorkflowRuntimeEventFactory eventFactory,
+                                     WorkflowApprovalTaskPolicyService approvalTaskPolicyService) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
+        this.nodeInstanceDao = nodeInstanceDao;
         this.eventDao = eventDao;
         this.eventFactory = eventFactory;
+        this.approvalTaskPolicyService = approvalTaskPolicyService;
+    }
+
+    @Transactional
+    public WorkflowTaskActionResult approve(WorkflowTaskActionRequest request) {
+        WorkflowTask task = requireTodoTask(request);
+        if (task.getTaskKind() != WorkflowTaskKind.APPROVAL) {
+            throw new PlatformException("workflow task is not an approval task: " + request.taskId());
+        }
+        WorkflowInstance instance = requireInstance(task);
+        WorkflowNodeInstance node = requireNode(task);
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        task.setTaskStatus(WorkflowTaskStatus.DONE);
+        task.setActualProcessorId(operatorId);
+        task.setDecision("approve");
+        task.setResultMessage(request.reason());
+        task.setCompletedAt(now);
+        updateTask(task, now);
+
+        List<WorkflowTask> nodeTasks = nodeTasks(task);
+        List<WorkflowTask> effectiveTasks = replaceTask(nodeTasks, task);
+        if (approvalTaskPolicyService.isNodePassed(node.getApprovalMode(), node.getApprovalRatio(), effectiveTasks)) {
+            node.setNodeStatus(WorkflowNodeStatus.COMPLETED);
+            node.setApprovedTaskCount(countStatus(effectiveTasks, WorkflowTaskStatus.DONE));
+            node.setCompletedTaskCount(countCompleted(effectiveTasks));
+            node.setCompletedAt(now);
+            updateNode(node, now);
+            if (approvalTaskPolicyService.shouldSkipPendingSiblings(node.getApprovalMode(), node.getApprovalRatio(),
+                    effectiveTasks)) {
+                skipPendingSiblings(instance, task, effectiveTasks, operatorId, now);
+            }
+        }
+        WorkflowEvent event = eventFactory.taskCompleted(instance, task, "approve", operatorId, request.reason(), now);
+        eventDao.insert(event);
+        return WorkflowTaskActionResult.of(task, node, instance, event);
+    }
+
+    @Transactional
+    public WorkflowTaskActionResult reject(WorkflowTaskActionRequest request) {
+        WorkflowTask task = requireTodoTask(request);
+        if (task.getTaskKind() != WorkflowTaskKind.APPROVAL) {
+            throw new PlatformException("workflow task is not an approval task: " + request.taskId());
+        }
+        WorkflowInstance instance = requireInstance(task);
+        WorkflowNodeInstance node = requireNode(task);
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        task.setTaskStatus(WorkflowTaskStatus.REJECTED);
+        task.setActualProcessorId(operatorId);
+        task.setDecision("reject");
+        task.setResultMessage(request.reason());
+        task.setCompletedAt(now);
+        updateTask(task, now);
+
+        node.setNodeStatus(WorkflowNodeStatus.REJECTED);
+        node.setRejectedTaskCount(value(node.getRejectedTaskCount()) + 1);
+        node.setCompletedAt(now);
+        updateNode(node, now);
+
+        instance.setInstanceStatus(WorkflowInstanceStatus.REJECTED);
+        if (Boolean.TRUE.equals(instance.getApprovalEnabled())) {
+            instance.setApprovalStatus(WorkflowApprovalStatus.REJECTED);
+        }
+        instance.setLastActionCode("reject");
+        instance.setLastActionReason(request.reason());
+        instance.setLastOperatorId(operatorId);
+        instance.setLastOperatedAt(now);
+        updateInstance(instance, now);
+
+        WorkflowEvent event = eventFactory.taskRejected(instance, task, operatorId, request.reason(), now);
+        eventDao.insert(event);
+        return WorkflowTaskActionResult.of(task, node, instance, event);
     }
 
     @Transactional
@@ -174,6 +258,53 @@ public class WorkflowTaskActionService {
         return instance;
     }
 
+    private WorkflowNodeInstance requireNode(WorkflowTask task) {
+        WorkflowNodeInstance node = nodeInstanceDao.findById(task.getNodeInstanceId());
+        if (node == null) {
+            throw new PlatformException("workflow node instance not found: " + task.getNodeInstanceId());
+        }
+        return node;
+    }
+
+    private List<WorkflowTask> nodeTasks(WorkflowTask task) {
+        return taskDao.query(Criteria.of()
+                .eq("instanceId", task.getInstanceId())
+                .eq("nodeInstanceId", task.getNodeInstanceId()), ALL);
+    }
+
+    private List<WorkflowTask> replaceTask(List<WorkflowTask> tasks, WorkflowTask changed) {
+        List<WorkflowTask> result = new ArrayList<>();
+        boolean replaced = false;
+        for (WorkflowTask task : tasks == null ? List.<WorkflowTask>of() : tasks) {
+            if (changed.getId().equals(task.getId())) {
+                result.add(changed);
+                replaced = true;
+            } else {
+                result.add(task);
+            }
+        }
+        if (!replaced) {
+            result.add(changed);
+        }
+        return result;
+    }
+
+    private void skipPendingSiblings(WorkflowInstance instance, WorkflowTask completedTask,
+                                     List<WorkflowTask> tasks, String operatorId, Instant now) {
+        for (WorkflowTask task : tasks) {
+            if (task == completedTask || completedTask.getId().equals(task.getId())
+                    || task.getTaskStatus() != WorkflowTaskStatus.TODO) {
+                continue;
+            }
+            task.setTaskStatus(WorkflowTaskStatus.SKIPPED);
+            task.setDecision("skip");
+            task.setResultMessage("approval node passed");
+            task.setCompletedAt(now);
+            updateTask(task, now);
+            eventDao.insert(eventFactory.taskSkipped(instance, task, operatorId, "approval node passed", now));
+        }
+    }
+
     private void updateTask(WorkflowTask task, Instant now) {
         Integer expectedVersion = task.getVersion();
         EntityLifecycle.prepareUpdate(task, now, EntityLifecycle.nextVersion(expectedVersion));
@@ -181,6 +312,38 @@ public class WorkflowTaskActionService {
         if (updated <= 0) {
             throw new OptimisticLockException("workflow task version conflict: " + task.getId());
         }
+    }
+
+    private void updateNode(WorkflowNodeInstance node, Instant now) {
+        Integer expectedVersion = node.getVersion();
+        EntityLifecycle.prepareUpdate(node, now, EntityLifecycle.nextVersion(expectedVersion));
+        int updated = nodeInstanceDao.updateByIdAndVersion(node, expectedVersion);
+        if (updated <= 0) {
+            throw new OptimisticLockException("workflow node version conflict: " + node.getId());
+        }
+    }
+
+    private void updateInstance(WorkflowInstance instance, Instant now) {
+        Integer expectedVersion = instance.getVersion();
+        EntityLifecycle.prepareUpdate(instance, now, EntityLifecycle.nextVersion(expectedVersion));
+        int updated = instanceDao.updateByIdAndVersion(instance, expectedVersion);
+        if (updated <= 0) {
+            throw new OptimisticLockException("workflow instance version conflict: " + instance.getId());
+        }
+    }
+
+    private int countStatus(List<WorkflowTask> tasks, WorkflowTaskStatus status) {
+        return (int) tasks.stream().filter(task -> task.getTaskStatus() == status).count();
+    }
+
+    private int countCompleted(List<WorkflowTask> tasks) {
+        return (int) tasks.stream()
+                .filter(task -> task.getCompletedAt() != null || task.getTaskStatus() == WorkflowTaskStatus.DONE)
+                .count();
+    }
+
+    private int value(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private String operatorId(WorkflowTaskActionRequest request) {

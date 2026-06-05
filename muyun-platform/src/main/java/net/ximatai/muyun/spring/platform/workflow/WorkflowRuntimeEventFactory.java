@@ -36,6 +36,18 @@ public class WorkflowRuntimeEventFactory {
                 message, payloadText, occurredAt);
     }
 
+    public WorkflowEvent taskRejected(WorkflowInstance instance, WorkflowTask task,
+                                      String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_REJECTED, "reject", operatorId,
+                message == null || message.isBlank() ? "workflow task rejected" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent taskSkipped(WorkflowInstance instance, WorkflowTask task,
+                                     String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_SKIPPED, "skip", operatorId,
+                message == null || message.isBlank() ? "workflow task skipped" : message, null, occurredAt);
+    }
+
     public WorkflowEvent taskInvalidated(WorkflowInstance instance, WorkflowTask task,
                                          String operatorId, String message, Instant occurredAt) {
         return event(instance, null, task, WorkflowEventType.TASK_INVALIDATED, "invalidate", operatorId,

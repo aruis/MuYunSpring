@@ -37,6 +37,9 @@ public class WorkflowNodeInstance extends StandardEntity {
     @Column(name = "approval_mode", type = ColumnType.VARCHAR, length = 32, comment = "Approval mode")
     private WorkflowApprovalMode approvalMode;
 
+    @Column(name = "approval_ratio", type = ColumnType.INT, comment = "Approval ratio percent")
+    private Integer approvalRatio;
+
     @Column(name = "milestone_type", type = ColumnType.VARCHAR, length = 32, comment = "Milestone type")
     private WorkflowMilestoneType milestoneType;
 
