@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import org.springframework.aop.support.AopUtils;
@@ -49,7 +50,8 @@ public class StaticModuleDefinitionScanner {
                 module.alias(),
                 module.title(),
                 module.parent().isBlank() ? null : module.parent(),
-                actions(beanClass)
+                java.util.Set.of(module.capabilities()),
+                actions(beanClass, java.util.Set.of(module.capabilities()))
         );
     }
 
@@ -73,9 +75,11 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
-    private List<StaticModuleActionDefinition> actions(Class<?> beanClass) {
+    private List<StaticModuleActionDefinition> actions(Class<?> beanClass,
+                                                       java.util.Set<EntityCapability> capabilities) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
         addStandardActions(actions, beanClass);
+        addWorkflowActions(actions, capabilities);
         ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
         return List.copyOf(actions.values());
     }
@@ -101,6 +105,21 @@ public class StaticModuleDefinitionScanner {
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.REFERENCE);
+        }
+    }
+
+    private void addWorkflowActions(Map<String, StaticModuleActionDefinition> actions,
+                                    java.util.Set<EntityCapability> capabilities) {
+        if (capabilities == null || capabilities.isEmpty()) {
+            return;
+        }
+        if (capabilities.contains(EntityCapability.WORKFLOW) || capabilities.contains(EntityCapability.APPROVAL)) {
+            actions.putIfAbsent("submitWorkflow",
+                    StaticModuleActionDefinition.workflowAction("submitWorkflow", "发起流程"));
+        }
+        if (capabilities.contains(EntityCapability.APPROVAL)) {
+            actions.putIfAbsent("submitApproval",
+                    StaticModuleActionDefinition.workflowAction("submitApproval", "提交审批"));
         }
     }
 

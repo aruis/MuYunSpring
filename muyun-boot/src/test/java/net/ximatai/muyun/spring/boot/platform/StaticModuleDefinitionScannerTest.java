@@ -5,6 +5,9 @@ import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import org.junit.jupiter.api.Test;
@@ -81,6 +84,30 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
+    @Test
+    void shouldAssembleWorkflowActionsFromStaticModuleCapabilities() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(WorkflowEnabledWeb.class);
+            context.refresh();
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("sales.contract");
+            assertThat(definition.supports(EntityCapability.WORKFLOW)).isTrue();
+            assertThat(definition.supports(EntityCapability.APPROVAL)).isTrue();
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("submitWorkflow", "submitApproval");
+            assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("submitApproval"))
+                    .singleElement()
+                    .satisfies(action -> {
+                        assertThat(action.category()).isEqualTo(EntityActionCategory.WORKFLOW);
+                        assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+                        assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.SERVICE);
+                        assertThat(action.executorKey()).isEqualTo("platform.workflow");
+                        assertThat(action.dataAuth()).isFalse();
+                    });
+        }
+    }
+
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
         assertThat(action.actionCode()).isEqualTo(actionCode);
         assertThat(action.permissionActionCode()).isEqualTo(actionCode);
@@ -109,5 +136,11 @@ class StaticModuleDefinitionScannerTest {
     @PlatformStaticModule(application = "iam", alias = "iam.bad", title = "Bad")
     @RequestMapping("/iam.good")
     static class BadAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "sales", alias = "sales.contract", title = "合同",
+            capabilities = EntityCapability.APPROVAL)
+    static class WorkflowEnabledWeb {
     }
 }

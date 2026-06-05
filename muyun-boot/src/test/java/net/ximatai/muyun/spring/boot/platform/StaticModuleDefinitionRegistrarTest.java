@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -24,6 +26,38 @@ class StaticModuleDefinitionRegistrarTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+    }
+
+    @Test
+    void shouldRegisterWorkflowActionMetadataForStaticModuleCapabilities() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        when(moduleService.select("sales.contract")).thenReturn(null);
+        when(actionService.findByModuleAliasAndActionCode("sales.contract", "submitWorkflow")).thenReturn(null);
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                moduleService,
+                actionService,
+                List.of(new StaticModuleDefinition(
+                        "sales",
+                        "sales.contract",
+                        "合同",
+                        null,
+                        List.of(StaticModuleActionDefinition.workflowAction("submitWorkflow", "发起流程"))
+                ))
+        );
+
+        registrar.registerAll();
+
+        ArgumentCaptor<PlatformModuleAction> actionCaptor = ArgumentCaptor.forClass(PlatformModuleAction.class);
+        verify(actionService).insert(actionCaptor.capture());
+        assertThat(actionCaptor.getValue()).satisfies(action -> {
+            assertThat(action.getModuleAlias()).isEqualTo("sales.contract");
+            assertThat(action.getActionCode()).isEqualTo("submitWorkflow");
+            assertThat(action.getCategory()).isEqualTo(EntityActionCategory.WORKFLOW);
+            assertThat(action.getExecutorType()).isEqualTo(EntityActionExecutorType.SERVICE);
+            assertThat(action.getExecutorKey()).isEqualTo("platform.workflow");
+            assertThat(action.getDataAuth()).isFalse();
+        });
     }
 
     @Test

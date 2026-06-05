@@ -117,11 +117,14 @@ public class StaticModuleDefinitionRegistrar implements ApplicationRunner {
             }
             action.setPermissionActionCode(actionDefinition.permissionActionCode());
             action.setTitle(actionDefinition.title());
+            action.setCategory(actionDefinition.category());
             action.setActionLevel(actionDefinition.actionLevel());
             action.setAccessMode(actionDefinition.accessMode());
             action.setActionAuth(actionDefinition.actionAuth());
             action.setDataAuth(actionDefinition.dataAuth());
             action.setDefaultGrantPolicy(actionDefinition.defaultGrantPolicy());
+            action.setExecutorType(actionDefinition.executorType());
+            action.setExecutorKey(actionDefinition.executorKey());
             action.setSystemManaged(Boolean.TRUE);
             action.setEnabled(Boolean.TRUE);
             action.setSortOrder(order++);
