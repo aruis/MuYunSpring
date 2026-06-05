@@ -60,12 +60,17 @@ public record WorkflowTaskAvailableAction(
                 node == null ? null : node.getNodeKey(), rejectResubmitModes, defaultRejectResubmitMode,
                 task == null ? null : task.getAssignmentKind(), task == null ? null : task.getOriginalAssigneeId(),
                 task == null ? null : task.getDelegatedFromUserId(),
-                task == null ? null : task.getAssigneeId(), null);
+                task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
+                task == null ? null : task.getPrincipalCanProcess());
     }
 
     public WorkflowTaskAvailableAction withRejectResubmitModes(List<String> modes, String defaultMode) {
         return new WorkflowTaskAvailableAction(actionCode, title, reasonRequired, targetAssigneeRequired,
                 rejectReturnToMeSupported, taskId, nodeKey, nodeTitle, modes, defaultMode, assignmentKind,
                 originalAssigneeId, delegatedFromUserId, delegatedToUserId, principalCanProcess);
+    }
+
+    private static String firstText(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
     }
 }

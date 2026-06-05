@@ -26,12 +26,23 @@ public class WorkflowInstanceSnapshotFactory {
                                           String recordId,
                                           String startedBy,
                                           Instant startedAt) {
+        return build(definition, version, nodeDefinitions, linkDefinitions, recordId, null, startedBy, startedAt);
+    }
+
+    public WorkflowInstanceSnapshot build(WorkflowDefinition definition,
+                                          WorkflowVersion version,
+                                          List<WorkflowNodeDefinition> nodeDefinitions,
+                                          List<WorkflowLinkDefinition> linkDefinitions,
+                                          String recordId,
+                                          String authOrgId,
+                                          String startedBy,
+                                          Instant startedAt) {
         String snapshotText = version == null ? null : version.getSnapshotText();
         if (snapshotText == null || snapshotText.isBlank()) {
             snapshotText = "{}";
         }
-        WorkflowInstance instance = instanceStateService.startInstance(definition, version, recordId, startedBy,
-                startedAt, snapshotText);
+        WorkflowInstance instance = instanceStateService.startInstance(definition, version, recordId, authOrgId,
+                startedBy, startedAt, snapshotText);
         instance.setId(Ids.newId());
         List<WorkflowNodeInstance> nodes = createNodeSnapshots(instance, nodeDefinitions);
         List<WorkflowRouteInstance> routes = createRouteSnapshots(instance, linkDefinitions);

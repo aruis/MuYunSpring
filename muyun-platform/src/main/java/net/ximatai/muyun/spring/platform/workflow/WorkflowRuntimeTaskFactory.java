@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -14,9 +15,17 @@ import java.util.stream.Collectors;
 @Service
 public class WorkflowRuntimeTaskFactory {
     private final WorkflowRuntimeEventFactory eventFactory;
+    private final WorkflowDelegationService delegationService;
 
     public WorkflowRuntimeTaskFactory(WorkflowRuntimeEventFactory eventFactory) {
+        this(eventFactory, null);
+    }
+
+    @Autowired
+    public WorkflowRuntimeTaskFactory(WorkflowRuntimeEventFactory eventFactory,
+                                      WorkflowDelegationService delegationService) {
         this.eventFactory = eventFactory;
+        this.delegationService = delegationService;
     }
 
     public WorkflowRuntimeTaskDraft createBlockingTasks(WorkflowInstance instance,
@@ -67,7 +76,27 @@ public class WorkflowRuntimeTaskFactory {
         task.setAssignmentSnapshotText(ownerId == null ? null : "{\"assigneeId\":\"" + escape(ownerId) + "\"}");
         task.setCheckStatus(taskKind == WorkflowTaskKind.BUSINESS
                 ? WorkflowTaskCheckStatus.NOT_CHECKED : WorkflowTaskCheckStatus.NO_CHECK);
+        applyDelegation(instance, task);
         return task;
+    }
+
+    private void applyDelegation(WorkflowInstance instance, WorkflowTask task) {
+        if (delegationService == null || task.getTaskKind() == WorkflowTaskKind.NOTICE
+                || task.getTaskKind() == WorkflowTaskKind.RESUBMIT) {
+            return;
+        }
+        WorkflowDelegationMatch match = delegationService.match(task.getOriginalAssigneeId(),
+                instance.getModuleAlias(), instance.getAuthOrgId());
+        if (match == null) {
+            return;
+        }
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setAssigneeId(match.delegateUserId());
+        task.setDelegatedFromUserId(match.principalUserId());
+        task.setDelegatedToUserId(match.delegateUserId());
+        task.setPrincipalCanProcess(match.principalCanProcess());
+        task.setDelegationPolicyId(match.delegationPolicyId());
+        task.setAssignmentSnapshotText(match.snapshotText());
     }
 
     private String approvalAssignee(WorkflowNodeInstance node, String operatorId) {

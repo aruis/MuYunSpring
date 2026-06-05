@@ -76,6 +76,31 @@ class WorkflowTaskActionAvailabilityServiceTest {
     }
 
     @Test
+    void shouldExposeActionsToDelegatedPrincipalWhenAllowed() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setOriginalAssigneeId("principal-1");
+        task.setAssigneeId("delegate-1");
+        task.setDelegatedFromUserId("principal-1");
+        task.setDelegatedToUserId("delegate-1");
+        task.setPrincipalCanProcess(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING, null));
+        when(nodeDao.findById("node-1")).thenReturn(node());
+        when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(task));
+
+        List<WorkflowTaskAvailableAction> actions = service.availableActions("task-1", "principal-1");
+        assertThat(codes(actions)).containsExactly("approve", "reject", "transfer");
+        assertThat(action(actions, "approve").assignmentKind()).isEqualTo(WorkflowAssignmentKind.DELEGATED);
+        assertThat(action(actions, "approve").originalAssigneeId()).isEqualTo("principal-1");
+        assertThat(action(actions, "approve").delegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(action(actions, "approve").delegatedToUserId()).isEqualTo("delegate-1");
+        assertThat(action(actions, "approve").principalCanProcess()).isTrue();
+        assertThat(service.availableActions("task-1", "other")).isEmpty();
+    }
+
+    @Test
     void shouldListBusinessNoticeAndReturnResubmitActions() {
         WorkflowTask business = task("business-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         WorkflowTask notice = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);

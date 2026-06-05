@@ -37,8 +37,19 @@ public class WorkflowSubmitDraftService {
                                      String recordId,
                                      String operatorId,
                                      Instant operatedAt) {
+        return build(definition, version, nodeDefinitions, linkDefinitions, recordId, null, operatorId, operatedAt);
+    }
+
+    public WorkflowSubmitDraft build(WorkflowDefinition definition,
+                                     WorkflowVersion version,
+                                     List<WorkflowNodeDefinition> nodeDefinitions,
+                                     List<WorkflowLinkDefinition> linkDefinitions,
+                                     String recordId,
+                                     String authOrgId,
+                                     String operatorId,
+                                     Instant operatedAt) {
         WorkflowInstanceSnapshot snapshot = snapshotFactory.build(definition, version, nodeDefinitions,
-                linkDefinitions, recordId, operatorId, operatedAt);
+                linkDefinitions, recordId, authOrgId, operatorId, operatedAt);
         WorkflowRuntimeGraph graph = WorkflowRuntimeGraph.of(nodeDefinitions, linkDefinitions);
         WorkflowNodeDefinition startNode = graph.startNodes().stream()
                 .findFirst()

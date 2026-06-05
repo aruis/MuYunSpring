@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowApprovalMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowApprovalStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowConvergeMode;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegationScopeType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
@@ -45,6 +46,7 @@ class PlatformEnumContractTest {
         assertEnumContract(DictionaryCategoryKind.class);
         assertEnumContract(WorkflowDefinitionStatus.class);
         assertEnumContract(WorkflowAssignmentKind.class);
+        assertEnumContract(WorkflowDelegationScopeType.class);
         assertEnumContract(WorkflowAddSignMode.class);
         assertEnumContract(WorkflowAddSignEditMode.class);
         assertEnumContract(WorkflowPublishStatus.class);

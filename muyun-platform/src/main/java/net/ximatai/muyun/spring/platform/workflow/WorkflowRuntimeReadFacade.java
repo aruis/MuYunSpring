@@ -24,6 +24,7 @@ public class WorkflowRuntimeReadFacade {
     private final WorkflowEventDao eventDao;
     private final WorkflowTaskActionAvailabilityService availabilityService;
     private final WorkflowActionPolicyService actionPolicyService;
+    private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
 
     public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
                                      WorkflowTaskDao taskDao,
@@ -32,7 +33,7 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowEventDao eventDao,
                                      WorkflowTaskActionAvailabilityService availabilityService) {
         this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService,
-                new WorkflowActionPolicyService());
+                new WorkflowActionPolicyService(), new WorkflowTaskAssignmentPolicyService());
     }
 
     @Autowired
@@ -42,7 +43,8 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowRouteInstanceDao routeDao,
                                      WorkflowEventDao eventDao,
                                      WorkflowTaskActionAvailabilityService availabilityService,
-                                     WorkflowActionPolicyService actionPolicyService) {
+                                     WorkflowActionPolicyService actionPolicyService,
+                                     WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeDao = nodeDao;
@@ -52,6 +54,20 @@ public class WorkflowRuntimeReadFacade {
         this.actionPolicyService = actionPolicyService == null
                 ? new WorkflowActionPolicyService()
                 : actionPolicyService;
+        this.assignmentPolicyService = assignmentPolicyService == null
+                ? new WorkflowTaskAssignmentPolicyService()
+                : assignmentPolicyService;
+    }
+
+    public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
+                                     WorkflowTaskDao taskDao,
+                                     WorkflowNodeInstanceDao nodeDao,
+                                     WorkflowRouteInstanceDao routeDao,
+                                     WorkflowEventDao eventDao,
+                                     WorkflowTaskActionAvailabilityService availabilityService,
+                                     WorkflowActionPolicyService actionPolicyService) {
+        this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService, actionPolicyService,
+                new WorkflowTaskAssignmentPolicyService());
     }
 
     public WorkflowRuntimeRenderBundle renderBundle(String instanceId) {
@@ -85,7 +101,7 @@ public class WorkflowRuntimeReadFacade {
         return taskDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL, Sort.asc("createdAt"))
                 .stream()
                 .filter(task -> task.getTaskStatus() == WorkflowTaskStatus.TODO)
-                .filter(task -> canOperate(task, validOperatorId))
+                .filter(task -> assignmentPolicyService.canProcess(task, validOperatorId))
                 .flatMap(task -> availabilityService.availableActions(task.getId(), validOperatorId).stream()
                         .map(action -> enrich(action, task, nodes.get(task.getNodeInstanceId()))))
                 .toList();
@@ -94,11 +110,13 @@ public class WorkflowRuntimeReadFacade {
     public List<WorkflowWorkbenchCard> todoCards(String assigneeId, PageRequest pageRequest) {
         String validAssigneeId = requireText(assigneeId, "workflow assignee id must not be blank");
         List<WorkflowTask> tasks = taskDao.query(Criteria.of()
-                        .eq("assigneeId", validAssigneeId)
                         .eq("taskStatus", WorkflowTaskStatus.TODO)
                         .in("taskKind", List.of(WorkflowTaskKind.APPROVAL, WorkflowTaskKind.BUSINESS,
                                 WorkflowTaskKind.RESUBMIT)),
-                page(pageRequest), Sort.asc("dueAt"), Sort.desc("createdAt"));
+                ALL, Sort.asc("dueAt"), Sort.desc("createdAt")).stream()
+                .filter(task -> assignmentPolicyService.canSeeTodo(task, validAssigneeId))
+                .toList();
+        tasks = pageItems(tasks, page(pageRequest));
         return cards("TODO", tasks);
     }
 
@@ -152,6 +170,13 @@ public class WorkflowRuntimeReadFacade {
         if (task == null || task.getAssigneeId() == null || task.getAssigneeId().isBlank()) {
             return List.of();
         }
+        if (task.getAssignmentKind() == WorkflowAssignmentKind.DELEGATED
+                && Boolean.TRUE.equals(task.getPrincipalCanProcess())
+                && task.getDelegatedFromUserId() != null
+                && !task.getDelegatedFromUserId().isBlank()
+                && task.getTransferredFromUserId() == null) {
+            return List.of(task.getAssigneeId(), task.getDelegatedFromUserId());
+        }
         return List.of(task.getAssigneeId());
     }
 
@@ -174,7 +199,8 @@ public class WorkflowRuntimeReadFacade {
                 instance.getLastOperatedAt() == null ? instance.getStartedAt() : instance.getLastOperatedAt(),
                 task == null ? null : task.getAssignmentKind(), task == null ? null : task.getOriginalAssigneeId(),
                 task == null ? null : task.getDelegatedFromUserId(),
-                task == null ? null : task.getAssigneeId(), null);
+                task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
+                task == null ? null : task.getPrincipalCanProcess());
     }
 
     private WorkflowTaskAvailableAction enrich(WorkflowTaskAvailableAction action, WorkflowTask task,
@@ -203,7 +229,7 @@ public class WorkflowRuntimeReadFacade {
                         .eq("taskStatus", WorkflowTaskStatus.TODO),
                 ALL, Sort.asc("createdAt"))
                 .stream()
-                .map(WorkflowTask::getAssigneeId)
+                .flatMap(task -> assigneeIds(task).stream())
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toList();
@@ -218,10 +244,6 @@ public class WorkflowRuntimeReadFacade {
         return instance;
     }
 
-    private boolean canOperate(WorkflowTask task, String operatorId) {
-        return operatorId.equals(task.getAssigneeId());
-    }
-
     private String requireOperator(String operatorId) {
         if (operatorId != null && !operatorId.isBlank()) {
             return operatorId;
@@ -234,6 +256,16 @@ public class WorkflowRuntimeReadFacade {
 
     private PageRequest page(PageRequest pageRequest) {
         return pageRequest == null ? PageRequest.of(1, 20) : pageRequest;
+    }
+
+    private List<WorkflowTask> pageItems(List<WorkflowTask> tasks, PageRequest pageRequest) {
+        int from = Math.min(pageRequest.getOffset(), tasks.size());
+        int to = Math.min(from + pageRequest.getLimit(), tasks.size());
+        return tasks.subList(from, to);
+    }
+
+    private String firstText(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
     }
 
     private String requireText(String value, String message) {

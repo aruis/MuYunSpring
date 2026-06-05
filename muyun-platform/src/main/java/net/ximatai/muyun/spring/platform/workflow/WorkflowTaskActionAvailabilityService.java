@@ -1,9 +1,9 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,18 +16,30 @@ public class WorkflowTaskActionAvailabilityService {
     private final WorkflowTaskDao taskDao;
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowNodeInstanceDao nodeDao;
+    private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
 
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao) {
+        this(taskDao, instanceDao, nodeDao, new WorkflowTaskAssignmentPolicyService());
+    }
+
+    @Autowired
+    public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
+                                                 WorkflowInstanceDao instanceDao,
+                                                 WorkflowNodeInstanceDao nodeDao,
+                                                 WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
         this.nodeDao = nodeDao;
+        this.assignmentPolicyService = assignmentPolicyService == null
+                ? new WorkflowTaskAssignmentPolicyService()
+                : assignmentPolicyService;
     }
 
     public List<WorkflowTaskAvailableAction> availableActions(String taskId, String operatorId) {
         WorkflowTask task = requireTask(taskId);
-        if (task.getTaskStatus() != WorkflowTaskStatus.TODO || !canOperate(task, operatorId)) {
+        if (task.getTaskStatus() != WorkflowTaskStatus.TODO || !assignmentPolicyService.canProcess(task, operatorId)) {
             return List.of();
         }
         WorkflowInstance instance = requireInstance(task);
@@ -66,7 +78,7 @@ public class WorkflowTaskActionAvailabilityService {
         if (task.getTaskKind() != WorkflowTaskKind.RESUBMIT) {
             actions.add(WorkflowTaskAvailableAction.of("transfer", "转办").requireTargetAssignee());
         }
-        return List.copyOf(actions);
+        return actions.stream().map(action -> action.withTask(task, node)).toList();
     }
 
     private WorkflowTask requireTask(String taskId) {
@@ -84,16 +96,6 @@ public class WorkflowTaskActionAvailabilityService {
             throw new PlatformException("workflow instance not found: " + task.getInstanceId());
         }
         return instance;
-    }
-
-    private boolean canOperate(WorkflowTask task, String operatorId) {
-        String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");
-        if (CurrentUserContext.currentUser()
-                .filter(user -> user.system() && validOperatorId.equals(user.userId()))
-                .isPresent()) {
-            return true;
-        }
-        return validOperatorId.equals(task.getAssigneeId());
     }
 
     private boolean hasMultipleTodoApprovalTasks(WorkflowTask task) {

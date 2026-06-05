@@ -35,6 +35,7 @@ public class WorkflowTaskActionService {
     private final WorkflowActionPolicyService actionPolicyService;
     private final WorkflowRuntimeProgressionService progressionService;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
+    private final WorkflowDelegationService delegationService;
 
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
                                      WorkflowInstanceDao instanceDao,
@@ -44,7 +45,7 @@ public class WorkflowTaskActionService {
                                      WorkflowApprovalTaskPolicyService approvalTaskPolicyService,
                                      WorkflowRuntimeProgressionService progressionService) {
         this(taskDao, instanceDao, nodeInstanceDao, null, eventDao, eventFactory,
-                approvalTaskPolicyService, new WorkflowActionPolicyService(), progressionService, Optional.empty());
+                approvalTaskPolicyService, new WorkflowActionPolicyService(), progressionService, Optional.empty(), null);
     }
 
     @Autowired
@@ -57,7 +58,8 @@ public class WorkflowTaskActionService {
                                      WorkflowApprovalTaskPolicyService approvalTaskPolicyService,
                                      WorkflowActionPolicyService actionPolicyService,
                                      WorkflowRuntimeProgressionService progressionService,
-                                     Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
+                                     Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter,
+                                     WorkflowDelegationService delegationService) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
         this.nodeInstanceDao = nodeInstanceDao;
@@ -68,6 +70,21 @@ public class WorkflowTaskActionService {
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.progressionService = progressionService;
         this.approvalSummaryWriter = approvalSummaryWriter == null ? Optional.empty() : approvalSummaryWriter;
+        this.delegationService = delegationService;
+    }
+
+    public WorkflowTaskActionService(WorkflowTaskDao taskDao,
+                                     WorkflowInstanceDao instanceDao,
+                                     WorkflowNodeInstanceDao nodeInstanceDao,
+                                     WorkflowRouteInstanceDao routeInstanceDao,
+                                     WorkflowEventDao eventDao,
+                                     WorkflowRuntimeEventFactory eventFactory,
+                                     WorkflowApprovalTaskPolicyService approvalTaskPolicyService,
+                                     WorkflowActionPolicyService actionPolicyService,
+                                     WorkflowRuntimeProgressionService progressionService,
+                                     Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
+        this(taskDao, instanceDao, nodeInstanceDao, routeInstanceDao, eventDao, eventFactory,
+                approvalTaskPolicyService, actionPolicyService, progressionService, approvalSummaryWriter, null);
     }
 
     @Transactional
@@ -518,6 +535,10 @@ public class WorkflowTaskActionService {
         task.setTransferredFromUserId(source.getAssigneeId());
         task.setTransferredBy(operatorId);
         task.setTransferredAt(now);
+        task.setDelegatedFromUserId(source.getDelegatedFromUserId());
+        task.setDelegatedToUserId(source.getDelegatedToUserId());
+        task.setPrincipalCanProcess(source.getPrincipalCanProcess());
+        task.setDelegationPolicyId(source.getDelegationPolicyId());
         task.setCheckStatus(source.getCheckStatus());
         task.setAssignmentPolicyText(source.getAssignmentPolicyText());
         task.setAssignmentSnapshotText(source.getAssignmentSnapshotText());
@@ -556,7 +577,26 @@ public class WorkflowTaskActionService {
         task.setOriginalAssigneeId(assigneeId);
         task.setAssigneeId(requireText(assigneeId, "workflow approval assignee id must not be blank"));
         task.setCheckStatus(WorkflowTaskCheckStatus.NO_CHECK);
+        applyDelegation(instance, task);
         return task;
+    }
+
+    private void applyDelegation(WorkflowInstance instance, WorkflowTask task) {
+        if (delegationService == null) {
+            return;
+        }
+        WorkflowDelegationMatch match = delegationService.match(task.getOriginalAssigneeId(),
+                instance.getModuleAlias(), instance.getAuthOrgId());
+        if (match == null) {
+            return;
+        }
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setAssigneeId(match.delegateUserId());
+        task.setDelegatedFromUserId(match.principalUserId());
+        task.setDelegatedToUserId(match.delegateUserId());
+        task.setPrincipalCanProcess(match.principalCanProcess());
+        task.setDelegationPolicyId(match.delegationPolicyId());
+        task.setAssignmentSnapshotText(match.snapshotText());
     }
 
     private WorkflowTask requireTodoTask(WorkflowTaskActionRequest request) {

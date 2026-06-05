@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -73,6 +74,46 @@ class WorkflowRuntimeTaskFactoryTest {
     }
 
     @Test
+    void shouldFreezeDelegationWhenCreatingApprovalTask() {
+        WorkflowDelegationService delegationService = new WorkflowDelegationService(new TestMemoryDao<>());
+        WorkflowDelegation delegation = new WorkflowDelegation();
+        delegation.setTitle("leave");
+        delegation.setPrincipalUserId("approver-2");
+        delegation.setDelegateUserId("delegate-1");
+        delegation.setPrincipalCanProcess(true);
+        delegation.setModuleScopeType(WorkflowDelegationScopeType.INCLUDE);
+        delegation.setModuleAliases(java.util.Set.of("sales.contract"));
+        delegation.setOrgScopeType(WorkflowDelegationScopeType.INCLUDE);
+        delegation.setOrgIds(java.util.Set.of("org-1"));
+        String delegationId = delegationService.insert(delegation);
+        delegationService.enable(delegationId);
+        WorkflowRuntimeTaskFactory delegatedFactory = new WorkflowRuntimeTaskFactory(
+                new WorkflowRuntimeEventFactory(), delegationService);
+        WorkflowInstance instance = instance();
+        instance.setModuleAlias("sales.contract");
+        instance.setAuthOrgId("org-1");
+        WorkflowNodeInstance approval = node(instance, "approve");
+        approval.setParticipantPolicyText("user:approver-2");
+
+        WorkflowRuntimeTaskDraft draft = delegatedFactory.createBlockingTasks(instance,
+                List.of(approval), activation("approve"), "operator-1",
+                Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(draft.tasks()).hasSize(1)
+                .first()
+                .satisfies(task -> {
+                    assertThat(task.getAssignmentKind()).isEqualTo(WorkflowAssignmentKind.DELEGATED);
+                    assertThat(task.getOriginalAssigneeId()).isEqualTo("approver-2");
+                    assertThat(task.getAssigneeId()).isEqualTo("delegate-1");
+                    assertThat(task.getDelegatedFromUserId()).isEqualTo("approver-2");
+                    assertThat(task.getDelegatedToUserId()).isEqualTo("delegate-1");
+                    assertThat(task.getPrincipalCanProcess()).isTrue();
+                    assertThat(task.getDelegationPolicyId()).isEqualTo(delegationId);
+                    assertThat(task.getAssignmentSnapshotText()).contains("\"delegationPolicyId\"");
+                });
+    }
+
+    @Test
     void shouldRejectAddSignApprovalTaskWithoutValidParticipantPolicy() {
         WorkflowInstance instance = instance();
         WorkflowNodeInstance missing = node(instance, "addMissing");
@@ -97,6 +138,7 @@ class WorkflowRuntimeTaskFactoryTest {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId("instance-1");
         instance.setTenantId("tenant-1");
+        instance.setModuleAlias("sales.contract");
         return instance;
     }
 

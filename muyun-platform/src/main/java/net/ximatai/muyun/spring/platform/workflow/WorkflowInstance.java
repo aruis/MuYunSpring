@@ -35,6 +35,10 @@ public class WorkflowInstance extends StandardEntity {
     @Column(name = "record_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Record id")
     private String recordId;
 
+    @Column(name = "auth_org_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Frozen business organization id for workflow assignment")
+    private String authOrgId;
+
     @Column(name = "approval_enabled", type = ColumnType.BOOLEAN, nullable = false,
             comment = "Whether workflow governs approval status", defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean approvalEnabled = Boolean.FALSE;

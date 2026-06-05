@@ -13,6 +13,12 @@ public class WorkflowInstanceStateService {
     public WorkflowInstance startInstance(WorkflowDefinition definition, WorkflowVersion version,
                                           String recordId, String startedBy, Instant startedAt,
                                           String snapshotText) {
+        return startInstance(definition, version, recordId, null, startedBy, startedAt, snapshotText);
+    }
+
+    public WorkflowInstance startInstance(WorkflowDefinition definition, WorkflowVersion version,
+                                          String recordId, String authOrgId, String startedBy, Instant startedAt,
+                                          String snapshotText) {
         if (definition == null || version == null) {
             throw new PlatformException("workflow definition and version must not be null");
         }
@@ -26,6 +32,7 @@ public class WorkflowInstanceStateService {
         instance.setTenantId(definition.getTenantId());
         instance.setModuleAlias(PlatformNameRules.requireModuleAlias(definition.getModuleAlias()));
         instance.setRecordId(requireText(recordId, "workflow record id must not be blank"));
+        instance.setAuthOrgId(authOrgId == null || authOrgId.isBlank() ? null : authOrgId.trim());
         instance.setApprovalEnabled(Boolean.TRUE.equals(definition.getApprovalEnabled()));
         instance.setApprovalStatus(Boolean.TRUE.equals(definition.getApprovalEnabled())
                 ? WorkflowApprovalStatus.PROCESSING : WorkflowApprovalStatus.NONE);

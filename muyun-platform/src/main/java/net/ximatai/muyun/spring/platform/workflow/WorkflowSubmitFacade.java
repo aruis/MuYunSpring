@@ -39,15 +39,24 @@ public class WorkflowSubmitFacade {
         WorkflowSubmitRequest normalized = normalize(request);
         recordGuards.forEach(guard -> guard.beforeSubmit(normalized));
         WorkflowDefinitionSelection selection = selector.select(normalized);
-        WorkflowSubmitDraft draft = runtimeSubmitService.submit(
+        WorkflowSubmitDraft draft = normalized.authOrgId() == null
+                ? runtimeSubmitService.submit(
                 selection.definition(),
                 selection.version(),
                 selection.nodes(),
                 selection.links(),
                 normalized.recordId(),
                 normalized.operatorId(),
-                normalized.operatedAt()
-        );
+                normalized.operatedAt())
+                : runtimeSubmitService.submit(
+                selection.definition(),
+                selection.version(),
+                selection.nodes(),
+                selection.links(),
+                normalized.recordId(),
+                normalized.authOrgId(),
+                normalized.operatorId(),
+                normalized.operatedAt());
         boolean written = writeApprovalSummaryIfNeeded(normalized, draft);
         return new WorkflowSubmitResult(draft, written);
     }
@@ -83,8 +92,12 @@ public class WorkflowSubmitFacade {
                     .orElse("system");
         }
         Instant operatedAt = request.operatedAt() == null ? Instant.now() : request.operatedAt();
+        String authOrgId = request.authOrgId();
+        if (authOrgId != null && authOrgId.isBlank()) {
+            authOrgId = null;
+        }
         return new WorkflowSubmitRequest(moduleAlias, recordId, request.approvalRequired(),
-                request.definitionAlias(), operatorId, operatedAt);
+                request.definitionAlias(), authOrgId, operatorId, operatedAt);
     }
 
     private String requireText(String value, String name) {

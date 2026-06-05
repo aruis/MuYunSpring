@@ -430,6 +430,10 @@ class WorkflowTaskActionServiceTest {
         task.setAssigneeId("user-a");
         task.setOriginalAssigneeId("user-a");
         task.setOwnerId("owner-1");
+        task.setDelegatedFromUserId("principal-1");
+        task.setDelegatedToUserId("user-a");
+        task.setPrincipalCanProcess(true);
+        task.setDelegationPolicyId("delegation-1");
         task.setDueAt(Instant.parse("2026-06-06T02:00:00Z"));
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance());
@@ -447,6 +451,10 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.createdTask().getAssigneeId()).isEqualTo("user-b");
         assertThat(result.createdTask().getTransferredFromUserId()).isEqualTo("user-a");
         assertThat(result.createdTask().getOriginalAssigneeId()).isEqualTo("user-a");
+        assertThat(result.createdTask().getDelegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(result.createdTask().getDelegatedToUserId()).isEqualTo("user-a");
+        assertThat(result.createdTask().getPrincipalCanProcess()).isTrue();
+        assertThat(result.createdTask().getDelegationPolicyId()).isEqualTo("delegation-1");
         assertThat(result.createdTask().getDueAt()).isEqualTo(Instant.parse("2026-06-06T02:00:00Z"));
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.TASK_TRANSFERRED);
         verify(taskDao).insert(result.createdTask());

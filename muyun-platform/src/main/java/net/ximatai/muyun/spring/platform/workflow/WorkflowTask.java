@@ -61,6 +61,14 @@ public class WorkflowTask extends StandardEntity {
             comment = "Delegated from user id")
     private String delegatedFromUserId;
 
+    @Column(name = "delegated_to_user_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Delegated to user id")
+    private String delegatedToUserId;
+
+    @Column(name = "principal_can_process", type = ColumnType.BOOLEAN,
+            comment = "Whether delegated principal can process")
+    private Boolean principalCanProcess;
+
     @Column(name = "transferred_from_user_id", type = ColumnType.VARCHAR, length = 64,
             comment = "Transferred from user id")
     private String transferredFromUserId;

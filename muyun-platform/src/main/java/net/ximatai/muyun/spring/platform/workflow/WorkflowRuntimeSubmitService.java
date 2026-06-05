@@ -47,6 +47,21 @@ public class WorkflowRuntimeSubmitService {
     }
 
     @Transactional
+    public WorkflowSubmitDraft submit(WorkflowDefinition definition,
+                                      WorkflowVersion version,
+                                      java.util.List<WorkflowNodeDefinition> nodeDefinitions,
+                                      java.util.List<WorkflowLinkDefinition> linkDefinitions,
+                                      String recordId,
+                                      String authOrgId,
+                                      String operatorId,
+                                      Instant operatedAt) {
+        WorkflowSubmitDraft draft = submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
+                recordId, authOrgId, operatorId, operatedAt);
+        persist(draft, operatedAt);
+        return draft;
+    }
+
+    @Transactional
     public void persist(WorkflowSubmitDraft draft, Instant operatedAt) {
         Instant now = operatedAt == null ? Instant.now() : operatedAt;
         prepareInsert(draft.instance(), now);

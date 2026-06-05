@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinition;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowLinkDefinition;
@@ -206,6 +207,7 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(WorkflowInstance.class)))
                 .contains("id", "tenant_id", "definition_id", "workflow_version_id", "version_no",
                         "module_alias", "record_id", "approval_enabled",
+                        "auth_org_id",
                         "approval_status", "instance_status", "approval_completed_at", "started_by",
                         "started_at", "completed_at", "terminated_at", "current_node_keys",
                         "reject_resubmit_mode", "reject_return_node_key", "reject_return_owner_id",
@@ -240,10 +242,15 @@ class PlatformModelSchemaTest {
                 .contains("id", "tenant_id", "instance_id", "node_instance_id", "task_kind",
                         "task_status", "parent_task_id", "origin_task_id", "assignment_kind",
                         "add_sign_mode", "owner_id", "original_assignee_id", "assignee_id", "actual_processor_id",
-                        "delegated_from_user_id", "transferred_from_user_id", "decision",
+                        "delegated_from_user_id", "delegated_to_user_id", "principal_can_process",
+                        "transferred_from_user_id", "decision",
                         "transferred_by", "transferred_at", "added_by", "added_at",
                         "check_status", "check_result_text", "result_message", "assignment_policy_text",
                         "assignment_snapshot_text", "delegation_policy_id", "due_at", "completed_at");
+        assertThat(columnNames(mapper.toTable(WorkflowDelegation.class)))
+                .contains("id", "tenant_id", "title", "principal_user_id", "delegate_user_id", "enabled",
+                        "principal_can_process", "module_scope_type", "module_aliases",
+                        "org_scope_type", "org_ids", "memo", "sort_order");
         assertThat(columnNames(mapper.toTable(WorkflowTaskCheckResult.class)))
                 .contains("id", "task_id", "check_key", "check_run_id", "check_kind", "check_status", "passed",
                         "checked_at", "failure_message", "result_payload_text");

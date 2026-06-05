@@ -40,30 +40,44 @@ public class WorkflowActionPolicyService {
 
     private final ActionExecutionPolicyService executionPolicyService;
     private final List<WorkflowModuleRecordGuard> recordGuards;
+    private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
 
     public WorkflowActionPolicyService() {
-        this(new AllowAllActionExecutionPolicyService(), List.of());
+        this(new AllowAllActionExecutionPolicyService(), List.of(), new WorkflowTaskAssignmentPolicyService());
     }
 
     public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService) {
-        this(executionPolicyService, List.of());
+        this(executionPolicyService, List.of(), new WorkflowTaskAssignmentPolicyService());
     }
 
     @Autowired
     public WorkflowActionPolicyService(ObjectProvider<ActionExecutionPolicyService> executionPolicyService,
-                                       ObjectProvider<WorkflowModuleRecordGuard> recordGuards) {
+                                       ObjectProvider<WorkflowModuleRecordGuard> recordGuards,
+                                       ObjectProvider<WorkflowTaskAssignmentPolicyService> assignmentPolicyService) {
         this(executionPolicyService == null
                         ? new AllowAllActionExecutionPolicyService()
                         : executionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new),
-                recordGuards == null ? List.of() : recordGuards.orderedStream().toList());
+                recordGuards == null ? List.of() : recordGuards.orderedStream().toList(),
+                assignmentPolicyService == null
+                        ? new WorkflowTaskAssignmentPolicyService()
+                        : assignmentPolicyService.getIfAvailable(WorkflowTaskAssignmentPolicyService::new));
     }
 
     public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService,
                                        List<WorkflowModuleRecordGuard> recordGuards) {
+        this(executionPolicyService, recordGuards, new WorkflowTaskAssignmentPolicyService());
+    }
+
+    public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService,
+                                       List<WorkflowModuleRecordGuard> recordGuards,
+                                       WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
         this.executionPolicyService = executionPolicyService == null
                 ? new AllowAllActionExecutionPolicyService()
                 : executionPolicyService;
         this.recordGuards = recordGuards == null ? List.of() : List.copyOf(recordGuards);
+        this.assignmentPolicyService = assignmentPolicyService == null
+                ? new WorkflowTaskAssignmentPolicyService()
+                : assignmentPolicyService;
     }
 
     public void requireRuntimeAction(WorkflowInstance instance, String actionCode) {
@@ -190,9 +204,9 @@ public class WorkflowActionPolicyService {
                 .isPresent()) {
             return;
         }
-        String assigneeId = requireText(task.getAssigneeId(), "workflow task assignee id must not be blank");
-        if (!validOperatorId.equals(assigneeId)) {
-            throw new PlatformException("workflow task action operator is not assignee: " + task.getId());
+        if (!assignmentPolicyService.canProcess(task, validOperatorId)) {
+            throw new PlatformException("workflow task action operator is not assignee or delegated principal: "
+                    + task.getId());
         }
     }
 

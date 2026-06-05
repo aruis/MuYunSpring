@@ -107,6 +107,32 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldBuildTodoWorkbenchCardForPrincipalCanProcessDelegatedTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setOriginalAssigneeId("principal-1");
+        task.setAssigneeId("delegate-1");
+        task.setDelegatedFromUserId("principal-1");
+        task.setDelegatedToUserId("delegate-1");
+        task.setPrincipalCanProcess(true);
+        task.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(task));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("principal-1", PageRequest.of(1, 20));
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().assignmentKind()).isEqualTo(WorkflowAssignmentKind.DELEGATED);
+        assertThat(cards.getFirst().originalAssigneeId()).isEqualTo("principal-1");
+        assertThat(cards.getFirst().delegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(cards.getFirst().delegatedToUserId()).isEqualTo("delegate-1");
+        assertThat(cards.getFirst().principalCanProcess()).isTrue();
+        assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("delegate-1", "principal-1");
+    }
+
+    @Test
     void shouldBuildTrackingCardsFromInstances() {
         WorkflowInstance instance = instance("instance-1");
         WorkflowTask todo = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
