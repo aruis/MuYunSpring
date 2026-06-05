@@ -21,6 +21,19 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinition;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowLinkDefinition;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeDefinition;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskCheck;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskCheckResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskDefinition;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskGuide;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowVersion;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -156,6 +169,80 @@ class PlatformModelSchemaTest {
     }
 
     @Test
+    void shouldMapWorkflowModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(WorkflowDefinition.class)))
+                .contains("id", "tenant_id", "application_alias", "module_alias", "entity_alias", "alias",
+                        "title", "approval_enabled", "definition_status", "current_version_no",
+                        "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(WorkflowDefinition.class)))
+                .contains(List.of("tenant_id", "module_alias", "alias"));
+        assertThat(columnNames(mapper.toTable(WorkflowVersion.class)))
+                .contains("id", "definition_id", "version_no", "publish_status", "snapshot_text",
+                        "published_by", "published_at");
+        assertThat(columnNames(mapper.toTable(WorkflowNodeDefinition.class)))
+                .contains("id", "workflow_version_id", "node_key", "node_type", "approval_mode",
+                        "milestone_type", "converge_mode", "converge_ratio", "task_definition_id", "participant_policy_text",
+                        "node_config_text", "sort_order");
+        assertThat(columnNames(mapper.toTable(WorkflowLinkDefinition.class)))
+                .contains("id", "workflow_version_id", "route_key", "source_node_key", "target_node_key",
+                        "condition_expression", "default_route", "route_config_text", "sort_order");
+        assertThat(columnNames(mapper.toTable(WorkflowTaskDefinition.class)))
+                .contains("id", "tenant_id", "module_alias", "entity_alias", "alias", "title",
+                        "manual_confirm", "task_config_text", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(WorkflowTaskGuide.class)))
+                .contains("id", "task_definition_id", "guide_key", "guide_kind", "target_module_alias",
+                        "target_action_code", "guide_config_text", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(WorkflowTaskCheck.class)))
+                .contains("id", "task_definition_id", "check_key", "check_kind", "expression",
+                        "failure_message", "check_config_text", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(WorkflowInstance.class)))
+                .contains("id", "tenant_id", "definition_id", "workflow_version_id", "version_no",
+                        "module_alias", "entity_alias", "record_id", "approval_enabled",
+                        "approval_status", "instance_status", "approval_completed_at", "started_by",
+                        "started_at", "completed_at", "terminated_at", "current_node_keys",
+                        "last_action_code", "last_action_reason", "last_operator_id", "last_operated_at",
+                        "snapshot_text");
+        assertThat(columnNames(mapper.toTable(WorkflowNodeInstance.class)))
+                .contains("id", "instance_id", "node_key", "node_run_id", "node_type", "node_status", "approval_mode",
+                        "milestone_type", "converge_mode", "converge_ratio", "route_id",
+                        "enter_route_id", "branch_run_id", "converge_run_id",
+                        "required_route_count", "arrived_route_count", "completed_route_count",
+                        "required_task_count", "completed_task_count", "approved_task_count",
+                        "rejected_task_count", "rollback_target_node_key",
+                        "overtime_status", "activated_at", "completed_at",
+                        "node_snapshot_text");
+        assertThat(columnNames(mapper.toTable(WorkflowRouteInstance.class)))
+                .contains("id", "instance_id", "route_key", "route_run_id", "source_node_key", "target_node_key",
+                        "branch_node_key", "branch_run_id", "converge_node_key", "converge_run_id",
+                        "parent_route_id", "route_depth",
+                        "route_status", "route_reason", "condition_matched", "default_route",
+                        "selected_by", "selected_at", "arrived_at", "closed_by_route_id", "closed_reason",
+                        "invalidated_by_action_id", "invalidated_at");
+        assertThat(columnNames(mapper.toTable(WorkflowTask.class)))
+                .contains("id", "tenant_id", "instance_id", "node_instance_id", "task_kind",
+                        "task_status", "parent_task_id", "origin_task_id", "assignment_kind",
+                        "add_sign_mode", "owner_id", "original_assignee_id", "assignee_id", "actual_processor_id",
+                        "delegated_from_user_id", "transferred_from_user_id", "decision",
+                        "transferred_by", "transferred_at", "added_by", "added_at",
+                        "check_status", "check_result_text", "result_message", "assignment_policy_text",
+                        "assignment_snapshot_text", "delegation_policy_id", "due_at", "completed_at");
+        assertThat(columnNames(mapper.toTable(WorkflowTaskCheckResult.class)))
+                .contains("id", "task_id", "check_key", "check_run_id", "check_kind", "check_status", "passed",
+                        "checked_at", "failure_message", "result_payload_text");
+        assertThat(uniqueIndexes(mapper.toTable(WorkflowTaskCheckResult.class)))
+                .contains(List.of("tenant_id", "task_id", "check_key", "check_run_id"));
+        assertThat(columnNames(mapper.toTable(WorkflowEvent.class)))
+                .contains("id", "tenant_id", "instance_id", "node_instance_id", "task_id", "event_type",
+                        "action_code", "operator_id", "message", "payload_text", "occurred_at");
+        assertThat(columnType(mapper.toTable(WorkflowInstance.class), "snapshot_text")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowNodeDefinition.class), "participant_policy_text"))
+                .isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowTask.class), "result_message")).isEqualTo(ColumnType.TEXT);
+        assertThat(indexes(mapper.toTable(WorkflowRouteInstance.class)))
+                .contains(List.of("instance_id", "route_key"), List.of("instance_id", "route_status"));
+    }
+
+    @Test
     void shouldMapStablePlatformDefaults() {
         assertThat(columnDefault(mapper.toTable(PlatformModule.class), "module_kind")).isEqualTo("'static'");
         assertThat(columnDefault(mapper.toTable(PlatformModule.class), "system_managed")).isEqualTo("FALSE");
@@ -170,6 +257,13 @@ class PlatformModelSchemaTest {
         assertThat(columnDefault(mapper.toTable(MetadataField.class), "required")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(MetadataViewField.class), "visible")).isEqualTo("TRUE");
         assertThat(columnDefault(mapper.toTable(RuntimeAuditRecord.class), "system_context")).isEqualTo("FALSE");
+        assertThat(columnDefault(mapper.toTable(WorkflowDefinition.class), "approval_enabled")).isEqualTo("FALSE");
+        assertThat(columnDefault(mapper.toTable(WorkflowInstance.class), "approval_status")).isEqualTo("'none'");
+        assertThat(columnDefault(mapper.toTable(WorkflowInstance.class), "instance_status")).isEqualTo("'running'");
+        assertThat(columnDefault(mapper.toTable(WorkflowRouteInstance.class), "route_status")).isEqualTo("'candidate'");
+        assertThat(columnDefault(mapper.toTable(WorkflowTask.class), "assignment_kind")).isEqualTo("'normal'");
+        assertThat(columnDefault(mapper.toTable(WorkflowTask.class), "check_status")).isEqualTo("'not_checked'");
+        assertThat(columnDefault(mapper.toTable(WorkflowTaskDefinition.class), "manual_confirm")).isEqualTo("TRUE");
     }
 
     private Set<String> columnNames(TableWrapper table) {
