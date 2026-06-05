@@ -1,28 +1,70 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
+import net.ximatai.muyun.spring.boot.iam.RoleWebController;
+import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
-import org.junit.jupiter.api.Nested;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class StaticModuleDefinitionScannerTest {
     @Test
-    void shouldScanStaticModuleAndActionsFromControllerAnnotations() {
+    void shouldScanIamStaticModulesAndActionsFromControllerAnnotations() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(TenantWebController.class);
+            context.registerBean(OrganizationWebController.class);
+            context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
             context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
             List<StaticModuleDefinition> definitions = scanner.scan();
+            Map<String, StaticModuleDefinition> byAlias = definitions.stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
-            assertThat(definitions).singleElement().satisfies(definition -> {
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "iam.tenant", "iam.organization", "iam.role", "iam.user");
+            assertThat(byAlias.get("iam.tenant")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.title()).isEqualTo("租户管理");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactly("create", "view", "update", "delete", "query",
+                                "sort", "enable", "disable");
+            });
+            assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.title()).isEqualTo("机构管理");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactly("create", "view", "update", "delete", "query",
+                                "tree", "sort", "enable", "disable");
+            });
+            assertThat(byAlias.get("iam.role")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.title()).isEqualTo("角色管理");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactlyInAnyOrder("create", "view", "update", "delete", "query",
+                                "sort", "enable", "disable", "roleUsers", "rolePermissions");
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("roleUsers"))
+                        .singleElement()
+                        .satisfies(action -> assertCustomRecordAction(action, "roleUsers", "角色用户"));
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("rolePermissions"))
+                        .singleElement()
+                        .satisfies(action -> assertCustomRecordAction(action, "rolePermissions", "角色授权"));
+            });
+            assertThat(byAlias.get("iam.user")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.moduleAlias()).isEqualTo("iam.user");
                 assertThat(definition.title()).isEqualTo("用户管理");
@@ -37,6 +79,17 @@ class StaticModuleDefinitionScannerTest {
                         });
             });
         }
+    }
+
+    private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
+        assertThat(action.actionCode()).isEqualTo(actionCode);
+        assertThat(action.permissionActionCode()).isEqualTo(actionCode);
+        assertThat(action.title()).isEqualTo(title);
+        assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+        assertThat(action.accessMode()).isEqualTo(EntityActionAccessMode.AUTH_REQUIRED);
+        assertThat(action.actionAuth()).isTrue();
+        assertThat(action.dataAuth()).isTrue();
+        assertThat(action.defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.NONE);
     }
 
     @Test

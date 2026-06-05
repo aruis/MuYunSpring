@@ -113,8 +113,31 @@ class ActionEndpointInterceptorTest {
 
         assertThat(policyService.context).satisfies(context -> {
             assertThat(context.moduleAlias()).isEqualTo("iam.role");
-            assertThat(context.platformAction()).isEqualTo(PlatformAction.UPDATE);
-            assertThat(context.permissionCode()).isEqualTo("iam.role:update");
+            assertThat(context.platformAction()).isNull();
+            assertThat(context.actionCode()).isEqualTo("rolePermissions");
+            assertThat(context.permissionCode()).isEqualTo("iam.role:rolePermissions");
+            assertThat(context.actionPolicy().requiresDataScope()).isTrue();
+            assertThat(context.recordIds()).containsExactly("role-1");
+        });
+    }
+
+    @Test
+    void shouldResolveRoleUsersCustomEndpointActionContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.role/users/role-1/bind");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("roleId", "role-1"));
+        RoleWebController controller = new RoleWebController(null);
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, RoleWebController.class.getMethod(
+                        "bindUsers", String.class, RoleWebController.UserIdsRequest.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("iam.role");
+            assertThat(context.platformAction()).isNull();
+            assertThat(context.actionCode()).isEqualTo("roleUsers");
+            assertThat(context.permissionCode()).isEqualTo("iam.role:roleUsers");
+            assertThat(context.actionPolicy().requiresDataScope()).isTrue();
+            assertThat(context.recordIds()).containsExactly("role-1");
         });
     }
 

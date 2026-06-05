@@ -5,8 +5,9 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
-import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
-import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
+@PlatformStaticModule(application = "iam", alias = "iam.role", title = "角色管理")
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements
         CrudWeb<Role, RoleService>,
@@ -34,27 +36,31 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     @PostMapping("/users/{roleId}/bind")
-    @ActionEndpoint(PlatformAction.UPDATE)
+    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebCountResponse bindUsers(@PathVariable String roleId,
                                       @RequestBody UserIdsRequest request) {
         return webScope(() -> new WebCountResponse(service().bindUsers(roleId, request.userIds())));
     }
 
     @PostMapping("/users/{roleId}/unbind")
-    @ActionEndpoint(PlatformAction.UPDATE)
+    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebCountResponse unbindUsers(@PathVariable String roleId,
                                         @RequestBody UserIdsRequest request) {
         return webScope(() -> new WebCountResponse(service().unbindUsers(roleId, request.userIds())));
     }
 
     @GetMapping("/users/{roleId}")
-    @ActionEndpoint(PlatformAction.VIEW)
+    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public List<String> userIds(@PathVariable String roleId) {
         return webScope(() -> service().userIds(roleId));
     }
 
     @PostMapping("/grant/{roleId}")
-    @ActionEndpoint(PlatformAction.UPDATE)
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebCountResponse grantAction(@PathVariable String roleId,
                                         @RequestBody GrantActionRequest request) {
         return webScope(() -> new WebCountResponse(service().grantAction(
@@ -70,7 +76,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     @PostMapping("/wildcard-data-scope/{roleId}/grant")
-    @ActionEndpoint(PlatformAction.UPDATE)
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebCountResponse grantWildcardDataScopeAction(@PathVariable String roleId,
                                                          @RequestBody GrantWildcardDataScopeRequest request) {
         return webScope(() -> new WebCountResponse(service().grantWildcardDataScopeAction(
@@ -82,7 +89,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     @PostMapping("/revoke/{roleId}")
-    @ActionEndpoint(PlatformAction.UPDATE)
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public WebCountResponse revokeAction(@PathVariable String roleId,
                                          @RequestBody RevokeActionRequest request) {
         return webScope(() -> new WebCountResponse(service().revokeAction(
@@ -90,7 +98,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     @PostMapping("/permissionMatrix/{roleId}")
-    @ActionEndpoint(PlatformAction.VIEW)
+    @CustomActionEndpoint(value = "rolePermissions", title = "角色授权",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
     public RolePermissionMatrix permissionMatrix(@PathVariable String roleId,
                                                  @RequestBody PermissionMatrixRequest request) {
         return webScope(() -> service().permissionMatrix(
