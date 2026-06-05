@@ -32,13 +32,18 @@ public class WorkflowModuleTaskRuntimeService {
     }
 
     public WorkflowModuleTaskContinueResult checkAndContinue(String taskId, String operatorId, String reason) {
+        return checkAndContinue(taskId, operatorId, reason, null, null);
+    }
+
+    public WorkflowModuleTaskContinueResult checkAndContinue(String taskId, String operatorId, String reason,
+                                                             String selectedRouteKey, String selectedReason) {
         Context context = requireContext(taskId, operatorId);
         WorkflowModuleTaskProcessBundle bundle = bundle(context);
         if (!bundle.evaluation().passed()) {
             return WorkflowModuleTaskContinueResult.blocked(bundle);
         }
         WorkflowTaskActionResult result = taskActionFacade.execute("complete",
-                WorkflowTaskActionRequest.complete(taskId, operatorId, reason));
+                WorkflowTaskActionRequest.complete(taskId, operatorId, reason, selectedRouteKey, selectedReason));
         return WorkflowModuleTaskContinueResult.continued(result);
     }
 

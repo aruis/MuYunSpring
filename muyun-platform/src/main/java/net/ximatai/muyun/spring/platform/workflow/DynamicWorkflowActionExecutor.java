@@ -98,10 +98,19 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                 requireText(payload(request, "taskId"), "workflow task id must not be blank"),
                 text(payload(request, "operatorId"), null),
                 text(payload(request, "targetAssigneeId"), null),
+                null,
+                null,
                 rejectResubmitMode(payload(request, "rejectResubmitMode")),
                 text(payload(request, "reason"), null),
-                operatedAt(payload(request, "operatedAt"))
+                operatedAt(payload(request, "operatedAt")),
+                selectedRouteKey(request),
+                text(payload(request, "selectedReason"), null)
         );
+    }
+
+    private String selectedRouteKey(DynamicActionExecutionRequest request) {
+        String routeKey = text(payload(request, "selectedRouteKey"), null);
+        return routeKey == null ? text(payload(request, "selectedDirectLinkKey"), null) : routeKey;
     }
 
     private WorkflowRejectResubmitMode rejectResubmitMode(Object value) {

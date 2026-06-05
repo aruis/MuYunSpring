@@ -62,7 +62,25 @@ class WorkflowTaskActionServiceTest {
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao, atLeastOnce()).insert(any());
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"));
+                Instant.parse("2026-06-05T02:00:00Z"), null);
+    }
+
+    @Test
+    void shouldPassSelectedRouteKeyWhenApprovingTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        service.approve(new WorkflowTaskActionRequest("task-1", "user-1", null, null, null, null,
+                "agree", Instant.parse("2026-06-05T02:00:00Z"), "manual-left", "choose left"));
+
+        verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T02:00:00Z"), "manual-left");
     }
 
     @Test
@@ -172,7 +190,7 @@ class WorkflowTaskActionServiceTest {
         verify(policyService).requireManagementTaskAction("forceApprove", "admin approved");
         verify(policyService, never()).requireRuntimeAction(result.instance(), "forceApprove");
         verify(progressionService).advanceFromNode("instance-1", "approve", "admin-1",
-                Instant.parse("2026-06-05T02:30:00Z"));
+                Instant.parse("2026-06-05T02:30:00Z"), null);
     }
 
     @Test
@@ -476,7 +494,25 @@ class WorkflowTaskActionServiceTest {
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao).insert(result.event());
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"));
+                Instant.parse("2026-06-05T02:00:00Z"), null);
+    }
+
+    @Test
+    void shouldPassSelectedRouteKeyWhenCompletingBusinessTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(null, null);
+        node.setNodeType(WorkflowNodeType.TASK);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        service.completeBusinessTask(new WorkflowTaskActionRequest("task-1", "user-1", null, null, null, null,
+                "done", Instant.parse("2026-06-05T02:00:00Z"), "manual-right", "choose right"));
+
+        verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T02:00:00Z"), "manual-right");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -7,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -176,6 +178,97 @@ class WorkflowRuntimeProgressionServiceTest {
         assertThat(result.droppedRoutes()).containsExactly(leftRoute);
         assertThat(result.events()).extracting(WorkflowEvent::getEventType)
                 .contains(WorkflowEventType.ROUTE_SELECTED, WorkflowEventType.ROUTE_DROPPED);
+    }
+
+    @Test
+    void shouldUseSelectedRouteKeyFromCompletedBranchNode() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance branch = node("node-branch", "branch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance right = node("node-right", "rightTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "branch", "rightTask", true);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(branch, left, right));
+        when(routeDao.query(any(), any())).thenReturn(List.of(leftRoute, rightRoute));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(branch, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(left, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(right, 2)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(leftRoute, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "branch", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute");
+
+        assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(leftRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
+        assertThat(rightRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(right.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(result.selectedRoutes()).containsExactly(leftRoute);
+        assertThat(result.droppedRoutes()).containsExactly(rightRoute);
+    }
+
+    @Test
+    void shouldPassSelectedRouteKeyToReachedBranchDuringActivation() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance branch = node("node-branch", "branch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance right = node("node-right", "rightTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toBranch", "approve", "branch", true);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "branch", "rightTask", true);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, branch, left, right));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, leftRoute, rightRoute));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(approve, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(branch, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(left, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(right, 2)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(entry, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(leftRoute, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute");
+
+        assertThat(entry.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(entry.getRouteReason()).isEqualTo(WorkflowRouteReason.DEFAULT_SELECTED);
+        assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(leftRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
+        assertThat(rightRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(right.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(result.selectedRoutes()).containsExactly(entry);
+        assertThat(result.activation().traversedRouteKeys()).containsExactly("leftRoute");
+    }
+
+    @Test
+    void shouldRejectSelectedRouteKeyWhenRouteIsNotCandidateOutgoingRoute() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance branch = node("node-branch", "branch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(branch, left));
+        when(routeDao.query(any(), any())).thenReturn(List.of(leftRoute));
+
+        assertThatThrownBy(() -> service.advanceFromNode("instance-1", "branch", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"), "missingRoute"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("selected route is not candidate outgoing route");
     }
 
     private WorkflowRuntimeProgressionService service(Optional<WorkflowApprovalSummaryWriter> writer) {

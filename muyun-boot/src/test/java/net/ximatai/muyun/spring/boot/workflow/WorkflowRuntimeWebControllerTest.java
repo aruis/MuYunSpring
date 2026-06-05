@@ -236,6 +236,12 @@ class WorkflowRuntimeWebControllerTest {
     void shouldExecuteTaskActionsThroughTaskActionFacade() throws Exception {
         WorkflowTask task = new WorkflowTask();
         task.setId("task-1");
+        when(taskActionFacade.execute(eq("approve"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "operator-1".equals(request.operatorId())
+                        && "leftRoute".equals(request.selectedRouteKey())
+                        && "choose left".equals(request.selectedReason()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
         when(taskActionFacade.execute(eq("reject"), argThat(request ->
                 "task-1".equals(request.taskId())
                         && "operator-1".equals(request.operatorId())
@@ -271,6 +277,18 @@ class WorkflowRuntimeWebControllerTest {
                         && "user-1".equals(request.operatorId())
                         && request.reason() == null)))
                 .thenReturn(WorkflowTaskActionResult.of(task, null));
+
+        mvc.perform(post("/workflow/runtime/task/task-1/actions/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "selectedDirectLinkKey": "leftRoute",
+                                  "selectedReason": "choose left"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-1"));
 
         mvc.perform(post("/workflow/runtime/task/task-1/actions/reject")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -371,7 +389,8 @@ class WorkflowRuntimeWebControllerTest {
         WorkflowModuleTaskProcessBundle bundle = moduleTaskBundle("task-1");
         WorkflowTaskActionResult actionResult = WorkflowTaskActionResult.of(new WorkflowTask(), null);
         when(moduleTaskRuntimeService.prepare("task-1", "user-1")).thenReturn(bundle);
-        when(moduleTaskRuntimeService.checkAndContinue("task-1", "operator-1", "done"))
+        when(moduleTaskRuntimeService.checkAndContinue("task-1", "operator-1", "done",
+                "leftRoute", "choose left"))
                 .thenReturn(WorkflowModuleTaskContinueResult.continued(actionResult));
 
         mvc.perform(get("/workflow/runtime/task/task-1/module-task/prepare"))
@@ -382,12 +401,20 @@ class WorkflowRuntimeWebControllerTest {
 
         mvc.perform(post("/workflow/runtime/task/task-1/module-task/check-and-continue")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"operatorId\":\"operator-1\",\"reason\":\"done\"}"))
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "reason": "done",
+                                  "selectedDirectLinkKey": "leftRoute",
+                                  "selectedReason": "choose left"
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.continued").value(true));
 
         verify(moduleTaskRuntimeService).prepare("task-1", "user-1");
-        verify(moduleTaskRuntimeService).checkAndContinue("task-1", "operator-1", "done");
+        verify(moduleTaskRuntimeService).checkAndContinue("task-1", "operator-1", "done",
+                "leftRoute", "choose left");
     }
 
     private WorkflowInstance instance(String id) {

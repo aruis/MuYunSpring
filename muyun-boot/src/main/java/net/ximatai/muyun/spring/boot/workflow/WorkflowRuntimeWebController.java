@@ -108,7 +108,9 @@ public class WorkflowRuntimeWebController {
                 request == null ? null : request.addSignSegment(),
                 rejectResubmitMode(request == null ? null : request.rejectResubmitMode()),
                 request == null ? null : request.reason(),
-                null));
+                null,
+                request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
+                request == null ? null : request.selectedReason()));
     }
 
     @PostMapping("/task/{taskId}/read")
@@ -122,6 +124,8 @@ public class WorkflowRuntimeWebController {
                 null,
                 null,
                 request == null ? null : request.reason(),
+                null,
+                null,
                 null));
     }
 
@@ -184,7 +188,9 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowModuleTaskContinueWebRequest request) {
         return moduleTaskRuntimeService.checkAndContinue(taskId,
                 operatorId(request == null ? null : request.operatorId()),
-                request == null ? null : request.reason());
+                request == null ? null : request.reason(),
+                request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
+                request == null ? null : request.selectedReason());
     }
 
     @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})
@@ -240,7 +246,13 @@ record WorkflowTaskActionWebRequest(String operatorId,
                                     String targetAssigneeId,
                                     WorkflowAddSignSegment addSignSegment,
                                     String rejectResubmitMode,
-                                    String reason) {
+                                    String reason,
+                                    String selectedRouteKey,
+                                    String selectedDirectLinkKey,
+                                    String selectedReason) {
+    String selectedRouteKeyOrDirectLinkKey() {
+        return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
+    }
 }
 
 record WorkflowWorkbenchWebRequest(
@@ -283,7 +295,14 @@ record WorkflowWorkbenchWebRequest(
     }
 }
 
-record WorkflowModuleTaskContinueWebRequest(String operatorId, String reason) {
+record WorkflowModuleTaskContinueWebRequest(String operatorId,
+                                            String reason,
+                                            String selectedRouteKey,
+                                            String selectedDirectLinkKey,
+                                            String selectedReason) {
+    String selectedRouteKeyOrDirectLinkKey() {
+        return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
+    }
 }
 
 record WorkflowWebError(String code, String message) {

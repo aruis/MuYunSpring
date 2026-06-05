@@ -10,28 +10,46 @@ public record WorkflowTaskActionRequest(
         WorkflowAddSignSegment addSignSegment,
         WorkflowRejectResubmitMode rejectResubmitMode,
         String reason,
-        Instant operatedAt
+        Instant operatedAt,
+        String selectedRouteKey,
+        String selectedReason
 ) {
     public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
                                      String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, null, null, null, reason, operatedAt);
+        this(taskId, operatorId, targetAssigneeId, null, null, null, reason, operatedAt, null, null);
     }
 
     public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
                                      WorkflowRejectResubmitMode rejectResubmitMode,
                                      String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, null, null, rejectResubmitMode, reason, operatedAt);
+        this(taskId, operatorId, targetAssigneeId, null, null, rejectResubmitMode, reason, operatedAt, null, null);
     }
 
     public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
                                      WorkflowAddSignMode addSignMode,
                                      WorkflowRejectResubmitMode rejectResubmitMode,
                                      String reason, Instant operatedAt) {
-        this(taskId, operatorId, targetAssigneeId, addSignMode, null, rejectResubmitMode, reason, operatedAt);
+        this(taskId, operatorId, targetAssigneeId, addSignMode, null, rejectResubmitMode, reason, operatedAt,
+                null, null);
+    }
+
+    public WorkflowTaskActionRequest(String taskId, String operatorId, String targetAssigneeId,
+                                     WorkflowAddSignMode addSignMode,
+                                     WorkflowAddSignSegment addSignSegment,
+                                     WorkflowRejectResubmitMode rejectResubmitMode,
+                                     String reason, Instant operatedAt) {
+        this(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment, rejectResubmitMode, reason, operatedAt,
+                null, null);
     }
 
     public static WorkflowTaskActionRequest complete(String taskId, String operatorId, String reason) {
         return new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, reason, null);
+    }
+
+    public static WorkflowTaskActionRequest complete(String taskId, String operatorId, String reason,
+                                                     String selectedRouteKey, String selectedReason) {
+        return new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, null, reason, null,
+                selectedRouteKey, selectedReason);
     }
 
     public static WorkflowTaskActionRequest reject(String taskId, String operatorId,
