@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -22,6 +23,7 @@ public class WorkflowRuntimeReadFacade {
     private final WorkflowRouteInstanceDao routeDao;
     private final WorkflowEventDao eventDao;
     private final WorkflowTaskActionAvailabilityService availabilityService;
+    private final WorkflowActionPolicyService actionPolicyService;
 
     public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
                                      WorkflowTaskDao taskDao,
@@ -29,16 +31,32 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowRouteInstanceDao routeDao,
                                      WorkflowEventDao eventDao,
                                      WorkflowTaskActionAvailabilityService availabilityService) {
+        this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService,
+                new WorkflowActionPolicyService());
+    }
+
+    @Autowired
+    public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
+                                     WorkflowTaskDao taskDao,
+                                     WorkflowNodeInstanceDao nodeDao,
+                                     WorkflowRouteInstanceDao routeDao,
+                                     WorkflowEventDao eventDao,
+                                     WorkflowTaskActionAvailabilityService availabilityService,
+                                     WorkflowActionPolicyService actionPolicyService) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeDao = nodeDao;
         this.routeDao = routeDao;
         this.eventDao = eventDao;
         this.availabilityService = availabilityService;
+        this.actionPolicyService = actionPolicyService == null
+                ? new WorkflowActionPolicyService()
+                : actionPolicyService;
     }
 
     public WorkflowRuntimeRenderBundle renderBundle(String instanceId) {
         WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
         List<WorkflowNodeInstance> nodes = nodeDao.query(Criteria.of().eq("instanceId", instance.getId()),
                 ALL, Sort.asc("createdAt"));
         List<WorkflowRouteInstance> routes = routeDao.query(Criteria.of().eq("instanceId", instance.getId()),
@@ -48,17 +66,20 @@ public class WorkflowRuntimeReadFacade {
 
     public List<WorkflowTask> instanceTasks(String instanceId) {
         WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
         return taskDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL, Sort.asc("createdAt"));
     }
 
     public List<WorkflowEvent> instanceEvents(String instanceId) {
         WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
         return eventDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL,
                 Sort.asc("occurredAt"), Sort.asc("createdAt"));
     }
 
     public List<WorkflowTaskAvailableAction> instanceAvailableActions(String instanceId, String operatorId) {
         WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
         String validOperatorId = requireOperator(operatorId);
         Map<String, WorkflowNodeInstance> nodes = nodeById(instance.getId());
         return taskDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL, Sort.asc("createdAt"))

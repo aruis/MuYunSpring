@@ -9,22 +9,61 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 
 @Service
 public class WorkflowActionPolicyService {
+    public static final String MANAGEMENT_MODULE_ALIAS = "platform.workflow_admin";
+    public static final String MANAGEMENT_TODO_TASK_QUERY_ACTION = "todoTaskQuery";
+    public static final String MANAGEMENT_FORCE_APPROVE_ACTION = "forceApprove";
+    public static final String MANAGEMENT_FORCE_TERMINATE_ACTION = "forceTerminate";
+    public static final List<String> RUNTIME_RECORD_ACTION_CODES = List.of(
+            "approve",
+            "reject",
+            "rollback",
+            "resubmit",
+            "complete",
+            "notice",
+            "transfer",
+            "addSign",
+            "invalidate",
+            "cancel",
+            "revoke",
+            "terminate",
+            "reset"
+    );
+
     private final ActionExecutionPolicyService executionPolicyService;
+    private final List<WorkflowModuleRecordGuard> recordGuards;
 
     public WorkflowActionPolicyService() {
-        this(new AllowAllActionExecutionPolicyService());
+        this(new AllowAllActionExecutionPolicyService(), List.of());
     }
 
     public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService) {
+        this(executionPolicyService, List.of());
+    }
+
+    @Autowired
+    public WorkflowActionPolicyService(ObjectProvider<ActionExecutionPolicyService> executionPolicyService,
+                                       ObjectProvider<WorkflowModuleRecordGuard> recordGuards) {
+        this(executionPolicyService == null
+                        ? new AllowAllActionExecutionPolicyService()
+                        : executionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new),
+                recordGuards == null ? List.of() : recordGuards.orderedStream().toList());
+    }
+
+    public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService,
+                                       List<WorkflowModuleRecordGuard> recordGuards) {
         this.executionPolicyService = executionPolicyService == null
                 ? new AllowAllActionExecutionPolicyService()
                 : executionPolicyService;
+        this.recordGuards = recordGuards == null ? List.of() : List.copyOf(recordGuards);
     }
 
     public void requireRuntimeAction(WorkflowInstance instance, String actionCode) {
@@ -34,10 +73,25 @@ public class WorkflowActionPolicyService {
         String validActionCode = requireText(actionCode, "workflow action code must not be blank");
         String moduleAlias = requireText(instance.getModuleAlias(), "workflow module alias must not be blank");
         String recordId = requireText(instance.getRecordId(), "workflow record id must not be blank");
+        ActionExecutionPolicy policy = runtimePolicy(validActionCode);
         executionPolicyService.requireRecordAction(ActionExecutionContext.ofPolicy(
                 moduleAlias,
-                runtimePolicy(validActionCode),
+                policy,
                 Set.of(recordId),
+                CurrentUserContext.currentUser()));
+        requireRecordDataScope(moduleAlias, recordId, policy);
+    }
+
+    public void requireRecordView(WorkflowInstance instance) {
+        requireRuntimeAction(instance, "view");
+    }
+
+    public void requireManagementAction(String actionCode) {
+        String validActionCode = requireText(actionCode, "workflow action code must not be blank");
+        executionPolicyService.requireAuthorized(ActionExecutionContext.ofPolicy(
+                MANAGEMENT_MODULE_ALIAS,
+                managementPolicy(validActionCode),
+                Set.of(),
                 CurrentUserContext.currentUser()));
     }
 
@@ -63,7 +117,16 @@ public class WorkflowActionPolicyService {
 
     public void requireManagementTaskAction(String actionCode, String reason) {
         String validActionCode = requireText(actionCode, "workflow action code must not be blank");
-        if ("forceApprove".equals(validActionCode) || "forceHandle".equals(validActionCode)) {
+        requireManagementAction(validActionCode);
+        if (MANAGEMENT_FORCE_APPROVE_ACTION.equals(validActionCode) || "forceHandle".equals(validActionCode)) {
+            requireReason(validActionCode, reason);
+        }
+    }
+
+    public void requireManagementInstanceAction(String actionCode, String reason) {
+        String validActionCode = requireText(actionCode, "workflow action code must not be blank");
+        requireManagementAction(validActionCode);
+        if (MANAGEMENT_FORCE_TERMINATE_ACTION.equals(validActionCode)) {
             requireReason(validActionCode, reason);
         }
     }
@@ -143,12 +206,30 @@ public class WorkflowActionPolicyService {
         return new ActionExecutionPolicy(
                 actionCode,
                 PlatformActionLevel.RECORD,
-                ActionAccessMode.LOGIN_REQUIRED,
-                false,
+                ActionAccessMode.AUTH_REQUIRED,
+                true,
+                true,
+                ActionDefaultGrantPolicy.NONE,
+                null
+        );
+    }
+
+    private ActionExecutionPolicy managementPolicy(String actionCode) {
+        return new ActionExecutionPolicy(
+                actionCode,
+                PlatformActionLevel.LIST,
+                ActionAccessMode.AUTH_REQUIRED,
+                true,
                 false,
                 ActionDefaultGrantPolicy.NONE,
                 null
         );
+    }
+
+    private void requireRecordDataScope(String moduleAlias, String recordId, ActionExecutionPolicy policy) {
+        for (WorkflowModuleRecordGuard recordGuard : recordGuards) {
+            recordGuard.requireRecordAction(moduleAlias, recordId, policy);
+        }
     }
 
     private String requireText(String value, String message) {

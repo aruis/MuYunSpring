@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistra
 import net.ximatai.muyun.spring.platform.module.ModuleActionSourceType;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -41,6 +43,36 @@ class WorkflowModuleActionContributorTest {
     }
 
     @Test
+    void shouldContributeRuntimeRecordActionsForApprovalWorkflow() {
+        List<ModuleActionContribution> contributions = contributor.contributions(definition(true), version());
+
+        assertThat(contributions).extracting(ModuleActionContribution::actionCode)
+                .containsAll(WorkflowActionPolicyService.RUNTIME_RECORD_ACTION_CODES);
+        assertThat(contributions)
+                .filteredOn(contribution -> "approve".equals(contribution.actionCode()))
+                .singleElement()
+                .satisfies(contribution -> {
+                    assertThat(contribution.moduleAlias()).isEqualTo("sales.contract");
+                    assertThat(contribution.permissionActionCode()).isEqualTo("approve");
+                    assertThat(contribution.actionLevel()).isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.RECORD);
+                    assertThat(contribution.accessMode()).isEqualTo(net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode.AUTH_REQUIRED);
+                    assertThat(contribution.actionAuth()).isTrue();
+                    assertThat(contribution.dataAuth()).isTrue();
+                    assertThat(contribution.sourceType()).isEqualTo(ModuleActionSourceType.WORKFLOW_RUNTIME);
+                    assertThat(contribution.bindingType()).isNull();
+                });
+    }
+
+    @Test
+    void shouldContributeRuntimeAndDefinitionActionForNonApprovalWorkflow() {
+        List<ModuleActionContribution> contributions = contributor.contributions(definition(false), version());
+
+        assertThat(contributions).extracting(ModuleActionContribution::actionCode)
+                .containsAll(WorkflowActionPolicyService.RUNTIME_RECORD_ACTION_CODES)
+                .contains("syncWorkflow");
+    }
+
+    @Test
     void shouldRejectNonApprovalWorkflowWithoutActionCode() {
         WorkflowDefinition definition = definition(false);
         definition.setActionCode(null);
@@ -57,9 +89,13 @@ class WorkflowModuleActionContributorTest {
 
         contributor.registerPublishedWorkflowAction(definition, version);
 
-        verify(registrar).register(org.mockito.ArgumentMatchers.argThat(contribution ->
-                "syncWorkflow".equals(contribution.actionCode())
-                        && "sync".equals(contribution.bindingAlias())));
+        verify(registrar).registerAll(org.mockito.ArgumentMatchers.argThat(contributions ->
+                contributions.stream().anyMatch(contribution ->
+                        "syncWorkflow".equals(contribution.actionCode())
+                                && "sync".equals(contribution.bindingAlias()))
+                        && contributions.stream().anyMatch(contribution ->
+                        "approve".equals(contribution.actionCode())
+                                && contribution.dataAuth())));
     }
 
     private WorkflowDefinition definition(boolean approvalEnabled) {

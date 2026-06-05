@@ -1,9 +1,13 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
@@ -21,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/workflow/runtime/admin")
+@PlatformStaticModule(application = "platform",
+        alias = WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS,
+        title = "Workflow Admin")
 public class WorkflowRuntimeAdminWebController {
     private final WorkflowAdminFacade adminFacade;
 
@@ -29,11 +36,15 @@ public class WorkflowRuntimeAdminWebController {
     }
 
     @GetMapping("/instance/{instanceId}/todo-tasks")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
+            title = "Todo Task Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowTask> currentTodoTasks(@PathVariable String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTasks(instanceId));
     }
 
     @PostMapping("/instance/{instanceId}/actions/forceTerminate")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_TERMINATE_ACTION,
+            title = "Force Terminate", level = PlatformActionLevel.LIST)
     public WorkflowInstanceActionResult forceTerminate(
             @PathVariable String instanceId,
             @RequestBody(required = false) WorkflowAdminActionWebRequest request) {
@@ -44,6 +55,8 @@ public class WorkflowRuntimeAdminWebController {
     }
 
     @PostMapping("/task/{taskId}/actions/forceApprove")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
+            title = "Force Approve", level = PlatformActionLevel.LIST)
     public WorkflowTaskActionResult forceApprove(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowAdminActionWebRequest request) {

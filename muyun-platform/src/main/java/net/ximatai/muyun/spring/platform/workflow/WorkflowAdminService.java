@@ -33,7 +33,7 @@ public class WorkflowAdminService {
 
     public List<WorkflowTask> currentTodoTasks(String instanceId) {
         WorkflowInstance instance = requireRunningInstance(instanceId);
-        actionPolicyService.requireRuntimeAction(instance, "forceApprove");
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
         return taskDao.query(Criteria.of()
                         .eq("instanceId", instance.getId())
                         .eq("taskStatus", WorkflowTaskStatus.TODO),

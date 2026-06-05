@@ -4,12 +4,14 @@ import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
+import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -105,6 +107,29 @@ class StaticModuleDefinitionScannerTest {
                         assertThat(action.executorKey()).isEqualTo("platform.workflow");
                         assertThat(action.dataAuth()).isFalse();
                     });
+        }
+    }
+
+    @Test
+    void shouldScanWorkflowAdminManagementActions() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(WorkflowRuntimeAdminWebController.class,
+                    () -> new WorkflowRuntimeAdminWebController(null));
+            context.refresh();
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.applicationAlias()).isEqualTo("platform");
+            assertThat(definition.moduleAlias()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS);
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder(
+                            WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
+                            WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
+                            WorkflowActionPolicyService.MANAGEMENT_FORCE_TERMINATE_ACTION);
+            assertThat(definition.actions()).allSatisfy(action -> {
+                assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
+                assertThat(action.actionAuth()).isTrue();
+                assertThat(action.dataAuth()).isFalse();
+            });
         }
     }
 

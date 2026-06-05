@@ -136,8 +136,12 @@ public class WorkflowInstanceActionService {
         WorkflowInstance instance = requireRunningInstance(request);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireRuntimeAction(instance, actionCode);
-        actionPolicyService.requireInstanceAction(actionCode, request.reason());
+        if ("forceTerminate".equals(actionCode)) {
+            actionPolicyService.requireManagementInstanceAction(actionCode, request.reason());
+        } else {
+            actionPolicyService.requireRuntimeAction(instance, actionCode);
+            actionPolicyService.requireInstanceAction(actionCode, request.reason());
+        }
         List<WorkflowTask> tasks = runningTasks(instance.getId());
         List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
         List<WorkflowRouteInstance> routes = openRoutes(instance.getId());

@@ -33,14 +33,19 @@ public class DynamicWorkflowModuleRecordGuard implements WorkflowModuleRecordGua
 
     @Override
     public void beforeSubmit(WorkflowSubmitRequest request) {
-        String entityAlias = mainEntityAliasOrNull(request.moduleAlias());
+        requireRecordAction(request.moduleAlias(), request.recordId(), SUBMIT_POLICY);
+    }
+
+    @Override
+    public void requireRecordAction(String moduleAlias, String recordId, ActionExecutionPolicy policy) {
+        String entityAlias = mainEntityAliasOrNull(moduleAlias);
         if (entityAlias == null) {
             return;
         }
-        dynamicRecordService.requireRecordActionScope(request.moduleAlias(), entityAlias, SUBMIT_POLICY,
-                Set.of(request.recordId()), CurrentUserContext.currentUser());
-        if (dynamicRecordService.selectSystem(request.moduleAlias(), entityAlias, request.recordId()) == null) {
-            throw new PlatformException("dynamic record not found: " + request.moduleAlias() + "." + request.recordId());
+        dynamicRecordService.requireRecordActionScope(moduleAlias, entityAlias, policy,
+                Set.of(recordId), CurrentUserContext.currentUser());
+        if (dynamicRecordService.selectSystem(moduleAlias, entityAlias, recordId) == null) {
+            throw new PlatformException("dynamic record not found: " + moduleAlias + "." + recordId);
         }
     }
 

@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,8 +26,9 @@ class WorkflowRuntimeReadFacadeTest {
     private final WorkflowEventDao eventDao = mock(WorkflowEventDao.class);
     private final WorkflowTaskActionAvailabilityService availabilityService =
             mock(WorkflowTaskActionAvailabilityService.class);
+    private final WorkflowActionPolicyService actionPolicyService = mock(WorkflowActionPolicyService.class);
     private final WorkflowRuntimeReadFacade facade = new WorkflowRuntimeReadFacade(
-            instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService);
+            instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService, actionPolicyService);
 
     @Test
     void shouldLoadRuntimeRenderBundle() {
@@ -43,6 +45,7 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(bundle.instance()).isSameAs(instance);
         assertThat(bundle.nodes()).containsExactly(node);
         assertThat(bundle.routes()).containsExactly(route);
+        verify(actionPolicyService).requireRecordView(instance);
     }
 
     @Test
@@ -64,6 +67,7 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(actions.getFirst().nodeKey()).isEqualTo("approve");
         assertThat(actions.getFirst().rejectResubmitModes()).containsExactly("restart", "return_to_me");
         assertThat(actions.getFirst().defaultRejectResubmitMode()).isEqualTo("restart");
+        verify(actionPolicyService).requireRecordView(instance);
     }
 
     @Test
@@ -134,6 +138,7 @@ class WorkflowRuntimeReadFacadeTest {
 
         verify(taskDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class));
         verify(eventDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class));
+        verify(actionPolicyService, times(2)).requireRecordView(any(WorkflowInstance.class));
     }
 
     private WorkflowInstance instance(String id) {

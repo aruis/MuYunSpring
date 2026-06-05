@@ -4,8 +4,12 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class ModuleActionContributionRegistrar {
@@ -19,33 +23,50 @@ public class ModuleActionContributionRegistrar {
         if (contribution == null) {
             return;
         }
-        try (TenantContext.Scope ignored = TenantContext.system("register contributed module action")) {
-            validateContribution(contribution);
-            disableStaleActions(contribution);
-            PlatformModuleAction action = actionService.findByModuleAliasAndActionCode(
-                    contribution.moduleAlias(), contribution.actionCode());
-            if (action == null) {
-                action = new PlatformModuleAction();
-                action.setModuleAlias(contribution.moduleAlias());
-                action.setActionCode(contribution.actionCode());
-            } else if (!sameContribution(action, contribution)) {
-                throw new PlatformException("module action contribution conflicts with existing action: "
-                        + contribution.moduleAlias() + "." + contribution.actionCode());
-            }
-            apply(action, contribution);
-            if (action.getId() == null || action.getId().isBlank()) {
-                actionService.insert(action);
-            } else {
-                actionService.update(action);
-            }
-        }
+        registerAll(List.of(contribution));
     }
 
     public void registerAll(List<ModuleActionContribution> contributions) {
         if (contributions == null || contributions.isEmpty()) {
             return;
         }
-        contributions.forEach(this::register);
+        List<ModuleActionContribution> validContributions = contributions.stream()
+                .filter(Objects::nonNull)
+                .toList();
+        if (validContributions.isEmpty()) {
+            return;
+        }
+        try (TenantContext.Scope ignored = TenantContext.system("register contributed module action")) {
+            Map<ContributionSource, List<ModuleActionContribution>> bySource = validContributions.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            contribution -> new ContributionSource(contribution.sourceType(), contribution.sourceId()),
+                            LinkedHashMap::new,
+                            java.util.stream.Collectors.toList()));
+            for (List<ModuleActionContribution> sourceContributions : bySource.values()) {
+                sourceContributions.forEach(this::validateContribution);
+                disableStaleActions(sourceContributions);
+                sourceContributions.forEach(this::upsert);
+            }
+        }
+    }
+
+    private void upsert(ModuleActionContribution contribution) {
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode(
+                contribution.moduleAlias(), contribution.actionCode());
+        if (action == null) {
+            action = new PlatformModuleAction();
+            action.setModuleAlias(contribution.moduleAlias());
+            action.setActionCode(contribution.actionCode());
+        } else if (!sameContribution(action, contribution)) {
+            throw new PlatformException("module action contribution conflicts with existing action: "
+                    + contribution.moduleAlias() + "." + contribution.actionCode());
+        }
+        apply(action, contribution);
+        if (action.getId() == null || action.getId().isBlank()) {
+            actionService.insert(action);
+        } else {
+            actionService.update(action);
+        }
     }
 
     public void disableBySource(ModuleActionSourceType sourceType, String sourceId) {
@@ -76,9 +97,16 @@ public class ModuleActionContributionRegistrar {
         }
     }
 
-    private void disableStaleActions(ModuleActionContribution contribution) {
-        for (PlatformModuleAction action : actionService.listBySource(contribution.sourceType(), contribution.sourceId())) {
-            if (Objects.equals(action.getActionCode(), contribution.actionCode())) {
+    private void disableStaleActions(List<ModuleActionContribution> contributions) {
+        if (contributions == null || contributions.isEmpty()) {
+            return;
+        }
+        ModuleActionContribution first = contributions.getFirst();
+        Set<String> currentActionCodes = contributions.stream()
+                .map(ModuleActionContribution::actionCode)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        for (PlatformModuleAction action : actionService.listBySource(first.sourceType(), first.sourceId())) {
+            if (currentActionCodes.contains(action.getActionCode())) {
                 continue;
             }
             action.setEnabled(Boolean.FALSE);
@@ -116,5 +144,8 @@ public class ModuleActionContributionRegistrar {
         action.setBindingAlias(contribution.bindingAlias());
         action.setSystemManaged(Boolean.TRUE);
         action.setEnabled(contribution.enabled());
+    }
+
+    private record ContributionSource(ModuleActionSourceType sourceType, String sourceId) {
     }
 }

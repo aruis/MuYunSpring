@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -81,6 +83,25 @@ class ModuleActionContributionRegistrarTest {
     }
 
     @Test
+    void shouldRegisterMultipleActionsFromSameSourceWithoutDisablingEachOther() {
+        moduleService.insert(module("sales.contract"));
+
+        registrar.registerAll(List.of(
+                contribution("approve", "runtime-1", "ver-1", null),
+                contribution("reject", "runtime-1", "ver-1", null)));
+
+        PlatformModuleAction approve = actionService.findByModuleAliasAndActionCode("sales.contract", "approve");
+        PlatformModuleAction reject = actionService.findByModuleAliasAndActionCode("sales.contract", "reject");
+        assertThat(approve.getEnabled()).isTrue();
+        assertThat(reject.getEnabled()).isTrue();
+
+        registrar.registerAll(List.of(contribution("approve", "runtime-1", "ver-2", null)));
+
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "approve").getEnabled()).isTrue();
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "reject").getEnabled()).isFalse();
+    }
+
+    @Test
     void shouldDisableAllActionsFromSource() {
         moduleService.insert(module("sales.contract"));
         registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
@@ -109,11 +130,11 @@ class ModuleActionContributionRegistrarTest {
                 null,
                 EntityActionExecutorType.SERVICE,
                 "platform.workflow",
-                ModuleActionSourceType.WORKFLOW_DEFINITION,
+                bindingAlias == null ? ModuleActionSourceType.WORKFLOW_RUNTIME : ModuleActionSourceType.WORKFLOW_DEFINITION,
                 sourceId,
                 versionId,
-                ModuleActionBindingType.WORKFLOW_DEFINITION,
-                sourceId,
+                bindingAlias == null ? null : ModuleActionBindingType.WORKFLOW_DEFINITION,
+                bindingAlias == null ? null : sourceId,
                 bindingAlias,
                 true
         );

@@ -100,6 +100,23 @@ class WorkflowInstanceActionServiceTest {
     }
 
     @Test
+    void shouldRequireManagementPolicyForForceTerminate() {
+        WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
+        WorkflowInstanceActionService managedService = new WorkflowInstanceActionService(
+                instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService,
+                policyService, Optional.of(summaryWriter));
+        WorkflowInstance instance = instance(true);
+        stubRuntime(instance, List.of(task("task-1")), List.of(node("node-1")),
+                List.of(route("route-1", WorkflowRouteStatus.EFFECTIVE)));
+
+        managedService.forceTerminate(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", "force stop", Instant.parse("2026-06-05T04:30:00Z")));
+
+        verify(policyService).requireManagementInstanceAction("forceTerminate", "force stop");
+        verify(policyService, never()).requireRuntimeAction(instance, "forceTerminate");
+    }
+
+    @Test
     void shouldResetInstanceAndArchiveCurrentRuntimeObjects() {
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");

@@ -36,14 +36,19 @@ public class StaticWorkflowModuleRecordGuard implements WorkflowModuleRecordGuar
 
     @Override
     public void beforeSubmit(WorkflowSubmitRequest request) {
-        Optional<CrudAbility<?>> matched = ability(request.moduleAlias());
+        requireRecordAction(request.moduleAlias(), request.recordId(), SUBMIT_POLICY);
+    }
+
+    @Override
+    public void requireRecordAction(String moduleAlias, String recordId, ActionExecutionPolicy policy) {
+        Optional<CrudAbility<?>> matched = ability(moduleAlias);
         if (matched.isEmpty()) {
             return;
         }
         CrudAbility<?> ability = matched.get();
-        EntityContract record = selectVisibleRecord(ability, request.recordId());
+        EntityContract record = selectVisibleRecord(ability, recordId, policy);
         if (record == null) {
-            throw new PlatformException("static record not found: " + request.moduleAlias() + "." + request.recordId());
+            throw new PlatformException("static record not found: " + moduleAlias + "." + recordId);
         }
     }
 
@@ -54,9 +59,9 @@ public class StaticWorkflowModuleRecordGuard implements WorkflowModuleRecordGuar
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private EntityContract selectVisibleRecord(CrudAbility<?> ability, String recordId) {
+    private EntityContract selectVisibleRecord(CrudAbility<?> ability, String recordId, ActionExecutionPolicy policy) {
         if (ability instanceof DataScopeAbility dataScopeAbility) {
-            DataScopeCriteriaResult scope = dataScopeAbility.requireRecordScopeResult(SUBMIT_POLICY, Set.of(recordId));
+            DataScopeCriteriaResult scope = dataScopeAbility.requireRecordScopeResult(policy, Set.of(recordId));
             return (EntityContract) dataScopeAbility.withDataScopeTenant(scope, () -> ability.select(recordId));
         }
         return (EntityContract) ability.select(recordId);

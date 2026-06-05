@@ -33,7 +33,8 @@ class WorkflowAdminServiceTest {
         List<WorkflowTask> tasks = service.currentTodoTasks("instance-1");
 
         assertThat(tasks).containsExactly(task);
-        verify(actionPolicyService).requireRuntimeAction(instance, "forceApprove");
+        verify(actionPolicyService).requireManagementAction(
+                WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
     }
 
     @Test

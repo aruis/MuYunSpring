@@ -1,8 +1,10 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistrar;
+import net.ximatai.muyun.spring.platform.module.ModuleActionSourceType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -50,7 +52,7 @@ class WorkflowPublishFacadeTest {
     }
 
     @Test
-    void shouldPublishApprovalWorkflowWithoutContributedSubmitWorkflowAction() {
+    void shouldPublishApprovalWorkflowRuntimeActionsWithoutSubmitWorkflowAction() {
         moduleService.insert(module("sales.contract"));
         WorkflowDefinition definition = definition();
         definition.setApprovalEnabled(true);
@@ -62,6 +64,13 @@ class WorkflowPublishFacadeTest {
         facade.publish(definition.getId(), version.getId());
 
         assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow")).isNull();
+        PlatformModuleAction approve = actionService.findByModuleAliasAndActionCode("sales.contract", "approve");
+        assertThat(approve).isNotNull();
+        assertThat(approve.getPermissionActionCode()).isEqualTo("approve");
+        assertThat(approve.getActionLevel()).isEqualTo(EntityActionLevel.RECORD);
+        assertThat(approve.getActionAuth()).isTrue();
+        assertThat(approve.getDataAuth()).isTrue();
+        assertThat(approve.getSourceType()).isEqualTo(ModuleActionSourceType.WORKFLOW_RUNTIME);
     }
 
     @Test

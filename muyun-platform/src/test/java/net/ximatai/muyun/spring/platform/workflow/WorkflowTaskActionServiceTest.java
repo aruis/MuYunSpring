@@ -109,8 +109,8 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.task().getDecision()).isEqualTo("forceApprove");
         assertThat(result.node().getNodeStatus()).isEqualTo(WorkflowNodeStatus.COMPLETED);
         assertThat(result.event().getActionCode()).isEqualTo("forceApprove");
-        verify(policyService).requireRuntimeAction(result.instance(), "forceApprove");
         verify(policyService).requireManagementTaskAction("forceApprove", "admin approved");
+        verify(policyService, never()).requireRuntimeAction(result.instance(), "forceApprove");
         verify(progressionService).advanceFromNode("instance-1", "approve", "admin-1",
                 Instant.parse("2026-06-05T02:30:00Z"));
     }

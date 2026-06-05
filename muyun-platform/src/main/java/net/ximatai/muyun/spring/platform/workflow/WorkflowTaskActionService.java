@@ -120,7 +120,6 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireRuntimeAction(instance, "forceApprove");
         actionPolicyService.requireManagementTaskAction("forceApprove", request.reason());
         task.setTaskStatus(WorkflowTaskStatus.DONE);
         task.setActualProcessorId(operatorId);
