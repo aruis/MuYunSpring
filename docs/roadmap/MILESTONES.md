@@ -2,7 +2,7 @@
 
 本文用于约束新 MuYun 的阶段推进节奏。当前核心路线是“动静一体”：静态 Java 模型和动态元数据模型不应演化成两套平台，而要共享同一套模型基座、数据访问、能力组合和生命周期语义。
 
-文档详细展开已完成的 M1、M1.5、M2 以及当前推进的 M3。后续里程碑只保留阶段目标和进入条件，等前置里程碑完成后再补功能点矩阵，避免过早设计造成文档负担。
+文档详细展开已完成的 M1、M1.5、M2、M3、M4 以及当前收口的 M5。后续里程碑只保留阶段目标和进入条件，等前置里程碑完成后再补功能点矩阵，避免过早设计造成文档负担。
 
 相关文档：
 
@@ -227,11 +227,17 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 | 授权矩阵 | 后端可按模块别名解析标准动作和配置动作，返回已授权、未授权和数据权限策略；静态模块可通过能力声明裁剪标准动作，避免暴露无效授权项 | `RoleGrantableActionResolverTest`、`RoleServiceContractTest` 和 Web contract 覆盖 | 已闭环 |
 | 数据权限策略 | 支持 NONE、ALL、OWNER、ASSIGNEE、MEMBER、ORGANIZATION、ORGANIZATION_AND_CHILDREN、WILDCARD、REFERENCE_DEPENDENCY；CUSTOM 保留字段但当前授权入口拒绝，避免产生不可执行权限事实 | `RoleDataScopeCriteriaServiceTest` 覆盖并集、无权限、跨租户、组织及下级、通配、引用依赖和默认策略；`RoleServiceContractTest` 覆盖 CUSTOM 拒绝授权 | 已闭环 |
 | 租户范围 | 数据范围与租户基线分离；普通授权默认当前租户，明确授权可跨租户；系统用户绕过数据范围 | `DataScopeAbilityTest`、`RoleDataScopeCriteriaServiceTest` 和动态运行态测试覆盖 | 已闭环 |
-| 静态接入 | 静态 Web 标准 CRUD、启停、树、排序等入口复用 `@ActionEndpoint`；实现 `DataScopeAbility` 的静态服务接入同一数据范围语义 | `ActionEndpointInterceptorTest`、`DataScopeWebTest` 和 `IamWebControllerIT` 覆盖 | 主体完成 |
-| 动态接入 | 动态主元数据标准 CRUD、动作执行、条件型动作 criteria 裁剪、动作列表、记录动作可用性、运行端 descriptor 和 OpenAPI 接入同一动作/数据权限服务 | `DynamicRecordServiceTest`、`DynamicRecordWebControllerTest` 和 `DynamicRecordWebControllerIT` 覆盖 | 主体完成 |
+| 静态接入 | 静态 Web 标准 CRUD、启停、树、排序等入口复用 `@ActionEndpoint`；实现 `DataScopeAbility` 的静态服务接入同一数据范围语义 | `ActionEndpointInterceptorTest`、`DataScopeWebTest` 和 `IamWebControllerIT` 覆盖 | 已闭环 |
+| 动态接入 | 动态主元数据标准 CRUD、动作执行、条件型动作 criteria 裁剪、动作列表、记录动作可用性、运行端 descriptor 和 OpenAPI 接入同一动作/数据权限服务 | `DynamicRecordServiceTest`、`DynamicRecordWebControllerTest` 和 `DynamicRecordWebControllerIT` 覆盖 | 已闭环 |
 | 菜单剪枝 | 菜单模型不承载权限事实，返回菜单树时按模块 `menu` 动作剪枝；我的菜单由当前用户推理菜单方案，前端不传 scheme | `RoleMenuVisibilityPolicyServiceTest`、`MenuServiceContractTest`、`MenuWebControllerTest` 覆盖 | 已闭环 |
 | 运行时身份 | 用户登录生成 token；Bearer token 解析为当前用户，并同步进入当前用户上下文和租户上下文 | `UserSessionServiceTest`、`BearerTokenCurrentUserProviderTest` 覆盖 | 已闭环 |
-| 审计上下文 | 动态动作审计记录轻量保存操作者、判定结果和权限动作；静态 Web 保留请求内授权上下文 | 动态审计相关测试和 ActionEndpoint 上下文测试覆盖 | 可收口 |
+| 审计上下文 | 动态动作审计记录轻量保存操作者、判定结果和权限动作；静态 Web 保留请求内授权上下文 | 动态审计相关测试和 ActionEndpoint 上下文测试覆盖 | 已闭环 |
+
+### M5 收口结论
+
+M5 已达到阶段收口条件：身份上下文、租户上下文、角色授权、动作执行、数据权限、菜单剪枝、静态模块自注册、动态模块动作接入和轻量审计上下文已经形成同一条后端闭环。
+
+M5 不再继续扩展管理端 UI、复杂自定义数据权限 DSL、动作前置依赖、跨模块同表记录归属和专题业务流水。后续如果真实业务需要这些能力，按对应专题进入 M6/M7 或技术债回收，不再阻塞 M6 启动。
 
 本阶段明确后移或暂不扩展的事项：
 
