@@ -84,6 +84,48 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldForceApproveByAdminWithoutAssigneeCheck() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
+        WorkflowTaskActionService adminService = new WorkflowTaskActionService(
+                taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory, approvalTaskPolicyService,
+                policyService, progressionService, Optional.empty());
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        WorkflowTaskActionResult result = adminService.forceApprove(new WorkflowTaskActionRequest(
+                "task-1", "admin-1", null, null, "admin approved", Instant.parse("2026-06-05T02:30:00Z")));
+
+        assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.DONE);
+        assertThat(result.task().getActualProcessorId()).isEqualTo("admin-1");
+        assertThat(result.task().getDecision()).isEqualTo("forceApprove");
+        assertThat(result.node().getNodeStatus()).isEqualTo(WorkflowNodeStatus.COMPLETED);
+        assertThat(result.event().getActionCode()).isEqualTo("forceApprove");
+        verify(policyService).requireRuntimeAction(result.instance(), "forceApprove");
+        verify(policyService).requireManagementTaskAction("forceApprove", "admin approved");
+        verify(progressionService).advanceFromNode("instance-1", "approve", "admin-1",
+                Instant.parse("2026-06-05T02:30:00Z"));
+    }
+
+    @Test
+    void shouldRejectForceApproveForBusinessTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        when(taskDao.findById("task-1")).thenReturn(task);
+
+        assertThatThrownBy(() -> service.forceApprove(new WorkflowTaskActionRequest(
+                "task-1", "admin-1", null, null, "admin approved", Instant.parse("2026-06-05T02:30:00Z"))))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports approval task");
+
+        verifyNoInteractions(instanceDao, nodeDao, eventDao);
+    }
+
+    @Test
     void shouldRejectApprovalTaskAndCreateRestartResubmitTask() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowTask sibling = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);

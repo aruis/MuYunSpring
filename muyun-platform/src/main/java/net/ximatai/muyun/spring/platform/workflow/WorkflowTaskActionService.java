@@ -107,6 +107,47 @@ public class WorkflowTaskActionService {
     }
 
     @Transactional
+    public WorkflowTaskActionResult forceApprove(WorkflowTaskActionRequest request) {
+        WorkflowTask task = requireTodoTask(request);
+        if (task.getTaskKind() != WorkflowTaskKind.APPROVAL) {
+            throw new PlatformException("workflow force approve only supports approval task: " + request.taskId());
+        }
+        WorkflowInstance instance = requireRunningInstance(task);
+        WorkflowNodeInstance node = requireNode(task);
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "forceApprove");
+        actionPolicyService.requireManagementTaskAction("forceApprove", request.reason());
+        task.setTaskStatus(WorkflowTaskStatus.DONE);
+        task.setActualProcessorId(operatorId);
+        task.setDecision("forceApprove");
+        task.setResultMessage(request.reason());
+        task.setCompletedAt(now);
+        updateTask(task, now);
+
+        List<WorkflowTask> nodeTasks = nodeTasks(task);
+        List<WorkflowTask> effectiveTasks = replaceTask(nodeTasks, task);
+        if (approvalTaskPolicyService.isNodePassed(node.getApprovalMode(), node.getApprovalRatio(), effectiveTasks)) {
+            node.setNodeStatus(WorkflowNodeStatus.COMPLETED);
+            node.setApprovedTaskCount(countStatus(effectiveTasks, WorkflowTaskStatus.DONE));
+            node.setCompletedTaskCount(countCompleted(effectiveTasks));
+            node.setCompletedAt(now);
+            updateNode(node, now);
+            if (approvalTaskPolicyService.shouldSkipPendingSiblings(node.getApprovalMode(), node.getApprovalRatio(),
+                    effectiveTasks)) {
+                skipPendingSiblings(instance, task, effectiveTasks, operatorId, now);
+            }
+        }
+        WorkflowEvent event = eventFactory.taskCompleted(instance, task, "forceApprove", operatorId,
+                request.reason(), now);
+        eventDao.insert(event);
+        if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
+            progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
+        }
+        return WorkflowTaskActionResult.of(task, node, instance, event);
+    }
+
+    @Transactional
     public WorkflowTaskActionResult reject(WorkflowTaskActionRequest request) {
         WorkflowTask task = requireTodoTask(request);
         if (task.getTaskKind() != WorkflowTaskKind.APPROVAL) {

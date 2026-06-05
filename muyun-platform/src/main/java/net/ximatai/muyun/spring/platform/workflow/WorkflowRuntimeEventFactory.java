@@ -130,6 +130,12 @@ public class WorkflowRuntimeEventFactory {
                 message == null || message.isBlank() ? "workflow instance terminated" : message, null, occurredAt);
     }
 
+    public WorkflowEvent instanceForceTerminated(WorkflowInstance instance, String operatorId,
+                                                 String message, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.INSTANCE_TERMINATED, "forceTerminate", operatorId,
+                message == null || message.isBlank() ? "workflow instance force terminated" : message, null, occurredAt);
+    }
+
     private WorkflowEvent event(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
                                 WorkflowEventType eventType, String actionCode, String operatorId,
                                 String message, String payloadText, Instant occurredAt) {

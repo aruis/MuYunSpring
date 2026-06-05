@@ -16,6 +16,7 @@ public class WorkflowInstanceActionFacade {
             case "revoke" -> actionService.revoke(request);
             case "reset" -> actionService.reset(request);
             case "terminate" -> actionService.terminate(request);
+            case "forceTerminate" -> actionService.forceTerminate(request);
             default -> throw new PlatformException("unsupported workflow instance action: " + actionCode);
         };
     }

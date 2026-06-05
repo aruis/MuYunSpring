@@ -121,6 +121,12 @@ public class WorkflowInstanceActionService {
                 WorkflowTaskStatus.INVALIDATED, WorkflowNodeStatus.CANCELED, "terminate");
     }
 
+    @Transactional
+    public WorkflowInstanceActionResult forceTerminate(WorkflowInstanceActionRequest request) {
+        return closeInstance(request, WorkflowInstanceStatus.TERMINATED, WorkflowApprovalStatus.TERMINATED,
+                WorkflowTaskStatus.INVALIDATED, WorkflowNodeStatus.CANCELED, "forceTerminate");
+    }
+
     private WorkflowInstanceActionResult closeInstance(WorkflowInstanceActionRequest request,
                                                        WorkflowInstanceStatus instanceStatus,
                                                        WorkflowApprovalStatus approvalStatus,
@@ -168,9 +174,11 @@ public class WorkflowInstanceActionService {
             updateRoute(route, now);
         }
 
-        WorkflowEvent event = actionCode.equals("revoke")
-                ? eventFactory.instanceRevoked(instance, operatorId, request.reason(), now)
-                : eventFactory.instanceTerminated(instance, operatorId, request.reason(), now);
+        WorkflowEvent event = switch (actionCode) {
+            case "revoke" -> eventFactory.instanceRevoked(instance, operatorId, request.reason(), now);
+            case "forceTerminate" -> eventFactory.instanceForceTerminated(instance, operatorId, request.reason(), now);
+            default -> eventFactory.instanceTerminated(instance, operatorId, request.reason(), now);
+        };
         EntityLifecycle.prepareInsert(event, now);
         eventDao.insert(event);
         if (!"revoke".equals(actionCode)) {

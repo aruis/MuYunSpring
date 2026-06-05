@@ -77,6 +77,29 @@ class WorkflowInstanceActionServiceTest {
     }
 
     @Test
+    void shouldForceTerminateWithManagementActionCodeAndWithoutArchive() {
+        WorkflowInstance instance = instance(true);
+        WorkflowTask task = task("task-1");
+        WorkflowNodeInstance node = node("node-1");
+        WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.EFFECTIVE);
+        stubRuntime(instance, List.of(task), List.of(node), List.of(route));
+
+        WorkflowInstanceActionResult result = service.forceTerminate(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", "force stop", Instant.parse("2026-06-05T04:30:00Z")));
+
+        assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.TERMINATED);
+        assertThat(result.instance().getApprovalStatus()).isEqualTo(WorkflowApprovalStatus.TERMINATED);
+        assertThat(result.instance().getLastActionCode()).isEqualTo("forceTerminate");
+        assertThat(task.getTaskStatus()).isEqualTo(WorkflowTaskStatus.INVALIDATED);
+        assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.CANCELED);
+        assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
+        assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.INSTANCE_TERMINATED);
+        assertThat(result.event().getActionCode()).isEqualTo("forceTerminate");
+        verify(archiveService, never()).archiveCurrentInstance(any(), any(), any());
+        verify(summaryWriter).writeSubmitted(any());
+    }
+
+    @Test
     void shouldResetInstanceAndArchiveCurrentRuntimeObjects() {
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");
@@ -119,6 +142,19 @@ class WorkflowInstanceActionServiceTest {
 
         assertThatThrownBy(() -> service.terminate(WorkflowInstanceActionRequest.terminate(
                 "instance-1", "admin-1", null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reason is required");
+
+        verifyNoInteractions(taskDao, nodeDao, routeDao, eventDao);
+    }
+
+    @Test
+    void shouldRequireReasonForForceTerminate() {
+        WorkflowInstance instance = instance(true);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+
+        assertThatThrownBy(() -> service.forceTerminate(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", null, null)))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("reason is required");
 
