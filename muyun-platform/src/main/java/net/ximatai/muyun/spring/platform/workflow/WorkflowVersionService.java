@@ -12,8 +12,15 @@ public class WorkflowVersionService extends AbstractAbilityService<WorkflowVersi
         SoftDeleteAbility<WorkflowVersion> {
     public static final String MODULE_ALIAS = "platform.workflow.version";
 
-    public WorkflowVersionService(BaseDao<WorkflowVersion, String> workflowVersionDao) {
+    private final WorkflowDefinitionService definitionService;
+    private final WorkflowModuleActionContributor actionContributor;
+
+    public WorkflowVersionService(BaseDao<WorkflowVersion, String> workflowVersionDao,
+                                  WorkflowDefinitionService definitionService,
+                                  WorkflowModuleActionContributor actionContributor) {
         super(MODULE_ALIAS, WorkflowVersion.class, workflowVersionDao);
+        this.definitionService = definitionService;
+        this.actionContributor = actionContributor;
     }
 
     @Override
@@ -30,9 +37,24 @@ public class WorkflowVersionService extends AbstractAbilityService<WorkflowVersi
         normalizeAndValidate(version);
     }
 
+    @Override
+    public void afterInsert(String id, WorkflowVersion version) {
+        registerPublishedAction(version);
+    }
+
+    @Override
+    public void afterUpdate(WorkflowVersion version, int updated) {
+        if (updated > 0) {
+            registerPublishedAction(version);
+        }
+    }
+
     private void normalizeAndValidate(WorkflowVersion version) {
         if (version.getDefinitionId() == null || version.getDefinitionId().isBlank()) {
             throw new PlatformException("workflow definition id must not be blank");
+        }
+        if (definitionService.select(version.getDefinitionId()) == null) {
+            throw new PlatformException("workflow definition not found: " + version.getDefinitionId());
         }
         if (version.getVersionNo() == null || version.getVersionNo() <= 0) {
             throw new PlatformException("workflow version number must be positive");
@@ -44,5 +66,16 @@ public class WorkflowVersionService extends AbstractAbilityService<WorkflowVersi
                         .eq("definitionId", version.getDefinitionId())
                         .eq("versionNo", version.getVersionNo()),
                 "workflow version number must be unique within definition: " + version.getVersionNo());
+    }
+
+    private void registerPublishedAction(WorkflowVersion version) {
+        if (version.getPublishStatus() != WorkflowPublishStatus.PUBLISHED) {
+            return;
+        }
+        WorkflowDefinition definition = definitionService.select(version.getDefinitionId());
+        if (definition == null) {
+            throw new PlatformException("workflow definition not found: " + version.getDefinitionId());
+        }
+        actionContributor.registerPublishedWorkflowAction(definition, version);
     }
 }

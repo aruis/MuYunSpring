@@ -71,6 +71,25 @@ public class PlatformModuleAction extends StandardEnabledSortableEntity {
     @Column(name = "executor_key", type = ColumnType.VARCHAR, length = 128, comment = "Action executor key")
     private String executorKey;
 
+    @Column(name = "source_type", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source type")
+    private ModuleActionSourceType sourceType;
+
+    @Column(name = "source_id", type = ColumnType.VARCHAR, length = 64, comment = "Action contribution source id")
+    private String sourceId;
+
+    @Column(name = "source_version_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Action contribution source version id")
+    private String sourceVersionId;
+
+    @Column(name = "binding_type", type = ColumnType.VARCHAR, length = 64, comment = "Action binding type")
+    private ModuleActionBindingType bindingType;
+
+    @Column(name = "binding_id", type = ColumnType.VARCHAR, length = 64, comment = "Action binding id")
+    private String bindingId;
+
+    @Column(name = "binding_alias", type = ColumnType.VARCHAR, length = 64, comment = "Action binding alias")
+    private String bindingAlias;
+
     @Column(name = "system_managed", comment = "Whether action is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean systemManaged = Boolean.FALSE;

@@ -113,10 +113,6 @@ public class StaticModuleDefinitionScanner {
         if (capabilities == null || capabilities.isEmpty()) {
             return;
         }
-        if (capabilities.contains(EntityCapability.WORKFLOW) || capabilities.contains(EntityCapability.APPROVAL)) {
-            actions.putIfAbsent("submitWorkflow",
-                    StaticModuleActionDefinition.workflowAction("submitWorkflow", "发起流程"));
-        }
         if (capabilities.contains(EntityCapability.APPROVAL)) {
             actions.putIfAbsent("submitApproval",
                     StaticModuleActionDefinition.workflowAction("submitApproval", "提交审批"));

@@ -6,6 +6,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
+import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,11 +25,14 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
 
     private final WorkflowModuleSubmitService submitService;
     private final WorkflowTaskActionFacade taskActionFacade;
+    private final PlatformModuleActionService actionService;
 
     public DynamicWorkflowActionExecutor(WorkflowModuleSubmitService submitService,
-                                         WorkflowTaskActionFacade taskActionFacade) {
+                                         WorkflowTaskActionFacade taskActionFacade,
+                                         PlatformModuleActionService actionService) {
         this.submitService = submitService;
         this.taskActionFacade = taskActionFacade;
+        this.actionService = actionService;
     }
 
     @Override
@@ -36,21 +42,55 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
 
     @Override
     public Object execute(DynamicActionExecutionContext context, DynamicActionExecutionRequest request) {
-        String workflowAction = text(payload(request, "workflowAction"), context == null ? null : context.actionCode());
+        String workflowAction = requireText(context == null ? null : context.actionCode(),
+                "workflow action code must not be blank");
         return switch (workflowAction) {
             case ACTION_SUBMIT_APPROVAL -> DynamicActionResultBody.refreshed(
                     submitService.submitApproval(moduleAlias(context), recordId(context, request)));
             case ACTION_SUBMIT_WORKFLOW -> DynamicActionResultBody.refreshed(
                     submitService.submitWorkflow(moduleAlias(context), recordId(context, request),
-                            requireText(payload(request, "definitionAlias"), "workflow definition alias must not be blank")));
+                            workflowDefinitionAlias(context, request)));
             case ACTION_TASK_ACTION -> DynamicActionResultBody.refreshed(taskActionFacade.execute(
                     requireText(payload(request, "taskActionCode"), "workflow task action code must not be blank"),
                     taskRequest(request)));
             case ACTION_AVAILABLE_TASK_ACTIONS -> DynamicActionResultBody.of(taskActionFacade.availableActions(
                     requireText(payload(request, "taskId"), "workflow task id must not be blank"),
                     operatorId(context, request)));
-            default -> throw new PlatformException("unsupported dynamic workflow action: " + workflowAction);
+            default -> executeBoundWorkflowAction(context, request, workflowAction);
         };
+    }
+
+    private DynamicActionResultBody executeBoundWorkflowAction(DynamicActionExecutionContext context,
+                                                              DynamicActionExecutionRequest request,
+                                                              String workflowAction) {
+        String definitionAlias = boundWorkflowDefinitionAlias(context);
+        if (definitionAlias == null) {
+            throw new PlatformException("unsupported dynamic workflow action: " + workflowAction);
+        }
+        return DynamicActionResultBody.refreshed(
+                submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias));
+    }
+
+    private String workflowDefinitionAlias(DynamicActionExecutionContext context,
+                                           DynamicActionExecutionRequest request) {
+        String definitionAlias = text(payload(request, "definitionAlias"), null);
+        if (definitionAlias != null) {
+            return definitionAlias;
+        }
+        return requireText(boundWorkflowDefinitionAlias(context), "workflow definition alias must not be blank");
+    }
+
+    private String boundWorkflowDefinitionAlias(DynamicActionExecutionContext context) {
+        String moduleAlias = text(context == null ? null : context.moduleAlias(), null);
+        String actionCode = text(context == null ? null : context.actionCode(), null);
+        if (moduleAlias == null || actionCode == null) {
+            return null;
+        }
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode(moduleAlias, actionCode);
+        if (action == null || action.getBindingType() != ModuleActionBindingType.WORKFLOW_DEFINITION) {
+            return null;
+        }
+        return text(action.getBindingAlias(), null);
     }
 
     private WorkflowTaskActionRequest taskRequest(DynamicActionExecutionRequest request) {

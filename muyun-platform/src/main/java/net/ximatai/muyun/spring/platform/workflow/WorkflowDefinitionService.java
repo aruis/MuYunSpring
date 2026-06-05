@@ -42,8 +42,21 @@ public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDe
         if (definition.getApprovalEnabled() == null) {
             definition.setApprovalEnabled(Boolean.FALSE);
         }
+        if (definition.getActionCode() != null && definition.getActionCode().isBlank()) {
+            definition.setActionCode(null);
+        }
+        if (definition.getActionCode() != null) {
+            definition.setActionCode(PlatformNameRules.requireActionCode(definition.getActionCode(), "actionCode"));
+        }
         if (definition.getDefinitionStatus() == null) {
             definition.setDefinitionStatus(WorkflowDefinitionStatus.DRAFT);
+        }
+        if (!Boolean.TRUE.equals(definition.getApprovalEnabled()) && definition.getActionCode() != null) {
+            rejectDuplicate(definition, Criteria.of()
+                            .eq("moduleAlias", definition.getModuleAlias())
+                            .eq("approvalEnabled", Boolean.FALSE)
+                            .eq("actionCode", definition.getActionCode()),
+                    "workflow actionCode must be unique within module: " + definition.getActionCode());
         }
         rejectDuplicate(definition, Criteria.of()
                         .eq("moduleAlias", definition.getModuleAlias())

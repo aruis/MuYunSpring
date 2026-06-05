@@ -33,7 +33,7 @@ class StaticModuleDefinitionRegistrarTest {
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
         PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
         when(moduleService.select("sales.contract")).thenReturn(null);
-        when(actionService.findByModuleAliasAndActionCode("sales.contract", "submitWorkflow")).thenReturn(null);
+        when(actionService.findByModuleAliasAndActionCode("sales.contract", "submitApproval")).thenReturn(null);
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 moduleService,
                 actionService,
@@ -42,7 +42,7 @@ class StaticModuleDefinitionRegistrarTest {
                         "sales.contract",
                         "合同",
                         null,
-                        List.of(StaticModuleActionDefinition.workflowAction("submitWorkflow", "发起流程"))
+                        List.of(StaticModuleActionDefinition.workflowAction("submitApproval", "提交审批"))
                 ))
         );
 
@@ -52,7 +52,7 @@ class StaticModuleDefinitionRegistrarTest {
         verify(actionService).insert(actionCaptor.capture());
         assertThat(actionCaptor.getValue()).satisfies(action -> {
             assertThat(action.getModuleAlias()).isEqualTo("sales.contract");
-            assertThat(action.getActionCode()).isEqualTo("submitWorkflow");
+            assertThat(action.getActionCode()).isEqualTo("submitApproval");
             assertThat(action.getCategory()).isEqualTo(EntityActionCategory.WORKFLOW);
             assertThat(action.getExecutorType()).isEqualTo(EntityActionExecutorType.SERVICE);
             assertThat(action.getExecutorKey()).isEqualTo("platform.workflow");

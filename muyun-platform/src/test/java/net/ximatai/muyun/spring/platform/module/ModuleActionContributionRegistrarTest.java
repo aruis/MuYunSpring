@@ -1,0 +1,118 @@
+package net.ximatai.muyun.spring.platform.module;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ModuleActionContributionRegistrarTest {
+    private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformModuleAction> actionDao = new TestMemoryDao<>();
+    private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
+    private final PlatformModuleActionService actionService = new PlatformModuleActionService(actionDao, moduleService);
+    private final ModuleActionContributionRegistrar registrar = new ModuleActionContributionRegistrar(actionService);
+
+    @Test
+    void shouldRegisterContributedModuleActionWithBinding() {
+        moduleService.insert(module("sales.contract"));
+
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(action).isNotNull();
+        assertThat(action.getTitle()).isEqualTo("同步流程");
+        assertThat(action.getCategory()).isEqualTo(EntityActionCategory.WORKFLOW);
+        assertThat(action.getExecutorKey()).isEqualTo("platform.workflow");
+        assertThat(action.getSourceType()).isEqualTo(ModuleActionSourceType.WORKFLOW_DEFINITION);
+        assertThat(action.getSourceId()).isEqualTo("def-1");
+        assertThat(action.getSourceVersionId()).isEqualTo("ver-1");
+        assertThat(action.getBindingType()).isEqualTo(ModuleActionBindingType.WORKFLOW_DEFINITION);
+        assertThat(action.getBindingId()).isEqualTo("def-1");
+        assertThat(action.getBindingAlias()).isEqualTo("sync");
+        assertThat(action.getSystemManaged()).isTrue();
+    }
+
+    @Test
+    void shouldUpdateExistingContributedModuleAction() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-2", "sync"));
+
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(action.getSourceVersionId()).isEqualTo("ver-2");
+        assertThat(actionDao.count(Criteria.of())).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRejectActionCodeConflictWithDifferentSource() {
+        moduleService.insert(module("sales.contract"));
+        PlatformModuleAction existing = new PlatformModuleAction();
+        existing.setModuleAlias("sales.contract");
+        existing.setActionCode("syncWorkflow");
+        existing.setTitle("已有动作");
+        existing.setSystemManaged(Boolean.FALSE);
+        actionService.insert(existing);
+
+        assertThatThrownBy(() -> registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("module action contribution conflicts");
+    }
+
+    @Test
+    void shouldDisableStaleActionFromSameSourceWhenActionCodeChanges() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("oldWorkflow", "def-1", "ver-1", "sync"));
+
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-2", "sync"));
+
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "oldWorkflow").getEnabled())
+                .isFalse();
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow").getEnabled())
+                .isTrue();
+    }
+
+    private ModuleActionContribution contribution(String actionCode, String sourceId,
+                                                  String versionId, String bindingAlias) {
+        return new ModuleActionContribution(
+                "sales.contract",
+                null,
+                actionCode,
+                actionCode,
+                "同步流程",
+                EntityActionCategory.WORKFLOW,
+                EntityActionLevel.RECORD,
+                EntityActionAccessMode.AUTH_REQUIRED,
+                true,
+                false,
+                ActionDefaultGrantPolicy.NONE,
+                null,
+                null,
+                EntityActionExecutorType.SERVICE,
+                "platform.workflow",
+                ModuleActionSourceType.WORKFLOW_DEFINITION,
+                sourceId,
+                versionId,
+                ModuleActionBindingType.WORKFLOW_DEFINITION,
+                sourceId,
+                bindingAlias,
+                true
+        );
+    }
+
+    private PlatformModule module(String alias) {
+        PlatformModule module = new PlatformModule();
+        module.setAlias(alias);
+        module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
+        module.setTitle(alias);
+        return module;
+    }
+}

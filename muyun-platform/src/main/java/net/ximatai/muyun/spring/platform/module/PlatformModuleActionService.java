@@ -79,6 +79,18 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
     }
 
+    public List<PlatformModuleAction> listBySource(ModuleActionSourceType sourceType, String sourceId) {
+        if (sourceType == null || sourceId == null || sourceId.isBlank()) {
+            return List.of();
+        }
+        try (TenantContext.Scope ignored = TenantContext.system("select global contributed module actions")) {
+            return list(Criteria.of()
+                    .eq("sourceType", sourceType)
+                    .eq("sourceId", sourceId)
+                    .isNull(StandardEntitySchema.TENANT_ID_FIELD), ALL, Sort.asc("sortOrder"));
+        }
+    }
+
     private void normalizeAndValidate(PlatformModuleAction action) {
         String moduleAlias = PlatformNameRules.requireModuleAlias(action.getModuleAlias());
         if (moduleService.resolveVisibleModule(moduleAlias) == null) {
@@ -130,6 +142,18 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
         if (action.getExecutorKey() != null && action.getExecutorKey().isBlank()) {
             action.setExecutorKey(null);
+        }
+        if (action.getSourceId() != null && action.getSourceId().isBlank()) {
+            action.setSourceId(null);
+        }
+        if (action.getSourceVersionId() != null && action.getSourceVersionId().isBlank()) {
+            action.setSourceVersionId(null);
+        }
+        if (action.getBindingId() != null && action.getBindingId().isBlank()) {
+            action.setBindingId(null);
+        }
+        if (action.getBindingAlias() != null && action.getBindingAlias().isBlank()) {
+            action.setBindingAlias(null);
         }
         if (action.getSystemManaged() == null) {
             action.setSystemManaged(false);

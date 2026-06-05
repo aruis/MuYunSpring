@@ -45,6 +45,7 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -440,7 +441,7 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(definition.entities().getFirst().supports(EntityCapability.WORKFLOW)).isTrue();
         assertThat(definition.actions())
                 .extracting(action -> action.actionCode())
-                .containsExactly("submitWorkflow", "submitApproval");
+                .containsExactly("submitApproval");
         assertThat(definition.actions())
                 .allSatisfy(action -> {
                     assertThat(action.category()).isEqualTo(EntityActionCategory.WORKFLOW);
@@ -478,7 +479,35 @@ class PlatformModuleDefinitionCompilerTest {
                 });
         assertThat(definition.actions())
                 .extracting(action -> action.actionCode())
-                .containsExactly("submitApproval", "submitWorkflow");
+                .containsExactly("submitApproval");
+    }
+
+    @Test
+    void shouldCompileContributedWorkflowActionFromModuleActionCatalog() {
+        moduleService.insert(module("sales.contract", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "contract"));
+        fieldService.insert(titleField(metadataId));
+        relationService.insert(mainRelation("sales.contract", metadataId));
+        PlatformModuleAction syncWorkflow = moduleAction("sales.contract", "contract", "syncWorkflow");
+        syncWorkflow.setTitle("同步流程");
+        syncWorkflow.setCategory(EntityActionCategory.WORKFLOW);
+        syncWorkflow.setActionLevel(EntityActionLevel.RECORD);
+        syncWorkflow.setExecutorType(EntityActionExecutorType.SERVICE);
+        syncWorkflow.setExecutorKey(DynamicWorkflowActionExecutor.EXECUTOR_KEY);
+        syncWorkflow.setBindingType(ModuleActionBindingType.WORKFLOW_DEFINITION);
+        syncWorkflow.setBindingAlias("sync");
+        actionService.insert(syncWorkflow);
+
+        ModuleDefinition definition = compiler.compile("sales.contract");
+
+        assertThat(definition.actions())
+                .singleElement()
+                .satisfies(action -> {
+                    assertThat(action.actionCode()).isEqualTo("syncWorkflow");
+                    assertThat(action.title()).isEqualTo("同步流程");
+                    assertThat(action.category()).isEqualTo(EntityActionCategory.WORKFLOW);
+                    assertThat(action.executorKey()).isEqualTo(DynamicWorkflowActionExecutor.EXECUTOR_KEY);
+                });
     }
 
     @Test

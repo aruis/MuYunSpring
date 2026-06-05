@@ -95,7 +95,7 @@ class StaticModuleDefinitionScannerTest {
             assertThat(definition.supports(EntityCapability.WORKFLOW)).isTrue();
             assertThat(definition.supports(EntityCapability.APPROVAL)).isTrue();
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                    .containsExactly("submitWorkflow", "submitApproval");
+                    .containsExactly("submitApproval");
             assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("submitApproval"))
                     .singleElement()
                     .satisfies(action -> {

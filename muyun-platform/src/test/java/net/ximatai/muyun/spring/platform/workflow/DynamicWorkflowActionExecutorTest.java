@@ -4,6 +4,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
+import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -19,15 +22,16 @@ import static org.mockito.Mockito.when;
 class DynamicWorkflowActionExecutorTest {
     private final WorkflowModuleSubmitService submitService = mock(WorkflowModuleSubmitService.class);
     private final WorkflowTaskActionFacade taskActionFacade = mock(WorkflowTaskActionFacade.class);
+    private final PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
     private final DynamicWorkflowActionExecutor executor =
-            new DynamicWorkflowActionExecutor(submitService, taskActionFacade);
+            new DynamicWorkflowActionExecutor(submitService, taskActionFacade, actionService);
 
     @Test
     void shouldSubmitApprovalByDynamicRecordAction() {
         DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
                 .withPayload(Map.of("workflowAction", "submitApproval"));
 
-        Object result = executor.execute(context("submit", "record-1"), request);
+        Object result = executor.execute(context("submitApproval", "record-1"), request);
 
         verify(submitService).submitApproval("sales.contract", "record-1");
         assertThat(result).isInstanceOf(DynamicActionResultBody.class);
@@ -39,7 +43,30 @@ class DynamicWorkflowActionExecutorTest {
         DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
                 .withPayload(Map.of("workflowAction", "submitWorkflow", "definitionAlias", "sync"));
 
-        executor.execute(context("submitSync", "record-1"), request);
+        executor.execute(context("submitWorkflow", "record-1"), request);
+
+        verify(submitService).submitWorkflow("sales.contract", "record-1", "sync");
+    }
+
+    @Test
+    void shouldRejectPayloadWorkflowActionOverride() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
+                .withPayload(Map.of("workflowAction", "submitWorkflow", "definitionAlias", "sync"));
+
+        assertThatThrownBy(() -> executor.execute(context("customWorkflow", "record-1"), request))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unsupported dynamic workflow action");
+    }
+
+    @Test
+    void shouldSubmitWorkflowByBoundModuleAction() {
+        PlatformModuleAction action = new PlatformModuleAction();
+        action.setBindingType(ModuleActionBindingType.WORKFLOW_DEFINITION);
+        action.setBindingAlias("sync");
+        when(actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow")).thenReturn(action);
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1");
+
+        executor.execute(context("syncWorkflow", "record-1"), request);
 
         verify(submitService).submitWorkflow("sales.contract", "record-1", "sync");
     }
@@ -57,7 +84,7 @@ class DynamicWorkflowActionExecutorTest {
                         "operatedAt", "2026-06-05T02:00:00Z"
                 ));
 
-        executor.execute(context("workflowTask", null), request);
+        executor.execute(context("taskAction", null), request);
 
         verify(taskActionFacade).execute(org.mockito.ArgumentMatchers.eq("reject"),
                 org.mockito.ArgumentMatchers.argThat(actionRequest ->
@@ -76,7 +103,7 @@ class DynamicWorkflowActionExecutorTest {
                 .withPayload(Map.of("workflowAction", "availableTaskActions", "taskId", "task-1",
                         "operatorId", "user-1"));
 
-        Object result = executor.execute(context("workflowActions", null), request);
+        Object result = executor.execute(context("availableTaskActions", null), request);
 
         assertThat(((DynamicActionResultBody) result).value()).isSameAs(actions);
     }

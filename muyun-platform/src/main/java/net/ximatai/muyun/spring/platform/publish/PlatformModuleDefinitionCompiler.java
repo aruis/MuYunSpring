@@ -413,9 +413,6 @@ public class PlatformModuleDefinitionCompiler {
                                                              EntityDefinition mainEntity) {
         Map<String, EntityActionDefinition> actions = new LinkedHashMap<>();
         configured.forEach(action -> actions.put(action.actionCode(), action));
-        if (mainEntity.supports(EntityCapability.WORKFLOW)) {
-            actions.putIfAbsent("submitWorkflow", workflowAction(mainEntity.alias(), "submitWorkflow", "发起流程"));
-        }
         if (mainEntity.supports(EntityCapability.APPROVAL)) {
             actions.putIfAbsent("submitApproval", workflowAction(mainEntity.alias(), "submitApproval", "提交审批"));
         }

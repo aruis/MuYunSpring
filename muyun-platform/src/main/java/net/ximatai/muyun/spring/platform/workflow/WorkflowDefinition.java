@@ -29,6 +29,10 @@ public class WorkflowDefinition extends StandardEnabledSortableEntity {
             comment = "Whether workflow governs approval status", defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean approvalEnabled = Boolean.FALSE;
 
+    @Column(name = "action_code", type = ColumnType.VARCHAR, length = 64,
+            comment = "Module action code contributed by non-approval workflow")
+    private String actionCode;
+
     @Column(name = "definition_status", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Definition status", defaultVal = @Default(varchar = "draft"))
     private WorkflowDefinitionStatus definitionStatus = WorkflowDefinitionStatus.DRAFT;

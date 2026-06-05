@@ -110,6 +110,8 @@ class PlatformModelSchemaTest {
                 .contains("id", "module_alias", "entity_alias", "action_code", "permission_action_code", "title",
                         "category", "available_expression", "unavailable_message", "executor_type", "executor_key",
                         "action_level", "access_mode", "action_auth", "data_auth", "default_grant_policy",
+                        "source_type", "source_id", "source_version_id",
+                        "binding_type", "binding_id", "binding_alias",
                         "system_managed", "enabled", "sort_order")
                 .doesNotContain("relation_id", "permission_code", "alias");
         assertThat(columnNames(mapper.toTable(ModuleMetadataFormulaRule.class)))
@@ -172,7 +174,7 @@ class PlatformModelSchemaTest {
     void shouldMapWorkflowModelsAsPlatformTables() {
         assertThat(columnNames(mapper.toTable(WorkflowDefinition.class)))
                 .contains("id", "tenant_id", "application_alias", "module_alias", "alias",
-                        "title", "approval_enabled", "definition_status", "current_version_no",
+                        "title", "approval_enabled", "action_code", "definition_status", "current_version_no",
                         "enabled", "sort_order")
                 .doesNotContain("entity_alias");
         assertThat(uniqueIndexes(mapper.toTable(WorkflowDefinition.class)))
