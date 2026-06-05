@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ public class WorkflowInstanceActionService {
     private final WorkflowTaskDao taskDao;
     private final WorkflowEventDao eventDao;
     private final WorkflowRuntimeEventFactory eventFactory;
+    private final WorkflowActionPolicyService actionPolicyService;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
 
     public WorkflowInstanceActionService(WorkflowInstanceDao instanceDao,
@@ -32,12 +34,26 @@ public class WorkflowInstanceActionService {
                                          WorkflowEventDao eventDao,
                                          WorkflowRuntimeEventFactory eventFactory,
                                          Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
+        this(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, new WorkflowActionPolicyService(),
+                approvalSummaryWriter);
+    }
+
+    @Autowired
+    public WorkflowInstanceActionService(WorkflowInstanceDao instanceDao,
+                                         WorkflowNodeInstanceDao nodeDao,
+                                         WorkflowRouteInstanceDao routeDao,
+                                         WorkflowTaskDao taskDao,
+                                         WorkflowEventDao eventDao,
+                                         WorkflowRuntimeEventFactory eventFactory,
+                                         WorkflowActionPolicyService actionPolicyService,
+                                         Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
         this.instanceDao = instanceDao;
         this.nodeDao = nodeDao;
         this.routeDao = routeDao;
         this.taskDao = taskDao;
         this.eventDao = eventDao;
         this.eventFactory = eventFactory;
+        this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.approvalSummaryWriter = approvalSummaryWriter == null ? Optional.empty() : approvalSummaryWriter;
     }
 
@@ -62,6 +78,7 @@ public class WorkflowInstanceActionService {
         WorkflowInstance instance = requireRunningInstance(request);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireInstanceAction(actionCode, request.reason());
         List<WorkflowTask> tasks = runningTasks(instance.getId());
         List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
         List<WorkflowRouteInstance> routes = openRoutes(instance.getId());

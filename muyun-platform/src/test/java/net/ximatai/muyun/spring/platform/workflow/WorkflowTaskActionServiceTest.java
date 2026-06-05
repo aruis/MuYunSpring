@@ -25,10 +25,11 @@ class WorkflowTaskActionServiceTest {
     private final WorkflowEventDao eventDao = mock(WorkflowEventDao.class);
     private final WorkflowRuntimeEventFactory eventFactory = new WorkflowRuntimeEventFactory();
     private final WorkflowApprovalTaskPolicyService approvalTaskPolicyService = new WorkflowApprovalTaskPolicyService();
+    private final WorkflowActionPolicyService actionPolicyService = new WorkflowActionPolicyService();
     private final WorkflowRuntimeProgressionService progressionService = mock(WorkflowRuntimeProgressionService.class);
     private final WorkflowTaskActionService service = new WorkflowTaskActionService(
             taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory, approvalTaskPolicyService,
-            progressionService, Optional.empty());
+            actionPolicyService, progressionService, Optional.empty());
 
     @Test
     void shouldApproveApprovalTaskAndCompleteAnyNode() {
@@ -99,6 +100,7 @@ class WorkflowTaskActionServiceTest {
     @Test
     void shouldRejectApprovalTaskWithReturnToMeMetadata() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssigneeId("manager-1");
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
         WorkflowInstance instance = instance();
         instance.setApprovalEnabled(true);
@@ -125,6 +127,7 @@ class WorkflowTaskActionServiceTest {
     @Test
     void shouldResubmitReturnToRejectOwnerInSameInstance() {
         WorkflowTask task = task("resubmit-1", WorkflowTaskKind.RESUBMIT, WorkflowTaskStatus.TODO);
+        task.setAssigneeId("starter-1");
         task.setNodeInstanceId(null);
         WorkflowInstance instance = instance();
         instance.setInstanceStatus(WorkflowInstanceStatus.REJECTED);
@@ -200,7 +203,7 @@ class WorkflowTaskActionServiceTest {
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
         WorkflowTaskActionResult result = service.rollback(new WorkflowTaskActionRequest(
-                "task-1", "manager-1", null, null, "return", Instant.parse("2026-06-05T03:00:00Z")));
+                "task-1", "user-1", null, null, "return", Instant.parse("2026-06-05T03:00:00Z")));
 
         assertThat(currentTask.getTaskStatus()).isEqualTo(WorkflowTaskStatus.ROLLED_BACK);
         assertThat(currentNode.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ROLLED_BACK);
@@ -225,7 +228,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.query(any(), any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.rollback(WorkflowTaskActionRequest.complete(
-                "task-1", "manager-1", "return")))
+                "task-1", "user-1", "return")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("previous approval node not found");
     }
@@ -243,7 +246,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.query(any(), any())).thenReturn(List.of(first, second));
 
         assertThatThrownBy(() -> service.rollback(WorkflowTaskActionRequest.complete(
-                "task-1", "manager-1", "return")))
+                "task-1", "user-1", "return")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("linear effective route");
     }
@@ -266,7 +269,7 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.query(any(), any())).thenReturn(List.of(currentTask, parallelTask));
 
         assertThatThrownBy(() -> service.rollback(WorkflowTaskActionRequest.complete(
-                "task-1", "manager-1", "return")))
+                "task-1", "user-1", "return")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("single active node");
 
@@ -331,10 +334,10 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
 
         WorkflowTaskActionResult result = service.transfer(new WorkflowTaskActionRequest(
-                "task-1", "leader-1", "user-b", null, "handover", Instant.parse("2026-06-05T02:00:00Z")));
+                "task-1", "user-a", "user-b", null, "handover", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TRANSFERRED);
-        assertThat(result.task().getTransferredBy()).isEqualTo("leader-1");
+        assertThat(result.task().getTransferredBy()).isEqualTo("user-a");
         assertThat(result.createdTask()).isNotNull();
         assertThat(result.createdTask().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
         assertThat(result.createdTask().getAssignmentKind()).isEqualTo(WorkflowAssignmentKind.TRANSFERRED);
@@ -346,6 +349,38 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.TASK_TRANSFERRED);
         verify(taskDao).insert(result.createdTask());
         verify(eventDao).insert(result.event());
+    }
+
+    @Test
+    void shouldRejectTaskActionWhenOperatorIsNotAssignee() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> service.approve(WorkflowTaskActionRequest.complete(
+                "task-1", "other-user", "agree")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("operator is not assignee");
+
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRequireReasonForRiskTaskAction() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> service.reject(WorkflowTaskActionRequest.reject(
+                "task-1", "user-1", WorkflowRejectResubmitMode.RESTART, null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reason is required");
+
+        verifyNoInteractions(eventDao);
     }
 
     @Test

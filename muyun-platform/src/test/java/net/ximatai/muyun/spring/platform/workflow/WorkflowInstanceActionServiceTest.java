@@ -87,6 +87,19 @@ class WorkflowInstanceActionServiceTest {
         verifyNoInteractions(taskDao, nodeDao, routeDao, eventDao);
     }
 
+    @Test
+    void shouldRequireReasonForCloseInstanceAction() {
+        WorkflowInstance instance = instance(true);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+
+        assertThatThrownBy(() -> service.terminate(WorkflowInstanceActionRequest.terminate(
+                "instance-1", "admin-1", null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reason is required");
+
+        verifyNoInteractions(taskDao, nodeDao, routeDao, eventDao);
+    }
+
     private void stubRuntime(WorkflowInstance instance, List<WorkflowTask> tasks,
                              List<WorkflowNodeInstance> nodes, List<WorkflowRouteInstance> routes) {
         when(instanceDao.findById("instance-1")).thenReturn(instance);
