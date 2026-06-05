@@ -19,7 +19,11 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskProcessBundl
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNoticeReadStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeType;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteMode;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
@@ -98,6 +102,31 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(jsonPath("$.mode").value("RUNTIME"))
                 .andExpect(jsonPath("$.instance.id").value("inst-1"))
                 .andExpect(jsonPath("$.nodes[0].nodeKey").value("review"));
+    }
+
+    @Test
+    void shouldExposeManualBranchCandidates() throws Exception {
+        when(runtimeReadFacade.manualBranchCandidates("inst-1")).thenReturn(List.of(
+                new WorkflowManualBranchCandidateView("manualBranch", WorkflowRouteMode.MANUAL, "approve",
+                        Boolean.TRUE, List.of(
+                        new WorkflowManualBranchCandidateView.Candidate("route-1", "leftRoute", "leftTask",
+                                WorkflowNodeType.TASK, WorkflowRouteStatus.CANDIDATE, Boolean.FALSE)
+                ))));
+
+        mvc.perform(get("/workflow/runtime/instance/inst-1/manual-branches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].branchNodeKey").value("manualBranch"))
+                .andExpect(jsonPath("$.records[0].routeMode").value("MANUAL"))
+                .andExpect(jsonPath("$.records[0].selectorNodeKey").value("approve"))
+                .andExpect(jsonPath("$.records[0].requireManualSelectionReason").value(true))
+                .andExpect(jsonPath("$.records[0].candidates[0].routeId").value("route-1"))
+                .andExpect(jsonPath("$.records[0].candidates[0].routeKey").value("leftRoute"))
+                .andExpect(jsonPath("$.records[0].candidates[0].targetNodeKey").value("leftTask"))
+                .andExpect(jsonPath("$.records[0].candidates[0].targetNodeType").value("TASK"))
+                .andExpect(jsonPath("$.records[0].candidates[0].routeStatus").value("CANDIDATE"))
+                .andExpect(jsonPath("$.records[0].candidates[0].defaultRoute").value(false));
+
+        verify(runtimeReadFacade).manualBranchCandidates("inst-1");
     }
 
     @Test

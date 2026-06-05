@@ -28,6 +28,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchSort;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchStats;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
@@ -65,6 +66,11 @@ public class WorkflowRuntimeWebController {
     @GetMapping("/instance/{instanceId}/bundle")
     public WorkflowRuntimeRenderBundle renderBundle(@PathVariable String instanceId) {
         return runtimeReadFacade.renderBundle(instanceId);
+    }
+
+    @GetMapping("/instance/{instanceId}/manual-branches")
+    public WebListResponse<WorkflowManualBranchCandidateView> manualBranchCandidates(@PathVariable String instanceId) {
+        return new WebListResponse<>(runtimeReadFacade.manualBranchCandidates(instanceId));
     }
 
     @GetMapping("/instance/{instanceId}/tasks")

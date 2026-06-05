@@ -11,13 +11,21 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class WorkflowRuntimeReadFacade {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
+    private static final Set<WorkflowRouteStatus> MANUAL_BRANCH_CANDIDATE_STATUSES = EnumSet.of(
+            WorkflowRouteStatus.CANDIDATE,
+            WorkflowRouteStatus.EFFECTIVE,
+            WorkflowRouteStatus.INEFFECTIVE);
 
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowTaskDao taskDao;
@@ -80,6 +88,29 @@ public class WorkflowRuntimeReadFacade {
         List<WorkflowRouteInstance> routes = routeDao.query(Criteria.of().eq("instanceId", instance.getId()),
                 ALL, Sort.asc("createdAt"));
         return new WorkflowRuntimeRenderBundle("RUNTIME", instance, nodes, routes);
+    }
+
+    public List<WorkflowManualBranchCandidateView> manualBranchCandidates(String instanceId) {
+        WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
+        List<WorkflowNodeInstance> nodes = nodeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowRouteInstance> routes = routeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        Map<String, WorkflowNodeInstance> nodeByKey = nodes.stream()
+                .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<String, List<WorkflowRouteInstance>> routesBySourceNodeKey = routes.stream()
+                .filter(route -> MANUAL_BRANCH_CANDIDATE_STATUSES.contains(route.getRouteStatus()))
+                .collect(Collectors.groupingBy(WorkflowRouteInstance::getSourceNodeKey, LinkedHashMap::new,
+                        Collectors.toList()));
+        return nodes.stream()
+                .filter(node -> node.getNodeType() == WorkflowNodeType.BRANCH)
+                .filter(node -> node.getRouteMode() == WorkflowRouteMode.MANUAL)
+                .sorted(nodeSort())
+                .map(node -> manualBranchCandidate(node, routesBySourceNodeKey.getOrDefault(node.getNodeKey(),
+                        List.of()), nodeByKey))
+                .toList();
     }
 
     public List<WorkflowTask> instanceTasks(String instanceId) {
@@ -177,6 +208,42 @@ public class WorkflowRuntimeReadFacade {
         EnumMap<WorkflowInstanceStatus, Long> counts = new EnumMap<>(WorkflowInstanceStatus.class);
         cards.forEach(card -> counts.merge(card.instanceStatus(), 1L, Long::sum));
         return new WorkflowWorkbenchStats("TRACKING", statsWithAll(cards.size(), WorkflowInstanceStatus.values(), counts));
+    }
+
+    private WorkflowManualBranchCandidateView manualBranchCandidate(WorkflowNodeInstance node,
+                                                                    List<WorkflowRouteInstance> routes,
+                                                                    Map<String, WorkflowNodeInstance> nodeByKey) {
+        List<WorkflowManualBranchCandidateView.Candidate> candidates = routes.stream()
+                .sorted(routeSort())
+                .map(route -> {
+                    WorkflowNodeInstance target = nodeByKey.get(route.getTargetNodeKey());
+                    return new WorkflowManualBranchCandidateView.Candidate(
+                            route.getId(),
+                            route.getRouteKey(),
+                            route.getTargetNodeKey(),
+                            target == null ? null : target.getNodeType(),
+                            route.getRouteStatus(),
+                            route.getDefaultRoute());
+                })
+                .toList();
+        return new WorkflowManualBranchCandidateView(
+                node.getNodeKey(),
+                node.getRouteMode(),
+                node.getSelectorNodeKey(),
+                node.getRequireManualSelectionReason(),
+                candidates);
+    }
+
+    private Comparator<WorkflowNodeInstance> nodeSort() {
+        return Comparator
+                .comparing(WorkflowNodeInstance::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(WorkflowNodeInstance::getNodeKey, Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    private Comparator<WorkflowRouteInstance> routeSort() {
+        return Comparator
+                .comparing(WorkflowRouteInstance::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(WorkflowRouteInstance::getRouteKey, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     private WorkflowWorkbenchStats todoStats(String assigneeId) {

@@ -49,6 +49,58 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldExposeManualBranchCandidatesFromDirectRuntimeRoutes() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance approve = node("node-approve", "approve");
+        WorkflowNodeInstance manual = branch("node-manual", "manualBranch", WorkflowRouteMode.MANUAL,
+                "approve", true, "2026-06-05T01:00:00Z");
+        WorkflowNodeInstance auto = branch("node-auto", "autoBranch", WorkflowRouteMode.AUTO,
+                null, false, "2026-06-05T00:30:00Z");
+        WorkflowNodeInstance left = node("node-left", "leftTask");
+        left.setNodeType(WorkflowNodeType.TASK);
+        WorkflowNodeInstance right = node("node-right", "rightTask");
+        right.setNodeType(WorkflowNodeType.TASK);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "manualBranch", "leftTask",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:01:00Z");
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "manualBranch", "rightTask",
+                WorkflowRouteStatus.INEFFECTIVE, true, "2026-06-05T01:02:00Z");
+        WorkflowRouteInstance canceledRoute = route("route-canceled", "canceledRoute", "manualBranch", "rightTask",
+                WorkflowRouteStatus.CANCELED, false, "2026-06-05T01:03:00Z");
+        WorkflowRouteInstance closedRoute = route("route-closed", "closedRoute", "manualBranch", "rightTask",
+                WorkflowRouteStatus.CLOSED, false, "2026-06-05T01:04:00Z");
+        WorkflowRouteInstance droppedRoute = route("route-dropped", "droppedRoute", "manualBranch", "rightTask",
+                WorkflowRouteStatus.DROPPED, false, "2026-06-05T01:05:00Z");
+        WorkflowRouteInstance nestedRoute = route("route-nested", "nestedRoute", "leftTask", "rightTask",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:06:00Z");
+        WorkflowRouteInstance autoRoute = route("route-auto", "autoRoute", "autoBranch", "leftTask",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T00:31:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(approve, auto, manual, left, right));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(leftRoute, rightRoute, canceledRoute, closedRoute, droppedRoute, nestedRoute,
+                        autoRoute));
+
+        List<WorkflowManualBranchCandidateView> views = facade.manualBranchCandidates("instance-1");
+
+        assertThat(views).hasSize(1);
+        WorkflowManualBranchCandidateView view = views.getFirst();
+        assertThat(view.branchNodeKey()).isEqualTo("manualBranch");
+        assertThat(view.routeMode()).isEqualTo(WorkflowRouteMode.MANUAL);
+        assertThat(view.selectorNodeKey()).isEqualTo("approve");
+        assertThat(view.requireManualSelectionReason()).isTrue();
+        assertThat(view.candidates()).extracting(WorkflowManualBranchCandidateView.Candidate::routeKey)
+                .containsExactly("leftRoute", "rightRoute");
+        assertThat(view.candidates().getFirst().routeId()).isEqualTo("route-left");
+        assertThat(view.candidates().getFirst().targetNodeKey()).isEqualTo("leftTask");
+        assertThat(view.candidates().getFirst().targetNodeType()).isEqualTo(WorkflowNodeType.TASK);
+        assertThat(view.candidates().getFirst().routeStatus()).isEqualTo(WorkflowRouteStatus.CANDIDATE);
+        assertThat(view.candidates().getFirst().defaultRoute()).isFalse();
+        assertThat(view.candidates().get(1).defaultRoute()).isTrue();
+        verify(actionPolicyService).requireRecordView(instance);
+    }
+
+    @Test
     void shouldLoadInstanceAvailableActionsWithTaskAndNodeContext() {
         WorkflowInstance instance = instance("instance-1");
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
@@ -446,10 +498,34 @@ class WorkflowRuntimeReadFacadeTest {
         return node;
     }
 
+    private WorkflowNodeInstance branch(String id, String key, WorkflowRouteMode routeMode, String selectorNodeKey,
+                                        Boolean requireReason, String createdAt) {
+        WorkflowNodeInstance node = node(id, key);
+        node.setNodeType(WorkflowNodeType.BRANCH);
+        node.setRouteMode(routeMode);
+        node.setSelectorNodeKey(selectorNodeKey);
+        node.setRequireManualSelectionReason(requireReason);
+        node.setCreatedAt(Instant.parse(createdAt));
+        return node;
+    }
+
     private WorkflowRouteInstance route() {
         WorkflowRouteInstance route = new WorkflowRouteInstance();
         route.setId("route-1");
         route.setInstanceId("instance-1");
+        return route;
+    }
+
+    private WorkflowRouteInstance route(String id, String key, String sourceNodeKey, String targetNodeKey,
+                                        WorkflowRouteStatus status, Boolean defaultRoute, String createdAt) {
+        WorkflowRouteInstance route = route();
+        route.setId(id);
+        route.setRouteKey(key);
+        route.setSourceNodeKey(sourceNodeKey);
+        route.setTargetNodeKey(targetNodeKey);
+        route.setRouteStatus(status);
+        route.setDefaultRoute(defaultRoute);
+        route.setCreatedAt(Instant.parse(createdAt));
         return route;
     }
 
