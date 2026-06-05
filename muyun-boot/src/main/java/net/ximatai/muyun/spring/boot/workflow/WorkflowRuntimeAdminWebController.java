@@ -115,13 +115,17 @@ public class WorkflowRuntimeAdminWebController {
             title = "Force Approve", level = PlatformActionLevel.LIST)
     public WorkflowTaskActionResult forceApprove(
             @PathVariable String taskId,
-            @RequestBody(required = false) WorkflowAdminActionWebRequest request) {
+            @RequestBody(required = false) WorkflowAdminTaskActionWebRequest request) {
         return adminFacade.forceApprove(new WorkflowTaskActionRequest(taskId,
                 operatorId(request == null ? null : request.operatorId()),
                 null,
                 null,
+                null,
+                null,
                 request == null ? null : request.reason(),
-                null));
+                null,
+                request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
+                request == null ? null : request.selectedReason()));
     }
 
     @PostMapping("/history/query")
@@ -191,6 +195,16 @@ public class WorkflowRuntimeAdminWebController {
 }
 
 record WorkflowAdminActionWebRequest(String operatorId, String reason) {
+}
+
+record WorkflowAdminTaskActionWebRequest(String operatorId,
+                                         String reason,
+                                         String selectedRouteKey,
+                                         String selectedDirectLinkKey,
+                                         String selectedReason) {
+    String selectedRouteKeyOrDirectLinkKey() {
+        return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
+    }
 }
 
 record WorkflowAdminHistoryQueryWebRequest(String moduleAlias, String recordId, WebPageRequest page) {

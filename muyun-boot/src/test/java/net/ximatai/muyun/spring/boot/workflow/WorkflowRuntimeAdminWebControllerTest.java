@@ -181,7 +181,9 @@ class WorkflowRuntimeAdminWebControllerTest {
         when(adminFacade.forceApprove(argThat(request ->
                 "task-1".equals(request.taskId())
                         && "user-1".equals(request.operatorId())
-                        && "force agree".equals(request.reason()))))
+                        && "force agree".equals(request.reason())
+                        && "leftRoute".equals(request.selectedRouteKey())
+                        && "choose left".equals(request.selectedReason()))))
                 .thenReturn(WorkflowTaskActionResult.of(task, null));
 
         mvc.perform(post("/workflow/runtime/admin/instance/inst-1/actions/forceTerminate")
@@ -192,7 +194,33 @@ class WorkflowRuntimeAdminWebControllerTest {
 
         mvc.perform(post("/workflow/runtime/admin/task/task-1/actions/forceApprove")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"force agree\"}"))
+                        .content("{\"reason\":\"force agree\",\"selectedDirectLinkKey\":\"leftRoute\","
+                                + "\"selectedReason\":\"choose left\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-1"));
+    }
+
+    @Test
+    void shouldPreferSelectedRouteKeyWhenAdminForceApproveReceivesBothRouteKeys() throws Exception {
+        WorkflowTask task = new WorkflowTask();
+        task.setId("task-1");
+        when(adminFacade.forceApprove(argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "admin-1".equals(request.operatorId())
+                        && "routeKey".equals(request.selectedRouteKey())
+                        && "choose route".equals(request.selectedReason()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
+
+        mvc.perform(post("/workflow/runtime/admin/task/task-1/actions/forceApprove")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "admin-1",
+                                  "selectedRouteKey": "routeKey",
+                                  "selectedDirectLinkKey": "directLinkKey",
+                                  "selectedReason": "choose route"
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.task.id").value("task-1"));
     }
