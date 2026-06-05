@@ -265,6 +265,34 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldDeriveDelegationCompletedNoticeSourceFromExplanationFields() {
+        WorkflowTask notice = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        notice.setAssignmentKind(WorkflowAssignmentKind.TRANSFERRED);
+        notice.setAssigneeId("principal-1");
+        notice.setOriginalAssigneeId("principal-1");
+        notice.setDelegatedFromUserId("principal-1");
+        notice.setDelegatedToUserId("delegate-1");
+        notice.setDelegationPolicyId("delegation-1");
+        notice.setActualProcessorId("user-b");
+        notice.setAssignmentSnapshotText("{\"sourceTaskId\":\"task-1\"}");
+        notice.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        notice.setCompletedAt(Instant.parse("2026-06-05T01:59:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(notice));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+
+        List<WorkflowWorkbenchCard> cards = facade.noticeCards("principal-1", PageRequest.of(1, 20));
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().readStatus()).isEqualTo(WorkflowNoticeReadStatus.UNREAD);
+        assertThat(cards.getFirst().noticeSourceType()).isEqualTo("DELEGATION_COMPLETED");
+        assertThat(cards.getFirst().delegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(cards.getFirst().delegatedToUserId()).isEqualTo("delegate-1");
+        assertThat(cards.getFirst().completedAt()).isEqualTo(Instant.parse("2026-06-05T01:59:00Z"));
+    }
+
+    @Test
     void shouldBuildTodoDoneAndNoticeStatsWithStableBuckets() {
         WorkflowTask normalTodo = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         normalTodo.setNodeInstanceId("node-normal");

@@ -11,6 +11,7 @@ public enum WorkflowEventType implements CodeTitleEnum {
     ADD_SIGN("add_sign", "加签"),
     TASK_RESUBMITTED("task_resubmitted", "任务重提"),
     TASK_TRANSFERRED("task_transferred", "任务转办"),
+    DELEGATION_COMPLETED("delegation_completed", "委托完成知会"),
     TASK_SKIPPED("task_skipped", "任务跳过"),
     TASK_INVALIDATED("task_invalidated", "任务失效"),
     TASK_CANCELED("task_canceled", "任务取消"),

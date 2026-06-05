@@ -42,6 +42,12 @@ public class WorkflowRuntimeEventFactory {
                 message, payloadText, occurredAt);
     }
 
+    public WorkflowEvent delegationCompleted(WorkflowInstance instance, WorkflowTask sourceTask,
+                                             String operatorId, String payloadText, Instant occurredAt) {
+        return event(instance, null, sourceTask, WorkflowEventType.DELEGATION_COMPLETED, "delegation_completed",
+                operatorId, "workflow delegation completed notice created", payloadText, occurredAt);
+    }
+
     public WorkflowEvent addSign(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
                                  String operatorId, String message, String payloadText, Instant occurredAt) {
         return event(instance, node, task, WorkflowEventType.ADD_SIGN, "addSign", operatorId,

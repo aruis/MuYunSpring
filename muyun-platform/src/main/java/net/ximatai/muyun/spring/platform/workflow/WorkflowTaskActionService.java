@@ -36,6 +36,7 @@ public class WorkflowTaskActionService {
     private final WorkflowRuntimeProgressionService progressionService;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
     private final WorkflowDelegationService delegationService;
+    private final WorkflowDelegationCompletionNoticeService delegationCompletionNoticeService;
     private final WorkflowRuntimePluginDispatcher pluginDispatcher;
 
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
@@ -47,7 +48,7 @@ public class WorkflowTaskActionService {
                                      WorkflowRuntimeProgressionService progressionService) {
         this(taskDao, instanceDao, nodeInstanceDao, null, eventDao, eventFactory,
                 approvalTaskPolicyService, new WorkflowActionPolicyService(), progressionService, Optional.empty(), null,
-                null);
+                null, null);
     }
 
     @Autowired
@@ -62,6 +63,7 @@ public class WorkflowTaskActionService {
                                      WorkflowRuntimeProgressionService progressionService,
                                      Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter,
                                      WorkflowDelegationService delegationService,
+                                     WorkflowDelegationCompletionNoticeService delegationCompletionNoticeService,
                                      WorkflowRuntimePluginDispatcher pluginDispatcher) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
@@ -74,6 +76,7 @@ public class WorkflowTaskActionService {
         this.progressionService = progressionService;
         this.approvalSummaryWriter = approvalSummaryWriter == null ? Optional.empty() : approvalSummaryWriter;
         this.delegationService = delegationService;
+        this.delegationCompletionNoticeService = delegationCompletionNoticeService;
         this.pluginDispatcher = pluginDispatcher == null ? new WorkflowRuntimePluginDispatcher(List.of()) : pluginDispatcher;
     }
 
@@ -88,7 +91,8 @@ public class WorkflowTaskActionService {
                                      WorkflowRuntimeProgressionService progressionService,
                                      Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
         this(taskDao, instanceDao, nodeInstanceDao, routeInstanceDao, eventDao, eventFactory,
-                approvalTaskPolicyService, actionPolicyService, progressionService, approvalSummaryWriter, null, null);
+                approvalTaskPolicyService, actionPolicyService, progressionService, approvalSummaryWriter, null, null,
+                null);
     }
 
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
@@ -104,7 +108,24 @@ public class WorkflowTaskActionService {
                                      WorkflowDelegationService delegationService) {
         this(taskDao, instanceDao, nodeInstanceDao, routeInstanceDao, eventDao, eventFactory,
                 approvalTaskPolicyService, actionPolicyService, progressionService, approvalSummaryWriter,
-                delegationService, null);
+                delegationService, null, null);
+    }
+
+    public WorkflowTaskActionService(WorkflowTaskDao taskDao,
+                                     WorkflowInstanceDao instanceDao,
+                                     WorkflowNodeInstanceDao nodeInstanceDao,
+                                     WorkflowRouteInstanceDao routeInstanceDao,
+                                     WorkflowEventDao eventDao,
+                                     WorkflowRuntimeEventFactory eventFactory,
+                                     WorkflowApprovalTaskPolicyService approvalTaskPolicyService,
+                                     WorkflowActionPolicyService actionPolicyService,
+                                     WorkflowRuntimeProgressionService progressionService,
+                                     Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter,
+                                     WorkflowDelegationService delegationService,
+                                     WorkflowRuntimePluginDispatcher pluginDispatcher) {
+        this(taskDao, instanceDao, nodeInstanceDao, routeInstanceDao, eventDao, eventFactory,
+                approvalTaskPolicyService, actionPolicyService, progressionService, approvalSummaryWriter,
+                delegationService, null, pluginDispatcher);
     }
 
     @Transactional
@@ -143,6 +164,7 @@ public class WorkflowTaskActionService {
         }
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "approve", operatorId, request.reason(), now);
         eventDao.insert(event);
+        createDelegationCompletionNotice(instance, task, operatorId, now);
         if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
             progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
         }
@@ -185,6 +207,7 @@ public class WorkflowTaskActionService {
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "forceApprove", operatorId,
                 request.reason(), now);
         eventDao.insert(event);
+        createDelegationCompletionNotice(instance, task, operatorId, now);
         if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
             progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
         }
@@ -246,6 +269,7 @@ public class WorkflowTaskActionService {
         taskDao.insert(resubmitTask);
         WorkflowEvent event = eventFactory.taskRejected(instance, task, operatorId, request.reason(), now);
         eventDao.insert(event);
+        createDelegationCompletionNotice(instance, task, operatorId, now);
         eventDao.insert(eventFactory.taskCreated(instance, resubmitTask, operatorId, now));
         writeApprovalSummary(instance);
         dispatchTask(instance, node, task, WorkflowRuntimePluginEventType.AFTER_REJECT, "reject",
@@ -317,6 +341,7 @@ public class WorkflowTaskActionService {
         taskDao.insert(createdTask);
         WorkflowEvent event = eventFactory.nodeRolledBack(instance, currentNode, operatorId, request.reason(), now);
         eventDao.insert(event);
+        createDelegationCompletionNotice(instance, task, operatorId, now);
         eventDao.insert(eventFactory.taskCreated(instance, previousNode, createdTask, operatorId, now));
         writeApprovalSummary(instance);
         dispatchTask(instance, currentNode, task, WorkflowRuntimePluginEventType.AFTER_ROLLBACK, "rollback",
@@ -401,6 +426,7 @@ public class WorkflowTaskActionService {
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "complete", operatorId,
                 request.reason(), now);
         eventDao.insert(event);
+        createDelegationCompletionNotice(instance, task, operatorId, now);
         progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
         return WorkflowTaskActionResult.of(task, node, instance, event);
     }
@@ -417,10 +443,12 @@ public class WorkflowTaskActionService {
         actionPolicyService.requireRuntimeAction(instance, "notice");
         actionPolicyService.requireTaskOperator(task, "notice", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.NOTICED);
-        task.setActualProcessorId(operatorId);
+        if (!isDelegationCompletionNotice(task)) {
+            task.setActualProcessorId(operatorId);
+            task.setCompletedAt(now);
+        }
         task.setDecision("notice");
         task.setResultMessage(request.reason());
-        task.setCompletedAt(now);
         updateTask(task, now);
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "notice", operatorId,
                 request.reason(), now);
@@ -440,10 +468,12 @@ public class WorkflowTaskActionService {
             return WorkflowTaskActionResult.of(task, null);
         }
         task.setTaskStatus(WorkflowTaskStatus.NOTICED);
-        task.setActualProcessorId(operatorId);
+        if (!isDelegationCompletionNotice(task)) {
+            task.setActualProcessorId(operatorId);
+            task.setCompletedAt(now);
+        }
         task.setDecision("notice");
         task.setResultMessage(request.reason());
-        task.setCompletedAt(now);
         updateTask(task, now);
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "notice", operatorId,
                 request.reason(), now);
@@ -711,6 +741,23 @@ public class WorkflowTaskActionService {
         if (!validOperatorId.equals(task.getAssigneeId())) {
             throw new PlatformException("workflow notice reader is not assignee: " + task.getId());
         }
+    }
+
+    private boolean isDelegationCompletionNotice(WorkflowTask task) {
+        if (task == null || task.getTaskKind() != WorkflowTaskKind.NOTICE) {
+            return false;
+        }
+        if (hasText(task.getDelegatedFromUserId())
+                && hasText(task.getActualProcessorId())
+                && !task.getActualProcessorId().equals(task.getDelegatedFromUserId())
+                && (hasText(task.getDelegatedToUserId())
+                || hasText(task.getDelegationPolicyId())
+                || task.getAssignmentKind() == WorkflowAssignmentKind.DELEGATED
+                || task.getAssignmentKind() == WorkflowAssignmentKind.TRANSFERRED)) {
+            return true;
+        }
+        String snapshot = task.getAssignmentSnapshotText();
+        return snapshot != null && snapshot.contains("DELEGATION_COMPLETED");
     }
 
     private WorkflowInstance requireInstance(WorkflowTask task) {
@@ -1197,6 +1244,14 @@ public class WorkflowTaskActionService {
         if (updated <= 0) {
             throw new OptimisticLockException("workflow task version conflict: " + task.getId());
         }
+    }
+
+    private void createDelegationCompletionNotice(WorkflowInstance instance, WorkflowTask task,
+                                                  String operatorId, Instant now) {
+        if (delegationCompletionNoticeService == null) {
+            return;
+        }
+        delegationCompletionNoticeService.createIfNeeded(instance, task, operatorId, now);
     }
 
     private void updateNode(WorkflowNodeInstance node, Instant now) {

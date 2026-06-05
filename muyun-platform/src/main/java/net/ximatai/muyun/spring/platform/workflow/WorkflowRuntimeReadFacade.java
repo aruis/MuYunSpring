@@ -350,11 +350,27 @@ public class WorkflowRuntimeReadFacade {
         if (task == null || task.getTaskKind() != WorkflowTaskKind.NOTICE) {
             return null;
         }
-        String snapshot = task.getAssignmentSnapshotText();
-        if (snapshot != null && snapshot.contains("DELEGATION_COMPLETED")) {
+        if (isDelegationCompletionNotice(task)) {
             return "DELEGATION_COMPLETED";
         }
         return null;
+    }
+
+    private boolean isDelegationCompletionNotice(WorkflowTask task) {
+        if (task == null || task.getTaskKind() != WorkflowTaskKind.NOTICE) {
+            return false;
+        }
+        if (hasText(task.getDelegatedFromUserId())
+                && hasText(task.getActualProcessorId())
+                && !task.getActualProcessorId().equals(task.getDelegatedFromUserId())
+                && (hasText(task.getDelegatedToUserId())
+                || hasText(task.getDelegationPolicyId())
+                || task.getAssignmentKind() == WorkflowAssignmentKind.DELEGATED
+                || task.getAssignmentKind() == WorkflowAssignmentKind.TRANSFERRED)) {
+            return true;
+        }
+        String snapshot = task.getAssignmentSnapshotText();
+        return snapshot != null && snapshot.contains("DELEGATION_COMPLETED");
     }
 
     private WorkflowTaskAvailableAction enrich(WorkflowTaskAvailableAction action, WorkflowTask task,
@@ -525,6 +541,10 @@ public class WorkflowRuntimeReadFacade {
 
     private boolean sameText(String expected, String actual) {
         return expected == null || expected.isBlank() || expected.equals(actual);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private boolean same(Object expected, Object actual) {

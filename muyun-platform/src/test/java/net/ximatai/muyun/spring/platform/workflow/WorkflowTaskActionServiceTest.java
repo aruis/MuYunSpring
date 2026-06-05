@@ -480,6 +480,106 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldCreateDelegationCompletionNoticeWhenDelegateApprovesTask() {
+        WorkflowTask task = delegatedTask("task-1", WorkflowTaskKind.APPROVAL);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        WorkflowTaskActionService noticeService = serviceWithDelegationCompletionNotice();
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        noticeService.approve(new WorkflowTaskActionRequest(
+                "task-1", "delegate-1", null, null, "agree", Instant.parse("2026-06-05T02:00:00Z")));
+
+        ArgumentCaptor<WorkflowTask> taskCaptor = ArgumentCaptor.forClass(WorkflowTask.class);
+        verify(taskDao).insert(taskCaptor.capture());
+        WorkflowTask notice = taskCaptor.getValue();
+        assertThat(notice.getTaskKind()).isEqualTo(WorkflowTaskKind.NOTICE);
+        assertThat(notice.getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
+        assertThat(notice.getAssigneeId()).isEqualTo("principal-1");
+        assertThat(notice.getParentTaskId()).isEqualTo("task-1");
+        assertThat(notice.getOriginalAssigneeId()).isEqualTo("principal-1");
+        assertThat(notice.getDelegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(notice.getDelegatedToUserId()).isEqualTo("delegate-1");
+        assertThat(notice.getDelegationPolicyId()).isEqualTo("delegation-1");
+        assertThat(notice.getActualProcessorId()).isEqualTo("delegate-1");
+        assertThat(notice.getCompletedAt()).isEqualTo(Instant.parse("2026-06-05T02:00:00Z"));
+        assertThat(notice.getAssignmentSnapshotText()).contains("DELEGATION_COMPLETED", "\"sourceTaskId\":\"task-1\"");
+
+        ArgumentCaptor<WorkflowEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowEvent.class);
+        verify(eventDao, times(2)).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues()).extracting(WorkflowEvent::getEventType)
+                .contains(WorkflowEventType.TASK_COMPLETED, WorkflowEventType.DELEGATION_COMPLETED);
+        WorkflowEvent delegationEvent = eventCaptor.getAllValues().stream()
+                .filter(event -> event.getEventType() == WorkflowEventType.DELEGATION_COMPLETED)
+                .findFirst()
+                .orElseThrow();
+        assertThat(delegationEvent.getTaskId()).isEqualTo("task-1");
+        assertThat(delegationEvent.getPayloadText()).contains("\"sourceTaskId\":\"task-1\"");
+        assertThat(delegationEvent.getPayloadText()).contains("\"noticeTaskId\":\"" + notice.getId() + "\"");
+        assertThat(delegationEvent.getPayloadText()).contains("\"actualProcessorId\":\"delegate-1\"");
+    }
+
+    @Test
+    void shouldNotCreateDelegationCompletionNoticeWhenPrincipalProcessesOwnDelegatedTask() {
+        WorkflowTask task = delegatedTask("task-1", WorkflowTaskKind.APPROVAL);
+        task.setPrincipalCanProcess(true);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        WorkflowTaskActionService noticeService = serviceWithDelegationCompletionNotice();
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        noticeService.approve(new WorkflowTaskActionRequest(
+                "task-1", "principal-1", null, null, "agree", Instant.parse("2026-06-05T02:00:00Z")));
+
+        verify(taskDao, never()).insert(any(WorkflowTask.class));
+        ArgumentCaptor<WorkflowEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowEvent.class);
+        verify(eventDao).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getEventType()).isEqualTo(WorkflowEventType.TASK_COMPLETED);
+    }
+
+    @Test
+    void shouldCreateDelegationCompletionNoticeWhenTransferredDelegationTaskIsCompleted() {
+        WorkflowTask task = delegatedTask("task-1", WorkflowTaskKind.BUSINESS);
+        task.setAssignmentKind(WorkflowAssignmentKind.TRANSFERRED);
+        task.setAssigneeId("user-b");
+        task.setTransferredFromUserId("delegate-1");
+        task.setTransferredBy("delegate-1");
+        task.setTransferredAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowNodeInstance node = node(null, null);
+        node.setNodeType(WorkflowNodeType.TASK);
+        WorkflowTaskActionService noticeService = serviceWithDelegationCompletionNotice();
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of());
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        noticeService.completeBusinessTask(new WorkflowTaskActionRequest(
+                "task-1", "user-b", null, null, "done", Instant.parse("2026-06-05T03:00:00Z")));
+
+        ArgumentCaptor<WorkflowTask> taskCaptor = ArgumentCaptor.forClass(WorkflowTask.class);
+        verify(taskDao).insert(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getAssigneeId()).isEqualTo("principal-1");
+        assertThat(taskCaptor.getValue().getAssignmentKind()).isEqualTo(WorkflowAssignmentKind.TRANSFERRED);
+        assertThat(taskCaptor.getValue().getTransferredFromUserId()).isEqualTo("delegate-1");
+        assertThat(taskCaptor.getValue().getActualProcessorId()).isEqualTo("user-b");
+        ArgumentCaptor<WorkflowEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowEvent.class);
+        verify(eventDao, times(2)).insert(eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues()).extracting(WorkflowEvent::getEventType)
+                .contains(WorkflowEventType.TASK_COMPLETED, WorkflowEventType.DELEGATION_COMPLETED);
+    }
+
+    @Test
     void shouldMarkNoticeTaskAsNoticed() {
         WorkflowTask task = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
         when(taskDao.findById("notice-1")).thenReturn(task);
@@ -594,6 +694,7 @@ class WorkflowTaskActionServiceTest {
         assertThat(plugin.contexts().getFirst().reason()).isEqualTo("handover");
         verify(taskDao).insert(result.createdTask());
         verify(eventDao).insert(result.event());
+        assertThat(result.event().getEventType()).isNotEqualTo(WorkflowEventType.DELEGATION_COMPLETED);
     }
 
     @Test
@@ -896,6 +997,20 @@ class WorkflowTaskActionServiceTest {
         return task;
     }
 
+    private WorkflowTask delegatedTask(String id, WorkflowTaskKind kind) {
+        WorkflowTask task = task(id, kind, WorkflowTaskStatus.TODO);
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setOriginalAssigneeId("principal-1");
+        task.setOwnerId("principal-1");
+        task.setAssigneeId("delegate-1");
+        task.setDelegatedFromUserId("principal-1");
+        task.setDelegatedToUserId("delegate-1");
+        task.setPrincipalCanProcess(false);
+        task.setDelegationPolicyId("delegation-1");
+        task.setAssignmentSnapshotText("{\"delegationPolicyId\":\"delegation-1\"}");
+        return task;
+    }
+
     private WorkflowAddSignSegment segment(String addedNodeKey, String sourceNodeKey, String nextNodeKey) {
         return new WorkflowAddSignSegment(List.of(nodeDefinition(addedNodeKey)), List.of(
                 linkDefinition("entry-" + addedNodeKey, sourceNodeKey, addedNodeKey),
@@ -940,6 +1055,14 @@ class WorkflowTaskActionServiceTest {
         return new WorkflowTaskActionService(taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory,
                 approvalTaskPolicyService, actionPolicyService, progressionService, Optional.empty(), null,
                 new WorkflowRuntimePluginDispatcher(List.of(plugin)));
+    }
+
+    private WorkflowTaskActionService serviceWithDelegationCompletionNotice() {
+        WorkflowDelegationCompletionNoticeService completionNoticeService =
+                new WorkflowDelegationCompletionNoticeService(taskDao, eventDao, eventFactory);
+        return new WorkflowTaskActionService(taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory,
+                approvalTaskPolicyService, actionPolicyService, progressionService, Optional.empty(), null,
+                completionNoticeService, null);
     }
 
     private static final class RecordingPlugin implements WorkflowRuntimePlugin {
