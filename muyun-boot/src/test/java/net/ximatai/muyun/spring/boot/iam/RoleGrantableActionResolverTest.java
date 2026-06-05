@@ -1,18 +1,37 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.Role;
+import net.ximatai.muyun.spring.iam.role.RoleAction;
+import net.ximatai.muyun.spring.iam.role.RoleActionDao;
+import net.ximatai.muyun.spring.iam.role.RoleDao;
+import net.ximatai.muyun.spring.iam.role.RoleKind;
+import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
+import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
+import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.role.RoleUserDao;
+import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleActionDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.GenericApplicationContext;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -87,6 +106,49 @@ class RoleGrantableActionResolverTest {
     }
 
     @Test
+    void shouldExposeSelfRegisteredStaticRoleActionsInPermissionMatrix() {
+        List<PlatformModuleAction> registeredActions = scannedRoleModuleActions();
+        PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        when(moduleService.resolveVisibleModule("iam.role")).thenReturn(module("iam.role", ModuleKind.STATIC));
+        when(moduleActionService.listByModuleAliases(List.of("iam.role"))).thenReturn(registeredActions);
+        RoleGrantableActionResolver resolver = new RoleGrantableActionResolver(moduleService, moduleActionService);
+        List<GrantableAction> grantableActions = resolver.resolve(List.of("iam.role"));
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleActionDao roleActionDao = mock(RoleActionDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(standardRole("role-1")));
+        RoleAction rolePermissionsGrant = enabledAction("grant-1", "role-1", "iam.role", "rolePermissions");
+        rolePermissionsGrant.setDataScopePolicy(DataScopePolicy.ORGANIZATION);
+        when(roleActionDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(List.of(rolePermissionsGrant));
+        RoleService roleService = new RoleService(
+                roleDao, mock(RoleUserDao.class), roleActionDao, tenantId -> {
+        });
+
+        RolePermissionMatrix matrix = roleService.permissionMatrix("role-1", grantableActions);
+
+        assertThat(grantableActions).extracting(GrantableAction::actionCode)
+                .contains("roleUsers", "rolePermissions");
+        assertThat(matrix.modules()).singleElement()
+                .satisfies(module -> {
+                    assertThat(module.moduleAlias()).isEqualTo("iam.role");
+                    assertThat(module.actions()).filteredOn(action -> "rolePermissions".equals(action.actionCode()))
+                            .singleElement()
+                            .extracting(RolePermissionAction::permissionActionCode,
+                                    RolePermissionAction::granted,
+                                    RolePermissionAction::dataScopePolicy,
+                                    RolePermissionAction::dataAuth)
+                            .containsExactly("rolePermissions", true, DataScopePolicy.ORGANIZATION, true);
+                    assertThat(module.actions()).filteredOn(action -> "roleUsers".equals(action.actionCode()))
+                            .singleElement()
+                            .extracting(RolePermissionAction::permissionActionCode,
+                                    RolePermissionAction::granted,
+                                    RolePermissionAction::dataAuth)
+                            .containsExactly("roleUsers", false, true);
+                });
+    }
+
+    @Test
     void shouldIgnoreDisabledOrNonActionAuthRegisteredActions() {
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         PlatformModuleService moduleService = mock(PlatformModuleService.class);
@@ -125,6 +187,20 @@ class RoleGrantableActionResolverTest {
         return module;
     }
 
+    private List<PlatformModuleAction> scannedRoleModuleActions() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
+            context.refresh();
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().stream()
+                    .filter(candidate -> "iam.role".equals(candidate.moduleAlias()))
+                    .findFirst()
+                    .orElseThrow();
+            return definition.actions().stream()
+                    .map(action -> moduleAction(definition.moduleAlias(), action))
+                    .toList();
+        }
+    }
+
     private PlatformModuleAction moduleAction(String actionCode, String permissionActionCode, String title, boolean dataAuth) {
         PlatformModuleAction action = new PlatformModuleAction();
         action.setModuleAlias("iam.user");
@@ -133,6 +209,41 @@ class RoleGrantableActionResolverTest {
         action.setTitle(title);
         action.setActionAuth(Boolean.TRUE);
         action.setDataAuth(dataAuth);
+        action.setEnabled(Boolean.TRUE);
+        return action;
+    }
+
+    private PlatformModuleAction moduleAction(String moduleAlias, StaticModuleActionDefinition definition) {
+        PlatformModuleAction action = new PlatformModuleAction();
+        action.setModuleAlias(moduleAlias);
+        action.setActionCode(definition.actionCode());
+        action.setPermissionActionCode(definition.permissionActionCode());
+        action.setTitle(definition.title());
+        action.setActionLevel(definition.actionLevel());
+        action.setAccessMode(definition.accessMode());
+        action.setActionAuth(definition.actionAuth());
+        action.setDataAuth(definition.dataAuth());
+        action.setDefaultGrantPolicy(definition.defaultGrantPolicy());
+        action.setEnabled(Boolean.TRUE);
+        return action;
+    }
+
+    private Role standardRole(String id) {
+        Role role = new Role();
+        role.setId(id);
+        role.setTitle("Role " + id);
+        role.setRoleKind(RoleKind.STANDARD);
+        role.setEnabled(Boolean.TRUE);
+        return role;
+    }
+
+    private RoleAction enabledAction(String id, String roleId, String moduleAlias, String actionCode) {
+        RoleAction action = new RoleAction();
+        action.setId(id);
+        action.setRoleId(roleId);
+        action.setModuleAlias(moduleAlias);
+        action.setActionCode(actionCode);
+        action.setTenantScopePolicy(TenantScopePolicy.CURRENT_TENANT);
         action.setEnabled(Boolean.TRUE);
         return action;
     }
