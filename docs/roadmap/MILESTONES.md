@@ -211,7 +211,7 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 | M5-04 | 动作授权配置 | 建立角色到模块动作的授权事实和授权回显矩阵 | 授权按模块别名和权限动作落表；撤权软失效；标准动作和模块配置动作能合并成授权矩阵；动作继承统一落到权限动作 | P0 | 已完成 |
 | M5-05 | 数据权限策略 | 建立动作授权上的数据范围策略 | 支持无权限、全部、本人负责、负责人、相关人、机构、机构及下级、通配和引用依赖；租户范围与数据范围分离；引用依赖 fail closed；自定义条件保留字段但当前拒绝授权 | P0 | 已完成 |
 | M5-06 | 权限执行接入 | 将动作权限和数据权限接入静态与动态运行入口 | 静态 Web、动态 Web 和动作执行入口复用同一套动作策略；静态标准 Web 已对查询、查看、更新、删除、启停接入数据权限；动态标准读写和动作执行由动态服务统一接入数据权限；动态条件型动作会把数据范围裁剪后的 criteria 交给 executor；动态动作列表、记录动作可用性、运行端 descriptor 和 OpenAPI 已接入动作授权 | P0 | 已完成 |
-| M5-07 | 菜单剪枝 | 基于权限结果对菜单树做可见性剪枝 | 菜单自身仍按租户和方案管理；权限只影响返回树，不改变菜单模型；后端服务层已支持按模块 `view` 权限剪枝 | P1 | 已完成 |
+| M5-07 | 菜单剪枝 | 基于权限结果对菜单树做可见性剪枝 | 菜单自身仍按租户和方案管理；权限只影响返回树，不改变菜单模型；后端服务层已支持按模块 `menu` 动作剪枝，`view` 只表达数据查看 | P1 | 已完成 |
 | M5-08 | 审计上下文 | 将权限判定结果进入动作执行和审计上下文 | 授权服务已返回轻量判定结果；静态 Web action context 和动态动作执行上下文已可携带操作者与判定口径；动态动作审计事件已下沉 operator、authorizationDecision、permissionCode 和 permissionActionCode；不替代业务专题流水 | P1 | 已完成 |
 | M5-09 | 用户登录与运行时身份 | 建立用户账号、密码登录、token 身份解析和当前用户菜单入口 | 已提供租户内用户账号、PBKDF2 密码哈希、登录 token、Bearer token 当前用户解析；`CurrentUserWebFilter` 将身份同步到当前用户上下文和租户上下文；我的菜单入口由后端按当前用户推理菜单方案，不接受前端 scheme 参数 | P0 | 已完成 |
 
@@ -229,7 +229,7 @@ M5 功能点矩阵在 M4 完成后展开。当前先固定以下边界：
 | 租户范围 | 数据范围与租户基线分离；普通授权默认当前租户，明确授权可跨租户；系统用户绕过数据范围 | `DataScopeAbilityTest`、`RoleDataScopeCriteriaServiceTest` 和动态运行态测试覆盖 | 已闭环 |
 | 静态接入 | 静态 Web 标准 CRUD、启停、树、排序等入口复用 `@ActionEndpoint`；实现 `DataScopeAbility` 的静态服务接入同一数据范围语义 | `ActionEndpointInterceptorTest`、`DataScopeWebTest` 和 `IamWebControllerIT` 覆盖 | 主体完成 |
 | 动态接入 | 动态主元数据标准 CRUD、动作执行、条件型动作 criteria 裁剪、动作列表、记录动作可用性、运行端 descriptor 和 OpenAPI 接入同一动作/数据权限服务 | `DynamicRecordServiceTest`、`DynamicRecordWebControllerTest` 和 `DynamicRecordWebControllerIT` 覆盖 | 主体完成 |
-| 菜单剪枝 | 菜单模型不承载权限事实，返回菜单树时按模块查看权限剪枝；我的菜单由当前用户推理菜单方案，前端不传 scheme | `RoleMenuVisibilityPolicyServiceTest`、`MenuServiceContractTest`、`MenuWebControllerTest` 覆盖 | 已闭环 |
+| 菜单剪枝 | 菜单模型不承载权限事实，返回菜单树时按模块 `menu` 动作剪枝；我的菜单由当前用户推理菜单方案，前端不传 scheme | `RoleMenuVisibilityPolicyServiceTest`、`MenuServiceContractTest`、`MenuWebControllerTest` 覆盖 | 已闭环 |
 | 运行时身份 | 用户登录生成 token；Bearer token 解析为当前用户，并同步进入当前用户上下文和租户上下文 | `UserSessionServiceTest`、`BearerTokenCurrentUserProviderTest` 覆盖 | 已闭环 |
 | 审计上下文 | 动态动作审计记录轻量保存操作者、判定结果和权限动作；静态 Web 保留请求内授权上下文 | 动态审计相关测试和 ActionEndpoint 上下文测试覆盖 | 可收口 |
 

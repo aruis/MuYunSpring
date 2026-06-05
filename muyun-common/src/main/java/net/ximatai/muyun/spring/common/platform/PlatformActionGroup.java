@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.common.platform;
 
 public enum PlatformActionGroup {
+    MENU(EntityCapability.CRUD),
     CRUD(EntityCapability.CRUD),
     SORT(EntityCapability.SORT),
     TREE(EntityCapability.TREE),

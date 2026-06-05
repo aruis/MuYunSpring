@@ -33,16 +33,19 @@ class PlatformActionResolverTest {
     @Test
     void shouldExposeStandardActionsFromSupportedActionGroupsOnly() {
         assertThat(actionCodes(entityWith(EntityCapability.CRUD)))
-                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD));
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD));
         assertThat(actionCodes(entityWith(EntityCapability.SORT)))
-                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD, PlatformActionGroup.SORT));
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.SORT));
         assertThat(actionCodes(entityWith(EntityCapability.TREE)))
-                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD, PlatformActionGroup.SORT,
-                        PlatformActionGroup.TREE));
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.SORT, PlatformActionGroup.TREE));
         assertThat(actionCodes(entityWith(EntityCapability.REFERENCE)))
-                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD, PlatformActionGroup.REFERENCE));
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.REFERENCE));
         assertThat(actionCodes(entityWith(EntityCapability.ENABLE)))
-                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.CRUD, PlatformActionGroup.ENABLE));
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.ENABLE));
     }
 
     @Test
@@ -54,6 +57,8 @@ class PlatformActionResolverTest {
                 EntityStandardActionCatalog.from(entityWith(EntityCapability.DATA_SCOPE, EntityCapability.TREE,
                         EntityCapability.REFERENCE, EntityCapability.ENABLE));
 
+        assertThat(action(plainActions, PlatformAction.MENU).actionAuth()).isTrue();
+        assertThat(action(plainActions, PlatformAction.MENU).dataAuth()).isFalse();
         assertThat(action(plainActions, PlatformAction.UPDATE).actionAuth()).isTrue();
         assertThat(action(plainActions, PlatformAction.UPDATE).dataAuth()).isFalse();
         assertThat(action(dataScopedActions, PlatformAction.CREATE).dataAuth()).isFalse();

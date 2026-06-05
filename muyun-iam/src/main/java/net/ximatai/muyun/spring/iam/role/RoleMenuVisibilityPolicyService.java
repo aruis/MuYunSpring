@@ -24,6 +24,6 @@ public class RoleMenuVisibilityPolicyService implements MenuVisibilityPolicyServ
         if (user.system()) {
             return true;
         }
-        return roleService.hasActionPermission(user.userId(), moduleAlias, PlatformAction.VIEW.code());
+        return roleService.hasActionPermission(user.userId(), moduleAlias, PlatformAction.MENU.code());
     }
 }

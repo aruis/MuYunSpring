@@ -7,13 +7,14 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleMenuVisibilityPolicyServiceTest {
     @Test
-    void shouldUseViewActionPermissionForModuleMenuVisibility() {
+    void shouldUseMenuActionPermissionForModuleMenuVisibility() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.hasActionPermission("user-1", "crm.customer", "view")).thenReturn(true);
+        when(roleService.hasActionPermission("user-1", "crm.customer", "menu")).thenReturn(true);
         RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService);
 
         assertThat(service.canViewModuleMenu(
@@ -21,6 +22,18 @@ class RoleMenuVisibilityPolicyServiceTest {
                 Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a")))).isTrue();
         assertThat(service.canViewModuleMenu(
                 "crm.contract",
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a")))).isFalse();
+        verify(roleService).hasActionPermission("user-1", "crm.customer", "menu");
+    }
+
+    @Test
+    void shouldNotTreatViewPermissionAsMenuVisibilityPermission() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.hasActionPermission("user-1", "crm.customer", "view")).thenReturn(true);
+        RoleMenuVisibilityPolicyService service = new RoleMenuVisibilityPolicyService(roleService);
+
+        assertThat(service.canViewModuleMenu(
+                "crm.customer",
                 Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a")))).isFalse();
     }
 

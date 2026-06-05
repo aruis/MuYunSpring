@@ -82,6 +82,7 @@ public class StaticModuleDefinitionScanner {
 
     private void addStandardActions(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
         if (CrudWeb.class.isAssignableFrom(beanClass)) {
+            addPlatform(actions, PlatformAction.MENU);
             addPlatform(actions, PlatformAction.CREATE);
             addPlatform(actions, PlatformAction.VIEW);
             addPlatform(actions, PlatformAction.UPDATE);

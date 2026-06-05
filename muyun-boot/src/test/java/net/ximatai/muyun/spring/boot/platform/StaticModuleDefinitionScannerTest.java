@@ -41,21 +41,21 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("租户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactly("create", "view", "update", "delete", "query",
+                        .containsExactly("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable");
             });
             assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("机构管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactly("create", "view", "update", "delete", "query",
+                        .containsExactly("menu", "create", "view", "update", "delete", "query",
                                 "tree", "sort", "enable", "disable");
             });
             assertThat(byAlias.get("iam.role")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("角色管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactlyInAnyOrder("create", "view", "update", "delete", "query",
+                        .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable", "roleUsers", "rolePermissions");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("roleUsers"))
                         .singleElement()
@@ -69,7 +69,7 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.moduleAlias()).isEqualTo("iam.user");
                 assertThat(definition.title()).isEqualTo("用户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactly("create", "view", "update", "delete", "query",
+                        .containsExactly("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable", "changePassword");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("changePassword"))
                         .singleElement()

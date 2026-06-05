@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.Optional;
 
 public enum PlatformAction {
+    MENU(PlatformActionGroup.MENU, "menu", "Menu",
+            PlatformActionLevel.LIST, 10,
+            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
+
     CREATE(PlatformActionGroup.CRUD, "create", "Create",
             PlatformActionLevel.LIST, 10,
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
