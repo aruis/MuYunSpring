@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskContinueResu
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskEvaluation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskProcessBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowNoticeReadStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
@@ -31,6 +32,8 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchQueryRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchCard;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchStatItem;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchStats;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -199,6 +202,37 @@ class WorkflowRuntimeWebControllerTest {
     }
 
     @Test
+    void shouldPassNoticeReadStatusAndExposeWorkbenchStats() throws Exception {
+        ArgumentCaptor<WorkflowWorkbenchQueryRequest> noticeQueryCaptor =
+                ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
+        when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+                noticeQueryCaptor.capture()))
+                .thenReturn(List.of());
+        when(runtimeReadFacade.workbenchStats("notice", "operator-1"))
+                .thenReturn(new WorkflowWorkbenchStats("NOTICE", List.of(
+                        new WorkflowWorkbenchStatItem("ALL", "全部", 2),
+                        new WorkflowWorkbenchStatItem("UNREAD", "未读", 1),
+                        new WorkflowWorkbenchStatItem("READ", "已读", 1)
+                )));
+
+        mvc.perform(post("/workflow/runtime/workbench/notice/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\",\"readStatus\":\"READ\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records").isArray());
+
+        mvc.perform(post("/workflow/runtime/workbench/notice/stats")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.boardType").value("NOTICE"))
+                .andExpect(jsonPath("$.items[1].code").value("UNREAD"))
+                .andExpect(jsonPath("$.items[1].count").value(1));
+
+        assertThat(noticeQueryCaptor.getValue().readStatus()).isEqualTo(WorkflowNoticeReadStatus.READ);
+    }
+
+    @Test
     void shouldExecuteTaskActionsThroughTaskActionFacade() throws Exception {
         WorkflowTask task = new WorkflowTask();
         task.setId("task-1");
@@ -227,6 +261,16 @@ class WorkflowRuntimeWebControllerTest {
                         && request.addSignSegment().linkDefinitions().size() == 2
                         && "need review".equals(request.reason()))))
                 .thenReturn(new WorkflowTaskActionResult(task, null, null, null, null));
+        when(taskActionFacade.execute(eq("read"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "operator-1".equals(request.operatorId())
+                        && "opened".equals(request.reason()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
+        when(taskActionFacade.execute(eq("read"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "user-1".equals(request.operatorId())
+                        && request.reason() == null)))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
 
         mvc.perform(post("/workflow/runtime/task/task-1/actions/reject")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -282,6 +326,18 @@ class WorkflowRuntimeWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk());
+
+        mvc.perform(post("/workflow/runtime/task/task-1/actions/read")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\",\"reason\":\"opened\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-1"));
+
+        mvc.perform(post("/workflow/runtime/task/task-1/read")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-1"));
     }
 
     @Test

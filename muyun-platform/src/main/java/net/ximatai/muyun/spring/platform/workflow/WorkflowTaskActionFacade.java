@@ -28,6 +28,7 @@ public class WorkflowTaskActionFacade {
             case "resubmit" -> actionService.resubmit(request);
             case "complete" -> actionService.completeBusinessTask(request);
             case "notice" -> actionService.notice(request);
+            case "read" -> actionService.readNotice(request);
             case "transfer" -> actionService.transfer(request);
             case "addSign" -> actionService.addSign(request);
             case "invalidate" -> actionService.invalidate(request);

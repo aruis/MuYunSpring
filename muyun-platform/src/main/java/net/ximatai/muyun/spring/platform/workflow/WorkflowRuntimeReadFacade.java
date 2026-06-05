@@ -5,10 +5,12 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,10 +134,12 @@ public class WorkflowRuntimeReadFacade {
                                                  WorkflowWorkbenchQueryRequest request) {
         String validProcessorId = requireText(processorId, "workflow processor id must not be blank");
         List<WorkflowTask> tasks = taskDao.query(Criteria.of()
-                        .eq("actualProcessorId", validProcessorId)
                         .in("taskStatus", List.of(WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED,
                                 WorkflowTaskStatus.ROLLED_BACK, WorkflowTaskStatus.TRANSFERRED)),
-                ALL, Sort.desc("completedAt"), Sort.desc("updatedAt"));
+                ALL, Sort.desc("completedAt"), Sort.desc("updatedAt")).stream()
+                .filter(task -> validProcessorId.equals(task.getActualProcessorId())
+                        || validProcessorId.equals(task.getTransferredBy()))
+                .toList();
         return pageItems(cards("DONE", tasks, request), page(pageRequest));
     }
 
@@ -152,6 +156,65 @@ public class WorkflowRuntimeReadFacade {
                         .in("taskStatus", List.of(WorkflowTaskStatus.TODO, WorkflowTaskStatus.NOTICED)),
                 ALL, Sort.desc("createdAt"));
         return pageItems(cards("NOTICE", tasks, request), page(pageRequest));
+    }
+
+    public WorkflowWorkbenchStats workbenchStats(String boardType, String operatorId) {
+        String normalizedBoard = requireText(boardType, "workflow workbench board type must not be blank")
+                .toUpperCase();
+        String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");
+        return switch (normalizedBoard) {
+            case "TRACKING" -> trackingStats(validOperatorId);
+            case "TODO" -> todoStats(validOperatorId);
+            case "DONE" -> doneStats(validOperatorId);
+            case "NOTICE" -> noticeStats(validOperatorId);
+            case "DELEGATION" -> delegationStats(validOperatorId);
+            default -> throw new PlatformException("unsupported workflow workbench board type: " + boardType);
+        };
+    }
+
+    private WorkflowWorkbenchStats trackingStats(String starterId) {
+        List<WorkflowWorkbenchCard> cards = trackingCards(starterId, ALL, WorkflowWorkbenchQueryRequest.empty());
+        EnumMap<WorkflowInstanceStatus, Long> counts = new EnumMap<>(WorkflowInstanceStatus.class);
+        cards.forEach(card -> counts.merge(card.instanceStatus(), 1L, Long::sum));
+        return new WorkflowWorkbenchStats("TRACKING", statsWithAll(cards.size(), WorkflowInstanceStatus.values(), counts));
+    }
+
+    private WorkflowWorkbenchStats todoStats(String assigneeId) {
+        List<WorkflowWorkbenchCard> cards = todoCards(assigneeId, ALL, WorkflowWorkbenchQueryRequest.empty());
+        EnumMap<WorkflowOvertimeStatus, Long> counts = new EnumMap<>(WorkflowOvertimeStatus.class);
+        cards.forEach(card -> counts.merge(overtimeStatus(card), 1L, Long::sum));
+        return new WorkflowWorkbenchStats("TODO", statsWithAll(cards.size(), WorkflowOvertimeStatus.values(), counts));
+    }
+
+    private WorkflowWorkbenchStats doneStats(String processorId) {
+        List<WorkflowWorkbenchCard> cards = doneCards(processorId, ALL, WorkflowWorkbenchQueryRequest.empty());
+        Map<String, Long> counts = new LinkedHashMap<>();
+        cards.forEach(card -> counts.merge(doneStatCode(card), 1L, Long::sum));
+        return new WorkflowWorkbenchStats("DONE", List.of(
+                stat("ALL", "全部", cards.size()),
+                stat("DONE", WorkflowTaskStatus.DONE.getTitle(), counts.getOrDefault("DONE", 0L)),
+                stat("REJECTED", WorkflowTaskStatus.REJECTED.getTitle(), counts.getOrDefault("REJECTED", 0L)),
+                stat("ROLLED_BACK", WorkflowTaskStatus.ROLLED_BACK.getTitle(), counts.getOrDefault("ROLLED_BACK", 0L)),
+                stat("TRANSFERRED", WorkflowTaskStatus.TRANSFERRED.getTitle(), counts.getOrDefault("TRANSFERRED", 0L))
+        ));
+    }
+
+    private WorkflowWorkbenchStats noticeStats(String assigneeId) {
+        List<WorkflowWorkbenchCard> cards = noticeCards(assigneeId, ALL, WorkflowWorkbenchQueryRequest.empty());
+        EnumMap<WorkflowNoticeReadStatus, Long> counts = new EnumMap<>(WorkflowNoticeReadStatus.class);
+        cards.forEach(card -> counts.merge(card.readStatus(), 1L, Long::sum));
+        return new WorkflowWorkbenchStats("NOTICE", List.of(
+                stat(WorkflowNoticeReadStatus.ALL, cards.size()),
+                stat(WorkflowNoticeReadStatus.UNREAD, counts.getOrDefault(WorkflowNoticeReadStatus.UNREAD, 0L)),
+                stat(WorkflowNoticeReadStatus.READ, counts.getOrDefault(WorkflowNoticeReadStatus.READ, 0L))
+        ));
+    }
+
+    private WorkflowWorkbenchStats delegationStats(String principalId) {
+        List<WorkflowWorkbenchCard> cards = delegationCards(principalId, ALL, WorkflowWorkbenchQueryRequest.empty());
+        EnumMap<WorkflowOvertimeStatus, Long> counts = new EnumMap<>(WorkflowOvertimeStatus.class);
+        cards.forEach(card -> counts.merge(overtimeStatus(card), 1L, Long::sum));
+        return new WorkflowWorkbenchStats("DELEGATION", statsWithAll(cards.size(), WorkflowOvertimeStatus.values(), counts));
     }
 
     public List<WorkflowWorkbenchCard> trackingCards(String starterId, PageRequest pageRequest) {
@@ -273,14 +336,14 @@ public class WorkflowRuntimeReadFacade {
                 node == null ? null : node.getNodeKey(), instance.getCurrentNodeKeys(), currentAssigneeIds,
                 instance.getStartedAt(), task == null ? instance.getStartedAt() : task.getCreatedAt(),
                 task == null ? instance.getCompletedAt() : task.getCompletedAt(),
-                task == null ? instance.getLastActionCode() : task.getDecision(),
+                task == null ? instance.getLastActionCode() : actionCode(task),
                 node == null ? null : node.getOvertimeStatus(), task == null ? null : task.getDueAt(),
                 instance.getLastOperatedAt() == null ? instance.getStartedAt() : instance.getLastOperatedAt(),
                 task == null ? null : task.getAssignmentKind(), task == null ? null : task.getOriginalAssigneeId(),
                 task == null ? null : task.getDelegatedFromUserId(),
                 task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
                 task == null ? null : task.getPrincipalCanProcess(),
-                noticeSourceType(task), delegationTaskCount);
+                noticeReadStatus(task), noticeSourceType(task), delegationTaskCount);
     }
 
     private String noticeSourceType(WorkflowTask task) {
@@ -368,6 +431,9 @@ public class WorkflowRuntimeReadFacade {
                 || !same(normalized.taskStatus(), card.taskStatus())
                 || !same(normalized.assignmentKind(), card.assignmentKind())
                 || !same(normalized.overtimeStatus(), card.overtimeStatus())) {
+            return false;
+        }
+        if (!matchesReadStatus(normalized.readStatus(), card.readStatus())) {
             return false;
         }
         if (!matchesNodeKey(normalized.nodeKey(), card)) {
@@ -482,6 +548,69 @@ public class WorkflowRuntimeReadFacade {
             }
         }
         return false;
+    }
+
+    private boolean matchesReadStatus(WorkflowNoticeReadStatus expected, WorkflowNoticeReadStatus actual) {
+        return expected == null || expected == WorkflowNoticeReadStatus.ALL || expected == actual;
+    }
+
+    private WorkflowNoticeReadStatus noticeReadStatus(WorkflowTask task) {
+        if (task == null || task.getTaskKind() != WorkflowTaskKind.NOTICE) {
+            return null;
+        }
+        if (task.getTaskStatus() == WorkflowTaskStatus.NOTICED) {
+            return WorkflowNoticeReadStatus.READ;
+        }
+        if (task.getTaskStatus() == WorkflowTaskStatus.TODO) {
+            return WorkflowNoticeReadStatus.UNREAD;
+        }
+        return null;
+    }
+
+    private String actionCode(WorkflowTask task) {
+        if (task == null) {
+            return null;
+        }
+        if (task.getDecision() != null && !task.getDecision().isBlank()) {
+            return task.getDecision();
+        }
+        return task.getTaskStatus() == WorkflowTaskStatus.TRANSFERRED ? "transfer" : null;
+    }
+
+    private WorkflowOvertimeStatus overtimeStatus(WorkflowWorkbenchCard card) {
+        return card.overtimeStatus() == null ? WorkflowOvertimeStatus.NORMAL : card.overtimeStatus();
+    }
+
+    private String doneStatCode(WorkflowWorkbenchCard card) {
+        if (card.taskStatus() == WorkflowTaskStatus.REJECTED) {
+            return "REJECTED";
+        }
+        if (card.taskStatus() == WorkflowTaskStatus.ROLLED_BACK) {
+            return "ROLLED_BACK";
+        }
+        if (card.taskStatus() == WorkflowTaskStatus.TRANSFERRED) {
+            return "TRANSFERRED";
+        }
+        return "DONE";
+    }
+
+    private <E extends Enum<E> & CodeTitleEnum> List<WorkflowWorkbenchStatItem> statsWithAll(long all,
+                                                                                            E[] values,
+                                                                                            Map<E, Long> counts) {
+        java.util.ArrayList<WorkflowWorkbenchStatItem> items = new java.util.ArrayList<>();
+        items.add(stat("ALL", "全部", all));
+        for (E value : values) {
+            items.add(stat(value, counts.getOrDefault(value, 0L)));
+        }
+        return List.copyOf(items);
+    }
+
+    private WorkflowWorkbenchStatItem stat(CodeTitleEnum value, long count) {
+        return stat(((Enum<?>) value).name(), value.getTitle(), count);
+    }
+
+    private WorkflowWorkbenchStatItem stat(String code, String label, long count) {
+        return new WorkflowWorkbenchStatItem(code, label, count);
     }
 
     private boolean inRange(Comparable<?> value, Comparable<?> from, Comparable<?> to) {

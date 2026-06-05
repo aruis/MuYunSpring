@@ -496,6 +496,58 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldReadNoticeTaskWithOwnerCheckAndIdempotentStatus() {
+        WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        when(taskDao.findById("notice-1")).thenReturn(unread);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(taskDao.updateByIdAndVersion(unread, 3)).thenReturn(1);
+
+        WorkflowTaskActionResult unreadResult = service.readNotice(new WorkflowTaskActionRequest(
+                "notice-1", "user-1", null, null, "read", Instant.parse("2026-06-05T02:00:00Z")));
+
+        assertThat(unreadResult.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.NOTICED);
+        assertThat(unreadResult.event()).isNotNull();
+
+        WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
+        when(taskDao.findById("notice-2")).thenReturn(read);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+
+        WorkflowTaskActionResult readResult = service.readNotice(new WorkflowTaskActionRequest(
+                "notice-2", "user-1", null, null, "read again", Instant.parse("2026-06-05T03:00:00Z")));
+
+        assertThat(readResult.task()).isSameAs(read);
+        assertThat(readResult.event()).isNull();
+        verify(taskDao, never()).updateByIdAndVersion(read, 3);
+    }
+
+    @Test
+    void shouldRejectNoticeReadForOtherOwnerOrInvalidTaskState() {
+        WorkflowTask otherOwner = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        otherOwner.setAssigneeId("user-2");
+        when(taskDao.findById("notice-1")).thenReturn(otherOwner);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+
+        assertThatThrownBy(() -> service.readNotice(WorkflowTaskActionRequest.complete(
+                "notice-1", "user-1", null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reader is not assignee");
+
+        WorkflowTask doneApproval = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        when(taskDao.findById("task-1")).thenReturn(doneApproval);
+        assertThatThrownBy(() -> service.readNotice(WorkflowTaskActionRequest.complete(
+                "task-1", "user-1", null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("not a notice task");
+
+        WorkflowTask canceledNotice = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.CANCELED);
+        when(taskDao.findById("notice-2")).thenReturn(canceledNotice);
+        assertThatThrownBy(() -> service.readNotice(WorkflowTaskActionRequest.complete(
+                "notice-2", "user-1", null)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("not readable");
+    }
+
+    @Test
     void shouldTransferTodoTaskByCreatingNewAssigneeTask() {
         RecordingPlugin plugin = new RecordingPlugin();
         WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
@@ -519,6 +571,8 @@ class WorkflowTaskActionServiceTest {
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TRANSFERRED);
         assertThat(result.task().getTransferredBy()).isEqualTo("user-a");
+        assertThat(result.task().getActualProcessorId()).isEqualTo("user-a");
+        assertThat(result.task().getDecision()).isEqualTo("transfer");
         assertThat(result.createdTask()).isNotNull();
         assertThat(result.createdTask().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
         assertThat(result.createdTask().getAssignmentKind()).isEqualTo(WorkflowAssignmentKind.TRANSFERRED);

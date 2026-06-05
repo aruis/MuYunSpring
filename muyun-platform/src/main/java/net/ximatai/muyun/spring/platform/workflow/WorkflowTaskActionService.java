@@ -429,6 +429,29 @@ public class WorkflowTaskActionService {
     }
 
     @Transactional
+    public WorkflowTaskActionResult readNotice(WorkflowTaskActionRequest request) {
+        WorkflowTask task = requireNoticeReadTask(request);
+        WorkflowInstance instance = requireInstance(task);
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "notice");
+        requireNoticeOwner(task, operatorId);
+        if (task.getTaskStatus() == WorkflowTaskStatus.NOTICED) {
+            return WorkflowTaskActionResult.of(task, null);
+        }
+        task.setTaskStatus(WorkflowTaskStatus.NOTICED);
+        task.setActualProcessorId(operatorId);
+        task.setDecision("notice");
+        task.setResultMessage(request.reason());
+        task.setCompletedAt(now);
+        updateTask(task, now);
+        WorkflowEvent event = eventFactory.taskCompleted(instance, task, "notice", operatorId,
+                request.reason(), now);
+        eventDao.insert(event);
+        return WorkflowTaskActionResult.of(task, event);
+    }
+
+    @Transactional
     public WorkflowTaskActionResult transfer(WorkflowTaskActionRequest request) {
         WorkflowTask task = requireTodoTask(request);
         String targetAssigneeId = requireText(request.targetAssigneeId(), "workflow target assignee id must not be blank");
@@ -441,6 +464,8 @@ public class WorkflowTaskActionService {
         dispatchTask(instance, node, task, WorkflowRuntimePluginEventType.BEFORE_TRANSFER, "transfer",
                 operatorId, targetAssigneeId, null, request.reason());
         task.setTaskStatus(WorkflowTaskStatus.TRANSFERRED);
+        task.setActualProcessorId(operatorId);
+        task.setDecision("transfer");
         task.setTransferredBy(operatorId);
         task.setTransferredAt(now);
         task.setResultMessage(request.reason());
@@ -664,6 +689,28 @@ public class WorkflowTaskActionService {
             throw new PlatformException("workflow task is not todo: " + taskId);
         }
         return task;
+    }
+
+    private WorkflowTask requireNoticeReadTask(WorkflowTaskActionRequest request) {
+        String taskId = requireText(request == null ? null : request.taskId(), "workflow task id must not be blank");
+        WorkflowTask task = taskDao.findById(taskId);
+        if (task == null) {
+            throw new PlatformException("workflow task not found: " + taskId);
+        }
+        if (task.getTaskKind() != WorkflowTaskKind.NOTICE) {
+            throw new PlatformException("workflow task is not a notice task: " + taskId);
+        }
+        if (task.getTaskStatus() != WorkflowTaskStatus.TODO && task.getTaskStatus() != WorkflowTaskStatus.NOTICED) {
+            throw new PlatformException("workflow notice task is not readable: " + taskId);
+        }
+        return task;
+    }
+
+    private void requireNoticeOwner(WorkflowTask task, String operatorId) {
+        String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");
+        if (!validOperatorId.equals(task.getAssigneeId())) {
+            throw new PlatformException("workflow notice reader is not assignee: " + task.getId());
+        }
     }
 
     private WorkflowInstance requireInstance(WorkflowTask task) {

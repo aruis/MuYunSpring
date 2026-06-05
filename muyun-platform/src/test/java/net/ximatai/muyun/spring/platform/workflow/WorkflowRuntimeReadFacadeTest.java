@@ -245,6 +245,110 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldFilterNoticeCardsByReadStatusAndReturnReadStatusOnCard() {
+        WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
+        read.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(unread, read));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "notice"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, WorkflowNoticeReadStatus.READ,
+                null, null, null, null, null, null, null, null, null, null, List.of());
+
+        List<WorkflowWorkbenchCard> cards = facade.noticeCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().taskId()).isEqualTo("notice-2");
+        assertThat(cards.getFirst().readStatus()).isEqualTo(WorkflowNoticeReadStatus.READ);
+    }
+
+    @Test
+    void shouldBuildTodoDoneAndNoticeStatsWithStableBuckets() {
+        WorkflowTask normalTodo = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        normalTodo.setNodeInstanceId("node-normal");
+        WorkflowTask warnedTodo = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        warnedTodo.setNodeInstanceId("node-warned");
+        WorkflowNodeInstance normalNode = node("node-normal", "visit");
+        WorkflowNodeInstance warnedNode = node("node-warned", "approve");
+        warnedNode.setOvertimeStatus(WorkflowOvertimeStatus.WARNED);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(normalTodo, warnedTodo));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-normal")).thenReturn(normalNode);
+        when(nodeDao.findById("node-warned")).thenReturn(warnedNode);
+
+        WorkflowWorkbenchStats todoStats = facade.workbenchStats("todo", "user-1");
+
+        assertThat(todoStats.boardType()).isEqualTo("TODO");
+        assertThat(todoStats.items()).extracting(WorkflowWorkbenchStatItem::code)
+                .containsExactly("ALL", "NORMAL", "WARNED", "OVERDUE");
+        assertThat(count(todoStats, "ALL")).isEqualTo(2);
+        assertThat(count(todoStats, "WARNED")).isEqualTo(1);
+
+        WorkflowTask done = task("task-3", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE);
+        done.setActualProcessorId("user-1");
+        WorkflowTask rejected = task("task-4", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.REJECTED);
+        rejected.setActualProcessorId("user-1");
+        WorkflowTask transferred = task("task-5", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TRANSFERRED);
+        transferred.setTransferredBy("user-1");
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(done, rejected, transferred));
+
+        WorkflowWorkbenchStats doneStats = facade.workbenchStats("done", "user-1");
+
+        assertThat(doneStats.items()).extracting(WorkflowWorkbenchStatItem::code)
+                .containsExactly("ALL", "DONE", "REJECTED", "ROLLED_BACK", "TRANSFERRED");
+        assertThat(count(doneStats, "ALL")).isEqualTo(3);
+        assertThat(count(doneStats, "REJECTED")).isEqualTo(1);
+        assertThat(count(doneStats, "TRANSFERRED")).isEqualTo(1);
+
+        WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(unread, read));
+
+        WorkflowWorkbenchStats noticeStats = facade.workbenchStats("notice", "user-1");
+
+        assertThat(noticeStats.items()).extracting(WorkflowWorkbenchStatItem::code)
+                .containsExactly("ALL", "UNREAD", "READ");
+        assertThat(count(noticeStats, "UNREAD")).isEqualTo(1);
+        assertThat(count(noticeStats, "READ")).isEqualTo(1);
+    }
+
+    @Test
+    void shouldBuildTrackingAndDelegationStats() {
+        WorkflowInstance running = instance("instance-1");
+        WorkflowInstance completed = instance("instance-2");
+        completed.setInstanceStatus(WorkflowInstanceStatus.COMPLETED);
+        when(instanceDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(running, completed));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of());
+
+        WorkflowWorkbenchStats trackingStats = facade.workbenchStats("tracking", "starter-1");
+
+        assertThat(count(trackingStats, "RUNNING")).isEqualTo(1);
+        assertThat(count(trackingStats, "COMPLETED")).isEqualTo(1);
+
+        WorkflowTask delegated = delegatedTask("task-1", "delegate-1");
+        WorkflowNodeInstance node = node("node-1", "approve");
+        node.setOvertimeStatus(WorkflowOvertimeStatus.OVERDUE);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(delegated));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        WorkflowWorkbenchStats delegationStats = facade.workbenchStats("delegation", "principal-1");
+
+        assertThat(delegationStats.items()).extracting(WorkflowWorkbenchStatItem::code)
+                .containsExactly("ALL", "NORMAL", "WARNED", "OVERDUE");
+        assertThat(count(delegationStats, "ALL")).isEqualTo(1);
+        assertThat(count(delegationStats, "OVERDUE")).isEqualTo(1);
+    }
+
+    @Test
     void shouldRejectMissingInstance() {
         assertThatThrownBy(() -> facade.renderBundle("missing"))
                 .isInstanceOf(PlatformException.class)
@@ -319,5 +423,13 @@ class WorkflowRuntimeReadFacadeTest {
         route.setId("route-1");
         route.setInstanceId("instance-1");
         return route;
+    }
+
+    private long count(WorkflowWorkbenchStats stats, String code) {
+        return stats.items().stream()
+                .filter(item -> code.equals(item.code()))
+                .findFirst()
+                .map(WorkflowWorkbenchStatItem::count)
+                .orElseThrow();
     }
 }

@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskContinueResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskProcessBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowNoticeReadStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
@@ -24,6 +25,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskAvailableAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchCard;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchQueryRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchSort;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchStats;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
@@ -109,6 +111,20 @@ public class WorkflowRuntimeWebController {
                 null));
     }
 
+    @PostMapping("/task/{taskId}/read")
+    public WorkflowTaskActionResult readNoticeTask(
+            @PathVariable String taskId,
+            @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
+        return taskActionFacade.execute("read", new WorkflowTaskActionRequest(taskId,
+                operatorId(request == null ? null : request.operatorId()),
+                null,
+                null,
+                null,
+                null,
+                request == null ? null : request.reason(),
+                null));
+    }
+
     @PostMapping("/workbench/todo/query")
     public WebListResponse<WorkflowWorkbenchCard> todoCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
@@ -147,6 +163,14 @@ public class WorkflowRuntimeWebController {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
         return new WebListResponse<>(runtimeReadFacade.delegationCards(operatorId(normalized.operatorId()),
                 page(normalized.page()), normalized.toQueryRequest()));
+    }
+
+    @PostMapping("/workbench/{board}/stats")
+    public WorkflowWorkbenchStats workbenchStats(
+            @PathVariable String board,
+            @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
+        WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
+        return runtimeReadFacade.workbenchStats(board, operatorId(normalized.operatorId()));
     }
 
     @GetMapping("/task/{taskId}/module-task/prepare")
@@ -233,6 +257,7 @@ record WorkflowWorkbenchWebRequest(
         WorkflowTaskStatus taskStatus,
         WorkflowAssignmentKind assignmentKind,
         WorkflowOvertimeStatus overtimeStatus,
+        WorkflowNoticeReadStatus readStatus,
         Instant startedFrom,
         Instant startedTo,
         Instant receivedFrom,
@@ -246,15 +271,15 @@ record WorkflowWorkbenchWebRequest(
         List<WorkflowWorkbenchSort> sorts) {
     static WorkflowWorkbenchWebRequest empty() {
         return new WorkflowWorkbenchWebRequest(null, WebPageRequest.DEFAULT, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
                 List.of());
     }
 
     WorkflowWorkbenchQueryRequest toQueryRequest() {
         return new WorkflowWorkbenchQueryRequest(moduleAlias, recordId, definitionId, workflowVersionId,
                 definitionVersionId, instanceStatus, nodeKey, taskKind, taskStatus, assignmentKind, overtimeStatus,
-                startedFrom, startedTo, receivedFrom, receivedTo, completedFrom, completedTo, lastOperatedFrom,
-                lastOperatedTo, dueFrom, dueTo, sorts);
+                readStatus, startedFrom, startedTo, receivedFrom, receivedTo, completedFrom, completedTo,
+                lastOperatedFrom, lastOperatedTo, dueFrom, dueTo, sorts);
     }
 }
 
