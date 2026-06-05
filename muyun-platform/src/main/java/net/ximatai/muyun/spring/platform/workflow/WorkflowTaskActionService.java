@@ -76,6 +76,7 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "approve");
         actionPolicyService.requireTaskOperator(task, "approve", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.DONE);
         task.setActualProcessorId(operatorId);
@@ -115,6 +116,7 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "reject");
         actionPolicyService.requireNodeTaskAction(task, node, "reject", operatorId, request.reason());
         WorkflowRejectResubmitMode resubmitMode = request.rejectResubmitMode() == null
                 ? WorkflowRejectResubmitMode.RESTART
@@ -175,6 +177,7 @@ public class WorkflowTaskActionService {
         }
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "rollback");
         actionPolicyService.requireNodeTaskAction(task, currentNode, "rollback", operatorId, request.reason());
         RollbackTarget target = previousApprovalNode(instance.getId(), currentNode);
         rejectRollbackWithOtherActiveNodes(instance.getId(), task);
@@ -247,6 +250,7 @@ public class WorkflowTaskActionService {
         }
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "resubmit");
         actionPolicyService.requireTaskOperator(task, "resubmit", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.DONE);
         task.setActualProcessorId(operatorId);
@@ -289,6 +293,7 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "complete");
         actionPolicyService.requireTaskOperator(task, "complete", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.DONE);
         task.setActualProcessorId(operatorId);
@@ -316,6 +321,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "notice");
         actionPolicyService.requireTaskOperator(task, "notice", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.NOTICED);
         task.setActualProcessorId(operatorId);
@@ -336,6 +342,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "transfer");
         actionPolicyService.requireTaskOperator(task, "transfer", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.TRANSFERRED);
         task.setTransferredBy(operatorId);
@@ -360,6 +367,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "invalidate");
         actionPolicyService.requireTaskOperator(task, "invalidate", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.INVALIDATED);
         task.setActualProcessorId(operatorId);
@@ -378,6 +386,7 @@ public class WorkflowTaskActionService {
         WorkflowInstance instance = requireInstance(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "cancel");
         actionPolicyService.requireTaskOperator(task, "cancel", operatorId);
         task.setTaskStatus(WorkflowTaskStatus.CANCELED);
         task.setActualProcessorId(operatorId);

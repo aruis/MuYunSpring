@@ -2,10 +2,45 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
+import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import org.springframework.stereotype.Service;
+
+import java.util.Set;
 
 @Service
 public class WorkflowActionPolicyService {
+    private final ActionExecutionPolicyService executionPolicyService;
+
+    public WorkflowActionPolicyService() {
+        this(new AllowAllActionExecutionPolicyService());
+    }
+
+    public WorkflowActionPolicyService(ActionExecutionPolicyService executionPolicyService) {
+        this.executionPolicyService = executionPolicyService == null
+                ? new AllowAllActionExecutionPolicyService()
+                : executionPolicyService;
+    }
+
+    public void requireRuntimeAction(WorkflowInstance instance, String actionCode) {
+        if (instance == null) {
+            throw new PlatformException("workflow instance must not be null");
+        }
+        String validActionCode = requireText(actionCode, "workflow action code must not be blank");
+        String moduleAlias = requireText(instance.getModuleAlias(), "workflow module alias must not be blank");
+        String recordId = requireText(instance.getRecordId(), "workflow record id must not be blank");
+        executionPolicyService.requireRecordAction(ActionExecutionContext.ofPolicy(
+                moduleAlias,
+                runtimePolicy(validActionCode),
+                Set.of(recordId),
+                CurrentUserContext.currentUser()));
+    }
+
     public void requireTaskOperator(WorkflowTask task, String actionCode, String operatorId) {
         requireText(actionCode, "workflow action code must not be blank");
         requireAssignee(task, operatorId);
@@ -93,6 +128,18 @@ public class WorkflowActionPolicyService {
         if (reason == null || reason.isBlank()) {
             throw new PlatformException("workflow action reason is required: " + actionCode);
         }
+    }
+
+    private ActionExecutionPolicy runtimePolicy(String actionCode) {
+        return new ActionExecutionPolicy(
+                actionCode,
+                PlatformActionLevel.RECORD,
+                ActionAccessMode.LOGIN_REQUIRED,
+                false,
+                false,
+                ActionDefaultGrantPolicy.NONE,
+                null
+        );
     }
 
     private String requireText(String value, String message) {

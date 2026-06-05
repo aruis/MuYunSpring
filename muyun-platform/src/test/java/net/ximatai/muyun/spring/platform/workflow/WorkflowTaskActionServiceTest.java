@@ -62,6 +62,28 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldRequireRuntimeAuthorizationBeforeTaskAction() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
+        WorkflowTaskActionService authorizedService = new WorkflowTaskActionService(
+                taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory, approvalTaskPolicyService,
+                policyService, progressionService, Optional.empty());
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        authorizedService.approve(WorkflowTaskActionRequest.complete("task-1", "user-1", "agree"));
+
+        verify(policyService).requireRuntimeAction(instance, "approve");
+        verify(policyService).requireTaskOperator(task, "approve", "user-1");
+    }
+
+    @Test
     void shouldRejectApprovalTaskAndCreateRestartResubmitTask() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowTask sibling = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
@@ -516,6 +538,8 @@ class WorkflowTaskActionServiceTest {
         instance.setId("instance-1");
         instance.setTenantId("tenant-1");
         instance.setVersion(5);
+        instance.setModuleAlias("sales.contract");
+        instance.setRecordId("record-1");
         instance.setInstanceStatus(WorkflowInstanceStatus.RUNNING);
         instance.setApprovalStatus(WorkflowApprovalStatus.PROCESSING);
         return instance;
