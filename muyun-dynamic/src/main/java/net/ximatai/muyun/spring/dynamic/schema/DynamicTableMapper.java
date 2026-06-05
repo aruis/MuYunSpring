@@ -60,6 +60,9 @@ public class DynamicTableMapper {
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
             fields.addAll(DynamicAbilityFields.dataScopeFields());
         }
+        if (entity.supports(EntityCapability.APPROVAL)) {
+            fields.addAll(DynamicAbilityFields.approvalFields());
+        }
         fields.addAll(entity.fields());
         fields.addAll(FieldCompanionRules.generatedFields(entity));
         return List.copyOf(fields);

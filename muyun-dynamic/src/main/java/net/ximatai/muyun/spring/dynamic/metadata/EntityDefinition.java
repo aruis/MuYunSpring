@@ -74,6 +74,9 @@ public record EntityDefinition(
         if (normalized.contains(EntityCapability.TREE)) {
             normalized.add(EntityCapability.SORT);
         }
+        if (normalized.contains(EntityCapability.APPROVAL)) {
+            normalized.add(EntityCapability.WORKFLOW);
+        }
         return Set.copyOf(normalized);
     }
 

@@ -6,7 +6,9 @@ import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.ApprovalCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
+import net.ximatai.muyun.spring.common.model.standard.StandardApprovalEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 import net.ximatai.muyun.spring.common.model.standard.StandardTreeEntity;
@@ -80,6 +82,16 @@ class StaticEntityTableMapperTest {
                 .contains("auth_user_id", "auth_assignee_ids", "auth_member_ids", "auth_organization_id", "auth_module_alias");
     }
 
+    @Test
+    void shouldMapStandardApprovalEntityInheritedAbilityColumns() {
+        TableWrapper table = mapper.toTable(DemoStandardApproval.class);
+
+        assertThat(ApprovalCapable.class).isAssignableFrom(DemoStandardApproval.class);
+        assertThat(columnNames(table))
+                .contains("approval_instance_id", "approval_status", "approval_submitted_by", "approval_submitted_at",
+                        "approval_completed_at");
+    }
+
     private Set<String> columnNames(TableWrapper table) {
         Set<String> names = new LinkedHashSet<>();
         if (table.getPrimaryKey() != null) {
@@ -114,6 +126,10 @@ class StaticEntityTableMapperTest {
 
     @Table(name = "demo_standard_data_scoped")
     private static class DemoStandardDataScoped extends StandardDataScopedEntity {
+    }
+
+    @Table(name = "demo_standard_approval")
+    private static class DemoStandardApproval extends StandardApprovalEntity {
     }
 
     @Table(name = "not_platform_model")

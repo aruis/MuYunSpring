@@ -15,7 +15,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @Table(name = "platform_workflow_instance", comment = "Workflow instance")
-@CompositeIndex(columns = {"tenant_id", "module_alias", "entity_alias", "record_id", "instance_status"})
+@CompositeIndex(columns = {"tenant_id", "module_alias", "record_id", "instance_status"})
 @CompositeIndex(columns = {"tenant_id", "definition_id", "started_at"})
 public class WorkflowInstance extends StandardEntity {
     @Column(name = "definition_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
@@ -31,9 +31,6 @@ public class WorkflowInstance extends StandardEntity {
 
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String moduleAlias;
-
-    @Column(name = "entity_alias", type = ColumnType.VARCHAR, length = 64, comment = "Entity alias")
-    private String entityAlias;
 
     @Column(name = "record_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Record id")
     private String recordId;

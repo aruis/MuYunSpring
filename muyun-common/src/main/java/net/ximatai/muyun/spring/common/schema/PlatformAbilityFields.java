@@ -44,6 +44,29 @@ public final class PlatformAbilityFields {
     public static final ColumnType AUTH_MODULE_COLUMN_TYPE = ColumnType.VARCHAR;
     public static final int AUTH_MODULE_LENGTH = 128;
 
+    public static final String APPROVAL_INSTANCE_FIELD = "approvalInstanceId";
+    public static final String APPROVAL_INSTANCE_COLUMN = "approval_instance_id";
+    public static final ColumnType APPROVAL_INSTANCE_COLUMN_TYPE = ColumnType.VARCHAR;
+    public static final int APPROVAL_INSTANCE_LENGTH = 32;
+
+    public static final String APPROVAL_STATUS_FIELD = "approvalStatus";
+    public static final String APPROVAL_STATUS_COLUMN = "approval_status";
+    public static final ColumnType APPROVAL_STATUS_COLUMN_TYPE = ColumnType.VARCHAR;
+    public static final int APPROVAL_STATUS_LENGTH = 32;
+
+    public static final String APPROVAL_COMPLETED_AT_FIELD = "approvalCompletedAt";
+    public static final String APPROVAL_COMPLETED_AT_COLUMN = "approval_completed_at";
+    public static final ColumnType APPROVAL_COMPLETED_AT_COLUMN_TYPE = ColumnType.TIMESTAMP;
+
+    public static final String APPROVAL_SUBMITTED_BY_FIELD = "approvalSubmittedBy";
+    public static final String APPROVAL_SUBMITTED_BY_COLUMN = "approval_submitted_by";
+    public static final ColumnType APPROVAL_SUBMITTED_BY_COLUMN_TYPE = ColumnType.VARCHAR;
+    public static final int APPROVAL_SUBMITTED_BY_LENGTH = 64;
+
+    public static final String APPROVAL_SUBMITTED_AT_FIELD = "approvalSubmittedAt";
+    public static final String APPROVAL_SUBMITTED_AT_COLUMN = "approval_submitted_at";
+    public static final ColumnType APPROVAL_SUBMITTED_AT_COLUMN_TYPE = ColumnType.TIMESTAMP;
+
     private PlatformAbilityFields() {
     }
 }

@@ -249,6 +249,9 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
             fields.addAll(DynamicAbilityFields.dataScopeFields());
         }
+        if (entity.supports(EntityCapability.APPROVAL)) {
+            fields.addAll(DynamicAbilityFields.approvalFields());
+        }
         fields.addAll(FieldCompanionRules.recordFields(entity));
         return fields;
     }

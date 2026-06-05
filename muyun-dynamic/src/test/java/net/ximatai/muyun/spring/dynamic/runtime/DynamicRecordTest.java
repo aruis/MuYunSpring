@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -110,6 +111,25 @@ class DynamicRecordTest {
 
         assertThat(record.getValue("businessDate")).isEqualTo(LocalDate.parse("2026-01-02"));
         assertThat(record.getValue("submittedAt")).isEqualTo(Instant.parse("2026-01-02T09:30:00Z"));
+    }
+
+    @Test
+    void shouldExposeWorkflowAndApprovalAbilityFields() {
+        DynamicRecord record = new DynamicRecord(contractEntity().withCapabilities(EntityCapability.APPROVAL));
+        Instant submittedAt = Instant.parse("2026-06-05T01:00:00Z");
+        Instant approvedAt = Instant.parse("2026-06-05T02:00:00Z");
+
+        record.setApprovalInstanceId("workflow-1");
+        record.setApprovalSubmittedBy("user-1");
+        record.setApprovalSubmittedAt(submittedAt);
+        record.setApprovalStatus("approved");
+        record.setApprovalCompletedAt(approvedAt);
+
+        assertThat(record.getApprovalInstanceId()).isEqualTo("workflow-1");
+        assertThat(record.getApprovalSubmittedBy()).isEqualTo("user-1");
+        assertThat(record.getApprovalSubmittedAt()).isEqualTo(submittedAt);
+        assertThat(record.getApprovalStatus()).isEqualTo("approved");
+        assertThat(record.getApprovalCompletedAt()).isEqualTo(approvedAt);
     }
 
     @Test

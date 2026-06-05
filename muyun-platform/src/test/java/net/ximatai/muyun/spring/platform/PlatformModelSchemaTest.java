@@ -171,9 +171,10 @@ class PlatformModelSchemaTest {
     @Test
     void shouldMapWorkflowModelsAsPlatformTables() {
         assertThat(columnNames(mapper.toTable(WorkflowDefinition.class)))
-                .contains("id", "tenant_id", "application_alias", "module_alias", "entity_alias", "alias",
+                .contains("id", "tenant_id", "application_alias", "module_alias", "alias",
                         "title", "approval_enabled", "definition_status", "current_version_no",
-                        "enabled", "sort_order");
+                        "enabled", "sort_order")
+                .doesNotContain("entity_alias");
         assertThat(uniqueIndexes(mapper.toTable(WorkflowDefinition.class)))
                 .contains(List.of("tenant_id", "module_alias", "alias"));
         assertThat(columnNames(mapper.toTable(WorkflowVersion.class)))
@@ -187,8 +188,9 @@ class PlatformModelSchemaTest {
                 .contains("id", "workflow_version_id", "route_key", "source_node_key", "target_node_key",
                         "condition_expression", "default_route", "route_config_text", "sort_order");
         assertThat(columnNames(mapper.toTable(WorkflowTaskDefinition.class)))
-                .contains("id", "tenant_id", "module_alias", "entity_alias", "alias", "title",
-                        "manual_confirm", "task_config_text", "enabled", "sort_order");
+                .contains("id", "tenant_id", "module_alias", "alias", "title",
+                        "manual_confirm", "task_config_text", "enabled", "sort_order")
+                .doesNotContain("entity_alias");
         assertThat(columnNames(mapper.toTable(WorkflowTaskGuide.class)))
                 .contains("id", "task_definition_id", "guide_key", "guide_kind", "target_module_alias",
                         "target_action_code", "guide_config_text", "title", "enabled", "sort_order");
@@ -197,11 +199,12 @@ class PlatformModelSchemaTest {
                         "failure_message", "check_config_text", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(WorkflowInstance.class)))
                 .contains("id", "tenant_id", "definition_id", "workflow_version_id", "version_no",
-                        "module_alias", "entity_alias", "record_id", "approval_enabled",
+                        "module_alias", "record_id", "approval_enabled",
                         "approval_status", "instance_status", "approval_completed_at", "started_by",
                         "started_at", "completed_at", "terminated_at", "current_node_keys",
                         "last_action_code", "last_action_reason", "last_operator_id", "last_operated_at",
-                        "snapshot_text");
+                        "snapshot_text")
+                .doesNotContain("entity_alias");
         assertThat(columnNames(mapper.toTable(WorkflowNodeInstance.class)))
                 .contains("id", "instance_id", "node_key", "node_run_id", "node_type", "node_status", "approval_mode",
                         "milestone_type", "converge_mode", "converge_ratio", "route_id",

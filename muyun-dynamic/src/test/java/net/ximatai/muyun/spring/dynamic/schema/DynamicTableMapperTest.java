@@ -308,6 +308,20 @@ class DynamicTableMapperTest {
     }
 
     @Test
+    void shouldAddWorkflowAndApprovalAbilityColumns() {
+        EntityDefinition workflowEntity = contractEntity().withCapabilities(EntityCapability.WORKFLOW);
+        EntityDefinition approvalEntity = contractEntity().withCapabilities(EntityCapability.APPROVAL);
+
+        assertThat(columnNames(mapper.toTable(workflowEntity)))
+                .doesNotContain("approval_instance_id", "approval_status", "approval_submitted_by",
+                        "approval_submitted_at", "approval_completed_at");
+        assertThat(approvalEntity.supports(EntityCapability.WORKFLOW)).isTrue();
+        assertThat(columnNames(mapper.toTable(approvalEntity)))
+                .contains("approval_instance_id", "approval_status", "approval_submitted_by",
+                        "approval_submitted_at", "approval_completed_at");
+    }
+
+    @Test
     void shouldClassifyBaselineFieldAndDefinitionCapabilitiesInSameCatalog() {
         assertThat(EntityCapability.CRUD.isBaseline()).isTrue();
         assertThat(EntityCapability.SOFT_DELETE.isBaseline()).isTrue();
@@ -315,6 +329,8 @@ class DynamicTableMapperTest {
         assertThat(EntityCapability.REFERENCE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.ENABLE.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.DATA_SCOPE.isDeclaredByEntityFields()).isTrue();
+        assertThat(EntityCapability.WORKFLOW.isDeclaredByDefinition()).isTrue();
+        assertThat(EntityCapability.APPROVAL.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.CHILD_RELATION.isDeclaredByDefinition()).isTrue();
         assertThat(EntityCapability.REFERENCE_DEPENDENCY.isDeclaredByDefinition()).isTrue();
 

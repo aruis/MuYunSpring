@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.security.FieldOutputRenderer;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.ApprovalCapable;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -33,7 +34,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapable, TitledCapable, DataScopeCapable {
+public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapable, TitledCapable, DataScopeCapable,
+        ApprovalCapable {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
@@ -335,6 +337,56 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         setDataScopeValue(PlatformAbilityFields.AUTH_MODULE_FIELD, authModuleAlias);
     }
 
+    @Override
+    public String getApprovalInstanceId() {
+        return approvalValue(PlatformAbilityFields.APPROVAL_INSTANCE_FIELD);
+    }
+
+    @Override
+    public void setApprovalInstanceId(String approvalInstanceId) {
+        setApprovalValue(PlatformAbilityFields.APPROVAL_INSTANCE_FIELD, approvalInstanceId);
+    }
+
+    @Override
+    public String getApprovalStatus() {
+        return approvalValue(PlatformAbilityFields.APPROVAL_STATUS_FIELD);
+    }
+
+    @Override
+    public void setApprovalStatus(String approvalStatus) {
+        setApprovalValue(PlatformAbilityFields.APPROVAL_STATUS_FIELD, approvalStatus);
+    }
+
+    @Override
+    public String getApprovalSubmittedBy() {
+        return approvalValue(PlatformAbilityFields.APPROVAL_SUBMITTED_BY_FIELD);
+    }
+
+    @Override
+    public void setApprovalSubmittedBy(String approvalSubmittedBy) {
+        setApprovalValue(PlatformAbilityFields.APPROVAL_SUBMITTED_BY_FIELD, approvalSubmittedBy);
+    }
+
+    @Override
+    public Instant getApprovalSubmittedAt() {
+        return instantValue(values.get(PlatformAbilityFields.APPROVAL_SUBMITTED_AT_FIELD));
+    }
+
+    @Override
+    public void setApprovalSubmittedAt(Instant approvalSubmittedAt) {
+        setApprovalValue(PlatformAbilityFields.APPROVAL_SUBMITTED_AT_FIELD, approvalSubmittedAt);
+    }
+
+    @Override
+    public Instant getApprovalCompletedAt() {
+        return instantValue(values.get(PlatformAbilityFields.APPROVAL_COMPLETED_AT_FIELD));
+    }
+
+    @Override
+    public void setApprovalCompletedAt(Instant approvalCompletedAt) {
+        setApprovalValue(PlatformAbilityFields.APPROVAL_COMPLETED_AT_FIELD, approvalCompletedAt);
+    }
+
     Set<String> fieldCodes() {
         return fields.keySet();
     }
@@ -441,6 +493,9 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
             values.addAll(DynamicAbilityFields.dataScopeFields());
         }
+        if (entity.supports(EntityCapability.APPROVAL)) {
+            values.addAll(DynamicAbilityFields.approvalFields());
+        }
         values.addAll(FieldCompanionRules.recordFields(entity));
         return List.copyOf(values);
     }
@@ -452,8 +507,21 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return stringValue(values.get(fieldCode));
     }
 
+    private String approvalValue(String fieldCode) {
+        if (!entity.supports(EntityCapability.APPROVAL) || !hasField(fieldCode)) {
+            return null;
+        }
+        return stringValue(values.get(fieldCode));
+    }
+
     private void setDataScopeValue(String fieldCode, String value) {
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
+            setPlatformValueIfPresent(fieldCode, value);
+        }
+    }
+
+    private void setApprovalValue(String fieldCode, Object value) {
+        if (entity.supports(EntityCapability.APPROVAL)) {
             setPlatformValueIfPresent(fieldCode, value);
         }
     }
@@ -470,6 +538,10 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private Instant instantValue(Object value) {
+        return value instanceof Instant instant ? instant : null;
     }
 
     @Override

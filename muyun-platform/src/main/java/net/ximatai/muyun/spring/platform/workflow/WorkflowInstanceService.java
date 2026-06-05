@@ -59,7 +59,6 @@ public class WorkflowInstanceService extends AbstractAbilityService<WorkflowInst
         }
         boolean exists = existsOtherInCurrentScope(instance, Criteria.of()
                 .eq("moduleAlias", instance.getModuleAlias())
-                .eq("entityAlias", instance.getEntityAlias())
                 .eq("recordId", instance.getRecordId())
                 .eq("approvalEnabled", Boolean.TRUE)
                 .eq("instanceStatus", WorkflowInstanceStatus.RUNNING));

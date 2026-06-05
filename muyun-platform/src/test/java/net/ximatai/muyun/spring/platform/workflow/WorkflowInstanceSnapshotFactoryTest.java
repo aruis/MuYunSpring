@@ -1,0 +1,76 @@
+package net.ximatai.muyun.spring.platform.workflow;
+
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class WorkflowInstanceSnapshotFactoryTest {
+    private final WorkflowRuntimeEventFactory eventFactory = new WorkflowRuntimeEventFactory();
+    private final WorkflowInstanceSnapshotFactory factory = new WorkflowInstanceSnapshotFactory(
+            new WorkflowInstanceStateService(), eventFactory);
+
+    @Test
+    void shouldCreateInstanceNodeRouteAndStartEventSnapshot() {
+        WorkflowInstanceSnapshot snapshot = factory.build(definition(), version(),
+                List.of(node("start", WorkflowNodeType.START), node("approve", WorkflowNodeType.APPROVAL)),
+                List.of(link("r1", "start", "approve")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(snapshot.instance().getId()).isNotBlank();
+        assertThat(snapshot.instance().getApprovalStatus()).isEqualTo(WorkflowApprovalStatus.PROCESSING);
+        assertThat(snapshot.nodes()).hasSize(2)
+                .allSatisfy(node -> {
+                    assertThat(node.getInstanceId()).isEqualTo(snapshot.instance().getId());
+                    assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+                    assertThat(node.getNodeRunId()).endsWith(":1");
+                });
+        assertThat(snapshot.routes()).hasSize(1)
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getInstanceId()).isEqualTo(snapshot.instance().getId());
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANDIDATE);
+                    assertThat(route.getRouteRunId()).isEqualTo("r1:1");
+                });
+        assertThat(snapshot.events()).hasSize(1)
+                .first()
+                .satisfies(event -> {
+                    assertThat(event.getEventType()).isEqualTo(WorkflowEventType.INSTANCE_STARTED);
+                    assertThat(event.getOperatorId()).isEqualTo("user-1");
+                });
+    }
+
+    private WorkflowDefinition definition() {
+        WorkflowDefinition definition = new WorkflowDefinition();
+        definition.setId("definition-1");
+        definition.setTenantId("tenant-1");
+        definition.setModuleAlias("crm.customer");
+        definition.setApprovalEnabled(Boolean.TRUE);
+        return definition;
+    }
+
+    private WorkflowVersion version() {
+        WorkflowVersion version = new WorkflowVersion();
+        version.setId("version-1");
+        version.setVersionNo(1);
+        version.setSnapshotText("{\"nodes\":[]}");
+        return version;
+    }
+
+    private WorkflowNodeDefinition node(String key, WorkflowNodeType type) {
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition();
+        node.setNodeKey(key);
+        node.setNodeType(type);
+        return node;
+    }
+
+    private WorkflowLinkDefinition link(String key, String source, String target) {
+        WorkflowLinkDefinition link = new WorkflowLinkDefinition();
+        link.setRouteKey(key);
+        link.setSourceNodeKey(source);
+        link.setTargetNodeKey(target);
+        return link;
+    }
+}

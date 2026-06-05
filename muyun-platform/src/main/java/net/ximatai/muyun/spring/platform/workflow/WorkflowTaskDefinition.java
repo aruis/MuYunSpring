@@ -18,9 +18,6 @@ public class WorkflowTaskDefinition extends StandardEnabledSortableEntity {
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String moduleAlias;
 
-    @Column(name = "entity_alias", type = ColumnType.VARCHAR, length = 64, comment = "Entity alias")
-    private String entityAlias;
-
     @Column(name = "alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Task alias")
     private String alias;
 

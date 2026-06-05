@@ -25,4 +25,22 @@ public final class DynamicAbilityFields {
                         .length(PlatformAbilityFields.AUTH_MODULE_LENGTH)
         );
     }
+
+    public static List<FieldDefinition> approvalFields() {
+        return List.of(
+                FieldDefinition.string(PlatformAbilityFields.APPROVAL_INSTANCE_FIELD, "Approval Instance")
+                        .column(PlatformAbilityFields.APPROVAL_INSTANCE_COLUMN)
+                        .length(PlatformAbilityFields.APPROVAL_INSTANCE_LENGTH),
+                FieldDefinition.string(PlatformAbilityFields.APPROVAL_STATUS_FIELD, "Approval Status")
+                        .column(PlatformAbilityFields.APPROVAL_STATUS_COLUMN)
+                        .length(PlatformAbilityFields.APPROVAL_STATUS_LENGTH),
+                FieldDefinition.string(PlatformAbilityFields.APPROVAL_SUBMITTED_BY_FIELD, "Approval Submitted By")
+                        .column(PlatformAbilityFields.APPROVAL_SUBMITTED_BY_COLUMN)
+                        .length(PlatformAbilityFields.APPROVAL_SUBMITTED_BY_LENGTH),
+                FieldDefinition.timestamp(PlatformAbilityFields.APPROVAL_SUBMITTED_AT_FIELD, "Approval Submitted At")
+                        .column(PlatformAbilityFields.APPROVAL_SUBMITTED_AT_COLUMN),
+                FieldDefinition.timestamp(PlatformAbilityFields.APPROVAL_COMPLETED_AT_FIELD, "Approval Completed At")
+                        .column(PlatformAbilityFields.APPROVAL_COMPLETED_AT_COLUMN)
+        );
+    }
 }
