@@ -82,6 +82,18 @@ public class WorkflowRuntimeEventFactory {
                 "workflow instance completed", null, occurredAt);
     }
 
+    public WorkflowEvent instanceRevoked(WorkflowInstance instance, String operatorId,
+                                         String message, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.INSTANCE_REVOKED, "revoke", operatorId,
+                message == null || message.isBlank() ? "workflow instance revoked" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent instanceTerminated(WorkflowInstance instance, String operatorId,
+                                            String message, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.INSTANCE_TERMINATED, "terminate", operatorId,
+                message == null || message.isBlank() ? "workflow instance terminated" : message, null, occurredAt);
+    }
+
     private WorkflowEvent event(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
                                 WorkflowEventType eventType, String actionCode, String operatorId,
                                 String message, String payloadText, Instant occurredAt) {
