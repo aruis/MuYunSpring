@@ -97,10 +97,11 @@ public class WorkflowActionPolicyService {
                     requireReason(actionCode, reason);
                 }
             }
-            case "add_sign" -> {
+            case "addSign" -> {
                 if (!Boolean.TRUE.equals(node.getAllowAddSign())) {
                     throw new PlatformException("workflow node does not allow add sign: " + node.getNodeKey());
                 }
+                requireReason(actionCode, reason);
             }
             default -> {
             }

@@ -36,6 +36,7 @@ class WorkflowTaskActionFacadeTest {
         facade.execute("complete", request);
         facade.execute("notice", request);
         facade.execute("transfer", request);
+        facade.execute("addSign", request);
         facade.execute("invalidate", request);
         facade.execute("cancel", request);
 
@@ -46,6 +47,7 @@ class WorkflowTaskActionFacadeTest {
         verify(actionService).completeBusinessTask(request);
         verify(actionService).notice(request);
         verify(actionService).transfer(request);
+        verify(actionService).addSign(request);
         verify(actionService).invalidate(request);
         verify(actionService).cancel(request);
     }

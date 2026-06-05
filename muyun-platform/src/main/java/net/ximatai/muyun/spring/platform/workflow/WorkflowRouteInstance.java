@@ -90,4 +90,18 @@ public class WorkflowRouteInstance extends StandardEntity {
 
     @Column(name = "invalidated_at", type = ColumnType.TIMESTAMP, comment = "Invalidated at")
     private Instant invalidatedAt;
+
+    @Column(name = "added_by_add_sign", type = ColumnType.BOOLEAN, comment = "Added by runtime add sign")
+    private Boolean addedByAddSign;
+
+    @Column(name = "add_sign_source_node_key", type = ColumnType.VARCHAR, length = 64,
+            comment = "Add sign source node key")
+    private String addSignSourceNodeKey;
+
+    @Column(name = "add_sign_operator_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Add sign operator id")
+    private String addSignOperatorId;
+
+    @Column(name = "add_sign_at", type = ColumnType.TIMESTAMP, comment = "Add sign at")
+    private Instant addSignAt;
 }

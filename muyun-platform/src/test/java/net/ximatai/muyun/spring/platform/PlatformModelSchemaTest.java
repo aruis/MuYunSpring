@@ -220,9 +220,11 @@ class PlatformModelSchemaTest {
                         "required_route_count", "arrived_route_count", "completed_route_count",
                         "required_task_count", "completed_task_count", "approved_task_count",
                         "rejected_task_count", "rollback_target_node_key", "task_definition_id",
+                        "participant_policy_text",
                         "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
                         "allow_rollback", "require_rollback_reason", "allow_terminate",
                         "require_terminate_reason", "allow_add_sign",
+                        "added_by_add_sign", "add_sign_source_node_key", "add_sign_operator_id", "add_sign_at",
                         "warning_duration_minutes", "overtime_duration_minutes",
                         "overtime_status", "warned_at", "overdue_at", "activated_at", "completed_at",
                         "node_snapshot_text");
@@ -232,7 +234,8 @@ class PlatformModelSchemaTest {
                         "parent_route_id", "route_depth",
                         "route_status", "route_reason", "condition_matched", "default_route",
                         "selected_by", "selected_at", "arrived_at", "closed_by_route_id", "closed_reason",
-                        "invalidated_by_action_id", "invalidated_at");
+                        "invalidated_by_action_id", "invalidated_at",
+                        "added_by_add_sign", "add_sign_source_node_key", "add_sign_operator_id", "add_sign_at");
         assertThat(columnNames(mapper.toTable(WorkflowTask.class)))
                 .contains("id", "tenant_id", "instance_id", "node_instance_id", "task_kind",
                         "task_status", "parent_task_id", "origin_task_id", "assignment_kind",
@@ -251,6 +254,8 @@ class PlatformModelSchemaTest {
                         "action_code", "operator_id", "message", "payload_text", "occurred_at");
         assertThat(columnType(mapper.toTable(WorkflowInstance.class), "snapshot_text")).isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowNodeDefinition.class), "participant_policy_text"))
+                .isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowNodeInstance.class), "participant_policy_text"))
                 .isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowTask.class), "result_message")).isEqualTo(ColumnType.TEXT);
         assertThat(indexes(mapper.toTable(WorkflowRouteInstance.class)))

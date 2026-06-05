@@ -11,11 +11,14 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 class WorkflowTaskActionServiceTest {
     private final WorkflowTaskDao taskDao = mock(WorkflowTaskDao.class);
@@ -451,6 +454,212 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldInsertRuntimeAddSignSegmentWithoutCompletingCurrentTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowRouteInstance originalRoute = route("route-1", "approve", "next", WorkflowRouteStatus.CANDIDATE);
+        originalRoute.setRouteKey("approve-next");
+        originalRoute.setDefaultRoute(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(originalRoute));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, node("node-next", "next",
+                WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
+        when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
+
+        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+                "task-1", "user-1", null, null, segment("add-1", "approve", "next"), null,
+                "need finance review", Instant.parse("2026-06-05T04:00:00Z")));
+
+        assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
+        assertThat(result.node().getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(result.createdTask()).isNull();
+        assertThat(result.addSignEditMode()).isEqualTo(WorkflowAddSignEditMode.CREATE);
+        assertThat(result.sourceNodeKey()).isEqualTo("approve");
+        assertThat(result.addedNodeKeys()).containsExactly("add-1");
+        assertThat(result.replacedRouteIds()).containsExactly("route-1");
+        assertThat(originalRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
+        assertThat(originalRoute.getClosedReason()).isEqualTo("workflow route replaced by addSign");
+        ArgumentCaptor<WorkflowNodeInstance> nodeCaptor = ArgumentCaptor.forClass(WorkflowNodeInstance.class);
+        verify(nodeDao).insert(nodeCaptor.capture());
+        assertThat(nodeCaptor.getValue().getNodeKey()).isEqualTo("add-1");
+        assertThat(nodeCaptor.getValue().getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(nodeCaptor.getValue().getParticipantPolicyText()).isEqualTo("user:add-signer-1");
+        assertThat(nodeCaptor.getValue().getAddedByAddSign()).isTrue();
+        assertThat(nodeCaptor.getValue().getAddSignSourceNodeKey()).isEqualTo("approve");
+        assertThat(nodeCaptor.getValue().getAddSignOperatorId()).isEqualTo("user-1");
+        assertThat(nodeCaptor.getValue().getAddSignAt()).isEqualTo(Instant.parse("2026-06-05T04:00:00Z"));
+        ArgumentCaptor<WorkflowRouteInstance> routeCaptor = ArgumentCaptor.forClass(WorkflowRouteInstance.class);
+        verify(routeDao, times(2)).insert(routeCaptor.capture());
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getSourceNodeKey)
+                .containsExactly("approve", "add-1");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getTargetNodeKey)
+                .containsExactly("add-1", "next");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getRouteStatus)
+                .containsOnly(WorkflowRouteStatus.CANDIDATE);
+        assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.ADD_SIGN);
+        assertThat(result.event().getActionCode()).isEqualTo("addSign");
+        assertThat(result.event().getTaskId()).isEqualTo("task-1");
+        assertThat(result.event().getPayloadText()).contains("\"sourceNodeKey\":\"approve\"");
+        assertThat(result.event().getPayloadText()).contains("\"addedNodeKeys\":[\"add-1\"]");
+        assertThat(result.event().getPayloadText()).contains("\"replacedRouteIds\":[\"route-1\"]");
+        verify(taskDao, never()).insert(any());
+        verify(eventDao).insert(result.event());
+        verifyNoInteractions(progressionService);
+    }
+
+    @Test
+    void shouldRequireRuntimeAuthorizationBeforeAddSign() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
+        WorkflowTaskActionService authorizedService = new WorkflowTaskActionService(
+                taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory, approvalTaskPolicyService,
+                policyService, progressionService, Optional.empty());
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(route("route-1", "approve", "next",
+                WorkflowRouteStatus.CANDIDATE)));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, node("node-next", "next",
+                WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
+        when(routeDao.updateByIdAndVersion(any(), any())).thenReturn(1);
+
+        authorizedService.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "need review"));
+
+        verify(policyService).requireRuntimeAction(instance, "addSign");
+        verify(policyService).requireNodeTaskAction(task, node, "addSign", "user-1", "need review");
+    }
+
+    @Test
+    void shouldRejectAddSignWhenNodeDoesNotAllowIt() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(false);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("does not allow add sign");
+
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRejectAddSignForNonApprovalTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        when(taskDao.findById("task-1")).thenReturn(task);
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports approval task");
+
+        verifyNoInteractions(instanceDao, nodeDao, eventDao);
+    }
+
+    @Test
+    void shouldRejectAddSignWhenNodeHasMultipleTodoApprovalTasks() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowTask sibling = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task, sibling));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("multi todo approval tasks");
+
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRejectInvalidAddSignSegments() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowRouteInstance originalRoute = route("route-1", "approve", "next", WorkflowRouteStatus.CANDIDATE);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(originalRoute));
+        when(nodeDao.query(any(), any())).thenReturn(
+                List.of(),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(List.of(), List.of()), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must contain nodes");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1",
+                new WorkflowAddSignSegment(List.of(nodeDefinition("add-1")), List.of(
+                        linkDefinition("direct", "approve", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("empty direct route");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1",
+                new WorkflowAddSignSegment(List.of(nodeDefinition("add-1")), List.of(
+                        linkDefinition("entry", "approve", "add-1"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("one exit");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("approve", "approve", "next"), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("conflicts");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1",
+                new WorkflowAddSignSegment(List.of(nodeDefinition("add-missing", null)), List.of(
+                        linkDefinition("entry-missing", "approve", "add-missing"),
+                        linkDefinition("exit-missing", "add-missing", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("participant policy is required");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1",
+                new WorkflowAddSignSegment(List.of(nodeDefinition("add-invalid", "role:finance")), List.of(
+                        linkDefinition("entry-invalid", "approve", "add-invalid"),
+                        linkDefinition("exit-invalid", "add-invalid", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports user:<userId>");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1",
+                new WorkflowAddSignSegment(List.of(nodeDefinition("add-task", WorkflowNodeType.TASK,
+                        "user:add-signer-1")), List.of(
+                        linkDefinition("entry-task", "approve", "add-task"),
+                        linkDefinition("exit-task", "add-task", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports approval nodes");
+    }
+
+    @Test
     void shouldRejectTaskActionWhenOperatorIsNotAssignee() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
@@ -539,6 +748,46 @@ class WorkflowTaskActionServiceTest {
         task.setAssigneeId("user-1");
         task.setCheckStatus(WorkflowTaskCheckStatus.NOT_CHECKED);
         return task;
+    }
+
+    private WorkflowAddSignSegment segment(String addedNodeKey, String sourceNodeKey, String nextNodeKey) {
+        return new WorkflowAddSignSegment(List.of(nodeDefinition(addedNodeKey)), List.of(
+                linkDefinition("entry-" + addedNodeKey, sourceNodeKey, addedNodeKey),
+                linkDefinition("exit-" + addedNodeKey, addedNodeKey, nextNodeKey)
+        ));
+    }
+
+    private WorkflowNodeDefinition nodeDefinition(String nodeKey) {
+        return nodeDefinition(nodeKey, "user:add-signer-1");
+    }
+
+    private WorkflowNodeDefinition nodeDefinition(String nodeKey, String participantPolicyText) {
+        return nodeDefinition(nodeKey, WorkflowNodeType.APPROVAL, participantPolicyText);
+    }
+
+    private WorkflowNodeDefinition nodeDefinition(String nodeKey, WorkflowNodeType nodeType,
+                                                  String participantPolicyText) {
+        WorkflowNodeDefinition definition = new WorkflowNodeDefinition();
+        definition.setNodeKey(nodeKey);
+        definition.setNodeType(nodeType);
+        definition.setApprovalMode(WorkflowApprovalMode.ALL);
+        definition.setParticipantPolicyText(participantPolicyText);
+        definition.setAllowReject(true);
+        definition.setAllowRollback(true);
+        definition.setAllowAddSign(true);
+        definition.setWarningDurationMinutes(30);
+        definition.setOvertimeDurationMinutes(60);
+        definition.setNodeConfigText("{\"source\":\"test\"}");
+        return definition;
+    }
+
+    private WorkflowLinkDefinition linkDefinition(String routeKey, String sourceNodeKey, String targetNodeKey) {
+        WorkflowLinkDefinition definition = new WorkflowLinkDefinition();
+        definition.setRouteKey(routeKey);
+        definition.setSourceNodeKey(sourceNodeKey);
+        definition.setTargetNodeKey(targetNodeKey);
+        definition.setDefaultRoute(false);
+        return definition;
     }
 
     private WorkflowNodeInstance node(WorkflowApprovalMode mode, Integer ratio) {

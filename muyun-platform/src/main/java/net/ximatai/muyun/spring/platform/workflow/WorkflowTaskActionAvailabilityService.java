@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -9,6 +11,8 @@ import java.util.List;
 
 @Service
 public class WorkflowTaskActionAvailabilityService {
+    private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
+
     private final WorkflowTaskDao taskDao;
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowNodeInstanceDao nodeDao;
@@ -41,6 +45,14 @@ public class WorkflowTaskActionAvailabilityService {
                     && Boolean.TRUE.equals(node.getAllowRollback())) {
                 actions.add(WorkflowTaskAvailableAction.of("rollback", "回退")
                         .requireReason(Boolean.TRUE.equals(node.getRequireRollbackReason())));
+            }
+            if (instance.getInstanceStatus() == WorkflowInstanceStatus.RUNNING
+                    && node != null
+                    && node.getNodeType() == WorkflowNodeType.APPROVAL
+                    && Boolean.TRUE.equals(node.getAllowAddSign())
+                    && !hasMultipleTodoApprovalTasks(task)) {
+                actions.add(WorkflowTaskAvailableAction.of("addSign", "加签")
+                        .requireReason(true));
             }
         } else if (task.getTaskKind() == WorkflowTaskKind.BUSINESS) {
             actions.add(WorkflowTaskAvailableAction.of("complete", "完成"));
@@ -82,6 +94,15 @@ public class WorkflowTaskActionAvailabilityService {
             return true;
         }
         return validOperatorId.equals(task.getAssigneeId());
+    }
+
+    private boolean hasMultipleTodoApprovalTasks(WorkflowTask task) {
+        return taskDao.query(Criteria.of()
+                        .eq("instanceId", task.getInstanceId())
+                        .eq("nodeInstanceId", task.getNodeInstanceId()), ALL).stream()
+                .filter(nodeTask -> nodeTask.getTaskKind() == WorkflowTaskKind.APPROVAL)
+                .filter(nodeTask -> nodeTask.getTaskStatus() == WorkflowTaskStatus.TODO)
+                .count() > 1;
     }
 
     private String requireText(String value, String message) {

@@ -183,6 +183,19 @@ class WorkflowRuntimeWebControllerTest {
                         && "user-2".equals(request.targetAssigneeId())
                         && "handoff".equals(request.reason()))))
                 .thenReturn(WorkflowTaskActionResult.transferred(task, new WorkflowTask(), null));
+        when(taskActionFacade.execute(eq("addSign"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "operator-1".equals(request.operatorId())
+                        && request.targetAssigneeId() == null
+                        && request.addSignMode() == null
+                        && request.addSignSegment() != null
+                        && request.addSignSegment().nodeDefinitions().size() == 1
+                        && "add-1".equals(request.addSignSegment().nodeDefinitions().getFirst().getNodeKey())
+                        && "user:add-signer-1".equals(request.addSignSegment().nodeDefinitions().getFirst()
+                                .getParticipantPolicyText())
+                        && request.addSignSegment().linkDefinitions().size() == 2
+                        && "need review".equals(request.reason()))))
+                .thenReturn(new WorkflowTaskActionResult(task, null, null, null, null));
 
         mvc.perform(post("/workflow/runtime/task/task-1/actions/reject")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -202,6 +215,39 @@ class WorkflowRuntimeWebControllerTest {
                                 {
                                   "targetAssigneeId": "user-2",
                                   "reason": "handoff"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/workflow/runtime/task/task-1/actions/addSign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "addSignSegment": {
+                                    "nodeDefinitions": [
+                                      {
+                                        "nodeKey": "add-1",
+                                        "nodeType": "APPROVAL",
+                                        "approvalMode": "ALL",
+                                        "participantPolicyText": "user:add-signer-1",
+                                        "allowAddSign": true
+                                      }
+                                    ],
+                                    "linkDefinitions": [
+                                      {
+                                        "routeKey": "entry-add",
+                                        "sourceNodeKey": "approve",
+                                        "targetNodeKey": "add-1"
+                                      },
+                                      {
+                                        "routeKey": "exit-add",
+                                        "sourceNodeKey": "add-1",
+                                        "targetNodeKey": "next"
+                                      }
+                                    ]
+                                  },
+                                  "reason": "need review"
                                 }
                                 """))
                 .andExpect(status().isOk());

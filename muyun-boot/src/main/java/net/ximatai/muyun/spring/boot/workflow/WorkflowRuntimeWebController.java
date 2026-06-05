@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAddSignSegment;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
@@ -91,6 +92,8 @@ public class WorkflowRuntimeWebController {
         return taskActionFacade.execute(actionCode, new WorkflowTaskActionRequest(taskId,
                 operatorId(request == null ? null : request.operatorId()),
                 request == null ? null : request.targetAssigneeId(),
+                null,
+                request == null ? null : request.addSignSegment(),
                 rejectResubmitMode(request == null ? null : request.rejectResubmitMode()),
                 request == null ? null : request.reason(),
                 null));
@@ -182,6 +185,7 @@ public class WorkflowRuntimeWebController {
         }
         throw new PlatformException("unsupported workflow reject resubmit mode: " + value);
     }
+
 }
 
 record WorkflowOperatorWebRequest(String operatorId) {
@@ -192,6 +196,7 @@ record WorkflowInstanceActionWebRequest(String operatorId, String reason) {
 
 record WorkflowTaskActionWebRequest(String operatorId,
                                     String targetAssigneeId,
+                                    WorkflowAddSignSegment addSignSegment,
                                     String rejectResubmitMode,
                                     String reason) {
 }

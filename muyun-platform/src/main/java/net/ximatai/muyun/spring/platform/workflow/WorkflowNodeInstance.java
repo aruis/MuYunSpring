@@ -89,6 +89,9 @@ public class WorkflowNodeInstance extends StandardEntity {
     @Column(name = "task_definition_id", type = ColumnType.VARCHAR, length = 32, comment = "Task definition id")
     private String taskDefinitionId;
 
+    @Column(name = "participant_policy_text", type = ColumnType.TEXT, comment = "Participant policy")
+    private String participantPolicyText;
+
     @Column(name = "allow_reject", type = ColumnType.BOOLEAN, comment = "Allow reject")
     private Boolean allowReject;
 
@@ -113,6 +116,20 @@ public class WorkflowNodeInstance extends StandardEntity {
 
     @Column(name = "allow_add_sign", type = ColumnType.BOOLEAN, comment = "Allow add sign")
     private Boolean allowAddSign;
+
+    @Column(name = "added_by_add_sign", type = ColumnType.BOOLEAN, comment = "Added by runtime add sign")
+    private Boolean addedByAddSign;
+
+    @Column(name = "add_sign_source_node_key", type = ColumnType.VARCHAR, length = 64,
+            comment = "Add sign source node key")
+    private String addSignSourceNodeKey;
+
+    @Column(name = "add_sign_operator_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Add sign operator id")
+    private String addSignOperatorId;
+
+    @Column(name = "add_sign_at", type = ColumnType.TIMESTAMP, comment = "Add sign at")
+    private Instant addSignAt;
 
     @Column(name = "warning_duration_minutes", type = ColumnType.INT, comment = "Warning duration minutes")
     private Integer warningDurationMinutes;

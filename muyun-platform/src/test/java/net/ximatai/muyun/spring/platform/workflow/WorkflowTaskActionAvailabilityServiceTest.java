@@ -27,17 +27,37 @@ class WorkflowTaskActionAvailabilityServiceTest {
         node.setAllowRejectReturnToMe(true);
         node.setAllowRollback(true);
         node.setRequireRollbackReason(true);
+        node.setAllowAddSign(true);
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance);
         when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(task));
 
         List<WorkflowTaskAvailableAction> actions = service.availableActions("task-1", "user-1");
 
-        assertThat(codes(actions)).containsExactly("approve", "reject", "rollback", "transfer");
+        assertThat(codes(actions)).containsExactly("approve", "reject", "rollback", "addSign", "transfer");
         assertThat(action(actions, "reject").reasonRequired()).isTrue();
         assertThat(action(actions, "reject").rejectReturnToMeSupported()).isTrue();
         assertThat(action(actions, "rollback").reasonRequired()).isTrue();
+        assertThat(action(actions, "addSign").reasonRequired()).isTrue();
+        assertThat(action(actions, "addSign").targetAssigneeRequired()).isFalse();
         assertThat(action(actions, "transfer").targetAssigneeRequired()).isTrue();
+    }
+
+    @Test
+    void shouldHideAddSignWhenNodeHasMultipleTodoApprovalTasks() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowTask sibling = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node();
+        node.setAllowAddSign(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING, null));
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(task, sibling));
+
+        assertThat(codes(service.availableActions("task-1", "user-1"))).doesNotContain("addSign");
     }
 
     @Test

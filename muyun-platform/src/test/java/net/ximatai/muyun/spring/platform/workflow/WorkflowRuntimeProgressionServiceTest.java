@@ -57,6 +57,57 @@ class WorkflowRuntimeProgressionServiceTest {
     }
 
     @Test
+    void shouldAdvanceThroughInsertedAddSignRouteAndCreateApprovalTask() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance addSign = node("node-add", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.WAITING);
+        addSign.setAddedByAddSign(true);
+        addSign.setAddSignSourceNodeKey("approve");
+        addSign.setParticipantPolicyText("user:add-signer-1");
+        WorkflowNodeInstance next = node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance replaced = route("route-old", "old", "approve", "next", true);
+        replaced.setRouteStatus(WorkflowRouteStatus.CANCELED);
+        WorkflowRouteInstance entry = route("route-entry", "entry-add", "approve", "add-1", true);
+        entry.setAddedByAddSign(true);
+        entry.setAddSignSourceNodeKey("approve");
+        WorkflowRouteInstance exit = route("route-exit", "exit-add", "add-1", "next", false);
+        exit.setAddedByAddSign(true);
+        exit.setAddSignSourceNodeKey("approve");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, addSign, next));
+        when(routeDao.query(any(), any())).thenReturn(List.of(replaced, entry, exit));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(approve, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(addSign, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(next, 2)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(replaced, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(entry, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(exit, 4)).thenReturn(1);
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"));
+
+        assertThat(replaced.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
+        assertThat(entry.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(addSign.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(next.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(instance.getCurrentNodeKeys()).isEqualTo("add-1");
+        assertThat(result.selectedRoutes()).containsExactly(entry);
+        assertThat(result.createdTasks()).hasSize(1)
+                .first()
+                .satisfies(task -> {
+                    assertThat(task.getTaskKind()).isEqualTo(WorkflowTaskKind.APPROVAL);
+                    assertThat(task.getNodeInstanceId()).isEqualTo("node-add");
+                    assertThat(task.getAssigneeId()).isEqualTo("add-signer-1");
+                    assertThat(task.getAssignmentPolicyText()).isEqualTo("user:add-signer-1");
+                });
+        verify(taskDao).insert(result.createdTasks().get(0));
+    }
+
+    @Test
     void shouldWriteApprovalSummaryWhenApprovalCompletedMilestoneIsReached() {
         WorkflowRuntimeProgressionService service = service(Optional.of(summaryWriter));
         WorkflowInstance instance = instance();

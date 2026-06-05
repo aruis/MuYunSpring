@@ -29,6 +29,7 @@ public class WorkflowTaskActionFacade {
             case "complete" -> actionService.completeBusinessTask(request);
             case "notice" -> actionService.notice(request);
             case "transfer" -> actionService.transfer(request);
+            case "addSign" -> actionService.addSign(request);
             case "invalidate" -> actionService.invalidate(request);
             case "cancel" -> actionService.cancel(request);
             default -> throw new PlatformException("unsupported workflow task action: " + actionCode);

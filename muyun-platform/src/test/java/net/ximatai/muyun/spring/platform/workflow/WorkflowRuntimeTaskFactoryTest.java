@@ -1,11 +1,13 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WorkflowRuntimeTaskFactoryTest {
     private final WorkflowRuntimeTaskFactory factory = new WorkflowRuntimeTaskFactory(new WorkflowRuntimeEventFactory());
@@ -40,6 +42,57 @@ class WorkflowRuntimeTaskFactoryTest {
                 .allSatisfy(event -> assertThat(event.getEventType()).isEqualTo(WorkflowEventType.TASK_CREATED));
     }
 
+    @Test
+    void shouldAssignApprovalTaskBySingleUserParticipantPolicy() {
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approval = node(instance, "approve");
+        approval.setParticipantPolicyText("user:approver-2");
+        WorkflowActivationResult activation = new WorkflowActivationResult(
+                List.of("approve"),
+                List.of(),
+                List.of("approve"),
+                List.of(),
+                List.of(),
+                List.of(),
+                false
+        );
+
+        WorkflowRuntimeTaskDraft draft = factory.createBlockingTasks(instance,
+                List.of(approval), activation, "operator-1",
+                Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(draft.tasks()).hasSize(1)
+                .first()
+                .satisfies(task -> {
+                    assertThat(task.getAssigneeId()).isEqualTo("approver-2");
+                    assertThat(task.getOwnerId()).isEqualTo("approver-2");
+                    assertThat(task.getOriginalAssigneeId()).isEqualTo("approver-2");
+                    assertThat(task.getAssignmentPolicyText()).isEqualTo("user:approver-2");
+                    assertThat(task.getAssignmentSnapshotText()).contains("\"assigneeId\":\"approver-2\"");
+                });
+    }
+
+    @Test
+    void shouldRejectAddSignApprovalTaskWithoutValidParticipantPolicy() {
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance missing = node(instance, "addMissing");
+        missing.setAddedByAddSign(true);
+        WorkflowNodeInstance invalid = node(instance, "addInvalid");
+        invalid.setAddedByAddSign(true);
+        invalid.setParticipantPolicyText("role:finance");
+        WorkflowActivationResult missingActivation = activation("addMissing");
+        WorkflowActivationResult invalidActivation = activation("addInvalid");
+
+        assertThatThrownBy(() -> factory.createBlockingTasks(instance, List.of(missing), missingActivation,
+                "operator-1", Instant.parse("2026-06-05T01:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("participant policy is required");
+        assertThatThrownBy(() -> factory.createBlockingTasks(instance, List.of(invalid), invalidActivation,
+                "operator-1", Instant.parse("2026-06-05T01:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only supports user:<userId>");
+    }
+
     private WorkflowInstance instance() {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId("instance-1");
@@ -53,5 +106,17 @@ class WorkflowRuntimeTaskFactoryTest {
         node.setInstanceId(instance.getId());
         node.setNodeKey(key);
         return node;
+    }
+
+    private WorkflowActivationResult activation(String nodeKey) {
+        return new WorkflowActivationResult(
+                List.of(nodeKey),
+                List.of(),
+                List.of(nodeKey),
+                List.of(),
+                List.of(),
+                List.of(),
+                false
+        );
     }
 }

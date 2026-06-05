@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +33,8 @@ public class WorkflowRuntimeTaskFactory {
             if (node == null) {
                 continue;
             }
-            WorkflowTask task = task(instance, node, WorkflowTaskKind.APPROVAL, operatorId);
+            WorkflowTask task = task(instance, node, WorkflowTaskKind.APPROVAL,
+                    approvalAssignee(node, operatorId));
             tasks.add(task);
             events.add(eventFactory.taskCreated(instance, node, task, operatorId, occurredAt));
         }
@@ -61,8 +63,40 @@ public class WorkflowRuntimeTaskFactory {
         task.setOriginalAssigneeId(ownerId);
         task.setAssigneeId(ownerId);
         task.setAssignmentKind(WorkflowAssignmentKind.NORMAL);
+        task.setAssignmentPolicyText(node.getParticipantPolicyText());
+        task.setAssignmentSnapshotText(ownerId == null ? null : "{\"assigneeId\":\"" + escape(ownerId) + "\"}");
         task.setCheckStatus(taskKind == WorkflowTaskKind.BUSINESS
                 ? WorkflowTaskCheckStatus.NOT_CHECKED : WorkflowTaskCheckStatus.NO_CHECK);
         return task;
+    }
+
+    private String approvalAssignee(WorkflowNodeInstance node, String operatorId) {
+        String policy = node.getParticipantPolicyText();
+        if (policy == null || policy.isBlank()) {
+            if (Boolean.TRUE.equals(node.getAddedByAddSign())) {
+                throw new PlatformException("workflow add sign node participant policy is required: "
+                        + node.getNodeKey());
+            }
+            return operatorId;
+        }
+        String trimmed = policy.trim();
+        if (!trimmed.startsWith("user:")) {
+            throw new PlatformException("workflow participant policy only supports user:<userId>: "
+                    + node.getNodeKey());
+        }
+        String userId = trimmed.substring("user:".length()).trim();
+        if (userId.isBlank()) {
+            throw new PlatformException("workflow participant policy user id must not be blank: "
+                    + node.getNodeKey());
+        }
+        if (userId.indexOf(',') >= 0 || userId.indexOf(';') >= 0 || userId.contains("[") || userId.contains("]")) {
+            throw new PlatformException("workflow participant policy only supports single user in first version: "
+                    + node.getNodeKey());
+        }
+        return userId;
+    }
+
+    private String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

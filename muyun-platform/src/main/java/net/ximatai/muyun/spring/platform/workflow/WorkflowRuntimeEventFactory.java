@@ -42,6 +42,13 @@ public class WorkflowRuntimeEventFactory {
                 message, payloadText, occurredAt);
     }
 
+    public WorkflowEvent addSign(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
+                                 String operatorId, String message, String payloadText, Instant occurredAt) {
+        return event(instance, node, task, WorkflowEventType.ADD_SIGN, "addSign", operatorId,
+                message == null || message.isBlank() ? "workflow runtime add sign" : message,
+                payloadText, occurredAt);
+    }
+
     public WorkflowEvent taskRejected(WorkflowInstance instance, WorkflowTask task,
                                       String operatorId, String message, Instant occurredAt) {
         return event(instance, null, task, WorkflowEventType.TASK_REJECTED, "reject", operatorId,

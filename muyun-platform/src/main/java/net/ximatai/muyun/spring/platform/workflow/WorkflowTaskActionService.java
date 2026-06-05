@@ -14,8 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class WorkflowTaskActionService {
@@ -403,6 +407,61 @@ public class WorkflowTaskActionService {
     }
 
     @Transactional
+    public WorkflowTaskActionResult addSign(WorkflowTaskActionRequest request) {
+        WorkflowTask task = requireTodoTask(request);
+        if (task.getTaskKind() != WorkflowTaskKind.APPROVAL) {
+            throw new PlatformException("workflow add sign only supports approval task: " + request.taskId());
+        }
+        WorkflowInstance instance = requireRunningInstance(task);
+        WorkflowNodeInstance node = requireNode(task);
+        if (node.getNodeType() != WorkflowNodeType.APPROVAL) {
+            throw new PlatformException("workflow add sign only supports approval node task: " + request.taskId());
+        }
+        if (node.getNodeStatus() != WorkflowNodeStatus.ACTIVE) {
+            throw new PlatformException("workflow add sign only supports active approval node: " + node.getNodeKey());
+        }
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "addSign");
+        actionPolicyService.requireNodeTaskAction(task, node, "addSign", operatorId, request.reason());
+        rejectMultiTodoApprovalTasks(task);
+        rejectExistingUnstartedAddSignSegment(instance.getId(), node.getNodeKey());
+        List<WorkflowRouteInstance> originalRoutes = outgoingCandidateRoutes(instance.getId(), node.getNodeKey());
+        if (originalRoutes.isEmpty()) {
+            throw new PlatformException("workflow add sign requires candidate route after current node: "
+                    + node.getNodeKey());
+        }
+        AddSignSegmentPlan plan = buildAddSignSegmentPlan(instance, node, originalRoutes, request.addSignSegment(),
+                operatorId, now);
+
+        for (WorkflowRouteInstance route : originalRoutes) {
+            route.setRouteStatus(WorkflowRouteStatus.CANCELED);
+            route.setRouteReason(WorkflowRouteReason.MANUAL_UNSELECTED);
+            route.setSelectedBy(operatorId);
+            route.setSelectedAt(now);
+            route.setClosedReason("workflow route replaced by addSign");
+            route.setInvalidatedByActionId("addSign");
+            route.setInvalidatedAt(now);
+            updateRoute(route, now);
+        }
+        for (WorkflowNodeInstance addedNode : plan.nodes()) {
+            EntityLifecycle.prepareInsert(addedNode, now);
+            nodeInstanceDao.insert(addedNode);
+        }
+        for (WorkflowRouteInstance addedRoute : plan.routes()) {
+            EntityLifecycle.prepareInsert(addedRoute, now);
+            routeInstanceDao.insert(addedRoute);
+        }
+
+        WorkflowEvent event = eventFactory.addSign(instance, node, task, operatorId, request.reason(),
+                addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), originalRoutes.stream()
+                        .map(WorkflowRouteInstance::getId).toList(), WorkflowAddSignEditMode.CREATE), now);
+        eventDao.insert(event);
+        return WorkflowTaskActionResult.addSign(task, node, instance, event, WorkflowAddSignEditMode.CREATE,
+                plan.addedNodeKeys(), originalRoutes.stream().map(WorkflowRouteInstance::getId).toList());
+    }
+
+    @Transactional
     public WorkflowTaskActionResult invalidate(WorkflowTaskActionRequest request) {
         WorkflowTask task = requireTodoTask(request);
         WorkflowInstance instance = requireInstance(task);
@@ -541,6 +600,276 @@ public class WorkflowTaskActionService {
         return taskDao.query(Criteria.of()
                 .eq("instanceId", task.getInstanceId())
                 .eq("nodeInstanceId", task.getNodeInstanceId()), ALL);
+    }
+
+    private void rejectMultiTodoApprovalTasks(WorkflowTask task) {
+        long todoApprovalCount = nodeTasks(task).stream()
+                .filter(nodeTask -> nodeTask.getTaskKind() == WorkflowTaskKind.APPROVAL)
+                .filter(nodeTask -> nodeTask.getTaskStatus() == WorkflowTaskStatus.TODO)
+                .count();
+        if (todoApprovalCount > 1) {
+            throw new PlatformException("workflow add sign does not support multi todo approval tasks on one node: "
+                    + task.getNodeInstanceId());
+        }
+    }
+
+    private void rejectExistingUnstartedAddSignSegment(String instanceId, String sourceNodeKey) {
+        List<WorkflowNodeInstance> existingNodes = nodeInstanceDao.query(Criteria.of()
+                .eq("instanceId", instanceId)
+                .eq("addedByAddSign", true)
+                .eq("addSignSourceNodeKey", sourceNodeKey), ALL);
+        if (existingNodes.isEmpty()) {
+            return;
+        }
+        for (WorkflowNodeInstance existingNode : existingNodes) {
+            if (existingNode.getNodeStatus() != WorkflowNodeStatus.WAITING) {
+                throw new PlatformException("workflow add sign segment is already effective: " + sourceNodeKey);
+            }
+        }
+        Set<String> nodeIds = existingNodes.stream()
+                .map(WorkflowNodeInstance::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        boolean hasTasks = taskDao.query(Criteria.of()
+                        .eq("instanceId", instanceId), ALL).stream()
+                .anyMatch(existingTask -> nodeIds.contains(existingTask.getNodeInstanceId()));
+        if (hasTasks) {
+            throw new PlatformException("workflow add sign segment is already effective: " + sourceNodeKey);
+        }
+        throw new PlatformException("workflow add sign replace is not supported in first version: "
+                + WorkflowAddSignEditMode.UNSUPPORTED_REPLACE_FAIL_FAST.getCode());
+    }
+
+    private List<WorkflowRouteInstance> outgoingCandidateRoutes(String instanceId, String sourceNodeKey) {
+        return requireRouteDao().query(Criteria.of()
+                .eq("instanceId", instanceId)
+                .eq("sourceNodeKey", sourceNodeKey)
+                .eq("routeStatus", WorkflowRouteStatus.CANDIDATE), ALL);
+    }
+
+    private AddSignSegmentPlan buildAddSignSegmentPlan(WorkflowInstance instance,
+                                                       WorkflowNodeInstance sourceNode,
+                                                       List<WorkflowRouteInstance> originalRoutes,
+                                                       WorkflowAddSignSegment segment,
+                                                       String operatorId,
+                                                       Instant now) {
+        if (segment == null) {
+            throw new PlatformException("workflow add sign segment must not be null");
+        }
+        if (segment.nodeDefinitions().isEmpty()) {
+            throw new PlatformException("workflow add sign segment must contain nodes");
+        }
+        if (segment.linkDefinitions().isEmpty()) {
+            throw new PlatformException("workflow add sign segment must contain links");
+        }
+        if (originalRoutes.size() != 1) {
+            throw new PlatformException("workflow add sign only supports single original next node in first version: "
+                    + sourceNode.getNodeKey());
+        }
+        String originalNextNodeKey = requireText(originalRoutes.getFirst().getTargetNodeKey(),
+                "workflow original next node key must not be blank");
+        Set<String> existingNodeKeys = nodeInstanceDao.query(Criteria.of()
+                        .eq("instanceId", instance.getId()), ALL).stream()
+                .map(WorkflowNodeInstance::getNodeKey)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Map<String, WorkflowNodeDefinition> definitionsByKey = new LinkedHashMap<>();
+        for (WorkflowNodeDefinition definition : segment.nodeDefinitions()) {
+            String nodeKey = requireText(definition.getNodeKey(), "workflow add sign node key must not be blank");
+            if (definitionsByKey.containsKey(nodeKey)) {
+                throw new PlatformException("workflow add sign node key duplicated: " + nodeKey);
+            }
+            if (existingNodeKeys.contains(nodeKey)) {
+                throw new PlatformException("workflow add sign node key conflicts with instance node: " + nodeKey);
+            }
+            validateAddSignNodeDefinition(definition);
+            definitionsByKey.put(nodeKey, definition);
+        }
+        Set<String> routeKeys = new LinkedHashSet<>();
+        for (WorkflowLinkDefinition definition : segment.linkDefinitions()) {
+            String routeKey = requireText(definition.getRouteKey(), "workflow add sign route key must not be blank");
+            if (!routeKeys.add(routeKey)) {
+                throw new PlatformException("workflow add sign route key duplicated: " + routeKey);
+            }
+        }
+        validateLinearAddSignLinks(sourceNode.getNodeKey(), originalNextNodeKey, definitionsByKey.keySet(),
+                segment.linkDefinitions());
+        List<WorkflowNodeInstance> nodes = segment.nodeDefinitions().stream()
+                .map(definition -> addSignNode(instance, sourceNode, definition, operatorId, now))
+                .toList();
+        List<WorkflowRouteInstance> routes = segment.linkDefinitions().stream()
+                .map(definition -> addSignRoute(instance, sourceNode, definition, operatorId, now))
+                .toList();
+        return new AddSignSegmentPlan(nodes, routes,
+                nodes.stream().map(WorkflowNodeInstance::getNodeKey).toList());
+    }
+
+    private void validateLinearAddSignLinks(String sourceNodeKey,
+                                            String originalNextNodeKey,
+                                            Set<String> addedNodeKeys,
+                                            List<WorkflowLinkDefinition> linkDefinitions) {
+        Set<String> allowed = new LinkedHashSet<>();
+        allowed.add(sourceNodeKey);
+        allowed.addAll(addedNodeKeys);
+        allowed.add(originalNextNodeKey);
+        Map<String, List<String>> outgoing = new LinkedHashMap<>();
+        Map<String, List<String>> incoming = new LinkedHashMap<>();
+        for (WorkflowLinkDefinition link : linkDefinitions) {
+            String source = requireText(link.getSourceNodeKey(), "workflow add sign link source must not be blank");
+            String target = requireText(link.getTargetNodeKey(), "workflow add sign link target must not be blank");
+            if (!allowed.contains(source) || !allowed.contains(target)) {
+                throw new PlatformException("workflow add sign link must stay inside local segment: "
+                        + source + " -> " + target);
+            }
+            if (sourceNodeKey.equals(target)) {
+                throw new PlatformException("workflow add sign link cannot target source node: " + target);
+            }
+            if (originalNextNodeKey.equals(source)) {
+                throw new PlatformException("workflow add sign link cannot leave original next node: " + source);
+            }
+            if (sourceNodeKey.equals(source) && originalNextNodeKey.equals(target)) {
+                throw new PlatformException("workflow add sign segment cannot be empty direct route");
+            }
+            outgoing.computeIfAbsent(source, ignored -> new ArrayList<>()).add(target);
+            incoming.computeIfAbsent(target, ignored -> new ArrayList<>()).add(source);
+        }
+        if (outgoing.getOrDefault(sourceNodeKey, List.of()).size() != 1) {
+            throw new PlatformException("workflow add sign segment must have one entry from source node");
+        }
+        if (incoming.getOrDefault(originalNextNodeKey, List.of()).size() != 1) {
+            throw new PlatformException("workflow add sign segment must have one exit to original next node");
+        }
+        for (String addedNodeKey : addedNodeKeys) {
+            if (incoming.getOrDefault(addedNodeKey, List.of()).size() != 1
+                    || outgoing.getOrDefault(addedNodeKey, List.of()).size() != 1) {
+                throw new PlatformException("workflow add sign only supports linear single chain in first version: "
+                        + addedNodeKey);
+            }
+        }
+        Set<String> visited = new LinkedHashSet<>();
+        String cursor = sourceNodeKey;
+        for (int depth = 0; depth <= addedNodeKeys.size(); depth++) {
+            List<String> next = outgoing.getOrDefault(cursor, List.of());
+            if (next.size() != 1) {
+                throw new PlatformException("workflow add sign linear chain is broken at: " + cursor);
+            }
+            cursor = next.getFirst();
+            if (originalNextNodeKey.equals(cursor)) {
+                if (visited.size() != addedNodeKeys.size()) {
+                    throw new PlatformException("workflow add sign segment must include all added nodes");
+                }
+                return;
+            }
+            if (!addedNodeKeys.contains(cursor) || !visited.add(cursor)) {
+                throw new PlatformException("workflow add sign segment contains invalid cycle: " + cursor);
+            }
+        }
+        throw new PlatformException("workflow add sign segment must return to original next node: "
+                + originalNextNodeKey);
+    }
+
+    private void validateAddSignNodeDefinition(WorkflowNodeDefinition definition) {
+        if (definition.getNodeType() != WorkflowNodeType.APPROVAL) {
+            throw new PlatformException("workflow add sign segment only supports approval nodes in first version: "
+                    + definition.getNodeKey());
+        }
+        String policy = definition.getParticipantPolicyText();
+        if (policy == null || policy.isBlank()) {
+            throw new PlatformException("workflow add sign approval node participant policy is required: "
+                    + definition.getNodeKey());
+        }
+        String trimmed = policy.trim();
+        if (!trimmed.startsWith("user:")) {
+            throw new PlatformException("workflow add sign participant policy only supports user:<userId>: "
+                    + definition.getNodeKey());
+        }
+        String userId = trimmed.substring("user:".length()).trim();
+        if (userId.isBlank()) {
+            throw new PlatformException("workflow add sign participant policy user id must not be blank: "
+                    + definition.getNodeKey());
+        }
+        if (userId.indexOf(',') >= 0 || userId.indexOf(';') >= 0 || userId.contains("[") || userId.contains("]")) {
+            throw new PlatformException("workflow add sign participant policy only supports single user in first version: "
+                    + definition.getNodeKey());
+        }
+    }
+
+    private WorkflowNodeInstance addSignNode(WorkflowInstance instance,
+                                             WorkflowNodeInstance sourceNode,
+                                             WorkflowNodeDefinition definition,
+                                             String operatorId,
+                                             Instant now) {
+        WorkflowNodeInstance node = new WorkflowNodeInstance();
+        node.setId(Ids.newId());
+        node.setTenantId(instance.getTenantId());
+        node.setInstanceId(instance.getId());
+        node.setNodeKey(requireText(definition.getNodeKey(), "workflow add sign node key must not be blank"));
+        node.setNodeRunId(node.getNodeKey() + ":addSign:1");
+        node.setNodeType(definition.getNodeType());
+        node.setNodeStatus(WorkflowNodeStatus.WAITING);
+        node.setApprovalMode(definition.getApprovalMode());
+        node.setApprovalRatio(definition.getApprovalRatio());
+        node.setMilestoneType(definition.getMilestoneType());
+        node.setConvergeMode(definition.getConvergeMode());
+        node.setConvergeRatio(definition.getConvergeRatio());
+        node.setTaskDefinitionId(definition.getTaskDefinitionId());
+        node.setParticipantPolicyText(definition.getParticipantPolicyText());
+        node.setAllowReject(definition.getAllowReject());
+        node.setRequireRejectReason(definition.getRequireRejectReason());
+        node.setAllowRejectReturnToMe(definition.getAllowRejectReturnToMe());
+        node.setAllowRollback(definition.getAllowRollback());
+        node.setRequireRollbackReason(definition.getRequireRollbackReason());
+        node.setAllowTerminate(definition.getAllowTerminate());
+        node.setRequireTerminateReason(definition.getRequireTerminateReason());
+        node.setAllowAddSign(definition.getAllowAddSign());
+        node.setWarningDurationMinutes(definition.getWarningDurationMinutes());
+        node.setOvertimeDurationMinutes(definition.getOvertimeDurationMinutes());
+        node.setNodeSnapshotText(definition.getNodeConfigText());
+        node.setAddedByAddSign(true);
+        node.setAddSignSourceNodeKey(sourceNode.getNodeKey());
+        node.setAddSignOperatorId(operatorId);
+        node.setAddSignAt(now);
+        return node;
+    }
+
+    private WorkflowRouteInstance addSignRoute(WorkflowInstance instance,
+                                               WorkflowNodeInstance sourceNode,
+                                               WorkflowLinkDefinition definition,
+                                               String operatorId,
+                                               Instant now) {
+        WorkflowRouteInstance route = new WorkflowRouteInstance();
+        route.setId(Ids.newId());
+        route.setTenantId(instance.getTenantId());
+        route.setInstanceId(instance.getId());
+        route.setRouteKey(requireText(definition.getRouteKey(), "workflow add sign route key must not be blank"));
+        route.setRouteRunId(route.getRouteKey() + ":addSign:1");
+        route.setSourceNodeKey(requireText(definition.getSourceNodeKey(),
+                "workflow add sign route source node key must not be blank"));
+        route.setTargetNodeKey(requireText(definition.getTargetNodeKey(),
+                "workflow add sign route target node key must not be blank"));
+        route.setRouteStatus(WorkflowRouteStatus.CANDIDATE);
+        route.setDefaultRoute(definition.getDefaultRoute());
+        route.setAddedByAddSign(true);
+        route.setAddSignSourceNodeKey(sourceNode.getNodeKey());
+        route.setAddSignOperatorId(operatorId);
+        route.setAddSignAt(now);
+        return route;
+    }
+
+    private String addSignPayload(String sourceNodeKey,
+                                  List<String> addedNodeKeys,
+                                  List<String> replacedRouteIds,
+                                  WorkflowAddSignEditMode editMode) {
+        return "{\"sourceNodeKey\":\"" + sourceNodeKey
+                + "\",\"addedNodeKeys\":" + jsonArray(addedNodeKeys)
+                + ",\"replacedRouteIds\":" + jsonArray(replacedRouteIds)
+                + ",\"editMode\":\"" + editMode.getCode() + "\"}";
+    }
+
+    private String jsonArray(List<String> values) {
+        return values == null || values.isEmpty()
+                ? "[]"
+                : values.stream()
+                        .map(value -> "\"" + value.replace("\"", "\\\"") + "\"")
+                        .collect(java.util.stream.Collectors.joining(",", "[", "]"));
     }
 
     private List<WorkflowTask> instanceTodoTasks(String instanceId) {
@@ -808,7 +1137,7 @@ public class WorkflowTaskActionService {
 
     private WorkflowRouteInstanceDao requireRouteDao() {
         if (routeInstanceDao == null) {
-            throw new PlatformException("workflow route dao is required for rollback");
+            throw new PlatformException("workflow route dao is required");
         }
         return routeInstanceDao;
     }
@@ -832,5 +1161,10 @@ public class WorkflowTaskActionService {
 
     private record RollbackTarget(WorkflowNodeInstance node, List<WorkflowRouteInstance> routes,
                                   List<WorkflowNodeInstance> intermediateNodes) {
+    }
+
+    private record AddSignSegmentPlan(List<WorkflowNodeInstance> nodes,
+                                      List<WorkflowRouteInstance> routes,
+                                      List<String> addedNodeKeys) {
     }
 }
