@@ -15,6 +15,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
@@ -37,6 +41,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.workflow.DynamicWorkflowActionExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
@@ -114,7 +119,8 @@ public class PlatformModuleDefinitionCompiler {
                 .toList();
         List<EntityReferenceDefinition> references = references(module.getAlias(), relations, metadataById);
         List<EntityViewDefinition> views = views(relations, metadataById);
-        List<EntityActionDefinition> actions = actions(module.getAlias(), mainRelation, relations, metadataById);
+        List<EntityActionDefinition> actions = actions(module.getAlias(), mainRelation, relations, metadataById,
+                entities);
         List<EntityAssociationViewDefinition> associationViews = associationViews(module.getAlias(), childRelations,
                 references);
         String mainEntityAlias = metadataById.get(mainRelation.getMetadataId()).getAlias();
@@ -222,8 +228,24 @@ public class PlatformModuleDefinitionCompiler {
                     || PlatformAbilityFields.ENABLED_COLUMN.equals(field.columnName())) {
                 capabilities.add(EntityCapability.ENABLE);
             }
+            if (isApprovalField(field)) {
+                capabilities.add(EntityCapability.APPROVAL);
+            }
         }
         return capabilities;
+    }
+
+    private boolean isApprovalField(FieldDefinition field) {
+        return PlatformAbilityFields.APPROVAL_INSTANCE_FIELD.equals(field.fieldName())
+                || PlatformAbilityFields.APPROVAL_STATUS_FIELD.equals(field.fieldName())
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_BY_FIELD.equals(field.fieldName())
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_AT_FIELD.equals(field.fieldName())
+                || PlatformAbilityFields.APPROVAL_COMPLETED_AT_FIELD.equals(field.fieldName())
+                || PlatformAbilityFields.APPROVAL_INSTANCE_COLUMN.equals(field.columnName())
+                || PlatformAbilityFields.APPROVAL_STATUS_COLUMN.equals(field.columnName())
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_BY_COLUMN.equals(field.columnName())
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_AT_COLUMN.equals(field.columnName())
+                || PlatformAbilityFields.APPROVAL_COMPLETED_AT_COLUMN.equals(field.columnName());
     }
 
     private EntityRelationDefinition childRelation(ModuleMetadataRelation relation, Map<String, Metadata> metadataById) {
@@ -367,15 +389,56 @@ public class PlatformModuleDefinitionCompiler {
     private List<EntityActionDefinition> actions(String moduleAlias,
                                                  ModuleMetadataRelation mainRelation,
                                                  List<ModuleMetadataRelation> relations,
-                                                 Map<String, Metadata> metadataById) {
+                                                 Map<String, Metadata> metadataById,
+                                                 List<EntityDefinition> entities) {
         String mainEntityAlias = metadataById.get(mainRelation.getMetadataId()).getAlias();
         Map<String, Metadata> metadataByAlias = relations.stream()
                 .map(relation -> metadataById.get(relation.getMetadataId()))
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toMap(Metadata::getAlias, metadata -> metadata));
-        return actionService.listByModuleAliases(List.of(moduleAlias)).stream()
+        List<EntityActionDefinition> actions = actionService.listByModuleAliases(List.of(moduleAlias)).stream()
                 .map(action -> action(action, mainEntityAlias, metadataByAlias))
                 .toList();
+        return withWorkflowActions(actions, mainEntity(mainEntityAlias, entities));
+    }
+
+    private EntityDefinition mainEntity(String mainEntityAlias, List<EntityDefinition> entities) {
+        return entities.stream()
+                .filter(entity -> entity.alias().equals(mainEntityAlias))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Main entity not found in module definition: " + mainEntityAlias));
+    }
+
+    private List<EntityActionDefinition> withWorkflowActions(List<EntityActionDefinition> configured,
+                                                             EntityDefinition mainEntity) {
+        Map<String, EntityActionDefinition> actions = new LinkedHashMap<>();
+        configured.forEach(action -> actions.put(action.actionCode(), action));
+        if (mainEntity.supports(EntityCapability.WORKFLOW)) {
+            actions.putIfAbsent("submitWorkflow", workflowAction(mainEntity.alias(), "submitWorkflow", "发起流程"));
+        }
+        if (mainEntity.supports(EntityCapability.APPROVAL)) {
+            actions.putIfAbsent("submitApproval", workflowAction(mainEntity.alias(), "submitApproval", "提交审批"));
+        }
+        return List.copyOf(actions.values());
+    }
+
+    private EntityActionDefinition workflowAction(String entityAlias, String actionCode, String title) {
+        return new EntityActionDefinition(
+                entityAlias,
+                actionCode,
+                title,
+                true,
+                EntityActionLevel.RECORD,
+                EntityActionCategory.WORKFLOW,
+                EntityActionAccessMode.AUTH_REQUIRED,
+                true,
+                false,
+                null,
+                null,
+                null,
+                EntityActionExecutorType.SERVICE,
+                DynamicWorkflowActionExecutor.EXECUTOR_KEY
+        );
     }
 
     private EntityActionDefinition action(PlatformModuleAction action,

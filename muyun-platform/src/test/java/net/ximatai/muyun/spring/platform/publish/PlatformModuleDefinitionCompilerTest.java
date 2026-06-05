@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -50,6 +51,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import net.ximatai.muyun.spring.platform.workflow.DynamicWorkflowActionExecutor;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -419,6 +421,64 @@ class PlatformModuleDefinitionCompilerTest {
                     assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
                     assertThat(action.executorKey()).isEqualTo("customerExportDialog");
                 });
+    }
+
+    @Test
+    void shouldAssembleWorkflowActionsWhenMainEntitySupportsApproval() {
+        moduleService.insert(module("sales.contract", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "contract"));
+        fieldService.insert(titleField(metadataId));
+        fieldService.insert(field(metadataId, PlatformAbilityFields.APPROVAL_INSTANCE_FIELD,
+                PlatformAbilityFields.APPROVAL_INSTANCE_COLUMN, FieldType.STRING));
+        fieldService.insert(field(metadataId, PlatformAbilityFields.APPROVAL_STATUS_FIELD,
+                PlatformAbilityFields.APPROVAL_STATUS_COLUMN, FieldType.STRING));
+        relationService.insert(mainRelation("sales.contract", metadataId));
+
+        ModuleDefinition definition = compiler.compile("sales.contract");
+
+        assertThat(definition.entities().getFirst().supports(EntityCapability.APPROVAL)).isTrue();
+        assertThat(definition.entities().getFirst().supports(EntityCapability.WORKFLOW)).isTrue();
+        assertThat(definition.actions())
+                .extracting(action -> action.actionCode())
+                .containsExactly("submitWorkflow", "submitApproval");
+        assertThat(definition.actions())
+                .allSatisfy(action -> {
+                    assertThat(action.category()).isEqualTo(EntityActionCategory.WORKFLOW);
+                    assertThat(action.level()).isEqualTo(EntityActionLevel.RECORD);
+                    assertThat(action.executorType()).isEqualTo(EntityActionExecutorType.SERVICE);
+                    assertThat(action.executorKey()).isEqualTo(DynamicWorkflowActionExecutor.EXECUTOR_KEY);
+                });
+    }
+
+    @Test
+    void shouldKeepConfiguredWorkflowActionWhenActionCodeConflictsWithAssembly() {
+        moduleService.insert(module("sales.contract", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "contract"));
+        fieldService.insert(titleField(metadataId));
+        fieldService.insert(field(metadataId, PlatformAbilityFields.APPROVAL_INSTANCE_FIELD,
+                PlatformAbilityFields.APPROVAL_INSTANCE_COLUMN, FieldType.STRING));
+        relationService.insert(mainRelation("sales.contract", metadataId));
+        PlatformModuleAction submitApproval = moduleAction("sales.contract", "contract", "submitApproval");
+        submitApproval.setTitle("送审");
+        submitApproval.setExecutorType(EntityActionExecutorType.SERVICE);
+        submitApproval.setExecutorKey("customWorkflow");
+        submitApproval.setCategory(EntityActionCategory.WORKFLOW);
+        submitApproval.setActionLevel(EntityActionLevel.RECORD);
+        actionService.insert(submitApproval);
+
+        ModuleDefinition definition = compiler.compile("sales.contract");
+
+        assertThat(definition.actions().stream()
+                .filter(action -> action.actionCode().equals("submitApproval"))
+                .findFirst())
+                .get()
+                .satisfies(action -> {
+                    assertThat(action.title()).isEqualTo("送审");
+                    assertThat(action.executorKey()).isEqualTo("customWorkflow");
+                });
+        assertThat(definition.actions())
+                .extracting(action -> action.actionCode())
+                .containsExactly("submitApproval", "submitWorkflow");
     }
 
     @Test
