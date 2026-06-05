@@ -106,6 +106,12 @@ public class WorkflowRuntimeEventFactory {
                 message == null || message.isBlank() ? "workflow instance revoked" : message, null, occurredAt);
     }
 
+    public WorkflowEvent instanceReset(WorkflowInstance instance, String operatorId,
+                                       String message, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.INSTANCE_RESET, "reset", operatorId,
+                message == null || message.isBlank() ? "workflow instance reset" : message, null, occurredAt);
+    }
+
     public WorkflowEvent instanceTerminated(WorkflowInstance instance, String operatorId,
                                             String message, Instant occurredAt) {
         return event(instance, null, null, WorkflowEventType.INSTANCE_TERMINATED, "terminate", operatorId,

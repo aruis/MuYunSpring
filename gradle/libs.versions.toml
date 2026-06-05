@@ -9,6 +9,7 @@ postgresql = "42.7.11"
 testcontainers = "1.21.4"
 lombok = "1.18.42"
 caffeine = "3.2.4"
+jackson = "2.19.0"
 
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
@@ -28,6 +29,8 @@ testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", ve
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

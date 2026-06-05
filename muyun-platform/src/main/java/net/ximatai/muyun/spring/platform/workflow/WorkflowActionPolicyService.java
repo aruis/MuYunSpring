@@ -55,7 +55,7 @@ public class WorkflowActionPolicyService {
 
     public void requireInstanceAction(String actionCode, String reason) {
         requireText(actionCode, "workflow action code must not be blank");
-        if ("revoke".equals(actionCode) || "terminate".equals(actionCode)) {
+        if ("revoke".equals(actionCode) || "terminate".equals(actionCode) || "reset".equals(actionCode)) {
             requireReason(actionCode, reason);
         }
     }

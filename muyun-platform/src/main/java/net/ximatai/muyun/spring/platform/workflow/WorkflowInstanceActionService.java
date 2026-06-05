@@ -24,6 +24,7 @@ public class WorkflowInstanceActionService {
     private final WorkflowTaskDao taskDao;
     private final WorkflowEventDao eventDao;
     private final WorkflowRuntimeEventFactory eventFactory;
+    private final WorkflowArchiveService archiveService;
     private final WorkflowActionPolicyService actionPolicyService;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
 
@@ -33,8 +34,9 @@ public class WorkflowInstanceActionService {
                                          WorkflowTaskDao taskDao,
                                          WorkflowEventDao eventDao,
                                          WorkflowRuntimeEventFactory eventFactory,
+                                         WorkflowArchiveService archiveService,
                                          Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
-        this(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, new WorkflowActionPolicyService(),
+        this(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService, new WorkflowActionPolicyService(),
                 approvalSummaryWriter);
     }
 
@@ -45,6 +47,7 @@ public class WorkflowInstanceActionService {
                                          WorkflowTaskDao taskDao,
                                          WorkflowEventDao eventDao,
                                          WorkflowRuntimeEventFactory eventFactory,
+                                         WorkflowArchiveService archiveService,
                                          WorkflowActionPolicyService actionPolicyService,
                                          Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
         this.instanceDao = instanceDao;
@@ -53,14 +56,63 @@ public class WorkflowInstanceActionService {
         this.taskDao = taskDao;
         this.eventDao = eventDao;
         this.eventFactory = eventFactory;
+        this.archiveService = archiveService;
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.approvalSummaryWriter = approvalSummaryWriter == null ? Optional.empty() : approvalSummaryWriter;
     }
 
     @Transactional
     public WorkflowInstanceActionResult revoke(WorkflowInstanceActionRequest request) {
-        return closeInstance(request, WorkflowInstanceStatus.REVOKED, WorkflowApprovalStatus.REVOKED,
-                WorkflowTaskStatus.CANCELED, WorkflowNodeStatus.CANCELED, "revoke");
+        WorkflowInstanceActionResult result = closeInstance(request, WorkflowInstanceStatus.REVOKED,
+                WorkflowApprovalStatus.REVOKED, WorkflowTaskStatus.CANCELED, WorkflowNodeStatus.CANCELED, "revoke");
+        archiveAndReleaseApproval(result.instance(), WorkflowArchiveReason.RECALLED,
+                result.instance().getLastOperatedAt());
+        return result;
+    }
+
+    @Transactional
+    public WorkflowInstanceActionResult reset(WorkflowInstanceActionRequest request) {
+        WorkflowInstance instance = requireExistingInstance(request);
+        Instant now = operatedAt(request);
+        String operatorId = operatorId(request);
+        actionPolicyService.requireRuntimeAction(instance, "reset");
+        actionPolicyService.requireInstanceAction("reset", request.reason());
+        List<WorkflowTask> tasks = runningTasks(instance.getId());
+        List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
+        List<WorkflowRouteInstance> routes = openRoutes(instance.getId());
+
+        instance.setLastActionCode("reset");
+        instance.setLastActionReason(request.reason());
+        instance.setLastOperatorId(operatorId);
+        instance.setLastOperatedAt(now);
+        updateInstance(instance, now);
+
+        for (WorkflowTask task : tasks) {
+            task.setTaskStatus(WorkflowTaskStatus.CANCELED);
+            task.setActualProcessorId(operatorId);
+            task.setDecision("reset");
+            task.setResultMessage(request.reason());
+            task.setCompletedAt(now);
+            updateTask(task, now);
+        }
+        for (WorkflowNodeInstance node : nodes) {
+            node.setNodeStatus(WorkflowNodeStatus.CANCELED);
+            node.setCompletedAt(now);
+            updateNode(node, now);
+        }
+        for (WorkflowRouteInstance route : routes) {
+            route.setRouteStatus(WorkflowRouteStatus.CANCELED);
+            route.setClosedReason("reset");
+            route.setInvalidatedByActionId("reset");
+            route.setInvalidatedAt(now);
+            updateRoute(route, now);
+        }
+
+        WorkflowEvent event = eventFactory.instanceReset(instance, operatorId, request.reason(), now);
+        EntityLifecycle.prepareInsert(event, now);
+        eventDao.insert(event);
+        archiveAndReleaseApproval(instance, WorkflowArchiveReason.RESET, now);
+        return new WorkflowInstanceActionResult(instance, tasks, nodes, routes, event);
     }
 
     @Transactional
@@ -121,19 +173,26 @@ public class WorkflowInstanceActionService {
                 : eventFactory.instanceTerminated(instance, operatorId, request.reason(), now);
         EntityLifecycle.prepareInsert(event, now);
         eventDao.insert(event);
-        writeApprovalSummary(instance);
+        if (!"revoke".equals(actionCode)) {
+            writeApprovalSummary(instance);
+        }
         return new WorkflowInstanceActionResult(instance, tasks, nodes, routes, event);
     }
 
     private WorkflowInstance requireRunningInstance(WorkflowInstanceActionRequest request) {
+        WorkflowInstance instance = requireExistingInstance(request);
+        if (instance.getInstanceStatus() != WorkflowInstanceStatus.RUNNING) {
+            throw new PlatformException("workflow instance is not running: " + instance.getId());
+        }
+        return instance;
+    }
+
+    private WorkflowInstance requireExistingInstance(WorkflowInstanceActionRequest request) {
         String instanceId = requireText(request == null ? null : request.instanceId(),
                 "workflow instance id must not be blank");
         WorkflowInstance instance = instanceDao.findById(instanceId);
         if (instance == null) {
             throw new PlatformException("workflow instance not found: " + instanceId);
-        }
-        if (instance.getInstanceStatus() != WorkflowInstanceStatus.RUNNING) {
-            throw new PlatformException("workflow instance is not running: " + instanceId);
         }
         return instance;
     }
@@ -205,6 +264,14 @@ public class WorkflowInstanceActionService {
                 instance.getStartedAt(),
                 instance.getApprovalCompletedAt()
         )));
+    }
+
+    private void archiveAndReleaseApproval(WorkflowInstance instance, WorkflowArchiveReason archiveReason,
+                                           Instant archivedAt) {
+        archiveService.archiveCurrentInstance(instance, archiveReason, archivedAt);
+        if (Boolean.TRUE.equals(instance.getApprovalEnabled())) {
+            approvalSummaryWriter.ifPresent(writer -> writer.clearCurrent(instance.getModuleAlias(), instance.getRecordId()));
+        }
     }
 
     private String operatorId(WorkflowInstanceActionRequest request) {

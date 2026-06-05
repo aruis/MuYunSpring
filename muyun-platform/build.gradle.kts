@@ -2,6 +2,9 @@ dependencies {
     api(project(":muyun-ability"))
     api(project(":muyun-dynamic"))
 
+    implementation(libs.jackson.databind)
+    implementation(libs.jackson.datatype.jsr310)
+
     compileOnly(libs.muyun.database.spring.boot.starter)
     compileOnly(libs.spring.context)
     compileOnly(libs.spring.tx)

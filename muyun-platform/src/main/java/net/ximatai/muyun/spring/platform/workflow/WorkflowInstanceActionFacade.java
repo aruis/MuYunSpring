@@ -14,6 +14,7 @@ public class WorkflowInstanceActionFacade {
     public WorkflowInstanceActionResult execute(String actionCode, WorkflowInstanceActionRequest request) {
         return switch (requireActionCode(actionCode)) {
             case "revoke" -> actionService.revoke(request);
+            case "reset" -> actionService.reset(request);
             case "terminate" -> actionService.terminate(request);
             default -> throw new PlatformException("unsupported workflow instance action: " + actionCode);
         };

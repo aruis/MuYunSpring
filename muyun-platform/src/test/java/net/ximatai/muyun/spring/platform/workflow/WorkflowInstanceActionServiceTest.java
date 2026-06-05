@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,9 +23,10 @@ class WorkflowInstanceActionServiceTest {
     private final WorkflowTaskDao taskDao = mock(WorkflowTaskDao.class);
     private final WorkflowEventDao eventDao = mock(WorkflowEventDao.class);
     private final WorkflowRuntimeEventFactory eventFactory = new WorkflowRuntimeEventFactory();
+    private final WorkflowArchiveService archiveService = mock(WorkflowArchiveService.class);
     private final WorkflowApprovalSummaryWriter summaryWriter = mock(WorkflowApprovalSummaryWriter.class);
     private final WorkflowInstanceActionService service = new WorkflowInstanceActionService(
-            instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, Optional.of(summaryWriter));
+            instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService, Optional.of(summaryWriter));
 
     @Test
     void shouldRevokeRunningInstanceAndCancelOpenRuntimeObjects() {
@@ -48,9 +50,10 @@ class WorkflowInstanceActionServiceTest {
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(routeDao).updateByIdAndVersion(route, 4);
         verify(eventDao).insert(result.event());
-        verify(summaryWriter).writeSubmitted(new WorkflowApprovalSummary(
-                "sales.contract", "record-1", "instance-1", WorkflowApprovalStatus.REVOKED,
-                "starter-1", Instant.parse("2026-06-05T01:00:00Z"), null));
+        verify(archiveService).archiveCurrentInstance(instance, WorkflowArchiveReason.RECALLED,
+                Instant.parse("2026-06-05T04:00:00Z"));
+        verify(summaryWriter).clearCurrent("sales.contract", "record-1");
+        verify(summaryWriter, never()).writeSubmitted(any());
     }
 
     @Test
@@ -71,6 +74,28 @@ class WorkflowInstanceActionServiceTest {
         assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.CANCELED);
         assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.INSTANCE_TERMINATED);
+    }
+
+    @Test
+    void shouldResetInstanceAndArchiveCurrentRuntimeObjects() {
+        WorkflowInstance instance = instance(true);
+        WorkflowTask task = task("task-1");
+        WorkflowNodeInstance node = node("node-1");
+        WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.CANDIDATE);
+        stubRuntime(instance, List.of(task), List.of(node), List.of(route));
+
+        WorkflowInstanceActionResult result = service.reset(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", "reset", Instant.parse("2026-06-05T05:00:00Z")));
+
+        assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
+        assertThat(result.instance().getLastActionCode()).isEqualTo("reset");
+        assertThat(task.getTaskStatus()).isEqualTo(WorkflowTaskStatus.CANCELED);
+        assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.CANCELED);
+        assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
+        assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.INSTANCE_RESET);
+        verify(archiveService).archiveCurrentInstance(instance, WorkflowArchiveReason.RESET,
+                Instant.parse("2026-06-05T05:00:00Z"));
+        verify(summaryWriter).clearCurrent("sales.contract", "record-1");
     }
 
     @Test

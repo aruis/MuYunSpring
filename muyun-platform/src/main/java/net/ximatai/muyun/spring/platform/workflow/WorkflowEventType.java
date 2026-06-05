@@ -20,6 +20,7 @@ public enum WorkflowEventType implements CodeTitleEnum {
     APPROVAL_UNAPPROVED("approval_unapproved", "弃审"),
     INSTANCE_COMPLETED("instance_completed", "流程完成"),
     INSTANCE_REVOKED("instance_revoked", "流程撤回"),
+    INSTANCE_RESET("instance_reset", "流程重置"),
     INSTANCE_REJECTED("instance_rejected", "流程驳回"),
     INSTANCE_TERMINATED("instance_terminated", "流程终止"),
     OVERTIME_WARNED("overtime_warned", "超期预警");

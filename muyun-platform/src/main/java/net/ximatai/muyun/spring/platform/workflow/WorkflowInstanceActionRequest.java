@@ -15,4 +15,8 @@ public record WorkflowInstanceActionRequest(
     public static WorkflowInstanceActionRequest terminate(String instanceId, String operatorId, String reason) {
         return new WorkflowInstanceActionRequest(instanceId, operatorId, reason, null);
     }
+
+    public static WorkflowInstanceActionRequest reset(String instanceId, String operatorId, String reason) {
+        return new WorkflowInstanceActionRequest(instanceId, operatorId, reason, null);
+    }
 }

@@ -46,6 +46,29 @@ class DynamicWorkflowApprovalSummaryWriterTest {
         verify(dynamicRecordService).updateSystem("sales.contract", "contract", record, "workflow submit");
     }
 
+    @Test
+    void shouldClearApprovalSummaryBySystemUpdate() {
+        DynamicRecord record = new DynamicRecord(entity());
+        record.setId("record-1");
+        record.setApprovalInstanceId("instance-1");
+        record.setApprovalStatus("processing");
+        record.setApprovalSubmittedBy("user-1");
+        record.setApprovalSubmittedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        record.setApprovalCompletedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        when(dynamicRecordService.mainEntityAlias("sales.contract")).thenReturn("contract");
+        when(dynamicRecordService.entityDescriptor("sales.contract", "contract")).thenReturn(descriptor());
+        when(dynamicRecordService.selectSystem("sales.contract", "contract", "record-1")).thenReturn(record);
+
+        writer.clearCurrent("sales.contract", "record-1");
+
+        assertThat(record.getApprovalInstanceId()).isNull();
+        assertThat(record.getApprovalStatus()).isNull();
+        assertThat(record.getApprovalSubmittedBy()).isNull();
+        assertThat(record.getApprovalSubmittedAt()).isNull();
+        assertThat(record.getApprovalCompletedAt()).isNull();
+        verify(dynamicRecordService).updateSystem("sales.contract", "contract", record, "workflow archive");
+    }
+
     private EntityDefinition entity() {
         return new EntityDefinition("contract", "app_contract", "Contract",
                 List.of(FieldDefinition.string("code", "Code")))

@@ -16,9 +16,11 @@ class WorkflowInstanceActionFacadeTest {
         WorkflowInstanceActionRequest request = WorkflowInstanceActionRequest.revoke("inst-1", "user-1", "cancel");
 
         facade.execute("revoke", request);
+        facade.execute("reset", request);
         facade.execute("terminate", request);
 
         verify(actionService).revoke(request);
+        verify(actionService).reset(request);
         verify(actionService).terminate(request);
     }
 
