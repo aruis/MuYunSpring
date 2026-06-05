@@ -1,0 +1,46 @@
+package net.ximatai.muyun.spring.platform.workflow;
+
+import java.time.Instant;
+
+public record WorkflowAdminActiveTaskView(
+        String taskId,
+        String instanceId,
+        String nodeInstanceId,
+        String nodeKey,
+        WorkflowTaskKind taskKind,
+        WorkflowTaskStatus taskStatus,
+        String assigneeId,
+        Instant createdAt,
+        Instant receivedAt,
+        WorkflowOvertimeStatus overtimeStatus,
+        boolean canForceApprove,
+        WorkflowAssignmentKind assignmentKind,
+        String originalAssigneeId,
+        String delegatedFromUserId,
+        String delegatedToUserId,
+        Boolean principalCanProcess,
+        String delegationPolicyId,
+        String delegationSnapshot
+) {
+    public static WorkflowAdminActiveTaskView from(WorkflowTask task, WorkflowNodeInstance node) {
+        return new WorkflowAdminActiveTaskView(
+                task.getId(),
+                task.getInstanceId(),
+                task.getNodeInstanceId(),
+                node.getNodeKey(),
+                task.getTaskKind(),
+                task.getTaskStatus(),
+                task.getAssigneeId(),
+                task.getCreatedAt(),
+                task.getCreatedAt(),
+                node.getOvertimeStatus(),
+                true,
+                task.getAssignmentKind(),
+                task.getOriginalAssigneeId(),
+                task.getDelegatedFromUserId(),
+                task.getDelegatedToUserId(),
+                task.getPrincipalCanProcess(),
+                task.getDelegationPolicyId(),
+                task.getAssignmentSnapshotText());
+    }
+}

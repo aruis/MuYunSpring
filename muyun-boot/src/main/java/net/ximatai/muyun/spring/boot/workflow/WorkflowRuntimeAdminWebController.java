@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminActiveTaskView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
@@ -47,6 +48,13 @@ public class WorkflowRuntimeAdminWebController {
             title = "Todo Task Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowTask> currentTodoTasks(@PathVariable String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTasks(instanceId));
+    }
+
+    @GetMapping("/instance/{instanceId}/active-tasks")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
+            title = "Active Task Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowAdminActiveTaskView> currentTodoTaskViews(@PathVariable String instanceId) {
+        return new WebListResponse<>(adminFacade.currentTodoTaskViews(instanceId));
     }
 
     @PostMapping("/instance/{instanceId}/actions/forceTerminate")

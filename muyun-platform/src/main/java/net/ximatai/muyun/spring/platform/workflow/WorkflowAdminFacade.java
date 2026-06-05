@@ -17,6 +17,10 @@ public class WorkflowAdminFacade {
         return adminService.currentTodoTasks(instanceId);
     }
 
+    public List<WorkflowAdminActiveTaskView> currentTodoTaskViews(String instanceId) {
+        return adminService.currentTodoTaskViews(instanceId);
+    }
+
     public WorkflowInstanceActionResult forceTerminate(WorkflowInstanceActionRequest request) {
         return adminService.forceTerminate(request);
     }

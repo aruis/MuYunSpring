@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminActiveTaskView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
@@ -14,6 +15,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
@@ -26,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,6 +74,25 @@ class WorkflowRuntimeAdminWebControllerTest {
         mvc.perform(get("/workflow/runtime/admin/instance/inst-1/todo-tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("task-1"));
+    }
+
+    @Test
+    void shouldExposeCurrentActiveTaskViews() throws Exception {
+        WorkflowAdminActiveTaskView view = new WorkflowAdminActiveTaskView("task-1", "inst-1", "node-1",
+                "approve_1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO, "delegate-1",
+                Instant.parse("2026-06-05T01:00:00Z"), Instant.parse("2026-06-05T01:00:00Z"),
+                WorkflowOvertimeStatus.WARNED, true, WorkflowAssignmentKind.DELEGATED, "principal-1",
+                "principal-1", "delegate-1", true, "delegation-1",
+                "{\"delegationPolicyId\":\"delegation-1\"}");
+        when(adminFacade.currentTodoTaskViews("inst-1")).thenReturn(List.of(view));
+
+        mvc.perform(get("/workflow/runtime/admin/instance/inst-1/active-tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].taskId").value("task-1"))
+                .andExpect(jsonPath("$.records[0].canForceApprove").value(true))
+                .andExpect(jsonPath("$.records[0].overtimeStatus").value("WARNED"))
+                .andExpect(jsonPath("$.records[0].assignmentKind").value("DELEGATED"))
+                .andExpect(jsonPath("$.records[0].principalCanProcess").value(true));
     }
 
     @Test
