@@ -80,6 +80,17 @@ class ModuleActionContributionRegistrarTest {
                 .isTrue();
     }
 
+    @Test
+    void shouldDisableAllActionsFromSource() {
+        moduleService.insert(module("sales.contract"));
+        registrar.register(contribution("syncWorkflow", "def-1", "ver-1", "sync"));
+
+        registrar.disableBySource(ModuleActionSourceType.WORKFLOW_DEFINITION, "def-1");
+
+        assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow").getEnabled())
+                .isFalse();
+    }
+
     private ModuleActionContribution contribution(String actionCode, String sourceId,
                                                   String versionId, String bindingAlias) {
         return new ModuleActionContribution(

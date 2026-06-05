@@ -64,6 +64,58 @@ class WorkflowPublishFacadeTest {
         assertThat(actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow")).isNull();
     }
 
+    @Test
+    void shouldDisableContributedWorkflowActionWhenDefinitionIsDisabled() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        facade.publish(definition.getId(), version.getId());
+
+        facade.disable(definition.getId());
+
+        WorkflowDefinition disabledDefinition = definitionService.select(definition.getId());
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(disabledDefinition.getDefinitionStatus()).isEqualTo(WorkflowDefinitionStatus.DISABLED);
+        assertThat(action.getEnabled()).isFalse();
+    }
+
+    @Test
+    void shouldDisableContributedWorkflowActionWhenDefinitionIsArchived() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        facade.publish(definition.getId(), version.getId());
+
+        facade.archive(definition.getId());
+
+        WorkflowDefinition archivedDefinition = definitionService.select(definition.getId());
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(archivedDefinition.getDefinitionStatus()).isEqualTo(WorkflowDefinitionStatus.ARCHIVED);
+        assertThat(action.getEnabled()).isFalse();
+    }
+
+    @Test
+    void shouldReEnableContributedWorkflowActionWhenDefinitionIsRepublished() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        facade.publish(definition.getId(), version.getId());
+        facade.disable(definition.getId());
+
+        facade.publish(definition.getId(), version.getId());
+
+        WorkflowDefinition publishedDefinition = definitionService.select(definition.getId());
+        PlatformModuleAction action = actionService.findByModuleAliasAndActionCode("sales.contract", "syncWorkflow");
+        assertThat(publishedDefinition.getDefinitionStatus()).isEqualTo(WorkflowDefinitionStatus.PUBLISHED);
+        assertThat(action.getEnabled()).isTrue();
+    }
+
     private WorkflowDefinition definition() {
         WorkflowDefinition definition = new WorkflowDefinition();
         definition.setId("def-1");

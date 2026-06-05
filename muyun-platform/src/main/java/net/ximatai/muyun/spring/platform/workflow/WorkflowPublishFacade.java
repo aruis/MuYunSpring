@@ -46,6 +46,24 @@ public class WorkflowPublishFacade {
         return publish(definitionId, versionId, null);
     }
 
+    @Transactional
+    public WorkflowDefinition disable(String definitionId) {
+        return changeDefinitionStatus(definitionId, WorkflowDefinitionStatus.DISABLED);
+    }
+
+    @Transactional
+    public WorkflowDefinition archive(String definitionId) {
+        return changeDefinitionStatus(definitionId, WorkflowDefinitionStatus.ARCHIVED);
+    }
+
+    private WorkflowDefinition changeDefinitionStatus(String definitionId, WorkflowDefinitionStatus status) {
+        WorkflowDefinition definition = requireDefinition(definitionId);
+        definition.setDefinitionStatus(status);
+        definitionService.update(definition);
+        actionContributor.disableWorkflowActions(definition);
+        return definition;
+    }
+
     private WorkflowDefinition requireDefinition(String definitionId) {
         WorkflowDefinition definition = definitionService.select(definitionId);
         if (definition == null) {

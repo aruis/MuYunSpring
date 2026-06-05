@@ -28,6 +28,13 @@ public class WorkflowModuleActionContributor {
         }
     }
 
+    public void disableWorkflowActions(WorkflowDefinition definition) {
+        if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
+            return;
+        }
+        actionRegistrar.disableBySource(ModuleActionSourceType.WORKFLOW_DEFINITION, definition.getId());
+    }
+
     public ModuleActionContribution contribution(WorkflowDefinition definition, WorkflowVersion version) {
         if (definition == null || Boolean.TRUE.equals(definition.getApprovalEnabled())) {
             return null;

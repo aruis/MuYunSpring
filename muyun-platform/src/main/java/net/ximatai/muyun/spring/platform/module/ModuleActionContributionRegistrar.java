@@ -48,6 +48,21 @@ public class ModuleActionContributionRegistrar {
         contributions.forEach(this::register);
     }
 
+    public void disableBySource(ModuleActionSourceType sourceType, String sourceId) {
+        if (sourceType == null || sourceId == null || sourceId.isBlank()) {
+            return;
+        }
+        try (TenantContext.Scope ignored = TenantContext.system("disable contributed module actions")) {
+            for (PlatformModuleAction action : actionService.listBySource(sourceType, sourceId)) {
+                if (Boolean.FALSE.equals(action.getEnabled())) {
+                    continue;
+                }
+                action.setEnabled(Boolean.FALSE);
+                actionService.update(action);
+            }
+        }
+    }
+
     private void validateContribution(ModuleActionContribution contribution) {
         if (contribution.sourceType() == null || contribution.sourceId() == null || contribution.sourceId().isBlank()) {
             throw new PlatformException("module action contribution source must not be blank: "
