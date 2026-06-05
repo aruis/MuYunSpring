@@ -72,7 +72,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         if (field == null) {
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
         }
-        if (isInternalGeneratedField(fieldCode)) {
+        if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
         }
         values.put(fieldCode, normalizeValue(field, value, true));
@@ -486,6 +486,15 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     private boolean isInternalGeneratedField(String fieldCode) {
         FieldCompanionDefinition companion = companionFields.get(fieldCode);
         return companion != null && companion.role() == FieldCompanionRole.SIGNATURE;
+    }
+
+    private boolean isApprovalManagedField(String fieldCode) {
+        return entity.supports(EntityCapability.APPROVAL)
+                && (PlatformAbilityFields.APPROVAL_INSTANCE_FIELD.equals(fieldCode)
+                || PlatformAbilityFields.APPROVAL_STATUS_FIELD.equals(fieldCode)
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_BY_FIELD.equals(fieldCode)
+                || PlatformAbilityFields.APPROVAL_SUBMITTED_AT_FIELD.equals(fieldCode)
+                || PlatformAbilityFields.APPROVAL_COMPLETED_AT_FIELD.equals(fieldCode));
     }
 
     private static List<FieldDefinition> recordFields(EntityDefinition entity) {

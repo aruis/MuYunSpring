@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
@@ -46,6 +47,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.Optional;
 
 public class DynamicRecordService {
     private static final DynamicOpenApiGenerator OPEN_API_GENERATOR = new DynamicOpenApiGenerator();
@@ -269,8 +271,31 @@ public class DynamicRecordService {
         return entityService(moduleAlias, entityAlias).selectIgnoreSoftDelete(id);
     }
 
+    public DynamicRecord selectSystem(String moduleAlias, String entityAlias, String id) {
+        return entityService(moduleAlias, entityAlias).select(id);
+    }
+
+    public DataScopeCriteriaResult requireRecordActionScope(String moduleAlias,
+                                                            String entityAlias,
+                                                            ActionExecutionPolicy policy,
+                                                            Collection<String> recordIds,
+                                                            Optional<CurrentUser> currentUser) {
+        Set<String> normalized = normalizeRecordIds(recordIds);
+        actionExecutionPolicyService.requireRecordAction(ActionExecutionContext.ofPolicy(
+                moduleAlias,
+                policy,
+                normalized,
+                currentUser
+        ));
+        return requireActionRecordDataScope(moduleAlias, entityAlias, policy, normalized);
+    }
+
     public int update(String moduleAlias, String entityAlias, DynamicRecord record) {
         return update(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null);
+    }
+
+    public int updateSystem(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
+        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, traceId);
     }
 
     int updateFromAction(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {

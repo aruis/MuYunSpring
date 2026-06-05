@@ -133,6 +133,18 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldRejectBusinessSetValueForApprovalManagedFields() {
+        DynamicRecord record = new DynamicRecord(contractEntity().withCapabilities(EntityCapability.APPROVAL));
+
+        assertThatThrownBy(() -> record.setValue("approvalStatus", "approved"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform managed");
+
+        record.setApprovalStatus("approved");
+        assertThat(record.getApprovalStatus()).isEqualTo("approved");
+    }
+
+    @Test
     void shouldNormalizeLoadedDateAndTimestampValuesWithoutRequiredWriteValidation() {
         DynamicRecord record = new DynamicRecord(requiredTimeEntity());
 
