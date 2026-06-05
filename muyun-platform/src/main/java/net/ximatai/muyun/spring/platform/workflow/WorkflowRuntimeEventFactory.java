@@ -24,6 +24,30 @@ public class WorkflowRuntimeEventFactory {
                 "workflow task created", null, occurredAt);
     }
 
+    public WorkflowEvent taskCompleted(WorkflowInstance instance, WorkflowTask task, String actionCode,
+                                       String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_COMPLETED, actionCode, operatorId,
+                message == null || message.isBlank() ? "workflow task completed" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent taskTransferred(WorkflowInstance instance, WorkflowTask task, String operatorId,
+                                         String message, String payloadText, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_TRANSFERRED, "transfer", operatorId,
+                message, payloadText, occurredAt);
+    }
+
+    public WorkflowEvent taskInvalidated(WorkflowInstance instance, WorkflowTask task,
+                                         String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_INVALIDATED, "invalidate", operatorId,
+                message == null || message.isBlank() ? "workflow task invalidated" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent taskCanceled(WorkflowInstance instance, WorkflowTask task,
+                                      String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_CANCELED, "cancel", operatorId,
+                message == null || message.isBlank() ? "workflow task canceled" : message, null, occurredAt);
+    }
+
     private WorkflowEvent event(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
                                 WorkflowEventType eventType, String actionCode, String operatorId,
                                 String message, String payloadText, Instant occurredAt) {
