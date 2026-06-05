@@ -68,6 +68,8 @@ public class WorkflowInstanceSnapshotFactory {
             node.setAllowTerminate(definition.getAllowTerminate());
             node.setRequireTerminateReason(definition.getRequireTerminateReason());
             node.setAllowAddSign(definition.getAllowAddSign());
+            node.setWarningDurationMinutes(definition.getWarningDurationMinutes());
+            node.setOvertimeDurationMinutes(definition.getOvertimeDurationMinutes());
             node.setNodeSnapshotText(definition.getNodeConfigText());
             result.add(node);
         }

@@ -60,6 +60,18 @@ public class WorkflowRuntimeEventFactory {
                 message == null || message.isBlank() ? "workflow node rolled back" : message, null, occurredAt);
     }
 
+    public WorkflowEvent overtimeWarned(WorkflowInstance instance, WorkflowNodeInstance node,
+                                        String operatorId, String payloadText, Instant occurredAt) {
+        return event(instance, node, null, WorkflowEventType.OVERTIME_WARNED, "overtime_warn", operatorId,
+                "workflow node overtime warned", payloadText, occurredAt);
+    }
+
+    public WorkflowEvent overtimeOverdue(WorkflowInstance instance, WorkflowNodeInstance node,
+                                         String operatorId, String payloadText, Instant occurredAt) {
+        return event(instance, node, null, WorkflowEventType.OVERTIME_OVERDUE, "overtime_overdue", operatorId,
+                "workflow node overdue", payloadText, occurredAt);
+    }
+
     public WorkflowEvent taskSkipped(WorkflowInstance instance, WorkflowTask task,
                                      String operatorId, String message, Instant occurredAt) {
         return event(instance, null, task, WorkflowEventType.TASK_SKIPPED, "skip", operatorId,

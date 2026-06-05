@@ -5,7 +5,7 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 public enum WorkflowOvertimeStatus implements CodeTitleEnum {
     NORMAL("normal", "正常"),
     WARNED("warned", "已预警"),
-    AUDITED("audited", "已审计");
+    OVERDUE("overdue", "已超期");
 
     private final String code;
     private final String title;

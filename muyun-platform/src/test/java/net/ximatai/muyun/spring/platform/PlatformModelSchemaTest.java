@@ -187,7 +187,8 @@ class PlatformModelSchemaTest {
                         "milestone_type", "converge_mode", "converge_ratio", "task_definition_id",
                         "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
                         "allow_rollback", "require_rollback_reason", "allow_terminate",
-                        "require_terminate_reason", "allow_add_sign", "participant_policy_text",
+                        "require_terminate_reason", "allow_add_sign",
+                        "warning_duration_minutes", "overtime_duration_minutes", "participant_policy_text",
                         "node_config_text", "sort_order");
         assertThat(columnNames(mapper.toTable(WorkflowLinkDefinition.class)))
                 .contains("id", "workflow_version_id", "route_key", "source_node_key", "target_node_key",
@@ -222,7 +223,8 @@ class PlatformModelSchemaTest {
                         "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
                         "allow_rollback", "require_rollback_reason", "allow_terminate",
                         "require_terminate_reason", "allow_add_sign",
-                        "overtime_status", "activated_at", "completed_at",
+                        "warning_duration_minutes", "overtime_duration_minutes",
+                        "overtime_status", "warned_at", "overdue_at", "activated_at", "completed_at",
                         "node_snapshot_text");
         assertThat(columnNames(mapper.toTable(WorkflowRouteInstance.class)))
                 .contains("id", "instance_id", "route_key", "route_run_id", "source_node_key", "target_node_key",

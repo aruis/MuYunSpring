@@ -23,7 +23,8 @@ public enum WorkflowEventType implements CodeTitleEnum {
     INSTANCE_RESET("instance_reset", "流程重置"),
     INSTANCE_REJECTED("instance_rejected", "流程驳回"),
     INSTANCE_TERMINATED("instance_terminated", "流程终止"),
-    OVERTIME_WARNED("overtime_warned", "超期预警");
+    OVERTIME_WARNED("overtime_warned", "超期预警"),
+    OVERTIME_OVERDUE("overtime_overdue", "节点超期");
 
     private final String code;
     private final String title;

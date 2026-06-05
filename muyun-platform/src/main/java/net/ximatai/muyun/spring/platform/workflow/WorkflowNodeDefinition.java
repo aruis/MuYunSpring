@@ -66,6 +66,12 @@ public class WorkflowNodeDefinition extends StandardSortableEntity {
     @Column(name = "allow_add_sign", type = ColumnType.BOOLEAN, comment = "Allow add sign")
     private Boolean allowAddSign;
 
+    @Column(name = "warning_duration_minutes", type = ColumnType.INT, comment = "Warning duration minutes")
+    private Integer warningDurationMinutes;
+
+    @Column(name = "overtime_duration_minutes", type = ColumnType.INT, comment = "Overtime duration minutes")
+    private Integer overtimeDurationMinutes;
+
     @Column(name = "participant_policy_text", type = ColumnType.TEXT, comment = "Participant policy")
     private String participantPolicyText;
 

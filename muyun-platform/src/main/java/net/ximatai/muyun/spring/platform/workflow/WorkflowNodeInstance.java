@@ -114,9 +114,21 @@ public class WorkflowNodeInstance extends StandardEntity {
     @Column(name = "allow_add_sign", type = ColumnType.BOOLEAN, comment = "Allow add sign")
     private Boolean allowAddSign;
 
+    @Column(name = "warning_duration_minutes", type = ColumnType.INT, comment = "Warning duration minutes")
+    private Integer warningDurationMinutes;
+
+    @Column(name = "overtime_duration_minutes", type = ColumnType.INT, comment = "Overtime duration minutes")
+    private Integer overtimeDurationMinutes;
+
     @Column(name = "overtime_status", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Overtime status", defaultVal = @Default(varchar = "normal"))
     private WorkflowOvertimeStatus overtimeStatus = WorkflowOvertimeStatus.NORMAL;
+
+    @Column(name = "warned_at", type = ColumnType.TIMESTAMP, comment = "Warned at")
+    private Instant warnedAt;
+
+    @Column(name = "overdue_at", type = ColumnType.TIMESTAMP, comment = "Overdue at")
+    private Instant overdueAt;
 
     @Column(name = "activated_at", type = ColumnType.TIMESTAMP, comment = "Activated at")
     private Instant activatedAt;
