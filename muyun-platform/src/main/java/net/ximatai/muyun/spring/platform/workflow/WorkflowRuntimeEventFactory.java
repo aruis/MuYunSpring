@@ -1,12 +1,19 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.id.Ids;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 public class WorkflowRuntimeEventFactory {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     public WorkflowEvent instanceStarted(WorkflowInstance instance, String operatorId, Instant occurredAt) {
         return event(instance, null, null, WorkflowEventType.INSTANCE_STARTED, "submit", operatorId,
                 "workflow instance started", null, occurredAt);
@@ -106,13 +113,13 @@ public class WorkflowRuntimeEventFactory {
     public WorkflowEvent routeSelected(WorkflowInstance instance, WorkflowRouteInstance route,
                                        String operatorId, Instant occurredAt) {
         return event(instance, null, null, WorkflowEventType.ROUTE_SELECTED, "route", operatorId,
-                "workflow route selected: " + route.getRouteKey(), null, occurredAt);
+                "workflow route selected: " + route.getRouteKey(), routePayload(route), occurredAt);
     }
 
     public WorkflowEvent routeDropped(WorkflowInstance instance, WorkflowRouteInstance route,
                                       String operatorId, Instant occurredAt) {
         return event(instance, null, null, WorkflowEventType.ROUTE_DROPPED, "route", operatorId,
-                "workflow route dropped: " + route.getRouteKey(), route.getClosedReason(), occurredAt);
+                "workflow route dropped: " + route.getRouteKey(), routePayload(route), occurredAt);
     }
 
     public WorkflowEvent approvalCompleted(WorkflowInstance instance, String operatorId, Instant occurredAt) {
@@ -165,5 +172,24 @@ public class WorkflowRuntimeEventFactory {
         event.setPayloadText(payloadText);
         event.setOccurredAt(occurredAt == null ? Instant.now() : occurredAt);
         return event;
+    }
+
+    private String routePayload(WorkflowRouteInstance route) {
+        boolean addedByAddSign = Boolean.TRUE.equals(route.getAddedByAddSign());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("routeId", route.getId());
+        payload.put("routeKey", route.getRouteKey());
+        payload.put("branchNodeKey", route.getBranchNodeKey());
+        payload.put("sourceNodeKey", route.getSourceNodeKey());
+        payload.put("targetNodeKey", route.getTargetNodeKey());
+        payload.put("addedByAddSign", addedByAddSign);
+        payload.put("isAddSignRoute", addedByAddSign);
+        payload.put("addSignSourceNodeKey", route.getAddSignSourceNodeKey());
+        payload.put("closedReason", route.getClosedReason());
+        try {
+            return OBJECT_MAPPER.writeValueAsString(payload);
+        } catch (JsonProcessingException ex) {
+            throw new PlatformException("workflow route event payload serialize failed: " + route.getId(), ex);
+        }
     }
 }

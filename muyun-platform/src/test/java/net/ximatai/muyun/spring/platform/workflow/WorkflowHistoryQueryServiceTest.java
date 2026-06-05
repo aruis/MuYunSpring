@@ -145,6 +145,96 @@ class WorkflowHistoryQueryServiceTest {
         assertThat(views.getFirst().taskCanceled()).isFalse();
     }
 
+    @Test
+    void shouldExposeAddSignOriginFromAddSignEventPayload() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowNodeInstance source = node("node-source", "approve_source", false, null);
+        WorkflowEvent event = event("event-add-sign", WorkflowEventType.ADD_SIGN, null,
+                "{\"sourceNodeKey\":\"approve_source\",\"addedNodeKeys\":[\"approve_added\"]}");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(List.of(source), List.of(), List.of(), List.of(event)));
+
+        List<WorkflowHistoryEventView> views = service.eventViews("history-1");
+
+        assertThat(views).hasSize(1);
+        assertThat(views.getFirst().originType()).isEqualTo(WorkflowHistoryEventView.ORIGIN_TYPE_ADD_SIGN);
+        assertThat(views.getFirst().isAddSignRoute()).isFalse();
+        assertThat(views.getFirst().addSignSourceNodeKey()).isEqualTo("approve_source");
+        assertThat(views.getFirst().addSignSourceNodeName()).isEqualTo("approve_source");
+    }
+
+    @Test
+    void shouldExposeAddSignOriginFromRouteSnapshot() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowNodeInstance source = node("node-source", "approve_source", false, null);
+        WorkflowRouteInstance route = route("route-1", "add_route", true, "approve_source");
+        WorkflowEvent event = event("event-route-dropped", WorkflowEventType.ROUTE_DROPPED, null,
+                "{\"routeId\":\"route-1\",\"routeKey\":\"add_route\",\"addedByAddSign\":true,\"isAddSignRoute\":true}");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(List.of(source), List.of(route), List.of(), List.of(event)));
+
+        List<WorkflowHistoryEventView> views = service.eventViews("history-1");
+
+        assertThat(views.getFirst().originType()).isEqualTo(WorkflowHistoryEventView.ORIGIN_TYPE_ADD_SIGN);
+        assertThat(views.getFirst().isAddSignRoute()).isTrue();
+        assertThat(views.getFirst().addSignSourceNodeKey()).isEqualTo("approve_source");
+        assertThat(views.getFirst().addSignSourceNodeName()).isEqualTo("approve_source");
+    }
+
+    @Test
+    void shouldKeepDefinitionOriginForNormalRoutePayloadWithSourceNodeKey() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowRouteInstance route = route("route-1", "normal_route", false, null);
+        String payload = "{\"routeId\":\"route-1\",\"routeKey\":\"normal_route\",\"sourceNodeKey\":\"approve\","
+                + "\"targetNodeKey\":\"next\",\"addedByAddSign\":false,\"isAddSignRoute\":false}";
+        WorkflowEvent selected = event("event-route-selected", WorkflowEventType.ROUTE_SELECTED, null, payload);
+        WorkflowEvent dropped = event("event-route-dropped", WorkflowEventType.ROUTE_DROPPED, null, payload);
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(List.of(), List.of(route), List.of(),
+                List.of(selected, dropped)));
+
+        List<WorkflowHistoryEventView> views = service.eventViews("history-1");
+
+        assertThat(views).hasSize(2);
+        assertThat(views).allSatisfy(view -> {
+            assertThat(view.originType()).isEqualTo(WorkflowHistoryEventView.ORIGIN_TYPE_DEFINITION);
+            assertThat(view.isAddSignRoute()).isFalse();
+            assertThat(view.addSignSourceNodeKey()).isNull();
+            assertThat(view.addSignSourceNodeName()).isNull();
+        });
+    }
+
+    @Test
+    void shouldExposeAddSignOriginFromAssociatedEventNode() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowNodeInstance source = node("node-source", "approve_source", false, null);
+        WorkflowNodeInstance added = node("node-added", "approve_added", true, "approve_source");
+        WorkflowEvent event = event("event-task-created", WorkflowEventType.TASK_CREATED, "node-added", null);
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(List.of(source, added), List.of(), List.of(), List.of(event)));
+
+        List<WorkflowHistoryEventView> views = service.eventViews("history-1");
+
+        assertThat(views.getFirst().originType()).isEqualTo(WorkflowHistoryEventView.ORIGIN_TYPE_ADD_SIGN);
+        assertThat(views.getFirst().isAddSignRoute()).isTrue();
+        assertThat(views.getFirst().addSignSourceNodeKey()).isEqualTo("approve_source");
+    }
+
+    @Test
+    void shouldKeepDefinitionOriginWhenPayloadIsInvalid() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowEvent event = event("event-bad-payload", WorkflowEventType.ROUTE_DROPPED, null, "{bad json");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(List.of(), List.of(), List.of(), List.of(event)));
+
+        List<WorkflowHistoryEventView> views = service.eventViews("history-1");
+
+        assertThat(views.getFirst().originType()).isEqualTo(WorkflowHistoryEventView.ORIGIN_TYPE_DEFINITION);
+        assertThat(views.getFirst().isAddSignRoute()).isFalse();
+        assertThat(views.getFirst().addSignSourceNodeKey()).isNull();
+        assertThat(views.getFirst().addSignSourceNodeName()).isNull();
+    }
+
     private WorkflowHistoryInstance history(String id) {
         WorkflowHistoryInstance history = new WorkflowHistoryInstance();
         history.setId(id);
@@ -173,8 +263,54 @@ class WorkflowHistoryQueryServiceTest {
         return task;
     }
 
+    private WorkflowEvent event(String id, WorkflowEventType eventType, String nodeInstanceId, String payloadText) {
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId(id);
+        event.setInstanceId("instance-1");
+        event.setNodeInstanceId(nodeInstanceId);
+        event.setEventType(eventType);
+        event.setActionCode(eventType == WorkflowEventType.ADD_SIGN ? "addSign" : "route");
+        event.setOperatorId("user-1");
+        event.setPayloadText(payloadText);
+        event.setOccurredAt(Instant.parse("2026-06-05T03:00:00Z"));
+        return event;
+    }
+
+    private WorkflowNodeInstance node(String id, String nodeKey, boolean addedByAddSign, String sourceNodeKey) {
+        WorkflowNodeInstance node = new WorkflowNodeInstance();
+        node.setId(id);
+        node.setInstanceId("instance-1");
+        node.setNodeKey(nodeKey);
+        node.setNodeRunId(nodeKey + ":run");
+        node.setNodeType(WorkflowNodeType.APPROVAL);
+        node.setAddedByAddSign(addedByAddSign);
+        node.setAddSignSourceNodeKey(sourceNodeKey);
+        return node;
+    }
+
+    private WorkflowRouteInstance route(String id, String routeKey, boolean addedByAddSign, String sourceNodeKey) {
+        WorkflowRouteInstance route = new WorkflowRouteInstance();
+        route.setId(id);
+        route.setInstanceId("instance-1");
+        route.setRouteKey(routeKey);
+        route.setRouteRunId(routeKey + ":run");
+        route.setSourceNodeKey(sourceNodeKey);
+        route.setTargetNodeKey("approve_added");
+        route.setAddedByAddSign(addedByAddSign);
+        route.setAddSignSourceNodeKey(sourceNodeKey);
+        return route;
+    }
+
     private WorkflowHistorySnapshot snapshot(WorkflowTask task, List<WorkflowEvent> events) {
         return new WorkflowHistorySnapshot(1, Instant.parse("2026-06-05T04:00:00Z"),
                 WorkflowArchiveReason.RECALLED, new WorkflowInstance(), List.of(), List.of(), List.of(task), events);
+    }
+
+    private WorkflowHistorySnapshot snapshot(List<WorkflowNodeInstance> nodes,
+                                             List<WorkflowRouteInstance> routes,
+                                             List<WorkflowTask> tasks,
+                                             List<WorkflowEvent> events) {
+        return new WorkflowHistorySnapshot(1, Instant.parse("2026-06-05T04:00:00Z"),
+                WorkflowArchiveReason.RECALLED, new WorkflowInstance(), nodes, routes, tasks, events);
     }
 }

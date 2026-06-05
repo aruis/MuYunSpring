@@ -118,6 +118,7 @@ class WorkflowRuntimeAdminWebControllerTest {
                 .thenReturn(new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of()));
         when(adminFacade.historyEvents("history-1")).thenReturn(List.of(event));
         when(adminFacade.historyEventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
+                WorkflowHistoryEventView.ORIGIN_TYPE_DEFINITION, false, null, null,
                 "event-1", "instance-1", null, null, WorkflowEventType.INSTANCE_TERMINATED, "forceTerminate",
                 "admin-1", "admin-1", false, WorkflowAssignmentKind.NORMAL, null, null,
                 null, null, null, null, false, false, null, null, null)));

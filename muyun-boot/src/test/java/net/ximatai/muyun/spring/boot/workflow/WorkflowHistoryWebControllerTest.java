@@ -67,6 +67,7 @@ class WorkflowHistoryWebControllerTest {
                 WorkflowAssignmentKind.DELEGATED, "delegate-1", "delegate-1", true, "principal-1", "principal-1",
                 "delegate-1", true, "delegation-1", "{}", false, false, "approve", null, null)));
         when(historyQueryService.eventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
+                WorkflowHistoryEventView.ORIGIN_TYPE_ADD_SIGN, true, "approve-source", "approve-source",
                 "event-1", "instance-1", "node-1", "task-1", WorkflowEventType.TASK_COMPLETED, "approve",
                 "delegate-1", "delegate-1", true, WorkflowAssignmentKind.DELEGATED, "principal-1", "principal-1",
                 "delegate-1", true, "delegation-1", "{}", false, false, null, null, null)));
@@ -86,6 +87,9 @@ class WorkflowHistoryWebControllerTest {
                 .andExpect(jsonPath("$.records").isArray());
         mvc.perform(get("/workflow/history/history-1/events/view"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].originType").value("ADD_SIGN"))
+                .andExpect(jsonPath("$.records[0].isAddSignRoute").value(true))
+                .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve-source"))
                 .andExpect(jsonPath("$.records[0].delegationPolicyId").value("delegation-1"));
     }
 

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -101,9 +102,30 @@ public class WorkflowHistoryQueryService {
         Map<String, WorkflowTask> tasksById = snapshot.tasks().stream()
                 .filter(task -> task.getId() != null)
                 .collect(Collectors.toMap(WorkflowTask::getId, Function.identity(), (left, right) -> left));
+        Map<String, WorkflowNodeInstance> nodesById = snapshot.nodes().stream()
+                .filter(node -> node.getId() != null)
+                .collect(Collectors.toMap(WorkflowNodeInstance::getId, Function.identity(), (left, right) -> left));
+        Map<String, WorkflowNodeInstance> nodesByKey = snapshot.nodes().stream()
+                .filter(node -> node.getNodeKey() != null)
+                .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left));
+        Map<String, WorkflowRouteInstance> routesByIdOrKey = routesByIdOrKey(snapshot.routes());
         return snapshot.events().stream()
-                .map(event -> WorkflowHistoryEventView.from(event, tasksById.get(event.getTaskId())))
+                .map(event -> WorkflowHistoryEventView.from(event, tasksById.get(event.getTaskId()),
+                        nodesById, nodesByKey, routesByIdOrKey))
                 .toList();
+    }
+
+    private Map<String, WorkflowRouteInstance> routesByIdOrKey(List<WorkflowRouteInstance> routes) {
+        Map<String, WorkflowRouteInstance> result = new LinkedHashMap<>();
+        for (WorkflowRouteInstance route : routes) {
+            if (route.getId() != null) {
+                result.putIfAbsent(route.getId(), route);
+            }
+            if (route.getRouteKey() != null) {
+                result.putIfAbsent(route.getRouteKey(), route);
+            }
+        }
+        return result;
     }
 
     private WorkflowHistoryInstance requireHistory(String historyInstanceId) {
