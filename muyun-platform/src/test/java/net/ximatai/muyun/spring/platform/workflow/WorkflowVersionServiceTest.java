@@ -3,36 +3,33 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkflowVersionServiceTest {
     private final WorkflowDefinitionService definitionService = new WorkflowDefinitionService(new TestMemoryDao<>());
-    private final WorkflowModuleActionContributor actionContributor = mock(WorkflowModuleActionContributor.class);
     private final WorkflowVersionService service = new WorkflowVersionService(new TestMemoryDao<>(),
-            definitionService, actionContributor);
+            definitionService);
 
     @Test
-    void shouldRegisterActionWhenVersionIsPublished() {
+    void shouldKeepPublishedVersionWithoutActionSideEffect() {
         WorkflowDefinition definition = definition();
         definitionService.insert(definition);
         WorkflowVersion version = version(definition.getId(), WorkflowPublishStatus.PUBLISHED);
 
         service.insert(version);
 
-        verify(actionContributor).registerPublishedWorkflowAction(definition, version);
+        assertThat(service.select(version.getId()).getPublishStatus()).isEqualTo(WorkflowPublishStatus.PUBLISHED);
     }
 
     @Test
-    void shouldNotRegisterActionWhenVersionIsDraft() {
+    void shouldInsertDraftVersion() {
         WorkflowDefinition definition = definition();
         definitionService.insert(definition);
         WorkflowVersion version = version(definition.getId(), WorkflowPublishStatus.DRAFT);
 
         service.insert(version);
 
-        verifyNoInteractions(actionContributor);
+        assertThat(service.select(version.getId()).getPublishStatus()).isEqualTo(WorkflowPublishStatus.DRAFT);
     }
 
     private WorkflowDefinition definition() {

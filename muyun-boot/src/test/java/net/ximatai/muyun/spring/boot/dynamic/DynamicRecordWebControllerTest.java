@@ -693,6 +693,35 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldExecuteContributedWorkflowActionThroughRecordActionPath() throws Exception {
+        DynamicActionDescriptor syncWorkflow = workflowAction("syncWorkflow");
+        when(service.action(MODULE, "syncWorkflow")).thenReturn(syncWorkflow);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.actionEntityAlias(MODULE, "syncWorkflow")).thenReturn(ENTITY);
+        when(service.executeAction(eq(MODULE), eq("syncWorkflow"), any(DynamicActionExecutionRequest.class)))
+                .thenReturn(new DynamicActionExecutionResult(
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "syncWorkflow", syncWorkflow,
+                                "contract-1", "trace-1", "tenant-1", false,
+                                DynamicActionAvailability.available("syncWorkflow")),
+                        "ok",
+                        DynamicActionResultBody.refreshed("ok")));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "syncWorkflow", "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.actionCode").value("syncWorkflow"))
+                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
+                .andExpect(jsonPath("$.context.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.body.refresh").value(true));
+
+        ArgumentCaptor<DynamicActionExecutionRequest> request = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
+        verify(service).executeAction(eq(MODULE), eq("syncWorkflow"), request.capture());
+        assertThat(request.getValue().recordId()).isEqualTo("contract-1");
+    }
+
+    @Test
     void shouldExposeDialogActionResultThroughStableWebResponse() throws Exception {
         DynamicActionDescriptor submitDialog = dialogAction("submitDialog", EntityActionLevel.RECORD);
         DynamicActionDialog dialog = new DynamicActionDialog("contractSubmitDialog", "提交合同");
@@ -1087,6 +1116,13 @@ class DynamicRecordWebControllerTest {
         return new DynamicActionDescriptor(code, "Submit", true, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor").withPermission(MODULE);
+    }
+
+    private DynamicActionDescriptor workflowAction(String code) {
+        return new DynamicActionDescriptor(code, "同步流程", true, EntityActionLevel.RECORD,
+                EntityActionCategory.WORKFLOW, EntityActionAccessMode.AUTH_REQUIRED,
+                true, false, null, false, null,
+                EntityActionExecutorType.SERVICE, "platform.workflow").withPermission(MODULE);
     }
 
     private DynamicActionDescriptor dialogAction(String code, EntityActionLevel level) {

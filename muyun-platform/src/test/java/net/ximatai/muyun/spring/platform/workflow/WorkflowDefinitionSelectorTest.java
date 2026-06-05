@@ -15,7 +15,7 @@ import static org.mockito.Mockito.when;
 class WorkflowDefinitionSelectorTest {
     private final WorkflowDefinitionService definitionService = new WorkflowDefinitionService(new TestMemoryDao<>());
     private final WorkflowVersionService versionService = new WorkflowVersionService(new TestMemoryDao<>(),
-            definitionService, mock(WorkflowModuleActionContributor.class));
+            definitionService);
     private final WorkflowNodeDefinitionDao nodeDao = mock(WorkflowNodeDefinitionDao.class);
     private final WorkflowLinkDefinitionDao linkDao = mock(WorkflowLinkDefinitionDao.class);
     private final WorkflowDefinitionSelector selector = new WorkflowDefinitionSelector(
