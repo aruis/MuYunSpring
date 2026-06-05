@@ -12,11 +12,16 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminActiveTaskView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminInstanceQueryRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminInstanceView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowApprovalStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
@@ -55,6 +60,42 @@ public class WorkflowRuntimeAdminWebController {
             title = "Active Task Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowAdminActiveTaskView> currentTodoTaskViews(@PathVariable String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTaskViews(instanceId));
+    }
+
+    @PostMapping("/instance/query")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowAdminInstanceView> queryCurrentInstances(
+            @RequestBody(required = false) WorkflowAdminInstanceQueryWebRequest request) {
+        WorkflowAdminInstanceQueryWebRequest payload = request == null
+                ? new WorkflowAdminInstanceQueryWebRequest(null, null, null, null, null, null, null, null)
+                : request;
+        return new WebListResponse<>(adminFacade.queryCurrentInstances(payload.toServiceRequest(),
+                page(payload.page())));
+    }
+
+    @PostMapping({"/instance/{instanceId}/bundle", "/instance/{instanceId}/render"})
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WorkflowRuntimeRenderBundle renderCurrentBundle(@PathVariable String instanceId,
+                                                           @RequestBody(required = false) Object ignored) {
+        return adminFacade.renderCurrentBundle(instanceId);
+    }
+
+    @PostMapping("/instance/{instanceId}/events")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowEvent> currentEvents(@PathVariable String instanceId,
+                                                        @RequestBody(required = false) Object ignored) {
+        return new WebListResponse<>(adminFacade.currentEvents(instanceId));
+    }
+
+    @PostMapping("/instance/{instanceId}/tasks")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowTask> currentTasks(@PathVariable String instanceId,
+                                                      @RequestBody(required = false) Object ignored) {
+        return new WebListResponse<>(adminFacade.currentTasks(instanceId));
     }
 
     @PostMapping("/instance/{instanceId}/actions/forceTerminate")
@@ -153,4 +194,20 @@ record WorkflowAdminActionWebRequest(String operatorId, String reason) {
 }
 
 record WorkflowAdminHistoryQueryWebRequest(String moduleAlias, String recordId, WebPageRequest page) {
+}
+
+record WorkflowAdminInstanceQueryWebRequest(
+        String moduleAlias,
+        String recordId,
+        String starterId,
+        WorkflowInstanceStatus instanceStatus,
+        WorkflowApprovalStatus approvalStatus,
+        String currentAssigneeId,
+        WorkflowOvertimeStatus overtimeStatus,
+        WebPageRequest page
+) {
+    WorkflowAdminInstanceQueryRequest toServiceRequest() {
+        return new WorkflowAdminInstanceQueryRequest(moduleAlias, recordId, starterId, instanceStatus, approvalStatus,
+                currentAssigneeId, overtimeStatus);
+    }
 }

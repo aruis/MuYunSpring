@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -19,12 +21,95 @@ class WorkflowAdminServiceTest {
     private final WorkflowInstanceDao instanceDao = mock(WorkflowInstanceDao.class);
     private final WorkflowTaskDao taskDao = mock(WorkflowTaskDao.class);
     private final WorkflowNodeInstanceDao nodeInstanceDao = mock(WorkflowNodeInstanceDao.class);
+    private final WorkflowRouteInstanceDao routeInstanceDao = mock(WorkflowRouteInstanceDao.class);
+    private final WorkflowEventDao eventDao = mock(WorkflowEventDao.class);
     private final WorkflowActionPolicyService actionPolicyService = mock(WorkflowActionPolicyService.class);
     private final WorkflowInstanceActionService instanceActionService = mock(WorkflowInstanceActionService.class);
     private final WorkflowTaskActionService taskActionService = mock(WorkflowTaskActionService.class);
     private final WorkflowHistoryQueryService historyQueryService = mock(WorkflowHistoryQueryService.class);
     private final WorkflowAdminService service = new WorkflowAdminService(instanceDao, taskDao, nodeInstanceDao,
-            actionPolicyService, instanceActionService, taskActionService, historyQueryService);
+            routeInstanceDao, eventDao, actionPolicyService, instanceActionService, taskActionService,
+            historyQueryService);
+
+    @Test
+    void shouldDefaultCurrentInstanceQueryToRunningInstances() {
+        WorkflowInstance instance = instance(WorkflowInstanceStatus.RUNNING);
+        instance.setDefinitionId("definition-1");
+        instance.setWorkflowVersionId("version-1");
+        instance.setVersionNo(3);
+        instance.setStartedBy("starter-1");
+        instance.setStartedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        instance.setUpdatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        instance.setLastOperatedAt(Instant.parse("2026-06-05T02:30:00Z"));
+        WorkflowTask task = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssigneeId("approver-1");
+        WorkflowNodeInstance node = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        node.setOvertimeStatus(WorkflowOvertimeStatus.NORMAL);
+        when(instanceDao.query(any(), any(), any(), any(), any())).thenReturn(List.of(instance));
+        when(taskDao.query(any(), any(), any())).thenReturn(List.of(task));
+        when(nodeInstanceDao.query(any(), any(), any())).thenReturn(List.of(node));
+
+        List<WorkflowAdminInstanceView> views = service.queryCurrentInstances(null, PageRequest.of(1, 20));
+
+        assertThat(views).hasSize(1);
+        WorkflowAdminInstanceView view = views.getFirst();
+        assertThat(view.instanceId()).isEqualTo("instance-1");
+        assertThat(view.moduleAlias()).isEqualTo("sales.contract");
+        assertThat(view.recordId()).isEqualTo("record-1");
+        assertThat(view.definitionId()).isEqualTo("definition-1");
+        assertThat(view.workflowVersionId()).isEqualTo("version-1");
+        assertThat(view.versionNo()).isEqualTo(3);
+        assertThat(view.instanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
+        assertThat(view.startedBy()).isEqualTo("starter-1");
+        assertThat(view.activeNodeKeys()).containsExactly("approve_1");
+        assertThat(view.currentTaskIds()).containsExactly("task-1");
+        assertThat(view.currentAssigneeIds()).containsExactly("approver-1");
+        assertThat(view.overtimeStatus()).isEqualTo(WorkflowOvertimeStatus.NORMAL);
+        assertThat(view.updatedAt()).isEqualTo(Instant.parse("2026-06-05T02:00:00Z"));
+        assertThat(view.lastOperatedAt()).isEqualTo(Instant.parse("2026-06-05T02:30:00Z"));
+        verify(actionPolicyService).requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        ArgumentCaptor<net.ximatai.muyun.database.core.orm.Criteria> criteriaCaptor =
+                ArgumentCaptor.forClass(net.ximatai.muyun.database.core.orm.Criteria.class);
+        verify(instanceDao).query(criteriaCaptor.capture(), any(), any(), any(), any());
+        assertThat(criteriaCaptor.getValue().getClauses())
+                .anySatisfy(clause -> {
+                    assertThat(clause.getField()).isEqualTo("instanceStatus");
+                    assertThat(clause.getValues()).containsExactly(WorkflowInstanceStatus.RUNNING);
+                });
+    }
+
+    @Test
+    void shouldFilterCurrentInstancesByCurrentAssigneeAndOvertime() {
+        WorkflowInstance warned = instance(WorkflowInstanceStatus.RUNNING);
+        WorkflowInstance normal = instance(WorkflowInstanceStatus.RUNNING);
+        normal.setId("instance-2");
+        when(instanceDao.query(any(), any(), any(), any(), any())).thenReturn(List.of(warned, normal));
+        WorkflowTask delegated = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        delegated.setAssigneeId("delegate-1");
+        delegated.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        delegated.setPrincipalCanProcess(true);
+        delegated.setDelegatedFromUserId("principal-1");
+        WorkflowTask normalTask = task("task-2", "node-normal", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        normalTask.setInstanceId("instance-2");
+        normalTask.setAssigneeId("other-1");
+        WorkflowNodeInstance warnedNode = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        warnedNode.setOvertimeStatus(WorkflowOvertimeStatus.WARNED);
+        WorkflowNodeInstance normalNode = node("node-normal", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        normalNode.setInstanceId("instance-2");
+        normalNode.setOvertimeStatus(WorkflowOvertimeStatus.NORMAL);
+        when(taskDao.query(any(), any(), any())).thenReturn(List.of(delegated), List.of(normalTask));
+        when(nodeInstanceDao.query(any(), any(), any())).thenReturn(List.of(warnedNode), List.of(normalNode));
+
+        List<WorkflowAdminInstanceView> views = service.queryCurrentInstances(
+                new WorkflowAdminInstanceQueryRequest(null, null, null, null, null,
+                        "principal-1", WorkflowOvertimeStatus.WARNED),
+                PageRequest.of(1, 20));
+
+        assertThat(views).hasSize(1);
+        assertThat(views.getFirst().instanceId()).isEqualTo("instance-1");
+        assertThat(views.getFirst().currentAssigneeIds()).containsExactly("delegate-1", "principal-1");
+        assertThat(views.getFirst().overtimeStatus()).isEqualTo(WorkflowOvertimeStatus.WARNED);
+    }
 
     @Test
     void shouldQueryCurrentTodoTasksThroughForceApprovePolicy() {
@@ -124,6 +209,46 @@ class WorkflowAdminServiceTest {
 
         verify(instanceActionService).forceTerminate(instanceRequest);
         verify(taskActionService).forceApprove(taskRequest);
+    }
+
+    @Test
+    void shouldReadCurrentInstanceDetailsThroughManagementQueryPolicy() {
+        WorkflowInstance instance = instance(WorkflowInstanceStatus.RUNNING);
+        WorkflowNodeInstance node = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        WorkflowRouteInstance route = new WorkflowRouteInstance();
+        route.setId("route-1");
+        route.setInstanceId("instance-1");
+        WorkflowTask task = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId("event-1");
+        event.setInstanceId("instance-1");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeInstanceDao.query(any(), any(), any())).thenReturn(List.of(node));
+        when(routeInstanceDao.query(any(), any(), any())).thenReturn(List.of(route));
+        when(taskDao.query(any(), any(), any())).thenReturn(List.of(task));
+        when(eventDao.query(any(), any(), any(), any())).thenReturn(List.of(event));
+
+        WorkflowRuntimeRenderBundle bundle = service.renderCurrentBundle("instance-1");
+
+        assertThat(bundle.mode()).isEqualTo("RUNTIME");
+        assertThat(bundle.instance()).isEqualTo(instance);
+        assertThat(bundle.nodes()).containsExactly(node);
+        assertThat(bundle.routes()).containsExactly(route);
+        assertThat(service.currentTasks("instance-1")).containsExactly(task);
+        assertThat(service.currentEvents("instance-1")).containsExactly(event);
+        verify(actionPolicyService, times(3)).requireManagementAction(
+                WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+    }
+
+    @Test
+    void shouldRejectCurrentDetailsForNonRunningInstance() {
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.COMPLETED));
+
+        assertThatThrownBy(() -> service.renderCurrentBundle("instance-1"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("not running");
+
+        verifyNoInteractions(routeInstanceDao, eventDao, actionPolicyService);
     }
 
     @Test

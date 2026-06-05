@@ -21,12 +21,33 @@ public class WorkflowAdminFacade {
         return adminService.currentTodoTaskViews(instanceId);
     }
 
+    public List<WorkflowAdminInstanceView> queryCurrentInstances(WorkflowAdminInstanceQueryRequest request,
+                                                                 PageRequest pageRequest) {
+        return adminService.queryCurrentInstances(request, pageRequest);
+    }
+
     public WorkflowInstanceActionResult forceTerminate(WorkflowInstanceActionRequest request) {
         return adminService.forceTerminate(request);
     }
 
     public WorkflowTaskActionResult forceApprove(WorkflowTaskActionRequest request) {
         return adminService.forceApprove(request);
+    }
+
+    public WorkflowRuntimeRenderBundle renderCurrentBundle(String instanceId) {
+        return adminService.renderCurrentBundle(instanceId);
+    }
+
+    public WorkflowRuntimeRenderBundle renderInstanceBundle(String instanceId) {
+        return adminService.renderInstanceBundle(instanceId);
+    }
+
+    public List<WorkflowEvent> currentEvents(String instanceId) {
+        return adminService.currentEvents(instanceId);
+    }
+
+    public List<WorkflowTask> currentTasks(String instanceId) {
+        return adminService.currentTasks(instanceId);
     }
 
     public List<WorkflowHistoryInstance> queryHistory(String moduleAlias, String recordId, PageRequest pageRequest) {

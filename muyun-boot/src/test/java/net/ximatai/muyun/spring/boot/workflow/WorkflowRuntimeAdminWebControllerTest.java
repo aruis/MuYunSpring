@@ -6,6 +6,9 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminActiveTaskView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminInstanceQueryRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminInstanceView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowApprovalStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
@@ -13,6 +16,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
@@ -36,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -93,6 +98,73 @@ class WorkflowRuntimeAdminWebControllerTest {
                 .andExpect(jsonPath("$.records[0].overtimeStatus").value("WARNED"))
                 .andExpect(jsonPath("$.records[0].assignmentKind").value("DELEGATED"))
                 .andExpect(jsonPath("$.records[0].principalCanProcess").value(true));
+    }
+
+    @Test
+    void shouldExposeAdminCurrentInstanceQueryAndDetails() throws Exception {
+        WorkflowAdminInstanceView view = new WorkflowAdminInstanceView("inst-1", "sales.contract",
+                "record-1", "definition-1", "version-1", 2, WorkflowInstanceStatus.RUNNING,
+                WorkflowApprovalStatus.PROCESSING, "starter-1", Instant.parse("2026-06-05T01:00:00Z"),
+                List.of("approve_1"), List.of("task-1"), List.of("approver-1"), WorkflowOvertimeStatus.WARNED,
+                Instant.parse("2026-06-05T02:00:00Z"), Instant.parse("2026-06-05T02:30:00Z"));
+        WorkflowTask task = new WorkflowTask();
+        task.setId("task-1");
+        task.setTaskKind(WorkflowTaskKind.APPROVAL);
+        task.setTaskStatus(WorkflowTaskStatus.TODO);
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId("event-1");
+        event.setEventType(WorkflowEventType.TASK_COMPLETED);
+        when(adminFacade.queryCurrentInstances(argThat(request ->
+                        "sales.contract".equals(request.moduleAlias())
+                                && "record-1".equals(request.recordId())
+                                && "starter-1".equals(request.starterId())
+                                && request.instanceStatus() == WorkflowInstanceStatus.RUNNING
+                                && request.approvalStatus() == WorkflowApprovalStatus.PROCESSING
+                                && "approver-1".equals(request.currentAssigneeId())
+                                && request.overtimeStatus() == WorkflowOvertimeStatus.WARNED),
+                any())).thenReturn(List.of(view));
+        when(adminFacade.renderCurrentBundle("inst-1"))
+                .thenReturn(new WorkflowRuntimeRenderBundle("RUNTIME", null, List.of(), List.of()));
+        when(adminFacade.currentEvents("inst-1")).thenReturn(List.of(event));
+        when(adminFacade.currentTasks("inst-1")).thenReturn(List.of(task));
+
+        mvc.perform(post("/workflow/runtime/admin/instance/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"moduleAlias\":\"sales.contract\",\"recordId\":\"record-1\","
+                                + "\"starterId\":\"starter-1\",\"instanceStatus\":\"RUNNING\","
+                                + "\"approvalStatus\":\"PROCESSING\",\"currentAssigneeId\":\"approver-1\","
+                                + "\"overtimeStatus\":\"WARNED\",\"page\":{\"pageNum\":1,\"pageSize\":20}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].instanceId").value("inst-1"))
+                .andExpect(jsonPath("$.records[0].activeNodeKeys[0]").value("approve_1"))
+                .andExpect(jsonPath("$.records[0].currentTaskIds[0]").value("task-1"))
+                .andExpect(jsonPath("$.records[0].currentAssigneeIds[0]").value("approver-1"))
+                .andExpect(jsonPath("$.records[0].overtimeStatus").value("WARNED"));
+        mvc.perform(post("/workflow/runtime/admin/instance/inst-1/bundle")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("RUNTIME"));
+        mvc.perform(post("/workflow/runtime/admin/instance/inst-1/render")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("RUNTIME"));
+        mvc.perform(post("/workflow/runtime/admin/instance/inst-1/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("event-1"));
+        mvc.perform(post("/workflow/runtime/admin/instance/inst-1/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("task-1"));
+
+        verify(adminFacade).queryCurrentInstances(any(WorkflowAdminInstanceQueryRequest.class), any());
+        verify(adminFacade, times(2)).renderCurrentBundle("inst-1");
+        verify(adminFacade).currentEvents("inst-1");
+        verify(adminFacade).currentTasks("inst-1");
     }
 
     @Test

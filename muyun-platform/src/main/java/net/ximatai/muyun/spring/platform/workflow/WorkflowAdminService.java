@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -17,6 +18,8 @@ public class WorkflowAdminService {
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowTaskDao taskDao;
     private final WorkflowNodeInstanceDao nodeInstanceDao;
+    private final WorkflowRouteInstanceDao routeInstanceDao;
+    private final WorkflowEventDao eventDao;
     private final WorkflowActionPolicyService actionPolicyService;
     private final WorkflowInstanceActionService instanceActionService;
     private final WorkflowTaskActionService taskActionService;
@@ -27,7 +30,7 @@ public class WorkflowAdminService {
                                 WorkflowActionPolicyService actionPolicyService,
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService) {
-        this(instanceDao, taskDao, null, actionPolicyService, instanceActionService, taskActionService, null);
+        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService, null);
     }
 
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
@@ -36,11 +39,10 @@ public class WorkflowAdminService {
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService,
                                 WorkflowHistoryQueryService historyQueryService) {
-        this(instanceDao, taskDao, null, actionPolicyService, instanceActionService, taskActionService,
+        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService,
                 historyQueryService);
     }
 
-    @Autowired
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
                                 WorkflowTaskDao taskDao,
                                 WorkflowNodeInstanceDao nodeInstanceDao,
@@ -48,13 +50,61 @@ public class WorkflowAdminService {
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService,
                                 WorkflowHistoryQueryService historyQueryService) {
+        this(instanceDao, taskDao, nodeInstanceDao, null, null, actionPolicyService, instanceActionService,
+                taskActionService, historyQueryService);
+    }
+
+    @Autowired
+    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
+                                WorkflowTaskDao taskDao,
+                                WorkflowNodeInstanceDao nodeInstanceDao,
+                                WorkflowRouteInstanceDao routeInstanceDao,
+                                WorkflowEventDao eventDao,
+                                WorkflowActionPolicyService actionPolicyService,
+                                WorkflowInstanceActionService instanceActionService,
+                                WorkflowTaskActionService taskActionService,
+                                WorkflowHistoryQueryService historyQueryService) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeInstanceDao = nodeInstanceDao;
+        this.routeInstanceDao = routeInstanceDao;
+        this.eventDao = eventDao;
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.instanceActionService = instanceActionService;
         this.taskActionService = taskActionService;
         this.historyQueryService = historyQueryService;
+    }
+
+    public List<WorkflowAdminInstanceView> queryCurrentInstances(WorkflowAdminInstanceQueryRequest request,
+                                                                 PageRequest pageRequest) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        WorkflowAdminInstanceQueryRequest normalized = request == null
+                ? WorkflowAdminInstanceQueryRequest.empty()
+                : request;
+        Criteria criteria = Criteria.of()
+                .eq("instanceStatus", normalized.instanceStatus() == null
+                        ? WorkflowInstanceStatus.RUNNING
+                        : normalized.instanceStatus());
+        if (hasText(normalized.moduleAlias())) {
+            criteria.eq("moduleAlias", normalized.moduleAlias());
+        }
+        if (hasText(normalized.recordId())) {
+            criteria.eq("recordId", normalized.recordId());
+        }
+        if (hasText(normalized.starterId())) {
+            criteria.eq("startedBy", normalized.starterId());
+        }
+        if (normalized.approvalStatus() != null) {
+            criteria.eq("approvalStatus", normalized.approvalStatus());
+        }
+        List<WorkflowAdminInstanceView> views = instanceDao.query(criteria, ALL,
+                        Sort.desc("lastOperatedAt"), Sort.desc("startedAt"), Sort.desc("updatedAt"))
+                .stream()
+                .map(this::toInstanceView)
+                .filter(view -> matchesCurrentAssignee(view, normalized.currentAssigneeId()))
+                .filter(view -> matchesOvertime(view, normalized.overtimeStatus()))
+                .toList();
+        return pageItems(views, page(pageRequest));
     }
 
     public List<WorkflowTask> currentTodoTasks(String instanceId) {
@@ -91,6 +141,33 @@ public class WorkflowAdminService {
         return taskActionService.forceApprove(request);
     }
 
+    public WorkflowRuntimeRenderBundle renderCurrentBundle(String instanceId) {
+        WorkflowInstance instance = requireRunningInstance(instanceId);
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        List<WorkflowNodeInstance> nodes = nodeInstanceDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowRouteInstance> routes = routeInstanceDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        return new WorkflowRuntimeRenderBundle("RUNTIME", instance, nodes, routes);
+    }
+
+    public WorkflowRuntimeRenderBundle renderInstanceBundle(String instanceId) {
+        return renderCurrentBundle(instanceId);
+    }
+
+    public List<WorkflowEvent> currentEvents(String instanceId) {
+        WorkflowInstance instance = requireRunningInstance(instanceId);
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        return eventDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL,
+                Sort.asc("occurredAt"), Sort.asc("createdAt"));
+    }
+
+    public List<WorkflowTask> currentTasks(String instanceId) {
+        WorkflowInstance instance = requireRunningInstance(instanceId);
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        return taskDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL, Sort.asc("createdAt"));
+    }
+
     public List<WorkflowHistoryInstance> queryHistory(String moduleAlias, String recordId, PageRequest pageRequest) {
         return historyQueryService.queryAdminHistory(moduleAlias, recordId, pageRequest);
     }
@@ -125,6 +202,99 @@ public class WorkflowAdminService {
         return WorkflowAdminActiveTaskView.from(task, node);
     }
 
+    private WorkflowAdminInstanceView toInstanceView(WorkflowInstance instance) {
+        List<WorkflowTask> todoTasks = taskDao.query(Criteria.of()
+                        .eq("instanceId", instance.getId())
+                        .eq("taskStatus", WorkflowTaskStatus.TODO),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowNodeInstance> activeNodes = nodeInstanceDao.query(Criteria.of()
+                        .eq("instanceId", instance.getId())
+                        .eq("nodeStatus", WorkflowNodeStatus.ACTIVE),
+                ALL, Sort.asc("createdAt"));
+        List<String> activeNodeKeys = activeNodes.stream()
+                .map(WorkflowNodeInstance::getNodeKey)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+        List<String> currentTaskIds = todoTasks.stream()
+                .map(WorkflowTask::getId)
+                .filter(this::hasText)
+                .toList();
+        List<String> currentAssigneeIds = todoTasks.stream()
+                .flatMap(task -> assigneeIds(task).stream())
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+        return new WorkflowAdminInstanceView(
+                instance.getId(),
+                instance.getModuleAlias(),
+                instance.getRecordId(),
+                instance.getDefinitionId(),
+                instance.getWorkflowVersionId(),
+                instance.getVersionNo(),
+                instance.getInstanceStatus(),
+                instance.getApprovalStatus(),
+                instance.getStartedBy(),
+                instance.getStartedAt(),
+                activeNodeKeys,
+                currentTaskIds,
+                currentAssigneeIds,
+                aggregateOvertimeStatus(activeNodes),
+                instance.getUpdatedAt(),
+                instance.getLastOperatedAt());
+    }
+
+    private WorkflowOvertimeStatus aggregateOvertimeStatus(List<WorkflowNodeInstance> nodes) {
+        if (nodes == null || nodes.isEmpty()) {
+            return WorkflowOvertimeStatus.NORMAL;
+        }
+        return nodes.stream()
+                .map(WorkflowNodeInstance::getOvertimeStatus)
+                .filter(status -> status != null)
+                .max(Comparator.comparingInt(this::overtimeSeverity))
+                .orElse(WorkflowOvertimeStatus.NORMAL);
+    }
+
+    private int overtimeSeverity(WorkflowOvertimeStatus status) {
+        return switch (status) {
+            case OVERDUE -> 3;
+            case WARNED -> 2;
+            case NORMAL -> 1;
+        };
+    }
+
+    private List<String> assigneeIds(WorkflowTask task) {
+        if (task == null || !hasText(task.getAssigneeId())) {
+            return List.of();
+        }
+        if (task.getAssignmentKind() == WorkflowAssignmentKind.DELEGATED
+                && Boolean.TRUE.equals(task.getPrincipalCanProcess())
+                && hasText(task.getDelegatedFromUserId())
+                && task.getTransferredFromUserId() == null) {
+            return List.of(task.getAssigneeId(), task.getDelegatedFromUserId());
+        }
+        return List.of(task.getAssigneeId());
+    }
+
+    private boolean matchesCurrentAssignee(WorkflowAdminInstanceView view, String currentAssigneeId) {
+        return !hasText(currentAssigneeId) || view.currentAssigneeIds().contains(currentAssigneeId);
+    }
+
+    private boolean matchesOvertime(WorkflowAdminInstanceView view, WorkflowOvertimeStatus overtimeStatus) {
+        return overtimeStatus == null || overtimeStatus == view.overtimeStatus();
+    }
+
+    private <T> List<T> pageItems(List<T> items, PageRequest pageRequest) {
+        PageRequest normalized = page(pageRequest);
+        int from = Math.min(normalized.getOffset(), items.size());
+        int to = Math.min(from + normalized.getLimit(), items.size());
+        return items.subList(from, to);
+    }
+
+    private PageRequest page(PageRequest pageRequest) {
+        return pageRequest == null ? PageRequest.of(1, 20) : pageRequest;
+    }
+
     private WorkflowInstance requireRunningInstance(String instanceId) {
         WorkflowInstance instance = requireInstance(instanceId);
         if (instance.getInstanceStatus() != WorkflowInstanceStatus.RUNNING) {
@@ -147,5 +317,9 @@ public class WorkflowAdminService {
             throw new PlatformException(message);
         }
         return value;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
