@@ -86,9 +86,13 @@ class WorkflowTaskActionServiceTest {
     void shouldCompleteBusinessTaskAndWriteEvent() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(null, null);
+        node.setNodeType(WorkflowNodeType.TASK);
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
 
         WorkflowTaskActionResult result = service.completeBusinessTask(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, "done", Instant.parse("2026-06-05T02:00:00Z")));
@@ -98,10 +102,14 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.task().getDecision()).isEqualTo("complete");
         assertThat(result.task().getCompletedAt()).isEqualTo(Instant.parse("2026-06-05T02:00:00Z"));
         assertThat(result.task().getVersion()).isEqualTo(4);
+        assertThat(result.node().getNodeStatus()).isEqualTo(WorkflowNodeStatus.COMPLETED);
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.TASK_COMPLETED);
         assertThat(result.event().getActionCode()).isEqualTo("complete");
         verify(taskDao).updateByIdAndVersion(task, 3);
+        verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao).insert(result.event());
+        verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T02:00:00Z"));
     }
 
     @Test
@@ -178,8 +186,11 @@ class WorkflowTaskActionServiceTest {
     @Test
     void shouldThrowOptimisticLockWhenTaskUpdateLosesRace() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(null, null);
+        node.setNodeType(WorkflowNodeType.TASK);
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(0);
 
         assertThatThrownBy(() -> service.completeBusinessTask(WorkflowTaskActionRequest.complete(

@@ -124,6 +124,7 @@ public class WorkflowTaskActionService {
             throw new PlatformException("workflow task is not a business task: " + request.taskId());
         }
         WorkflowInstance instance = requireInstance(task);
+        WorkflowNodeInstance node = requireNode(task);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
         task.setTaskStatus(WorkflowTaskStatus.DONE);
@@ -132,10 +133,15 @@ public class WorkflowTaskActionService {
         task.setResultMessage(request.reason());
         task.setCompletedAt(now);
         updateTask(task, now);
+        node.setNodeStatus(WorkflowNodeStatus.COMPLETED);
+        node.setCompletedTaskCount(value(node.getCompletedTaskCount()) + 1);
+        node.setCompletedAt(now);
+        updateNode(node, now);
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "complete", operatorId,
                 request.reason(), now);
         eventDao.insert(event);
-        return WorkflowTaskActionResult.of(task, event);
+        progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
+        return WorkflowTaskActionResult.of(task, node, instance, event);
     }
 
     @Transactional
