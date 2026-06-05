@@ -24,19 +24,22 @@ public class WorkflowTaskActionService {
     private final WorkflowEventDao eventDao;
     private final WorkflowRuntimeEventFactory eventFactory;
     private final WorkflowApprovalTaskPolicyService approvalTaskPolicyService;
+    private final WorkflowRuntimeProgressionService progressionService;
 
     public WorkflowTaskActionService(WorkflowTaskDao taskDao,
                                      WorkflowInstanceDao instanceDao,
                                      WorkflowNodeInstanceDao nodeInstanceDao,
                                      WorkflowEventDao eventDao,
                                      WorkflowRuntimeEventFactory eventFactory,
-                                     WorkflowApprovalTaskPolicyService approvalTaskPolicyService) {
+                                     WorkflowApprovalTaskPolicyService approvalTaskPolicyService,
+                                     WorkflowRuntimeProgressionService progressionService) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
         this.nodeInstanceDao = nodeInstanceDao;
         this.eventDao = eventDao;
         this.eventFactory = eventFactory;
         this.approvalTaskPolicyService = approvalTaskPolicyService;
+        this.progressionService = progressionService;
     }
 
     @Transactional
@@ -71,6 +74,9 @@ public class WorkflowTaskActionService {
         }
         WorkflowEvent event = eventFactory.taskCompleted(instance, task, "approve", operatorId, request.reason(), now);
         eventDao.insert(event);
+        if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
+            progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now);
+        }
         return WorkflowTaskActionResult.of(task, node, instance, event);
     }
 

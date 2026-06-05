@@ -60,6 +60,22 @@ public class WorkflowRuntimeEventFactory {
                 message == null || message.isBlank() ? "workflow task canceled" : message, null, occurredAt);
     }
 
+    public WorkflowEvent routeSelected(WorkflowInstance instance, WorkflowRouteInstance route,
+                                       String operatorId, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.ROUTE_SELECTED, "route", operatorId,
+                "workflow route selected: " + route.getRouteKey(), null, occurredAt);
+    }
+
+    public WorkflowEvent approvalCompleted(WorkflowInstance instance, String operatorId, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.APPROVAL_COMPLETED, "approval_completed", operatorId,
+                "workflow approval completed", null, occurredAt);
+    }
+
+    public WorkflowEvent instanceCompleted(WorkflowInstance instance, String operatorId, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.INSTANCE_COMPLETED, "complete", operatorId,
+                "workflow instance completed", null, occurredAt);
+    }
+
     private WorkflowEvent event(WorkflowInstance instance, WorkflowNodeInstance node, WorkflowTask task,
                                 WorkflowEventType eventType, String actionCode, String operatorId,
                                 String message, String payloadText, Instant occurredAt) {

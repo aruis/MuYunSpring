@@ -23,8 +23,9 @@ class WorkflowTaskActionServiceTest {
     private final WorkflowEventDao eventDao = mock(WorkflowEventDao.class);
     private final WorkflowRuntimeEventFactory eventFactory = new WorkflowRuntimeEventFactory();
     private final WorkflowApprovalTaskPolicyService approvalTaskPolicyService = new WorkflowApprovalTaskPolicyService();
+    private final WorkflowRuntimeProgressionService progressionService = mock(WorkflowRuntimeProgressionService.class);
     private final WorkflowTaskActionService service = new WorkflowTaskActionService(
-            taskDao, instanceDao, nodeDao, eventDao, eventFactory, approvalTaskPolicyService);
+            taskDao, instanceDao, nodeDao, eventDao, eventFactory, approvalTaskPolicyService, progressionService);
 
     @Test
     void shouldApproveApprovalTaskAndCompleteAnyNode() {
@@ -52,6 +53,8 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.event().getActionCode()).isEqualTo("approve");
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao, atLeastOnce()).insert(any());
+        verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T02:00:00Z"));
     }
 
     @Test
