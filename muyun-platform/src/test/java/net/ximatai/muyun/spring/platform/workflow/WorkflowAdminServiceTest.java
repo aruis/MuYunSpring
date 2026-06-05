@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
@@ -19,8 +20,9 @@ class WorkflowAdminServiceTest {
     private final WorkflowActionPolicyService actionPolicyService = mock(WorkflowActionPolicyService.class);
     private final WorkflowInstanceActionService instanceActionService = mock(WorkflowInstanceActionService.class);
     private final WorkflowTaskActionService taskActionService = mock(WorkflowTaskActionService.class);
+    private final WorkflowHistoryQueryService historyQueryService = mock(WorkflowHistoryQueryService.class);
     private final WorkflowAdminService service = new WorkflowAdminService(instanceDao, taskDao, actionPolicyService,
-            instanceActionService, taskActionService);
+            instanceActionService, taskActionService, historyQueryService);
 
     @Test
     void shouldQueryCurrentTodoTasksThroughForceApprovePolicy() {
@@ -60,6 +62,29 @@ class WorkflowAdminServiceTest {
 
         verify(instanceActionService).forceTerminate(instanceRequest);
         verify(taskActionService).forceApprove(taskRequest);
+    }
+
+    @Test
+    void shouldDelegateAdminHistoryContracts() {
+        WorkflowRuntimeRenderBundle bundle = new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of());
+        PageRequest pageRequest = PageRequest.of(1, 20);
+        when(historyQueryService.queryAdminHistory("sales.contract", "record-1", pageRequest)).thenReturn(List.of());
+        when(historyQueryService.renderAdminBundle("history-1")).thenReturn(bundle);
+        when(historyQueryService.adminEvents("history-1")).thenReturn(List.of());
+        when(historyQueryService.adminEventViews("history-1")).thenReturn(List.of());
+        when(historyQueryService.deleteHistory("history-1")).thenReturn(1);
+
+        assertThat(service.queryHistory("sales.contract", "record-1", pageRequest)).isEmpty();
+        assertThat(service.renderHistoryBundle("history-1")).isEqualTo(bundle);
+        assertThat(service.historyEvents("history-1")).isEmpty();
+        assertThat(service.historyEventViews("history-1")).isEmpty();
+        assertThat(service.deleteHistory("history-1")).isEqualTo(1);
+
+        verify(historyQueryService).queryAdminHistory("sales.contract", "record-1", pageRequest);
+        verify(historyQueryService).renderAdminBundle("history-1");
+        verify(historyQueryService).adminEvents("history-1");
+        verify(historyQueryService).adminEventViews("history-1");
+        verify(historyQueryService).deleteHistory("history-1");
     }
 
     private WorkflowInstance instance(WorkflowInstanceStatus status) {

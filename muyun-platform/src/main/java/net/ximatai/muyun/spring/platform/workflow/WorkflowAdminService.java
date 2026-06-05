@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,17 +19,29 @@ public class WorkflowAdminService {
     private final WorkflowActionPolicyService actionPolicyService;
     private final WorkflowInstanceActionService instanceActionService;
     private final WorkflowTaskActionService taskActionService;
+    private final WorkflowHistoryQueryService historyQueryService;
 
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
                                 WorkflowTaskDao taskDao,
                                 WorkflowActionPolicyService actionPolicyService,
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService) {
+        this(instanceDao, taskDao, actionPolicyService, instanceActionService, taskActionService, null);
+    }
+
+    @Autowired
+    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
+                                WorkflowTaskDao taskDao,
+                                WorkflowActionPolicyService actionPolicyService,
+                                WorkflowInstanceActionService instanceActionService,
+                                WorkflowTaskActionService taskActionService,
+                                WorkflowHistoryQueryService historyQueryService) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.instanceActionService = instanceActionService;
         this.taskActionService = taskActionService;
+        this.historyQueryService = historyQueryService;
     }
 
     public List<WorkflowTask> currentTodoTasks(String instanceId) {
@@ -48,6 +61,27 @@ public class WorkflowAdminService {
     @Transactional
     public WorkflowTaskActionResult forceApprove(WorkflowTaskActionRequest request) {
         return taskActionService.forceApprove(request);
+    }
+
+    public List<WorkflowHistoryInstance> queryHistory(String moduleAlias, String recordId, PageRequest pageRequest) {
+        return historyQueryService.queryAdminHistory(moduleAlias, recordId, pageRequest);
+    }
+
+    public WorkflowRuntimeRenderBundle renderHistoryBundle(String historyInstanceId) {
+        return historyQueryService.renderAdminBundle(historyInstanceId);
+    }
+
+    public List<WorkflowEvent> historyEvents(String historyInstanceId) {
+        return historyQueryService.adminEvents(historyInstanceId);
+    }
+
+    public List<WorkflowHistoryEventView> historyEventViews(String historyInstanceId) {
+        return historyQueryService.adminEventViews(historyInstanceId);
+    }
+
+    @Transactional
+    public int deleteHistory(String historyInstanceId) {
+        return historyQueryService.deleteHistory(historyInstanceId);
     }
 
     private WorkflowInstance requireRunningInstance(String instanceId) {

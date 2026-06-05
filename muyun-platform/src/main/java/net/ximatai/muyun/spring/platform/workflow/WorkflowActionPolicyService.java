@@ -19,9 +19,11 @@ import java.util.Set;
 @Service
 public class WorkflowActionPolicyService {
     public static final String MANAGEMENT_MODULE_ALIAS = "platform.workflow_admin";
+    public static final String MANAGEMENT_QUERY_ACTION = "workflowAdminQuery";
     public static final String MANAGEMENT_TODO_TASK_QUERY_ACTION = "todoTaskQuery";
     public static final String MANAGEMENT_FORCE_APPROVE_ACTION = "forceApprove";
     public static final String MANAGEMENT_FORCE_TERMINATE_ACTION = "forceTerminate";
+    public static final String MANAGEMENT_DELETE_HISTORY_ACTION = "deleteHistory";
     public static final List<String> RUNTIME_RECORD_ACTION_CODES = List.of(
             "approve",
             "reject",

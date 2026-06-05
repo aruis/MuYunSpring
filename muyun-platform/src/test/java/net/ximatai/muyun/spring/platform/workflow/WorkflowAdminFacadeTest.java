@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -22,12 +23,29 @@ class WorkflowAdminFacadeTest {
                 "instance-1", "admin-1", "force stop");
         WorkflowTaskActionRequest taskRequest = WorkflowTaskActionRequest.complete(
                 "task-1", "admin-1", "force approve");
+        WorkflowRuntimeRenderBundle bundle = new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of());
+        PageRequest pageRequest = PageRequest.of(1, 20);
+        when(adminService.queryHistory("sales.contract", "record-1", pageRequest)).thenReturn(List.of());
+        when(adminService.renderHistoryBundle("history-1")).thenReturn(bundle);
+        when(adminService.historyEvents("history-1")).thenReturn(List.of());
+        when(adminService.historyEventViews("history-1")).thenReturn(List.of());
+        when(adminService.deleteHistory("history-1")).thenReturn(1);
 
         assertThat(facade.currentTodoTasks("instance-1")).containsExactly(task);
         facade.forceTerminate(instanceRequest);
         facade.forceApprove(taskRequest);
+        assertThat(facade.queryHistory("sales.contract", "record-1", pageRequest)).isEmpty();
+        assertThat(facade.renderHistoryBundle("history-1")).isEqualTo(bundle);
+        assertThat(facade.historyEvents("history-1")).isEmpty();
+        assertThat(facade.historyEventViews("history-1")).isEmpty();
+        assertThat(facade.deleteHistory("history-1")).isEqualTo(1);
 
         verify(adminService).forceTerminate(instanceRequest);
         verify(adminService).forceApprove(taskRequest);
+        verify(adminService).queryHistory("sales.contract", "record-1", pageRequest);
+        verify(adminService).renderHistoryBundle("history-1");
+        verify(adminService).historyEvents("history-1");
+        verify(adminService).historyEventViews("history-1");
+        verify(adminService).deleteHistory("history-1");
     }
 }

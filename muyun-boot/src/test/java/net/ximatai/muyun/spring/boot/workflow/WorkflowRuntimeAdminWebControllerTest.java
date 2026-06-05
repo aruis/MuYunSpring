@@ -5,9 +5,15 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowEventType;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
@@ -23,9 +29,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,5 +101,61 @@ class WorkflowRuntimeAdminWebControllerTest {
                         .content("{\"reason\":\"force agree\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.task.id").value("task-1"));
+    }
+
+    @Test
+    void shouldExposeAdminHistoryQueryDetailsAndDelete() throws Exception {
+        WorkflowHistoryInstance history = new WorkflowHistoryInstance();
+        history.setId("history-1");
+        history.setModuleAlias("sales.contract");
+        history.setRecordId("record-1");
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId("event-1");
+        event.setEventType(WorkflowEventType.INSTANCE_TERMINATED);
+        when(adminFacade.queryHistory(eq("sales.contract"), eq("record-1"), any()))
+                .thenReturn(List.of(history));
+        when(adminFacade.renderHistoryBundle("history-1"))
+                .thenReturn(new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of()));
+        when(adminFacade.historyEvents("history-1")).thenReturn(List.of(event));
+        when(adminFacade.historyEventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
+                "event-1", "instance-1", null, null, WorkflowEventType.INSTANCE_TERMINATED, "forceTerminate",
+                "admin-1", "admin-1", false, WorkflowAssignmentKind.NORMAL, null, null,
+                null, null, null, null, false, false, null, null, null)));
+        when(adminFacade.deleteHistory("history-1")).thenReturn(1);
+
+        mvc.perform(post("/workflow/runtime/admin/history/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"moduleAlias\":\"sales.contract\",\"recordId\":\"record-1\","
+                                + "\"page\":{\"pageNum\":2,\"pageSize\":10}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("history-1"));
+        mvc.perform(post("/workflow/runtime/admin/history/history-1/bundle")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("HISTORY"));
+        mvc.perform(post("/workflow/runtime/admin/history/history-1/render")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("HISTORY"));
+        mvc.perform(post("/workflow/runtime/admin/history/history-1/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("event-1"));
+        mvc.perform(post("/workflow/runtime/admin/history/history-1/events/view")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].actualProcessUserId").value("admin-1"));
+        mvc.perform(post("/workflow/runtime/admin/history/history-1/delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(adminFacade).queryHistory(eq("sales.contract"), eq("record-1"), any());
+        verify(adminFacade).deleteHistory("history-1");
     }
 }

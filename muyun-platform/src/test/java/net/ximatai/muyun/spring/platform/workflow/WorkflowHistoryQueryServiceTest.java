@@ -13,13 +13,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WorkflowHistoryQueryServiceTest {
     private final WorkflowHistoryInstanceDao historyDao = mock(WorkflowHistoryInstanceDao.class);
     private final WorkflowArchiveService archiveService = mock(WorkflowArchiveService.class);
-    private final WorkflowHistoryQueryService service = new WorkflowHistoryQueryService(historyDao, archiveService);
+    private final WorkflowActionPolicyService actionPolicyService = mock(WorkflowActionPolicyService.class);
+    private final WorkflowHistoryQueryService service = new WorkflowHistoryQueryService(
+            historyDao, archiveService, actionPolicyService);
 
     @Test
     void shouldQueryRecordHistoryByModuleAndRecord() {
@@ -32,10 +35,65 @@ class WorkflowHistoryQueryServiceTest {
     }
 
     @Test
+    void shouldQueryAdminHistoryThroughManagementQueryAction() {
+        when(historyDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(history("history-1")));
+
+        List<WorkflowHistoryInstance> histories = service.queryAdminHistory(
+                "sales.contract", null, PageRequest.of(1, 20));
+
+        assertThat(histories).extracting(WorkflowHistoryInstance::getId).containsExactly("history-1");
+        verify(actionPolicyService).requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        verify(historyDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class));
+    }
+
+    @Test
+    void shouldReadAdminHistoryDetailsThroughManagementQueryAction() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId("event-1");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(task("task-1", WorkflowTaskStatus.DONE),
+                List.of(event)));
+
+        assertThat(service.renderAdminBundle("history-1").mode()).isEqualTo("HISTORY");
+        assertThat(service.adminEvents("history-1")).containsExactly(event);
+        assertThat(service.adminEventViews("history-1")).hasSize(1);
+
+        verify(actionPolicyService, org.mockito.Mockito.times(3))
+                .requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+    }
+
+    @Test
     void shouldRejectMissingHistoryInstance() {
         assertThatThrownBy(() -> service.renderBundle("missing"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("workflow history instance not found");
+    }
+
+    @Test
+    void shouldDeleteAdminHistoryThroughDeleteHistoryAction() {
+        WorkflowHistoryInstance history = history("history-1");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(historyDao.deleteById("history-1")).thenReturn(1);
+
+        int deleted = service.deleteHistory("history-1");
+
+        assertThat(deleted).isEqualTo(1);
+        verify(actionPolicyService).requireManagementAction(
+                WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
+        verify(historyDao).deleteById("history-1");
+    }
+
+    @Test
+    void shouldRejectDeletingMissingAdminHistoryBeforeHardDelete() {
+        assertThatThrownBy(() -> service.deleteHistory("missing"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("workflow history instance not found");
+
+        verify(actionPolicyService).requireManagementAction(
+                WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
+        verify(historyDao, never()).deleteById("missing");
     }
 
     @Test

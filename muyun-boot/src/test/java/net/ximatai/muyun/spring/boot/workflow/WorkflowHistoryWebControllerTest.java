@@ -88,4 +88,12 @@ class WorkflowHistoryWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].delegationPolicyId").value("delegation-1"));
     }
+
+    @Test
+    void shouldNotExposeHistoryDeleteOnOrdinaryHistoryController() throws Exception {
+        mvc.perform(post("/workflow/history/history-1/delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
 }

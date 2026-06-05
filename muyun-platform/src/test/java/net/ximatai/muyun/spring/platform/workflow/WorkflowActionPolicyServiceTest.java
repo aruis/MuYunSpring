@@ -55,12 +55,13 @@ class WorkflowActionPolicyServiceTest {
 
     @Test
     void shouldRequireManagementActionThroughDedicatedManagementModule() {
-        service.requireManagementAction("forceTerminate");
+        service.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
 
         ArgumentCaptor<ActionExecutionContext> context = ArgumentCaptor.forClass(ActionExecutionContext.class);
         verify(executionPolicyService).requireAuthorized(context.capture());
         assertThat(context.getValue().moduleAlias()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS);
-        assertThat(context.getValue().actionCode()).isEqualTo("forceTerminate");
+        assertThat(context.getValue().actionCode())
+                .isEqualTo(WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
         assertThat(context.getValue().recordIds()).isEmpty();
         assertThat(context.getValue().actionPolicy().level()).isEqualTo(PlatformActionLevel.LIST);
         assertThat(context.getValue().actionPolicy().accessMode()).isEqualTo(ActionAccessMode.AUTH_REQUIRED);

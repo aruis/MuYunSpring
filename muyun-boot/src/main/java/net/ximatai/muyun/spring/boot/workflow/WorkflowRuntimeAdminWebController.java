@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
@@ -8,8 +11,12 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryEventView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
@@ -68,6 +75,50 @@ public class WorkflowRuntimeAdminWebController {
                 null));
     }
 
+    @PostMapping("/history/query")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowHistoryInstance> queryHistory(
+            @RequestBody(required = false) WorkflowAdminHistoryQueryWebRequest request) {
+        WorkflowAdminHistoryQueryWebRequest payload = request == null
+                ? new WorkflowAdminHistoryQueryWebRequest(null, null, null)
+                : request;
+        return new WebListResponse<>(adminFacade.queryHistory(
+                payload.moduleAlias(), payload.recordId(), page(payload.page())));
+    }
+
+    @PostMapping({"/history/{historyInstanceId}/bundle", "/history/{historyInstanceId}/render"})
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WorkflowRuntimeRenderBundle renderHistoryBundle(@PathVariable String historyInstanceId,
+                                                           @RequestBody(required = false) Object ignored) {
+        return adminFacade.renderHistoryBundle(historyInstanceId);
+    }
+
+    @PostMapping("/history/{historyInstanceId}/events")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowEvent> historyEvents(@PathVariable String historyInstanceId,
+                                                        @RequestBody(required = false) Object ignored) {
+        return new WebListResponse<>(adminFacade.historyEvents(historyInstanceId));
+    }
+
+    @PostMapping("/history/{historyInstanceId}/events/view")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
+            title = "Workflow Admin Query", level = PlatformActionLevel.LIST)
+    public WebListResponse<WorkflowHistoryEventView> historyEventViews(@PathVariable String historyInstanceId,
+                                                                       @RequestBody(required = false) Object ignored) {
+        return new WebListResponse<>(adminFacade.historyEventViews(historyInstanceId));
+    }
+
+    @PostMapping("/history/{historyInstanceId}/delete")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION,
+            title = "Delete Workflow History", level = PlatformActionLevel.LIST)
+    public WebCountResponse deleteHistory(@PathVariable String historyInstanceId,
+                                          @RequestBody(required = false) Object ignored) {
+        return new WebCountResponse(adminFacade.deleteHistory(historyInstanceId));
+    }
+
     @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public WorkflowWebError handleBadRequest(RuntimeException exception) {
@@ -83,7 +134,15 @@ public class WorkflowRuntimeAdminWebController {
                 .filter(userId -> !userId.isBlank())
                 .orElseThrow(() -> new PlatformException("workflow operator id must not be blank"));
     }
+
+    private PageRequest page(WebPageRequest request) {
+        WebPageRequest normalized = request == null ? WebPageRequest.DEFAULT : request;
+        return PageRequest.of(normalized.pageNum(), normalized.pageSize());
+    }
 }
 
 record WorkflowAdminActionWebRequest(String operatorId, String reason) {
+}
+
+record WorkflowAdminHistoryQueryWebRequest(String moduleAlias, String recordId, WebPageRequest page) {
 }

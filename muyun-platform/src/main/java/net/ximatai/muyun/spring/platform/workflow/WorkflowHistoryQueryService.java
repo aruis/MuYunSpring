@@ -4,7 +4,9 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -17,11 +19,20 @@ public class WorkflowHistoryQueryService {
 
     private final WorkflowHistoryInstanceDao historyDao;
     private final WorkflowArchiveService archiveService;
+    private final WorkflowActionPolicyService actionPolicyService;
 
     public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
                                        WorkflowArchiveService archiveService) {
+        this(historyDao, archiveService, null);
+    }
+
+    @Autowired
+    public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
+                                       WorkflowArchiveService archiveService,
+                                       WorkflowActionPolicyService actionPolicyService) {
         this.historyDao = historyDao;
         this.archiveService = archiveService;
+        this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
     }
 
     public List<WorkflowHistoryInstance> queryRecordHistory(String moduleAlias, String recordId,
@@ -30,6 +41,39 @@ public class WorkflowHistoryQueryService {
                         .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"))
                         .eq("recordId", requireText(recordId, "workflow record id must not be blank")),
                 page(pageRequest), Sort.desc("archivedAt"), Sort.desc("startedAt"));
+    }
+
+    public List<WorkflowHistoryInstance> queryAdminHistory(String moduleAlias, String recordId,
+                                                           PageRequest pageRequest) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        Criteria criteria = Criteria.of()
+                .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"));
+        if (recordId != null && !recordId.isBlank()) {
+            criteria.eq("recordId", recordId);
+        }
+        return historyDao.query(criteria, page(pageRequest), Sort.desc("archivedAt"), Sort.desc("startedAt"));
+    }
+
+    public WorkflowRuntimeRenderBundle renderAdminBundle(String historyInstanceId) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        return renderBundle(historyInstanceId);
+    }
+
+    public List<WorkflowEvent> adminEvents(String historyInstanceId) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        return events(historyInstanceId);
+    }
+
+    public List<WorkflowHistoryEventView> adminEventViews(String historyInstanceId) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        return eventViews(historyInstanceId);
+    }
+
+    @Transactional
+    public int deleteHistory(String historyInstanceId) {
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        return historyDao.deleteById(history.getId());
     }
 
     public WorkflowRuntimeRenderBundle renderBundle(String historyInstanceId) {
