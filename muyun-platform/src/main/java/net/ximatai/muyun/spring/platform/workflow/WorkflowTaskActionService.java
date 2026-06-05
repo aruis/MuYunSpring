@@ -12,8 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -914,7 +916,7 @@ public class WorkflowTaskActionService {
                 throw new PlatformException("workflow add sign route key duplicated: " + routeKey);
             }
         }
-        validateLinearAddSignLinks(sourceNode.getNodeKey(), originalNextNodeKey, definitionsByKey.keySet(),
+        validateAddSignSegmentGraph(sourceNode.getNodeKey(), originalNextNodeKey, definitionsByKey.keySet(),
                 segment.linkDefinitions());
         List<WorkflowNodeInstance> nodes = segment.nodeDefinitions().stream()
                 .map(definition -> addSignNode(instance, sourceNode, definition, operatorId, now))
@@ -926,16 +928,17 @@ public class WorkflowTaskActionService {
                 nodes.stream().map(WorkflowNodeInstance::getNodeKey).toList());
     }
 
-    private void validateLinearAddSignLinks(String sourceNodeKey,
-                                            String originalNextNodeKey,
-                                            Set<String> addedNodeKeys,
-                                            List<WorkflowLinkDefinition> linkDefinitions) {
+    private void validateAddSignSegmentGraph(String sourceNodeKey,
+                                             String originalNextNodeKey,
+                                             Set<String> addedNodeKeys,
+                                             List<WorkflowLinkDefinition> linkDefinitions) {
         Set<String> allowed = new LinkedHashSet<>();
         allowed.add(sourceNodeKey);
         allowed.addAll(addedNodeKeys);
         allowed.add(originalNextNodeKey);
         Map<String, List<String>> outgoing = new LinkedHashMap<>();
         Map<String, List<String>> incoming = new LinkedHashMap<>();
+        Set<String> edges = new LinkedHashSet<>();
         for (WorkflowLinkDefinition link : linkDefinitions) {
             String source = requireText(link.getSourceNodeKey(), "workflow add sign link source must not be blank");
             String target = requireText(link.getTargetNodeKey(), "workflow add sign link target must not be blank");
@@ -952,48 +955,53 @@ public class WorkflowTaskActionService {
             if (sourceNodeKey.equals(source) && originalNextNodeKey.equals(target)) {
                 throw new PlatformException("workflow add sign segment cannot be empty direct route");
             }
+            if (!edges.add(source + "->" + target)) {
+                throw new PlatformException("workflow add sign link duplicated: " + source + " -> " + target);
+            }
             outgoing.computeIfAbsent(source, ignored -> new ArrayList<>()).add(target);
             incoming.computeIfAbsent(target, ignored -> new ArrayList<>()).add(source);
         }
-        if (outgoing.getOrDefault(sourceNodeKey, List.of()).size() != 1) {
-            throw new PlatformException("workflow add sign segment must have one entry from source node");
+        if (outgoing.getOrDefault(sourceNodeKey, List.of()).isEmpty()) {
+            throw new PlatformException("workflow add sign segment must have at least one entry from source node");
         }
         if (incoming.getOrDefault(originalNextNodeKey, List.of()).size() != 1) {
             throw new PlatformException("workflow add sign segment must have one exit to original next node");
         }
+        Set<String> reachableFromSource = reachable(sourceNodeKey, outgoing);
+        Map<String, List<String>> reverse = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : outgoing.entrySet()) {
+            for (String target : entry.getValue()) {
+                reverse.computeIfAbsent(target, ignored -> new ArrayList<>()).add(entry.getKey());
+            }
+        }
+        Set<String> canReachOriginalNext = reachable(originalNextNodeKey, reverse);
         for (String addedNodeKey : addedNodeKeys) {
-            if (incoming.getOrDefault(addedNodeKey, List.of()).size() != 1
-                    || outgoing.getOrDefault(addedNodeKey, List.of()).size() != 1) {
-                throw new PlatformException("workflow add sign only supports linear single chain in first version: "
+            if (!reachableFromSource.contains(addedNodeKey)) {
+                throw new PlatformException("workflow add sign segment contains unreachable added node: "
+                        + addedNodeKey);
+            }
+            if (!canReachOriginalNext.contains(addedNodeKey)) {
+                throw new PlatformException("workflow add sign segment added node cannot reach original next node: "
                         + addedNodeKey);
             }
         }
-        Set<String> visited = new LinkedHashSet<>();
-        String cursor = sourceNodeKey;
-        for (int depth = 0; depth <= addedNodeKeys.size(); depth++) {
-            List<String> next = outgoing.getOrDefault(cursor, List.of());
-            if (next.size() != 1) {
-                throw new PlatformException("workflow add sign linear chain is broken at: " + cursor);
-            }
-            cursor = next.getFirst();
-            if (originalNextNodeKey.equals(cursor)) {
-                if (visited.size() != addedNodeKeys.size()) {
-                    throw new PlatformException("workflow add sign segment must include all added nodes");
-                }
-                return;
-            }
-            if (!addedNodeKeys.contains(cursor) || !visited.add(cursor)) {
-                throw new PlatformException("workflow add sign segment contains invalid cycle: " + cursor);
-            }
+        if (!reachableFromSource.contains(originalNextNodeKey)) {
+            throw new PlatformException("workflow add sign segment must return to original next node: "
+                    + originalNextNodeKey);
         }
-        throw new PlatformException("workflow add sign segment must return to original next node: "
-                + originalNextNodeKey);
+        rejectAddSignSegmentCycles(sourceNodeKey, originalNextNodeKey, addedNodeKeys, outgoing);
     }
 
     private void validateAddSignNodeDefinition(WorkflowNodeDefinition definition) {
-        if (definition.getNodeType() != WorkflowNodeType.APPROVAL) {
-            throw new PlatformException("workflow add sign segment only supports approval nodes in first version: "
+        WorkflowNodeType nodeType = definition.getNodeType();
+        if (nodeType != WorkflowNodeType.APPROVAL
+                && nodeType != WorkflowNodeType.BRANCH
+                && nodeType != WorkflowNodeType.CONVERGE) {
+            throw new PlatformException("workflow add sign segment only supports approval, branch and converge nodes: "
                     + definition.getNodeKey());
+        }
+        if (nodeType != WorkflowNodeType.APPROVAL) {
+            return;
         }
         String policy = definition.getParticipantPolicyText();
         if (policy == null || policy.isBlank()) {
@@ -1014,6 +1022,54 @@ public class WorkflowTaskActionService {
             throw new PlatformException("workflow add sign participant policy only supports single user in first version: "
                     + definition.getNodeKey());
         }
+    }
+
+    private Set<String> reachable(String start, Map<String, List<String>> outgoing) {
+        Set<String> visited = new LinkedHashSet<>();
+        Deque<String> stack = new ArrayDeque<>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (!visited.add(current)) {
+                continue;
+            }
+            for (String next : outgoing.getOrDefault(current, List.of())) {
+                stack.push(next);
+            }
+        }
+        return visited;
+    }
+
+    private void rejectAddSignSegmentCycles(String sourceNodeKey,
+                                            String originalNextNodeKey,
+                                            Set<String> addedNodeKeys,
+                                            Map<String, List<String>> outgoing) {
+        Set<String> visited = new LinkedHashSet<>();
+        Set<String> visiting = new LinkedHashSet<>();
+        detectAddSignCycle(sourceNodeKey, originalNextNodeKey, addedNodeKeys, outgoing, visited, visiting);
+    }
+
+    private void detectAddSignCycle(String nodeKey,
+                                    String originalNextNodeKey,
+                                    Set<String> addedNodeKeys,
+                                    Map<String, List<String>> outgoing,
+                                    Set<String> visited,
+                                    Set<String> visiting) {
+        if (!addedNodeKeys.contains(nodeKey) && !originalNextNodeKey.equals(nodeKey)) {
+            if (!visiting.add(nodeKey)) {
+                throw new PlatformException("workflow add sign segment contains invalid cycle: " + nodeKey);
+            }
+        } else if (!visiting.add(nodeKey)) {
+            throw new PlatformException("workflow add sign segment contains invalid cycle: " + nodeKey);
+        }
+        for (String next : outgoing.getOrDefault(nodeKey, List.of())) {
+            if (visited.contains(next)) {
+                continue;
+            }
+            detectAddSignCycle(next, originalNextNodeKey, addedNodeKeys, outgoing, visited, visiting);
+        }
+        visiting.remove(nodeKey);
+        visited.add(nodeKey);
     }
 
     private WorkflowNodeInstance addSignNode(WorkflowInstance instance,

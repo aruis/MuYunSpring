@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -797,6 +798,54 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldInsertRuntimeAddSignBranchConvergeSegment() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowRouteInstance originalRoute = route("route-1", "approve", "next", WorkflowRouteStatus.CANDIDATE);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(originalRoute));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, node("node-next", "next",
+                WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
+        when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
+
+        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+                "task-1", "user-1", null, null, branchConvergeSegment(), null,
+                "need parallel review", Instant.parse("2026-06-05T04:00:00Z")));
+
+        assertThat(result.addSignEditMode()).isEqualTo(WorkflowAddSignEditMode.CREATE);
+        assertThat(result.addedNodeKeys()).containsExactly("addBranch", "addA", "addB", "addConverge");
+        assertThat(result.createdTask()).isNull();
+        ArgumentCaptor<WorkflowNodeInstance> nodeCaptor = ArgumentCaptor.forClass(WorkflowNodeInstance.class);
+        verify(nodeDao, times(4)).insert(nodeCaptor.capture());
+        assertThat(nodeCaptor.getAllValues()).extracting(WorkflowNodeInstance::getNodeKey)
+                .containsExactly("addBranch", "addA", "addB", "addConverge");
+        assertThat(nodeCaptor.getAllValues()).extracting(WorkflowNodeInstance::getNodeType)
+                .containsExactly(WorkflowNodeType.BRANCH, WorkflowNodeType.APPROVAL, WorkflowNodeType.APPROVAL,
+                        WorkflowNodeType.CONVERGE);
+        assertThat(nodeCaptor.getAllValues()).extracting(WorkflowNodeInstance::getAddedByAddSign)
+                .containsOnly(true);
+        assertThat(nodeCaptor.getAllValues()).extracting(WorkflowNodeInstance::getAddSignSourceNodeKey)
+                .containsOnly("approve");
+        assertThat(nodeCaptor.getAllValues()).extracting(WorkflowNodeInstance::getAddSignOperatorId)
+                .containsOnly("user-1");
+        ArgumentCaptor<WorkflowRouteInstance> routeCaptor = ArgumentCaptor.forClass(WorkflowRouteInstance.class);
+        verify(routeDao, times(6)).insert(routeCaptor.capture());
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getSourceNodeKey)
+                .containsExactly("approve", "addBranch", "addBranch", "addA", "addB", "addConverge");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getTargetNodeKey)
+                .containsExactly("addBranch", "addA", "addB", "addConverge", "addConverge", "next");
+        assertThat(result.event().getPayloadText())
+                .contains("\"addedNodeKeys\":[\"addBranch\",\"addA\",\"addB\",\"addConverge\"]");
+        verify(taskDao, never()).insert(any());
+        verifyNoInteractions(progressionService);
+    }
+
+    @Test
     void shouldReplaceUnstartedRuntimeAddSignSegmentFromSameSourceNode() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowInstance instance = instance();
@@ -1049,7 +1098,80 @@ class WorkflowTaskActionServiceTest {
                         linkDefinition("entry-task", "approve", "add-task"),
                         linkDefinition("exit-task", "add-task", "next"))), "need review")))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("only supports approval nodes");
+                .hasMessageContaining("only supports approval, branch and converge nodes");
+    }
+
+    @Test
+    void shouldRejectInvalidAddSignBranchConvergeSegments() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowRouteInstance originalRoute = route("route-1", "approve", "next", WorkflowRouteStatus.CANDIDATE);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of(), List.of(task), List.of(),
+                List.of(task), List.of(), List.of(task), List.of(), List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(originalRoute));
+        when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
+        when(nodeDao.query(any(), any())).thenReturn(
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)),
+                List.of(),
+                List.of(node, node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(
+                        List.of(nodeDefinition("addA"), nodeDefinition("addB")),
+                        List.of(
+                                linkDefinition("entry", "approve", "addA"),
+                                linkDefinition("a-exit", "addA", "next"),
+                                linkDefinition("b-exit", "addB", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("one exit");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(
+                        List.of(nodeDefinition("addA"), nodeDefinition("isolated")),
+                        List.of(
+                                linkDefinition("entry", "approve", "addA"),
+                                linkDefinition("exit", "addA", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unreachable added node");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(
+                        List.of(nodeDefinition("addA"), nodeDefinition("dead")),
+                        List.of(
+                                linkDefinition("entry-a", "approve", "addA"),
+                                linkDefinition("entry-dead", "approve", "dead"),
+                                linkDefinition("exit", "addA", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot reach original next node");
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(
+                        List.of(nodeDefinition("addA"), nodeDefinition("addB")),
+                        List.of(
+                                linkDefinition("entry", "approve", "addA"),
+                                linkDefinition("a-b", "addA", "addB"),
+                                linkDefinition("b-a", "addB", "addA"),
+                                linkDefinition("exit", "addA", "next"))), "need review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("invalid cycle");
+        assertThatCode(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", new WorkflowAddSignSegment(
+                        List.of(nodeDefinition("add-branch", WorkflowNodeType.BRANCH, null),
+                                nodeDefinition("add-converge", WorkflowNodeType.CONVERGE, null)),
+                        List.of(
+                                linkDefinition("entry", "approve", "add-branch"),
+                                linkDefinition("middle", "add-branch", "add-converge"),
+                                linkDefinition("exit", "add-converge", "next"))), "need review")))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -1161,6 +1283,22 @@ class WorkflowTaskActionServiceTest {
         return new WorkflowAddSignSegment(List.of(nodeDefinition(addedNodeKey)), List.of(
                 linkDefinition("entry-" + addedNodeKey, sourceNodeKey, addedNodeKey),
                 linkDefinition("exit-" + addedNodeKey, addedNodeKey, nextNodeKey)
+        ));
+    }
+
+    private WorkflowAddSignSegment branchConvergeSegment() {
+        return new WorkflowAddSignSegment(List.of(
+                nodeDefinition("addBranch", WorkflowNodeType.BRANCH, null),
+                nodeDefinition("addA"),
+                nodeDefinition("addB"),
+                nodeDefinition("addConverge", WorkflowNodeType.CONVERGE, null)
+        ), List.of(
+                linkDefinition("entry-branch", "approve", "addBranch"),
+                linkDefinition("branch-a", "addBranch", "addA"),
+                linkDefinition("branch-b", "addBranch", "addB"),
+                linkDefinition("a-converge", "addA", "addConverge"),
+                linkDefinition("b-converge", "addB", "addConverge"),
+                linkDefinition("exit-converge", "addConverge", "next")
         ));
     }
 
