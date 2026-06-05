@@ -86,12 +86,14 @@ class WorkflowSubmitDraftServiceTest {
                     assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
                     assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
                     assertThat(route.getSelectedBy()).isEqualTo("user-1");
+                    assertThat(route.getSelectedReason()).isEqualTo("choose left");
                 });
         assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("rightRoute"))
                 .first()
                 .satisfies(route -> {
                     assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
                     assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+                    assertThat(route.getSelectedReason()).isNull();
                 });
     }
 

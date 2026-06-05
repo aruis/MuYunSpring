@@ -108,7 +108,9 @@ public class WorkflowRuntimeProgressionService {
                 selectedInitialRoutes, operatorId, now);
         List<WorkflowEvent> events = new ArrayList<>();
         for (WorkflowRouteInstance route : selectedInitialRoutes) {
-            routeRuntimeService.effectiveRoute(route, routeReason(route, selectedKey), operatorId, now);
+            WorkflowRouteReason reason = routeReason(route, selectedKey);
+            routeRuntimeService.effectiveRoute(route, reason, operatorId, now,
+                    selectedReasonForRoute(route, reason, selectedKey, selectedReason));
             events.add(eventFactory.routeSelected(instance, route, operatorId, now));
         }
         for (WorkflowRouteInstance route : droppedRoutes) {
@@ -124,7 +126,7 @@ public class WorkflowRuntimeProgressionService {
                 passedConvergeNodeKeys,
                 512
         ));
-        applyManualBranchSelection(routes, selectedRouteKeysByBranch, operatorId, now);
+        applyManualBranchSelection(routes, selectedRouteKeysByBranch, selectedKey, selectedReason, operatorId, now);
         instanceStateService.applyActivation(instance, activation, now);
         nodeStateService.applyActivation(nodes, activation, now);
         routeStateService.applyActivation(routes, activation, operatorId, now);
@@ -300,6 +302,8 @@ public class WorkflowRuntimeProgressionService {
 
     private void applyManualBranchSelection(List<WorkflowRouteInstance> routes,
                                             Map<String, Set<String>> selectedRouteKeysByBranch,
+                                            String selectedRouteKey,
+                                            String selectedReason,
                                             String operatorId,
                                             Instant now) {
         if (selectedRouteKeysByBranch.isEmpty()) {
@@ -312,7 +316,9 @@ public class WorkflowRuntimeProgressionService {
                     continue;
                 }
                 if (entry.getValue().contains(route.getRouteKey())) {
-                    routeRuntimeService.effectiveRoute(route, WorkflowRouteReason.MANUAL_SELECTED, operatorId, now);
+                    routeRuntimeService.effectiveRoute(route, WorkflowRouteReason.MANUAL_SELECTED, operatorId, now,
+                            selectedReasonForRoute(route, WorkflowRouteReason.MANUAL_SELECTED,
+                                    selectedRouteKey, selectedReason));
                 } else {
                     routeRuntimeService.ineffectiveRoute(route, WorkflowRouteReason.MANUAL_UNSELECTED,
                             operatorId, now);
@@ -345,6 +351,17 @@ public class WorkflowRuntimeProgressionService {
                 : Boolean.TRUE.equals(route.getDefaultRoute())
                 ? WorkflowRouteReason.DEFAULT_SELECTED
                 : WorkflowRouteReason.CONDITION_MATCHED;
+    }
+
+    private String selectedReasonForRoute(WorkflowRouteInstance route,
+                                          WorkflowRouteReason reason,
+                                          String selectedRouteKey,
+                                          String selectedReason) {
+        return reason == WorkflowRouteReason.MANUAL_SELECTED
+                && selectedRouteKey != null
+                && selectedRouteKey.equals(route.getRouteKey())
+                ? selectedReason
+                : null;
     }
 
     private List<WorkflowNodeInstance> activatedNodes(List<WorkflowNodeInstance> nodes, WorkflowActivationResult activation) {

@@ -201,12 +201,14 @@ class WorkflowRuntimeProgressionServiceTest {
         when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
 
         WorkflowProgressionResult result = service.advanceFromNode("instance-1", "branch", "user-1",
-                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute");
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute", "choose left route");
 
         assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
         assertThat(leftRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(leftRoute.getSelectedReason()).isEqualTo("choose left route");
         assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
         assertThat(rightRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(rightRoute.getSelectedReason()).isNull();
         assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
         assertThat(right.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
         assertThat(result.selectedRoutes()).containsExactly(leftRoute);
@@ -239,14 +241,17 @@ class WorkflowRuntimeProgressionServiceTest {
         when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
 
         WorkflowProgressionResult result = service.advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute");
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute", "choose reachable left");
 
         assertThat(entry.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
         assertThat(entry.getRouteReason()).isEqualTo(WorkflowRouteReason.DEFAULT_SELECTED);
+        assertThat(entry.getSelectedReason()).isNull();
         assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
         assertThat(leftRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(leftRoute.getSelectedReason()).isEqualTo("choose reachable left");
         assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
         assertThat(rightRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(rightRoute.getSelectedReason()).isNull();
         assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
         assertThat(right.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
         assertThat(result.selectedRoutes()).containsExactly(entry);

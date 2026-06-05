@@ -237,7 +237,7 @@ class PlatformModelSchemaTest {
                         "branch_node_key", "branch_run_id", "converge_node_key", "converge_run_id",
                         "parent_route_id", "route_depth",
                         "route_status", "route_reason", "condition_matched", "default_route",
-                        "selected_by", "selected_at", "arrived_at", "closed_by_route_id", "closed_reason",
+                        "selected_by", "selected_at", "selected_reason", "arrived_at", "closed_by_route_id", "closed_reason",
                         "invalidated_by_action_id", "invalidated_at",
                         "added_by_add_sign", "add_sign_source_node_key", "add_sign_operator_id", "add_sign_at");
         assertThat(columnNames(mapper.toTable(WorkflowTask.class)))
@@ -265,6 +265,8 @@ class PlatformModelSchemaTest {
         assertThat(columnType(mapper.toTable(WorkflowNodeDefinition.class), "participant_policy_text"))
                 .isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowNodeInstance.class), "participant_policy_text"))
+                .isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowRouteInstance.class), "selected_reason"))
                 .isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowTask.class), "result_message")).isEqualTo(ColumnType.TEXT);
         assertThat(indexes(mapper.toTable(WorkflowRouteInstance.class)))

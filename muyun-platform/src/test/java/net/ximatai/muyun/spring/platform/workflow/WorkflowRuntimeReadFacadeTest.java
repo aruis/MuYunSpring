@@ -35,6 +35,7 @@ class WorkflowRuntimeReadFacadeTest {
         WorkflowInstance instance = instance("instance-1");
         WorkflowNodeInstance node = node("node-1", "approve");
         WorkflowRouteInstance route = route();
+        route.setSelectedReason("choose manual route");
         when(instanceDao.findById("instance-1")).thenReturn(instance);
         when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of(node));
         when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of(route));
@@ -45,6 +46,7 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(bundle.instance()).isSameAs(instance);
         assertThat(bundle.nodes()).containsExactly(node);
         assertThat(bundle.routes()).containsExactly(route);
+        assertThat(bundle.routes().getFirst().getSelectedReason()).isEqualTo("choose manual route");
         verify(actionPolicyService).requireRecordView(instance);
     }
 

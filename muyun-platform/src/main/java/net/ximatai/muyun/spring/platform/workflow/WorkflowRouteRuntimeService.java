@@ -12,6 +12,11 @@ import java.util.Objects;
 public class WorkflowRouteRuntimeService {
     public WorkflowRouteInstance effectiveRoute(WorkflowRouteInstance route, WorkflowRouteReason reason,
                                                 String operatorId, Instant selectedAt) {
+        return effectiveRoute(route, reason, operatorId, selectedAt, null);
+    }
+
+    public WorkflowRouteInstance effectiveRoute(WorkflowRouteInstance route, WorkflowRouteReason reason,
+                                                String operatorId, Instant selectedAt, String selectedReason) {
         route.setRouteStatus(WorkflowRouteStatus.EFFECTIVE);
         route.setRouteReason(reason);
         route.setConditionMatched(reason == WorkflowRouteReason.CONDITION_MATCHED
@@ -19,6 +24,9 @@ public class WorkflowRouteRuntimeService {
                 || reason == WorkflowRouteReason.MANUAL_SELECTED);
         route.setSelectedBy(operatorId);
         route.setSelectedAt(selectedAt);
+        if (reason == WorkflowRouteReason.MANUAL_SELECTED) {
+            route.setSelectedReason(textOrNull(selectedReason));
+        }
         return route;
     }
 
@@ -99,6 +107,10 @@ public class WorkflowRouteRuntimeService {
         }
         return Objects.equals(left.getId(), right.getId())
                 || Objects.equals(left.getRouteRunId(), right.getRouteRunId());
+    }
+
+    private String textOrNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private boolean canPass(WorkflowConvergeMode convergeMode, Integer convergeRatio,

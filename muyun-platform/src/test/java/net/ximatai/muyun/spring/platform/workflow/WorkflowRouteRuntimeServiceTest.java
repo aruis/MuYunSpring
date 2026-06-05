@@ -13,6 +13,20 @@ class WorkflowRouteRuntimeServiceTest {
     private final WorkflowRouteRuntimeService service = new WorkflowRouteRuntimeService();
 
     @Test
+    void shouldPersistSelectedReasonOnlyForManualSelectedRoute() {
+        WorkflowRouteInstance manual = route("manual", WorkflowRouteStatus.CANDIDATE);
+        WorkflowRouteInstance defaultRoute = route("default", WorkflowRouteStatus.CANDIDATE);
+
+        service.effectiveRoute(manual, WorkflowRouteReason.MANUAL_SELECTED, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "choose manual route");
+        service.effectiveRoute(defaultRoute, WorkflowRouteReason.DEFAULT_SELECTED, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "should be ignored");
+
+        assertThat(manual.getSelectedReason()).isEqualTo("choose manual route");
+        assertThat(defaultRoute.getSelectedReason()).isNull();
+    }
+
+    @Test
     void shouldCloseArrivedRouteAndDropPendingRoutesWhenAnyConvergePasses() {
         WorkflowRouteInstance first = route("r1", WorkflowRouteStatus.EFFECTIVE);
         WorkflowRouteInstance second = route("r2", WorkflowRouteStatus.EFFECTIVE);

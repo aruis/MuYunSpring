@@ -46,6 +46,7 @@ class WorkflowArchiveServiceTest {
         assertThat(snapshot.instance().getId()).isEqualTo("instance-1");
         assertThat(snapshot.nodes()).extracting(WorkflowNodeInstance::getId).containsExactly("node-1");
         assertThat(snapshot.routes()).extracting(WorkflowRouteInstance::getId).containsExactly("route-1");
+        assertThat(snapshot.routes().getFirst().getSelectedReason()).isEqualTo("choose manual route");
         assertThat(snapshot.tasks()).extracting(WorkflowTask::getId).containsExactly("task-1");
         assertThat(snapshot.events()).extracting(WorkflowEvent::getId).containsExactly("event-1");
     }
@@ -90,6 +91,7 @@ class WorkflowArchiveServiceTest {
         route.setSourceNodeKey("start");
         route.setTargetNodeKey("approve");
         route.setRouteStatus(WorkflowRouteStatus.CANCELED);
+        route.setSelectedReason("choose manual route");
         return route;
     }
 

@@ -97,7 +97,8 @@ public class WorkflowSubmitDraftService {
         instanceStateService.applyActivation(snapshot.instance(), activation, operatedAt);
         nodeInstanceStateService.applyActivation(snapshot.nodes(), activation, operatedAt);
         routeInstanceStateService.applyActivation(snapshot.routes(), activation, operatorId, operatedAt);
-        applyManualBranchSelection(snapshot.routes(), selectedRouteKeysByBranch, operatorId, operatedAt);
+        applyManualBranchSelection(snapshot.routes(), selectedRouteKeysByBranch, selectedRouteKey, selectedReason,
+                operatorId, operatedAt);
         WorkflowRuntimeTaskDraft taskDraft = taskFactory.createBlockingTasks(snapshot.instance(), snapshot.nodes(),
                 activation, operatorId, operatedAt);
 
@@ -110,6 +111,8 @@ public class WorkflowSubmitDraftService {
 
     private void applyManualBranchSelection(List<WorkflowRouteInstance> routes,
                                             Map<String, Set<String>> selectedRouteKeysByBranch,
+                                            String selectedRouteKey,
+                                            String selectedReason,
                                             String operatorId,
                                             Instant operatedAt) {
         if (selectedRouteKeysByBranch.isEmpty()) {
@@ -123,12 +126,17 @@ public class WorkflowSubmitDraftService {
                     continue;
                 }
                 if (entry.getValue().contains(route.getRouteKey())) {
-                    routeRuntimeService.effectiveRoute(route, WorkflowRouteReason.MANUAL_SELECTED, operatorId, now);
+                    routeRuntimeService.effectiveRoute(route, WorkflowRouteReason.MANUAL_SELECTED, operatorId, now,
+                            selectedReasonForRoute(route, selectedRouteKey, selectedReason));
                 } else if (route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE) {
                     routeRuntimeService.ineffectiveRoute(route, WorkflowRouteReason.MANUAL_UNSELECTED,
                             operatorId, now);
                 }
             }
         }
+    }
+
+    private String selectedReasonForRoute(WorkflowRouteInstance route, String selectedRouteKey, String selectedReason) {
+        return selectedRouteKey != null && selectedRouteKey.equals(route.getRouteKey()) ? selectedReason : null;
     }
 }

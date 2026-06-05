@@ -75,6 +75,9 @@ public class WorkflowRouteInstance extends StandardEntity {
     @Column(name = "selected_at", type = ColumnType.TIMESTAMP, comment = "Selected at")
     private Instant selectedAt;
 
+    @Column(name = "selected_reason", type = ColumnType.TEXT, comment = "Manual selected reason")
+    private String selectedReason;
+
     @Column(name = "arrived_at", type = ColumnType.TIMESTAMP, comment = "Arrived at converge")
     private Instant arrivedAt;
 
