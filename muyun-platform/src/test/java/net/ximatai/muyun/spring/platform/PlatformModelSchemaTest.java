@@ -202,6 +202,8 @@ class PlatformModelSchemaTest {
                         "module_alias", "record_id", "approval_enabled",
                         "approval_status", "instance_status", "approval_completed_at", "started_by",
                         "started_at", "completed_at", "terminated_at", "current_node_keys",
+                        "reject_resubmit_mode", "reject_return_node_key", "reject_return_owner_id",
+                        "previous_instance_id",
                         "last_action_code", "last_action_reason", "last_operator_id", "last_operated_at",
                         "snapshot_text")
                 .doesNotContain("entity_alias");

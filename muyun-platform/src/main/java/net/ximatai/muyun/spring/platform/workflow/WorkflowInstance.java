@@ -62,6 +62,22 @@ public class WorkflowInstance extends StandardEntity {
     @Column(name = "terminated_at", type = ColumnType.TIMESTAMP, comment = "Terminated at")
     private Instant terminatedAt;
 
+    @Column(name = "reject_resubmit_mode", type = ColumnType.VARCHAR, length = 32,
+            comment = "Reject resubmit mode")
+    private WorkflowRejectResubmitMode rejectResubmitMode;
+
+    @Column(name = "reject_return_node_key", type = ColumnType.VARCHAR, length = 64,
+            comment = "Reject return node key")
+    private String rejectReturnNodeKey;
+
+    @Column(name = "reject_return_owner_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Reject return owner id")
+    private String rejectReturnOwnerId;
+
+    @Column(name = "previous_instance_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Previous workflow instance id")
+    private String previousInstanceId;
+
     @Column(name = "current_node_keys", type = ColumnType.TEXT, comment = "Current active node keys")
     private String currentNodeKeys;
 

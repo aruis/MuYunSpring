@@ -2,16 +2,14 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
-public enum WorkflowTaskKind implements CodeTitleEnum {
-    APPROVAL("approval", "审批任务"),
-    BUSINESS("business", "业务任务"),
-    NOTICE("notice", "知会任务"),
-    RESUBMIT("resubmit", "重提任务");
+public enum WorkflowRejectResubmitMode implements CodeTitleEnum {
+    RESTART("restart", "重新发起"),
+    RETURN_TO_ME("return_to_me", "回到驳回人");
 
     private final String code;
     private final String title;
 
-    WorkflowTaskKind(String code, String title) {
+    WorkflowRejectResubmitMode(String code, String title) {
         this.code = code;
         this.title = title;
     }

@@ -8,6 +8,7 @@ public enum WorkflowEventType implements CodeTitleEnum {
     TASK_CREATED("task_created", "任务创建"),
     TASK_COMPLETED("task_completed", "任务完成"),
     TASK_REJECTED("task_rejected", "任务驳回"),
+    TASK_RESUBMITTED("task_resubmitted", "任务重提"),
     TASK_TRANSFERRED("task_transferred", "任务转办"),
     TASK_SKIPPED("task_skipped", "任务跳过"),
     TASK_INVALIDATED("task_invalidated", "任务失效"),

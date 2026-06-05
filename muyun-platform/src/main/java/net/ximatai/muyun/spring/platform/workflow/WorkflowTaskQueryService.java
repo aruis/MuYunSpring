@@ -29,7 +29,8 @@ public class WorkflowTaskQueryService {
         return taskDao.query(Criteria.of()
                         .eq("actualProcessorId", requireText(processorId, "workflow processor id must not be blank"))
                         .in("taskStatus", List.of(WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED,
-                                WorkflowTaskStatus.NOTICED, WorkflowTaskStatus.TRANSFERRED)),
+                                WorkflowTaskStatus.ROLLED_BACK, WorkflowTaskStatus.NOTICED,
+                                WorkflowTaskStatus.TRANSFERRED)),
                 page(pageRequest), Sort.desc("completedAt"), Sort.desc("updatedAt"));
     }
 

@@ -24,6 +24,12 @@ public class WorkflowRuntimeEventFactory {
                 "workflow task created", null, occurredAt);
     }
 
+    public WorkflowEvent taskCreated(WorkflowInstance instance, WorkflowTask task,
+                                     String operatorId, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_CREATED, null, operatorId,
+                "workflow task created", null, occurredAt);
+    }
+
     public WorkflowEvent taskCompleted(WorkflowInstance instance, WorkflowTask task, String actionCode,
                                        String operatorId, String message, Instant occurredAt) {
         return event(instance, null, task, WorkflowEventType.TASK_COMPLETED, actionCode, operatorId,
@@ -40,6 +46,18 @@ public class WorkflowRuntimeEventFactory {
                                       String operatorId, String message, Instant occurredAt) {
         return event(instance, null, task, WorkflowEventType.TASK_REJECTED, "reject", operatorId,
                 message == null || message.isBlank() ? "workflow task rejected" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent taskResubmitted(WorkflowInstance instance, WorkflowTask task,
+                                         String operatorId, String message, Instant occurredAt) {
+        return event(instance, null, task, WorkflowEventType.TASK_RESUBMITTED, "resubmit", operatorId,
+                message == null || message.isBlank() ? "workflow task resubmitted" : message, null, occurredAt);
+    }
+
+    public WorkflowEvent nodeRolledBack(WorkflowInstance instance, WorkflowNodeInstance node,
+                                        String operatorId, String message, Instant occurredAt) {
+        return event(instance, node, null, WorkflowEventType.NODE_ROLLED_BACK, "rollback", operatorId,
+                message == null || message.isBlank() ? "workflow node rolled back" : message, null, occurredAt);
     }
 
     public WorkflowEvent taskSkipped(WorkflowInstance instance, WorkflowTask task,
