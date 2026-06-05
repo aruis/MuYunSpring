@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -29,10 +30,16 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (id == null || id.isBlank()) {
             return null;
         }
-        return getDao().query(CrudAbility.super.activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
+        T entity = getDao().query(CrudAbility.super.activeCriteria(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id)), new PageRequest(0, 1))
                 .stream()
                 .findFirst()
                 .orElse(null);
+        if (entity != null && this instanceof FieldProtectionAbility<?> fieldProtectionAbility) {
+            @SuppressWarnings("unchecked")
+            FieldProtectionAbility<T> typed = (FieldProtectionAbility<T>) fieldProtectionAbility;
+            typed.restoreProtectedFieldsFromStorage(entity);
+        }
+        return entity;
     }
 
     @Override
@@ -75,7 +82,10 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         }
         Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
         EntityLifecycle.prepareDelete(entity, Instant.now());
-        int deleted = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+        int deleted;
+        try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+            deleted = getDao().updateByIdAndVersion(entity, effectiveExpectedVersion);
+        }
         if (deleted <= 0) {
             throw new OptimisticLockException("record version conflict: " + id);
         }

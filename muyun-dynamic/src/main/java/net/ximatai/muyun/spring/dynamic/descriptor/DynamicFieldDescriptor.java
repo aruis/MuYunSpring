@@ -28,7 +28,10 @@ public record DynamicFieldDescriptor(
         String defaultValue,
         String validationRegex,
         boolean copyable,
-        boolean writeProtected
+        boolean writeProtected,
+        boolean encrypted,
+        boolean signed,
+        String maskingPolicy
 ) {
     public DynamicFieldDescriptor {
         companions = companions == null ? List.of() : List.copyOf(companions);
@@ -55,7 +58,10 @@ public record DynamicFieldDescriptor(
                 field.behavior().defaultValue(),
                 field.behavior().validationRegex(),
                 field.behavior().copyable(),
-                field.behavior().writeProtected()
+                field.behavior().writeProtected(),
+                field.protection().encryptionMode().enabled(),
+                field.protection().signatureMode().enabled(),
+                field.protection().maskingPolicy().enabled() ? field.protection().maskingPolicy().name() : null
         );
     }
 
@@ -81,7 +87,10 @@ public record DynamicFieldDescriptor(
                 descriptor.defaultValue(),
                 descriptor.validationRegex(),
                 descriptor.copyable(),
-                descriptor.writeProtected()
+                descriptor.writeProtected(),
+                descriptor.encrypted(),
+                descriptor.signed(),
+                descriptor.maskingPolicy()
         );
     }
 

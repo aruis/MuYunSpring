@@ -12,11 +12,17 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
+import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionPlan;
+import net.ximatai.muyun.spring.ability.security.FieldSigner;
+import net.ximatai.muyun.spring.ability.security.ProtectedFieldAccessor;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -24,6 +30,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
@@ -49,7 +56,8 @@ public class DynamicEntityService implements
         ChildAbility<DynamicRecord>,
         ChildrenAbility<DynamicRecord>,
         ReferencerAbility<DynamicRecord>,
-        CacheAbility<DynamicRecord> {
+        CacheAbility<DynamicRecord>,
+        FieldProtectionAbility<DynamicRecord> {
     private final DynamicRecordDao dao;
     private final String moduleAlias;
     private final DynamicRecordLifecycle lifecycle;
@@ -57,6 +65,9 @@ public class DynamicEntityService implements
     private final Function<String, DynamicEntityService> relationServiceResolver;
     private final String cacheNamespace;
     private final DynamicFieldValueValidator fieldValueValidator;
+    private final FieldCryptoProvider fieldCryptoProvider;
+    private final FieldSigner fieldSigner;
+    private final FieldProtectionPlan<DynamicRecord> fieldProtectionPlan;
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
@@ -92,6 +103,19 @@ public class DynamicEntityService implements
                                 Function<String, DynamicEntityService> relationServiceResolver,
                                 String cacheNamespacePrefix,
                                 DynamicFieldValueValidator fieldValueValidator) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix, fieldValueValidator,
+                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE);
+    }
+
+    public DynamicEntityService(DynamicRecordDao dao,
+                                String moduleAlias,
+                                DynamicRecordLifecycle lifecycle,
+                                ModuleDefinition module,
+                                Function<String, DynamicEntityService> relationServiceResolver,
+                                String cacheNamespacePrefix,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                FieldCryptoProvider fieldCryptoProvider,
+                                FieldSigner fieldSigner) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
@@ -99,6 +123,12 @@ public class DynamicEntityService implements
         this.relationServiceResolver = Objects.requireNonNull(relationServiceResolver, "relationServiceResolver must not be null");
         this.cacheNamespace = resolveCacheNamespace(cacheNamespacePrefix);
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
+        this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
+        this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
+        this.fieldProtectionPlan = new FieldProtectionPlan<DynamicRecord>(dao.getEntity().fields().stream()
+                .filter(field -> field.protection().enabled())
+                .map(field -> (ProtectedFieldAccessor<DynamicRecord>) new DynamicProtectedFieldAccessor(field))
+                .toList());
     }
 
     @Override
@@ -139,6 +169,21 @@ public class DynamicEntityService implements
     @Override
     public String cacheNamespace() {
         return cacheNamespace;
+    }
+
+    @Override
+    public FieldProtectionPlan<DynamicRecord> fieldProtectionPlan() {
+        return fieldProtectionPlan;
+    }
+
+    @Override
+    public FieldCryptoProvider fieldCryptoProvider() {
+        return fieldCryptoProvider;
+    }
+
+    @Override
+    public FieldSigner fieldSigner() {
+        return fieldSigner;
     }
 
     @Override
@@ -285,12 +330,32 @@ public class DynamicEntityService implements
         return new DynamicQueryCriteriaBuilder(dao.getEntity()).build(conditions);
     }
 
+    @Override
+    public PageResult<DynamicRecord> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        PageResult<DynamicRecord> page = getDao().pageQuery(activeCriteria(criteria), pageRequest, sorts);
+        List<DynamicRecord> records = page.getRecords().stream()
+                .peek(this::applyReadPipeline)
+                .toList();
+        return PageResult.of(records, page.getTotal(), pageRequest);
+    }
+
+    @Override
+    public List<DynamicRecord> list(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+        return getDao().query(activeCriteria(criteria), pageRequest, sorts).stream()
+                .peek(this::applyReadPipeline)
+                .toList();
+    }
+
     public List<DynamicRecord> sortedList(Criteria criteria) {
         requireCapability(EntityCapability.SORT);
+        List<DynamicRecord> records;
         if (dao.getEntity().supports(EntityCapability.TREE)) {
-            return treeRuntime().sortedList(criteria).stream().map(DynamicTreeRecord::record).toList();
+            records = treeRuntime().sortedList(criteria).stream().map(DynamicTreeRecord::record).toList();
+        } else {
+            records = sortRuntime().sortedList(criteria).stream().map(DynamicSortRecord::record).toList();
         }
-        return sortRuntime().sortedList(criteria).stream().map(DynamicSortRecord::record).toList();
+        records.forEach(this::applyReadPipeline);
+        return records;
     }
 
     public void reorder(List<String> orderedIds) {
@@ -327,24 +392,29 @@ public class DynamicEntityService implements
 
     public List<DynamicRecord> children(String parentId) {
         requireCapability(EntityCapability.TREE);
-        return treeRuntime().children(parentId).stream().map(DynamicTreeRecord::record).toList();
+        return treeRuntime().children(parentId).stream()
+                .map(DynamicTreeRecord::record)
+                .peek(this::applyReadPipeline)
+                .toList();
     }
 
     public List<DynamicRecord> children(Criteria scopeCriteria, String parentId) {
         requireCapability(EntityCapability.TREE);
-        return treeRuntime().children(scopeCriteria, parentId).stream().map(DynamicTreeRecord::record).toList();
+        return treeRuntime().children(scopeCriteria, parentId).stream()
+                .map(DynamicTreeRecord::record)
+                .peek(this::applyReadPipeline)
+                .toList();
     }
 
     @Override
     public List<DynamicRecord> selectChildRows(Criteria criteria) {
         List<DynamicRecord> rows;
         if (dao.getEntity().supports(EntityCapability.SORT)) {
-            rows = sortedList(criteria);
+            return sortedList(criteria);
         } else {
             rows = ChildAbility.super.selectChildRows(criteria);
         }
-        rows.forEach(this::afterReferenceSelect);
-        rows.forEach(this::refreshReferenceDependencies);
+        rows.forEach(this::applyReadPipeline);
         return rows;
     }
 
@@ -389,7 +459,11 @@ public class DynamicEntityService implements
 
     public String referenceTitle(DynamicRecord entity) {
         requireCapability(EntityCapability.REFERENCE);
-        return entity == null ? null : entity.title();
+        if (entity == null) {
+            return null;
+        }
+        Object rendered = maskProtectedValue(PlatformAbilityFields.TITLE_FIELD, entity.title(), FieldOutputContext.REFERENCE);
+        return rendered == null ? null : String.valueOf(rendered);
     }
 
     public Map<String, String> titles(Collection<String> ids) {
@@ -404,15 +478,15 @@ public class DynamicEntityService implements
         }
         LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
         LinkedHashSet<String> normalizedFields = new LinkedHashSet<>(fieldNames);
-        List<DynamicRecord> records = getDao().query(
-                activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
+        List<DynamicRecord> records = list(
+                Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds)),
                 new PageRequest(0, Integer.MAX_VALUE)
         );
         Map<String, Map<String, Object>> loaded = new LinkedHashMap<>();
         for (DynamicRecord record : records) {
             Map<String, Object> values = new LinkedHashMap<>();
             for (String fieldName : normalizedFields) {
-                values.put(fieldName, record.getValue(fieldName));
+                values.put(fieldName, maskProtectedValue(fieldName, record.getValue(fieldName), FieldOutputContext.REFERENCE));
             }
             loaded.put(record.getId(), Collections.unmodifiableMap(new LinkedHashMap<>(values)));
         }
@@ -494,6 +568,12 @@ public class DynamicEntityService implements
             }
             populateReferenceProjectionValues(record, targetService, ids, plan);
         }
+    }
+
+    private void applyReadPipeline(DynamicRecord record) {
+        restoreProtectedFieldsFromStorage(record);
+        afterReferenceSelect(record);
+        refreshReferenceDependencies(record);
     }
 
     private List<ReferencePlan> referencePlans() {

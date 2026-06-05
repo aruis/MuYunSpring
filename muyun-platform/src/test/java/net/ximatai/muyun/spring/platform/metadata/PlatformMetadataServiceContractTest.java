@@ -12,6 +12,9 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
@@ -42,6 +45,7 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
     private final MemoryDao<PlatformFieldType> fieldTypeDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
+    private final MemoryDao<MetadataFieldProtectionConfig> protectionConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
     private final MemoryDao<MetadataView> viewDao = new MemoryDao<>();
@@ -54,11 +58,13 @@ class PlatformMetadataServiceContractTest {
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+    private final MetadataFieldProtectionConfigService protectionConfigService =
+            new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao);
     private final MetadataFieldConfigService fieldConfigService =
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
-                    categoryService, relationService);
+                    categoryService, relationService, protectionConfigService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
-            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
+            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, protectionConfigService);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                     fieldTypeService, moduleService, relationService);
@@ -141,6 +147,73 @@ class PlatformMetadataServiceContractTest {
         FieldDefinition definition = fieldDefinitionCompiler.compile(field);
         assertThat(definition.queryDefinition().queryable()).isTrue();
         assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+    }
+
+    @Test
+    void shouldCompileFieldProtectionFromIndependentMetadataConfig() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "mobile", "mobile", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig fieldConfig = fieldConfig(field.getId());
+        fieldConfig.setQueryable(false);
+        fieldConfigService.insert(fieldConfig);
+        MetadataFieldProtectionConfig config = protectionConfig(field.getId());
+        config.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        config.setSignatureMode(FieldSignatureMode.SIGNED);
+        config.setMaskingPolicy(FieldMaskingPolicy.PHONE);
+
+        protectionConfigService.insert(config);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+        assertThat(definition.protection().encryptionMode()).isEqualTo(FieldEncryptionMode.ENCRYPTED);
+        assertThat(definition.protection().signatureMode()).isEqualTo(FieldSignatureMode.SIGNED);
+        assertThat(definition.protection().maskingPolicy()).isEqualTo(FieldMaskingPolicy.PHONE);
+    }
+
+    @Test
+    void shouldRejectInvalidFieldProtectionMetadataConfig() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.INTEGER);
+        fieldService.insert(amount);
+        MetadataField title = titleField(metadataId);
+        fieldService.insert(title);
+
+        MetadataFieldProtectionConfig numericConfig = protectionConfig(amount.getId());
+        numericConfig.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        assertThatThrownBy(() -> protectionConfigService.insert(numericConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("requires string field");
+
+        MetadataFieldProtectionConfig titleConfig = protectionConfig(title.getId());
+        titleConfig.setSignatureMode(FieldSignatureMode.SIGNED);
+        assertThatThrownBy(() -> protectionConfigService.insert(titleConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot be unique, indexed, sortable or title field");
+    }
+
+    @Test
+    void shouldRejectQueryableProtectedStorageFieldRegardlessOfSaveOrder() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField mobile = field(metadataId, "mobile", "mobile", FieldType.STRING);
+        fieldService.insert(mobile);
+
+        MetadataFieldProtectionConfig firstProtection = protectionConfig(mobile.getId());
+        firstProtection.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        assertThatThrownBy(() -> protectionConfigService.insert(firstProtection))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot be queryable");
+
+        MetadataFieldConfig disabledQuery = fieldConfig(mobile.getId());
+        disabledQuery.setQueryable(false);
+        fieldConfigService.insert(disabledQuery);
+        protectionConfigService.insert(firstProtection);
+
+        MetadataFieldConfig enabledQuery = fieldConfig(mobile.getId());
+        enabledQuery.setId(disabledQuery.getId());
+        enabledQuery.setQueryable(true);
+        assertThatThrownBy(() -> fieldConfigService.update(enabledQuery))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("cannot be queryable");
     }
 
     @Test
@@ -669,6 +742,12 @@ class PlatformMetadataServiceContractTest {
 
     private MetadataFieldConfig fieldConfig(String fieldId) {
         MetadataFieldConfig config = new MetadataFieldConfig();
+        config.setMetadataFieldId(fieldId);
+        return config;
+    }
+
+    private MetadataFieldProtectionConfig protectionConfig(String fieldId) {
+        MetadataFieldProtectionConfig config = new MetadataFieldProtectionConfig();
         config.setMetadataFieldId(fieldId);
         return config;
     }

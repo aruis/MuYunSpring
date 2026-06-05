@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 
 import java.util.Collection;
 import java.time.Instant;
@@ -95,7 +96,7 @@ record DynamicRecordResponse(String id,
                                 : entry.getValue().stream().map(DynamicRecordResponse::from).toList()
                 ));
         @SuppressWarnings("unchecked")
-        Map<String, Object> values = (Map<String, Object>) DynamicWebValues.webValue(record.getValues());
+        Map<String, Object> values = (Map<String, Object>) DynamicWebValues.webValue(record.outputValues(FieldOutputContext.VIEW));
         return new DynamicRecordResponse(record.getId(), record.getVersion(), values, childResponses);
     }
 }

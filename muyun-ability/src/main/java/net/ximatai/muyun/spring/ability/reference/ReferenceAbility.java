@@ -5,10 +5,13 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -33,7 +36,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
 
     default String title(String id) {
         T entity = selectReferenceRaw(id);
-        return entity == null ? null : referenceTitle(entity);
+        return entity == null ? null : referenceTitleForOutput(entity);
     }
 
     default Map<String, String> titles(Collection<String> ids) {
@@ -44,10 +47,10 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         List<T> entities = getDao().query(
                 activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
                 new PageRequest(0, Integer.MAX_VALUE)
-        );
+        ).stream().peek(this::restoreReferenceProtectedFields).toList();
         Map<String, String> loadedTitles = new LinkedHashMap<>();
         for (T entity : entities) {
-            loadedTitles.put(entity.getId(), referenceTitle(entity));
+            loadedTitles.put(entity.getId(), referenceTitleForOutput(entity));
         }
         Map<String, String> titles = new LinkedHashMap<>();
         for (String id : normalizedIds) {
@@ -67,12 +70,12 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         List<T> entities = getDao().query(
                 activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
                 new PageRequest(0, Integer.MAX_VALUE)
-        );
+        ).stream().peek(this::restoreReferenceProtectedFields).toList();
         Map<String, Map<String, Object>> loaded = new LinkedHashMap<>();
         for (T entity : entities) {
             Map<String, Object> values = new LinkedHashMap<>();
             for (String fieldName : normalizedFields) {
-                values.put(fieldName, ReferenceFieldResolver.read(entity, fieldName));
+                values.put(fieldName, referenceProjectionValue(fieldName, ReferenceFieldResolver.read(entity, fieldName)));
             }
             loaded.put(entity.getId(), Collections.unmodifiableMap(new LinkedHashMap<>(values)));
         }
@@ -86,14 +89,16 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
     }
 
     default T selectReferenceRaw(String id) {
-        return selectActiveRaw(id);
+        T entity = selectActiveRaw(id);
+        restoreReferenceProtectedFields(entity);
+        return entity;
     }
 
     default PageResult<ReferenceOption> referenceOptions(Criteria criteria, PageRequest pageRequest) {
         PageResult<T> page = pageQuery(criteria, pageRequest);
         return PageResult.of(
                 page.getRecords().stream()
-                        .map(entity -> new ReferenceOption(entity.getId(), referenceTitle(entity)))
+                        .map(entity -> new ReferenceOption(entity.getId(), referenceTitleForOutput(entity)))
                         .toList(),
                 page.getTotal(),
                 pageRequest
@@ -111,5 +116,28 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         }
         throw new PlatformException("reference entity requires @TitleField or non-null TitledCapable title: "
                 + entity.getClass().getName());
+    }
+
+    private String referenceTitleForOutput(T entity) {
+        String title = referenceTitle(entity);
+        String titleFieldName = TitleFieldResolver.resolveFieldName(modelClass()).orElse(PlatformAbilityFields.TITLE_FIELD);
+        Object rendered = referenceProjectionValue(titleFieldName, title);
+        return rendered == null ? null : String.valueOf(rendered);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object referenceProjectionValue(String fieldName, Object value) {
+        if (this instanceof FieldProtectionAbility<?> fieldProtectionAbility) {
+            return ((FieldProtectionAbility<T>) fieldProtectionAbility)
+                    .maskProtectedValue(fieldName, value, FieldOutputContext.REFERENCE);
+        }
+        return value;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void restoreReferenceProtectedFields(T entity) {
+        if (entity != null && this instanceof FieldProtectionAbility<?> fieldProtectionAbility) {
+            ((FieldProtectionAbility<T>) fieldProtectionAbility).restoreProtectedFieldsFromStorage(entity);
+        }
     }
 }

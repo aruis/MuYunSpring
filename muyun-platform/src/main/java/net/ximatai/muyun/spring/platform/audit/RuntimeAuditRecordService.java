@@ -21,9 +21,16 @@ import java.util.Objects;
 @Service
 public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAuditRecord> {
     public static final String MODULE_ALIAS = "platform.runtime_audit_record";
+    private final RuntimeAuditPayloadSanitizer payloadSanitizer;
 
     public RuntimeAuditRecordService(BaseDao<RuntimeAuditRecord, String> auditRecordDao) {
+        this(auditRecordDao, new RuntimeAuditPayloadSanitizer());
+    }
+
+    public RuntimeAuditRecordService(BaseDao<RuntimeAuditRecord, String> auditRecordDao,
+                                     RuntimeAuditPayloadSanitizer payloadSanitizer) {
         super(MODULE_ALIAS, RuntimeAuditRecord.class, auditRecordDao);
+        this.payloadSanitizer = payloadSanitizer == null ? new RuntimeAuditPayloadSanitizer() : payloadSanitizer;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -47,7 +54,8 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         record.setAuthorizationPermissionCode(event.authorizationPermissionCode());
         record.setAuthorizationPermissionActionCode(event.authorizationPermissionActionCode());
         record.setMutationSource(event.mutationSource());
-        record.setPayloadText(payloadText(event.payload()));
+        Map<String, Object> sanitizedPayload = payloadSanitizer.sanitize(event.payload());
+        record.setPayloadText(payloadText(sanitizedPayload));
         record.setOccurredAt(event.occurredAt());
         if (event.tenantId() == null) {
             try (TenantContext.Scope ignored = TenantContext.system("runtime audit persist")) {
@@ -65,7 +73,8 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
             record.setResultMessage(ActionEventPayload.text(event.payload(), ActionEventPayload.MESSAGE));
             record.setRefreshRequested(ActionEventPayload.bool(event.payload(), ActionEventPayload.REFRESH));
             record.setRedirectTo(ActionEventPayload.text(event.payload(), ActionEventPayload.REDIRECT_TO));
-            record.setResultText(ActionEventPayload.text(event.payload(), ActionEventPayload.RESULT));
+            record.setResultText(payloadSanitizer.sanitizeText(ActionEventPayload.RESULT,
+                    ActionEventPayload.text(event.payload(), ActionEventPayload.RESULT)));
             return;
         }
         if (event.eventType() == RuntimeEventType.ACTION_FAILED) {

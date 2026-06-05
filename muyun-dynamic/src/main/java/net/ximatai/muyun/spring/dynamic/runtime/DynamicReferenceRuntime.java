@@ -20,6 +20,6 @@ final class DynamicReferenceRuntime extends DynamicAbilityRuntime<DynamicTitledR
 
     @Override
     public String referenceTitle(DynamicTitledRecord entity) {
-        return entity == null ? null : entity.getTitle();
+        return entity == null ? null : owner.referenceTitle(entity.record());
     }
 }

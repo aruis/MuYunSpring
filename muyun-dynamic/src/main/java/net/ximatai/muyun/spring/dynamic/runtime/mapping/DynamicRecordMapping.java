@@ -4,13 +4,17 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public final class DynamicRecordMapping {
     private final Map<String, String> columns = new HashMap<>();
+    private final Set<String> protectedStorageFields = new HashSet<>();
 
     public DynamicRecordMapping(EntityDefinition entity) {
         columns.put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
@@ -40,6 +44,14 @@ public final class DynamicRecordMapping {
         for (FieldDefinition field : entity.fields()) {
             columns.put(field.code(), field.columnName());
             columns.put(field.columnName(), field.columnName());
+            if (field.protection().hasStorageProtection()) {
+                protectedStorageFields.add(field.code());
+                protectedStorageFields.add(field.columnName());
+                if (field.protection().signatureMode().enabled()) {
+                    protectedStorageFields.add(FieldCompanionRules.signatureFieldName(field.fieldName()));
+                    protectedStorageFields.add(FieldCompanionRules.signatureColumnName(field.columnName()));
+                }
+            }
         }
     }
 
@@ -49,5 +61,13 @@ public final class DynamicRecordMapping {
             throw new IllegalArgumentException("unknown dynamic field or column: " + fieldOrColumn);
         }
         return column;
+    }
+
+    public String resolveQueryableColumn(String fieldOrColumn) {
+        if (protectedStorageFields.contains(fieldOrColumn)) {
+            throw new IllegalArgumentException("protected storage field cannot be used in dynamic query or sort: "
+                    + fieldOrColumn);
+        }
+        return resolveColumn(fieldOrColumn);
     }
 }

@@ -6,12 +6,14 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -24,6 +26,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     private final PlatformFieldTypeService fieldTypeService;
     private final DictionaryCategoryService categoryService;
     private final ModuleMetadataRelationService relationService;
+    private final MetadataFieldProtectionConfigService protectionConfigService;
 
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
@@ -31,12 +34,24 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                                       PlatformFieldTypeService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService) {
+        this(configDao, fieldService, metadataService, fieldTypeService, categoryService, relationService, null);
+    }
+
+    @Autowired
+    public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
+                                      MetadataFieldService fieldService,
+                                      MetadataService metadataService,
+                                      PlatformFieldTypeService fieldTypeService,
+                                      DictionaryCategoryService categoryService,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataFieldProtectionConfigService protectionConfigService) {
         super(MODULE_ALIAS, MetadataFieldConfig.class, configDao);
         this.fieldService = fieldService;
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
         this.categoryService = categoryService;
         this.relationService = relationService;
+        this.protectionConfigService = protectionConfigService;
     }
 
     @Override
@@ -77,6 +92,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         normalizeFieldShape(config, fieldType);
         normalizeDictionaryBinding(config, field, fieldType);
         normalizeQueryDefinition(config, fieldType);
+        validateProtectionQueryBoundary(config, fieldType);
         normalizeBehavior(config, fieldType);
         rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
                 "metadata field config must be unique in scope: " + config.getMetadataFieldId());
@@ -171,6 +187,20 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
             config.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.parseNames(config.getQueryOperators())));
         }
         config.queryDefinition(fieldType);
+    }
+
+    private void validateProtectionQueryBoundary(MetadataFieldConfig config, PlatformFieldType fieldType) {
+        if (protectionConfigService == null) {
+            return;
+        }
+        FieldProtectionDefinition protection = protectionConfigService.definition(config.getMetadataFieldId());
+        if (!protection.hasStorageProtection()) {
+            return;
+        }
+        if (config.queryDefinition(fieldType).queryable()) {
+            throw new PlatformException("Protected storage field cannot be queryable: "
+                    + config.getMetadataFieldId());
+        }
     }
 
     private void normalizeBehavior(MetadataFieldConfig config, PlatformFieldType fieldType) {

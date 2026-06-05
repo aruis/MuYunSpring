@@ -2,6 +2,10 @@ package net.ximatai.muyun.spring.dynamic.metadata;
 
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
+import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -157,5 +161,51 @@ class FieldDefinitionTest {
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("required field requires required companion");
+    }
+
+    @Test
+    void shouldComposeGeneratedSignatureCompanionWithDeclaredTimeZoneCompanion() {
+        EntityDefinition entity = new EntityDefinition(
+                "meeting",
+                "app_meeting",
+                "Meeting",
+                java.util.List.of(
+                        FieldDefinition.zonedTimestamp("meetingAt", "Meeting At")
+                                .column("meeting_at")
+                                .protection(new FieldProtectionDefinition(
+                                        FieldEncryptionMode.NONE,
+                                        FieldSignatureMode.SIGNED,
+                                        FieldMaskingPolicy.NONE
+                                )),
+                        FieldDefinition.zonedTimestampTimeZone("meetingAt", "meeting_at")
+                )
+        );
+
+        new ModuleDefinitionValidator().validateEntity(entity);
+
+        assertThat(FieldCompanionRules.recordFields(entity))
+                .extracting(FieldDefinition::fieldName)
+                .contains("meetingAt", "meetingAtTimeZone", "meetingAtSignature");
+        assertThat(FieldCompanionRules.recordFields(entity))
+                .filteredOn(field -> field.fieldName().equals("meetingAtSignature"))
+                .singleElement()
+                .satisfies(field -> assertThat(field.columnName()).isEqualTo("meeting_at_signature"));
+    }
+
+    @Test
+    void shouldRejectQueryableProtectedStorageField() {
+        FieldDefinition secret = FieldDefinition.string("secret", "Secret")
+                .protection(new FieldProtectionDefinition(
+                        FieldEncryptionMode.ENCRYPTED,
+                        FieldSignatureMode.NONE,
+                        FieldMaskingPolicy.NONE
+                ))
+                .queryable();
+        EntityDefinition entity = new EntityDefinition("contract", "app_contract", "Contract",
+                java.util.List.of(secret));
+
+        assertThatThrownBy(() -> new ModuleDefinitionValidator().validateEntity(entity))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("protected storage field cannot be queryable");
     }
 }

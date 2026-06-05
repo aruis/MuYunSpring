@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
+import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
+import net.ximatai.muyun.spring.ability.security.FieldSigner;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -22,6 +24,8 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final RuntimeEventPublisher eventPublisher;
     private final DynamicActionExecutorRegistry actionExecutorRegistry;
     private final DynamicActionTransactionOperator actionTransactionOperator;
+    private final FieldCryptoProvider fieldCryptoProvider;
+    private final FieldSigner fieldSigner;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
@@ -63,6 +67,18 @@ public class DynamicRecordRuntime implements AutoCloseable {
                                 RuntimeEventPublisher eventPublisher,
                                 DynamicActionExecutorRegistry actionExecutorRegistry,
                                 DynamicActionTransactionOperator actionTransactionOperator) {
+        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry, actionTransactionOperator,
+                FieldCryptoProvider.UNAVAILABLE, FieldSigner.UNAVAILABLE);
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
+                                DynamicModuleRegistry registry,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                RuntimeEventPublisher eventPublisher,
+                                DynamicActionExecutorRegistry actionExecutorRegistry,
+                                DynamicActionTransactionOperator actionTransactionOperator,
+                                FieldCryptoProvider fieldCryptoProvider,
+                                FieldSigner fieldSigner) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
@@ -73,6 +89,8 @@ public class DynamicRecordRuntime implements AutoCloseable {
         this.actionTransactionOperator = actionTransactionOperator == null
                 ? DynamicActionTransactionOperator.none()
                 : actionTransactionOperator;
+        this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
+        this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
@@ -134,7 +152,9 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 module,
                 childEntityAliasCode -> entityService(moduleAlias, childEntityAliasCode),
                 cacheNamespacePrefix,
-                fieldValueValidator
+                fieldValueValidator,
+                fieldCryptoProvider,
+                fieldSigner
         );
     }
 

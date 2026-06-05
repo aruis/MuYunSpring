@@ -4,6 +4,8 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
+import net.ximatai.muyun.spring.ability.security.FieldSigner;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
@@ -56,9 +58,13 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               DynamicFieldValueValidator fieldValueValidator,
                                               RuntimeEventPublisher eventPublisher,
                                               DynamicActionExecutorRegistry actionExecutorRegistry,
-                                              DynamicActionTransactionOperator actionTransactionOperator) {
+                                              DynamicActionTransactionOperator actionTransactionOperator,
+                                              ObjectProvider<FieldCryptoProvider> fieldCryptoProvider,
+                                              ObjectProvider<FieldSigner> fieldSigner) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
-                eventPublisher, actionExecutorRegistry, actionTransactionOperator);
+                eventPublisher, actionExecutorRegistry, actionTransactionOperator,
+                fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
+                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE));
     }
 
     @Bean

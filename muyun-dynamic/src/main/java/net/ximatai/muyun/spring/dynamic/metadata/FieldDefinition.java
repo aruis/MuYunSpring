@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.dynamic.metadata;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 
 import java.util.Set;
 
@@ -21,10 +22,12 @@ public record FieldDefinition(
         Integer scale,
         FieldDictionaryBinding dictionaryBinding,
         FieldQueryDefinition queryDefinition,
-        FieldBehaviorDefinition behavior
+        FieldBehaviorDefinition behavior,
+        FieldProtectionDefinition protection
 ) {
     public FieldDefinition(String fieldName, String columnName, FieldType type, String name) {
-        this(fieldName, columnName, type, name, false, false, false, false, false, null, null, null, null, null, null);
+        this(fieldName, columnName, type, name, false, false, false, false, false,
+                null, null, null, null, null, null, null);
     }
 
     public FieldDefinition(String fieldName,
@@ -42,12 +45,13 @@ public record FieldDefinition(
                            FieldDictionaryBinding dictionaryBinding,
                            FieldQueryDefinition queryDefinition) {
         this(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, null);
+                length, precision, scale, dictionaryBinding, queryDefinition, null, null);
     }
 
     public FieldDefinition {
         queryDefinition = queryDefinition == null ? FieldQueryDefinition.disabled() : queryDefinition;
         behavior = behavior == null ? FieldBehaviorDefinition.DEFAULT : behavior;
+        protection = protection == null ? FieldProtectionDefinition.NONE : protection;
     }
 
     public static FieldDefinition of(String fieldName, FieldType type, String name) {
@@ -123,42 +127,42 @@ public record FieldDefinition(
 
     public FieldDefinition column(String value) {
         return new FieldDefinition(fieldName, value, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition required() {
         return new FieldDefinition(fieldName, columnName, type, name, true, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition unique() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, true, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition indexed() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, true, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition sortable() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, true, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition title() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, true,
-                length, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition length(int value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                value, precision, scale, dictionaryBinding, queryDefinition, behavior);
+                value, precision, scale, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition precision(int value, int scaleValue) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, value, scaleValue, dictionaryBinding, queryDefinition, behavior);
+                length, value, scaleValue, dictionaryBinding, queryDefinition, behavior, protection);
     }
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
@@ -167,7 +171,8 @@ public record FieldDefinition(
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias, OptionSelectionMode selectionMode) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias, selectionMode), queryDefinition, behavior);
+                length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias, selectionMode),
+                queryDefinition, behavior, protection);
     }
 
     public FieldDefinition queryable() {
@@ -180,7 +185,7 @@ public record FieldDefinition(
 
     public FieldDefinition queryable(FieldQueryDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, value, behavior);
+                length, precision, scale, dictionaryBinding, value, behavior, protection);
     }
 
     public FieldDefinition defaultValue(String value) {
@@ -201,7 +206,12 @@ public record FieldDefinition(
 
     public FieldDefinition behavior(FieldBehaviorDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
-                length, precision, scale, dictionaryBinding, queryDefinition, value);
+                length, precision, scale, dictionaryBinding, queryDefinition, value, protection);
+    }
+
+    public FieldDefinition protection(FieldProtectionDefinition value) {
+        return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, behavior, value);
     }
 
     public OptionBinding optionBinding() {

@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,7 +45,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
                     rows.add(root);
                     appendDescendants(root.getId(), rows);
                 }
-                return new WebListResponse<>(rows);
+                return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
             }
             return new WebListResponse<>(roots.stream().map(this::treeNode).toList());
         });
@@ -71,7 +72,7 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
                 rows.add(root);
             }
             appendDescendants(root.getId(), rows);
-            return new WebListResponse<>(rows);
+            return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
         });
     }
 
@@ -83,7 +84,8 @@ public interface TreeWeb<T extends EntityContract & TreeCapable, S extends TreeA
     }
 
     private WebTreeNode<T> treeNode(T record) {
-        return new WebTreeNode<>(record, treeChildren(record.getId()).stream().map(this::treeNode).toList());
+        return new WebTreeNode<>(WebOutputSupport.record(service(), record, FieldOutputContext.VIEW),
+                treeChildren(record.getId()).stream().map(this::treeNode).toList());
     }
 
     private T treeSelect(String id) {

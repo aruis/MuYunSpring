@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
 public enum FieldCompanionRole {
-    TIME_ZONE
+    TIME_ZONE,
+    SIGNATURE
 }

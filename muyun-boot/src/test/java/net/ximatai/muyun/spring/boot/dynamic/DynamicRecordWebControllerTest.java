@@ -16,6 +16,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
+import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -237,6 +241,20 @@ class DynamicRecordWebControllerTest {
         assertThat(updateRecord.getValue().getId()).isEqualTo("contract-1");
         assertThat(updateRecord.getValue().getVersion()).isEqualTo(3);
         assertThat(updateRecord.getValue().getValue("amount")).isEqualTo(10);
+    }
+
+    @Test
+    void shouldMaskProtectedDynamicFieldsInViewResponse() throws Exception {
+        DynamicRecord record = new DynamicRecord(protectedEntity())
+                .setValue("code", "C-001")
+                .setValue("secret", "sensitive-value");
+        record.setId("contract-1");
+        when(mainEntity.select("contract-1")).thenReturn(record);
+
+        mvc.perform(get("/{moduleAlias}/view/{recordId}", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.values.code").value("C-001"))
+                .andExpect(jsonPath("$.values.secret").value("s*************e"));
     }
 
     @Test
@@ -1083,6 +1101,18 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
+        ));
+    }
+
+    private EntityDefinition protectedEntity() {
+        return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required(),
+                FieldDefinition.string("secret", "Secret")
+                        .protection(new FieldProtectionDefinition(
+                                FieldEncryptionMode.NONE,
+                                FieldSignatureMode.NONE,
+                                FieldMaskingPolicy.MIDDLE
+                        ))
         ));
     }
 

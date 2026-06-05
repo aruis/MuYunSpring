@@ -24,6 +24,20 @@ public final class FieldCompanionRules {
         return columnName + "_timezone";
     }
 
+    public static String signatureFieldName(String fieldName) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("signature owner fieldName must not be blank");
+        }
+        return fieldName + "Signature";
+    }
+
+    public static String signatureColumnName(String columnName) {
+        if (columnName == null || columnName.isBlank()) {
+            throw new IllegalArgumentException("signature owner columnName must not be blank");
+        }
+        return columnName + "_signature";
+    }
+
     public static List<FieldCompanionGroup> groups(EntityDefinition entity) {
         return entity.fields().stream()
                 .map(FieldCompanionRules::group)
@@ -32,8 +46,9 @@ public final class FieldCompanionRules {
     }
 
     public static List<FieldCompanionGroup> group(FieldDefinition owner) {
+        java.util.ArrayList<FieldCompanionGroup> groups = new java.util.ArrayList<>();
         if (owner.type() == FieldType.ZONED_TIMESTAMP) {
-            return List.of(new FieldCompanionGroup(
+            groups.add(new FieldCompanionGroup(
                     owner.fieldName(),
                     FieldCompanionKind.ZONED_TIMESTAMP,
                     List.of(new FieldCompanionDefinition(
@@ -47,7 +62,22 @@ public final class FieldCompanionRules {
                     ))
             ));
         }
-        return List.of();
+        if (owner.protection().signatureMode().enabled()) {
+            groups.add(new FieldCompanionGroup(
+                    owner.fieldName(),
+                    FieldCompanionKind.FIELD_PROTECTION,
+                    List.of(new FieldCompanionDefinition(
+                            owner.fieldName(),
+                            signatureFieldName(owner.fieldName()),
+                            signatureColumnName(owner.columnName()),
+                            FieldType.STRING,
+                            FieldCompanionRole.SIGNATURE,
+                            false,
+                            false
+                    ))
+            ));
+        }
+        return List.copyOf(groups);
     }
 
     public static Map<String, FieldCompanionDefinition> companionsByField(EntityDefinition entity) {
@@ -58,6 +88,20 @@ public final class FieldCompanionRules {
 
     public static Set<String> companionFieldNames(EntityDefinition entity) {
         return companionsByField(entity).keySet();
+    }
+
+    public static List<FieldDefinition> generatedFields(EntityDefinition entity) {
+        return groups(entity).stream()
+                .filter(group -> group.kind() == FieldCompanionKind.FIELD_PROTECTION)
+                .flatMap(group -> group.companions().stream())
+                .map(FieldCompanionRules::toGeneratedField)
+                .toList();
+    }
+
+    public static List<FieldDefinition> recordFields(EntityDefinition entity) {
+        java.util.ArrayList<FieldDefinition> fields = new java.util.ArrayList<>(entity.fields());
+        fields.addAll(generatedFields(entity));
+        return List.copyOf(fields);
     }
 
     public static Object normalizeCompanionValue(FieldCompanionDefinition companion, Object value) {
@@ -73,6 +117,13 @@ public final class FieldCompanionRules {
         for (FieldCompanionGroup group : groups(entity)) {
             for (FieldCompanionDefinition expected : group.companions()) {
                 FieldDefinition actual = fieldsByName.get(expected.fieldName());
+                if (group.kind() == FieldCompanionKind.FIELD_PROTECTION) {
+                    if (actual != null) {
+                        throw new ModuleDefinitionException("field protection companion must not be declared manually: "
+                                + entity.alias() + "." + expected.fieldName());
+                    }
+                    continue;
+                }
                 if (actual == null) {
                     throw new ModuleDefinitionException("field companion is missing: "
                             + entity.alias() + "." + expected.fieldName());
@@ -96,6 +147,9 @@ public final class FieldCompanionRules {
 
     public static void validateForInsert(EntityDefinition entity, Map<String, Object> values) {
         for (FieldCompanionGroup group : groups(entity)) {
+            if (group.kind() == FieldCompanionKind.FIELD_PROTECTION) {
+                continue;
+            }
             if (values.get(group.ownerField()) == null) {
                 continue;
             }
@@ -109,6 +163,9 @@ public final class FieldCompanionRules {
 
     public static void validateForUpdate(EntityDefinition entity, Set<String> explicitFields) {
         for (FieldCompanionGroup group : groups(entity)) {
+            if (group.kind() == FieldCompanionKind.FIELD_PROTECTION) {
+                continue;
+            }
             if (!explicitFields.contains(group.ownerField())) {
                 continue;
             }
@@ -118,5 +175,26 @@ public final class FieldCompanionRules {
                 }
             }
         }
+    }
+
+    private static FieldDefinition toGeneratedField(FieldCompanionDefinition companion) {
+        return new FieldDefinition(
+                companion.fieldName(),
+                companion.columnName(),
+                companion.type(),
+                companion.fieldName(),
+                false,
+                false,
+                false,
+                false,
+                false,
+                512,
+                null,
+                null,
+                null,
+                null,
+                FieldBehaviorDefinition.DEFAULT,
+                null
+        );
     }
 }

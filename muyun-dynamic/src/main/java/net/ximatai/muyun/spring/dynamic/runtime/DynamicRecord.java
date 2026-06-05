@@ -1,11 +1,13 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.ability.security.FieldOutputRenderer;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
@@ -14,6 +16,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRole;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldValueSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
@@ -67,12 +70,18 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         if (field == null) {
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
         }
+        if (isInternalGeneratedField(fieldCode)) {
+            throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
+        }
         values.put(fieldCode, normalizeValue(field, value, true));
         explicitFields.add(fieldCode);
         return this;
     }
 
     public Object getValue(String fieldCode) {
+        if (isInternalGeneratedField(fieldCode)) {
+            throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
+        }
         if (!fields.containsKey(fieldCode)) {
             if (loadedValues.containsKey(fieldCode)) {
                 return loadedValues.get(fieldCode);
@@ -83,7 +92,27 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     }
 
     public Map<String, Object> getValues() {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+        Map<String, Object> visible = new LinkedHashMap<>();
+        values.forEach((fieldCode, value) -> {
+            if (!isInternalGeneratedField(fieldCode)) {
+                visible.put(fieldCode, value);
+            }
+        });
+        return Collections.unmodifiableMap(visible);
+    }
+
+    public Map<String, Object> outputValues(FieldOutputContext context) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        values.forEach((fieldCode, value) -> {
+            if (isInternalGeneratedField(fieldCode)) {
+                return;
+            }
+            FieldDefinition field = fields.get(fieldCode);
+            output.put(fieldCode, field == null
+                    ? value
+                    : FieldOutputRenderer.renderValue(fieldCode, value, field.protection(), context, null));
+        });
+        return Collections.unmodifiableMap(output);
     }
 
     public boolean isExplicitlySet(String fieldCode) {
@@ -331,6 +360,17 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         values.put(fieldCode, normalizeValue(field, value, true));
     }
 
+    Object getPlatformValue(String fieldCode) {
+        if (!fields.containsKey(fieldCode)) {
+            throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        return values.get(fieldCode);
+    }
+
+    Map<String, Object> getPlatformValues() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
+    }
+
     void validateForInsert() {
         for (FieldDefinition field : fields.values()) {
             if (field.isRequired() && values.get(field.code()) == null) {
@@ -391,12 +431,17 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return fields.containsKey(fieldCode);
     }
 
+    private boolean isInternalGeneratedField(String fieldCode) {
+        FieldCompanionDefinition companion = companionFields.get(fieldCode);
+        return companion != null && companion.role() == FieldCompanionRole.SIGNATURE;
+    }
+
     private static List<FieldDefinition> recordFields(EntityDefinition entity) {
         List<FieldDefinition> values = new ArrayList<>();
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
             values.addAll(DynamicAbilityFields.dataScopeFields());
         }
-        values.addAll(entity.fields());
+        values.addAll(FieldCompanionRules.recordFields(entity));
         return List.copyOf(values);
     }
 

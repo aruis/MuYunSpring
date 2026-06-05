@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.dynamic.runtime.mapping.DynamicRecordMapping;
 
@@ -113,7 +114,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     @Override
     public List<DynamicRecord> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         Objects.requireNonNull(pageRequest, "pageRequest must not be null");
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveColumn, databaseType());
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveQueryableColumn, databaseType());
         StringBuilder sql = selectSql(compiled.getSql());
         appendOrderBy(sql, sorts);
         sql.append(" LIMIT :limit OFFSET :offset");
@@ -144,7 +145,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public long count(Criteria criteria) {
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveColumn, databaseType());
+        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveQueryableColumn, databaseType());
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS total_count FROM ")
                 .append(qualifiedTable());
         if (!compiled.getSql().isBlank()) {
@@ -177,8 +178,8 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
         body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
         for (FieldDefinition field : recordFields()) {
-            if (record.getValues().containsKey(field.code())) {
-                body.put(field.columnName(), record.getValues().get(field.code()));
+            if (record.getPlatformValues().containsKey(field.code())) {
+                body.put(field.columnName(), record.getPlatformValues().get(field.code()));
             }
         }
         if (!includeId) {
@@ -198,8 +199,8 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
             body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
         }
         for (FieldDefinition field : recordFields()) {
-            if (record.getValues().containsKey(field.code())) {
-                body.put(field.columnName(), record.getValues().get(field.code()));
+            if (record.getPlatformValues().containsKey(field.code())) {
+                body.put(field.columnName(), record.getPlatformValues().get(field.code()));
             }
         }
         return body;
@@ -248,7 +249,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
             fields.addAll(DynamicAbilityFields.dataScopeFields());
         }
-        fields.addAll(entity.fields());
+        fields.addAll(FieldCompanionRules.recordFields(entity));
         return fields;
     }
 
@@ -266,7 +267,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         }
         List<String> parts = java.util.Arrays.stream(sorts)
                 .filter(Objects::nonNull)
-                .map(sort -> quote(mapping.resolveColumn(sort.getField())) + " " + sort.getDirection().name())
+                .map(sort -> quote(mapping.resolveQueryableColumn(sort.getField())) + " " + sort.getDirection().name())
                 .toList();
         if (!parts.isEmpty()) {
             sql.append(" ORDER BY ").append(String.join(", ", parts));

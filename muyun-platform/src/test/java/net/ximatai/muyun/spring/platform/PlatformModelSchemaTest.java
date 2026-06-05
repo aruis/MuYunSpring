@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
@@ -79,6 +80,8 @@ class PlatformModelSchemaTest {
                 .doesNotContain("verify_regex");
         assertThat(columnType(mapper.toTable(MetadataFieldConfig.class), "query_operators"))
                 .isEqualTo(ColumnType.JSON_SET);
+        assertThat(columnNames(mapper.toTable(MetadataFieldProtectionConfig.class)))
+                .contains("id", "metadata_field_id", "enabled", "encryption_mode", "signature_mode", "masking_policy");
         assertThat(columnNames(mapper.toTable(MetadataFieldReferenceConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "target_module_alias", "target_metadata_id",
                         "cardinality", "auto_title", "title_output_field", "projection_mappings");
@@ -163,6 +166,7 @@ class PlatformModelSchemaTest {
         assertThat(columnDefault(mapper.toTable(ModuleMetadataRelation.class), "relation_role")).isEqualTo("'main'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldReferenceConfig.class), "cardinality")).isEqualTo("'ONE'");
         assertThat(columnDefault(mapper.toTable(MetadataFieldConfig.class), "queryable")).isNull();
+        assertThat(columnDefault(mapper.toTable(MetadataFieldProtectionConfig.class), "enabled")).isEqualTo("TRUE");
         assertThat(columnDefault(mapper.toTable(MetadataField.class), "required")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(MetadataViewField.class), "visible")).isEqualTo("TRUE");
         assertThat(columnDefault(mapper.toTable(RuntimeAuditRecord.class), "system_context")).isEqualTo("FALSE");

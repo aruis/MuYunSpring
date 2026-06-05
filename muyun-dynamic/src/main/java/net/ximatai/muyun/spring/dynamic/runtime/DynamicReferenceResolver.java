@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -155,7 +156,11 @@ final class DynamicReferenceResolver {
         }
         Map<String, Object> values = new LinkedHashMap<>();
         for (ReferenceProjection projection : plan.projections()) {
-            values.put(projection.outputField(), record.getValue(projection.targetField()));
+            values.put(projection.outputField(), targetService.maskProtectedValue(
+                    projection.targetField(),
+                    record.getValue(projection.targetField()),
+                    FieldOutputContext.REFERENCE
+            ));
         }
         return values;
     }

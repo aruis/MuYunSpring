@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,7 +40,10 @@ public interface CrudAbility<T extends EntityContract> {
         beforeInsert(entity);
         prepareSortDefault(entity);
         validateTreePlacementIfNeeded(entity);
-        String id = getDao().insert(entity);
+        String id;
+        try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+            id = getDao().insert(entity);
+        }
         PlatformAbilityDispatcher.afterInsert(this, id, entity);
         afterInsert(id, entity);
         afterChanged(entity);
@@ -87,7 +91,10 @@ public interface CrudAbility<T extends EntityContract> {
             EntityLifecycle.prepareUpdate(entity, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
             beforeUpdate(entity);
             validateTreePlacementIfNeeded(entity);
-            int updated = getDao().updateByIdAndVersion(entity, expectedVersion);
+            int updated;
+            try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+                updated = getDao().updateByIdAndVersion(entity, expectedVersion);
+            }
             if (updated <= 0) {
                 throw new OptimisticLockException("record version conflict: " + entity.getId());
             }

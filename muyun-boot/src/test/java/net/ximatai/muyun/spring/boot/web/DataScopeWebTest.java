@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
@@ -26,6 +27,9 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.MaskedField;
+import net.ximatai.muyun.spring.common.security.SignedField;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -93,6 +97,24 @@ class DataScopeWebTest {
 
         assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE);
         assertThat(service.scopedDataAuth).containsExactly(false);
+    }
+
+    @Test
+    void crudWebShouldMaskProtectedStaticFieldsBeforeOutput() {
+        ProtectedWebService service = new ProtectedWebService();
+        ProtectedWebController controller = new ProtectedWebController(service);
+
+        WebPageResponse<ProtectedWebRecord> page;
+        ProtectedWebRecord viewed;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            page = controller.query(null);
+            viewed = controller.view("protected-1");
+        }
+
+        assertThat(page.records().getFirst().getPhone()).isEqualTo("138****5678");
+        assertThat(page.records().getFirst().getPhoneSignature()).isNull();
+        assertThat(viewed.getPhone()).isEqualTo("138****5678");
+        assertThat(viewed.getPhoneSignature()).isNull();
     }
 
     @Test
@@ -174,6 +196,15 @@ class DataScopeWebTest {
     @Setter
     private static final class DataScopedEnabledRecord extends DataScopedRecord implements EnabledCapable {
         private Boolean enabled;
+    }
+
+    @Getter
+    @Setter
+    private static final class ProtectedWebRecord extends DataScopedRecord {
+        @SignedField
+        @MaskedField(FieldMaskingPolicy.PHONE)
+        private String phone;
+        private String phoneSignature;
     }
 
     private static final class DataScopedCrudService extends AbstractAbilityService<DataScopedRecord>
@@ -355,6 +386,31 @@ class DataScopeWebTest {
         }
     }
 
+    private static final class ProtectedWebService extends AbstractAbilityService<ProtectedWebRecord>
+            implements FieldProtectionAbility<ProtectedWebRecord> {
+        private ProtectedWebService() {
+            super("demo.protectedWeb", ProtectedWebRecord.class, dao());
+        }
+
+        @Override
+        public PageResult<ProtectedWebRecord> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+            return PageResult.of(List.of(record("query")), 1, pageRequest);
+        }
+
+        @Override
+        public ProtectedWebRecord select(String id) {
+            return record(id);
+        }
+
+        private ProtectedWebRecord record(String id) {
+            ProtectedWebRecord record = new ProtectedWebRecord();
+            record.setId(id);
+            record.setPhone("13812345678");
+            record.setPhoneSignature("sig:phone:13812345678");
+            return record;
+        }
+    }
+
     private static final class DataScopedCrudController extends WebSupport<DataScopedCrudService>
             implements CrudWeb<DataScopedRecord, DataScopedCrudService> {
         private DataScopedCrudController(DataScopedCrudService service) {
@@ -379,6 +435,13 @@ class DataScopeWebTest {
     private static final class DataScopedSortController extends WebSupport<DataScopedSortService>
             implements SortWeb<DataScopedSortRecord, DataScopedSortService> {
         private DataScopedSortController(DataScopedSortService service) {
+            this.service = service;
+        }
+    }
+
+    private static final class ProtectedWebController extends WebSupport<ProtectedWebService>
+            implements CrudWeb<ProtectedWebRecord, ProtectedWebService> {
+        private ProtectedWebController(ProtectedWebService service) {
             this.service = service;
         }
     }

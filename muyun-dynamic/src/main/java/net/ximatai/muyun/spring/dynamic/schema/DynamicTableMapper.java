@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 
 import java.util.List;
@@ -60,6 +61,7 @@ public class DynamicTableMapper {
             fields.addAll(DynamicAbilityFields.dataScopeFields());
         }
         fields.addAll(entity.fields());
+        fields.addAll(FieldCompanionRules.generatedFields(entity));
         return List.copyOf(fields);
     }
 

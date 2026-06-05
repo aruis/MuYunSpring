@@ -278,6 +278,15 @@ public class ModuleDefinitionValidator {
         if (field.isTitle() && field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
             throw new ModuleDefinitionException("title field must be a text type: " + field.code());
         }
+        if (field.protection().hasStorageProtection()) {
+            if (field.isUnique() || field.isIndexed() || field.isSortable() || field.isTitle()) {
+                throw new ModuleDefinitionException("protected storage field cannot be unique, indexed, sortable or title field: "
+                        + field.code());
+            }
+            if (field.queryDefinition().queryable()) {
+                throw new ModuleDefinitionException("protected storage field cannot be queryable: " + field.code());
+            }
+        }
         try {
             FieldBehaviorSupport.validateBehavior(field.type(), field.behavior(), field.code());
         } catch (RuntimeException e) {

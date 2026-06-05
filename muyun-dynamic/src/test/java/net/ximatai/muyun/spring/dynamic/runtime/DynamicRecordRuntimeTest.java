@@ -4,10 +4,19 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
+import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
+import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
+import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
+import net.ximatai.muyun.spring.common.security.FieldProtectionException;
+import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -16,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -115,6 +125,176 @@ class DynamicRecordRuntimeTest {
         assertThat(CacheRegistry.namespaceCount()).isZero();
     }
 
+    @Test
+    void shouldApplyDynamicFieldProtectionAcrossCrudReadsAndDescriptors() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "title", "Contract One",
+                "secret", "enc:sensitive-value",
+                "secret_signature", "sig:secret:sensitive-value",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicRecordRuntime runtime = protectedRuntime(operations).register(protectedContractModule());
+        DynamicEntityService entityService = runtime.entityService("sales.contract", "contract");
+        DynamicRecord record = runtime.newRecord("sales.contract", "contract")
+                .setValue("code", "C-001")
+                .setValue("secret", "sensitive-value");
+        record.setId("contract-1");
+
+        entityService.insert(record);
+        DynamicRecord selected = entityService.select("contract-1");
+        DynamicRecord paged = entityService.pageQuery(Criteria.of(), PageRequest.of(1, 10)).getRecords().getFirst();
+        Map<String, Map<String, Object>> projections = entityService.projections(List.of("contract-1"), List.of("secret"));
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue())
+                .containsEntry("secret", "enc:sensitive-value")
+                .containsEntry("secret_signature", "sig:secret:sensitive-value");
+        assertThat(record.getValue("secret")).isEqualTo("sensitive-value");
+        assertThat(record.getValues()).doesNotContainKey("secretSignature");
+        assertThatThrownBy(() -> record.getValue("secretSignature"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform managed");
+        assertThat(selected.getValue("secret")).isEqualTo("sensitive-value");
+        assertThat(paged.getValue("secret")).isEqualTo("sensitive-value");
+        assertThat(projections.get("contract-1").get("secret"))
+                .isNotEqualTo("sensitive-value")
+                .asString()
+                .startsWith("s")
+                .endsWith("e");
+        assertThat(runtime.describe("sales.contract").entities().getFirst().fields())
+                .anySatisfy(field -> {
+                    assertThat(field.fieldName()).isEqualTo("secret");
+                    assertThat(field.encrypted()).isTrue();
+                    assertThat(field.signed()).isTrue();
+                    assertThat(field.maskingPolicy()).isEqualTo("MIDDLE");
+                    assertThat(field.companions()).extracting(companion -> companion.fieldName())
+                            .containsExactly("secretSignature");
+                });
+        assertThatThrownBy(() -> entityService.pageQuery(
+                Criteria.of().eq("secretSignature", "sig:secret:sensitive-value"),
+                PageRequest.of(1, 10)
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("protected storage field cannot be used in dynamic query or sort");
+    }
+
+    @Test
+    void shouldRejectDynamicQueryAndSortByProtectedStorageField() {
+        IDatabaseOperations<Object> operations = operations();
+        DynamicEntityService entityService = protectedRuntime(operations)
+                .register(protectedContractModule())
+                .entityService("sales.contract", "contract");
+
+        assertThatThrownBy(() -> entityService.pageQuery(Criteria.of().eq("secret", "sensitive-value"),
+                PageRequest.of(1, 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("protected storage field cannot be used in dynamic query or sort: secret");
+        assertThatThrownBy(() -> entityService.pageQuery(Criteria.of(), PageRequest.of(1, 10), Sort.asc("secret")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("protected storage field cannot be used in dynamic query or sort: secret");
+        assertThatThrownBy(() -> entityService.pageQuery(Criteria.of().eq("secret_signature", "sig"),
+                PageRequest.of(1, 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("protected storage field cannot be used in dynamic query or sort: secret_signature");
+    }
+
+    @Test
+    void shouldMaskDynamicReferenceTitleWhenTitleFieldHasOutputProtection() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "title", "Sensitive Contract",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        DynamicEntityService entityService = protectedRuntime(operations)
+                .register(maskedTitleContractModule())
+                .entityService("sales.contract", "contract");
+
+        assertThat(entityService.title("contract-1")).isEqualTo("S****************t");
+        assertThat(entityService.referenceOptions(Criteria.of(), PageRequest.of(1, 10)).getRecords().getFirst().title())
+                .isEqualTo("S****************t");
+    }
+
+    @Test
+    void shouldRejectTamperedDynamicProtectedFieldSignature() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "title", "Contract One",
+                "secret", "enc:sensitive-value",
+                "secret_signature", "sig:secret:tampered",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicEntityService entityService = protectedRuntime(operations)
+                .register(protectedContractModule())
+                .entityService("sales.contract", "contract");
+
+        assertThatThrownBy(() -> entityService.select("contract-1"))
+                .isInstanceOf(FieldProtectionException.class)
+                .hasMessageContaining("field signature mismatch: secret");
+    }
+
+    @Test
+    void shouldApplyDynamicFieldProtectionWhenReadingSortedList() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "secret", "enc:sensitive-value",
+                "secret_signature", "sig:secret:sensitive-value",
+                "sort_order", 100,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicEntityService entityService = protectedRuntime(operations)
+                .register(protectedSortableContractModule())
+                .entityService("sales.contract", "contract");
+
+        List<DynamicRecord> records = entityService.sortedList(Criteria.of());
+
+        assertThat(records).hasSize(1);
+        assertThat(records.getFirst().getValue("secret")).isEqualTo("sensitive-value");
+    }
+
+    @Test
+    void shouldClearDynamicProtectedFieldSignatureWhenExplicitlySetToNull() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "secret", "enc:sensitive-value",
+                "secret_signature", "sig:secret:sensitive-value",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        )));
+        DynamicRecordRuntime runtime = protectedRuntime(operations)
+                .register(protectedContractModule());
+        DynamicEntityService entityService = runtime.entityService("sales.contract", "contract");
+        DynamicRecord record = runtime.newRecord("sales.contract", "contract").setValue("secret", null);
+        record.setId("contract-1");
+        record.setVersion(0);
+
+        entityService.update(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+        assertThat(body.getValue())
+                .containsEntry("secret", null)
+                .containsEntry("secret_signature", null);
+    }
+
     @SuppressWarnings("unchecked")
     private IDatabaseOperations<Object> operations() {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
@@ -126,6 +306,87 @@ class DynamicRecordRuntimeTest {
 
     private ModuleDefinition contractModule() {
         return new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()));
+    }
+
+    private DynamicRecordRuntime protectedRuntime(IDatabaseOperations<Object> operations) {
+        FieldCryptoProvider crypto = new FieldCryptoProvider() {
+            @Override
+            public String encrypt(String fieldName, Object plainValue) {
+                return "enc:" + plainValue;
+            }
+
+            @Override
+            public Object decrypt(String fieldName, String protectedValue) {
+                return protectedValue.substring("enc:".length());
+            }
+        };
+        return new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                RuntimeEventPublisher.noop(),
+                DynamicActionExecutorRegistry.empty(),
+                DynamicActionTransactionOperator.none(),
+                crypto,
+                (fieldName, plainValue) -> "sig:" + fieldName + ":" + plainValue
+        );
+    }
+
+    private ModuleDefinition protectedContractModule() {
+        return new ModuleDefinition("sales.contract", "Contract", List.of(new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.titleField(),
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("secret", "Secret")
+                                .length(128)
+                                .protection(new FieldProtectionDefinition(
+                                        FieldEncryptionMode.ENCRYPTED,
+                                        FieldSignatureMode.SIGNED,
+                                        FieldMaskingPolicy.MIDDLE
+                                ))
+                ),
+                java.util.Set.of(EntityCapability.REFERENCE)
+        )));
+    }
+
+    private ModuleDefinition protectedSortableContractModule() {
+        return new ModuleDefinition("sales.contract", "Contract", List.of(new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("secret", "Secret")
+                                .length(128)
+                                .protection(new FieldProtectionDefinition(
+                                        FieldEncryptionMode.ENCRYPTED,
+                                        FieldSignatureMode.SIGNED,
+                                        FieldMaskingPolicy.MIDDLE
+                                )),
+                        FieldDefinition.sortOrder()
+                ),
+                java.util.Set.of(EntityCapability.SORT)
+        )));
+    }
+
+    private ModuleDefinition maskedTitleContractModule() {
+        return new ModuleDefinition("sales.contract", "Contract", List.of(new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.titleField()
+                                .protection(new FieldProtectionDefinition(
+                                        FieldEncryptionMode.NONE,
+                                        FieldSignatureMode.NONE,
+                                        FieldMaskingPolicy.MIDDLE
+                                ))
+                ),
+                java.util.Set.of(EntityCapability.REFERENCE)
+        )));
     }
 
     private EntityDefinition contractEntity() {

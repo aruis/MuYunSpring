@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,13 +56,14 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     @PostMapping("/query")
     @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
-        return webScope(() -> WebPageResponse.from(queryRecords(request)));
+        return webScope(() -> WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST)));
     }
 
     @GetMapping("/view/{id}")
     @ActionEndpoint(PlatformAction.VIEW)
     default T view(@PathVariable String id) {
-        return webScope(() -> selectForAction(PlatformAction.VIEW, id));
+        return webScope(() -> WebOutputSupport.record(service(),
+                selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW));
     }
 
     @PostMapping("/insert")
@@ -70,7 +72,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     default T insert(@RequestBody T record) {
         return webScope(() -> {
             String id = service().insert(record);
-            return service().select(id);
+            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
         });
     }
 
@@ -81,7 +83,7 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
-            return selectForAction(PlatformAction.VIEW, id);
+            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
         });
     }
 

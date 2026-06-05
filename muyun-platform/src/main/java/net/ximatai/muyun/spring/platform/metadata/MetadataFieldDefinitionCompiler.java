@@ -3,17 +3,27 @@ package net.ximatai.muyun.spring.platform.metadata;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MetadataFieldDefinitionCompiler {
     private final PlatformFieldTypeService fieldTypeService;
     private final MetadataFieldConfigService configService;
+    private final MetadataFieldProtectionConfigService protectionConfigService;
 
     public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
                                            MetadataFieldConfigService configService) {
+        this(fieldTypeService, configService, null);
+    }
+
+    @Autowired
+    public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
+                                           MetadataFieldConfigService configService,
+                                           MetadataFieldProtectionConfigService protectionConfigService) {
         this.fieldTypeService = fieldTypeService;
         this.configService = configService;
+        this.protectionConfigService = protectionConfigService;
     }
 
     public FieldDefinition compile(MetadataField field) {
@@ -52,7 +62,10 @@ public class MetadataFieldDefinitionCompiler {
                 scale,
                 null,
                 queryDefinition,
-                behavior(fieldType, defaultConfig, relationConfig, field.getId())
+                behavior(fieldType, defaultConfig, relationConfig, field.getId()),
+                protectionConfigService == null
+                        ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
+                        : protectionConfigService.definition(field.getId())
         );
         if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
             definition = definition.dictionary(dictionaryConfig.getDictionaryApplicationAlias(),
