@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -87,6 +88,65 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldDispatchApprovePluginsAndExposeContext() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        pluginService.approve(WorkflowTaskActionRequest.complete("task-1", "user-1", "agree"));
+
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_APPROVE,
+                WorkflowRuntimePluginEventType.AFTER_APPROVE);
+        WorkflowRuntimePluginContext before = plugin.contexts().getFirst();
+        assertThat(before.actionCode()).isEqualTo("approve");
+        assertThat(before.moduleAlias()).isEqualTo("sales.contract");
+        assertThat(before.recordId()).isEqualTo("record-1");
+        assertThat(before.instanceId()).isEqualTo("instance-1");
+        assertThat(before.nodeKey()).isEqualTo("approve");
+        assertThat(before.taskId()).isEqualTo("task-1");
+        assertThat(before.operatorId()).isEqualTo("user-1");
+        assertThat(before.reason()).isEqualTo("agree");
+    }
+
+    @Test
+    void shouldBlockApproveWhenBeforePluginFails() {
+        WorkflowRuntimePlugin blocker = new WorkflowRuntimePlugin() {
+            @Override
+            public String pluginKey() {
+                return "blocker";
+            }
+
+            @Override
+            public void handle(WorkflowRuntimePluginContext context) {
+                if (context.eventType() == WorkflowRuntimePluginEventType.BEFORE_APPROVE) {
+                    throw new PlatformException("blocked by plugin");
+                }
+            }
+        };
+        WorkflowTaskActionService pluginService = serviceWithPlugin(blocker);
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> pluginService.approve(WorkflowTaskActionRequest.complete(
+                "task-1", "user-1", "agree")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocked by plugin");
+
+        verify(taskDao, never()).updateByIdAndVersion(any(), any());
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
     void shouldForceApproveByAdminWithoutAssigneeCheck() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
@@ -130,6 +190,8 @@ class WorkflowTaskActionServiceTest {
 
     @Test
     void shouldRejectApprovalTaskAndCreateRestartResubmitTask() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowTask sibling = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
@@ -145,7 +207,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.reject(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.reject(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, null, "not ok", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.REJECTED);
@@ -160,6 +222,9 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.createdTask().getTaskKind()).isEqualTo(WorkflowTaskKind.RESUBMIT);
         assertThat(result.createdTask().getAssigneeId()).isEqualTo("starter-1");
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.TASK_REJECTED);
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_REJECT,
+                WorkflowRuntimePluginEventType.AFTER_REJECT);
+        assertThat(plugin.contexts().getFirst().reason()).isEqualTo("not ok");
         verify(instanceDao).updateByIdAndVersion(instance, 5);
         verify(taskDao).insert(result.createdTask());
     }
@@ -281,6 +346,8 @@ class WorkflowTaskActionServiceTest {
 
     @Test
     void shouldRollbackToPreviousLinearApprovalNode() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
         WorkflowTask currentTask = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowTask previousDoneTask = task("task-prev", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE);
         previousDoneTask.setNodeInstanceId("node-prev");
@@ -304,7 +371,7 @@ class WorkflowTaskActionServiceTest {
         when(routeDao.updateByIdAndVersion(route, 4)).thenReturn(1);
         when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.rollback(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.rollback(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, null, "return", Instant.parse("2026-06-05T03:00:00Z")));
 
         assertThat(currentTask.getTaskStatus()).isEqualTo(WorkflowTaskStatus.ROLLED_BACK);
@@ -317,6 +384,10 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.createdTask().getAssigneeId()).isEqualTo("leader-1");
         assertThat(result.createdTask().getDueAt()).isNull();
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.NODE_ROLLED_BACK);
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_ROLLBACK,
+                WorkflowRuntimePluginEventType.AFTER_ROLLBACK);
+        assertThat(plugin.contexts().getFirst().rollbackTargetNodeKey()).isEqualTo("leader");
+        assertThat(plugin.contexts().getFirst().operatorId()).isEqualTo("user-1");
     }
 
     @Test
@@ -426,6 +497,8 @@ class WorkflowTaskActionServiceTest {
 
     @Test
     void shouldTransferTodoTaskByCreatingNewAssigneeTask() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
         WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         task.setAssigneeId("user-a");
         task.setOriginalAssigneeId("user-a");
@@ -435,11 +508,13 @@ class WorkflowTaskActionServiceTest {
         task.setPrincipalCanProcess(true);
         task.setDelegationPolicyId("delegation-1");
         task.setDueAt(Instant.parse("2026-06-06T02:00:00Z"));
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.transfer(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.transfer(new WorkflowTaskActionRequest(
                 "task-1", "user-a", "user-b", null, "handover", Instant.parse("2026-06-05T02:00:00Z")));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TRANSFERRED);
@@ -457,12 +532,20 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.createdTask().getDelegationPolicyId()).isEqualTo("delegation-1");
         assertThat(result.createdTask().getDueAt()).isEqualTo(Instant.parse("2026-06-06T02:00:00Z"));
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.TASK_TRANSFERRED);
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_TRANSFER,
+                WorkflowRuntimePluginEventType.AFTER_TRANSFER);
+        assertThat(plugin.contexts().getFirst().targetAssigneeId()).isEqualTo("user-b");
+        assertThat(plugin.contexts().getFirst().nodeKey()).isEqualTo("approve");
+        assertThat(plugin.contexts().getFirst().operatorId()).isEqualTo("user-a");
+        assertThat(plugin.contexts().getFirst().reason()).isEqualTo("handover");
         verify(taskDao).insert(result.createdTask());
         verify(eventDao).insert(result.event());
     }
 
     @Test
     void shouldInsertRuntimeAddSignSegmentWithoutCompletingCurrentTask() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowInstance instance = instance();
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
@@ -479,7 +562,7 @@ class WorkflowTaskActionServiceTest {
                 WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
         when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
 
-        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+        WorkflowTaskActionResult result = pluginService.addSign(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, null, segment("add-1", "approve", "next"), null,
                 "need finance review", Instant.parse("2026-06-05T04:00:00Z")));
 
@@ -518,6 +601,7 @@ class WorkflowTaskActionServiceTest {
         verify(taskDao, never()).insert(any());
         verify(eventDao).insert(result.event());
         verifyNoInteractions(progressionService);
+        assertThat(plugin.contexts()).isEmpty();
     }
 
     @Test
@@ -796,6 +880,34 @@ class WorkflowTaskActionServiceTest {
         definition.setTargetNodeKey(targetNodeKey);
         definition.setDefaultRoute(false);
         return definition;
+    }
+
+    private WorkflowTaskActionService serviceWithPlugin(WorkflowRuntimePlugin plugin) {
+        return new WorkflowTaskActionService(taskDao, instanceDao, nodeDao, routeDao, eventDao, eventFactory,
+                approvalTaskPolicyService, actionPolicyService, progressionService, Optional.empty(), null,
+                new WorkflowRuntimePluginDispatcher(List.of(plugin)));
+    }
+
+    private static final class RecordingPlugin implements WorkflowRuntimePlugin {
+        private final List<WorkflowRuntimePluginContext> contexts = new ArrayList<>();
+
+        @Override
+        public String pluginKey() {
+            return "recording";
+        }
+
+        @Override
+        public void handle(WorkflowRuntimePluginContext context) {
+            contexts.add(context);
+        }
+
+        List<WorkflowRuntimePluginContext> contexts() {
+            return contexts;
+        }
+
+        List<WorkflowRuntimePluginEventType> events() {
+            return contexts.stream().map(WorkflowRuntimePluginContext::eventType).toList();
+        }
     }
 
     private WorkflowNodeInstance node(WorkflowApprovalMode mode, Integer ratio) {

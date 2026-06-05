@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +62,63 @@ class WorkflowRuntimeSubmitServiceTest {
     }
 
     @Test
+    void shouldDispatchSubmitPluginsBeforeAndAfterPersist() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowRuntimeSubmitService pluginService = new WorkflowRuntimeSubmitService(
+                draftService, instanceService, instanceDao, nodeDao, routeDao, taskDao, eventDao,
+                new WorkflowRuntimePluginDispatcher(List.of(plugin)));
+        WorkflowDefinition definition = new WorkflowDefinition();
+        WorkflowVersion version = new WorkflowVersion();
+        WorkflowSubmitDraft draft = draft();
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"))).thenReturn(draft);
+
+        pluginService.submit(definition, version, List.of(), List.of(),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_SUBMIT,
+                WorkflowRuntimePluginEventType.AFTER_SUBMIT);
+        assertThat(plugin.contexts().getFirst().moduleAlias()).isEqualTo("sales.contract");
+        assertThat(plugin.contexts().getFirst().recordId()).isEqualTo("record-1");
+        assertThat(plugin.contexts().getFirst().instanceId()).isEqualTo("instance-1");
+        assertThat(plugin.contexts().getFirst().nodeKey()).isEqualTo("approve");
+        assertThat(plugin.contexts().getFirst().taskId()).isEqualTo("task-1");
+        assertThat(plugin.contexts().getFirst().operatorId()).isEqualTo("user-1");
+    }
+
+    @Test
+    void shouldBlockSubmitWhenBeforePluginFails() {
+        WorkflowRuntimePlugin blocker = new WorkflowRuntimePlugin() {
+            @Override
+            public String pluginKey() {
+                return "blocker";
+            }
+
+            @Override
+            public void handle(WorkflowRuntimePluginContext context) {
+                if (context.eventType() == WorkflowRuntimePluginEventType.BEFORE_SUBMIT) {
+                    throw new PlatformException("blocked by plugin");
+                }
+            }
+        };
+        WorkflowRuntimeSubmitService pluginService = new WorkflowRuntimeSubmitService(
+                draftService, instanceService, instanceDao, nodeDao, routeDao, taskDao, eventDao,
+                new WorkflowRuntimePluginDispatcher(List.of(blocker)));
+        WorkflowDefinition definition = new WorkflowDefinition();
+        WorkflowVersion version = new WorkflowVersion();
+        WorkflowSubmitDraft draft = draft();
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"))).thenReturn(draft);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> pluginService.submit(definition, version,
+                        List.of(), List.of(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocked by plugin");
+
+        verifyNoInteractions(instanceDao, nodeDao, routeDao, taskDao, eventDao);
+    }
+
+    @Test
     void shouldStopPersistingWhenInstanceValidationFails() {
         WorkflowSubmitDraft draft = draft();
         doThrow(new PlatformException("approval workflow already running for record: record-1"))
@@ -78,15 +136,41 @@ class WorkflowRuntimeSubmitServiceTest {
     private WorkflowSubmitDraft draft() {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId("instance-1");
+        instance.setModuleAlias("sales.contract");
+        instance.setRecordId("record-1");
         WorkflowNodeInstance node = new WorkflowNodeInstance();
         node.setId("node-1");
+        node.setNodeKey("approve");
         WorkflowRouteInstance route = new WorkflowRouteInstance();
         route.setId("route-1");
         WorkflowTask task = new WorkflowTask();
         task.setId("task-1");
+        task.setNodeInstanceId("node-1");
         WorkflowEvent event = new WorkflowEvent();
         event.setId("event-1");
         return new WorkflowSubmitDraft(instance, List.of(node), List.of(route), List.of(task), List.of(event),
                 new WorkflowActivationResult(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), false));
+    }
+
+    private static final class RecordingPlugin implements WorkflowRuntimePlugin {
+        private final List<WorkflowRuntimePluginContext> contexts = new ArrayList<>();
+
+        @Override
+        public String pluginKey() {
+            return "recording";
+        }
+
+        @Override
+        public void handle(WorkflowRuntimePluginContext context) {
+            contexts.add(context);
+        }
+
+        List<WorkflowRuntimePluginContext> contexts() {
+            return contexts;
+        }
+
+        List<WorkflowRuntimePluginEventType> events() {
+            return contexts.stream().map(WorkflowRuntimePluginContext::eventType).toList();
+        }
     }
 }

@@ -1,10 +1,14 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class WorkflowRuntimeSubmitService {
@@ -15,6 +19,7 @@ public class WorkflowRuntimeSubmitService {
     private final WorkflowRouteInstanceDao routeInstanceDao;
     private final WorkflowTaskDao taskDao;
     private final WorkflowEventDao eventDao;
+    private final WorkflowRuntimePluginDispatcher pluginDispatcher;
 
     public WorkflowRuntimeSubmitService(WorkflowSubmitDraftService submitDraftService,
                                         WorkflowInstanceService instanceService,
@@ -23,6 +28,19 @@ public class WorkflowRuntimeSubmitService {
                                         WorkflowRouteInstanceDao routeInstanceDao,
                                         WorkflowTaskDao taskDao,
                                         WorkflowEventDao eventDao) {
+        this(submitDraftService, instanceService, instanceDao, nodeInstanceDao, routeInstanceDao, taskDao, eventDao,
+                null);
+    }
+
+    @Autowired
+    public WorkflowRuntimeSubmitService(WorkflowSubmitDraftService submitDraftService,
+                                        WorkflowInstanceService instanceService,
+                                        WorkflowInstanceDao instanceDao,
+                                        WorkflowNodeInstanceDao nodeInstanceDao,
+                                        WorkflowRouteInstanceDao routeInstanceDao,
+                                        WorkflowTaskDao taskDao,
+                                        WorkflowEventDao eventDao,
+                                        WorkflowRuntimePluginDispatcher pluginDispatcher) {
         this.submitDraftService = submitDraftService;
         this.instanceService = instanceService;
         this.instanceDao = instanceDao;
@@ -30,6 +48,7 @@ public class WorkflowRuntimeSubmitService {
         this.routeInstanceDao = routeInstanceDao;
         this.taskDao = taskDao;
         this.eventDao = eventDao;
+        this.pluginDispatcher = pluginDispatcher == null ? new WorkflowRuntimePluginDispatcher(List.of()) : pluginDispatcher;
     }
 
     @Transactional
@@ -42,7 +61,9 @@ public class WorkflowRuntimeSubmitService {
                                       Instant operatedAt) {
         WorkflowSubmitDraft draft = submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
                 recordId, operatorId, operatedAt);
+        dispatchSubmit(draft, WorkflowRuntimePluginEventType.BEFORE_SUBMIT, operatorId);
         persist(draft, operatedAt);
+        dispatchSubmit(draft, WorkflowRuntimePluginEventType.AFTER_SUBMIT, operatorId);
         return draft;
     }
 
@@ -57,7 +78,9 @@ public class WorkflowRuntimeSubmitService {
                                       Instant operatedAt) {
         WorkflowSubmitDraft draft = submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
                 recordId, authOrgId, operatorId, operatedAt);
+        dispatchSubmit(draft, WorkflowRuntimePluginEventType.BEFORE_SUBMIT, operatorId);
         persist(draft, operatedAt);
+        dispatchSubmit(draft, WorkflowRuntimePluginEventType.AFTER_SUBMIT, operatorId);
         return draft;
     }
 
@@ -87,5 +110,43 @@ public class WorkflowRuntimeSubmitService {
 
     private void prepareInsert(net.ximatai.muyun.spring.common.model.contract.EntityContract entity, Instant now) {
         EntityLifecycle.prepareInsert(entity, now);
+    }
+
+    private void dispatchSubmit(WorkflowSubmitDraft draft, WorkflowRuntimePluginEventType eventType,
+                                String operatorId) {
+        if (draft == null || draft.instance() == null) {
+            return;
+        }
+        Map<String, WorkflowNodeInstance> nodesById = new LinkedHashMap<>();
+        draft.nodes().forEach(node -> nodesById.put(node.getId(), node));
+        if (!draft.tasks().isEmpty()) {
+            draft.tasks().forEach(task -> dispatch(draft.instance(), nodesById.get(task.getNodeInstanceId()), task,
+                    eventType, "submit", operatorId, null, null, null, null));
+            return;
+        }
+        if (!draft.nodes().isEmpty()) {
+            draft.nodes().stream()
+                    .filter(node -> node.getNodeStatus() == WorkflowNodeStatus.ACTIVE)
+                    .forEach(node -> dispatch(draft.instance(), node, null, eventType, "submit", operatorId,
+                            null, null, null, null));
+            return;
+        }
+        dispatch(draft.instance(), null, null, eventType, "submit", operatorId, null, null, null, null);
+    }
+
+    private void dispatch(WorkflowInstance instance,
+                          WorkflowNodeInstance node,
+                          WorkflowTask task,
+                          WorkflowRuntimePluginEventType eventType,
+                          String actionCode,
+                          String operatorId,
+                          String targetAssigneeId,
+                          String rollbackTargetNodeKey,
+                          WorkflowRuntimeTerminateMode terminateMode,
+                          String reason) {
+        pluginDispatcher.dispatch(new WorkflowRuntimePluginContext(eventType, actionCode,
+                instance.getModuleAlias(), instance.getRecordId(), instance.getId(),
+                node == null ? null : node.getNodeKey(), task == null ? null : task.getId(),
+                operatorId, targetAssigneeId, rollbackTargetNodeKey, terminateMode, reason, instance, node, task));
     }
 }

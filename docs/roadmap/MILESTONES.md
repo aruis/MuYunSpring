@@ -285,7 +285,7 @@ M6 吸收成熟审批与任务业务规则，并使用 MuYun 自己的 workflow 
 | M6-09 | 待办、历史与工作台 | 已建立我的待办、已办、知会、实例任务、实例事件、历史实例列表、历史渲染包、历史任务和历史事件查询 | 还需补发起跟踪、历史解释字段增强和工作台筛选排序入口 | P0 | 进行中 |
 | M6-10 | 超期预警 | 已支持审批节点预警时长和超期时长标记 | 只扫描活动审批节点；只更新节点超期状态并写入预警/超期事件；不自动流转。调度器和工作台筛选排序入口后续按工作台专题补齐 | P1 | 可收口 |
 | M6-11 | 委托与任务分派策略 | 已建立个人委托和管理委托配置、启停状态机、任务生成时委托匹配与冻结，以及工作台/动作读侧解释字段 | 委托只在正式 TODO 任务生成时匹配，不改变定义和实例图，不追链；按启用配置、原处理人、模块/组织 ALL/INCLUDE 范围和具体度分数选择，最强多 delegate 冲突 fail-fast；任务冻结 `assignmentKind/originalAssigneeId/delegatedFromUserId/delegatedToUserId/delegationPolicyId/principalCanProcess/assignmentSnapshotText`；delegate 可处理，principal 仅在 `principalCanProcess=true` 且未 transfer 时可处理；transfer 不重新匹配并切断 principal 额外处理权但保留来源解释；自助和管理 Web 入口已覆盖 query/insert/update/delete/enable/disable 与 delegatedToMe 查询；完整 UI 编排、复杂委托冲突治理和完成知会后续按工作台专题扩展 | P1 | 进行中 |
-| M6-12 | 插件挂点 | 在稳定 runtime 动作前后开放 workflow 插件点 | 插件上下文显式携带实例、节点、任务、操作者和动作语义；改写实例图的动作默认不开放普通插件 | P1 | 待开始 |
+| M6-12 | 插件挂点 | 已建立 workflow runtime 插件事件、上下文、插件接口和同步 dispatcher，并接入稳定运行时动作前后切点 | 插件上下文显式携带 eventType/actionCode、模块、记录、实例、节点、任务、操作者、目标处理人、回退目标、终止模式和原因；已开放 `submit/approve/transfer/reject/rollback/revoke/reset/terminate/forceTerminate` 的 before/after 切点，`forceTerminate` 复用 terminate 事件并通过 `terminateMode=FORCE` 区分；改写实例图的 `addSign` 不开放普通插件；当前首版同步执行并由异常阻断主流程，after-commit、异步分发、插件配置管理和动态脚本不在本阶段展开 | P1 | 进行中 |
 
 ## M7 平台业务编排能力
 

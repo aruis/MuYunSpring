@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -27,6 +29,7 @@ public class WorkflowInstanceActionService {
     private final WorkflowArchiveService archiveService;
     private final WorkflowActionPolicyService actionPolicyService;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
+    private final WorkflowRuntimePluginDispatcher pluginDispatcher;
 
     public WorkflowInstanceActionService(WorkflowInstanceDao instanceDao,
                                          WorkflowNodeInstanceDao nodeDao,
@@ -37,7 +40,20 @@ public class WorkflowInstanceActionService {
                                          WorkflowArchiveService archiveService,
                                          Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
         this(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService, new WorkflowActionPolicyService(),
-                approvalSummaryWriter);
+                approvalSummaryWriter, null);
+    }
+
+    public WorkflowInstanceActionService(WorkflowInstanceDao instanceDao,
+                                         WorkflowNodeInstanceDao nodeDao,
+                                         WorkflowRouteInstanceDao routeDao,
+                                         WorkflowTaskDao taskDao,
+                                         WorkflowEventDao eventDao,
+                                         WorkflowRuntimeEventFactory eventFactory,
+                                         WorkflowArchiveService archiveService,
+                                         WorkflowActionPolicyService actionPolicyService,
+                                         Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
+        this(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService, actionPolicyService,
+                approvalSummaryWriter, null);
     }
 
     @Autowired
@@ -49,7 +65,8 @@ public class WorkflowInstanceActionService {
                                          WorkflowRuntimeEventFactory eventFactory,
                                          WorkflowArchiveService archiveService,
                                          WorkflowActionPolicyService actionPolicyService,
-                                         Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter) {
+                                         Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter,
+                                         WorkflowRuntimePluginDispatcher pluginDispatcher) {
         this.instanceDao = instanceDao;
         this.nodeDao = nodeDao;
         this.routeDao = routeDao;
@@ -59,6 +76,7 @@ public class WorkflowInstanceActionService {
         this.archiveService = archiveService;
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
         this.approvalSummaryWriter = approvalSummaryWriter == null ? Optional.empty() : approvalSummaryWriter;
+        this.pluginDispatcher = pluginDispatcher == null ? new WorkflowRuntimePluginDispatcher(List.of()) : pluginDispatcher;
     }
 
     @Transactional
@@ -80,6 +98,8 @@ public class WorkflowInstanceActionService {
         List<WorkflowTask> tasks = runningTasks(instance.getId());
         List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
         List<WorkflowRouteInstance> routes = openRoutes(instance.getId());
+        dispatchInstanceAction(instance, nodes, tasks, WorkflowRuntimePluginEventType.BEFORE_RESET, "reset",
+                operatorId, null, request.reason());
 
         instance.setLastActionCode("reset");
         instance.setLastActionReason(request.reason());
@@ -111,6 +131,8 @@ public class WorkflowInstanceActionService {
         WorkflowEvent event = eventFactory.instanceReset(instance, operatorId, request.reason(), now);
         EntityLifecycle.prepareInsert(event, now);
         eventDao.insert(event);
+        dispatchInstanceAction(instance, nodes, tasks, WorkflowRuntimePluginEventType.AFTER_RESET, "reset",
+                operatorId, null, request.reason());
         archiveAndReleaseApproval(instance, WorkflowArchiveReason.RESET, now);
         return new WorkflowInstanceActionResult(instance, tasks, nodes, routes, event);
     }
@@ -145,6 +167,10 @@ public class WorkflowInstanceActionService {
         List<WorkflowTask> tasks = runningTasks(instance.getId());
         List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
         List<WorkflowRouteInstance> routes = openRoutes(instance.getId());
+        WorkflowRuntimeTerminateMode terminateMode = "forceTerminate".equals(actionCode)
+                ? WorkflowRuntimeTerminateMode.FORCE : WorkflowRuntimeTerminateMode.NORMAL;
+        dispatchInstanceAction(instance, nodes, tasks, beforeEvent(actionCode), actionCode, operatorId,
+                terminateMode, request.reason());
 
         instance.setInstanceStatus(instanceStatus);
         if (Boolean.TRUE.equals(instance.getApprovalEnabled())) {
@@ -185,10 +211,70 @@ public class WorkflowInstanceActionService {
         };
         EntityLifecycle.prepareInsert(event, now);
         eventDao.insert(event);
+        dispatchInstanceAction(instance, nodes, tasks, afterEvent(actionCode), actionCode, operatorId,
+                terminateMode, request.reason());
         if (!"revoke".equals(actionCode)) {
             writeApprovalSummary(instance);
         }
         return new WorkflowInstanceActionResult(instance, tasks, nodes, routes, event);
+    }
+
+    private WorkflowRuntimePluginEventType beforeEvent(String actionCode) {
+        return switch (actionCode) {
+            case "revoke" -> WorkflowRuntimePluginEventType.BEFORE_REVOKE;
+            case "reset" -> WorkflowRuntimePluginEventType.BEFORE_RESET;
+            default -> WorkflowRuntimePluginEventType.BEFORE_TERMINATE;
+        };
+    }
+
+    private WorkflowRuntimePluginEventType afterEvent(String actionCode) {
+        return switch (actionCode) {
+            case "revoke" -> WorkflowRuntimePluginEventType.AFTER_REVOKE;
+            case "reset" -> WorkflowRuntimePluginEventType.AFTER_RESET;
+            default -> WorkflowRuntimePluginEventType.AFTER_TERMINATE;
+        };
+    }
+
+    private void dispatchInstanceAction(WorkflowInstance instance,
+                                        List<WorkflowNodeInstance> nodes,
+                                        List<WorkflowTask> tasks,
+                                        WorkflowRuntimePluginEventType eventType,
+                                        String actionCode,
+                                        String operatorId,
+                                        WorkflowRuntimeTerminateMode terminateMode,
+                                        String reason) {
+        Map<String, WorkflowNodeInstance> nodesById = new LinkedHashMap<>();
+        if (nodes != null) {
+            nodes.forEach(node -> nodesById.put(node.getId(), node));
+        }
+        if (tasks != null && !tasks.isEmpty()) {
+            tasks.forEach(task -> dispatch(instance, nodesById.get(task.getNodeInstanceId()), task, eventType,
+                    actionCode, operatorId, terminateMode, reason));
+            return;
+        }
+        if (nodes != null && !nodes.isEmpty()) {
+            nodes.forEach(node -> dispatch(instance, node, null, eventType, actionCode, operatorId,
+                    terminateMode, reason));
+            return;
+        }
+        dispatch(instance, null, null, eventType, actionCode, operatorId, terminateMode, reason);
+    }
+
+    private void dispatch(WorkflowInstance instance,
+                          WorkflowNodeInstance node,
+                          WorkflowTask task,
+                          WorkflowRuntimePluginEventType eventType,
+                          String actionCode,
+                          String operatorId,
+                          WorkflowRuntimeTerminateMode terminateMode,
+                          String reason) {
+        pluginDispatcher.dispatch(new WorkflowRuntimePluginContext(eventType, actionCode,
+                instance == null ? null : instance.getModuleAlias(),
+                instance == null ? null : instance.getRecordId(),
+                instance == null ? null : instance.getId(),
+                node == null ? null : node.getNodeKey(),
+                task == null ? null : task.getId(),
+                operatorId, null, null, terminateMode, reason, instance, node, task));
     }
 
     private WorkflowInstance requireRunningInstance(WorkflowInstanceActionRequest request) {

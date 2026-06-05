@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,13 +31,15 @@ class WorkflowInstanceActionServiceTest {
 
     @Test
     void shouldRevokeRunningInstanceAndCancelOpenRuntimeObjects() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowInstanceActionService pluginService = serviceWithPlugin(plugin);
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");
         WorkflowNodeInstance node = node("node-1");
         WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.EFFECTIVE);
         stubRuntime(instance, List.of(task), List.of(node), List.of(route));
 
-        WorkflowInstanceActionResult result = service.revoke(new WorkflowInstanceActionRequest(
+        WorkflowInstanceActionResult result = pluginService.revoke(new WorkflowInstanceActionRequest(
                 "instance-1", "user-1", "withdraw", Instant.parse("2026-06-05T04:00:00Z")));
 
         assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.REVOKED);
@@ -54,17 +57,21 @@ class WorkflowInstanceActionServiceTest {
                 Instant.parse("2026-06-05T04:00:00Z"));
         verify(summaryWriter).clearCurrent("sales.contract", "record-1");
         verify(summaryWriter, never()).writeSubmitted(any());
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_REVOKE,
+                WorkflowRuntimePluginEventType.AFTER_REVOKE);
     }
 
     @Test
     void shouldTerminateRunningInstanceAndInvalidateOpenTasks() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowInstanceActionService pluginService = serviceWithPlugin(plugin);
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");
         WorkflowNodeInstance node = node("node-1");
         WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.CANDIDATE);
         stubRuntime(instance, List.of(task), List.of(node), List.of(route));
 
-        WorkflowInstanceActionResult result = service.terminate(new WorkflowInstanceActionRequest(
+        WorkflowInstanceActionResult result = pluginService.terminate(new WorkflowInstanceActionRequest(
                 "instance-1", "admin-1", "stop", Instant.parse("2026-06-05T04:00:00Z")));
 
         assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.TERMINATED);
@@ -74,17 +81,27 @@ class WorkflowInstanceActionServiceTest {
         assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.CANCELED);
         assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.CANCELED);
         assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.INSTANCE_TERMINATED);
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_TERMINATE,
+                WorkflowRuntimePluginEventType.AFTER_TERMINATE);
+        WorkflowRuntimePluginContext before = plugin.contexts().getFirst();
+        assertThat(before.terminateMode()).isEqualTo(WorkflowRuntimeTerminateMode.NORMAL);
+        assertThat(before.operatorId()).isEqualTo("admin-1");
+        assertThat(before.reason()).isEqualTo("stop");
+        assertThat(before.nodeKey()).isEqualTo("approve");
+        assertThat(before.taskId()).isEqualTo("task-1");
     }
 
     @Test
     void shouldForceTerminateWithManagementActionCodeAndWithoutArchive() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowInstanceActionService pluginService = serviceWithPlugin(plugin);
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");
         WorkflowNodeInstance node = node("node-1");
         WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.EFFECTIVE);
         stubRuntime(instance, List.of(task), List.of(node), List.of(route));
 
-        WorkflowInstanceActionResult result = service.forceTerminate(new WorkflowInstanceActionRequest(
+        WorkflowInstanceActionResult result = pluginService.forceTerminate(new WorkflowInstanceActionRequest(
                 "instance-1", "admin-1", "force stop", Instant.parse("2026-06-05T04:30:00Z")));
 
         assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.TERMINATED);
@@ -97,6 +114,9 @@ class WorkflowInstanceActionServiceTest {
         assertThat(result.event().getActionCode()).isEqualTo("forceTerminate");
         verify(archiveService, never()).archiveCurrentInstance(any(), any(), any());
         verify(summaryWriter).writeSubmitted(any());
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_TERMINATE,
+                WorkflowRuntimePluginEventType.AFTER_TERMINATE);
+        assertThat(plugin.contexts().getFirst().terminateMode()).isEqualTo(WorkflowRuntimeTerminateMode.FORCE);
     }
 
     @Test
@@ -118,13 +138,15 @@ class WorkflowInstanceActionServiceTest {
 
     @Test
     void shouldResetInstanceAndArchiveCurrentRuntimeObjects() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowInstanceActionService pluginService = serviceWithPlugin(plugin);
         WorkflowInstance instance = instance(true);
         WorkflowTask task = task("task-1");
         WorkflowNodeInstance node = node("node-1");
         WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.CANDIDATE);
         stubRuntime(instance, List.of(task), List.of(node), List.of(route));
 
-        WorkflowInstanceActionResult result = service.reset(new WorkflowInstanceActionRequest(
+        WorkflowInstanceActionResult result = pluginService.reset(new WorkflowInstanceActionRequest(
                 "instance-1", "admin-1", "reset", Instant.parse("2026-06-05T05:00:00Z")));
 
         assertThat(result.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
@@ -136,6 +158,8 @@ class WorkflowInstanceActionServiceTest {
         verify(archiveService).archiveCurrentInstance(instance, WorkflowArchiveReason.RESET,
                 Instant.parse("2026-06-05T05:00:00Z"));
         verify(summaryWriter).clearCurrent("sales.contract", "record-1");
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_RESET,
+                WorkflowRuntimePluginEventType.AFTER_RESET);
     }
 
     @Test
@@ -190,6 +214,34 @@ class WorkflowInstanceActionServiceTest {
         routes.forEach(route -> when(routeDao.updateByIdAndVersion(route, 4)).thenReturn(1));
     }
 
+    private WorkflowInstanceActionService serviceWithPlugin(WorkflowRuntimePlugin plugin) {
+        return new WorkflowInstanceActionService(instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory,
+                archiveService, new WorkflowActionPolicyService(), Optional.of(summaryWriter),
+                new WorkflowRuntimePluginDispatcher(List.of(plugin)));
+    }
+
+    private static final class RecordingPlugin implements WorkflowRuntimePlugin {
+        private final List<WorkflowRuntimePluginContext> contexts = new ArrayList<>();
+
+        @Override
+        public String pluginKey() {
+            return "recording";
+        }
+
+        @Override
+        public void handle(WorkflowRuntimePluginContext context) {
+            contexts.add(context);
+        }
+
+        List<WorkflowRuntimePluginContext> contexts() {
+            return contexts;
+        }
+
+        List<WorkflowRuntimePluginEventType> events() {
+            return contexts.stream().map(WorkflowRuntimePluginContext::eventType).toList();
+        }
+    }
+
     private WorkflowInstance instance(boolean approvalEnabled) {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId("instance-1");
@@ -212,6 +264,7 @@ class WorkflowInstanceActionServiceTest {
         task.setTenantId("tenant-1");
         task.setVersion(3);
         task.setInstanceId("instance-1");
+        task.setNodeInstanceId("node-1");
         task.setTaskStatus(WorkflowTaskStatus.TODO);
         task.setTaskKind(WorkflowTaskKind.APPROVAL);
         return task;

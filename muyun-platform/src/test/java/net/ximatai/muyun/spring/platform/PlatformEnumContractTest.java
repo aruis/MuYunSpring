@@ -25,6 +25,8 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteReason;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimePluginEventType;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeTerminateMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskCheckKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskCheckStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskGuideKind;
@@ -60,6 +62,8 @@ class PlatformEnumContractTest {
         assertEnumContract(WorkflowNodeStatus.class);
         assertEnumContract(WorkflowRouteStatus.class);
         assertEnumContract(WorkflowRouteReason.class);
+        assertEnumContract(WorkflowRuntimePluginEventType.class);
+        assertEnumContract(WorkflowRuntimeTerminateMode.class);
         assertEnumContract(WorkflowTaskKind.class);
         assertEnumContract(WorkflowTaskStatus.class);
         assertEnumContract(WorkflowEventType.class);
