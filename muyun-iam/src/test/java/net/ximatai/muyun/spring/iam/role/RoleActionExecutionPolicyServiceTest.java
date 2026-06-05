@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import org.junit.jupiter.api.Test;
 
@@ -140,6 +141,25 @@ class RoleActionExecutionPolicyServiceTest {
         assertThat(result.permissionCode()).isEqualTo("sales.contract:view");
         assertThat(result.permissionActionCode()).isEqualTo("view");
         verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldAuthorizeMenuActionWithMenuPermissionInsteadOfViewPermission() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.hasActionPermission("user-1", "sales.contract", "menu")).thenReturn(true);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        ActionAuthorizationResult result = policy.authorize(ActionExecutionContext.ofPlatformAction(
+                "sales.contract",
+                PlatformAction.MENU,
+                Set.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))
+        ));
+
+        assertThat(result.permissionCode()).isEqualTo("sales.contract:menu");
+        assertThat(result.permissionActionCode()).isEqualTo("menu");
+        verify(roleService).hasActionPermission("user-1", "sales.contract", "menu");
+        verify(roleService, never()).hasActionPermission("user-1", "sales.contract", "view");
     }
 
     @Test
