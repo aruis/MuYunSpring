@@ -66,6 +66,12 @@ public class WorkflowRuntimeEventFactory {
                 "workflow route selected: " + route.getRouteKey(), null, occurredAt);
     }
 
+    public WorkflowEvent routeDropped(WorkflowInstance instance, WorkflowRouteInstance route,
+                                      String operatorId, Instant occurredAt) {
+        return event(instance, null, null, WorkflowEventType.ROUTE_DROPPED, "route", operatorId,
+                "workflow route dropped: " + route.getRouteKey(), route.getClosedReason(), occurredAt);
+    }
+
     public WorkflowEvent approvalCompleted(WorkflowInstance instance, String operatorId, Instant occurredAt) {
         return event(instance, null, null, WorkflowEventType.APPROVAL_COMPLETED, "approval_completed", operatorId,
                 "workflow approval completed", null, occurredAt);

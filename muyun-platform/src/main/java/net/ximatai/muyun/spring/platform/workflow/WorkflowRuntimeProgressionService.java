@@ -87,6 +87,9 @@ public class WorkflowRuntimeProgressionService {
             routeRuntimeService.effectiveRoute(route, routeReason(route), operatorId, now);
             events.add(eventFactory.routeSelected(instance, route, operatorId, now));
         }
+        for (WorkflowRouteInstance route : droppedRoutes) {
+            events.add(eventFactory.routeDropped(instance, route, operatorId, now));
+        }
         Set<String> passedConvergeNodeKeys = handleConvergeArrivals(selectedInitialRoutes, routes, nodes, now);
         WorkflowActivationResult activation = activationService.activate(new WorkflowActivationRequest(
                 graph,

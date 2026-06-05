@@ -94,6 +94,39 @@ class WorkflowRuntimeProgressionServiceTest {
         ));
     }
 
+    @Test
+    void shouldDropUnselectedOutgoingRoutesWhenDefaultRouteExists() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance branch = node("node-branch", "branch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance right = node("node-right", "rightTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "branch", "rightTask", true);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(branch, left, right));
+        when(routeDao.query(any(), any())).thenReturn(List.of(leftRoute, rightRoute));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(branch, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(left, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(right, 2)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(leftRoute, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "branch", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"));
+
+        assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
+        assertThat(right.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(result.selectedRoutes()).containsExactly(rightRoute);
+        assertThat(result.droppedRoutes()).containsExactly(leftRoute);
+        assertThat(result.events()).extracting(WorkflowEvent::getEventType)
+                .contains(WorkflowEventType.ROUTE_SELECTED, WorkflowEventType.ROUTE_DROPPED);
+    }
+
     private WorkflowRuntimeProgressionService service(Optional<WorkflowApprovalSummaryWriter> writer) {
         return new WorkflowRuntimeProgressionService(
                 instanceDao,
