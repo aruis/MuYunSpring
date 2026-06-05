@@ -17,7 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DynamicWorkflowActionExecutorTest {
-    private final DynamicWorkflowSubmitService submitService = mock(DynamicWorkflowSubmitService.class);
+    private final WorkflowModuleSubmitService submitService = mock(WorkflowModuleSubmitService.class);
     private final WorkflowTaskActionFacade taskActionFacade = mock(WorkflowTaskActionFacade.class);
     private final DynamicWorkflowActionExecutor executor =
             new DynamicWorkflowActionExecutor(submitService, taskActionFacade);

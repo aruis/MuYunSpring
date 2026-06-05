@@ -20,10 +20,10 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
     private static final String ACTION_TASK_ACTION = "taskAction";
     private static final String ACTION_AVAILABLE_TASK_ACTIONS = "availableTaskActions";
 
-    private final DynamicWorkflowSubmitService submitService;
+    private final WorkflowModuleSubmitService submitService;
     private final WorkflowTaskActionFacade taskActionFacade;
 
-    public DynamicWorkflowActionExecutor(DynamicWorkflowSubmitService submitService,
+    public DynamicWorkflowActionExecutor(WorkflowModuleSubmitService submitService,
                                          WorkflowTaskActionFacade taskActionFacade) {
         this.submitService = submitService;
         this.taskActionFacade = taskActionFacade;

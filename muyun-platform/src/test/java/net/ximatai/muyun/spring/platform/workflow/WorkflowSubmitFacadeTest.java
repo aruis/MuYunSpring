@@ -9,6 +9,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -17,8 +18,9 @@ class WorkflowSubmitFacadeTest {
     private final WorkflowDefinitionSelector selector = mock(WorkflowDefinitionSelector.class);
     private final WorkflowRuntimeSubmitService runtimeSubmitService = mock(WorkflowRuntimeSubmitService.class);
     private final WorkflowApprovalSummaryWriter writer = mock(WorkflowApprovalSummaryWriter.class);
+    private final WorkflowModuleRecordGuard recordGuard = mock(WorkflowModuleRecordGuard.class);
     private final WorkflowSubmitFacade facade = new WorkflowSubmitFacade(
-            selector, runtimeSubmitService, Optional.of(writer));
+            selector, runtimeSubmitService, Optional.of(writer), List.of(recordGuard));
 
     @Test
     void shouldSubmitThroughSelectedDefinitionAndWriteApprovalSummary() {
@@ -36,6 +38,11 @@ class WorkflowSubmitFacadeTest {
 
         assertThat(result.draft()).isEqualTo(draft);
         assertThat(result.approvalSummaryWritten()).isTrue();
+        var order = inOrder(recordGuard, selector, runtimeSubmitService);
+        order.verify(recordGuard).beforeSubmit(request);
+        order.verify(selector).select(request);
+        order.verify(runtimeSubmitService).submit(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
         var captor = forClass(WorkflowApprovalSummary.class);
         verify(writer).writeSubmitted(captor.capture());
         assertThat(captor.getValue().approvalInstanceId()).isEqualTo("instance-1");
