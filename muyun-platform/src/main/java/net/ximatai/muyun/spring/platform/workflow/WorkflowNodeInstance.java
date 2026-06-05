@@ -49,6 +49,17 @@ public class WorkflowNodeInstance extends StandardEntity {
     @Column(name = "converge_ratio", type = ColumnType.INT, comment = "Converge ratio percent")
     private Integer convergeRatio;
 
+    @Column(name = "route_mode", type = ColumnType.VARCHAR, length = 32, comment = "Branch route mode")
+    private WorkflowRouteMode routeMode;
+
+    @Column(name = "selector_node_key", type = ColumnType.VARCHAR, length = 64,
+            comment = "Manual route selector source node key")
+    private String selectorNodeKey;
+
+    @Column(name = "require_manual_selection_reason", type = ColumnType.BOOLEAN,
+            comment = "Require manual route selection reason")
+    private Boolean requireManualSelectionReason;
+
     @Column(name = "route_id", type = ColumnType.VARCHAR, length = 32, comment = "Current route id")
     private String routeId;
 

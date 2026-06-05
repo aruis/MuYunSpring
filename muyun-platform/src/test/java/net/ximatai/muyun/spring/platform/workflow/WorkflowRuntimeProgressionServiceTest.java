@@ -254,6 +254,113 @@ class WorkflowRuntimeProgressionServiceTest {
     }
 
     @Test
+    void shouldRejectProgressionWhenReachedManualBranchHasNoSelectedRoute() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance branch = manualBranch("node-branch", "branch", "approve", false);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance right = node("node-right", "rightTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toBranch", "approve", "branch", true);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "branch", "rightTask", true);
+        WorkflowTask approvedTask = task("task-approve", approve, "approver-1");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, branch, left, right));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, leftRoute, rightRoute));
+        when(taskDao.query(any(), any())).thenReturn(List.of(approvedTask));
+
+        assertThatThrownBy(() -> service.advanceFromNode("instance-1", "approve", "approver-1",
+                Instant.parse("2026-06-05T03:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("manual branch requires selected route: branch");
+    }
+
+    @Test
+    void shouldAllowProgressionManualBranchWhenSelectorProcessorMatchesOperator() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance branch = manualBranch("node-branch", "branch", "approve", false);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance right = node("node-right", "rightTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toBranch", "approve", "branch", true);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowRouteInstance rightRoute = route("route-right", "rightRoute", "branch", "rightTask", true);
+        WorkflowTask approvedTask = task("task-approve", approve, "approver-1");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, branch, left, right));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, leftRoute, rightRoute));
+        when(taskDao.query(any(), any())).thenReturn(List.of(approvedTask));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(approve, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(branch, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(left, 2)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(right, 2)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(entry, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(leftRoute, 4)).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(rightRoute, 4)).thenReturn(1);
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "approve", "approver-1",
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute", null);
+
+        assertThat(entry.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(leftRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(leftRoute.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(leftRoute.getSelectedBy()).isEqualTo("approver-1");
+        assertThat(rightRoute.getRouteStatus()).isEqualTo(WorkflowRouteStatus.INEFFECTIVE);
+        assertThat(left.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(result.activation().traversedRouteKeys()).containsExactly("leftRoute");
+    }
+
+    @Test
+    void shouldRejectProgressionManualBranchWhenSelectorProcessorDoesNotMatchOperator() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance branch = manualBranch("node-branch", "branch", "approve", false);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toBranch", "approve", "branch", true);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        WorkflowTask approvedTask = task("task-approve", approve, "approver-1");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, branch, left));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, leftRoute));
+        when(taskDao.query(any(), any())).thenReturn(List.of(approvedTask));
+
+        assertThatThrownBy(() -> service.advanceFromNode("instance-1", "approve", "other-user",
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute", null))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("manual branch selector must be operator: branch");
+    }
+
+    @Test
+    void shouldRejectProgressionManualBranchWhenSelectorNodeIsNotActionNode() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance selector = node("node-selector", "selectorBranch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance branch = manualBranch("node-branch", "branch", "selectorBranch", false);
+        WorkflowNodeInstance left = node("node-left", "leftTask", WorkflowNodeType.TASK, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toBranch", "approve", "branch", true);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "branch", "leftTask", false);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, selector, branch, left));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, leftRoute));
+        when(taskDao.query(any(), any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.advanceFromNode("instance-1", "approve", "user-1",
+                Instant.parse("2026-06-05T03:00:00Z"), "leftRoute", null))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("selector node must be start, approval or task: selectorBranch");
+    }
+
+    @Test
     void shouldRejectSelectedRouteKeyWhenRouteIsNotCandidateOutgoingRoute() {
         WorkflowRuntimeProgressionService service = service(Optional.empty());
         WorkflowInstance instance = instance();
@@ -316,6 +423,28 @@ class WorkflowRuntimeProgressionServiceTest {
         node.setNodeType(type);
         node.setNodeStatus(status);
         return node;
+    }
+
+    private WorkflowNodeInstance manualBranch(String id, String key, String selectorNodeKey, boolean requireReason) {
+        WorkflowNodeInstance node = node(id, key, WorkflowNodeType.BRANCH, WorkflowNodeStatus.WAITING);
+        node.setRouteMode(WorkflowRouteMode.MANUAL);
+        node.setSelectorNodeKey(selectorNodeKey);
+        node.setRequireManualSelectionReason(requireReason);
+        return node;
+    }
+
+    private WorkflowTask task(String id, WorkflowNodeInstance node, String actualProcessorId) {
+        WorkflowTask task = new WorkflowTask();
+        task.setId(id);
+        task.setTenantId("tenant-1");
+        task.setVersion(3);
+        task.setInstanceId("instance-1");
+        task.setNodeInstanceId(node.getId());
+        task.setTaskKind(node.getNodeType() == WorkflowNodeType.TASK ? WorkflowTaskKind.BUSINESS : WorkflowTaskKind.APPROVAL);
+        task.setTaskStatus(WorkflowTaskStatus.DONE);
+        task.setActualProcessorId(actualProcessorId);
+        task.setCompletedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        return task;
     }
 
     private WorkflowRouteInstance route(String id, String key, String source, String target, boolean defaultRoute) {

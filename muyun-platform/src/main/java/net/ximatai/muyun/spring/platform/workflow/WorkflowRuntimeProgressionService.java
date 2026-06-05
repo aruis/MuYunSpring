@@ -35,6 +35,7 @@ public class WorkflowRuntimeProgressionService {
     private final WorkflowRuntimeTaskFactory taskFactory;
     private final WorkflowRuntimeEventFactory eventFactory;
     private final Optional<WorkflowApprovalSummaryWriter> approvalSummaryWriter;
+    private final WorkflowManualRouteSelectionPolicy manualRouteSelectionPolicy = new WorkflowManualRouteSelectionPolicy();
 
     public WorkflowRuntimeProgressionService(WorkflowInstanceDao instanceDao,
                                              WorkflowNodeInstanceDao nodeDao,
@@ -74,6 +75,14 @@ public class WorkflowRuntimeProgressionService {
     public WorkflowProgressionResult advanceFromNode(String instanceId, String completedNodeKey,
                                                      String operatorId, Instant operatedAt,
                                                      String selectedRouteKey) {
+        return advanceFromNode(instanceId, completedNodeKey, operatorId, operatedAt, selectedRouteKey, null);
+    }
+
+    @Transactional
+    public WorkflowProgressionResult advanceFromNode(String instanceId, String completedNodeKey,
+                                                     String operatorId, Instant operatedAt,
+                                                     String selectedRouteKey,
+                                                     String selectedReason) {
         WorkflowInstance instance = requireInstance(instanceId);
         if (instance.getInstanceStatus() != WorkflowInstanceStatus.RUNNING) {
             throw new PlatformException("workflow instance is not running: " + instanceId);
@@ -82,14 +91,18 @@ public class WorkflowRuntimeProgressionService {
         String selectedKey = textOrNull(selectedRouteKey);
         List<WorkflowNodeInstance> nodes = nodes(instanceId);
         List<WorkflowRouteInstance> routes = routes(instanceId);
+        List<WorkflowTask> tasks = tasks(instanceId);
         WorkflowRuntimeGraph graph = graph(nodes, routes);
         List<WorkflowRouteInstance> selectedInitialRoutes = selectOutgoingRoutes(routes, nodes, graph,
                 completedNodeKey, selectedKey);
         if (selectedInitialRoutes.isEmpty()) {
             return WorkflowProgressionResult.empty(instance);
         }
-        Map<String, Set<String>> selectedRouteKeysByBranch = selectedRouteKeysByBranch(routes, nodes, graph,
-                selectedInitialRoutes, selectedKey);
+        manualRouteSelectionPolicy.requireCompletedBranchSelection(instance, nodes, tasks, completedNodeKey,
+                selectedInitialRoutes, selectedKey, selectedReason, operatorId);
+        Map<String, Set<String>> selectedRouteKeysByBranch =
+                manualRouteSelectionPolicy.selectedRouteKeysByProgressionBranch(routes, nodes, graph, instance,
+                        tasks, completedNodeKey, selectedInitialRoutes, selectedKey, selectedReason, operatorId);
 
         List<WorkflowRouteInstance> droppedRoutes = dropUnselectedOutgoingRoutes(routes, completedNodeKey,
                 selectedInitialRoutes, operatorId, now);
@@ -199,6 +212,9 @@ public class WorkflowRuntimeProgressionService {
         definition.setMilestoneType(node.getMilestoneType());
         definition.setConvergeMode(node.getConvergeMode());
         definition.setConvergeRatio(node.getConvergeRatio());
+        definition.setRouteMode(node.getRouteMode());
+        definition.setSelectorNodeKey(node.getSelectorNodeKey());
+        definition.setRequireManualSelectionReason(node.getRequireManualSelectionReason());
         return definition;
     }
 
@@ -237,25 +253,6 @@ public class WorkflowRuntimeProgressionService {
             throw new PlatformException("workflow selected route is not candidate outgoing route");
         }
         return defaultSelection;
-    }
-
-    private Map<String, Set<String>> selectedRouteKeysByBranch(List<WorkflowRouteInstance> routes,
-                                                               List<WorkflowNodeInstance> nodes,
-                                                               WorkflowRuntimeGraph graph,
-                                                               List<WorkflowRouteInstance> selectedInitialRoutes,
-                                                               String selectedRouteKey) {
-        if (selectedRouteKey == null || selectedInitialRoutes.stream()
-                .anyMatch(route -> selectedRouteKey.equals(route.getRouteKey()))) {
-            return Map.of();
-        }
-        Set<String> branchNodeKeys = reachableBranchNodeKeys(nodes, graph, selectedInitialRoutes);
-        return routes.stream()
-                .filter(route -> route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE)
-                .filter(route -> selectedRouteKey.equals(route.getRouteKey()))
-                .filter(route -> branchNodeKeys.contains(route.getSourceNodeKey()))
-                .findFirst()
-                .map(route -> Map.of(route.getSourceNodeKey(), Set.of(selectedRouteKey)))
-                .orElseGet(Map::of);
     }
 
     private boolean canUseSelectedRouteForReachableBranch(List<WorkflowRouteInstance> routes,
@@ -369,6 +366,10 @@ public class WorkflowRuntimeProgressionService {
 
     private List<WorkflowRouteInstance> routes(String instanceId) {
         return routeDao.query(Criteria.of().eq("instanceId", instanceId), ALL);
+    }
+
+    private List<WorkflowTask> tasks(String instanceId) {
+        return taskDao.query(Criteria.of().eq("instanceId", instanceId), ALL);
     }
 
     private void updateInstance(WorkflowInstance instance, Instant now) {

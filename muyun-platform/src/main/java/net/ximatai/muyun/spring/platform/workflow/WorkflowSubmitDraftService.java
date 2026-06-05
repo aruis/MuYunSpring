@@ -4,9 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +18,7 @@ public class WorkflowSubmitDraftService {
     private final WorkflowRouteInstanceStateService routeInstanceStateService;
     private final WorkflowRouteRuntimeService routeRuntimeService;
     private final WorkflowRuntimeTaskFactory taskFactory;
+    private final WorkflowManualRouteSelectionPolicy manualRouteSelectionPolicy = new WorkflowManualRouteSelectionPolicy();
 
     public WorkflowSubmitDraftService(WorkflowInstanceSnapshotFactory snapshotFactory,
                                       WorkflowRuntimeActivationService activationService,
@@ -89,8 +88,9 @@ public class WorkflowSubmitDraftService {
         WorkflowNodeDefinition startNode = graph.startNodes().stream()
                 .findFirst()
                 .orElseThrow(() -> new PlatformException("workflow must contain a start node"));
-        Map<String, Set<String>> selectedRouteKeysByBranch = selectedRouteKeysByBranch(
-                graph, startNode.getNodeKey(), selectedRouteKey);
+        Map<String, Set<String>> selectedRouteKeysByBranch =
+                manualRouteSelectionPolicy.selectedRouteKeysBySubmitBranch(graph, snapshot.instance(),
+                        startNode.getNodeKey(), selectedRouteKey, selectedReason, operatorId);
         WorkflowActivationResult activation = activationService.activate(
                 new WorkflowActivationRequest(graph, List.of(WorkflowActivationTarget.of(startNode.getNodeKey())),
                         selectedRouteKeysByBranch, Set.of(), 512));
@@ -106,52 +106,6 @@ public class WorkflowSubmitDraftService {
         events.addAll(taskDraft.events());
         return new WorkflowSubmitDraft(snapshot.instance(), snapshot.nodes(), snapshot.routes(),
                 taskDraft.tasks(), events, activation);
-    }
-
-    private Map<String, Set<String>> selectedRouteKeysByBranch(WorkflowRuntimeGraph graph,
-                                                               String startNodeKey,
-                                                               String selectedRouteKey) {
-        String routeKey = textOrNull(selectedRouteKey);
-        if (routeKey == null) {
-            return Map.of();
-        }
-        Set<String> branchNodeKeys = reachableBranchNodeKeys(graph, startNodeKey);
-        return graph.links().values().stream()
-                .filter(link -> routeKey.equals(link.getRouteKey()))
-                .filter(link -> branchNodeKeys.contains(link.getSourceNodeKey()))
-                .findFirst()
-                .map(link -> Map.of(link.getSourceNodeKey(), Set.of(routeKey)))
-                .orElseThrow(() -> new PlatformException("workflow selected route is not candidate outgoing route"));
-    }
-
-    private Set<String> reachableBranchNodeKeys(WorkflowRuntimeGraph graph, String startNodeKey) {
-        ArrayDeque<String> queue = new ArrayDeque<>();
-        queue.add(startNodeKey);
-        Set<String> visited = new LinkedHashSet<>();
-        Set<String> branchNodeKeys = new LinkedHashSet<>();
-        while (!queue.isEmpty()) {
-            String nodeKey = queue.removeFirst();
-            if (!visited.add(nodeKey)) {
-                continue;
-            }
-            WorkflowNodeDefinition node = graph.requireNode(nodeKey);
-            if (node.getNodeType() == WorkflowNodeType.BRANCH) {
-                branchNodeKeys.add(nodeKey);
-                continue;
-            }
-            if (node.getNodeType() == WorkflowNodeType.APPROVAL || node.getNodeType() == WorkflowNodeType.TASK) {
-                continue;
-            }
-            defaultRoutes(graph.outgoing(nodeKey)).forEach(link -> queue.addLast(link.getTargetNodeKey()));
-        }
-        return branchNodeKeys;
-    }
-
-    private List<WorkflowLinkDefinition> defaultRoutes(List<WorkflowLinkDefinition> outgoing) {
-        List<WorkflowLinkDefinition> defaults = outgoing.stream()
-                .filter(link -> Boolean.TRUE.equals(link.getDefaultRoute()))
-                .toList();
-        return defaults.isEmpty() ? outgoing : defaults;
     }
 
     private void applyManualBranchSelection(List<WorkflowRouteInstance> routes,
@@ -176,9 +130,5 @@ public class WorkflowSubmitDraftService {
                 }
             }
         }
-    }
-
-    private String textOrNull(String value) {
-        return value == null || value.isBlank() ? null : value;
     }
 }

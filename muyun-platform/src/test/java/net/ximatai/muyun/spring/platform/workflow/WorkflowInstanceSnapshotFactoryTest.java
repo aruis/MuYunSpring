@@ -40,6 +40,8 @@ class WorkflowInstanceSnapshotFactoryTest {
                     assertThat(node.getAllowAddSign()).isTrue();
                     assertThat(node.getTaskDefinitionId()).isEqualTo("task-def-1");
                 });
+        assertThat(snapshot.nodes()).filteredOn(node -> "branch".equals(node.getNodeKey()))
+                .isEmpty();
         assertThat(snapshot.routes()).hasSize(1)
                 .first()
                 .satisfies(route -> {
@@ -52,6 +54,27 @@ class WorkflowInstanceSnapshotFactoryTest {
                 .satisfies(event -> {
                     assertThat(event.getEventType()).isEqualTo(WorkflowEventType.INSTANCE_STARTED);
                     assertThat(event.getOperatorId()).isEqualTo("user-1");
+                });
+    }
+
+    @Test
+    void shouldCopyManualBranchGovernanceToNodeSnapshot() {
+        WorkflowNodeDefinition branch = node("branch", WorkflowNodeType.BRANCH);
+        branch.setRouteMode(WorkflowRouteMode.MANUAL);
+        branch.setSelectorNodeKey("start");
+        branch.setRequireManualSelectionReason(true);
+
+        WorkflowInstanceSnapshot snapshot = factory.build(definition(), version(),
+                List.of(node("start", WorkflowNodeType.START), branch, node("end", WorkflowNodeType.END)),
+                List.of(link("toBranch", "start", "branch"), link("toEnd", "branch", "end")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(snapshot.nodes()).filteredOn(node -> "branch".equals(node.getNodeKey()))
+                .first()
+                .satisfies(node -> {
+                    assertThat(node.getRouteMode()).isEqualTo(WorkflowRouteMode.MANUAL);
+                    assertThat(node.getSelectorNodeKey()).isEqualTo("start");
+                    assertThat(node.getRequireManualSelectionReason()).isTrue();
                 });
     }
 

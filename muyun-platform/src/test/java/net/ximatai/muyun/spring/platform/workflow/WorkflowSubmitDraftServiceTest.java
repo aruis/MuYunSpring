@@ -96,6 +96,63 @@ class WorkflowSubmitDraftServiceTest {
     }
 
     @Test
+    void shouldRejectSubmitWhenInitialManualBranchHasNoSelectedRoute() {
+        WorkflowNodeDefinition branch = manualBranch("branch", "START", false);
+
+        assertThatThrownBy(() -> service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        branch,
+                        node("leftTask", WorkflowNodeType.TASK),
+                        node("rightTask", WorkflowNodeType.TASK)),
+                List.of(link("toBranch", "start", "branch"),
+                        link("leftRoute", "branch", "leftTask"),
+                        defaultLink("rightRoute", "branch", "rightTask")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("manual branch requires selected route: branch");
+    }
+
+    @Test
+    void shouldAllowSubmitManualBranchWhenStartSelectorMatchesStarter() {
+        WorkflowNodeDefinition branch = manualBranch("branch", "START", false);
+
+        WorkflowSubmitDraft draft = service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        branch,
+                        node("leftTask", WorkflowNodeType.TASK),
+                        node("rightTask", WorkflowNodeType.TASK)),
+                List.of(link("toBranch", "start", "branch"),
+                        link("leftRoute", "branch", "leftTask"),
+                        defaultLink("rightRoute", "branch", "rightTask")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", null);
+
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("leftRoute"))
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+                    assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+                    assertThat(route.getSelectedBy()).isEqualTo("user-1");
+                });
+    }
+
+    @Test
+    void shouldRejectSubmitManualBranchWhenRequiredReasonIsMissing() {
+        WorkflowNodeDefinition branch = manualBranch("branch", "START", true);
+
+        assertThatThrownBy(() -> service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        branch,
+                        node("leftTask", WorkflowNodeType.TASK)),
+                List.of(link("toBranch", "start", "branch"),
+                        link("leftRoute", "branch", "leftTask")),
+                "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", null))
+                .isInstanceOf(net.ximatai.muyun.spring.common.exception.PlatformException.class)
+                .hasMessageContaining("selection reason is required: branch");
+    }
+
+    @Test
     void shouldRejectSelectedRouteKeyWhenSubmitActivationCannotReachBranch() {
         assertThatThrownBy(() -> service.build(definition(false), version(),
                 List.of(node("start", WorkflowNodeType.START),
@@ -145,6 +202,14 @@ class WorkflowSubmitDraftServiceTest {
         WorkflowNodeDefinition node = new WorkflowNodeDefinition();
         node.setNodeKey(key);
         node.setNodeType(type);
+        return node;
+    }
+
+    private WorkflowNodeDefinition manualBranch(String key, String selectorNodeKey, boolean requireReason) {
+        WorkflowNodeDefinition node = node(key, WorkflowNodeType.BRANCH);
+        node.setRouteMode(WorkflowRouteMode.MANUAL);
+        node.setSelectorNodeKey(selectorNodeKey);
+        node.setRequireManualSelectionReason(requireReason);
         return node;
     }
 

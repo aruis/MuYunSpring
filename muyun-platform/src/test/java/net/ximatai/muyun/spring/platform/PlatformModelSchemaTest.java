@@ -186,6 +186,7 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(WorkflowNodeDefinition.class)))
                 .contains("id", "workflow_version_id", "node_key", "node_type", "approval_mode",
                         "milestone_type", "converge_mode", "converge_ratio", "task_definition_id",
+                        "route_mode", "selector_node_key", "require_manual_selection_reason",
                         "allow_reject", "require_reject_reason", "allow_reject_return_to_me",
                         "allow_rollback", "require_rollback_reason", "allow_terminate",
                         "require_terminate_reason", "allow_add_sign",
@@ -218,6 +219,7 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(WorkflowNodeInstance.class)))
                 .contains("id", "instance_id", "node_key", "node_run_id", "node_type", "node_status", "approval_mode",
                         "milestone_type", "converge_mode", "converge_ratio", "route_id",
+                        "route_mode", "selector_node_key", "require_manual_selection_reason",
                         "enter_route_id", "branch_run_id", "converge_run_id",
                         "required_route_count", "arrived_route_count", "completed_route_count",
                         "required_task_count", "completed_task_count", "approved_task_count",
