@@ -168,6 +168,7 @@ public class WorkflowTaskActionService {
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
         RollbackTarget target = previousApprovalNode(instance.getId(), currentNode);
+        rejectRollbackWithOtherActiveNodes(instance.getId(), task);
 
         task.setTaskStatus(WorkflowTaskStatus.ROLLED_BACK);
         task.setActualProcessorId(operatorId);
@@ -501,6 +502,18 @@ public class WorkflowTaskActionService {
         }
     }
 
+    private void rejectRollbackWithOtherActiveNodes(String instanceId, WorkflowTask currentTask) {
+        for (WorkflowTask other : instanceTodoTasks(instanceId)) {
+            if (currentTask.getId().equals(other.getId())) {
+                continue;
+            }
+            if (!sameText(currentTask.getNodeInstanceId(), other.getNodeInstanceId())) {
+                throw new PlatformException("workflow rollback only supports single active node in first version: "
+                        + instanceId);
+            }
+        }
+    }
+
     private RollbackTarget previousApprovalNode(String instanceId, WorkflowNodeInstance currentNode) {
         WorkflowNodeInstance cursor = currentNode;
         List<WorkflowRouteInstance> pathRoutes = new ArrayList<>();
@@ -737,6 +750,10 @@ public class WorkflowTaskActionService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean sameText(String left, String right) {
+        return left == null ? right == null : left.equals(right);
     }
 
     private String firstText(String... values) {

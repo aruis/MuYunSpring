@@ -189,7 +189,8 @@ class WorkflowTaskActionServiceTest {
         when(taskDao.findById("task-1")).thenReturn(currentTask);
         when(instanceDao.findById("instance-1")).thenReturn(instance);
         when(nodeDao.findById("node-1")).thenReturn(currentNode);
-        when(taskDao.query(any(), any())).thenReturn(List.of(currentTask), List.of(previousDoneTask));
+        when(taskDao.query(any(), any())).thenReturn(List.of(currentTask), List.of(currentTask),
+                List.of(previousDoneTask));
         when(routeDao.query(any(), any())).thenReturn(List.of(route));
         when(nodeDao.query(any(), any())).thenReturn(List.of(previousNode));
         when(taskDao.updateByIdAndVersion(currentTask, 3)).thenReturn(1);
@@ -245,6 +246,31 @@ class WorkflowTaskActionServiceTest {
                 "task-1", "manager-1", "return")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("linear effective route");
+    }
+
+    @Test
+    void shouldRejectRollbackWhenAnotherNodeIsStillActive() {
+        WorkflowTask currentTask = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowTask parallelTask = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        parallelTask.setNodeInstanceId("node-parallel");
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance currentNode = node(WorkflowApprovalMode.ALL, null);
+        WorkflowNodeInstance previousNode = node("node-prev", "leader", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowRouteInstance route = route("route-1", "leader", "approve", WorkflowRouteStatus.EFFECTIVE);
+        when(taskDao.findById("task-1")).thenReturn(currentTask);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(currentNode);
+        when(routeDao.query(any(), any())).thenReturn(List.of(route));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(previousNode));
+        when(taskDao.query(any(), any())).thenReturn(List.of(currentTask, parallelTask));
+
+        assertThatThrownBy(() -> service.rollback(WorkflowTaskActionRequest.complete(
+                "task-1", "manager-1", "return")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("single active node");
+
+        verifyNoInteractions(eventDao);
     }
 
     @Test
