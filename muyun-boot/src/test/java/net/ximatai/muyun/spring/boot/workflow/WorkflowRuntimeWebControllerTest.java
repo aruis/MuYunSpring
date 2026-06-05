@@ -7,6 +7,9 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowApprovalStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskCompletionPolicy;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskContext;
@@ -15,9 +18,12 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskEvaluation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskProcessBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeInstance;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskAvailableAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskDefinition;
@@ -37,6 +43,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,15 +54,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class WorkflowRuntimeWebControllerTest {
     private WorkflowRuntimeReadFacade runtimeReadFacade;
+    private WorkflowTaskActionFacade taskActionFacade;
+    private WorkflowInstanceActionFacade instanceActionFacade;
     private WorkflowModuleTaskRuntimeService moduleTaskRuntimeService;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         runtimeReadFacade = mock(WorkflowRuntimeReadFacade.class);
+        taskActionFacade = mock(WorkflowTaskActionFacade.class);
+        instanceActionFacade = mock(WorkflowInstanceActionFacade.class);
         moduleTaskRuntimeService = mock(WorkflowModuleTaskRuntimeService.class);
         mvc = MockMvcBuilders
-                .standaloneSetup(new WorkflowRuntimeWebController(runtimeReadFacade, moduleTaskRuntimeService))
+                .standaloneSetup(new WorkflowRuntimeWebController(runtimeReadFacade, taskActionFacade,
+                        instanceActionFacade, moduleTaskRuntimeService))
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant-a"))))
                 .build();
@@ -153,6 +165,72 @@ class WorkflowRuntimeWebControllerTest {
                         .content(request))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records").isArray());
+    }
+
+    @Test
+    void shouldExecuteTaskActionsThroughTaskActionFacade() throws Exception {
+        WorkflowTask task = new WorkflowTask();
+        task.setId("task-1");
+        when(taskActionFacade.execute(eq("reject"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "operator-1".equals(request.operatorId())
+                        && request.rejectResubmitMode() == WorkflowRejectResubmitMode.RETURN_TO_ME
+                        && "not ok".equals(request.reason()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
+        when(taskActionFacade.execute(eq("transfer"), argThat(request ->
+                "task-1".equals(request.taskId())
+                        && "user-1".equals(request.operatorId())
+                        && "user-2".equals(request.targetAssigneeId())
+                        && "handoff".equals(request.reason()))))
+                .thenReturn(WorkflowTaskActionResult.transferred(task, new WorkflowTask(), null));
+
+        mvc.perform(post("/workflow/runtime/task/task-1/actions/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "rejectResubmitMode": "return_to_me",
+                                  "reason": "not ok"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-1"));
+
+        mvc.perform(post("/workflow/runtime/task/task-1/actions/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetAssigneeId": "user-2",
+                                  "reason": "handoff"
+                                }
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldExecuteInstanceActionsThroughInstanceActionFacade() throws Exception {
+        WorkflowInstance instance = instance("inst-1");
+        when(instanceActionFacade.execute(eq("revoke"), argThat(request ->
+                "inst-1".equals(request.instanceId())
+                        && "operator-1".equals(request.operatorId())
+                        && "cancel".equals(request.reason()))))
+                .thenReturn(new WorkflowInstanceActionResult(instance, List.of(), List.of(), List.of(), null));
+        when(instanceActionFacade.execute(eq("terminate"), argThat(request ->
+                "inst-1".equals(request.instanceId())
+                        && "user-1".equals(request.operatorId())
+                        && "stop".equals(request.reason()))))
+                .thenReturn(new WorkflowInstanceActionResult(instance, List.of(), List.of(), List.of(), null));
+
+        mvc.perform(post("/workflow/runtime/instance/inst-1/actions/revoke")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\",\"reason\":\"cancel\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.instance.id").value("inst-1"));
+
+        mvc.perform(post("/workflow/runtime/instance/inst-1/actions/terminate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"stop\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test

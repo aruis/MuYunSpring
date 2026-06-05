@@ -6,12 +6,19 @@ import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskContinueResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskProcessBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskAvailableAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchCard;
 import org.springframework.http.HttpStatus;
@@ -28,11 +35,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/workflow/runtime")
 public class WorkflowRuntimeWebController {
     private final WorkflowRuntimeReadFacade runtimeReadFacade;
+    private final WorkflowTaskActionFacade taskActionFacade;
+    private final WorkflowInstanceActionFacade instanceActionFacade;
     private final WorkflowModuleTaskRuntimeService moduleTaskRuntimeService;
 
     public WorkflowRuntimeWebController(WorkflowRuntimeReadFacade runtimeReadFacade,
+                                        WorkflowTaskActionFacade taskActionFacade,
+                                        WorkflowInstanceActionFacade instanceActionFacade,
                                         WorkflowModuleTaskRuntimeService moduleTaskRuntimeService) {
         this.runtimeReadFacade = runtimeReadFacade;
+        this.taskActionFacade = taskActionFacade;
+        this.instanceActionFacade = instanceActionFacade;
         this.moduleTaskRuntimeService = moduleTaskRuntimeService;
     }
 
@@ -57,6 +70,30 @@ public class WorkflowRuntimeWebController {
             @RequestBody(required = false) WorkflowOperatorWebRequest request) {
         return new WebListResponse<>(runtimeReadFacade.instanceAvailableActions(instanceId,
                 operatorIdOrNull(request == null ? null : request.operatorId())));
+    }
+
+    @PostMapping("/instance/{instanceId}/actions/{actionCode}")
+    public WorkflowInstanceActionResult executeInstanceAction(
+            @PathVariable String instanceId,
+            @PathVariable String actionCode,
+            @RequestBody(required = false) WorkflowInstanceActionWebRequest request) {
+        return instanceActionFacade.execute(actionCode, new WorkflowInstanceActionRequest(instanceId,
+                operatorId(request == null ? null : request.operatorId()),
+                request == null ? null : request.reason(),
+                null));
+    }
+
+    @PostMapping("/task/{taskId}/actions/{actionCode}")
+    public WorkflowTaskActionResult executeTaskAction(
+            @PathVariable String taskId,
+            @PathVariable String actionCode,
+            @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
+        return taskActionFacade.execute(actionCode, new WorkflowTaskActionRequest(taskId,
+                operatorId(request == null ? null : request.operatorId()),
+                request == null ? null : request.targetAssigneeId(),
+                rejectResubmitMode(request == null ? null : request.rejectResubmitMode()),
+                request == null ? null : request.reason(),
+                null));
     }
 
     @PostMapping("/workbench/todo/query")
@@ -133,9 +170,30 @@ public class WorkflowRuntimeWebController {
                 .filter(userId -> !userId.isBlank())
                 .orElseThrow(() -> new PlatformException("workflow operator id must not be blank"));
     }
+
+    private WorkflowRejectResubmitMode rejectResubmitMode(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        for (WorkflowRejectResubmitMode mode : WorkflowRejectResubmitMode.values()) {
+            if (mode.name().equalsIgnoreCase(value) || mode.getCode().equals(value)) {
+                return mode;
+            }
+        }
+        throw new PlatformException("unsupported workflow reject resubmit mode: " + value);
+    }
 }
 
 record WorkflowOperatorWebRequest(String operatorId) {
+}
+
+record WorkflowInstanceActionWebRequest(String operatorId, String reason) {
+}
+
+record WorkflowTaskActionWebRequest(String operatorId,
+                                    String targetAssigneeId,
+                                    String rejectResubmitMode,
+                                    String reason) {
 }
 
 record WorkflowWorkbenchWebRequest(String operatorId, WebPageRequest page) {
