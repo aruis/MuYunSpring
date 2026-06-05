@@ -4,7 +4,7 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
 public enum WorkflowAddSignEditMode implements CodeTitleEnum {
     CREATE("create", "创建加签段"),
-    UNSUPPORTED_REPLACE_FAIL_FAST("unsupported_replace_fail_fast", "重复加签替换暂未开放");
+    REPLACE("replace", "替换加签段");
 
     private final String code;
     private final String title;

@@ -753,10 +753,120 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.event().getPayloadText()).contains("\"sourceNodeKey\":\"approve\"");
         assertThat(result.event().getPayloadText()).contains("\"addedNodeKeys\":[\"add-1\"]");
         assertThat(result.event().getPayloadText()).contains("\"replacedRouteIds\":[\"route-1\"]");
+        assertThat(result.event().getPayloadText()).contains("\"editMode\":\"create\"");
         verify(taskDao, never()).insert(any());
         verify(eventDao).insert(result.event());
         verifyNoInteractions(progressionService);
         assertThat(plugin.contexts()).isEmpty();
+    }
+
+    @Test
+    void shouldReplaceUnstartedRuntimeAddSignSegmentFromSameSourceNode() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowNodeInstance oldAdd = node("node-old-add", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.WAITING);
+        oldAdd.setAddedByAddSign(true);
+        oldAdd.setAddSignSourceNodeKey("approve");
+        WorkflowNodeInstance next = node("node-next", "next", WorkflowNodeType.END, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance oldEntry = route("route-old-entry", "approve", "add-1",
+                WorkflowRouteStatus.CANDIDATE);
+        oldEntry.setAddedByAddSign(true);
+        oldEntry.setAddSignSourceNodeKey("approve");
+        WorkflowRouteInstance oldExit = route("route-old-exit", "add-1", "next",
+                WorkflowRouteStatus.CANDIDATE);
+        oldExit.setAddedByAddSign(true);
+        oldExit.setAddSignSourceNodeKey("approve");
+        oldExit.setDefaultRoute(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of(task));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(oldAdd), List.of(node, oldAdd, next));
+        when(routeDao.query(any(), any())).thenReturn(List.of(oldEntry, oldExit));
+
+        WorkflowTaskActionResult result = service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "replace review"));
+
+        assertThat(result.addSignEditMode()).isEqualTo(WorkflowAddSignEditMode.REPLACE);
+        assertThat(result.addedNodeKeys()).containsExactly("add-1");
+        assertThat(result.replacedRouteIds()).containsExactly("route-old-entry", "route-old-exit");
+        verify(routeDao).deleteById("route-old-entry");
+        verify(routeDao).deleteById("route-old-exit");
+        verify(nodeDao).deleteById("node-old-add");
+        verify(routeDao, never()).updateByIdAndVersion(any(), any());
+        ArgumentCaptor<WorkflowNodeInstance> nodeCaptor = ArgumentCaptor.forClass(WorkflowNodeInstance.class);
+        verify(nodeDao).insert(nodeCaptor.capture());
+        assertThat(nodeCaptor.getValue().getNodeKey()).isEqualTo("add-1");
+        assertThat(nodeCaptor.getValue().getNodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(nodeCaptor.getValue().getAddedByAddSign()).isTrue();
+        ArgumentCaptor<WorkflowRouteInstance> routeCaptor = ArgumentCaptor.forClass(WorkflowRouteInstance.class);
+        verify(routeDao, times(2)).insert(routeCaptor.capture());
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getSourceNodeKey)
+                .containsExactly("approve", "add-1");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getTargetNodeKey)
+                .containsExactly("add-1", "next");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getRouteStatus)
+                .containsOnly(WorkflowRouteStatus.CANDIDATE);
+        assertThat(result.event().getPayloadText()).contains("\"editMode\":\"replace\"");
+        assertThat(result.event().getPayloadText())
+                .contains("\"replacedRouteIds\":[\"route-old-entry\",\"route-old-exit\"]");
+        verify(eventDao).insert(result.event());
+        verifyNoInteractions(progressionService);
+    }
+
+    @Test
+    void shouldRejectReplacingAddSignSegmentWhenExistingNodeIsEffective() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowNodeInstance activeAdd = node("node-old-add", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.ACTIVE);
+        activeAdd.setAddedByAddSign(true);
+        activeAdd.setAddSignSourceNodeKey("approve");
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(activeAdd));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "replace review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("already effective and cannot be edited");
+
+        verify(routeDao, never()).deleteById(any());
+        verify(nodeDao, never()).deleteById(any());
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRejectReplacingAddSignSegmentWhenExistingNodeAlreadyHasTask() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowTask oldAddTask = task("task-old-add", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        oldAddTask.setNodeInstanceId("node-old-add");
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowNodeInstance oldAdd = node("node-old-add", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.WAITING);
+        oldAdd.setAddedByAddSign(true);
+        oldAdd.setAddSignSourceNodeKey("approve");
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of(task, oldAddTask));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(oldAdd));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-1", "approve", "next"), "replace review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("already effective and cannot be edited");
+
+        verify(routeDao, never()).deleteById(any());
+        verify(nodeDao, never()).deleteById(any());
+        verifyNoInteractions(eventDao);
     }
 
     @Test

@@ -533,24 +533,36 @@ public class WorkflowTaskActionService {
         actionPolicyService.requireRuntimeAction(instance, "addSign");
         actionPolicyService.requireNodeTaskAction(task, node, "addSign", operatorId, request.reason());
         rejectMultiTodoApprovalTasks(task);
-        rejectExistingUnstartedAddSignSegment(instance.getId(), node.getNodeKey());
-        List<WorkflowRouteInstance> originalRoutes = outgoingCandidateRoutes(instance.getId(), node.getNodeKey());
+        EditableAddSignSegment existingSegment = loadEditableAddSignSegment(instance.getId(), node.getNodeKey());
+        WorkflowAddSignEditMode editMode = existingSegment == null
+                ? WorkflowAddSignEditMode.CREATE
+                : WorkflowAddSignEditMode.REPLACE;
+        List<WorkflowRouteInstance> originalRoutes = existingSegment == null
+                ? outgoingCandidateRoutes(instance.getId(), node.getNodeKey())
+                : existingSegment.restoreOriginalOutgoingRoutes(node.getNodeKey());
         if (originalRoutes.isEmpty()) {
             throw new PlatformException("workflow add sign requires candidate route after current node: "
                     + node.getNodeKey());
         }
+        List<String> replacedRouteIds = existingSegment == null
+                ? originalRoutes.stream().map(WorkflowRouteInstance::getId).toList()
+                : existingSegment.routeIds();
         AddSignSegmentPlan plan = buildAddSignSegmentPlan(instance, node, originalRoutes, request.addSignSegment(),
-                operatorId, now);
+                existingSegment == null ? Set.of() : existingSegment.nodeIds(), operatorId, now);
 
-        for (WorkflowRouteInstance route : originalRoutes) {
-            route.setRouteStatus(WorkflowRouteStatus.CANCELED);
-            route.setRouteReason(WorkflowRouteReason.MANUAL_UNSELECTED);
-            route.setSelectedBy(operatorId);
-            route.setSelectedAt(now);
-            route.setClosedReason("workflow route replaced by addSign");
-            route.setInvalidatedByActionId("addSign");
-            route.setInvalidatedAt(now);
-            updateRoute(route, now);
+        if (existingSegment == null) {
+            for (WorkflowRouteInstance route : originalRoutes) {
+                route.setRouteStatus(WorkflowRouteStatus.CANCELED);
+                route.setRouteReason(WorkflowRouteReason.MANUAL_UNSELECTED);
+                route.setSelectedBy(operatorId);
+                route.setSelectedAt(now);
+                route.setClosedReason("workflow route replaced by addSign");
+                route.setInvalidatedByActionId("addSign");
+                route.setInvalidatedAt(now);
+                updateRoute(route, now);
+            }
+        } else {
+            deleteEditableAddSignSegment(existingSegment);
         }
         for (WorkflowNodeInstance addedNode : plan.nodes()) {
             EntityLifecycle.prepareInsert(addedNode, now);
@@ -562,11 +574,10 @@ public class WorkflowTaskActionService {
         }
 
         WorkflowEvent event = eventFactory.addSign(instance, node, task, operatorId, request.reason(),
-                addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), originalRoutes.stream()
-                        .map(WorkflowRouteInstance::getId).toList(), WorkflowAddSignEditMode.CREATE), now);
+                addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), replacedRouteIds, editMode), now);
         eventDao.insert(event);
-        return WorkflowTaskActionResult.addSign(task, node, instance, event, WorkflowAddSignEditMode.CREATE,
-                plan.addedNodeKeys(), originalRoutes.stream().map(WorkflowRouteInstance::getId).toList());
+        return WorkflowTaskActionResult.addSign(task, node, instance, event, editMode,
+                plan.addedNodeKeys(), replacedRouteIds);
     }
 
     @Transactional
@@ -801,17 +812,18 @@ public class WorkflowTaskActionService {
         }
     }
 
-    private void rejectExistingUnstartedAddSignSegment(String instanceId, String sourceNodeKey) {
+    private EditableAddSignSegment loadEditableAddSignSegment(String instanceId, String sourceNodeKey) {
         List<WorkflowNodeInstance> existingNodes = nodeInstanceDao.query(Criteria.of()
                 .eq("instanceId", instanceId)
                 .eq("addedByAddSign", true)
                 .eq("addSignSourceNodeKey", sourceNodeKey), ALL);
         if (existingNodes.isEmpty()) {
-            return;
+            return null;
         }
         for (WorkflowNodeInstance existingNode : existingNodes) {
             if (existingNode.getNodeStatus() != WorkflowNodeStatus.WAITING) {
-                throw new PlatformException("workflow add sign segment is already effective: " + sourceNodeKey);
+                throw new PlatformException("workflow add sign segment is already effective and cannot be edited: "
+                        + sourceNodeKey);
             }
         }
         Set<String> nodeIds = existingNodes.stream()
@@ -821,10 +833,29 @@ public class WorkflowTaskActionService {
                         .eq("instanceId", instanceId), ALL).stream()
                 .anyMatch(existingTask -> nodeIds.contains(existingTask.getNodeInstanceId()));
         if (hasTasks) {
-            throw new PlatformException("workflow add sign segment is already effective: " + sourceNodeKey);
+            throw new PlatformException("workflow add sign segment is already effective and cannot be edited: "
+                    + sourceNodeKey);
         }
-        throw new PlatformException("workflow add sign replace is not supported in first version: "
-                + WorkflowAddSignEditMode.UNSUPPORTED_REPLACE_FAIL_FAST.getCode());
+        Set<String> nodeKeys = existingNodes.stream()
+                .map(WorkflowNodeInstance::getNodeKey)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        List<WorkflowRouteInstance> existingRoutes = requireRouteDao().query(Criteria.of()
+                .eq("instanceId", instanceId)
+                .eq("addedByAddSign", true)
+                .eq("addSignSourceNodeKey", sourceNodeKey), ALL);
+        if (existingRoutes.isEmpty()) {
+            throw new PlatformException("workflow add sign editable segment has no routes: " + sourceNodeKey);
+        }
+        return new EditableAddSignSegment(existingNodes, existingRoutes, nodeKeys);
+    }
+
+    private void deleteEditableAddSignSegment(EditableAddSignSegment segment) {
+        for (WorkflowRouteInstance route : segment.routes()) {
+            requireRouteDao().deleteById(route.getId());
+        }
+        for (WorkflowNodeInstance node : segment.nodes()) {
+            nodeInstanceDao.deleteById(node.getId());
+        }
     }
 
     private List<WorkflowRouteInstance> outgoingCandidateRoutes(String instanceId, String sourceNodeKey) {
@@ -838,6 +869,7 @@ public class WorkflowTaskActionService {
                                                        WorkflowNodeInstance sourceNode,
                                                        List<WorkflowRouteInstance> originalRoutes,
                                                        WorkflowAddSignSegment segment,
+                                                       Set<String> ignoredExistingNodeIds,
                                                        String operatorId,
                                                        Instant now) {
         if (segment == null) {
@@ -857,6 +889,7 @@ public class WorkflowTaskActionService {
                 "workflow original next node key must not be blank");
         Set<String> existingNodeKeys = nodeInstanceDao.query(Criteria.of()
                         .eq("instanceId", instance.getId()), ALL).stream()
+                .filter(node -> ignoredExistingNodeIds == null || !ignoredExistingNodeIds.contains(node.getId()))
                 .map(WorkflowNodeInstance::getNodeKey)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         Map<String, WorkflowNodeDefinition> definitionsByKey = new LinkedHashMap<>();
@@ -1362,5 +1395,45 @@ public class WorkflowTaskActionService {
     private record AddSignSegmentPlan(List<WorkflowNodeInstance> nodes,
                                       List<WorkflowRouteInstance> routes,
                                       List<String> addedNodeKeys) {
+    }
+
+    private record EditableAddSignSegment(List<WorkflowNodeInstance> nodes,
+                                          List<WorkflowRouteInstance> routes,
+                                          Set<String> nodeKeys) {
+
+        Set<String> nodeIds() {
+            return nodes.stream()
+                    .map(WorkflowNodeInstance::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        List<String> routeIds() {
+            return routes.stream()
+                    .map(WorkflowRouteInstance::getId)
+                    .filter(id -> id != null && !id.isBlank())
+                    .toList();
+        }
+
+        List<WorkflowRouteInstance> restoreOriginalOutgoingRoutes(String sourceNodeKey) {
+            List<WorkflowRouteInstance> exitRoutes = routes.stream()
+                    .filter(route -> nodeKeys.contains(route.getSourceNodeKey()))
+                    .filter(route -> !nodeKeys.contains(route.getTargetNodeKey()))
+                    .toList();
+            if (exitRoutes.size() != 1) {
+                throw new PlatformException("workflow add sign replace only supports single editable exit route: "
+                        + sourceNodeKey);
+            }
+            WorkflowRouteInstance exit = exitRoutes.getFirst();
+            WorkflowRouteInstance restored = new WorkflowRouteInstance();
+            restored.setTenantId(exit.getTenantId());
+            restored.setInstanceId(exit.getInstanceId());
+            restored.setRouteKey(sourceNodeKey + "-" + exit.getTargetNodeKey() + ":replace");
+            restored.setRouteRunId(restored.getRouteKey() + ":1");
+            restored.setSourceNodeKey(sourceNodeKey);
+            restored.setTargetNodeKey(exit.getTargetNodeKey());
+            restored.setRouteStatus(WorkflowRouteStatus.CANDIDATE);
+            restored.setDefaultRoute(exit.getDefaultRoute());
+            return List.of(restored);
+        }
     }
 }
