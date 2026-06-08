@@ -195,6 +195,74 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldDispatchForceApprovePluginsAndExposeContext() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task));
+        when(taskDao.updateByIdAndVersion(task, 3)).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+
+        pluginService.forceApprove(new WorkflowTaskActionRequest(
+                "task-1", "admin-1", null, null, "admin approved",
+                Instant.parse("2026-06-05T02:30:00Z")));
+
+        assertThat(plugin.events()).containsExactly(WorkflowRuntimePluginEventType.BEFORE_APPROVE,
+                WorkflowRuntimePluginEventType.AFTER_APPROVE);
+        WorkflowRuntimePluginContext before = plugin.contexts().getFirst();
+        assertThat(before.actionCode()).isEqualTo("forceApprove");
+        assertThat(before.moduleAlias()).isEqualTo("sales.contract");
+        assertThat(before.recordId()).isEqualTo("record-1");
+        assertThat(before.instanceId()).isEqualTo("instance-1");
+        assertThat(before.nodeKey()).isEqualTo("approve");
+        assertThat(before.taskId()).isEqualTo("task-1");
+        assertThat(before.operatorId()).isEqualTo("admin-1");
+        assertThat(before.reason()).isEqualTo("admin approved");
+        assertThat(before.instance()).isSameAs(plugin.contexts().getLast().instance());
+        assertThat(before.node()).isSameAs(plugin.contexts().getLast().node());
+        assertThat(before.task()).isSameAs(plugin.contexts().getLast().task());
+    }
+
+    @Test
+    void shouldBlockForceApproveWhenBeforePluginFails() {
+        WorkflowRuntimePlugin blocker = new WorkflowRuntimePlugin() {
+            @Override
+            public String pluginKey() {
+                return "blocker";
+            }
+
+            @Override
+            public void handle(WorkflowRuntimePluginContext context) {
+                if (context.eventType() == WorkflowRuntimePluginEventType.BEFORE_APPROVE) {
+                    throw new PlatformException("blocked by plugin");
+                }
+            }
+        };
+        WorkflowTaskActionService pluginService = serviceWithPlugin(blocker);
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ANY, null);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance());
+        when(nodeDao.findById("node-1")).thenReturn(node);
+
+        assertThatThrownBy(() -> pluginService.forceApprove(new WorkflowTaskActionRequest(
+                "task-1", "admin-1", null, null, "admin approved",
+                Instant.parse("2026-06-05T02:30:00Z"))))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocked by plugin");
+
+        assertThat(task.getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
+        assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        verify(taskDao, never()).updateByIdAndVersion(any(), any());
+        verify(nodeDao, never()).updateByIdAndVersion(any(), any());
+        verifyNoInteractions(eventDao, progressionService);
+    }
+
+    @Test
     void shouldRejectForceApproveForBusinessTask() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         when(taskDao.findById("task-1")).thenReturn(task);

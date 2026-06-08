@@ -187,6 +187,8 @@ public class WorkflowTaskActionService {
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
         actionPolicyService.requireManagementTaskAction("forceApprove", request.reason());
+        dispatchTask(instance, node, task, WorkflowRuntimePluginEventType.BEFORE_APPROVE, "forceApprove",
+                operatorId, null, null, request.reason());
         task.setTaskStatus(WorkflowTaskStatus.DONE);
         task.setActualProcessorId(operatorId);
         task.setDecision("forceApprove");
@@ -215,6 +217,8 @@ public class WorkflowTaskActionService {
             progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now,
                     request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
         }
+        dispatchTask(instance, node, task, WorkflowRuntimePluginEventType.AFTER_APPROVE, "forceApprove",
+                operatorId, null, null, request.reason());
         return WorkflowTaskActionResult.of(task, node, instance, event);
     }
 
