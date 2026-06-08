@@ -217,7 +217,7 @@ class PlatformModelSchemaTest {
                         "snapshot_text")
                 .doesNotContain("entity_alias");
         assertThat(columnNames(mapper.toTable(WorkflowNodeInstance.class)))
-                .contains("id", "instance_id", "node_key", "node_run_id", "node_type", "node_status", "approval_mode",
+                .contains("id", "instance_id", "node_key", "node_title", "node_run_id", "node_type", "node_status", "approval_mode",
                         "milestone_type", "converge_mode", "converge_ratio", "route_id",
                         "route_mode", "selector_node_key", "require_manual_selection_reason",
                         "enter_route_id", "branch_run_id", "converge_run_id",

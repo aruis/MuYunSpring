@@ -64,13 +64,15 @@ class WorkflowHistoryWebControllerTest {
         when(historyQueryService.events("history-1")).thenReturn(List.of());
         when(historyQueryService.taskViews("history-1")).thenReturn(List.of(new WorkflowHistoryTaskView(
                 "task-1", "instance-1", "node-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE,
-                WorkflowAssignmentKind.DELEGATED, "delegate-1", "delegate-1", true, "principal-1", "principal-1",
-                "delegate-1", true, "delegation-1", "{}", false, false, "approve", null, null)));
+                WorkflowAssignmentKind.DELEGATED, "delegate-1", "代理人", "delegate-1", "代理人", true,
+                "principal-1", "原审批人", "principal-1", "原审批人", "delegate-1", "代理人", true,
+                "delegation-1", "{}", false, false, "approve", null, null)));
         when(historyQueryService.eventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
                 WorkflowHistoryEventView.ORIGIN_TYPE_ADD_SIGN, true, "approve-source", "approve-source",
                 "event-1", "instance-1", "node-1", "task-1", WorkflowEventType.TASK_COMPLETED, "approve",
-                "delegate-1", "delegate-1", true, WorkflowAssignmentKind.DELEGATED, "principal-1", "principal-1",
-                "delegate-1", true, "delegation-1", "{}", false, false, null, null, null)));
+                "delegate-1", "代理人", "delegate-1", "代理人", true, WorkflowAssignmentKind.DELEGATED,
+                "principal-1", "原审批人", "principal-1", "原审批人", "delegate-1", "代理人", true,
+                "delegation-1", "{}", false, false, null, null, null)));
 
         mvc.perform(get("/workflow/history/history-1/bundle"))
                 .andExpect(status().isOk())
@@ -81,6 +83,7 @@ class WorkflowHistoryWebControllerTest {
         mvc.perform(get("/workflow/history/history-1/tasks/view"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].actualProcessUserId").value("delegate-1"))
+                .andExpect(jsonPath("$.records[0].actualProcessUserTitle").value("代理人"))
                 .andExpect(jsonPath("$.records[0].processedByDelegation").value(true));
         mvc.perform(get("/workflow/history/history-1/events"))
                 .andExpect(status().isOk())
@@ -90,6 +93,7 @@ class WorkflowHistoryWebControllerTest {
                 .andExpect(jsonPath("$.records[0].originType").value("ADD_SIGN"))
                 .andExpect(jsonPath("$.records[0].isAddSignRoute").value(true))
                 .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve-source"))
+                .andExpect(jsonPath("$.records[0].operatorTitle").value("代理人"))
                 .andExpect(jsonPath("$.records[0].delegationPolicyId").value("delegation-1"));
     }
 

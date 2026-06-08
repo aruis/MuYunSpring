@@ -1087,6 +1087,7 @@ public class WorkflowTaskActionService {
         node.setTenantId(instance.getTenantId());
         node.setInstanceId(instance.getId());
         node.setNodeKey(requireText(definition.getNodeKey(), "workflow add sign node key must not be blank"));
+        node.setNodeTitle(firstText(definition.getTitle(), definition.getNodeKey()));
         node.setNodeRunId(node.getNodeKey() + ":addSign:1");
         node.setNodeType(definition.getNodeType());
         node.setNodeStatus(WorkflowNodeStatus.WAITING);

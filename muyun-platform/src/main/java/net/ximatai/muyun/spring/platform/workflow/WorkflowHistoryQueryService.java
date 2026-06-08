@@ -5,12 +5,15 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -21,19 +24,37 @@ public class WorkflowHistoryQueryService {
     private final WorkflowHistoryInstanceDao historyDao;
     private final WorkflowArchiveService archiveService;
     private final WorkflowActionPolicyService actionPolicyService;
+    private final WorkflowUserTitleResolver userTitleResolver;
 
     public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
                                        WorkflowArchiveService archiveService) {
-        this(historyDao, archiveService, null);
+        this(historyDao, archiveService, null, WorkflowUserTitleResolver.NONE);
     }
 
     @Autowired
     public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
                                        WorkflowArchiveService archiveService,
+                                       WorkflowActionPolicyService actionPolicyService,
+                                       ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
+        this(historyDao, archiveService, actionPolicyService, userTitleResolver == null
+                ? WorkflowUserTitleResolver.NONE
+                : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
+    }
+
+    public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
+                                       WorkflowArchiveService archiveService,
                                        WorkflowActionPolicyService actionPolicyService) {
+        this(historyDao, archiveService, actionPolicyService, WorkflowUserTitleResolver.NONE);
+    }
+
+    public WorkflowHistoryQueryService(WorkflowHistoryInstanceDao historyDao,
+                                       WorkflowArchiveService archiveService,
+                                       WorkflowActionPolicyService actionPolicyService,
+                                       WorkflowUserTitleResolver userTitleResolver) {
         this.historyDao = historyDao;
         this.archiveService = archiveService;
         this.actionPolicyService = actionPolicyService == null ? new WorkflowActionPolicyService() : actionPolicyService;
+        this.userTitleResolver = userTitleResolver == null ? WorkflowUserTitleResolver.NONE : userTitleResolver;
     }
 
     public List<WorkflowHistoryInstance> queryRecordHistory(String moduleAlias, String recordId,
@@ -88,8 +109,10 @@ public class WorkflowHistoryQueryService {
     }
 
     public List<WorkflowHistoryTaskView> taskViews(String historyInstanceId) {
-        return archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks().stream()
-                .map(WorkflowHistoryTaskView::from)
+        List<WorkflowTask> tasks = archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks();
+        Map<String, String> userTitles = userTitles(tasks, List.of());
+        return tasks.stream()
+                .map(task -> WorkflowHistoryTaskView.from(task, userTitles))
                 .toList();
     }
 
@@ -109,10 +132,35 @@ public class WorkflowHistoryQueryService {
                 .filter(node -> node.getNodeKey() != null)
                 .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left));
         Map<String, WorkflowRouteInstance> routesByIdOrKey = routesByIdOrKey(snapshot.routes());
+        Map<String, String> userTitles = userTitles(snapshot.tasks(), snapshot.events());
         return snapshot.events().stream()
                 .map(event -> WorkflowHistoryEventView.from(event, tasksById.get(event.getTaskId()),
-                        nodesById, nodesByKey, routesByIdOrKey))
+                        nodesById, nodesByKey, routesByIdOrKey, userTitles))
                 .toList();
+    }
+
+    private Map<String, String> userTitles(List<WorkflowTask> tasks, List<WorkflowEvent> events) {
+        Set<String> userIds = new LinkedHashSet<>();
+        for (WorkflowTask task : tasks == null ? List.<WorkflowTask>of() : tasks) {
+            addUserId(userIds, task.getAssigneeId());
+            addUserId(userIds, task.getOriginalAssigneeId());
+            addUserId(userIds, task.getActualProcessorId());
+            addUserId(userIds, task.getDelegatedFromUserId());
+            addUserId(userIds, task.getDelegatedToUserId());
+            addUserId(userIds, task.getTransferredFromUserId());
+            addUserId(userIds, task.getTransferredBy());
+        }
+        for (WorkflowEvent event : events == null ? List.<WorkflowEvent>of() : events) {
+            addUserId(userIds, event.getOperatorId());
+        }
+        Map<String, String> titles = userTitleResolver.titles(userIds);
+        return titles == null ? Map.of() : titles;
+    }
+
+    private void addUserId(Set<String> userIds, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            userIds.add(userId);
+        }
     }
 
     private Map<String, WorkflowRouteInstance> routesByIdOrKey(List<WorkflowRouteInstance> routes) {

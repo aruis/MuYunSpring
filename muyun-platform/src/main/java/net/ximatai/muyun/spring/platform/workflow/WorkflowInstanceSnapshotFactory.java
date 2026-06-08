@@ -62,6 +62,7 @@ public class WorkflowInstanceSnapshotFactory {
             node.setTenantId(instance.getTenantId());
             node.setInstanceId(instance.getId());
             node.setNodeKey(requireText(definition.getNodeKey(), "workflow node key must not be blank"));
+            node.setNodeTitle(firstText(definition.getTitle(), definition.getNodeKey()));
             node.setNodeRunId(node.getNodeKey() + ":1");
             node.setNodeType(definition.getNodeType());
             node.setNodeStatus(WorkflowNodeStatus.WAITING);
@@ -118,5 +119,9 @@ public class WorkflowInstanceSnapshotFactory {
             throw new PlatformException(message);
         }
         return value;
+    }
+
+    private String firstText(String first, String second) {
+        return first != null && !first.isBlank() ? first.trim() : second;
     }
 }

@@ -308,9 +308,10 @@ class WorkflowRuntimeWebControllerTest {
     void shouldQueryWorkbenchCardsWithNormalizedPageAndCurrentUserFallback() throws Exception {
         WorkflowWorkbenchCard card = new WorkflowWorkbenchCard("TODO", "inst-1", "crm.contract", "record-1",
                 "def-1", "ver-1", WorkflowInstanceStatus.RUNNING, WorkflowApprovalStatus.PROCESSING, "task-1",
-                WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, "visit", "visit", List.of("user-1"),
-                null, null, null, null, null, null, null, null, null, null, "user-1", Boolean.TRUE, null, null,
-                null, Boolean.TRUE, "approve", "operator-1", Instant.parse("2026-06-05T00:30:00Z"));
+                WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, "visit", "回访", "visit", List.of("user-1"),
+                List.of("处理人"), null, null, null, null, null, null, null, null, "user-1", "处理人",
+                null, null, null, null, Boolean.TRUE, null, null, null, Boolean.TRUE, "approve", "operator-1", "加签人",
+                Instant.parse("2026-06-05T00:30:00Z"));
         ArgumentCaptor<PageRequest> pageCaptor = ArgumentCaptor.forClass(PageRequest.class);
         ArgumentCaptor<WorkflowWorkbenchQueryRequest> queryCaptor =
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);

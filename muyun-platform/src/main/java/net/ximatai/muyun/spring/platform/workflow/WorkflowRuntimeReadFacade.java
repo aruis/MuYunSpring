@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +43,7 @@ public class WorkflowRuntimeReadFacade {
     private final WorkflowTaskActionAvailabilityService availabilityService;
     private final WorkflowActionPolicyService actionPolicyService;
     private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
+    private final WorkflowUserTitleResolver userTitleResolver;
     private final WorkflowManualBranchSelectorResolver manualBranchSelectorResolver =
             new WorkflowManualBranchSelectorResolver();
 
@@ -51,7 +54,8 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowEventDao eventDao,
                                      WorkflowTaskActionAvailabilityService availabilityService) {
         this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService,
-                new WorkflowActionPolicyService(), new WorkflowTaskAssignmentPolicyService());
+                new WorkflowActionPolicyService(), new WorkflowTaskAssignmentPolicyService(),
+                WorkflowUserTitleResolver.NONE);
     }
 
     @Autowired
@@ -62,7 +66,23 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowEventDao eventDao,
                                      WorkflowTaskActionAvailabilityService availabilityService,
                                      WorkflowActionPolicyService actionPolicyService,
-                                     WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
+                                     WorkflowTaskAssignmentPolicyService assignmentPolicyService,
+                                     ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
+        this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService, actionPolicyService,
+                assignmentPolicyService, userTitleResolver == null
+                ? WorkflowUserTitleResolver.NONE
+                : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
+    }
+
+    public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
+                                     WorkflowTaskDao taskDao,
+                                     WorkflowNodeInstanceDao nodeDao,
+                                     WorkflowRouteInstanceDao routeDao,
+                                     WorkflowEventDao eventDao,
+                                     WorkflowTaskActionAvailabilityService availabilityService,
+                                     WorkflowActionPolicyService actionPolicyService,
+                                     WorkflowTaskAssignmentPolicyService assignmentPolicyService,
+                                     WorkflowUserTitleResolver userTitleResolver) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeDao = nodeDao;
@@ -75,6 +95,7 @@ public class WorkflowRuntimeReadFacade {
         this.assignmentPolicyService = assignmentPolicyService == null
                 ? new WorkflowTaskAssignmentPolicyService()
                 : assignmentPolicyService;
+        this.userTitleResolver = userTitleResolver == null ? WorkflowUserTitleResolver.NONE : userTitleResolver;
     }
 
     public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
@@ -85,7 +106,7 @@ public class WorkflowRuntimeReadFacade {
                                      WorkflowTaskActionAvailabilityService availabilityService,
                                      WorkflowActionPolicyService actionPolicyService) {
         this(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService, actionPolicyService,
-                new WorkflowTaskAssignmentPolicyService());
+                new WorkflowTaskAssignmentPolicyService(), WorkflowUserTitleResolver.NONE);
     }
 
     public WorkflowRuntimeRenderBundle renderBundle(String instanceId) {
@@ -537,9 +558,10 @@ public class WorkflowRuntimeReadFacade {
                 nodes.computeIfAbsent(task.getNodeInstanceId(), nodeDao::findById);
             }
         }
+        Map<String, String> userTitles = userTitles(tasks);
         return tasks.stream()
                 .map(task -> card(boardType, instances.get(task.getInstanceId()), task,
-                        nodes.get(task.getNodeInstanceId()), assigneeIds(task)))
+                        nodes.get(task.getNodeInstanceId()), assigneeIds(task), userTitles))
                 .filter(card -> matches(card, request))
                 .sorted(sorter(boardType, request))
                 .toList();
@@ -564,7 +586,7 @@ public class WorkflowRuntimeReadFacade {
                                        WorkflowTask task,
                                        WorkflowNodeInstance node,
                                        List<String> currentAssigneeIds) {
-        return card(boardType, instance, task, node, currentAssigneeIds, null);
+        return card(boardType, instance, task, node, currentAssigneeIds, (Map<String, String>) null);
     }
 
     private WorkflowWorkbenchCard delegationCard(List<WorkflowTask> tasks) {
@@ -582,7 +604,16 @@ public class WorkflowRuntimeReadFacade {
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toList();
-        return card("DELEGATION", instance, representative, node, currentAssigneeIds, tasks.size());
+        return card("DELEGATION", instance, representative, node, currentAssigneeIds, userTitles(tasks), tasks.size());
+    }
+
+    private WorkflowWorkbenchCard card(String boardType,
+                                       WorkflowInstance instance,
+                                       WorkflowTask task,
+                                       WorkflowNodeInstance node,
+                                       List<String> currentAssigneeIds,
+                                       Map<String, String> userTitles) {
+        return card(boardType, instance, task, node, currentAssigneeIds, userTitles, null);
     }
 
     private WorkflowWorkbenchCard card(String boardType,
@@ -591,6 +622,16 @@ public class WorkflowRuntimeReadFacade {
                                        WorkflowNodeInstance node,
                                        List<String> currentAssigneeIds,
                                        Integer delegationTaskCount) {
+        return card(boardType, instance, task, node, currentAssigneeIds, userTitles(task), delegationTaskCount);
+    }
+
+    private WorkflowWorkbenchCard card(String boardType,
+                                       WorkflowInstance instance,
+                                       WorkflowTask task,
+                                       WorkflowNodeInstance node,
+                                       List<String> currentAssigneeIds,
+                                       Map<String, String> userTitles,
+                                       Integer delegationTaskCount) {
         if (instance == null) {
             throw new PlatformException("workflow instance not found: " + (task == null ? null : task.getInstanceId()));
         }
@@ -598,19 +639,25 @@ public class WorkflowRuntimeReadFacade {
                 instance.getDefinitionId(), instance.getWorkflowVersionId(),
                 instance.getInstanceStatus(), instance.getApprovalStatus(), task == null ? null : task.getId(),
                 task == null ? null : task.getTaskKind(), task == null ? null : task.getTaskStatus(),
-                node == null ? null : node.getNodeKey(), instance.getCurrentNodeKeys(), currentAssigneeIds,
+                node == null ? null : node.getNodeKey(), nodeTitle(node), instance.getCurrentNodeKeys(),
+                currentAssigneeIds, titles(currentAssigneeIds, userTitles),
                 instance.getStartedAt(), task == null ? instance.getStartedAt() : task.getCreatedAt(),
                 task == null ? instance.getCompletedAt() : task.getCompletedAt(),
                 task == null ? instance.getLastActionCode() : actionCode(task),
                 node == null ? null : node.getOvertimeStatus(), task == null ? null : task.getDueAt(),
                 instance.getLastOperatedAt() == null ? instance.getStartedAt() : instance.getLastOperatedAt(),
                 task == null ? null : task.getAssignmentKind(), task == null ? null : task.getOriginalAssigneeId(),
+                title(task == null ? null : task.getOriginalAssigneeId(), userTitles),
                 task == null ? null : task.getDelegatedFromUserId(),
+                title(task == null ? null : task.getDelegatedFromUserId(), userTitles),
                 task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
+                title(task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
+                        userTitles),
                 task == null ? null : task.getPrincipalCanProcess(),
                 noticeReadStatus(task), noticeSourceType(task), delegationTaskCount,
                 Boolean.TRUE.equals(node == null ? null : node.getAddedByAddSign()),
-                addSignSourceNodeKey(node), addSignOperatorId(node), addSignAt(node));
+                addSignSourceNodeKey(node), addSignOperatorId(node), title(addSignOperatorId(node), userTitles),
+                addSignAt(node));
     }
 
     private String addSignSourceNodeKey(WorkflowNodeInstance node) {
@@ -623,6 +670,50 @@ public class WorkflowRuntimeReadFacade {
         return node != null && Boolean.TRUE.equals(node.getAddedByAddSign())
                 ? blankToNull(node.getAddSignOperatorId())
                 : null;
+    }
+
+    private Map<String, String> userTitles(WorkflowTask task) {
+        return userTitles(task == null ? List.of() : List.of(task));
+    }
+
+    private Map<String, String> userTitles(List<WorkflowTask> tasks) {
+        LinkedHashSet<String> userIds = new LinkedHashSet<>();
+        for (WorkflowTask task : tasks == null ? List.<WorkflowTask>of() : tasks) {
+            addUserId(userIds, task.getAssigneeId());
+            addUserId(userIds, task.getOriginalAssigneeId());
+            addUserId(userIds, task.getActualProcessorId());
+            addUserId(userIds, task.getDelegatedFromUserId());
+            addUserId(userIds, task.getDelegatedToUserId());
+            addUserId(userIds, task.getTransferredFromUserId());
+            addUserId(userIds, task.getTransferredBy());
+        }
+        Map<String, String> titles = userTitleResolver.titles(userIds);
+        return titles == null ? Map.of() : titles;
+    }
+
+    private void addUserId(Set<String> userIds, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            userIds.add(userId);
+        }
+    }
+
+    private List<String> titles(List<String> userIds, Map<String, String> userTitles) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> titles = userTitles == null ? Map.of() : userTitles;
+        return userIds.stream()
+                .map(titles::get)
+                .filter(value -> value != null && !value.isBlank())
+                .toList();
+    }
+
+    private String title(String userId, Map<String, String> userTitles) {
+        return userId == null || userTitles == null ? null : userTitles.get(userId);
+    }
+
+    private String nodeTitle(WorkflowNodeInstance node) {
+        return node == null ? null : firstText(node.getNodeTitle(), node.getNodeKey());
     }
 
     private Instant addSignAt(WorkflowNodeInstance node) {

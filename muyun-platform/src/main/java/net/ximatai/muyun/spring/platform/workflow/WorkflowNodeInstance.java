@@ -24,6 +24,9 @@ public class WorkflowNodeInstance extends StandardEntity {
     @Column(name = "node_key", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Node key")
     private String nodeKey;
 
+    @Column(name = "node_title", type = ColumnType.VARCHAR, length = 128, comment = "Node title")
+    private String nodeTitle;
+
     @Column(name = "node_run_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Node run id")
     private String nodeRunId;
 

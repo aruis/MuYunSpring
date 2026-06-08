@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,12 +45,16 @@ class WorkflowAdminServiceTest {
         WorkflowTask task = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         task.setAssigneeId("approver-1");
         WorkflowNodeInstance node = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        node.setNodeTitle("合同审批");
         node.setOvertimeStatus(WorkflowOvertimeStatus.NORMAL);
         when(instanceDao.query(any(), any(), any(), any(), any())).thenReturn(List.of(instance));
         when(taskDao.query(any(), any(), any())).thenReturn(List.of(task));
         when(nodeInstanceDao.query(any(), any(), any())).thenReturn(List.of(node));
+        WorkflowAdminService serviceWithTitles = serviceWithTitles(Map.of(
+                "starter-1", "发起人",
+                "approver-1", "审批人"));
 
-        List<WorkflowAdminInstanceView> views = service.queryCurrentInstances(null, PageRequest.of(1, 20));
+        List<WorkflowAdminInstanceView> views = serviceWithTitles.queryCurrentInstances(null, PageRequest.of(1, 20));
 
         assertThat(views).hasSize(1);
         WorkflowAdminInstanceView view = views.getFirst();
@@ -61,9 +66,12 @@ class WorkflowAdminServiceTest {
         assertThat(view.versionNo()).isEqualTo(3);
         assertThat(view.instanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
         assertThat(view.startedBy()).isEqualTo("starter-1");
+        assertThat(view.startedByTitle()).isEqualTo("发起人");
         assertThat(view.activeNodeKeys()).containsExactly("approve_1");
+        assertThat(view.activeNodeTitles()).containsExactly("合同审批");
         assertThat(view.currentTaskIds()).containsExactly("task-1");
         assertThat(view.currentAssigneeIds()).containsExactly("approver-1");
+        assertThat(view.currentAssigneeTitles()).containsExactly("审批人");
         assertThat(view.overtimeStatus()).isEqualTo(WorkflowOvertimeStatus.NORMAL);
         assertThat(view.updatedAt()).isEqualTo(Instant.parse("2026-06-05T02:00:00Z"));
         assertThat(view.lastOperatedAt()).isEqualTo(Instant.parse("2026-06-05T02:30:00Z"));
@@ -346,5 +354,11 @@ class WorkflowAdminServiceTest {
         node.setNodeStatus(status);
         node.setNodeType(type);
         return node;
+    }
+
+    private WorkflowAdminService serviceWithTitles(Map<String, String> userTitles) {
+        return new WorkflowAdminService(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao,
+                actionPolicyService, instanceActionService, taskActionService, historyQueryService,
+                userIds -> userTitles);
     }
 }

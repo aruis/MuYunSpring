@@ -19,12 +19,17 @@ public record WorkflowHistoryEventView(
         WorkflowEventType eventType,
         String actionCode,
         String operatorId,
+        String operatorTitle,
         String actualProcessUserId,
+        String actualProcessUserTitle,
         Boolean processedByDelegation,
         WorkflowAssignmentKind assignmentKind,
         String originalAssigneeId,
+        String originalAssigneeTitle,
         String delegatedFromUserId,
+        String delegatedFromUserTitle,
         String delegatedToUserId,
+        String delegatedToUserTitle,
         Boolean principalCanProcess,
         String delegationPolicyId,
         String delegationSnapshot,
@@ -46,17 +51,31 @@ public record WorkflowHistoryEventView(
                                                 Map<String, WorkflowNodeInstance> nodesById,
                                                 Map<String, WorkflowNodeInstance> nodesByKey,
                                                 Map<String, WorkflowRouteInstance> routesByIdOrKey) {
+        return from(event, task, nodesById, nodesByKey, routesByIdOrKey, Map.of());
+    }
+
+    public static WorkflowHistoryEventView from(WorkflowEvent event, WorkflowTask task,
+                                                Map<String, WorkflowNodeInstance> nodesById,
+                                                Map<String, WorkflowNodeInstance> nodesByKey,
+                                                Map<String, WorkflowRouteInstance> routesByIdOrKey,
+                                                Map<String, String> userTitles) {
         AddSignExplanation addSign = addSignExplanation(event, nodesById, nodesByKey, routesByIdOrKey);
+        String actualProcessUserId = task == null || task.getActualProcessorId() == null
+                ? event.getOperatorId()
+                : task.getActualProcessorId();
         return new WorkflowHistoryEventView(addSign.originType(), addSign.isAddSignRoute(),
                 addSign.sourceNodeKey(), addSign.sourceNodeName(),
                 event.getId(), event.getInstanceId(), event.getNodeInstanceId(),
                 event.getTaskId(), event.getEventType(), event.getActionCode(), event.getOperatorId(),
-                task == null || task.getActualProcessorId() == null ? event.getOperatorId() : task.getActualProcessorId(),
+                title(event.getOperatorId(), userTitles), actualProcessUserId, title(actualProcessUserId, userTitles),
                 task == null ? Boolean.FALSE : WorkflowHistoryTaskViews.processedByDelegation(task),
                 task == null ? null : task.getAssignmentKind(),
                 task == null ? null : task.getOriginalAssigneeId(),
+                title(task == null ? null : task.getOriginalAssigneeId(), userTitles),
                 task == null ? null : task.getDelegatedFromUserId(),
+                title(task == null ? null : task.getDelegatedFromUserId(), userTitles),
                 task == null ? null : task.getDelegatedToUserId(),
+                title(task == null ? null : task.getDelegatedToUserId(), userTitles),
                 task == null ? null : task.getPrincipalCanProcess(),
                 task == null ? null : task.getDelegationPolicyId(),
                 task == null ? null : task.getAssignmentSnapshotText(),
@@ -159,6 +178,10 @@ public record WorkflowHistoryEventView(
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private static String title(String userId, Map<String, String> userTitles) {
+        return userId == null || userTitles == null ? null : userTitles.get(userId);
     }
 
     private record AddSignExplanation(

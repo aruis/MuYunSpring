@@ -9,6 +9,7 @@ import org.mockito.InOrder;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -250,20 +251,25 @@ class WorkflowRuntimeReadFacadeTest {
         task.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
         WorkflowInstance instance = instance("instance-1");
         WorkflowNodeInstance node = node("node-1", "visit");
+        node.setNodeTitle("客户回访");
         node.setOvertimeStatus(WorkflowOvertimeStatus.WARNED);
         when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
                 .thenReturn(List.of(task));
         when(instanceDao.findById("instance-1")).thenReturn(instance);
         when(nodeDao.findById("node-1")).thenReturn(node);
+        WorkflowRuntimeReadFacade facadeWithTitles = facadeWithTitles(Map.of("user-1", "处理人"));
 
-        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20));
+        List<WorkflowWorkbenchCard> cards = facadeWithTitles.todoCards("user-1", PageRequest.of(1, 20));
 
         assertThat(cards).hasSize(1);
         assertThat(cards.getFirst().boardType()).isEqualTo("TODO");
         assertThat(cards.getFirst().instanceId()).isEqualTo("instance-1");
         assertThat(cards.getFirst().taskId()).isEqualTo("task-1");
         assertThat(cards.getFirst().nodeKey()).isEqualTo("visit");
+        assertThat(cards.getFirst().nodeTitle()).isEqualTo("客户回访");
         assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("user-1");
+        assertThat(cards.getFirst().currentAssigneeTitles()).containsExactly("处理人");
+        assertThat(cards.getFirst().originalAssigneeTitle()).isEqualTo("处理人");
         assertThat(cards.getFirst().overtimeStatus()).isEqualTo(WorkflowOvertimeStatus.WARNED);
     }
 
@@ -1030,5 +1036,10 @@ class WorkflowRuntimeReadFacadeTest {
                 .findFirst()
                 .map(WorkflowWorkbenchStatItem::count)
                 .orElseThrow();
+    }
+
+    private WorkflowRuntimeReadFacade facadeWithTitles(Map<String, String> userTitles) {
+        return new WorkflowRuntimeReadFacade(instanceDao, taskDao, nodeDao, routeDao, eventDao, availabilityService,
+                actionPolicyService, new WorkflowTaskAssignmentPolicyService(), userIds -> userTitles);
     }
 }

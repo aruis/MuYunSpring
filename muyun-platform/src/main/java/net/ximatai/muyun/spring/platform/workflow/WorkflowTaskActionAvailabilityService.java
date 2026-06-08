@@ -3,11 +3,15 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class WorkflowTaskActionAvailabilityService {
@@ -17,24 +21,38 @@ public class WorkflowTaskActionAvailabilityService {
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowNodeInstanceDao nodeDao;
     private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
+    private final WorkflowUserTitleResolver userTitleResolver;
 
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao) {
-        this(taskDao, instanceDao, nodeDao, new WorkflowTaskAssignmentPolicyService());
+        this(taskDao, instanceDao, nodeDao, new WorkflowTaskAssignmentPolicyService(),
+                WorkflowUserTitleResolver.NONE);
     }
 
     @Autowired
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao,
-                                                 WorkflowTaskAssignmentPolicyService assignmentPolicyService) {
+                                                 WorkflowTaskAssignmentPolicyService assignmentPolicyService,
+                                                 ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
+        this(taskDao, instanceDao, nodeDao, assignmentPolicyService, userTitleResolver == null
+                ? WorkflowUserTitleResolver.NONE
+                : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
+    }
+
+    public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
+                                                 WorkflowInstanceDao instanceDao,
+                                                 WorkflowNodeInstanceDao nodeDao,
+                                                 WorkflowTaskAssignmentPolicyService assignmentPolicyService,
+                                                 WorkflowUserTitleResolver userTitleResolver) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
         this.nodeDao = nodeDao;
         this.assignmentPolicyService = assignmentPolicyService == null
                 ? new WorkflowTaskAssignmentPolicyService()
                 : assignmentPolicyService;
+        this.userTitleResolver = userTitleResolver == null ? WorkflowUserTitleResolver.NONE : userTitleResolver;
     }
 
     public List<WorkflowTaskAvailableAction> availableActions(String taskId, String operatorId) {
@@ -78,7 +96,23 @@ public class WorkflowTaskActionAvailabilityService {
         if (task.getTaskKind() != WorkflowTaskKind.RESUBMIT) {
             actions.add(WorkflowTaskAvailableAction.of("transfer", "转办").requireTargetAssignee());
         }
-        return actions.stream().map(action -> action.withTask(task, node)).toList();
+        return actions.stream().map(action -> action.withTask(task, node, userTitles(task))).toList();
+    }
+
+    private Map<String, String> userTitles(WorkflowTask task) {
+        Set<String> userIds = new LinkedHashSet<>();
+        addUserId(userIds, task.getAssigneeId());
+        addUserId(userIds, task.getOriginalAssigneeId());
+        addUserId(userIds, task.getDelegatedFromUserId());
+        addUserId(userIds, task.getDelegatedToUserId());
+        Map<String, String> titles = userTitleResolver.titles(userIds);
+        return titles == null ? Map.of() : titles;
+    }
+
+    private void addUserId(Set<String> userIds, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            userIds.add(userId);
+        }
     }
 
     private WorkflowTask requireTask(String taskId) {

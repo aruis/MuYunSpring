@@ -13,17 +13,22 @@ public record WorkflowAdminInstanceView(
         WorkflowInstanceStatus instanceStatus,
         WorkflowApprovalStatus approvalStatus,
         String startedBy,
+        String startedByTitle,
         Instant startedAt,
         List<String> activeNodeKeys,
+        List<String> activeNodeTitles,
         List<String> currentTaskIds,
         List<String> currentAssigneeIds,
+        List<String> currentAssigneeTitles,
         WorkflowOvertimeStatus overtimeStatus,
         Instant updatedAt,
         Instant lastOperatedAt
 ) {
     public WorkflowAdminInstanceView {
         activeNodeKeys = activeNodeKeys == null ? List.of() : List.copyOf(activeNodeKeys);
+        activeNodeTitles = activeNodeTitles == null ? List.of() : List.copyOf(activeNodeTitles);
         currentTaskIds = currentTaskIds == null ? List.of() : List.copyOf(currentTaskIds);
         currentAssigneeIds = currentAssigneeIds == null ? List.of() : List.copyOf(currentAssigneeIds);
+        currentAssigneeTitles = currentAssigneeTitles == null ? List.of() : List.copyOf(currentAssigneeTitles);
     }
 }

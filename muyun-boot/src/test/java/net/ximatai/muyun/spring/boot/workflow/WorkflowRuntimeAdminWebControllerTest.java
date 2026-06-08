@@ -88,10 +88,10 @@ class WorkflowRuntimeAdminWebControllerTest {
     @Test
     void shouldExposeCurrentActiveTaskViews() throws Exception {
         WorkflowAdminActiveTaskView view = new WorkflowAdminActiveTaskView("task-1", "inst-1", "node-1",
-                "approve_1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO, "delegate-1",
+                "approve_1", "审批", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO, "delegate-1", "代理人",
                 Instant.parse("2026-06-05T01:00:00Z"), Instant.parse("2026-06-05T01:00:00Z"),
                 WorkflowOvertimeStatus.WARNED, true, WorkflowAssignmentKind.DELEGATED, "principal-1",
-                "principal-1", "delegate-1", true, "delegation-1",
+                "原审批人", "principal-1", "原审批人", "delegate-1", "代理人", true, "delegation-1",
                 "{\"delegationPolicyId\":\"delegation-1\"}", true, "approve_source", "operator-1",
                 Instant.parse("2026-06-05T00:30:00Z"));
         when(adminFacade.currentTodoTaskViews("inst-1")).thenReturn(List.of(view));
@@ -99,9 +99,14 @@ class WorkflowRuntimeAdminWebControllerTest {
         mvc.perform(get("/workflow/runtime/admin/instance/inst-1/active-tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].taskId").value("task-1"))
+                .andExpect(jsonPath("$.records[0].nodeTitle").value("审批"))
+                .andExpect(jsonPath("$.records[0].assigneeTitle").value("代理人"))
                 .andExpect(jsonPath("$.records[0].canForceApprove").value(true))
                 .andExpect(jsonPath("$.records[0].overtimeStatus").value("WARNED"))
                 .andExpect(jsonPath("$.records[0].assignmentKind").value("DELEGATED"))
+                .andExpect(jsonPath("$.records[0].originalAssigneeTitle").value("原审批人"))
+                .andExpect(jsonPath("$.records[0].delegatedFromUserTitle").value("原审批人"))
+                .andExpect(jsonPath("$.records[0].delegatedToUserTitle").value("代理人"))
                 .andExpect(jsonPath("$.records[0].principalCanProcess").value(true))
                 .andExpect(jsonPath("$.records[0].addedByAddSign").value(true))
                 .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve_source"))
@@ -124,8 +129,9 @@ class WorkflowRuntimeAdminWebControllerTest {
     void shouldExposeAdminCurrentInstanceQueryAndDetails() throws Exception {
         WorkflowAdminInstanceView view = new WorkflowAdminInstanceView("inst-1", "sales.contract",
                 "record-1", "definition-1", "version-1", 2, WorkflowInstanceStatus.RUNNING,
-                WorkflowApprovalStatus.PROCESSING, "starter-1", Instant.parse("2026-06-05T01:00:00Z"),
-                List.of("approve_1"), List.of("task-1"), List.of("approver-1"), WorkflowOvertimeStatus.WARNED,
+                WorkflowApprovalStatus.PROCESSING, "starter-1", "发起人",
+                Instant.parse("2026-06-05T01:00:00Z"), List.of("approve_1"), List.of("审批"),
+                List.of("task-1"), List.of("approver-1"), List.of("审批人"), WorkflowOvertimeStatus.WARNED,
                 Instant.parse("2026-06-05T02:00:00Z"), Instant.parse("2026-06-05T02:30:00Z"));
         WorkflowTask task = new WorkflowTask();
         task.setId("task-1");
@@ -303,8 +309,8 @@ class WorkflowRuntimeAdminWebControllerTest {
         when(adminFacade.historyEventViews("history-1")).thenReturn(List.of(new WorkflowHistoryEventView(
                 WorkflowHistoryEventView.ORIGIN_TYPE_DEFINITION, false, null, null,
                 "event-1", "instance-1", null, null, WorkflowEventType.INSTANCE_TERMINATED, "forceTerminate",
-                "admin-1", "admin-1", false, WorkflowAssignmentKind.NORMAL, null, null,
-                null, null, null, null, false, false, null, null, null)));
+                "admin-1", "管理员", "admin-1", "管理员", false, WorkflowAssignmentKind.NORMAL, null, null,
+                null, null, null, null, null, null, null, false, false, null, null, null)));
         when(adminFacade.deleteHistory("history-1")).thenReturn(1);
 
         mvc.perform(post("/workflow/runtime/admin/history/query")

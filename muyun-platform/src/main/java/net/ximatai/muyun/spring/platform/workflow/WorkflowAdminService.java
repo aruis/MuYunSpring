@@ -5,11 +5,15 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class WorkflowAdminService {
@@ -24,13 +28,15 @@ public class WorkflowAdminService {
     private final WorkflowInstanceActionService instanceActionService;
     private final WorkflowTaskActionService taskActionService;
     private final WorkflowHistoryQueryService historyQueryService;
+    private final WorkflowUserTitleResolver userTitleResolver;
 
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
                                 WorkflowTaskDao taskDao,
                                 WorkflowActionPolicyService actionPolicyService,
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService) {
-        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService, null);
+        this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService,
+                null, WorkflowUserTitleResolver.NONE);
     }
 
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
@@ -40,7 +46,7 @@ public class WorkflowAdminService {
                                 WorkflowTaskActionService taskActionService,
                                 WorkflowHistoryQueryService historyQueryService) {
         this(instanceDao, taskDao, null, null, null, actionPolicyService, instanceActionService, taskActionService,
-                historyQueryService);
+                historyQueryService, WorkflowUserTitleResolver.NONE);
     }
 
     public WorkflowAdminService(WorkflowInstanceDao instanceDao,
@@ -51,7 +57,7 @@ public class WorkflowAdminService {
                                 WorkflowTaskActionService taskActionService,
                                 WorkflowHistoryQueryService historyQueryService) {
         this(instanceDao, taskDao, nodeInstanceDao, null, null, actionPolicyService, instanceActionService,
-                taskActionService, historyQueryService);
+                taskActionService, historyQueryService, WorkflowUserTitleResolver.NONE);
     }
 
     @Autowired
@@ -63,7 +69,24 @@ public class WorkflowAdminService {
                                 WorkflowActionPolicyService actionPolicyService,
                                 WorkflowInstanceActionService instanceActionService,
                                 WorkflowTaskActionService taskActionService,
-                                WorkflowHistoryQueryService historyQueryService) {
+                                WorkflowHistoryQueryService historyQueryService,
+                                ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
+        this(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao, actionPolicyService,
+                instanceActionService, taskActionService, historyQueryService, userTitleResolver == null
+                ? WorkflowUserTitleResolver.NONE
+                : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
+    }
+
+    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
+                                WorkflowTaskDao taskDao,
+                                WorkflowNodeInstanceDao nodeInstanceDao,
+                                WorkflowRouteInstanceDao routeInstanceDao,
+                                WorkflowEventDao eventDao,
+                                WorkflowActionPolicyService actionPolicyService,
+                                WorkflowInstanceActionService instanceActionService,
+                                WorkflowTaskActionService taskActionService,
+                                WorkflowHistoryQueryService historyQueryService,
+                                WorkflowUserTitleResolver userTitleResolver) {
         this.instanceDao = instanceDao;
         this.taskDao = taskDao;
         this.nodeInstanceDao = nodeInstanceDao;
@@ -73,6 +96,20 @@ public class WorkflowAdminService {
         this.instanceActionService = instanceActionService;
         this.taskActionService = taskActionService;
         this.historyQueryService = historyQueryService;
+        this.userTitleResolver = userTitleResolver == null ? WorkflowUserTitleResolver.NONE : userTitleResolver;
+    }
+
+    public WorkflowAdminService(WorkflowInstanceDao instanceDao,
+                                WorkflowTaskDao taskDao,
+                                WorkflowNodeInstanceDao nodeInstanceDao,
+                                WorkflowRouteInstanceDao routeInstanceDao,
+                                WorkflowEventDao eventDao,
+                                WorkflowActionPolicyService actionPolicyService,
+                                WorkflowInstanceActionService instanceActionService,
+                                WorkflowTaskActionService taskActionService,
+                                WorkflowHistoryQueryService historyQueryService) {
+        this(instanceDao, taskDao, nodeInstanceDao, routeInstanceDao, eventDao, actionPolicyService,
+                instanceActionService, taskActionService, historyQueryService, WorkflowUserTitleResolver.NONE);
     }
 
     public List<WorkflowAdminInstanceView> queryCurrentInstances(WorkflowAdminInstanceQueryRequest request,
@@ -126,7 +163,7 @@ public class WorkflowAdminService {
                 ALL, Sort.asc("createdAt")).stream()
                 .filter(task -> task.getTaskKind() == WorkflowTaskKind.APPROVAL)
                 .filter(task -> task.getTaskStatus() == WorkflowTaskStatus.TODO)
-                .map(this::toActiveTaskView)
+                .map(task -> toActiveTaskView(task, userTitles(List.of(task))))
                 .filter(view -> view != null)
                 .toList();
     }
@@ -194,7 +231,7 @@ public class WorkflowAdminService {
         return historyQueryService.deleteHistory(historyInstanceId);
     }
 
-    private WorkflowAdminActiveTaskView toActiveTaskView(WorkflowTask task) {
+    private WorkflowAdminActiveTaskView toActiveTaskView(WorkflowTask task, Map<String, String> userTitles) {
         if (task == null || task.getNodeInstanceId() == null || task.getNodeInstanceId().isBlank()) {
             return null;
         }
@@ -204,7 +241,7 @@ public class WorkflowAdminService {
                 || node.getNodeType() != WorkflowNodeType.APPROVAL) {
             return null;
         }
-        return WorkflowAdminActiveTaskView.from(task, node);
+        return WorkflowAdminActiveTaskView.from(task, node, userTitles);
     }
 
     private WorkflowAdminInstanceView toInstanceView(WorkflowInstance instance) {
@@ -221,6 +258,11 @@ public class WorkflowAdminService {
                 .filter(this::hasText)
                 .distinct()
                 .toList();
+        List<String> activeNodeTitles = activeNodes.stream()
+                .map(this::nodeTitle)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
         List<String> currentTaskIds = todoTasks.stream()
                 .map(WorkflowTask::getId)
                 .filter(this::hasText)
@@ -230,6 +272,7 @@ public class WorkflowAdminService {
                 .filter(this::hasText)
                 .distinct()
                 .toList();
+        Map<String, String> userTitles = userTitles(todoTasks, instance.getStartedBy());
         return new WorkflowAdminInstanceView(
                 instance.getId(),
                 instance.getModuleAlias(),
@@ -240,10 +283,13 @@ public class WorkflowAdminService {
                 instance.getInstanceStatus(),
                 instance.getApprovalStatus(),
                 instance.getStartedBy(),
+                title(instance.getStartedBy(), userTitles),
                 instance.getStartedAt(),
                 activeNodeKeys,
+                activeNodeTitles,
                 currentTaskIds,
                 currentAssigneeIds,
+                titles(currentAssigneeIds, userTitles),
                 aggregateOvertimeStatus(activeNodes),
                 instance.getUpdatedAt(),
                 instance.getLastOperatedAt());
@@ -279,6 +325,53 @@ public class WorkflowAdminService {
             return List.of(task.getAssigneeId(), task.getDelegatedFromUserId());
         }
         return List.of(task.getAssigneeId());
+    }
+
+    private Map<String, String> userTitles(List<WorkflowTask> tasks, String... extraUserIds) {
+        Set<String> userIds = new LinkedHashSet<>();
+        for (WorkflowTask task : tasks == null ? List.<WorkflowTask>of() : tasks) {
+            addUserId(userIds, task.getAssigneeId());
+            addUserId(userIds, task.getOriginalAssigneeId());
+            addUserId(userIds, task.getActualProcessorId());
+            addUserId(userIds, task.getDelegatedFromUserId());
+            addUserId(userIds, task.getDelegatedToUserId());
+            addUserId(userIds, task.getTransferredFromUserId());
+            addUserId(userIds, task.getTransferredBy());
+        }
+        for (String extraUserId : extraUserIds == null ? new String[0] : extraUserIds) {
+            addUserId(userIds, extraUserId);
+        }
+        Map<String, String> titles = userTitleResolver.titles(userIds);
+        return titles == null ? Map.of() : titles;
+    }
+
+    private void addUserId(Set<String> userIds, String userId) {
+        if (hasText(userId)) {
+            userIds.add(userId);
+        }
+    }
+
+    private List<String> titles(List<String> userIds, Map<String, String> userTitles) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> titles = userTitles == null ? Map.of() : userTitles;
+        return userIds.stream()
+                .map(titles::get)
+                .filter(value -> value != null && !value.isBlank())
+                .toList();
+    }
+
+    private String title(String userId, Map<String, String> userTitles) {
+        return userId == null || userTitles == null ? null : userTitles.get(userId);
+    }
+
+    private String nodeTitle(WorkflowNodeInstance node) {
+        return node == null ? null : firstText(node.getNodeTitle(), node.getNodeKey());
+    }
+
+    private String firstText(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
     }
 
     private boolean matchesCurrentAssignee(WorkflowAdminInstanceView view, String currentAssigneeId) {

@@ -16,8 +16,10 @@ public record WorkflowWorkbenchCard(
         WorkflowTaskKind taskKind,
         WorkflowTaskStatus taskStatus,
         String nodeKey,
+        String nodeTitle,
         String currentNodeKeys,
         List<String> currentAssigneeIds,
+        List<String> currentAssigneeTitles,
         Instant startedAt,
         Instant receivedAt,
         Instant completedAt,
@@ -27,8 +29,11 @@ public record WorkflowWorkbenchCard(
         Instant lastOperatedAt,
         WorkflowAssignmentKind assignmentKind,
         String originalAssigneeId,
+        String originalAssigneeTitle,
         String delegatedFromUserId,
+        String delegatedFromUserTitle,
         String delegatedToUserId,
+        String delegatedToUserTitle,
         Boolean principalCanProcess,
         WorkflowNoticeReadStatus readStatus,
         String noticeSourceType,
@@ -36,10 +41,12 @@ public record WorkflowWorkbenchCard(
         Boolean addedByAddSign,
         String addSignSourceNodeKey,
         String addSignOperatorId,
+        String addSignOperatorTitle,
         Instant addSignAt
 ) {
     public WorkflowWorkbenchCard {
         currentAssigneeIds = currentAssigneeIds == null ? List.of() : List.copyOf(currentAssigneeIds);
+        currentAssigneeTitles = currentAssigneeTitles == null ? List.of() : List.copyOf(currentAssigneeTitles);
         addedByAddSign = Boolean.TRUE.equals(addedByAddSign);
     }
 
@@ -72,9 +79,10 @@ public record WorkflowWorkbenchCard(
                                  String noticeSourceType,
                                  Integer delegationTaskCount) {
         this(boardType, instanceId, moduleAlias, recordId, definitionId, workflowVersionId, instanceStatus,
-                approvalStatus, taskId, taskKind, taskStatus, nodeKey, currentNodeKeys, currentAssigneeIds,
+                approvalStatus, taskId, taskKind, taskStatus, nodeKey, nodeKey, currentNodeKeys, currentAssigneeIds,
+                List.of(),
                 startedAt, receivedAt, completedAt, actionCode, overtimeStatus, dueAt, lastOperatedAt,
-                assignmentKind, originalAssigneeId, delegatedFromUserId, delegatedToUserId, principalCanProcess,
-                null, noticeSourceType, delegationTaskCount, false, null, null, null);
+                assignmentKind, originalAssigneeId, null, delegatedFromUserId, null, delegatedToUserId, null,
+                principalCanProcess, null, noticeSourceType, delegationTaskCount, false, null, null, null, null);
     }
 }

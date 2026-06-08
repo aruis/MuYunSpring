@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,20 +85,30 @@ class WorkflowTaskActionAvailabilityServiceTest {
         task.setDelegatedFromUserId("principal-1");
         task.setDelegatedToUserId("delegate-1");
         task.setPrincipalCanProcess(true);
+        WorkflowNodeInstance node = node();
+        node.setNodeTitle("合同审批");
         when(taskDao.findById("task-1")).thenReturn(task);
         when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING, null));
-        when(nodeDao.findById("node-1")).thenReturn(node());
+        when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(task));
+        WorkflowTaskActionAvailabilityService serviceWithTitles = new WorkflowTaskActionAvailabilityService(
+                taskDao, instanceDao, nodeDao, null, userIds -> Map.of(
+                "principal-1", "原审批人",
+                "delegate-1", "代理人"));
 
-        List<WorkflowTaskAvailableAction> actions = service.availableActions("task-1", "principal-1");
+        List<WorkflowTaskAvailableAction> actions = serviceWithTitles.availableActions("task-1", "principal-1");
         assertThat(codes(actions)).containsExactly("approve", "reject", "transfer");
+        assertThat(action(actions, "approve").nodeTitle()).isEqualTo("合同审批");
         assertThat(action(actions, "approve").assignmentKind()).isEqualTo(WorkflowAssignmentKind.DELEGATED);
         assertThat(action(actions, "approve").originalAssigneeId()).isEqualTo("principal-1");
+        assertThat(action(actions, "approve").originalAssigneeTitle()).isEqualTo("原审批人");
         assertThat(action(actions, "approve").delegatedFromUserId()).isEqualTo("principal-1");
+        assertThat(action(actions, "approve").delegatedFromUserTitle()).isEqualTo("原审批人");
         assertThat(action(actions, "approve").delegatedToUserId()).isEqualTo("delegate-1");
+        assertThat(action(actions, "approve").delegatedToUserTitle()).isEqualTo("代理人");
         assertThat(action(actions, "approve").principalCanProcess()).isTrue();
-        assertThat(service.availableActions("task-1", "other")).isEmpty();
+        assertThat(serviceWithTitles.availableActions("task-1", "other")).isEmpty();
     }
 
     @Test
