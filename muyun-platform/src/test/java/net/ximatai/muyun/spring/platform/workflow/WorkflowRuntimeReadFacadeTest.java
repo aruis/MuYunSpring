@@ -502,6 +502,34 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortDelegationWorkbenchCardsByDelegationTaskCount() {
+        WorkflowTask one = delegatedTask("task-1", "delegate-1");
+        one.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowTask manyA = delegatedTask("task-2", "delegate-2");
+        manyA.setInstanceId("instance-2");
+        manyA.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowTask manyB = delegatedTask("task-3", "delegate-3");
+        manyB.setInstanceId("instance-2");
+        manyB.setCreatedAt(Instant.parse("2026-06-05T03:00:00Z"));
+        WorkflowInstance firstInstance = instance("instance-1");
+        WorkflowInstance secondInstance = instance("instance-2");
+        secondInstance.setRecordId("record-2");
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(one, manyA, manyB));
+        when(instanceDao.findById("instance-1")).thenReturn(firstInstance);
+        when(instanceDao.findById("instance-2")).thenReturn(secondInstance);
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("delegationTaskCount", WorkflowSortDirection.DESC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.delegationCards("principal-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::instanceId).containsExactly("instance-2", "instance-1");
+        assertThat(cards).extracting(WorkflowWorkbenchCard::delegationTaskCount).containsExactly(2, 1);
+    }
+
+    @Test
     void shouldFilterNoticeCardsByReadStatusAndReturnReadStatusOnCard() {
         WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
         WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
