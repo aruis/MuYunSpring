@@ -120,6 +120,48 @@ class WorkflowInstanceActionServiceTest {
     }
 
     @Test
+    void shouldBlockForceTerminateWhenBeforePluginFails() {
+        WorkflowRuntimePlugin blocker = new WorkflowRuntimePlugin() {
+            @Override
+            public String pluginKey() {
+                return "blocker";
+            }
+
+            @Override
+            public void handle(WorkflowRuntimePluginContext context) {
+                if (context.eventType() == WorkflowRuntimePluginEventType.BEFORE_TERMINATE
+                        && "forceTerminate".equals(context.actionCode())) {
+                    throw new PlatformException("blocked by plugin");
+                }
+            }
+        };
+        WorkflowInstanceActionService pluginService = serviceWithPlugin(blocker);
+        WorkflowInstance instance = instance(true);
+        WorkflowTask task = task("task-1");
+        WorkflowNodeInstance node = node("node-1");
+        WorkflowRouteInstance route = route("route-1", WorkflowRouteStatus.EFFECTIVE);
+        stubRuntime(instance, List.of(task), List.of(node), List.of(route));
+
+        assertThatThrownBy(() -> pluginService.forceTerminate(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", "force stop", Instant.parse("2026-06-05T04:30:00Z"))))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocked by plugin");
+
+        assertThat(instance.getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
+        assertThat(task.getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
+        assertThat(node.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        verify(instanceDao, never()).updateByIdAndVersion(any(), any());
+        verify(taskDao, never()).updateByIdAndVersion(any(), any());
+        verify(nodeDao, never()).updateByIdAndVersion(any(), any());
+        verify(routeDao, never()).updateByIdAndVersion(any(), any());
+        verify(eventDao, never()).insert(any());
+        verify(archiveService, never()).archiveCurrentInstance(any(), any(), any());
+        verify(summaryWriter, never()).writeSubmitted(any());
+        verify(summaryWriter, never()).clearCurrent(any(), any());
+    }
+
+    @Test
     void shouldRequireManagementPolicyForForceTerminate() {
         WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
         WorkflowInstanceActionService managedService = new WorkflowInstanceActionService(
