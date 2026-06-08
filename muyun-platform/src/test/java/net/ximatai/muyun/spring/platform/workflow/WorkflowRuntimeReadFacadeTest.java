@@ -103,6 +103,111 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldPrecheckStartSelectorForMatchingAndNonMatchingOperator() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance manual = branch("node-manual", "manualBranch", WorkflowRouteMode.MANUAL,
+                "START", true, "2026-06-05T01:00:00Z");
+        WorkflowNodeInstance left = node("node-left", "leftTask");
+        left.setNodeType(WorkflowNodeType.TASK);
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "manualBranch", "leftTask",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:01:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(manual, left));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(leftRoute));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of());
+
+        List<WorkflowManualBranchCandidatePrecheckView> matching =
+                facade.manualBranchCandidatePrechecks("instance-1", "starter-1");
+        List<WorkflowManualBranchCandidatePrecheckView> mismatching =
+                facade.manualBranchCandidatePrechecks("instance-1", "operator-2");
+
+        assertThat(matching).hasSize(1);
+        WorkflowManualBranchCandidatePrecheckView matchingView = matching.getFirst();
+        assertThat(matchingView.selectorNodeKey()).isEqualTo("START");
+        assertThat(matchingView.selectorResolvedUserId()).isEqualTo("starter-1");
+        assertThat(matchingView.operatorId()).isEqualTo("starter-1");
+        assertThat(matchingView.selectable()).isTrue();
+        assertThat(matchingView.unselectableReason()).isNull();
+        assertThat(matchingView.candidates().getFirst().selectable()).isTrue();
+        assertThat(matchingView.candidates().getFirst().unselectableReason()).isNull();
+        WorkflowManualBranchCandidatePrecheckView mismatchingView = mismatching.getFirst();
+        assertThat(mismatchingView.selectable()).isFalse();
+        assertThat(mismatchingView.unselectableReason()).isEqualTo("SELECTOR_NOT_OPERATOR");
+        assertThat(mismatchingView.candidates().getFirst().selectable()).isFalse();
+        assertThat(mismatchingView.candidates().getFirst().unselectableReason()).isEqualTo("SELECTOR_NOT_OPERATOR");
+        verify(actionPolicyService, times(2)).requireRecordView(instance);
+    }
+
+    @Test
+    void shouldPrecheckApprovalSelectorFromCompletedTaskActualProcessor() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance approve = node("node-approve", "approve");
+        WorkflowNodeInstance manual = branch("node-manual", "manualBranch", WorkflowRouteMode.MANUAL,
+                "approve", false, "2026-06-05T01:00:00Z");
+        WorkflowNodeInstance left = node("node-left", "leftTask");
+        left.setNodeType(WorkflowNodeType.TASK);
+        WorkflowTask done = task("task-approve", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE);
+        done.setNodeInstanceId("node-approve");
+        done.setAssigneeId("assignee-1");
+        done.setOwnerId("owner-1");
+        done.setActualProcessorId("processor-1");
+        done.setCompletedAt(Instant.parse("2026-06-05T00:59:00Z"));
+        WorkflowRouteInstance leftRoute = route("route-left", "leftRoute", "manualBranch", "leftTask",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:01:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(approve, manual, left));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(leftRoute));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of(done));
+
+        List<WorkflowManualBranchCandidatePrecheckView> views =
+                facade.manualBranchCandidatePrechecks("instance-1", "processor-1");
+
+        assertThat(views).hasSize(1);
+        WorkflowManualBranchCandidatePrecheckView view = views.getFirst();
+        assertThat(view.selectorNodeKey()).isEqualTo("approve");
+        assertThat(view.selectorResolvedUserId()).isEqualTo("processor-1");
+        assertThat(view.selectable()).isTrue();
+        assertThat(view.candidates().getFirst().selectable()).isTrue();
+    }
+
+    @Test
+    void shouldPrecheckDecidedRoutesAsUnselectable() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance manual = branch("node-manual", "manualBranch", WorkflowRouteMode.MANUAL,
+                "START", false, "2026-06-05T01:00:00Z");
+        WorkflowNodeInstance left = node("node-left", "leftTask");
+        left.setNodeType(WorkflowNodeType.TASK);
+        WorkflowNodeInstance right = node("node-right", "rightTask");
+        right.setNodeType(WorkflowNodeType.TASK);
+        WorkflowRouteInstance effective = route("route-left", "leftRoute", "manualBranch", "leftTask",
+                WorkflowRouteStatus.EFFECTIVE, false, "2026-06-05T01:01:00Z");
+        WorkflowRouteInstance ineffective = route("route-right", "rightRoute", "manualBranch", "rightTask",
+                WorkflowRouteStatus.INEFFECTIVE, true, "2026-06-05T01:02:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(manual, left, right));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(effective, ineffective));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of());
+
+        List<WorkflowManualBranchCandidatePrecheckView> views =
+                facade.manualBranchCandidatePrechecks("instance-1", "starter-1");
+
+        assertThat(views).hasSize(1);
+        WorkflowManualBranchCandidatePrecheckView view = views.getFirst();
+        assertThat(view.selectable()).isFalse();
+        assertThat(view.unselectableReason()).isEqualTo("ROUTE_ALREADY_DECIDED");
+        assertThat(view.candidates()).extracting(WorkflowManualBranchCandidatePrecheckView.Candidate::selectable)
+                .containsExactly(false, false);
+        assertThat(view.candidates()).extracting(WorkflowManualBranchCandidatePrecheckView.Candidate::unselectableReason)
+                .containsExactly("ROUTE_ALREADY_DECIDED", "ROUTE_ALREADY_DECIDED");
+    }
+
+    @Test
     void shouldLoadInstanceAvailableActionsWithTaskAndNodeContext() {
         WorkflowInstance instance = instance("instance-1");
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);

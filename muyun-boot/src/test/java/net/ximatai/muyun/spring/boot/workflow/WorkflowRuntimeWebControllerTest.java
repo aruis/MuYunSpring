@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowModuleTaskRuntimeServi
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNoticeReadStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeType;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidatePrecheckView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteMode;
@@ -127,6 +128,47 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(jsonPath("$.records[0].candidates[0].defaultRoute").value(false));
 
         verify(runtimeReadFacade).manualBranchCandidates("inst-1");
+    }
+
+    @Test
+    void shouldExposeManualBranchCandidatePrechecksWithOperatorFallbackAndParameter() throws Exception {
+        when(runtimeReadFacade.manualBranchCandidatePrechecks("inst-1", "user-1")).thenReturn(List.of(
+                new WorkflowManualBranchCandidatePrecheckView("manualBranch", WorkflowRouteMode.MANUAL, "START",
+                        Boolean.TRUE, "user-1", "user-1", Boolean.TRUE, null, List.of(
+                        new WorkflowManualBranchCandidatePrecheckView.Candidate("route-1", "leftRoute", "leftTask",
+                                WorkflowNodeType.TASK, WorkflowRouteStatus.CANDIDATE, Boolean.FALSE, Boolean.TRUE,
+                                null)
+                ))));
+        when(runtimeReadFacade.manualBranchCandidatePrechecks("inst-1", "operator-2")).thenReturn(List.of(
+                new WorkflowManualBranchCandidatePrecheckView("manualBranch", WorkflowRouteMode.MANUAL, "START",
+                        Boolean.TRUE, "user-1", "operator-2", Boolean.FALSE, "SELECTOR_NOT_OPERATOR", List.of(
+                        new WorkflowManualBranchCandidatePrecheckView.Candidate("route-1", "leftRoute", "leftTask",
+                                WorkflowNodeType.TASK, WorkflowRouteStatus.CANDIDATE, Boolean.FALSE, Boolean.FALSE,
+                                "SELECTOR_NOT_OPERATOR")
+                ))));
+
+        mvc.perform(get("/workflow/runtime/instance/inst-1/manual-branch-candidate-prechecks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].branchNodeKey").value("manualBranch"))
+                .andExpect(jsonPath("$.records[0].selectorNodeKey").value("START"))
+                .andExpect(jsonPath("$.records[0].selectorResolvedUserId").value("user-1"))
+                .andExpect(jsonPath("$.records[0].operatorId").value("user-1"))
+                .andExpect(jsonPath("$.records[0].selectable").value(true))
+                .andExpect(jsonPath("$.records[0].candidates[0].routeKey").value("leftRoute"))
+                .andExpect(jsonPath("$.records[0].candidates[0].selectable").value(true));
+
+        mvc.perform(get("/workflow/runtime/instance/inst-1/manual-branch-candidate-prechecks")
+                        .param("operatorId", "operator-2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].operatorId").value("operator-2"))
+                .andExpect(jsonPath("$.records[0].selectable").value(false))
+                .andExpect(jsonPath("$.records[0].unselectableReason").value("SELECTOR_NOT_OPERATOR"))
+                .andExpect(jsonPath("$.records[0].candidates[0].selectable").value(false))
+                .andExpect(jsonPath("$.records[0].candidates[0].unselectableReason")
+                        .value("SELECTOR_NOT_OPERATOR"));
+
+        verify(runtimeReadFacade).manualBranchCandidatePrechecks("inst-1", "user-1");
+        verify(runtimeReadFacade).manualBranchCandidatePrechecks("inst-1", "operator-2");
     }
 
     @Test

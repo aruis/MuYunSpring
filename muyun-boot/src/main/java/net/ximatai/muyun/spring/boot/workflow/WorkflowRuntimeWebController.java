@@ -28,6 +28,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchSort;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowWorkbenchStats;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidatePrecheckView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -71,6 +73,14 @@ public class WorkflowRuntimeWebController {
     @GetMapping("/instance/{instanceId}/manual-branches")
     public WebListResponse<WorkflowManualBranchCandidateView> manualBranchCandidates(@PathVariable String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.manualBranchCandidates(instanceId));
+    }
+
+    @GetMapping("/instance/{instanceId}/manual-branch-candidate-prechecks")
+    public WebListResponse<WorkflowManualBranchCandidatePrecheckView> manualBranchCandidatePrechecks(
+            @PathVariable String instanceId,
+            @RequestParam(required = false) String operatorId) {
+        return new WebListResponse<>(runtimeReadFacade.manualBranchCandidatePrechecks(instanceId,
+                operatorId(operatorId)));
     }
 
     @GetMapping("/instance/{instanceId}/tasks")

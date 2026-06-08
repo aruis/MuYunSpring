@@ -26,6 +26,7 @@ public class WorkflowRuntimeReadFacade {
             WorkflowRouteStatus.CANDIDATE,
             WorkflowRouteStatus.EFFECTIVE,
             WorkflowRouteStatus.INEFFECTIVE);
+    private static final String ROUTE_ALREADY_DECIDED = "ROUTE_ALREADY_DECIDED";
 
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowTaskDao taskDao;
@@ -35,6 +36,8 @@ public class WorkflowRuntimeReadFacade {
     private final WorkflowTaskActionAvailabilityService availabilityService;
     private final WorkflowActionPolicyService actionPolicyService;
     private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
+    private final WorkflowManualBranchSelectorResolver manualBranchSelectorResolver =
+            new WorkflowManualBranchSelectorResolver();
 
     public WorkflowRuntimeReadFacade(WorkflowInstanceDao instanceDao,
                                      WorkflowTaskDao taskDao,
@@ -110,6 +113,33 @@ public class WorkflowRuntimeReadFacade {
                 .sorted(nodeSort())
                 .map(node -> manualBranchCandidate(node, routesBySourceNodeKey.getOrDefault(node.getNodeKey(),
                         List.of()), nodeByKey))
+                .toList();
+    }
+
+    public List<WorkflowManualBranchCandidatePrecheckView> manualBranchCandidatePrechecks(String instanceId,
+                                                                                          String operatorId) {
+        WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
+        String validOperatorId = requireOperator(operatorId);
+        List<WorkflowNodeInstance> nodes = nodeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowRouteInstance> routes = routeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowTask> tasks = taskDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        Map<String, WorkflowNodeInstance> nodeByKey = nodes.stream()
+                .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<String, List<WorkflowRouteInstance>> routesBySourceNodeKey = routes.stream()
+                .filter(route -> MANUAL_BRANCH_CANDIDATE_STATUSES.contains(route.getRouteStatus()))
+                .collect(Collectors.groupingBy(WorkflowRouteInstance::getSourceNodeKey, LinkedHashMap::new,
+                        Collectors.toList()));
+        return nodes.stream()
+                .filter(node -> node.getNodeType() == WorkflowNodeType.BRANCH)
+                .filter(node -> node.getRouteMode() == WorkflowRouteMode.MANUAL)
+                .sorted(nodeSort())
+                .map(node -> manualBranchCandidatePrecheck(instance, node, routesBySourceNodeKey.getOrDefault(
+                        node.getNodeKey(), List.of()), nodes, tasks, nodeByKey, validOperatorId))
                 .toList();
     }
 
@@ -232,6 +262,67 @@ public class WorkflowRuntimeReadFacade {
                 node.getSelectorNodeKey(),
                 node.getRequireManualSelectionReason(),
                 candidates);
+    }
+
+    private WorkflowManualBranchCandidatePrecheckView manualBranchCandidatePrecheck(WorkflowInstance instance,
+                                                                                    WorkflowNodeInstance node,
+                                                                                    List<WorkflowRouteInstance> routes,
+                                                                                    List<WorkflowNodeInstance> nodes,
+                                                                                    List<WorkflowTask> tasks,
+                                                                                    Map<String, WorkflowNodeInstance> nodeByKey,
+                                                                                    String operatorId) {
+        WorkflowManualBranchSelectorResolver.SelectorResolution selectorResolution =
+                manualBranchSelectorResolver.resolve(instance, nodes, tasks, node.getSelectorNodeKey(),
+                        node.getNodeKey(), operatorId);
+        boolean hasSelectableRoute = routes.stream()
+                .anyMatch(route -> route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE);
+        boolean branchSelectable = selectorResolution.selectable() && hasSelectableRoute;
+        String branchUnselectableReason = branchSelectable
+                ? null
+                : firstText(selectorResolution.unselectableReason(), ROUTE_ALREADY_DECIDED);
+        List<WorkflowManualBranchCandidatePrecheckView.Candidate> candidates = routes.stream()
+                .sorted(routeSort())
+                .map(route -> manualBranchRouteCandidate(route, nodeByKey, selectorResolution))
+                .toList();
+        return new WorkflowManualBranchCandidatePrecheckView(
+                node.getNodeKey(),
+                node.getRouteMode(),
+                selectorResolution.selectorNodeKey(),
+                node.getRequireManualSelectionReason(),
+                selectorResolution.resolvedUserId(),
+                operatorId,
+                branchSelectable,
+                branchUnselectableReason,
+                candidates);
+    }
+
+    private WorkflowManualBranchCandidatePrecheckView.Candidate manualBranchRouteCandidate(
+            WorkflowRouteInstance route,
+            Map<String, WorkflowNodeInstance> nodeByKey,
+            WorkflowManualBranchSelectorResolver.SelectorResolution selectorResolution) {
+        WorkflowNodeInstance target = nodeByKey.get(route.getTargetNodeKey());
+        boolean routeSelectable = selectorResolution.selectable()
+                && route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE;
+        String routeUnselectableReason = routeSelectable
+                ? null
+                : routeUnselectableReason(route, selectorResolution);
+        return new WorkflowManualBranchCandidatePrecheckView.Candidate(
+                route.getId(),
+                route.getRouteKey(),
+                route.getTargetNodeKey(),
+                target == null ? null : target.getNodeType(),
+                route.getRouteStatus(),
+                route.getDefaultRoute(),
+                routeSelectable,
+                routeUnselectableReason);
+    }
+
+    private String routeUnselectableReason(WorkflowRouteInstance route,
+                                           WorkflowManualBranchSelectorResolver.SelectorResolution selectorResolution) {
+        if (route.getRouteStatus() != WorkflowRouteStatus.CANDIDATE) {
+            return ROUTE_ALREADY_DECIDED;
+        }
+        return selectorResolution.unselectableReason();
     }
 
     private Comparator<WorkflowNodeInstance> nodeSort() {

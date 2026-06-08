@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 
 import java.util.ArrayDeque;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,6 +12,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class WorkflowManualRouteSelectionPolicy {
+    private final WorkflowManualBranchSelectorResolver selectorResolver = new WorkflowManualBranchSelectorResolver();
+
     public Map<String, Set<String>> selectedRouteKeysBySubmitBranch(WorkflowRuntimeGraph graph,
                                                                     WorkflowInstance instance,
                                                                     String startNodeKey,
@@ -142,42 +143,28 @@ public class WorkflowManualRouteSelectionPolicy {
         if (selectorNodeKey == null) {
             selectorNodeKey = fallbackSelectorNodeKey;
         }
-        String selectorId = selectorId(instance, nodes, tasks, selectorNodeKey, operatorId);
-        if (!selectorId.equals(requireText(operatorId, "workflow operator id must not be blank"))) {
-            throw new PlatformException("workflow manual branch selector must be operator: " + branchNode.getNodeKey());
+        selectorNodeKey = requireText(selectorNodeKey, "workflow manual branch selector node key must not be blank");
+        String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");
+        WorkflowManualBranchSelectorResolver.SelectorResolution resolution = selectorResolver.resolve(instance, nodes,
+                tasks, selectorNodeKey, null, validOperatorId);
+        if (!resolution.selectable()) {
+            throw manualSelectorException(branchNode.getNodeKey(), resolution);
         }
     }
 
-    private String selectorId(WorkflowInstance instance,
-                              List<WorkflowNodeInstance> nodes,
-                              List<WorkflowTask> tasks,
-                              String selectorNodeKey,
-                              String operatorId) {
-        String nodeKey = requireText(selectorNodeKey, "workflow manual branch selector node key must not be blank");
-        if ("START".equalsIgnoreCase(nodeKey) || "start".equals(nodeKey)) {
-            return requireText(instance == null ? null : instance.getStartedBy(),
-                    "workflow manual branch selector START has no started by");
-        }
-        WorkflowNodeInstance selectorNode = nodesByKey(nodes).get(nodeKey);
-        if (selectorNode == null) {
-            throw new PlatformException("workflow manual branch selector node not found: " + nodeKey);
-        }
-        if (selectorNode.getNodeType() != WorkflowNodeType.APPROVAL
-                && selectorNode.getNodeType() != WorkflowNodeType.TASK) {
-            throw new PlatformException("workflow manual branch selector node must be start, approval or task: "
-                    + nodeKey);
-        }
-        if (tasks == null) {
-            throw new PlatformException("workflow manual branch selector has no actual processor: " + nodeKey);
-        }
-        return tasks.stream()
-                .filter(task -> selectorNode.getId() != null && selectorNode.getId().equals(task.getNodeInstanceId()))
-                .filter(task -> textOrNull(task.getActualProcessorId()) != null)
-                .max(Comparator.comparing(WorkflowTask::getCompletedAt,
-                        Comparator.nullsFirst(Comparator.naturalOrder())))
-                .map(WorkflowTask::getActualProcessorId)
-                .orElseThrow(() -> new PlatformException(
-                        "workflow manual branch selector has no actual processor: " + nodeKey));
+    private PlatformException manualSelectorException(
+            String branchNodeKey,
+            WorkflowManualBranchSelectorResolver.SelectorResolution resolution) {
+        String selectorNodeKey = resolution.selectorNodeKey();
+        return switch (resolution.unselectableReason()) {
+            case WorkflowManualBranchSelectorResolver.SELECTOR_NOT_FOUND ->
+                    new PlatformException("workflow manual branch selector node not found: " + selectorNodeKey);
+            case WorkflowManualBranchSelectorResolver.SELECTOR_UNSUPPORTED -> new PlatformException(
+                    "workflow manual branch selector node must be start, approval or task: " + selectorNodeKey);
+            case WorkflowManualBranchSelectorResolver.SELECTOR_NOT_PROCESSED -> new PlatformException(
+                    "workflow manual branch selector has no actual processor: " + selectorNodeKey);
+            default -> new PlatformException("workflow manual branch selector must be operator: " + branchNodeKey);
+        };
     }
 
     private Set<String> reachableSubmitBranchNodeKeys(WorkflowRuntimeGraph graph, String startNodeKey) {
