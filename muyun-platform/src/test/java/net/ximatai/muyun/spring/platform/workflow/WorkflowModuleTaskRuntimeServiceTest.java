@@ -93,6 +93,29 @@ class WorkflowModuleTaskRuntimeServiceTest {
     }
 
     @Test
+    void shouldPassManualRouteSelectionsWhenCheckAndContinuePassed() {
+        mockContext(WorkflowModuleTaskEvaluation.passed(List.of(), List.of()));
+        WorkflowTaskActionResult actionResult = mock(WorkflowTaskActionResult.class);
+        when(taskActionFacade.execute(eq("complete"), argThat(request ->
+                request.manualRouteSelections().size() == 2
+                        && "branchA".equals(request.manualRouteSelections().get(0).branchNodeKey())
+                        && "routeA1".equals(request.manualRouteSelections().get(0).routeKey())
+                        && "choose A1".equals(request.manualRouteSelections().get(0).selectedReason())
+                        && "branchB".equals(request.manualRouteSelections().get(1).branchNodeKey())
+                        && "routeB2".equals(request.manualRouteSelections().get(1).routeKey()))))
+                .thenReturn(actionResult);
+
+        WorkflowModuleTaskContinueResult result = service.checkAndContinue("task-1", "user-1", "done",
+                List.of(new WorkflowManualRouteSelection("branchA", "routeA1", "choose A1"),
+                        new WorkflowManualRouteSelection("branchB", "routeB2", "choose B2")));
+
+        assertThat(result.continued()).isTrue();
+        assertThat(result.actionResult()).isSameAs(actionResult);
+        verify(taskActionFacade).execute(eq("complete"), argThat(request ->
+                request.manualRouteSelections().size() == 2));
+    }
+
+    @Test
     void shouldRejectNonAssigneeOperator() {
         WorkflowTask task = task();
         when(taskDao.findById("task-1")).thenReturn(task);

@@ -30,6 +30,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowAssignmentKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidatePrecheckView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualRouteSelection;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
@@ -133,7 +134,8 @@ public class WorkflowRuntimeWebController {
                 request == null ? null : request.reason(),
                 null,
                 request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
-                request == null ? null : request.selectedReason()));
+                request == null ? null : request.selectedReason(),
+                request == null ? null : request.manualRouteSelections()));
     }
 
     @PostMapping("/task/{taskId}/read")
@@ -209,8 +211,13 @@ public class WorkflowRuntimeWebController {
     public WorkflowModuleTaskContinueResult checkAndContinueModuleTask(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowModuleTaskContinueWebRequest request) {
-        return moduleTaskRuntimeService.checkAndContinue(taskId,
-                operatorId(request == null ? null : request.operatorId()),
+        String operatorId = operatorId(request == null ? null : request.operatorId());
+        if (request != null && request.manualRouteSelections() != null && !request.manualRouteSelections().isEmpty()) {
+            return moduleTaskRuntimeService.checkAndContinue(taskId, operatorId, request.reason(),
+                    request.selectedRouteKeyOrDirectLinkKey(), request.selectedReason(),
+                    request.manualRouteSelections());
+        }
+        return moduleTaskRuntimeService.checkAndContinue(taskId, operatorId,
                 request == null ? null : request.reason(),
                 request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
                 request == null ? null : request.selectedReason());
@@ -272,7 +279,8 @@ record WorkflowTaskActionWebRequest(String operatorId,
                                     String reason,
                                     String selectedRouteKey,
                                     String selectedDirectLinkKey,
-                                    String selectedReason) {
+                                    String selectedReason,
+                                    List<WorkflowManualRouteSelection> manualRouteSelections) {
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }
@@ -324,7 +332,8 @@ record WorkflowModuleTaskContinueWebRequest(String operatorId,
                                             String reason,
                                             String selectedRouteKey,
                                             String selectedDirectLinkKey,
-                                            String selectedReason) {
+                                            String selectedReason,
+                                            List<WorkflowManualRouteSelection> manualRouteSelections) {
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }

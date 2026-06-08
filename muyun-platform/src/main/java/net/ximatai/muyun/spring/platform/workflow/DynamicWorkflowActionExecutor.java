@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -46,12 +47,9 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                 "workflow action code must not be blank");
         return switch (workflowAction) {
             case ACTION_SUBMIT_APPROVAL -> DynamicActionResultBody.refreshed(
-                    submitService.submitApproval(moduleAlias(context), recordId(context, request),
-                            selectedRouteKey(request), text(payload(request, "selectedReason"), null)));
+                    submitApproval(context, request));
             case ACTION_SUBMIT_WORKFLOW -> DynamicActionResultBody.refreshed(
-                    submitService.submitWorkflow(moduleAlias(context), recordId(context, request),
-                            workflowDefinitionAlias(context, request), selectedRouteKey(request),
-                            text(payload(request, "selectedReason"), null)));
+                    submitWorkflow(context, request, workflowDefinitionAlias(context, request)));
             case ACTION_TASK_ACTION -> DynamicActionResultBody.refreshed(taskActionFacade.execute(
                     requireText(payload(request, "taskActionCode"), "workflow task action code must not be blank"),
                     taskRequest(request)));
@@ -70,8 +68,29 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
             throw new PlatformException("unsupported dynamic workflow action: " + workflowAction);
         }
         return DynamicActionResultBody.refreshed(
-                submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias,
-                        selectedRouteKey(request), text(payload(request, "selectedReason"), null)));
+                submitWorkflow(context, request, definitionAlias));
+    }
+
+    private WorkflowSubmitResult submitApproval(DynamicActionExecutionContext context,
+                                                DynamicActionExecutionRequest request) {
+        List<WorkflowManualRouteSelection> selections = manualRouteSelections(request);
+        if (!selections.isEmpty()) {
+            return submitService.submitApproval(moduleAlias(context), recordId(context, request), selections);
+        }
+        return submitService.submitApproval(moduleAlias(context), recordId(context, request),
+                selectedRouteKey(request), text(payload(request, "selectedReason"), null));
+    }
+
+    private WorkflowSubmitResult submitWorkflow(DynamicActionExecutionContext context,
+                                                DynamicActionExecutionRequest request,
+                                                String definitionAlias) {
+        List<WorkflowManualRouteSelection> selections = manualRouteSelections(request);
+        if (!selections.isEmpty()) {
+            return submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias,
+                    selections);
+        }
+        return submitService.submitWorkflow(moduleAlias(context), recordId(context, request), definitionAlias,
+                selectedRouteKey(request), text(payload(request, "selectedReason"), null));
     }
 
     private String workflowDefinitionAlias(DynamicActionExecutionContext context,
@@ -107,7 +126,33 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                 text(payload(request, "reason"), null),
                 operatedAt(payload(request, "operatedAt")),
                 selectedRouteKey(request),
-                text(payload(request, "selectedReason"), null)
+                text(payload(request, "selectedReason"), null),
+                manualRouteSelections(request)
+        );
+    }
+
+    private List<WorkflowManualRouteSelection> manualRouteSelections(DynamicActionExecutionRequest request) {
+        Object value = payload(request, "manualRouteSelections");
+        if (!(value instanceof List<?> list) || list.isEmpty()) {
+            return List.of();
+        }
+        return list.stream()
+                .map(this::manualRouteSelection)
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private WorkflowManualRouteSelection manualRouteSelection(Object value) {
+        if (value instanceof WorkflowManualRouteSelection selection) {
+            return selection;
+        }
+        if (!(value instanceof Map<?, ?> map)) {
+            throw new PlatformException("workflow manual route selection must be object");
+        }
+        return new WorkflowManualRouteSelection(
+                text(((Map<String, Object>) map).get("branchNodeKey"), null),
+                text(((Map<String, Object>) map).get("routeKey"), null),
+                text(((Map<String, Object>) map).get("selectedReason"), null)
         );
     }
 

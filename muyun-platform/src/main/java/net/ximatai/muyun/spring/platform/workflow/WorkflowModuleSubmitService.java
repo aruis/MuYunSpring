@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class WorkflowModuleSubmitService {
     private final WorkflowSubmitFacade submitFacade;
@@ -20,6 +22,12 @@ public class WorkflowModuleSubmitService {
                 .withSelectedRoute(selectedRouteKey, selectedReason));
     }
 
+    public WorkflowSubmitResult submitApproval(String moduleAlias, String recordId,
+                                               List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return submitFacade.submit(WorkflowSubmitRequest.approval(moduleAlias, recordId)
+                .withManualRouteSelections(manualRouteSelections));
+    }
+
     public WorkflowSubmitResult submitWorkflow(String moduleAlias, String recordId, String definitionAlias) {
         return submitFacade.submit(WorkflowSubmitRequest.workflow(moduleAlias, recordId, definitionAlias));
     }
@@ -28,5 +36,11 @@ public class WorkflowModuleSubmitService {
                                                String selectedRouteKey, String selectedReason) {
         return submitFacade.submit(WorkflowSubmitRequest.workflow(moduleAlias, recordId, definitionAlias)
                 .withSelectedRoute(selectedRouteKey, selectedReason));
+    }
+
+    public WorkflowSubmitResult submitWorkflow(String moduleAlias, String recordId, String definitionAlias,
+                                               List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return submitFacade.submit(WorkflowSubmitRequest.workflow(moduleAlias, recordId, definitionAlias)
+                .withManualRouteSelections(manualRouteSelections));
     }
 }

@@ -82,6 +82,21 @@ public class WorkflowSubmitDraftService {
                                      Instant operatedAt,
                                      String selectedRouteKey,
                                      String selectedReason) {
+        return build(definition, version, nodeDefinitions, linkDefinitions, recordId, authOrgId, operatorId, operatedAt,
+                selectedRouteKey, selectedReason, List.of());
+    }
+
+    public WorkflowSubmitDraft build(WorkflowDefinition definition,
+                                     WorkflowVersion version,
+                                     List<WorkflowNodeDefinition> nodeDefinitions,
+                                     List<WorkflowLinkDefinition> linkDefinitions,
+                                     String recordId,
+                                     String authOrgId,
+                                     String operatorId,
+                                     Instant operatedAt,
+                                     String selectedRouteKey,
+                                     String selectedReason,
+                                     List<WorkflowManualRouteSelection> manualRouteSelections) {
         WorkflowInstanceSnapshot snapshot = snapshotFactory.build(definition, version, nodeDefinitions,
                 linkDefinitions, recordId, authOrgId, operatorId, operatedAt);
         WorkflowRuntimeGraph graph = WorkflowRuntimeGraph.of(nodeDefinitions, linkDefinitions);
@@ -90,15 +105,15 @@ public class WorkflowSubmitDraftService {
                 .orElseThrow(() -> new PlatformException("workflow must contain a start node"));
         Map<String, Set<String>> selectedRouteKeysByBranch =
                 manualRouteSelectionPolicy.selectedRouteKeysBySubmitBranch(graph, snapshot.instance(),
-                        startNode.getNodeKey(), selectedRouteKey, selectedReason, operatorId);
+                        startNode.getNodeKey(), manualRouteSelections, selectedRouteKey, selectedReason, operatorId);
         WorkflowActivationResult activation = activationService.activate(
                 new WorkflowActivationRequest(graph, List.of(WorkflowActivationTarget.of(startNode.getNodeKey())),
                         selectedRouteKeysByBranch, Set.of(), 512));
         instanceStateService.applyActivation(snapshot.instance(), activation, operatedAt);
         nodeInstanceStateService.applyActivation(snapshot.nodes(), activation, operatedAt);
         routeInstanceStateService.applyActivation(snapshot.routes(), activation, operatorId, operatedAt);
-        applyManualBranchSelection(snapshot.routes(), selectedRouteKeysByBranch, selectedRouteKey, selectedReason,
-                operatorId, operatedAt);
+        applyManualBranchSelection(snapshot.routes(), selectedRouteKeysByBranch, manualRouteSelections,
+                selectedRouteKey, selectedReason, operatorId, operatedAt);
         WorkflowRuntimeTaskDraft taskDraft = taskFactory.createBlockingTasks(snapshot.instance(), snapshot.nodes(),
                 activation, operatorId, operatedAt);
 
@@ -111,6 +126,7 @@ public class WorkflowSubmitDraftService {
 
     private void applyManualBranchSelection(List<WorkflowRouteInstance> routes,
                                             Map<String, Set<String>> selectedRouteKeysByBranch,
+                                            List<WorkflowManualRouteSelection> manualRouteSelections,
                                             String selectedRouteKey,
                                             String selectedReason,
                                             String operatorId,
@@ -127,7 +143,8 @@ public class WorkflowSubmitDraftService {
                 }
                 if (entry.getValue().contains(route.getRouteKey())) {
                     routeRuntimeService.effectiveRoute(route, WorkflowRouteReason.MANUAL_SELECTED, operatorId, now,
-                            selectedReasonForRoute(route, selectedRouteKey, selectedReason));
+                            manualRouteSelectionPolicy.selectedReasonForRoute(route, manualRouteSelections,
+                                    selectedRouteKey, selectedReason));
                 } else if (route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE) {
                     routeRuntimeService.ineffectiveRoute(route, WorkflowRouteReason.MANUAL_UNSELECTED,
                             operatorId, now);
@@ -136,7 +153,4 @@ public class WorkflowSubmitDraftService {
         }
     }
 
-    private String selectedReasonForRoute(WorkflowRouteInstance route, String selectedRouteKey, String selectedReason) {
-        return selectedRouteKey != null && selectedRouteKey.equals(route.getRouteKey()) ? selectedReason : null;
-    }
 }

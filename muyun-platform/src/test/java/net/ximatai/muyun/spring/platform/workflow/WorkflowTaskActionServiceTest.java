@@ -63,7 +63,7 @@ class WorkflowTaskActionServiceTest {
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao, atLeastOnce()).insert(any());
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"), null, null);
+                Instant.parse("2026-06-05T02:00:00Z"), null, null, List.of());
     }
 
     @Test
@@ -81,7 +81,7 @@ class WorkflowTaskActionServiceTest {
                 "agree", Instant.parse("2026-06-05T02:00:00Z"), "manual-left", "choose left"));
 
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"), "manual-left", "choose left");
+                Instant.parse("2026-06-05T02:00:00Z"), "manual-left", "choose left", List.of());
     }
 
     @Test
@@ -191,7 +191,7 @@ class WorkflowTaskActionServiceTest {
         verify(policyService).requireManagementTaskAction("forceApprove", "admin approved");
         verify(policyService, never()).requireRuntimeAction(result.instance(), "forceApprove");
         verify(progressionService).advanceFromNode("instance-1", "approve", "admin-1",
-                Instant.parse("2026-06-05T02:30:00Z"), null, null);
+                Instant.parse("2026-06-05T02:30:00Z"), null, null, List.of());
     }
 
     @Test
@@ -598,7 +598,7 @@ class WorkflowTaskActionServiceTest {
         verify(nodeDao).updateByIdAndVersion(node, 2);
         verify(eventDao).insert(result.event());
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"), null, null);
+                Instant.parse("2026-06-05T02:00:00Z"), null, null, List.of());
     }
 
     @Test
@@ -616,7 +616,7 @@ class WorkflowTaskActionServiceTest {
                 "done", Instant.parse("2026-06-05T02:00:00Z"), "manual-right", "choose right"));
 
         verify(progressionService).advanceFromNode("instance-1", "approve", "user-1",
-                Instant.parse("2026-06-05T02:00:00Z"), "manual-right", "choose right");
+                Instant.parse("2026-06-05T02:00:00Z"), "manual-right", "choose right", List.of());
     }
 
     @Test

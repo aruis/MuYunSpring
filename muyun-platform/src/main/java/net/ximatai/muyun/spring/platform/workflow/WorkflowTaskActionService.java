@@ -169,7 +169,7 @@ public class WorkflowTaskActionService {
         createDelegationCompletionNotice(instance, task, operatorId, now);
         if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
             progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now,
-                    request.selectedRouteKey(), request.selectedReason());
+                    request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
         }
         dispatchTask(instance, node, task, WorkflowRuntimePluginEventType.AFTER_APPROVE, "approve",
                 operatorId, null, null, request.reason());
@@ -213,7 +213,7 @@ public class WorkflowTaskActionService {
         createDelegationCompletionNotice(instance, task, operatorId, now);
         if (node.getNodeStatus() == WorkflowNodeStatus.COMPLETED) {
             progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now,
-                    request.selectedRouteKey(), request.selectedReason());
+                    request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
         }
         return WorkflowTaskActionResult.of(task, node, instance, event);
     }
@@ -433,7 +433,7 @@ public class WorkflowTaskActionService {
         eventDao.insert(event);
         createDelegationCompletionNotice(instance, task, operatorId, now);
         progressionService.advanceFromNode(instance.getId(), node.getNodeKey(), operatorId, now,
-                request.selectedRouteKey(), request.selectedReason());
+                request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
         return WorkflowTaskActionResult.of(task, node, instance, event);
     }
 

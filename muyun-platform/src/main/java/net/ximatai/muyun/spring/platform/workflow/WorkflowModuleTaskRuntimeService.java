@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.platform.workflow;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class WorkflowModuleTaskRuntimeService {
     private final WorkflowTaskDao taskDao;
@@ -37,13 +39,25 @@ public class WorkflowModuleTaskRuntimeService {
 
     public WorkflowModuleTaskContinueResult checkAndContinue(String taskId, String operatorId, String reason,
                                                              String selectedRouteKey, String selectedReason) {
+        return checkAndContinue(taskId, operatorId, reason, selectedRouteKey, selectedReason, List.of());
+    }
+
+    public WorkflowModuleTaskContinueResult checkAndContinue(String taskId, String operatorId, String reason,
+                                                             List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return checkAndContinue(taskId, operatorId, reason, null, null, manualRouteSelections);
+    }
+
+    public WorkflowModuleTaskContinueResult checkAndContinue(String taskId, String operatorId, String reason,
+                                                             String selectedRouteKey, String selectedReason,
+                                                             List<WorkflowManualRouteSelection> manualRouteSelections) {
         Context context = requireContext(taskId, operatorId);
         WorkflowModuleTaskProcessBundle bundle = bundle(context);
         if (!bundle.evaluation().passed()) {
             return WorkflowModuleTaskContinueResult.blocked(bundle);
         }
         WorkflowTaskActionResult result = taskActionFacade.execute("complete",
-                WorkflowTaskActionRequest.complete(taskId, operatorId, reason, selectedRouteKey, selectedReason));
+                new WorkflowTaskActionRequest(taskId, operatorId, null, null, null, null, reason, null,
+                        selectedRouteKey, selectedReason, manualRouteSelections));
         return WorkflowModuleTaskContinueResult.continued(result);
     }
 

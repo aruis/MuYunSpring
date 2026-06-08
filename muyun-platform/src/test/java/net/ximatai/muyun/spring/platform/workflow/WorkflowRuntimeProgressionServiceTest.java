@@ -259,6 +259,66 @@ class WorkflowRuntimeProgressionServiceTest {
     }
 
     @Test
+    void shouldUseStructuredSelectionsForMultipleReachableProgressionManualBranches() {
+        WorkflowRuntimeProgressionService service = service(Optional.empty());
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approve = node("node-approve", "approve", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance split = node("node-split", "split", WorkflowNodeType.MILESTONE,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance branchA = manualBranch("node-branch-a", "branchA", "approve", true);
+        WorkflowNodeInstance branchB = manualBranch("node-branch-b", "branchB", "approve", true);
+        WorkflowNodeInstance taskA1 = node("node-task-a1", "taskA1", WorkflowNodeType.TASK,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance taskA2 = node("node-task-a2", "taskA2", WorkflowNodeType.TASK,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance taskB1 = node("node-task-b1", "taskB1", WorkflowNodeType.TASK,
+                WorkflowNodeStatus.WAITING);
+        WorkflowNodeInstance taskB2 = node("node-task-b2", "taskB2", WorkflowNodeType.TASK,
+                WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance entry = route("route-entry", "toSplit", "approve", "split", true);
+        WorkflowRouteInstance toBranchA = route("route-to-a", "toBranchA", "split", "branchA", false);
+        WorkflowRouteInstance toBranchB = route("route-to-b", "toBranchB", "split", "branchB", false);
+        WorkflowRouteInstance routeA1 = route("route-a1", "routeA1", "branchA", "taskA1", false);
+        WorkflowRouteInstance routeA2 = route("route-a2", "routeA2", "branchA", "taskA2", true);
+        WorkflowRouteInstance routeB1 = route("route-b1", "routeB1", "branchB", "taskB1", false);
+        WorkflowRouteInstance routeB2 = route("route-b2", "routeB2", "branchB", "taskB2", true);
+        WorkflowTask approvedTask = task("task-approve", approve, "approver-1");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(approve, split, branchA, branchB,
+                taskA1, taskA2, taskB1, taskB2));
+        when(routeDao.query(any(), any())).thenReturn(List.of(entry, toBranchA, toBranchB,
+                routeA1, routeA2, routeB1, routeB2));
+        when(taskDao.query(any(), any())).thenReturn(List.of(approvedTask));
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+        for (WorkflowNodeInstance node : List.of(approve, split, branchA, branchB, taskA1, taskA2, taskB1, taskB2)) {
+            when(nodeDao.updateByIdAndVersion(node, 2)).thenReturn(1);
+        }
+        for (WorkflowRouteInstance route : List.of(entry, toBranchA, toBranchB, routeA1, routeA2, routeB1, routeB2)) {
+            when(routeDao.updateByIdAndVersion(route, 4)).thenReturn(1);
+        }
+
+        WorkflowProgressionResult result = service.advanceFromNode("instance-1", "approve", "approver-1",
+                Instant.parse("2026-06-05T03:00:00Z"),
+                List.of(new WorkflowManualRouteSelection("branchA", "routeA1", "choose A1"),
+                        new WorkflowManualRouteSelection("branchB", "routeB2", "choose B2")));
+
+        assertThat(routeA1.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(routeA1.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(routeA1.getSelectedReason()).isEqualTo("choose A1");
+        assertThat(routeB2.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+        assertThat(routeB2.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+        assertThat(routeB2.getSelectedReason()).isEqualTo("choose B2");
+        assertThat(routeA2.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(routeB1.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED);
+        assertThat(taskA1.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(taskB2.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(result.selectedRoutes()).containsExactly(entry);
+        assertThat(result.activation().traversedRouteKeys())
+                .containsExactly("toBranchA", "toBranchB", "routeA1", "routeB2");
+    }
+
+    @Test
     void shouldRejectProgressionWhenReachedManualBranchHasNoSelectedRoute() {
         WorkflowRuntimeProgressionService service = service(Optional.empty());
         WorkflowInstance instance = instance();

@@ -21,6 +21,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionRequest;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowManualRouteSelection;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
@@ -125,7 +126,8 @@ public class WorkflowRuntimeAdminWebController {
                 request == null ? null : request.reason(),
                 null,
                 request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
-                request == null ? null : request.selectedReason()));
+                request == null ? null : request.selectedReason(),
+                request == null ? null : request.manualRouteSelections()));
     }
 
     @PostMapping("/history/query")
@@ -201,7 +203,8 @@ record WorkflowAdminTaskActionWebRequest(String operatorId,
                                          String reason,
                                          String selectedRouteKey,
                                          String selectedDirectLinkKey,
-                                         String selectedReason) {
+                                         String selectedReason,
+                                         java.util.List<WorkflowManualRouteSelection> manualRouteSelections) {
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }

@@ -49,7 +49,8 @@ public class WorkflowSubmitFacade {
                 normalized.operatorId(),
                 normalized.operatedAt(),
                 normalized.selectedRouteKey(),
-                normalized.selectedReason())
+                normalized.selectedReason(),
+                normalized.manualRouteSelections())
                 : runtimeSubmitService.submit(
                 selection.definition(),
                 selection.version(),
@@ -60,7 +61,8 @@ public class WorkflowSubmitFacade {
                 normalized.operatorId(),
                 normalized.operatedAt(),
                 normalized.selectedRouteKey(),
-                normalized.selectedReason());
+                normalized.selectedReason(),
+                normalized.manualRouteSelections());
         boolean written = writeApprovalSummaryIfNeeded(normalized, draft);
         return new WorkflowSubmitResult(draft, written);
     }
@@ -103,7 +105,8 @@ public class WorkflowSubmitFacade {
         String selectedRouteKey = textOrNull(request.selectedRouteKey());
         String selectedReason = textOrNull(request.selectedReason());
         return new WorkflowSubmitRequest(moduleAlias, recordId, request.approvalRequired(),
-                request.definitionAlias(), authOrgId, operatorId, operatedAt, selectedRouteKey, selectedReason);
+                request.definitionAlias(), authOrgId, operatorId, operatedAt, selectedRouteKey, selectedReason,
+                request.manualRouteSelections());
     }
 
     private String requireText(String value, String name) {

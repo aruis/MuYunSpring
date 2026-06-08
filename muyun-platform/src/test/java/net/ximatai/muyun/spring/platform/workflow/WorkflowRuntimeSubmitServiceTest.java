@@ -47,15 +47,15 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowDefinition definition = new WorkflowDefinition();
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
-        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), null, null, List.of())).thenReturn(draft);
 
         WorkflowSubmitDraft result = service.submit(definition, version, List.of(), List.of(),
                 "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
 
         assertThat(result).isEqualTo(draft);
-        verify(draftService).build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), null, null);
+        verify(draftService).build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), null, null, List.of());
         verify(instanceDao).insert(draft.instance());
         verify(instanceService).beforeInsert(draft.instance());
         verifyNoMoreInteractions(draftService);
@@ -66,14 +66,14 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowDefinition definition = new WorkflowDefinition();
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
-        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left")).thenReturn(draft);
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left", List.of())).thenReturn(draft);
 
         service.submit(definition, version, List.of(), List.of(), "record-1", "user-1",
                 Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left");
 
-        verify(draftService).build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left");
+        verify(draftService).build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), "leftRoute", "choose left", List.of());
     }
 
     @Test
@@ -85,8 +85,8 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowDefinition definition = new WorkflowDefinition();
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
-        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), null, null, List.of())).thenReturn(draft);
 
         pluginService.submit(definition, version, List.of(), List.of(),
                 "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"));
@@ -122,8 +122,8 @@ class WorkflowRuntimeSubmitServiceTest {
         WorkflowDefinition definition = new WorkflowDefinition();
         WorkflowVersion version = new WorkflowVersion();
         WorkflowSubmitDraft draft = draft();
-        when(draftService.build(definition, version, List.of(), List.of(), "record-1", "user-1",
-                Instant.parse("2026-06-05T01:00:00Z"), null, null)).thenReturn(draft);
+        when(draftService.build(definition, version, List.of(), List.of(), "record-1", null, "user-1",
+                Instant.parse("2026-06-05T01:00:00Z"), null, null, List.of())).thenReturn(draft);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> pluginService.submit(definition, version,
                         List.of(), List.of(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z")))

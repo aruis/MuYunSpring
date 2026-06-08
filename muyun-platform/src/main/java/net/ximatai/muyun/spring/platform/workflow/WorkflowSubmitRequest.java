@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import java.time.Instant;
+import java.util.List;
 
 public record WorkflowSubmitRequest(
         String moduleAlias,
@@ -11,8 +12,26 @@ public record WorkflowSubmitRequest(
         String operatorId,
         Instant operatedAt,
         String selectedRouteKey,
-        String selectedReason
+        String selectedReason,
+        List<WorkflowManualRouteSelection> manualRouteSelections
 ) {
+    public WorkflowSubmitRequest {
+        manualRouteSelections = manualRouteSelections == null ? List.of() : List.copyOf(manualRouteSelections);
+    }
+
+    public WorkflowSubmitRequest(String moduleAlias,
+                                 String recordId,
+                                 boolean approvalRequired,
+                                 String definitionAlias,
+                                 String authOrgId,
+                                 String operatorId,
+                                 Instant operatedAt,
+                                 String selectedRouteKey,
+                                 String selectedReason) {
+        this(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId, operatorId, operatedAt,
+                selectedRouteKey, selectedReason, List.of());
+    }
+
     public WorkflowSubmitRequest(String moduleAlias,
                                  String recordId,
                                  boolean approvalRequired,
@@ -42,21 +61,27 @@ public record WorkflowSubmitRequest(
 
     public WorkflowSubmitRequest withOperator(String operatorId) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt, selectedRouteKey, selectedReason);
+                operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
     }
 
     public WorkflowSubmitRequest withAuthOrgId(String authOrgId) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt, selectedRouteKey, selectedReason);
+                operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
     }
 
     public WorkflowSubmitRequest withOperatedAt(Instant operatedAt) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt, selectedRouteKey, selectedReason);
+                operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
     }
 
     public WorkflowSubmitRequest withSelectedRoute(String selectedRouteKey, String selectedReason) {
         return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
-                operatorId, operatedAt, selectedRouteKey, selectedReason);
+                operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
+    }
+
+    public WorkflowSubmitRequest withManualRouteSelections(
+            List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return new WorkflowSubmitRequest(moduleAlias, recordId, approvalRequired, definitionAlias, authOrgId,
+                operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
     }
 }

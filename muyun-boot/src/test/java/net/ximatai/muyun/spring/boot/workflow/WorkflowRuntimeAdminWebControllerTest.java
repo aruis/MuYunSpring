@@ -231,6 +231,36 @@ class WorkflowRuntimeAdminWebControllerTest {
     }
 
     @Test
+    void shouldPassManualRouteSelectionsWhenAdminForceApprove() throws Exception {
+        WorkflowTask task = new WorkflowTask();
+        task.setId("task-structured");
+        when(adminFacade.forceApprove(argThat(request ->
+                "task-structured".equals(request.taskId())
+                        && "admin-1".equals(request.operatorId())
+                        && request.manualRouteSelections().size() == 2
+                        && "branchA".equals(request.manualRouteSelections().get(0).branchNodeKey())
+                        && "routeA1".equals(request.manualRouteSelections().get(0).routeKey())
+                        && "choose A1".equals(request.manualRouteSelections().get(0).selectedReason())
+                        && "branchB".equals(request.manualRouteSelections().get(1).branchNodeKey())
+                        && "routeB2".equals(request.manualRouteSelections().get(1).routeKey()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
+
+        mvc.perform(post("/workflow/runtime/admin/task/task-structured/actions/forceApprove")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "admin-1",
+                                  "manualRouteSelections": [
+                                    {"branchNodeKey":"branchA","routeKey":"routeA1","selectedReason":"choose A1"},
+                                    {"branchNodeKey":"branchB","routeKey":"routeB2","selectedReason":"choose B2"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-structured"));
+    }
+
+    @Test
     void shouldExposeAdminHistoryQueryDetailsAndDelete() throws Exception {
         WorkflowHistoryInstance history = new WorkflowHistoryInstance();
         history.setId("history-1");

@@ -53,6 +53,33 @@ class DynamicWorkflowActionExecutorTest {
     }
 
     @Test
+    void shouldPassManualRouteSelectionsForApprovalSubmit() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
+                .withPayload(Map.of(
+                        "workflowAction", "submitApproval",
+                        "selectedRouteKey", "ignoredLegacyRoute",
+                        "manualRouteSelections", List.of(
+                                Map.of("branchNodeKey", "branchA", "routeKey", "routeA1",
+                                        "selectedReason", "choose A1"),
+                                Map.of("branchNodeKey", "branchB", "routeKey", "routeB2",
+                                        "selectedReason", "choose B2"))
+                ));
+
+        executor.execute(context("submitApproval", "record-1"), request);
+
+        verify(submitService).submitApproval(org.mockito.ArgumentMatchers.eq("sales.contract"),
+                org.mockito.ArgumentMatchers.eq("record-1"),
+                org.mockito.ArgumentMatchers.argThat(selections ->
+                        selections.size() == 2
+                                && "branchA".equals(selections.get(0).branchNodeKey())
+                                && "routeA1".equals(selections.get(0).routeKey())
+                                && "choose A1".equals(selections.get(0).selectedReason())
+                                && "branchB".equals(selections.get(1).branchNodeKey())
+                                && "routeB2".equals(selections.get(1).routeKey())
+                                && "choose B2".equals(selections.get(1).selectedReason())));
+    }
+
+    @Test
     void shouldSubmitWorkflowByDefinitionAlias() {
         DynamicActionExecutionRequest request = DynamicActionExecutionRequest.id("record-1")
                 .withPayload(Map.of("workflowAction", "submitWorkflow", "definitionAlias", "sync"));
@@ -107,6 +134,36 @@ class DynamicWorkflowActionExecutorTest {
                                 && actionRequest.rejectResubmitMode() == WorkflowRejectResubmitMode.RETURN_TO_ME
                                 && "not ok".equals(actionRequest.reason())
                                 && Instant.parse("2026-06-05T02:00:00Z").equals(actionRequest.operatedAt())));
+    }
+
+    @Test
+    void shouldPassManualRouteSelectionsForTaskAction() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.empty()
+                .withPayload(Map.of(
+                        "workflowAction", "taskAction",
+                        "taskActionCode", "approve",
+                        "taskId", "task-1",
+                        "operatorId", "manager-1",
+                        "manualRouteSelections", List.of(
+                                Map.of("branchNodeKey", "branchA", "routeKey", "routeA1",
+                                        "selectedReason", "choose A1"),
+                                Map.of("branchNodeKey", "branchB", "routeKey", "routeB2",
+                                        "selectedReason", "choose B2"))
+                ));
+
+        executor.execute(context("taskAction", null), request);
+
+        verify(taskActionFacade).execute(org.mockito.ArgumentMatchers.eq("approve"),
+                org.mockito.ArgumentMatchers.argThat(actionRequest ->
+                        "task-1".equals(actionRequest.taskId())
+                                && "manager-1".equals(actionRequest.operatorId())
+                                && actionRequest.manualRouteSelections().size() == 2
+                                && "branchA".equals(actionRequest.manualRouteSelections().get(0).branchNodeKey())
+                                && "routeA1".equals(actionRequest.manualRouteSelections().get(0).routeKey())
+                                && "choose A1".equals(actionRequest.manualRouteSelections().get(0).selectedReason())
+                                && "branchB".equals(actionRequest.manualRouteSelections().get(1).branchNodeKey())
+                                && "routeB2".equals(actionRequest.manualRouteSelections().get(1).routeKey())
+                                && "choose B2".equals(actionRequest.manualRouteSelections().get(1).selectedReason())));
     }
 
     @Test

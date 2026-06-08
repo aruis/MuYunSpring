@@ -479,6 +479,37 @@ class WorkflowRuntimeWebControllerTest {
     }
 
     @Test
+    void shouldPassManualRouteSelectionsToTaskActionFacade() throws Exception {
+        WorkflowTask task = new WorkflowTask();
+        task.setId("task-structured");
+        when(taskActionFacade.execute(eq("approve"), argThat(request ->
+                "task-structured".equals(request.taskId())
+                        && "operator-1".equals(request.operatorId())
+                        && request.manualRouteSelections().size() == 2
+                        && "branchA".equals(request.manualRouteSelections().get(0).branchNodeKey())
+                        && "routeA1".equals(request.manualRouteSelections().get(0).routeKey())
+                        && "choose A1".equals(request.manualRouteSelections().get(0).selectedReason())
+                        && "branchB".equals(request.manualRouteSelections().get(1).branchNodeKey())
+                        && "routeB2".equals(request.manualRouteSelections().get(1).routeKey())
+                        && "choose B2".equals(request.manualRouteSelections().get(1).selectedReason()))))
+                .thenReturn(WorkflowTaskActionResult.of(task, null));
+
+        mvc.perform(post("/workflow/runtime/task/task-structured/actions/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "manualRouteSelections": [
+                                    {"branchNodeKey":"branchA","routeKey":"routeA1","selectedReason":"choose A1"},
+                                    {"branchNodeKey":"branchB","routeKey":"routeB2","selectedReason":"choose B2"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task.id").value("task-structured"));
+    }
+
+    @Test
     void shouldExecuteInstanceActionsThroughInstanceActionFacade() throws Exception {
         WorkflowInstance instance = instance("inst-1");
         when(instanceActionFacade.execute(eq("revoke"), argThat(request ->
@@ -535,6 +566,35 @@ class WorkflowRuntimeWebControllerTest {
         verify(moduleTaskRuntimeService).prepare("task-1", "user-1");
         verify(moduleTaskRuntimeService).checkAndContinue("task-1", "operator-1", "done",
                 "leftRoute", "choose left");
+    }
+
+    @Test
+    void shouldPassManualRouteSelectionsToModuleTaskContinue() throws Exception {
+        WorkflowTaskActionResult actionResult = WorkflowTaskActionResult.of(new WorkflowTask(), null);
+        when(moduleTaskRuntimeService.checkAndContinue(eq("task-1"), eq("operator-1"), eq("done"),
+                eq(null), eq(null), argThat(selections ->
+                        selections.size() == 2
+                                && "branchA".equals(selections.get(0).branchNodeKey())
+                                && "routeA1".equals(selections.get(0).routeKey())
+                                && "choose A1".equals(selections.get(0).selectedReason())
+                                && "branchB".equals(selections.get(1).branchNodeKey())
+                                && "routeB2".equals(selections.get(1).routeKey()))))
+                .thenReturn(WorkflowModuleTaskContinueResult.continued(actionResult));
+
+        mvc.perform(post("/workflow/runtime/task/task-1/module-task/check-and-continue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "operatorId": "operator-1",
+                                  "reason": "done",
+                                  "manualRouteSelections": [
+                                    {"branchNodeKey":"branchA","routeKey":"routeA1","selectedReason":"choose A1"},
+                                    {"branchNodeKey":"branchB","routeKey":"routeB2","selectedReason":"choose B2"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.continued").value(true));
     }
 
     private WorkflowInstance instance(String id) {

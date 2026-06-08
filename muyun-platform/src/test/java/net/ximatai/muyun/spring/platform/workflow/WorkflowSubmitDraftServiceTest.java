@@ -98,6 +98,55 @@ class WorkflowSubmitDraftServiceTest {
     }
 
     @Test
+    void shouldUseStructuredSelectionsForMultipleReachableInitialManualBranches() {
+        WorkflowSubmitDraft draft = service.build(definition(false), version(),
+                List.of(node("start", WorkflowNodeType.START),
+                        node("split", WorkflowNodeType.MILESTONE),
+                        manualBranch("branchA", "START", true),
+                        manualBranch("branchB", "START", true),
+                        node("taskA1", WorkflowNodeType.TASK),
+                        node("taskA2", WorkflowNodeType.TASK),
+                        node("taskB1", WorkflowNodeType.TASK),
+                        node("taskB2", WorkflowNodeType.TASK)),
+                List.of(link("toSplit", "start", "split"),
+                        link("toBranchA", "split", "branchA"),
+                        link("toBranchB", "split", "branchB"),
+                        link("routeA1", "branchA", "taskA1"),
+                        defaultLink("routeA2", "branchA", "taskA2"),
+                        link("routeB1", "branchB", "taskB1"),
+                        defaultLink("routeB2", "branchB", "taskB2")),
+                "record-1", null, "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                null, null,
+                List.of(new WorkflowManualRouteSelection("branchA", "routeA1", "choose A1"),
+                        new WorkflowManualRouteSelection("branchB", "routeB2", "choose B2")));
+
+        assertThat(draft.activation().traversedRouteKeys())
+                .containsExactly("toSplit", "toBranchA", "toBranchB", "routeA1", "routeB2");
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("routeA1"))
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+                    assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+                    assertThat(route.getSelectedReason()).isEqualTo("choose A1");
+                });
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("routeB2"))
+                .first()
+                .satisfies(route -> {
+                    assertThat(route.getRouteStatus()).isEqualTo(WorkflowRouteStatus.EFFECTIVE);
+                    assertThat(route.getRouteReason()).isEqualTo(WorkflowRouteReason.MANUAL_SELECTED);
+                    assertThat(route.getSelectedReason()).isEqualTo("choose B2");
+                });
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("routeA2"))
+                .first()
+                .satisfies(route -> assertThat(route.getRouteReason())
+                        .isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED));
+        assertThat(draft.routes()).filteredOn(route -> route.getRouteKey().equals("routeB1"))
+                .first()
+                .satisfies(route -> assertThat(route.getRouteReason())
+                        .isEqualTo(WorkflowRouteReason.MANUAL_UNSELECTED));
+    }
+
+    @Test
     void shouldRejectSubmitWhenInitialManualBranchHasNoSelectedRoute() {
         WorkflowNodeDefinition branch = manualBranch("branch", "START", false);
 
