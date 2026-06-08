@@ -584,7 +584,8 @@ public class WorkflowTaskActionService {
         }
 
         WorkflowEvent event = eventFactory.addSign(instance, node, task, operatorId, request.reason(),
-                addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), replacedRouteIds, editMode), now);
+                addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), replacedRouteIds, editMode,
+                        request.semanticJson(), request.layoutJson()), now);
         eventDao.insert(event);
         return WorkflowTaskActionResult.addSign(task, node, instance, event, editMode,
                 plan.addedNodeKeys(), replacedRouteIds);
@@ -1138,19 +1139,52 @@ public class WorkflowTaskActionService {
     private String addSignPayload(String sourceNodeKey,
                                   List<String> addedNodeKeys,
                                   List<String> replacedRouteIds,
-                                  WorkflowAddSignEditMode editMode) {
-        return "{\"sourceNodeKey\":\"" + sourceNodeKey
+                                  WorkflowAddSignEditMode editMode,
+                                  String semanticJson,
+                                  String layoutJson) {
+        return "{\"sourceNodeKey\":\"" + escapeJson(sourceNodeKey)
                 + "\",\"addedNodeKeys\":" + jsonArray(addedNodeKeys)
                 + ",\"replacedRouteIds\":" + jsonArray(replacedRouteIds)
-                + ",\"editMode\":\"" + editMode.getCode() + "\"}";
+                + ",\"editMode\":\"" + escapeJson(editMode.getCode()) + "\""
+                + optionalJsonString("semanticJson", semanticJson)
+                + optionalJsonString("layoutJson", layoutJson)
+                + "}";
     }
 
     private String jsonArray(List<String> values) {
         return values == null || values.isEmpty()
                 ? "[]"
                 : values.stream()
-                        .map(value -> "\"" + value.replace("\"", "\\\"") + "\"")
+                        .map(value -> "\"" + escapeJson(value) + "\"")
                         .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+    }
+
+    private String optionalJsonString(String fieldName, String value) {
+        return value == null || value.isBlank() ? "" : ",\"" + fieldName + "\":\"" + escapeJson(value) + "\"";
+    }
+
+    private String escapeJson(String value) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '"' -> builder.append("\\\"");
+                case '\\' -> builder.append("\\\\");
+                case '\b' -> builder.append("\\b");
+                case '\f' -> builder.append("\\f");
+                case '\n' -> builder.append("\\n");
+                case '\r' -> builder.append("\\r");
+                case '\t' -> builder.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        builder.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        builder.append(ch);
+                    }
+                }
+            }
+        }
+        return builder.toString();
     }
 
     private List<WorkflowTask> instanceTodoTasks(String instanceId) {

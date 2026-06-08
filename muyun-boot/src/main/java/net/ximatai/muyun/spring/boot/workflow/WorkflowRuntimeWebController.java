@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
@@ -172,7 +173,9 @@ public class WorkflowRuntimeWebController {
                 null,
                 request == null ? null : request.selectedRouteKeyOrDirectLinkKey(),
                 request == null ? null : request.selectedReason(),
-                request == null ? null : request.manualRouteSelections()));
+                request == null ? null : request.manualRouteSelections(),
+                request == null ? null : jsonText(request.semanticJson()),
+                request == null ? null : jsonText(request.layoutJson())));
     }
 
     @PostMapping("/task/{taskId}/read")
@@ -315,6 +318,13 @@ public class WorkflowRuntimeWebController {
                 .withManualRouteSelections(normalized.manualRouteSelections());
     }
 
+    private String jsonText(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        return node.isTextual() ? node.asText() : node.toString();
+    }
+
 }
 
 record WorkflowOperatorWebRequest(String operatorId) {
@@ -331,7 +341,9 @@ record WorkflowTaskActionWebRequest(String operatorId,
                                     String selectedRouteKey,
                                     String selectedDirectLinkKey,
                                     String selectedReason,
-                                    List<WorkflowManualRouteSelection> manualRouteSelections) {
+                                    List<WorkflowManualRouteSelection> manualRouteSelections,
+                                    JsonNode semanticJson,
+                                    JsonNode layoutJson) {
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }

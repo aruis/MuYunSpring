@@ -99,4 +99,10 @@ public class WorkflowInstance extends StandardEntity {
 
     @Column(name = "snapshot_text", type = ColumnType.TEXT, nullable = false, comment = "Workflow snapshot")
     private String snapshotText;
+
+    @Column(name = "semantic_json", type = ColumnType.TEXT, comment = "Frozen designer semantic workflow json")
+    private String semanticJson;
+
+    @Column(name = "layout_json", type = ColumnType.TEXT, comment = "Frozen designer layout json")
+    private String layoutJson;
 }

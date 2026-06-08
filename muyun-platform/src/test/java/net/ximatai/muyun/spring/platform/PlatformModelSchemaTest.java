@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinition;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowHistoryInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstance;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowLinkDefinition;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowNodeDefinition;
@@ -182,7 +183,7 @@ class PlatformModelSchemaTest {
                 .contains(List.of("tenant_id", "module_alias", "alias"));
         assertThat(columnNames(mapper.toTable(WorkflowVersion.class)))
                 .contains("id", "definition_id", "version_no", "publish_status", "snapshot_text",
-                        "published_by", "published_at");
+                        "semantic_json", "layout_json", "published_by", "published_at");
         assertThat(columnNames(mapper.toTable(WorkflowNodeDefinition.class)))
                 .contains("id", "workflow_version_id", "node_key", "node_type", "approval_mode",
                         "milestone_type", "converge_mode", "converge_ratio", "task_definition_id",
@@ -214,7 +215,7 @@ class PlatformModelSchemaTest {
                         "reject_resubmit_mode", "reject_return_node_key", "reject_return_owner_id",
                         "previous_instance_id",
                         "last_action_code", "last_action_reason", "last_operator_id", "last_operated_at",
-                        "snapshot_text")
+                        "snapshot_text", "semantic_json", "layout_json")
                 .doesNotContain("entity_alias");
         assertThat(columnNames(mapper.toTable(WorkflowNodeInstance.class)))
                 .contains("id", "instance_id", "node_key", "node_title", "node_run_id", "node_type", "node_status", "approval_mode",
@@ -261,7 +262,12 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(WorkflowEvent.class)))
                 .contains("id", "tenant_id", "instance_id", "node_instance_id", "task_id", "event_type",
                         "action_code", "operator_id", "message", "payload_text", "occurred_at");
+        assertThat(columnNames(mapper.toTable(WorkflowHistoryInstance.class)))
+                .contains("snapshot_text", "semantic_json", "layout_json");
         assertThat(columnType(mapper.toTable(WorkflowInstance.class), "snapshot_text")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowVersion.class), "semantic_json")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowInstance.class), "layout_json")).isEqualTo(ColumnType.TEXT);
+        assertThat(columnType(mapper.toTable(WorkflowHistoryInstance.class), "semantic_json")).isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowNodeDefinition.class), "participant_policy_text"))
                 .isEqualTo(ColumnType.TEXT);
         assertThat(columnType(mapper.toTable(WorkflowNodeInstance.class), "participant_policy_text"))

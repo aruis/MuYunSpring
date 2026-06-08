@@ -125,6 +125,8 @@ public class WorkflowArchiveService {
         target.setArchiveReason(archiveReason);
         target.setArchivedAt(archivedAt);
         target.setSnapshotText(writeSnapshot(snapshot, source.getId()));
+        target.setSemanticJson(source.getSemanticJson());
+        target.setLayoutJson(source.getLayoutJson());
         return target;
     }
 

@@ -927,7 +927,8 @@ class WorkflowTaskActionServiceTest {
 
         WorkflowTaskActionResult result = pluginService.addSign(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, null, segment("add-1", "approve", "next"), null,
-                "need finance review", Instant.parse("2026-06-05T04:00:00Z")));
+                "need finance review", Instant.parse("2026-06-05T04:00:00Z"),
+                null, null, List.of(), "{\"nodes\":[\"add-1\"]}", "{\"zoom\":1}"));
 
         assertThat(result.task().getTaskStatus()).isEqualTo(WorkflowTaskStatus.TODO);
         assertThat(result.node().getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
@@ -962,6 +963,9 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.event().getPayloadText()).contains("\"addedNodeKeys\":[\"add-1\"]");
         assertThat(result.event().getPayloadText()).contains("\"replacedRouteIds\":[\"route-1\"]");
         assertThat(result.event().getPayloadText()).contains("\"editMode\":\"create\"");
+        assertThat(result.event().getPayloadText())
+                .contains("\"semanticJson\":\"{\\\"nodes\\\":[\\\"add-1\\\"]}\"");
+        assertThat(result.event().getPayloadText()).contains("\"layoutJson\":\"{\\\"zoom\\\":1}\"");
         verify(taskDao, never()).insert(any());
         verify(eventDao).insert(result.event());
         verifyNoInteractions(progressionService);

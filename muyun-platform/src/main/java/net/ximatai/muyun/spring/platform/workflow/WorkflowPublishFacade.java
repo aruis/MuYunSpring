@@ -141,6 +141,8 @@ public class WorkflowPublishFacade {
         copy.setVersionNo(source.getVersionNo());
         copy.setPublishStatus(source.getPublishStatus());
         copy.setSnapshotText(source.getSnapshotText());
+        copy.setSemanticJson(source.getSemanticJson());
+        copy.setLayoutJson(source.getLayoutJson());
         copy.setPublishedBy(source.getPublishedBy());
         copy.setPublishedAt(source.getPublishedAt());
         return copy;

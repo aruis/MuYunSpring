@@ -105,6 +105,8 @@ class WorkflowRuntimeWebControllerTest {
     @Test
     void shouldExposeInstanceRenderBundle() throws Exception {
         WorkflowInstance instance = instance("inst-1");
+        instance.setSemanticJson("{\"nodes\":[\"review\"]}");
+        instance.setLayoutJson("{\"zoom\":1}");
         WorkflowNodeInstance node = new WorkflowNodeInstance();
         node.setId("node-1");
         node.setInstanceId("inst-1");
@@ -116,6 +118,8 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("RUNTIME"))
                 .andExpect(jsonPath("$.instance.id").value("inst-1"))
+                .andExpect(jsonPath("$.semanticJson").value("{\"nodes\":[\"review\"]}"))
+                .andExpect(jsonPath("$.layoutJson").value("{\"zoom\":1}"))
                 .andExpect(jsonPath("$.nodes[0].nodeKey").value("review"));
     }
 
@@ -460,6 +464,8 @@ class WorkflowRuntimeWebControllerTest {
                         && "user:add-signer-1".equals(request.addSignSegment().nodeDefinitions().getFirst()
                                 .getParticipantPolicyText())
                         && request.addSignSegment().linkDefinitions().size() == 2
+                        && "{\"nodes\":[\"add-1\"]}".equals(request.semanticJson())
+                        && "{\"zoom\":1}".equals(request.layoutJson())
                         && "need review".equals(request.reason()))))
                 .thenReturn(new WorkflowTaskActionResult(task, null, null, null, null));
         when(taskActionFacade.execute(eq("read"), argThat(request ->
@@ -535,6 +541,8 @@ class WorkflowRuntimeWebControllerTest {
                                       }
                                     ]
                                   },
+                                  "semanticJson": {"nodes":["add-1"]},
+                                  "layoutJson": {"zoom":1},
                                   "reason": "need review"
                                 }
                                 """))

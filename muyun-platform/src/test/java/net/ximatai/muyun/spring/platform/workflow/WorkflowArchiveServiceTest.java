@@ -36,6 +36,8 @@ class WorkflowArchiveServiceTest {
         assertThat(historyDao.findById("instance-1")).isSameAs(history);
         assertThat(history.getArchiveReason()).isEqualTo(WorkflowArchiveReason.RECALLED);
         assertThat(history.getArchivedAt()).isEqualTo(Instant.parse("2026-06-05T04:00:00Z"));
+        assertThat(history.getSemanticJson()).isEqualTo("{\"nodes\":[\"approve\"]}");
+        assertThat(history.getLayoutJson()).isEqualTo("{\"zoom\":1}");
         assertThat(instanceDao.findById("instance-1")).isNull();
         assertThat(nodeDao.findById("node-1")).isNull();
         assertThat(routeDao.findById("route-1")).isNull();
@@ -68,6 +70,8 @@ class WorkflowArchiveServiceTest {
         instance.setLastActionCode("revoke");
         instance.setLastOperatedAt(Instant.parse("2026-06-05T04:00:00Z"));
         instance.setSnapshotText("{}");
+        instance.setSemanticJson("{\"nodes\":[\"approve\"]}");
+        instance.setLayoutJson("{\"zoom\":1}");
         return instance;
     }
 

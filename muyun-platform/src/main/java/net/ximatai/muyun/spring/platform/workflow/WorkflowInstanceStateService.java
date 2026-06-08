@@ -40,6 +40,8 @@ public class WorkflowInstanceStateService {
         instance.setStartedBy(startedBy);
         instance.setStartedAt(startedAt == null ? Instant.now() : startedAt);
         instance.setSnapshotText(requireText(snapshotText, "workflow snapshot must not be blank"));
+        instance.setSemanticJson(blankToNull(version.getSemanticJson()));
+        instance.setLayoutJson(blankToNull(version.getLayoutJson()));
         return instance;
     }
 
@@ -74,5 +76,9 @@ public class WorkflowInstanceStateService {
             throw new PlatformException(message);
         }
         return value;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

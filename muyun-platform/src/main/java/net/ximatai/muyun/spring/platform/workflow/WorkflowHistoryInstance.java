@@ -84,4 +84,10 @@ public class WorkflowHistoryInstance extends StandardEntity {
 
     @Column(name = "snapshot_text", type = ColumnType.TEXT, nullable = false, comment = "Archived workflow snapshot")
     private String snapshotText;
+
+    @Column(name = "semantic_json", type = ColumnType.TEXT, comment = "Archived designer semantic workflow json")
+    private String semanticJson;
+
+    @Column(name = "layout_json", type = ColumnType.TEXT, comment = "Archived designer layout json")
+    private String layoutJson;
 }

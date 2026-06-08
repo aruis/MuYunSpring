@@ -14,10 +14,29 @@ public record WorkflowTaskActionRequest(
         Instant operatedAt,
         String selectedRouteKey,
         String selectedReason,
-        List<WorkflowManualRouteSelection> manualRouteSelections
+        List<WorkflowManualRouteSelection> manualRouteSelections,
+        String semanticJson,
+        String layoutJson
 ) {
     public WorkflowTaskActionRequest {
         manualRouteSelections = manualRouteSelections == null ? List.of() : List.copyOf(manualRouteSelections);
+        semanticJson = blankToNull(semanticJson);
+        layoutJson = blankToNull(layoutJson);
+    }
+
+    public WorkflowTaskActionRequest(String taskId,
+                                     String operatorId,
+                                     String targetAssigneeId,
+                                     WorkflowAddSignMode addSignMode,
+                                     WorkflowAddSignSegment addSignSegment,
+                                     WorkflowRejectResubmitMode rejectResubmitMode,
+                                     String reason,
+                                     Instant operatedAt,
+                                     String selectedRouteKey,
+                                     String selectedReason,
+                                     List<WorkflowManualRouteSelection> manualRouteSelections) {
+        this(taskId, operatorId, targetAssigneeId, addSignMode, addSignSegment, rejectResubmitMode, reason,
+                operatedAt, selectedRouteKey, selectedReason, manualRouteSelections, null, null);
     }
 
     public WorkflowTaskActionRequest(String taskId,
@@ -93,5 +112,9 @@ public record WorkflowTaskActionRequest(
                                                     WorkflowAddSignSegment addSignSegment,
                                                     String reason) {
         return new WorkflowTaskActionRequest(taskId, operatorId, null, null, addSignSegment, null, reason, null);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

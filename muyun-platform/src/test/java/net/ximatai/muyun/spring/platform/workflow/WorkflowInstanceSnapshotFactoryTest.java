@@ -21,6 +21,8 @@ class WorkflowInstanceSnapshotFactoryTest {
 
         assertThat(snapshot.instance().getId()).isNotBlank();
         assertThat(snapshot.instance().getApprovalStatus()).isEqualTo(WorkflowApprovalStatus.PROCESSING);
+        assertThat(snapshot.instance().getSemanticJson()).isEqualTo("{\"nodes\":[\"start\"]}");
+        assertThat(snapshot.instance().getLayoutJson()).isEqualTo("{\"zoom\":1}");
         assertThat(snapshot.nodes()).hasSize(2)
                 .allSatisfy(node -> {
                     assertThat(node.getInstanceId()).isEqualTo(snapshot.instance().getId());
@@ -92,6 +94,8 @@ class WorkflowInstanceSnapshotFactoryTest {
         version.setId("version-1");
         version.setVersionNo(1);
         version.setSnapshotText("{\"nodes\":[]}");
+        version.setSemanticJson("{\"nodes\":[\"start\"]}");
+        version.setLayoutJson("{\"zoom\":1}");
         return version;
     }
 
