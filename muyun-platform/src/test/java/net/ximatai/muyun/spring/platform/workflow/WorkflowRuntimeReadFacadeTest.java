@@ -550,6 +550,27 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortNoticeCardsByReadStatus() {
+        WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        unread.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
+        read.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(unread, read));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "notice"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("readStatus", WorkflowSortDirection.DESC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.noticeCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId).containsExactly("notice-2", "notice-1");
+        assertThat(cards).extracting(WorkflowWorkbenchCard::readStatus)
+                .containsExactly(WorkflowNoticeReadStatus.READ, WorkflowNoticeReadStatus.UNREAD);
+    }
+
+    @Test
     void shouldDeriveDelegationCompletedNoticeSourceFromExplanationFields() {
         WorkflowTask notice = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
         notice.setAssignmentKind(WorkflowAssignmentKind.TRANSFERRED);
