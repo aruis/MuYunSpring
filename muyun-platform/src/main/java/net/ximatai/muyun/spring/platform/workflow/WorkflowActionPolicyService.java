@@ -134,7 +134,7 @@ public class WorkflowActionPolicyService {
     public void requireManagementTaskAction(String actionCode, String reason) {
         String validActionCode = requireText(actionCode, "workflow action code must not be blank");
         requireManagementAction(validActionCode);
-        if (MANAGEMENT_FORCE_APPROVE_ACTION.equals(validActionCode) || "forceHandle".equals(validActionCode)) {
+        if (MANAGEMENT_FORCE_APPROVE_ACTION.equals(validActionCode)) {
             requireReason(validActionCode, reason);
         }
     }

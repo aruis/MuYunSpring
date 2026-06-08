@@ -3,7 +3,9 @@ package net.ximatai.muyun.spring.boot.workflow;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminActiveTaskView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAdminInstanceQueryRequest;
@@ -32,10 +34,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -103,6 +107,17 @@ class WorkflowRuntimeAdminWebControllerTest {
                 .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve_source"))
                 .andExpect(jsonPath("$.records[0].addSignOperatorId").value("operator-1"))
                 .andExpect(jsonPath("$.records[0].addSignAt").value(1780619400.0));
+    }
+
+    @Test
+    void shouldAuthorizeActiveTaskViewsThroughForceApproveAction() throws Exception {
+        Method method = WorkflowRuntimeAdminWebController.class
+                .getMethod("currentTodoTaskViews", String.class);
+
+        CustomActionEndpoint endpoint = method.getAnnotation(CustomActionEndpoint.class);
+
+        assertThat(endpoint.value()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION);
+        assertThat(endpoint.title()).isEqualTo("Force Handle Candidate Query");
     }
 
     @Test

@@ -112,7 +112,7 @@ class WorkflowAdminServiceTest {
     }
 
     @Test
-    void shouldQueryCurrentTodoTasksThroughForceApprovePolicy() {
+    void shouldQueryRawCurrentTodoTasksThroughTodoTaskQueryPolicy() {
         WorkflowInstance instance = instance(WorkflowInstanceStatus.RUNNING);
         WorkflowTask task = new WorkflowTask();
         task.setId("task-1");
@@ -124,6 +124,21 @@ class WorkflowAdminServiceTest {
         assertThat(tasks).containsExactly(task);
         verify(actionPolicyService).requireManagementAction(
                 WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
+    }
+
+    @Test
+    void shouldQueryCurrentTodoTaskViewsThroughForceApprovePolicy() {
+        WorkflowTask task = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING));
+        when(taskDao.query(any(), any(), any())).thenReturn(List.of(task));
+        when(nodeInstanceDao.findById("node-active")).thenReturn(node);
+
+        List<WorkflowAdminActiveTaskView> views = service.currentTodoTaskViews("instance-1");
+
+        assertThat(views).hasSize(1);
+        verify(actionPolicyService).requireManagementAction(
+                WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION);
     }
 
     @Test
@@ -191,7 +206,7 @@ class WorkflowAdminServiceTest {
         assertThat(view.addSignOperatorId()).isEqualTo("operator-1");
         assertThat(view.addSignAt()).isEqualTo(Instant.parse("2026-06-05T00:30:00Z"));
         verify(actionPolicyService).requireManagementAction(
-                WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
+                WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION);
     }
 
     @Test

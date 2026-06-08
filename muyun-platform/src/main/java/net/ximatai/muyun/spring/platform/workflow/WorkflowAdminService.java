@@ -118,7 +118,7 @@ public class WorkflowAdminService {
 
     public List<WorkflowAdminActiveTaskView> currentTodoTaskViews(String instanceId) {
         WorkflowInstance instance = requireRunningInstance(instanceId);
-        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
+        actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION);
         return taskDao.query(Criteria.of()
                         .eq("instanceId", instance.getId())
                         .eq("taskKind", WorkflowTaskKind.APPROVAL)

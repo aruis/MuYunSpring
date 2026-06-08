@@ -70,6 +70,19 @@ class WorkflowActionPolicyServiceTest {
         verifyNoInteractions(recordGuard);
     }
 
+    @Test
+    void shouldRequireReasonForForceApproveManagementTaskAction() {
+        assertThatThrownBy(() -> service.requireManagementTaskAction(
+                WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION, null))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("workflow action reason is required: forceApprove");
+
+        ArgumentCaptor<ActionExecutionContext> context = ArgumentCaptor.forClass(ActionExecutionContext.class);
+        verify(executionPolicyService).requireAuthorized(context.capture());
+        assertThat(context.getValue().actionCode())
+                .isEqualTo(WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION);
+    }
+
     private WorkflowInstance instance() {
         WorkflowInstance instance = new WorkflowInstance();
         instance.setId("instance-1");

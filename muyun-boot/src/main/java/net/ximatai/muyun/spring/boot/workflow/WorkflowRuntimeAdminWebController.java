@@ -57,8 +57,8 @@ public class WorkflowRuntimeAdminWebController {
     }
 
     @GetMapping("/instance/{instanceId}/active-tasks")
-    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
-            title = "Active Task Query", level = PlatformActionLevel.LIST)
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
+            title = "Force Handle Candidate Query", level = PlatformActionLevel.LIST)
     public WebListResponse<WorkflowAdminActiveTaskView> currentTodoTaskViews(@PathVariable String instanceId) {
         return new WebListResponse<>(adminFacade.currentTodoTaskViews(instanceId));
     }
@@ -113,7 +113,7 @@ public class WorkflowRuntimeAdminWebController {
 
     @PostMapping("/task/{taskId}/actions/forceApprove")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
-            title = "Force Approve", level = PlatformActionLevel.LIST)
+            title = "Force Handle", level = PlatformActionLevel.LIST)
     public WorkflowTaskActionResult forceApprove(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowAdminTaskActionWebRequest request) {
