@@ -475,6 +475,30 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortWorkbenchCardsByDelegationIdentityFields() {
+        WorkflowTask first = delegatedTodo("task-1", "principal-a", "source-b", "delegate-b", false);
+        WorkflowTask second = delegatedTodo("task-2", "principal-a", "source-b", "delegate-b", true);
+        WorkflowTask third = delegatedTodo("task-3", "principal-a", "source-b", "delegate-a", false);
+        WorkflowTask fourth = delegatedTodo("task-4", "principal-a", "source-a", "delegate-z", true);
+        WorkflowTask fifth = delegatedTodo("task-5", "principal-b", "source-z", "delegate-a", true);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(first, second, third, fourth, fifth));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("originalAssigneeId", WorkflowSortDirection.ASC),
+                        new WorkflowWorkbenchSort("delegatedFromUserId", WorkflowSortDirection.DESC),
+                        new WorkflowWorkbenchSort("delegatedToUserId", WorkflowSortDirection.ASC),
+                        new WorkflowWorkbenchSort("principalCanProcess", WorkflowSortDirection.DESC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId)
+                .containsExactly("task-3", "task-2", "task-1", "task-4", "task-5");
+    }
+
+    @Test
     void shouldBuildTrackingCardsFromInstances() {
         WorkflowInstance instance = instance("instance-1");
         WorkflowTask todo = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
@@ -890,6 +914,19 @@ class WorkflowRuntimeReadFacadeTest {
         task.setDelegatedFromUserId("principal-1");
         task.setDelegatedToUserId(delegateId);
         task.setPrincipalCanProcess(false);
+        task.setDelegationPolicyId("delegation-1");
+        return task;
+    }
+
+    private WorkflowTask delegatedTodo(String id, String originalAssigneeId, String delegatedFromUserId,
+                                       String delegatedToUserId, Boolean principalCanProcess) {
+        WorkflowTask task = task(id, WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setAssignmentKind(WorkflowAssignmentKind.DELEGATED);
+        task.setOriginalAssigneeId(originalAssigneeId);
+        task.setAssigneeId("user-1");
+        task.setDelegatedFromUserId(delegatedFromUserId);
+        task.setDelegatedToUserId(delegatedToUserId);
+        task.setPrincipalCanProcess(principalCanProcess);
         task.setDelegationPolicyId("delegation-1");
         return task;
     }
