@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.module.ModuleActionBindingType;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistrar;
 import net.ximatai.muyun.spring.platform.module.ModuleActionSourceType;
@@ -13,10 +14,12 @@ import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WorkflowPublishFacadeTest {
     private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformModuleAction> actionDao = new TestMemoryDao<>();
+    private final TestWorkflowNodeDefinitionDao nodeDefinitionDao = new TestWorkflowNodeDefinitionDao();
     private final WorkflowDefinitionService definitionService = new WorkflowDefinitionService(new TestMemoryDao<>());
     private final WorkflowVersionService versionService = new WorkflowVersionService(new TestMemoryDao<>(),
             definitionService);
@@ -25,7 +28,8 @@ class WorkflowPublishFacadeTest {
     private final WorkflowPublishFacade facade = new WorkflowPublishFacade(
             definitionService,
             versionService,
-            new WorkflowModuleActionContributor(new ModuleActionContributionRegistrar(actionService)));
+            new WorkflowModuleActionContributor(new ModuleActionContributionRegistrar(actionService)),
+            nodeDefinitionDao);
 
     @Test
     void shouldPublishWorkflowVersionAndContributeModuleAction() {
@@ -34,6 +38,7 @@ class WorkflowPublishFacadeTest {
         definitionService.insert(definition);
         WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
         versionService.insert(version);
+        nodeDefinitionDao.insert(node(version.getId(), "approve_1", WorkflowNodeType.APPROVAL, 30, 60));
 
         facade.publish(definition.getId(), version.getId(), "manager-1");
 
@@ -49,6 +54,48 @@ class WorkflowPublishFacadeTest {
         assertThat(action.getCategory()).isEqualTo(EntityActionCategory.WORKFLOW);
         assertThat(action.getBindingType()).isEqualTo(ModuleActionBindingType.WORKFLOW_DEFINITION);
         assertThat(action.getBindingAlias()).isEqualTo("sync");
+    }
+
+    @Test
+    void shouldRejectNonPositiveOvertimeDurationOnPublish() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        nodeDefinitionDao.insert(node(version.getId(), "approve_1", WorkflowNodeType.APPROVAL, 0, 60));
+
+        assertThatThrownBy(() -> facade.publish(definition.getId(), version.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("warningDurationMinutes must be positive");
+    }
+
+    @Test
+    void shouldRejectOvertimeDurationEarlierThanWarningOnPublish() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        nodeDefinitionDao.insert(node(version.getId(), "approve_1", WorkflowNodeType.APPROVAL, 60, 30));
+
+        assertThatThrownBy(() -> facade.publish(definition.getId(), version.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("overtimeDurationMinutes must not be less than warningDurationMinutes");
+    }
+
+    @Test
+    void shouldRejectOvertimeDurationsOnNonApprovalNodes() {
+        moduleService.insert(module("sales.contract"));
+        WorkflowDefinition definition = definition();
+        definitionService.insert(definition);
+        WorkflowVersion version = version(definition.getId(), 1, WorkflowPublishStatus.DRAFT);
+        versionService.insert(version);
+        nodeDefinitionDao.insert(node(version.getId(), "task_1", WorkflowNodeType.TASK, 30, null));
+
+        assertThatThrownBy(() -> facade.publish(definition.getId(), version.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("overtime durations are only supported on approval nodes");
     }
 
     @Test
@@ -146,11 +193,30 @@ class WorkflowPublishFacadeTest {
         return version;
     }
 
+    private WorkflowNodeDefinition node(String versionId,
+                                        String nodeKey,
+                                        WorkflowNodeType nodeType,
+                                        Integer warningDurationMinutes,
+                                        Integer overtimeDurationMinutes) {
+        WorkflowNodeDefinition node = new WorkflowNodeDefinition();
+        node.setId("node-" + nodeKey);
+        node.setWorkflowVersionId(versionId);
+        node.setNodeKey(nodeKey);
+        node.setNodeType(nodeType);
+        node.setWarningDurationMinutes(warningDurationMinutes);
+        node.setOvertimeDurationMinutes(overtimeDurationMinutes);
+        return node;
+    }
+
     private PlatformModule module(String alias) {
         PlatformModule module = new PlatformModule();
         module.setAlias(alias);
         module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
         module.setTitle(alias);
         return module;
+    }
+
+    private static class TestWorkflowNodeDefinitionDao extends TestMemoryDao<WorkflowNodeDefinition>
+            implements WorkflowNodeDefinitionDao {
     }
 }

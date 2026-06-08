@@ -1,23 +1,39 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class WorkflowPublishFacade {
+    private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
+
     private final WorkflowDefinitionService definitionService;
     private final WorkflowVersionService versionService;
     private final WorkflowModuleActionContributor actionContributor;
+    private final WorkflowNodeDefinitionDao nodeDefinitionDao;
 
     public WorkflowPublishFacade(WorkflowDefinitionService definitionService,
                                  WorkflowVersionService versionService,
                                  WorkflowModuleActionContributor actionContributor) {
+        this(definitionService, versionService, actionContributor, null);
+    }
+
+    @Autowired
+    public WorkflowPublishFacade(WorkflowDefinitionService definitionService,
+                                 WorkflowVersionService versionService,
+                                 WorkflowModuleActionContributor actionContributor,
+                                 WorkflowNodeDefinitionDao nodeDefinitionDao) {
         this.definitionService = definitionService;
         this.versionService = versionService;
         this.actionContributor = actionContributor;
+        this.nodeDefinitionDao = nodeDefinitionDao;
     }
 
     @Transactional
@@ -27,6 +43,7 @@ public class WorkflowPublishFacade {
         if (!definition.getId().equals(version.getDefinitionId())) {
             throw new PlatformException("workflow version does not belong to definition: " + versionId);
         }
+        validateOvertimeDefinitions(version);
         if (version.getPublishStatus() != WorkflowPublishStatus.PUBLISHED) {
             WorkflowVersion publishing = copyVersion(version);
             publishing.setPublishStatus(WorkflowPublishStatus.PUBLISHED);
@@ -78,6 +95,39 @@ public class WorkflowPublishFacade {
             throw new PlatformException("workflow version not found: " + versionId);
         }
         return version;
+    }
+
+    private void validateOvertimeDefinitions(WorkflowVersion version) {
+        if (nodeDefinitionDao == null) {
+            return;
+        }
+        List<WorkflowNodeDefinition> nodes = nodeDefinitionDao.query(
+                Criteria.of().eq("workflowVersionId", version.getId()), ALL);
+        for (WorkflowNodeDefinition node : nodes) {
+            validateOvertimeDefinition(node);
+        }
+    }
+
+    private void validateOvertimeDefinition(WorkflowNodeDefinition node) {
+        validatePositiveDuration(node.getWarningDurationMinutes(), "warningDurationMinutes", node);
+        validatePositiveDuration(node.getOvertimeDurationMinutes(), "overtimeDurationMinutes", node);
+        if (node.getWarningDurationMinutes() != null
+                && node.getOvertimeDurationMinutes() != null
+                && node.getOvertimeDurationMinutes() < node.getWarningDurationMinutes()) {
+            throw new PlatformException("workflow overtimeDurationMinutes must not be less than warningDurationMinutes: "
+                    + node.getNodeKey());
+        }
+        if (node.getNodeType() != WorkflowNodeType.APPROVAL
+                && (node.getWarningDurationMinutes() != null || node.getOvertimeDurationMinutes() != null)) {
+            throw new PlatformException("workflow overtime durations are only supported on approval nodes: "
+                    + node.getNodeKey());
+        }
+    }
+
+    private void validatePositiveDuration(Integer value, String fieldName, WorkflowNodeDefinition node) {
+        if (value != null && value <= 0) {
+            throw new PlatformException("workflow " + fieldName + " must be positive: " + node.getNodeKey());
+        }
     }
 
     private WorkflowVersion copyVersion(WorkflowVersion source) {
