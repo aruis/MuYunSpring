@@ -111,6 +111,18 @@ public class WorkflowRuntimeAdminWebController {
                 null));
     }
 
+    @PostMapping("/instance/{instanceId}/actions/reset")
+    @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_RESET_ACTION,
+            title = "Reset Workflow", level = PlatformActionLevel.LIST)
+    public WorkflowInstanceActionResult reset(
+            @PathVariable String instanceId,
+            @RequestBody(required = false) WorkflowAdminActionWebRequest request) {
+        return adminFacade.reset(new WorkflowInstanceActionRequest(instanceId,
+                operatorId(request == null ? null : request.operatorId()),
+                request == null ? null : request.reason(),
+                null));
+    }
+
     @PostMapping("/task/{taskId}/actions/forceApprove")
     @CustomActionEndpoint(value = WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
             title = "Force Handle", level = PlatformActionLevel.LIST)

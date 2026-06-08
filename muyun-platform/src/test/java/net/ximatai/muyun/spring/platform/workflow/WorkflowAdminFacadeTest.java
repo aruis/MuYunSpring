@@ -53,6 +53,7 @@ class WorkflowAdminFacadeTest {
         assertThat(facade.currentTodoTasks("instance-1")).containsExactly(task);
         assertThat(facade.currentTodoTaskViews("instance-1")).containsExactly(view);
         assertThat(facade.queryCurrentInstances(queryRequest, pageRequest)).containsExactly(instanceView);
+        facade.reset(instanceRequest);
         facade.forceTerminate(instanceRequest);
         facade.forceApprove(taskRequest);
         assertThat(facade.renderCurrentBundle("instance-1")).isEqualTo(currentBundle);
@@ -65,6 +66,7 @@ class WorkflowAdminFacadeTest {
         assertThat(facade.historyEventViews("history-1")).isEmpty();
         assertThat(facade.deleteHistory("history-1")).isEqualTo(1);
 
+        verify(adminService).reset(instanceRequest);
         verify(adminService).forceTerminate(instanceRequest);
         verify(adminService).forceApprove(taskRequest);
         verify(adminService).queryCurrentInstances(queryRequest, pageRequest);

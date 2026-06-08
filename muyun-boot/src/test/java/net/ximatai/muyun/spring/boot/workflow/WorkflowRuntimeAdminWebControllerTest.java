@@ -198,6 +198,11 @@ class WorkflowRuntimeAdminWebControllerTest {
                         && "admin-1".equals(request.operatorId())
                         && "force stop".equals(request.reason()))))
                 .thenReturn(new WorkflowInstanceActionResult(instance, List.of(), List.of(), List.of(), null));
+        when(adminFacade.reset(argThat(request ->
+                "inst-1".equals(request.instanceId())
+                        && "admin-2".equals(request.operatorId())
+                        && "reset approval".equals(request.reason()))))
+                .thenReturn(new WorkflowInstanceActionResult(instance, List.of(), List.of(), List.of(), null));
         when(adminFacade.forceApprove(argThat(request ->
                 "task-1".equals(request.taskId())
                         && "user-1".equals(request.operatorId())
@@ -209,6 +214,12 @@ class WorkflowRuntimeAdminWebControllerTest {
         mvc.perform(post("/workflow/runtime/admin/instance/inst-1/actions/forceTerminate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"operatorId\":\"admin-1\",\"reason\":\"force stop\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.instance.id").value("inst-1"));
+
+        mvc.perform(post("/workflow/runtime/admin/instance/inst-1/actions/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"admin-2\",\"reason\":\"reset approval\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.instance.id").value("inst-1"));
 

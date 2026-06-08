@@ -132,6 +132,11 @@ public class WorkflowAdminService {
     }
 
     @Transactional
+    public WorkflowInstanceActionResult reset(WorkflowInstanceActionRequest request) {
+        return instanceActionService.managementReset(request);
+    }
+
+    @Transactional
     public WorkflowInstanceActionResult forceTerminate(WorkflowInstanceActionRequest request) {
         return instanceActionService.forceTerminate(request);
     }

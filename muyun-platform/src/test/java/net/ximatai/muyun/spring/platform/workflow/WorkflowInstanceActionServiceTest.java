@@ -179,6 +179,25 @@ class WorkflowInstanceActionServiceTest {
     }
 
     @Test
+    void shouldRequireManagementPolicyForManagementReset() {
+        WorkflowActionPolicyService policyService = mock(WorkflowActionPolicyService.class);
+        WorkflowInstanceActionService managedService = new WorkflowInstanceActionService(
+                instanceDao, nodeDao, routeDao, taskDao, eventDao, eventFactory, archiveService,
+                policyService, Optional.of(summaryWriter));
+        WorkflowInstance instance = instance(true);
+        stubRuntime(instance, List.of(task("task-1")), List.of(node("node-1")),
+                List.of(route("route-1", WorkflowRouteStatus.EFFECTIVE)));
+
+        managedService.managementReset(new WorkflowInstanceActionRequest(
+                "instance-1", "admin-1", "reset", Instant.parse("2026-06-05T05:00:00Z")));
+
+        verify(policyService).requireManagementInstanceAction("reset", "reset");
+        verify(policyService, never()).requireRuntimeAction(instance, "reset");
+        verify(archiveService).archiveCurrentInstance(instance, WorkflowArchiveReason.RESET,
+                Instant.parse("2026-06-05T05:00:00Z"));
+    }
+
+    @Test
     void shouldResetInstanceAndArchiveCurrentRuntimeObjects() {
         RecordingPlugin plugin = new RecordingPlugin();
         WorkflowInstanceActionService pluginService = serviceWithPlugin(plugin);

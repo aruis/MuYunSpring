@@ -23,6 +23,7 @@ public class WorkflowActionPolicyService {
     public static final String MANAGEMENT_TODO_TASK_QUERY_ACTION = "todoTaskQuery";
     public static final String MANAGEMENT_FORCE_APPROVE_ACTION = "forceApprove";
     public static final String MANAGEMENT_FORCE_TERMINATE_ACTION = "forceTerminate";
+    public static final String MANAGEMENT_RESET_ACTION = "reset";
     public static final String MANAGEMENT_DELETE_HISTORY_ACTION = "deleteHistory";
     public static final List<String> RUNTIME_RECORD_ACTION_CODES = List.of(
             "approve",
@@ -142,7 +143,8 @@ public class WorkflowActionPolicyService {
     public void requireManagementInstanceAction(String actionCode, String reason) {
         String validActionCode = requireText(actionCode, "workflow action code must not be blank");
         requireManagementAction(validActionCode);
-        if (MANAGEMENT_FORCE_TERMINATE_ACTION.equals(validActionCode)) {
+        if (MANAGEMENT_FORCE_TERMINATE_ACTION.equals(validActionCode)
+                || MANAGEMENT_RESET_ACTION.equals(validActionCode)) {
             requireReason(validActionCode, reason);
         }
     }

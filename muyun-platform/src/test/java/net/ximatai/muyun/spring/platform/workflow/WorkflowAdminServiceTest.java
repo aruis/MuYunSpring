@@ -247,9 +247,11 @@ class WorkflowAdminServiceTest {
         WorkflowTaskActionRequest taskRequest = WorkflowTaskActionRequest.complete(
                 "task-1", "admin-1", "force approve");
 
+        service.reset(instanceRequest);
         service.forceTerminate(instanceRequest);
         service.forceApprove(taskRequest);
 
+        verify(instanceActionService).managementReset(instanceRequest);
         verify(instanceActionService).forceTerminate(instanceRequest);
         verify(taskActionService).forceApprove(taskRequest);
     }

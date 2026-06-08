@@ -126,6 +126,7 @@ class StaticModuleDefinitionScannerTest {
                             WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_FORCE_TERMINATE_ACTION,
+                            WorkflowActionPolicyService.MANAGEMENT_RESET_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_DELETE_HISTORY_ACTION);
             assertThat(definition.actions()).allSatisfy(action -> {
                 assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);

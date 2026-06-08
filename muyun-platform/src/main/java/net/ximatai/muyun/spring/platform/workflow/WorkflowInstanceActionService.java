@@ -90,11 +90,25 @@ public class WorkflowInstanceActionService {
 
     @Transactional
     public WorkflowInstanceActionResult reset(WorkflowInstanceActionRequest request) {
+        return reset(request, false);
+    }
+
+    @Transactional
+    public WorkflowInstanceActionResult managementReset(WorkflowInstanceActionRequest request) {
+        return reset(request, true);
+    }
+
+    private WorkflowInstanceActionResult reset(WorkflowInstanceActionRequest request, boolean management) {
         WorkflowInstance instance = requireExistingInstance(request);
         Instant now = operatedAt(request);
         String operatorId = operatorId(request);
-        actionPolicyService.requireRuntimeAction(instance, "reset");
-        actionPolicyService.requireInstanceAction("reset", request.reason());
+        if (management) {
+            actionPolicyService.requireManagementInstanceAction(WorkflowActionPolicyService.MANAGEMENT_RESET_ACTION,
+                    request.reason());
+        } else {
+            actionPolicyService.requireRuntimeAction(instance, "reset");
+            actionPolicyService.requireInstanceAction("reset", request.reason());
+        }
         List<WorkflowTask> tasks = runningTasks(instance.getId());
         List<WorkflowNodeInstance> nodes = runningNodes(instance.getId());
         List<WorkflowRouteInstance> routes = openRoutes(instance.getId());

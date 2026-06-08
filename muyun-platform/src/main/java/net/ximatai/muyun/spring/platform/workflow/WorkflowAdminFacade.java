@@ -30,6 +30,10 @@ public class WorkflowAdminFacade {
         return adminService.forceTerminate(request);
     }
 
+    public WorkflowInstanceActionResult reset(WorkflowInstanceActionRequest request) {
+        return adminService.reset(request);
+    }
+
     public WorkflowTaskActionResult forceApprove(WorkflowTaskActionRequest request) {
         return adminService.forceApprove(request);
     }
