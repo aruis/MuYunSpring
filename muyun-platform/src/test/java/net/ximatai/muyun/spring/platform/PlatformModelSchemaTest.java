@@ -5,6 +5,10 @@ import net.ximatai.muyun.database.core.builder.TableWrapper;
 import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
 import net.ximatai.muyun.spring.platform.application.Application;
 import net.ximatai.muyun.spring.platform.audit.RuntimeAuditRecord;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerEntry;
+import net.ximatai.muyun.spring.platform.code.CodeRecycleEntry;
+import net.ximatai.muyun.spring.platform.code.CodeRule;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.menu.Menu;
@@ -170,6 +174,34 @@ class PlatformModelSchemaTest {
         assertThat(columnType(table, "redirect_to")).isEqualTo(ColumnType.TEXT);
         assertThat(columnType(table, "result_text")).isEqualTo(ColumnType.TEXT);
         assertThat(columnType(table, "error_message")).isEqualTo(ColumnType.TEXT);
+    }
+
+    @Test
+    void shouldMapCodeLifecycleModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(CodeRule.class)))
+                .contains("id", "module_alias", "entity_alias", "metadata_field_id", "field_name",
+                        "field_role", "mode", "org_scope_type", "org_scope_id", "global_default",
+                        "effective_from", "effective_to", "linked_update", "allow_recycle")
+                .doesNotContain("field_code");
+        assertThat(columnNames(mapper.toTable(CodeRecycleEntry.class)))
+                .contains("id", "rule_id", "basis_key", "period_key", "recycled_value",
+                        "source_record_id", "status");
+        assertThat(columnNames(mapper.toTable(CodeLedgerEntry.class)))
+                .contains("id", "rule_id", "module_alias", "entity_alias", "field_name", "code_value",
+                        "basis_key", "period_key", "source_record_id", "status", "last_action");
+        assertThat(columnDefault(mapper.toTable(CodeRecycleEntry.class), "basis_key")).isEqualTo("'__DEFAULT__'");
+        assertThat(columnDefault(mapper.toTable(CodeRecycleEntry.class), "period_key")).isEqualTo("'__DEFAULT__'");
+        assertThat(columnDefault(mapper.toTable(CodeRecycleEntry.class), "status")).isEqualTo("'AVAILABLE'");
+        assertThat(columnDefault(mapper.toTable(CodeLedgerEntry.class), "basis_key")).isEqualTo("'__DEFAULT__'");
+        assertThat(columnDefault(mapper.toTable(CodeLedgerEntry.class), "period_key")).isEqualTo("'__DEFAULT__'");
+        assertThat(columnDefault(mapper.toTable(CodeLedgerEntry.class), "status")).isEqualTo("'ACTIVE'");
+        assertThat(columnDefault(mapper.toTable(CodeLedgerEntry.class), "last_action")).isEqualTo("'ASSIGNED'");
+        assertThat(uniqueIndexes(mapper.toTable(CodeSequenceState.class)))
+                .contains(List.of("tenant_id", "rule_id", "basis_key", "period_key"));
+        assertThat(uniqueIndexes(mapper.toTable(CodeLedgerEntry.class)))
+                .contains(List.of("tenant_id", "rule_id", "code_value"));
+        assertThat(uniqueIndexes(mapper.toTable(CodeRecycleEntry.class)))
+                .contains(List.of("tenant_id", "rule_id", "basis_key", "period_key", "recycled_value"));
     }
 
     @Test

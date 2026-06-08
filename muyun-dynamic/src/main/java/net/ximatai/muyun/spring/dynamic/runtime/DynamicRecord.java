@@ -404,6 +404,10 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         loadedValues.put(fieldCode, value);
     }
 
+    public void putGeneratedValue(String fieldCode, Object value) {
+        putPlatformValue(fieldCode, value);
+    }
+
     void putPlatformValue(String fieldCode, Object value) {
         FieldDefinition field = fields.get(fieldCode);
         if (field == null) {
@@ -419,7 +423,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return values.get(fieldCode);
     }
 
-    Map<String, Object> getPlatformValues() {
+    public Map<String, Object> getPlatformValues() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 

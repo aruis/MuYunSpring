@@ -10,11 +10,15 @@ class PlatformNameRulesTest {
     void shouldValidateApplicationAliasAndModuleAlias() {
         assertThat(PlatformNameRules.requireApplicationAlias("crm_app")).isEqualTo("crm_app");
         assertThat(PlatformNameRules.requireModuleAlias("crm.customer_profile")).isEqualTo("crm.customer_profile");
+        assertThat(PlatformNameRules.requireModuleAlias("platform.code_rule")).isEqualTo("platform.code_rule");
 
         assertThatThrownBy(() -> PlatformNameRules.requireApplicationAlias("crm-app"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("applicationAlias");
         assertThatThrownBy(() -> PlatformNameRules.requireModuleAlias("crm"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("moduleAlias");
+        assertThatThrownBy(() -> PlatformNameRules.requireModuleAlias("platform.codeRule"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("moduleAlias");
     }

@@ -1,5 +1,9 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.boot.code.CodeLedgerEntryWebController;
+import net.ximatai.muyun.spring.boot.code.CodeRecycleEntryWebController;
+import net.ximatai.muyun.spring.boot.code.CodeRuleWebController;
+import net.ximatai.muyun.spring.boot.code.CodeSequenceStateWebController;
 import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
@@ -12,6 +16,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
+import net.ximatai.muyun.spring.platform.code.CodePreviewService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -83,6 +88,37 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(action.dataAuth()).isTrue();
                         });
             });
+        }
+    }
+
+    @Test
+    void shouldScanCodeRuleAndReadOnlyLifecycleModules() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(CodeRuleWebController.class,
+                    () -> new CodeRuleWebController(org.mockito.Mockito.mock(CodePreviewService.class)));
+            context.registerBean(CodeSequenceStateWebController.class);
+            context.registerBean(CodeLedgerEntryWebController.class);
+            context.registerBean(CodeRecycleEntryWebController.class);
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
+
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "platform.code_rule",
+                    "platform.code_sequence_state",
+                    "platform.code_ledger_entry",
+                    "platform.code_recycle_entry");
+            assertThat(byAlias.get("platform.code_rule").actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("menu", "view", "query",
+                            "sort", "enable", "disable", "viewTree", "saveTree", "preview");
+            assertThat(byAlias.get("platform.code_sequence_state").actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("menu", "view", "query");
+            assertThat(byAlias.get("platform.code_ledger_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("menu", "view", "query");
+            assertThat(byAlias.get("platform.code_recycle_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("menu", "view", "query");
         }
     }
 

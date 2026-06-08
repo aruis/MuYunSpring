@@ -19,6 +19,8 @@ import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinators;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
@@ -71,10 +73,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     @ConditionalOnMissingBean
     DynamicRecordService dynamicRecordService(DynamicRecordRuntime runtime,
                                               ObjectProvider<ActionExecutionPolicyService> actionExecutionPolicyService,
-                                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
+                                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService,
+                                              ObjectProvider<DynamicRecordMutationCoordinator> mutationCoordinator) {
         return new DynamicRecordService(runtime,
                 actionExecutionPolicyService.getIfAvailable(AllowAllActionExecutionPolicyService::new),
-                dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new));
+                dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new),
+                DynamicRecordMutationCoordinators.lazyComposite(() -> mutationCoordinator.orderedStream().toList()));
     }
 
     @Bean

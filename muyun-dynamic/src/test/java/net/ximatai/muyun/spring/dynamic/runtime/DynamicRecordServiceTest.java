@@ -104,6 +104,15 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldRejectNullRecordOnUpdateWithClearMessage() {
+        DynamicRecordService service = service(operations(), contractEntity());
+
+        assertThatThrownBy(() -> service.update(MODULE, "contract", null))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic record must not be null");
+    }
+
+    @Test
     void shouldBindEntityOperationsForBusinessScopedCalls() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))

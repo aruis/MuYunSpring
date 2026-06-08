@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
+import net.ximatai.muyun.spring.boot.web.ReadOnlyWeb;
 import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
@@ -91,6 +92,10 @@ public class StaticModuleDefinitionScanner {
             addPlatform(actions, PlatformAction.VIEW);
             addPlatform(actions, PlatformAction.UPDATE);
             addPlatform(actions, PlatformAction.DELETE);
+            addPlatform(actions, PlatformAction.QUERY);
+        } else if (ReadOnlyWeb.class.isAssignableFrom(beanClass)) {
+            addPlatform(actions, PlatformAction.MENU);
+            addPlatform(actions, PlatformAction.VIEW);
             addPlatform(actions, PlatformAction.QUERY);
         }
         if (TreeWeb.class.isAssignableFrom(beanClass)) {

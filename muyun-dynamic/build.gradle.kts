@@ -3,6 +3,8 @@ dependencies {
     api(project(":muyun-ability"))
     api(libs.muyun.database.core)
 
+    implementation(libs.spring.tx)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)

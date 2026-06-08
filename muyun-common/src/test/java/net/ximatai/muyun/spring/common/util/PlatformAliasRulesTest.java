@@ -20,11 +20,16 @@ class PlatformAliasRulesTest {
     void shouldValidateModuleAliasWithDynamicRuntimeCompatibleRule() {
         assertThat(PlatformAliasRules.requireModuleAlias("crm.customer_profile"))
                 .isEqualTo("crm.customer_profile");
+        assertThat(PlatformAliasRules.requireModuleAlias("platform.code_rule"))
+                .isEqualTo("platform.code_rule");
 
         assertThatThrownBy(() -> PlatformAliasRules.requireModuleAlias("crm"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("moduleAlias");
         assertThatThrownBy(() -> PlatformAliasRules.requireModuleAlias("crm.customer-profile"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("moduleAlias");
+        assertThatThrownBy(() -> PlatformAliasRules.requireModuleAlias("platform.codeRule"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("moduleAlias");
     }

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
@@ -10,7 +11,13 @@ import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +36,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 class MuYunSpringDynamicRuntimeConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -128,6 +138,41 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
     }
 
     @Test
+    void shouldComposeDynamicRecordMutationCoordinatorsBySpringOrder() {
+        contextRunner.withUserConfiguration(OrderedMutationCoordinatorConfig.class)
+                .run(context -> {
+                    @SuppressWarnings("unchecked")
+                    IDatabaseOperations<Object> operations = context.getBean(IDatabaseOperations.class);
+                    when(operations.insertItem(eq("public"), eq("app_contract"), anyMap()))
+                            .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+                    when(operations.patchUpdateItemWhere(eq("public"), eq("app_contract"), anyMap(), anyMap()))
+                            .thenReturn(1);
+                    when(operations.query(anyString(), anyMap()))
+                            .thenReturn(List.of(contractRow("contract-1")));
+                    DynamicRecordRuntime runtime = context.getBean(DynamicRecordRuntime.class);
+                    runtime.register(new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity())));
+                    DynamicRecordService service = context.getBean(DynamicRecordService.class);
+                    OrderedRecorder recorder = context.getBean(OrderedRecorder.class);
+                    DynamicRecord record = service.newRecord("sales.contract", "contract")
+                            .setValue("code", "C-001");
+                    record.setId("contract-1");
+
+                    service.create("sales.contract", "contract", record);
+                    service.update("sales.contract", "contract", record);
+                    service.delete("sales.contract", "contract", "contract-1");
+
+                    assertThat(recorder.received()).containsExactly(
+                            "first:beforeCreate", "second:beforeCreate",
+                            "first:afterCreate", "second:afterCreate",
+                            "first:beforeUpdate", "second:beforeUpdate",
+                            "first:afterUpdate", "second:afterUpdate",
+                            "first:beforeDelete", "second:beforeDelete",
+                            "first:afterDelete", "second:afterDelete"
+                    );
+                });
+    }
+
+    @Test
     void shouldConfigureActionTransactionOperatorFromTransactionManager() {
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -167,12 +212,29 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 null, "tenant-1", false, RuntimeMutationSource.BUSINESS, Map.of());
     }
 
+    private EntityDefinition contractEntity() {
+        return new EntityDefinition("contract", "app_contract", "Contract",
+                List.of(FieldDefinition.string("code", "Code").length(64)));
+    }
+
+    private Map<String, Object> contractRow(String id) {
+        return Map.of(
+                "id", id,
+                "code", "C-001",
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
     @Configuration(proxyBeanMethods = false)
     static class BaseConfig {
         @Bean
         @SuppressWarnings("unchecked")
         IDatabaseOperations<Object> databaseOperations() {
-            return mock(IDatabaseOperations.class);
+            IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+            when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+            when(operations.getDefaultSchemaName()).thenReturn("public");
+            return operations;
         }
     }
 
@@ -238,6 +300,59 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
         DynamicActionExecutor runtimeDependentActionExecutor(DynamicRecordRuntime runtime) {
             assertThat(runtime).isNotNull();
             return new TestActionExecutor("runtimeSubmit");
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class OrderedMutationCoordinatorConfig {
+        @Bean
+        OrderedRecorder mutationRecorder() {
+            return new OrderedRecorder();
+        }
+
+        @Bean
+        @Order(2)
+        DynamicRecordMutationCoordinator secondMutationCoordinator(OrderedRecorder mutationRecorder) {
+            return new RecordingMutationCoordinator("second", mutationRecorder);
+        }
+
+        @Bean
+        @Order(1)
+        DynamicRecordMutationCoordinator firstMutationCoordinator(OrderedRecorder mutationRecorder) {
+            return new RecordingMutationCoordinator("first", mutationRecorder);
+        }
+    }
+
+    private record RecordingMutationCoordinator(String name, OrderedRecorder recorder)
+            implements DynamicRecordMutationCoordinator {
+        @Override
+        public void beforeCreate(String moduleAlias, String entityAlias, DynamicRecord record) {
+            recorder.add(name + ":beforeCreate");
+        }
+
+        @Override
+        public void afterCreate(String moduleAlias, String entityAlias, DynamicRecord record, String id) {
+            recorder.add(name + ":afterCreate");
+        }
+
+        @Override
+        public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
+            recorder.add(name + ":beforeUpdate");
+        }
+
+        @Override
+        public void afterUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord updated) {
+            recorder.add(name + ":afterUpdate");
+        }
+
+        @Override
+        public void beforeDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            recorder.add(name + ":beforeDelete");
+        }
+
+        @Override
+        public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            recorder.add(name + ":afterDelete");
         }
     }
 }

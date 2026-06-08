@@ -24,6 +24,15 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        maxParallelForks = 1
+        forkEvery = 0
+        systemProperty("junit.jupiter.execution.parallel.enabled", "false")
+
+        if (project.name == "muyun-platform") {
+            reports.html.required.set(false)
+            reports.junitXml.includeSystemOutLog.set(false)
+            reports.junitXml.includeSystemErrLog.set(false)
+        }
     }
 
     dependencies {

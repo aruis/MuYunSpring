@@ -1,0 +1,113 @@
+package net.ximatai.muyun.spring.dynamic.runtime;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
+
+public final class DynamicRecordMutationCoordinators {
+    private DynamicRecordMutationCoordinators() {
+    }
+
+    public static DynamicRecordMutationCoordinator composite(List<DynamicRecordMutationCoordinator> coordinators) {
+        List<DynamicRecordMutationCoordinator> delegates = coordinators == null
+                ? List.of()
+                : coordinators.stream()
+                .filter(Objects::nonNull)
+                .filter(coordinator -> coordinator != DynamicRecordMutationCoordinator.NONE)
+                .toList();
+        if (delegates.isEmpty()) {
+            return DynamicRecordMutationCoordinator.NONE;
+        }
+        if (delegates.size() == 1) {
+            return delegates.getFirst();
+        }
+        return new Composite(delegates);
+    }
+
+    public static DynamicRecordMutationCoordinator lazyComposite(
+            Supplier<List<DynamicRecordMutationCoordinator>> coordinators) {
+        Objects.requireNonNull(coordinators, "coordinators must not be null");
+        return new LazyComposite(coordinators);
+    }
+
+    private record Composite(List<DynamicRecordMutationCoordinator> delegates)
+            implements DynamicRecordMutationCoordinator {
+        private Composite {
+            delegates = List.copyOf(delegates);
+        }
+
+        @Override
+        public void beforeCreate(String moduleAlias, String entityAlias, DynamicRecord record) {
+            delegates.forEach(delegate -> delegate.beforeCreate(moduleAlias, entityAlias, record));
+        }
+
+        @Override
+        public void afterCreate(String moduleAlias, String entityAlias, DynamicRecord record, String id) {
+            delegates.forEach(delegate -> delegate.afterCreate(moduleAlias, entityAlias, record, id));
+        }
+
+        @Override
+        public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
+            delegates.forEach(delegate -> delegate.beforeUpdate(moduleAlias, entityAlias, before, incoming));
+        }
+
+        @Override
+        public void afterUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord updated) {
+            delegates.forEach(delegate -> delegate.afterUpdate(moduleAlias, entityAlias, before, updated));
+        }
+
+        @Override
+        public void beforeDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            delegates.forEach(delegate -> delegate.beforeDelete(moduleAlias, entityAlias, before));
+        }
+
+        @Override
+        public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            delegates.forEach(delegate -> delegate.afterDelete(moduleAlias, entityAlias, before));
+        }
+    }
+
+    private record LazyComposite(Supplier<List<DynamicRecordMutationCoordinator>> coordinators)
+            implements DynamicRecordMutationCoordinator {
+        private List<DynamicRecordMutationCoordinator> delegates() {
+            DynamicRecordMutationCoordinator coordinator = composite(coordinators.get());
+            if (coordinator == DynamicRecordMutationCoordinator.NONE) {
+                return List.of();
+            }
+            if (coordinator instanceof Composite composite) {
+                return composite.delegates();
+            }
+            return List.of(coordinator);
+        }
+
+        @Override
+        public void beforeCreate(String moduleAlias, String entityAlias, DynamicRecord record) {
+            delegates().forEach(delegate -> delegate.beforeCreate(moduleAlias, entityAlias, record));
+        }
+
+        @Override
+        public void afterCreate(String moduleAlias, String entityAlias, DynamicRecord record, String id) {
+            delegates().forEach(delegate -> delegate.afterCreate(moduleAlias, entityAlias, record, id));
+        }
+
+        @Override
+        public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
+            delegates().forEach(delegate -> delegate.beforeUpdate(moduleAlias, entityAlias, before, incoming));
+        }
+
+        @Override
+        public void afterUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord updated) {
+            delegates().forEach(delegate -> delegate.afterUpdate(moduleAlias, entityAlias, before, updated));
+        }
+
+        @Override
+        public void beforeDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            delegates().forEach(delegate -> delegate.beforeDelete(moduleAlias, entityAlias, before));
+        }
+
+        @Override
+        public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
+            delegates().forEach(delegate -> delegate.afterDelete(moduleAlias, entityAlias, before));
+        }
+    }
+}

@@ -37,6 +37,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,6 +57,7 @@ public class DynamicRecordService {
     private final DynamicRecordEventPublisher eventPublisher;
     private final ActionExecutionPolicyService actionExecutionPolicyService;
     private final DataScopeCriteriaService dataScopeCriteriaService;
+    private final DynamicRecordMutationCoordinator mutationCoordinator;
 
     public DynamicRecordService(DynamicRecordRuntime runtime) {
         this(runtime, new AllowAllActionExecutionPolicyService());
@@ -69,12 +71,20 @@ public class DynamicRecordService {
     public DynamicRecordService(DynamicRecordRuntime runtime,
                                 ActionExecutionPolicyService actionExecutionPolicyService,
                                 DataScopeCriteriaService dataScopeCriteriaService) {
+        this(runtime, actionExecutionPolicyService, dataScopeCriteriaService, DynamicRecordMutationCoordinator.NONE);
+    }
+
+    public DynamicRecordService(DynamicRecordRuntime runtime,
+                                ActionExecutionPolicyService actionExecutionPolicyService,
+                                DataScopeCriteriaService dataScopeCriteriaService,
+                                DynamicRecordMutationCoordinator mutationCoordinator) {
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
         this.eventPublisher = new DynamicRecordEventPublisher(runtime.eventPublisher());
         this.actionExecutionPolicyService = Objects.requireNonNull(actionExecutionPolicyService,
                 "actionExecutionPolicyService must not be null");
         this.dataScopeCriteriaService = Objects.requireNonNull(dataScopeCriteriaService,
                 "dataScopeCriteriaService must not be null");
+        this.mutationCoordinator = mutationCoordinator == null ? DynamicRecordMutationCoordinator.NONE : mutationCoordinator;
     }
 
     public DynamicRecord newRecord(String moduleAlias, String entityAlias) {
@@ -233,6 +243,7 @@ public class DynamicRecordService {
                         + moduleAlias + "." + entityAlias + "." + sourceField));
     }
 
+    @Transactional
     public String create(String moduleAlias, String entityAlias, DynamicRecord record) {
         return create(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null);
     }
@@ -250,7 +261,9 @@ public class DynamicRecordService {
                     CurrentUserContext.currentUser()
             ));
         }
+        mutationCoordinator.beforeCreate(moduleAlias, entityAlias, record);
         String id = entityService(moduleAlias, entityAlias).insert(record);
+        mutationCoordinator.afterCreate(moduleAlias, entityAlias, record, id);
         eventPublisher.created(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         return id;
     }
@@ -290,10 +303,12 @@ public class DynamicRecordService {
         return requireActionRecordDataScope(moduleAlias, entityAlias, policy, normalized);
     }
 
+    @Transactional
     public int update(String moduleAlias, String entityAlias, DynamicRecord record) {
         return update(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null);
     }
 
+    @Transactional
     public int updateSystem(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
         return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, traceId);
     }
@@ -303,18 +318,25 @@ public class DynamicRecordService {
     }
 
     private int update(String moduleAlias, String entityAlias, DynamicRecord record, RuntimeMutationSource mutationSource, String traceId) {
+        if (record == null) {
+            throw new PlatformException("dynamic record must not be null");
+        }
         DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
         if (mutationSource == RuntimeMutationSource.BUSINESS) {
             Set<String> recordIds = normalizeRecordId(record == null ? null : record.getId());
             mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.UPDATE, recordIds);
         }
+        DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(record.getId()));
+        mutationCoordinator.beforeUpdate(moduleAlias, entityAlias, before, record);
         int updated = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).update(record));
         if (updated > 0) {
+            mutationCoordinator.afterUpdate(moduleAlias, entityAlias, before, record);
             eventPublisher.updated(eventContext(moduleAlias, entityAlias, mutationSource, traceId), record.getId());
         }
         return updated;
     }
 
+    @Transactional
     public int delete(String moduleAlias, String entityAlias, String id) {
         return delete(moduleAlias, entityAlias, id, RuntimeMutationSource.BUSINESS, null);
     }
@@ -329,27 +351,38 @@ public class DynamicRecordService {
             Set<String> recordIds = normalizeRecordId(id);
             mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.DELETE, recordIds);
         }
+        DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(id));
+        mutationCoordinator.beforeDelete(moduleAlias, entityAlias, before);
         int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).delete(id));
         if (deleted > 0) {
+            mutationCoordinator.afterDelete(moduleAlias, entityAlias, before);
             eventPublisher.deleted(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         }
         return deleted;
     }
 
+    @Transactional
     public int deleteBatch(String moduleAlias, String entityAlias, Collection<String> ids) {
         return deleteBatch(moduleAlias, entityAlias, ids, RuntimeMutationSource.BUSINESS, null);
     }
 
     private int deleteBatch(String moduleAlias, String entityAlias, Collection<String> ids, RuntimeMutationSource mutationSource, String traceId) {
+        Set<String> normalizedIds = normalizeRecordIds(ids);
+        if (normalizedIds.isEmpty()) {
+            return 0;
+        }
         DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
         if (mutationSource == RuntimeMutationSource.BUSINESS) {
-            Set<String> normalized = normalizeRecordIds(ids);
-            mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.DELETE, normalized);
+            mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.DELETE, normalizedIds);
         }
-        int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).deleteBatch(ids));
+        List<DynamicRecord> beforeRecords = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias)
+                .list(Criteria.of().in("id", List.copyOf(normalizedIds)), PageRequest.of(1, normalizedIds.size())));
+        beforeRecords.forEach(record -> mutationCoordinator.beforeDelete(moduleAlias, entityAlias, record));
+        int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).deleteBatch(normalizedIds));
         if (deleted > 0) {
+            beforeRecords.forEach(record -> mutationCoordinator.afterDelete(moduleAlias, entityAlias, record));
             eventPublisher.deletedBatch(eventContext(moduleAlias, entityAlias, mutationSource, traceId),
-                    List.copyOf(ids), deleted);
+                    List.copyOf(normalizedIds), deleted);
         }
         return deleted;
     }

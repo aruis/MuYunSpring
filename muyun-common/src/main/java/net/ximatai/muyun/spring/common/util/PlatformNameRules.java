@@ -6,7 +6,9 @@ public final class PlatformNameRules {
 
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
     private static final String FIELD_NAME_PATTERN = "[a-z][A-Za-z0-9]{0,62}";
-    private static final String MODULE_ALIAS_PATTERN = IDENTIFIER_PATTERN + "(\\." + IDENTIFIER_PATTERN + ")+";
+    private static final String MODULE_ALIAS_SEGMENT_PATTERN = IDENTIFIER_PATTERN;
+    private static final String MODULE_ALIAS_PATTERN = MODULE_ALIAS_SEGMENT_PATTERN
+            + "(\\." + MODULE_ALIAS_SEGMENT_PATTERN + ")+";
 
     private PlatformNameRules() {
     }
