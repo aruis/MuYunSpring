@@ -58,6 +58,11 @@ public class WorkflowAdminFacade {
         return adminService.queryHistory(moduleAlias, recordId, pageRequest);
     }
 
+    public List<WorkflowHistoryInstance> queryHistory(String moduleAlias, String recordId, String startedBy,
+                                                      PageRequest pageRequest) {
+        return adminService.queryHistory(moduleAlias, recordId, startedBy, pageRequest);
+    }
+
     public WorkflowRuntimeRenderBundle renderHistoryBundle(String historyInstanceId) {
         return adminService.renderHistoryBundle(historyInstanceId);
     }

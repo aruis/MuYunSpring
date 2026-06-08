@@ -214,6 +214,11 @@ public class WorkflowAdminService {
         return historyQueryService.queryAdminHistory(moduleAlias, recordId, pageRequest);
     }
 
+    public List<WorkflowHistoryInstance> queryHistory(String moduleAlias, String recordId, String startedBy,
+                                                      PageRequest pageRequest) {
+        return historyQueryService.queryAdminHistory(moduleAlias, recordId, startedBy, pageRequest);
+    }
+
     public WorkflowRuntimeRenderBundle renderHistoryBundle(String historyInstanceId) {
         return historyQueryService.renderAdminBundle(historyInstanceId);
     }

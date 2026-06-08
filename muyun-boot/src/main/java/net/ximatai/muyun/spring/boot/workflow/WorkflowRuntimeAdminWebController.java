@@ -148,10 +148,10 @@ public class WorkflowRuntimeAdminWebController {
     public WebListResponse<WorkflowHistoryInstance> queryHistory(
             @RequestBody(required = false) WorkflowAdminHistoryQueryWebRequest request) {
         WorkflowAdminHistoryQueryWebRequest payload = request == null
-                ? new WorkflowAdminHistoryQueryWebRequest(null, null, null)
+                ? new WorkflowAdminHistoryQueryWebRequest(null, null, null, null)
                 : request;
         return new WebListResponse<>(adminFacade.queryHistory(
-                payload.moduleAlias(), payload.recordId(), page(payload.page())));
+                payload.moduleAlias(), payload.recordId(), payload.startedBy(), page(payload.page())));
     }
 
     @PostMapping({"/history/{historyInstanceId}/bundle", "/history/{historyInstanceId}/render"})
@@ -222,7 +222,7 @@ record WorkflowAdminTaskActionWebRequest(String operatorId,
     }
 }
 
-record WorkflowAdminHistoryQueryWebRequest(String moduleAlias, String recordId, WebPageRequest page) {
+record WorkflowAdminHistoryQueryWebRequest(String moduleAlias, String recordId, String startedBy, WebPageRequest page) {
 }
 
 record WorkflowAdminInstanceQueryWebRequest(

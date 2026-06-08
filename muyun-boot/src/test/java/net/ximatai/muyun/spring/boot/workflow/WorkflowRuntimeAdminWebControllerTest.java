@@ -301,7 +301,7 @@ class WorkflowRuntimeAdminWebControllerTest {
         WorkflowEvent event = new WorkflowEvent();
         event.setId("event-1");
         event.setEventType(WorkflowEventType.INSTANCE_TERMINATED);
-        when(adminFacade.queryHistory(eq("sales.contract"), eq("record-1"), any()))
+        when(adminFacade.queryHistory(eq("sales.contract"), eq("record-1"), eq("starter-1"), any()))
                 .thenReturn(List.of(history));
         when(adminFacade.renderHistoryBundle("history-1"))
                 .thenReturn(new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of()));
@@ -316,6 +316,7 @@ class WorkflowRuntimeAdminWebControllerTest {
         mvc.perform(post("/workflow/runtime/admin/history/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"moduleAlias\":\"sales.contract\",\"recordId\":\"record-1\","
+                                + "\"startedBy\":\"starter-1\","
                                 + "\"page\":{\"pageNum\":2,\"pageSize\":10}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("history-1"));
@@ -345,7 +346,7 @@ class WorkflowRuntimeAdminWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 
-        verify(adminFacade).queryHistory(eq("sales.contract"), eq("record-1"), any());
+        verify(adminFacade).queryHistory(eq("sales.contract"), eq("record-1"), eq("starter-1"), any());
         verify(adminFacade).deleteHistory("history-1");
     }
 }

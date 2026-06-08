@@ -308,19 +308,20 @@ class WorkflowAdminServiceTest {
     void shouldDelegateAdminHistoryContracts() {
         WorkflowRuntimeRenderBundle bundle = new WorkflowRuntimeRenderBundle("HISTORY", null, List.of(), List.of());
         PageRequest pageRequest = PageRequest.of(1, 20);
-        when(historyQueryService.queryAdminHistory("sales.contract", "record-1", pageRequest)).thenReturn(List.of());
+        when(historyQueryService.queryAdminHistory("sales.contract", "record-1", "starter-1", pageRequest))
+                .thenReturn(List.of());
         when(historyQueryService.renderAdminBundle("history-1")).thenReturn(bundle);
         when(historyQueryService.adminEvents("history-1")).thenReturn(List.of());
         when(historyQueryService.adminEventViews("history-1")).thenReturn(List.of());
         when(historyQueryService.deleteHistory("history-1")).thenReturn(1);
 
-        assertThat(service.queryHistory("sales.contract", "record-1", pageRequest)).isEmpty();
+        assertThat(service.queryHistory("sales.contract", "record-1", "starter-1", pageRequest)).isEmpty();
         assertThat(service.renderHistoryBundle("history-1")).isEqualTo(bundle);
         assertThat(service.historyEvents("history-1")).isEmpty();
         assertThat(service.historyEventViews("history-1")).isEmpty();
         assertThat(service.deleteHistory("history-1")).isEqualTo(1);
 
-        verify(historyQueryService).queryAdminHistory("sales.contract", "record-1", pageRequest);
+        verify(historyQueryService).queryAdminHistory("sales.contract", "record-1", "starter-1", pageRequest);
         verify(historyQueryService).renderAdminBundle("history-1");
         verify(historyQueryService).adminEvents("history-1");
         verify(historyQueryService).adminEventViews("history-1");

@@ -33,10 +33,10 @@ public class WorkflowHistoryWebController {
     @PostMapping("/query")
     public WebListResponse<WorkflowHistoryInstance> query(@RequestBody WorkflowHistoryQueryWebRequest request) {
         WorkflowHistoryQueryWebRequest payload = request == null
-                ? new WorkflowHistoryQueryWebRequest(null, null, null)
+                ? new WorkflowHistoryQueryWebRequest(null, null, null, null)
                 : request;
         return new WebListResponse<>(historyQueryService.queryRecordHistory(
-                payload.moduleAlias(), payload.recordId(), page(payload.page())));
+                payload.moduleAlias(), payload.recordId(), payload.startedBy(), page(payload.page())));
     }
 
     @GetMapping("/{historyInstanceId}/bundle")
@@ -78,6 +78,7 @@ public class WorkflowHistoryWebController {
     public record WorkflowHistoryQueryWebRequest(
             String moduleAlias,
             String recordId,
+            String startedBy,
             WebPageRequest page
     ) {
     }

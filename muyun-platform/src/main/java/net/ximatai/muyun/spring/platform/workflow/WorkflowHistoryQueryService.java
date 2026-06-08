@@ -59,19 +59,37 @@ public class WorkflowHistoryQueryService {
 
     public List<WorkflowHistoryInstance> queryRecordHistory(String moduleAlias, String recordId,
                                                             PageRequest pageRequest) {
-        return historyDao.query(Criteria.of()
-                        .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"))
-                        .eq("recordId", requireText(recordId, "workflow record id must not be blank")),
-                page(pageRequest), Sort.desc("archivedAt"), Sort.desc("startedAt"));
+        return queryRecordHistory(moduleAlias, recordId, null, pageRequest);
+    }
+
+    public List<WorkflowHistoryInstance> queryRecordHistory(String moduleAlias, String recordId,
+                                                            String startedBy,
+                                                            PageRequest pageRequest) {
+        Criteria criteria = Criteria.of()
+                .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"))
+                .eq("recordId", requireText(recordId, "workflow record id must not be blank"));
+        if (startedBy != null && !startedBy.isBlank()) {
+            criteria.eq("startedBy", startedBy);
+        }
+        return historyDao.query(criteria, page(pageRequest), Sort.desc("archivedAt"), Sort.desc("startedAt"));
     }
 
     public List<WorkflowHistoryInstance> queryAdminHistory(String moduleAlias, String recordId,
+                                                           PageRequest pageRequest) {
+        return queryAdminHistory(moduleAlias, recordId, null, pageRequest);
+    }
+
+    public List<WorkflowHistoryInstance> queryAdminHistory(String moduleAlias, String recordId,
+                                                           String startedBy,
                                                            PageRequest pageRequest) {
         actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
         Criteria criteria = Criteria.of()
                 .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"));
         if (recordId != null && !recordId.isBlank()) {
             criteria.eq("recordId", recordId);
+        }
+        if (startedBy != null && !startedBy.isBlank()) {
+            criteria.eq("startedBy", startedBy);
         }
         return historyDao.query(criteria, page(pageRequest), Sort.desc("archivedAt"), Sort.desc("startedAt"));
     }

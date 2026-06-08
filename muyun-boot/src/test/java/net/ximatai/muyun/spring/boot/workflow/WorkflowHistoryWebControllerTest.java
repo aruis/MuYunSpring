@@ -40,7 +40,7 @@ class WorkflowHistoryWebControllerTest {
         history.setId("history-1");
         history.setModuleAlias("sales.contract");
         history.setRecordId("record-1");
-        when(historyQueryService.queryRecordHistory(eq("sales.contract"), eq("record-1"), any()))
+        when(historyQueryService.queryRecordHistory(eq("sales.contract"), eq("record-1"), eq("starter-1"), any()))
                 .thenReturn(List.of(history));
         ArgumentCaptor<net.ximatai.muyun.database.core.orm.PageRequest> pageCaptor =
                 ArgumentCaptor.forClass(net.ximatai.muyun.database.core.orm.PageRequest.class);
@@ -48,11 +48,13 @@ class WorkflowHistoryWebControllerTest {
         mvc.perform(post("/workflow/history/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"moduleAlias\":\"sales.contract\",\"recordId\":\"record-1\","
+                                + "\"startedBy\":\"starter-1\","
                                 + "\"page\":{\"pageNum\":2,\"pageSize\":10}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("history-1"));
 
-        verify(historyQueryService).queryRecordHistory(eq("sales.contract"), eq("record-1"), pageCaptor.capture());
+        verify(historyQueryService).queryRecordHistory(eq("sales.contract"), eq("record-1"), eq("starter-1"),
+                pageCaptor.capture());
         assertThat(pageCaptor.getValue().getOffset()).isEqualTo(10);
     }
 

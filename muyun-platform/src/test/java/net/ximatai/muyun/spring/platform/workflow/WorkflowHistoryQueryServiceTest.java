@@ -1,10 +1,12 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +37,25 @@ class WorkflowHistoryQueryServiceTest {
     }
 
     @Test
+    void shouldQueryRecordHistoryByStartedByWhenProvided() {
+        when(historyDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(history("history-1")));
+
+        List<WorkflowHistoryInstance> histories = service.queryRecordHistory(
+                "sales.contract", "record-1", "starter-1", PageRequest.of(1, 20));
+
+        assertThat(histories).extracting(WorkflowHistoryInstance::getId).containsExactly("history-1");
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(historyDao).query(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
+        assertThat(criteria.getValue().getClauses())
+                .anySatisfy(clause -> {
+                    assertThat(clause.getField()).isEqualTo("startedBy");
+                    assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.EQ);
+                    assertThat(clause.getValues()).containsExactly("starter-1");
+                });
+    }
+
+    @Test
     void shouldQueryAdminHistoryThroughManagementQueryAction() {
         when(historyDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
                 .thenReturn(List.of(history("history-1")));
@@ -45,6 +66,26 @@ class WorkflowHistoryQueryServiceTest {
         assertThat(histories).extracting(WorkflowHistoryInstance::getId).containsExactly("history-1");
         verify(actionPolicyService).requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
         verify(historyDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class));
+    }
+
+    @Test
+    void shouldQueryAdminHistoryByStartedByWhenProvided() {
+        when(historyDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(history("history-1")));
+
+        List<WorkflowHistoryInstance> histories = service.queryAdminHistory(
+                "sales.contract", null, "starter-1", PageRequest.of(1, 20));
+
+        assertThat(histories).extracting(WorkflowHistoryInstance::getId).containsExactly("history-1");
+        verify(actionPolicyService).requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(historyDao).query(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
+        assertThat(criteria.getValue().getClauses())
+                .anySatisfy(clause -> {
+                    assertThat(clause.getField()).isEqualTo("startedBy");
+                    assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.EQ);
+                    assertThat(clause.getValues()).containsExactly("starter-1");
+                });
     }
 
     @Test
