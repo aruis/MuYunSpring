@@ -150,6 +150,10 @@ class WorkflowAdminServiceTest {
                 WorkflowTaskStatus.TODO);
         WorkflowNodeInstance activeNode = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
         activeNode.setOvertimeStatus(WorkflowOvertimeStatus.WARNED);
+        activeNode.setAddedByAddSign(true);
+        activeNode.setAddSignSourceNodeKey("approve_source");
+        activeNode.setAddSignOperatorId("operator-1");
+        activeNode.setAddSignAt(Instant.parse("2026-06-05T00:30:00Z"));
         WorkflowNodeInstance inactiveNode = node("node-inactive", WorkflowNodeStatus.COMPLETED,
                 WorkflowNodeType.APPROVAL);
         WorkflowNodeInstance taskNode = node("node-task", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.TASK);
@@ -182,8 +186,32 @@ class WorkflowAdminServiceTest {
         assertThat(view.principalCanProcess()).isTrue();
         assertThat(view.delegationPolicyId()).isEqualTo("delegation-1");
         assertThat(view.delegationSnapshot()).contains("delegation-1");
+        assertThat(view.addedByAddSign()).isTrue();
+        assertThat(view.addSignSourceNodeKey()).isEqualTo("approve_source");
+        assertThat(view.addSignOperatorId()).isEqualTo("operator-1");
+        assertThat(view.addSignAt()).isEqualTo(Instant.parse("2026-06-05T00:30:00Z"));
         verify(actionPolicyService).requireManagementAction(
                 WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION);
+    }
+
+    @Test
+    void shouldDefaultActiveTaskAddSignFactsForNormalNodes() {
+        WorkflowTask task = task("task-1", "node-active", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node("node-active", WorkflowNodeStatus.ACTIVE, WorkflowNodeType.APPROVAL);
+        node.setAddSignSourceNodeKey("ignored_source");
+        node.setAddSignOperatorId("ignored_operator");
+        node.setAddSignAt(Instant.parse("2026-06-05T00:30:00Z"));
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING));
+        when(taskDao.query(any(), any(), any())).thenReturn(List.of(task));
+        when(nodeInstanceDao.findById("node-active")).thenReturn(node);
+
+        List<WorkflowAdminActiveTaskView> views = service.currentTodoTaskViews("instance-1");
+
+        assertThat(views).hasSize(1);
+        assertThat(views.getFirst().addedByAddSign()).isFalse();
+        assertThat(views.getFirst().addSignSourceNodeKey()).isNull();
+        assertThat(views.getFirst().addSignOperatorId()).isNull();
+        assertThat(views.getFirst().addSignAt()).isNull();
     }
 
     @Test

@@ -21,7 +21,7 @@ class WorkflowAdminFacadeTest {
         WorkflowAdminActiveTaskView view = new WorkflowAdminActiveTaskView("task-1", "instance-1", "node-1",
                 "approve_1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO, "approver-1",
                 null, null, WorkflowOvertimeStatus.NORMAL, true, WorkflowAssignmentKind.NORMAL,
-                "approver-1", null, null, null, null, null);
+                "approver-1", null, null, null, null, null, false, null, null, null);
         when(adminService.currentTodoTasks("instance-1")).thenReturn(List.of(task));
         when(adminService.currentTodoTaskViews("instance-1")).thenReturn(List.of(view));
         WorkflowAdminInstanceQueryRequest queryRequest = WorkflowAdminInstanceQueryRequest.empty();

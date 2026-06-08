@@ -88,7 +88,8 @@ class WorkflowRuntimeAdminWebControllerTest {
                 Instant.parse("2026-06-05T01:00:00Z"), Instant.parse("2026-06-05T01:00:00Z"),
                 WorkflowOvertimeStatus.WARNED, true, WorkflowAssignmentKind.DELEGATED, "principal-1",
                 "principal-1", "delegate-1", true, "delegation-1",
-                "{\"delegationPolicyId\":\"delegation-1\"}");
+                "{\"delegationPolicyId\":\"delegation-1\"}", true, "approve_source", "operator-1",
+                Instant.parse("2026-06-05T00:30:00Z"));
         when(adminFacade.currentTodoTaskViews("inst-1")).thenReturn(List.of(view));
 
         mvc.perform(get("/workflow/runtime/admin/instance/inst-1/active-tasks"))
@@ -97,7 +98,11 @@ class WorkflowRuntimeAdminWebControllerTest {
                 .andExpect(jsonPath("$.records[0].canForceApprove").value(true))
                 .andExpect(jsonPath("$.records[0].overtimeStatus").value("WARNED"))
                 .andExpect(jsonPath("$.records[0].assignmentKind").value("DELEGATED"))
-                .andExpect(jsonPath("$.records[0].principalCanProcess").value(true));
+                .andExpect(jsonPath("$.records[0].principalCanProcess").value(true))
+                .andExpect(jsonPath("$.records[0].addedByAddSign").value(true))
+                .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve_source"))
+                .andExpect(jsonPath("$.records[0].addSignOperatorId").value("operator-1"))
+                .andExpect(jsonPath("$.records[0].addSignAt").value(1780619400.0));
     }
 
     @Test

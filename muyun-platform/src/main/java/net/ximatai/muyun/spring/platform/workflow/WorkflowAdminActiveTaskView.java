@@ -20,9 +20,24 @@ public record WorkflowAdminActiveTaskView(
         String delegatedToUserId,
         Boolean principalCanProcess,
         String delegationPolicyId,
-        String delegationSnapshot
+        String delegationSnapshot,
+        Boolean addedByAddSign,
+        String addSignSourceNodeKey,
+        String addSignOperatorId,
+        Instant addSignAt
 ) {
+    public WorkflowAdminActiveTaskView {
+        boolean isAddedByAddSign = Boolean.TRUE.equals(addedByAddSign);
+        addedByAddSign = isAddedByAddSign;
+        if (!isAddedByAddSign) {
+            addSignSourceNodeKey = null;
+            addSignOperatorId = null;
+            addSignAt = null;
+        }
+    }
+
     public static WorkflowAdminActiveTaskView from(WorkflowTask task, WorkflowNodeInstance node) {
+        boolean addedByAddSign = Boolean.TRUE.equals(node.getAddedByAddSign());
         return new WorkflowAdminActiveTaskView(
                 task.getId(),
                 task.getInstanceId(),
@@ -41,6 +56,14 @@ public record WorkflowAdminActiveTaskView(
                 task.getDelegatedToUserId(),
                 task.getPrincipalCanProcess(),
                 task.getDelegationPolicyId(),
-                task.getAssignmentSnapshotText());
+                task.getAssignmentSnapshotText(),
+                addedByAddSign,
+                addedByAddSign ? blankToNull(node.getAddSignSourceNodeKey()) : null,
+                addedByAddSign ? blankToNull(node.getAddSignOperatorId()) : null,
+                addedByAddSign ? node.getAddSignAt() : null);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }
