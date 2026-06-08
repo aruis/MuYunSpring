@@ -1017,6 +1017,51 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldAnchorRecursiveAddSignToCurrentAddSignNode() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        task.setNodeInstanceId("node-add-current");
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node("node-add-current", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.ACTIVE);
+        node.setApprovalMode(WorkflowApprovalMode.ALL);
+        node.setAllowAddSign(true);
+        node.setAddedByAddSign(true);
+        node.setAddSignSourceNodeKey("approve");
+        WorkflowNodeInstance next = node("node-next", "next2", WorkflowNodeType.END, WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance originalRoute = route("route-add-next", "add-1", "next2",
+                WorkflowRouteStatus.CANDIDATE);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-add-current")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of());
+        when(routeDao.query(any(), any())).thenReturn(List.of(originalRoute));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, next));
+        when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
+
+        WorkflowTaskActionResult result = service.addSign(new WorkflowTaskActionRequest(
+                "task-1", "user-1", null, null, segment("add-2", "add-1", "next2"), null,
+                "recursive review", Instant.parse("2026-06-05T04:30:00Z")));
+
+        assertThat(result.addSignEditMode()).isEqualTo(WorkflowAddSignEditMode.CREATE);
+        assertThat(result.sourceNodeKey()).isEqualTo("add-1");
+        assertThat(result.addedNodeKeys()).containsExactly("add-2");
+        ArgumentCaptor<WorkflowNodeInstance> nodeCaptor = ArgumentCaptor.forClass(WorkflowNodeInstance.class);
+        verify(nodeDao).insert(nodeCaptor.capture());
+        assertThat(nodeCaptor.getValue().getAddSignSourceNodeKey()).isEqualTo("add-1");
+        assertThat(nodeCaptor.getValue().getAddSignOperatorId()).isEqualTo("user-1");
+        ArgumentCaptor<WorkflowRouteInstance> routeCaptor = ArgumentCaptor.forClass(WorkflowRouteInstance.class);
+        verify(routeDao, times(2)).insert(routeCaptor.capture());
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getSourceNodeKey)
+                .containsExactly("add-1", "add-2");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getTargetNodeKey)
+                .containsExactly("add-2", "next2");
+        assertThat(routeCaptor.getAllValues()).extracting(WorkflowRouteInstance::getAddSignSourceNodeKey)
+                .containsOnly("add-1");
+        assertThat(result.event().getPayloadText()).contains("\"sourceNodeKey\":\"add-1\"");
+        verifyNoInteractions(progressionService);
+    }
+
+    @Test
     void shouldReplaceUnstartedRuntimeAddSignSegmentFromSameSourceNode() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowInstance instance = instance();
