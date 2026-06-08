@@ -108,21 +108,11 @@ public class WorkflowRuntimeTaskFactory {
             }
             return operatorId;
         }
-        String trimmed = policy.trim();
-        if (!trimmed.startsWith("user:")) {
-            throw new PlatformException("workflow participant policy only supports user:<userId>: "
-                    + node.getNodeKey());
-        }
-        String userId = trimmed.substring("user:".length()).trim();
-        if (userId.isBlank()) {
-            throw new PlatformException("workflow participant policy user id must not be blank: "
-                    + node.getNodeKey());
-        }
-        if (userId.indexOf(',') >= 0 || userId.indexOf(';') >= 0 || userId.contains("[") || userId.contains("]")) {
-            throw new PlatformException("workflow participant policy only supports single user in first version: "
-                    + node.getNodeKey());
-        }
-        return userId;
+        return WorkflowParticipantPolicyCodec.parse(policy, node.getNodeKey())
+                .requireSingleUser(
+                        "workflow participant policy user id must not be blank: " + node.getNodeKey(),
+                        "workflow participant policy only supports single user in first version: "
+                                + node.getNodeKey());
     }
 
     private String escape(String value) {

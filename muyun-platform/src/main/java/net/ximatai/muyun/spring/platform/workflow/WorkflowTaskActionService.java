@@ -1013,20 +1013,12 @@ public class WorkflowTaskActionService {
             throw new PlatformException("workflow add sign approval node participant policy is required: "
                     + definition.getNodeKey());
         }
-        String trimmed = policy.trim();
-        if (!trimmed.startsWith("user:")) {
-            throw new PlatformException("workflow add sign participant policy only supports user:<userId>: "
-                    + definition.getNodeKey());
-        }
-        String userId = trimmed.substring("user:".length()).trim();
-        if (userId.isBlank()) {
-            throw new PlatformException("workflow add sign participant policy user id must not be blank: "
-                    + definition.getNodeKey());
-        }
-        if (userId.indexOf(',') >= 0 || userId.indexOf(';') >= 0 || userId.contains("[") || userId.contains("]")) {
-            throw new PlatformException("workflow add sign participant policy only supports single user in first version: "
-                    + definition.getNodeKey());
-        }
+        WorkflowParticipantPolicyCodec.parse(policy, definition.getNodeKey())
+                .requireSingleUser(
+                        "workflow add sign participant policy user id must not be blank: "
+                                + definition.getNodeKey(),
+                        "workflow add sign participant policy only supports single user in first version: "
+                                + definition.getNodeKey());
     }
 
     private Set<String> reachable(String start, Map<String, List<String>> outgoing) {

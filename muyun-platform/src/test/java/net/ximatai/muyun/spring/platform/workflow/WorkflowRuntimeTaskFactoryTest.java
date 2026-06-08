@@ -74,6 +74,29 @@ class WorkflowRuntimeTaskFactoryTest {
     }
 
     @Test
+    void shouldAssignApprovalTaskByJsonUserParticipantPolicy() {
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance approval = node(instance, "approve");
+        approval.setParticipantPolicyText("""
+                {"rules":[{"type":"USER","targetId":"approver-2"}]}
+                """);
+
+        WorkflowRuntimeTaskDraft draft = factory.createBlockingTasks(instance,
+                List.of(approval), activation("approve"), "operator-1",
+                Instant.parse("2026-06-05T01:00:00Z"));
+
+        assertThat(draft.tasks()).hasSize(1)
+                .first()
+                .satisfies(task -> {
+                    assertThat(task.getAssigneeId()).isEqualTo("approver-2");
+                    assertThat(task.getOwnerId()).isEqualTo("approver-2");
+                    assertThat(task.getOriginalAssigneeId()).isEqualTo("approver-2");
+                    assertThat(task.getAssignmentPolicyText()).contains("\"targetId\":\"approver-2\"");
+                    assertThat(task.getAssignmentSnapshotText()).contains("\"assigneeId\":\"approver-2\"");
+                });
+    }
+
+    @Test
     void shouldFreezeDelegationWhenCreatingApprovalTask() {
         WorkflowDelegationService delegationService = new WorkflowDelegationService(new TestMemoryDao<>());
         WorkflowDelegation delegation = new WorkflowDelegation();
