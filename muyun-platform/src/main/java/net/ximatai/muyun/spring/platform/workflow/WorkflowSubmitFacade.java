@@ -39,32 +39,38 @@ public class WorkflowSubmitFacade {
         WorkflowSubmitRequest normalized = normalize(request);
         recordGuards.forEach(guard -> guard.beforeSubmit(normalized));
         WorkflowDefinitionSelection selection = selector.select(normalized);
-        WorkflowSubmitDraft draft = normalized.authOrgId() == null
-                ? runtimeSubmitService.submit(
-                selection.definition(),
-                selection.version(),
-                selection.nodes(),
-                selection.links(),
-                normalized.recordId(),
-                normalized.operatorId(),
-                normalized.operatedAt(),
-                normalized.selectedRouteKey(),
-                normalized.selectedReason(),
-                normalized.manualRouteSelections())
-                : runtimeSubmitService.submit(
-                selection.definition(),
-                selection.version(),
-                selection.nodes(),
-                selection.links(),
-                normalized.recordId(),
-                normalized.authOrgId(),
-                normalized.operatorId(),
-                normalized.operatedAt(),
-                normalized.selectedRouteKey(),
-                normalized.selectedReason(),
-                normalized.manualRouteSelections());
+        WorkflowSubmitDraft draft = submitDraft(normalized, selection);
         boolean written = writeApprovalSummaryIfNeeded(normalized, draft);
         return new WorkflowSubmitResult(draft, written);
+    }
+
+    public WorkflowSubmitPreview preview(WorkflowSubmitRequest request) {
+        WorkflowSubmitRequest normalized = normalize(request);
+        recordGuards.forEach(guard -> guard.beforeSubmit(normalized));
+        WorkflowDefinitionSelection selection = selector.select(normalized);
+        return new WorkflowSubmitPreview(selection, previewDraft(normalized, selection));
+    }
+
+    private WorkflowSubmitDraft submitDraft(WorkflowSubmitRequest request, WorkflowDefinitionSelection selection) {
+        if (request.authOrgId() == null) {
+            return runtimeSubmitService.submit(selection.definition(), selection.version(), selection.nodes(),
+                    selection.links(), request.recordId(), request.operatorId(), request.operatedAt(),
+                    request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
+        }
+        return runtimeSubmitService.submit(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), request.recordId(), request.authOrgId(), request.operatorId(), request.operatedAt(),
+                request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
+    }
+
+    private WorkflowSubmitDraft previewDraft(WorkflowSubmitRequest request, WorkflowDefinitionSelection selection) {
+        if (request.authOrgId() == null) {
+            return runtimeSubmitService.preview(selection.definition(), selection.version(), selection.nodes(),
+                    selection.links(), request.recordId(), request.operatorId(), request.operatedAt(),
+                    request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
+        }
+        return runtimeSubmitService.preview(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), request.recordId(), request.authOrgId(), request.operatorId(), request.operatedAt(),
+                request.selectedRouteKey(), request.selectedReason(), request.manualRouteSelections());
     }
 
     private boolean writeApprovalSummaryIfNeeded(WorkflowSubmitRequest request, WorkflowSubmitDraft draft) {

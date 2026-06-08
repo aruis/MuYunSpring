@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowAddSignSegment;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowInstanceActionFacade;
@@ -35,6 +37,12 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeAddSignExplanationView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitPreviewView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitReadFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitStatusView;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,15 +64,21 @@ public class WorkflowRuntimeWebController {
     private final WorkflowTaskActionFacade taskActionFacade;
     private final WorkflowInstanceActionFacade instanceActionFacade;
     private final WorkflowModuleTaskRuntimeService moduleTaskRuntimeService;
+    private final WorkflowSubmitFacade submitFacade;
+    private final WorkflowSubmitReadFacade submitReadFacade;
 
     public WorkflowRuntimeWebController(WorkflowRuntimeReadFacade runtimeReadFacade,
                                         WorkflowTaskActionFacade taskActionFacade,
                                         WorkflowInstanceActionFacade instanceActionFacade,
-                                        WorkflowModuleTaskRuntimeService moduleTaskRuntimeService) {
+                                        WorkflowModuleTaskRuntimeService moduleTaskRuntimeService,
+                                        WorkflowSubmitFacade submitFacade,
+                                        WorkflowSubmitReadFacade submitReadFacade) {
         this.runtimeReadFacade = runtimeReadFacade;
         this.taskActionFacade = taskActionFacade;
         this.instanceActionFacade = instanceActionFacade;
         this.moduleTaskRuntimeService = moduleTaskRuntimeService;
+        this.submitFacade = submitFacade;
+        this.submitReadFacade = submitReadFacade;
     }
 
     @GetMapping("/instance/{instanceId}/bundle")
@@ -99,6 +113,29 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowRuntimeAddSignExplanationView> addSignExplanations(
             @PathVariable String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.addSignExplanations(instanceId));
+    }
+
+    @PostMapping("/record/{moduleAlias}/{recordId}/submit/status")
+    public WorkflowSubmitStatusView submitStatus(@PathVariable String moduleAlias,
+                                                 @PathVariable String recordId,
+                                                 @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+        return submitReadFacade.status(submitRequest(moduleAlias, recordId, request, false));
+    }
+
+    @PostMapping("/record/{moduleAlias}/{recordId}/submit/preview")
+    public WorkflowSubmitPreviewView submitPreview(@PathVariable String moduleAlias,
+                                                   @PathVariable String recordId,
+                                                   @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+        return submitReadFacade.preview(submitRequest(moduleAlias, recordId, request, true));
+    }
+
+    @CustomActionEndpoint(value = "submitApproval", title = "Submit Approval",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "recordId")
+    @PostMapping("/record/{moduleAlias}/{recordId}/actions/submitApproval")
+    public WorkflowSubmitResult submitApproval(@PathVariable String moduleAlias,
+                                               @PathVariable String recordId,
+                                               @RequestBody(required = false) WorkflowSubmitWebRequest request) {
+        return submitFacade.submit(submitRequest(moduleAlias, recordId, request, true));
     }
 
     @PostMapping("/instance/{instanceId}/actions")
@@ -265,6 +302,19 @@ public class WorkflowRuntimeWebController {
         throw new PlatformException("unsupported workflow reject resubmit mode: " + value);
     }
 
+    private WorkflowSubmitRequest submitRequest(String moduleAlias,
+                                                String recordId,
+                                                WorkflowSubmitWebRequest request,
+                                                boolean requireOperator) {
+        WorkflowSubmitWebRequest normalized = request == null ? WorkflowSubmitWebRequest.empty() : request;
+        return WorkflowSubmitRequest.approval(moduleAlias, recordId)
+                .withAuthOrgId(normalized.authOrgId())
+                .withOperator(requireOperator ? operatorId(normalized.operatorId()) : operatorIdOrNull(
+                        normalized.operatorId()))
+                .withSelectedRoute(normalized.selectedRouteKeyOrDirectLinkKey(), normalized.selectedReason())
+                .withManualRouteSelections(normalized.manualRouteSelections());
+    }
+
 }
 
 record WorkflowOperatorWebRequest(String operatorId) {
@@ -282,6 +332,21 @@ record WorkflowTaskActionWebRequest(String operatorId,
                                     String selectedDirectLinkKey,
                                     String selectedReason,
                                     List<WorkflowManualRouteSelection> manualRouteSelections) {
+    String selectedRouteKeyOrDirectLinkKey() {
+        return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
+    }
+}
+
+record WorkflowSubmitWebRequest(String operatorId,
+                                String authOrgId,
+                                String selectedRouteKey,
+                                String selectedDirectLinkKey,
+                                String selectedReason,
+                                List<WorkflowManualRouteSelection> manualRouteSelections) {
+    static WorkflowSubmitWebRequest empty() {
+        return new WorkflowSubmitWebRequest(null, null, null, null, null, List.of());
+    }
+
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }

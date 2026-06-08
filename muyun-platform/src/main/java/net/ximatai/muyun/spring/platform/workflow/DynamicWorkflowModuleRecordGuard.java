@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
@@ -33,7 +34,7 @@ public class DynamicWorkflowModuleRecordGuard implements WorkflowModuleRecordGua
 
     @Override
     public void beforeSubmit(WorkflowSubmitRequest request) {
-        requireRecordAction(request.moduleAlias(), request.recordId(), SUBMIT_POLICY);
+        requireRecordAction(request.moduleAlias(), request.recordId(), currentActionPolicy(request));
     }
 
     @Override
@@ -55,5 +56,13 @@ public class DynamicWorkflowModuleRecordGuard implements WorkflowModuleRecordGua
         } catch (ModuleDefinitionException ignored) {
             return null;
         }
+    }
+
+    private ActionExecutionPolicy currentActionPolicy(WorkflowSubmitRequest request) {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> request.moduleAlias().equals(context.moduleAlias()))
+                .filter(context -> !context.hasRecordContext() || context.recordIds().contains(request.recordId()))
+                .map(context -> context.actionPolicy())
+                .orElse(SUBMIT_POLICY);
     }
 }

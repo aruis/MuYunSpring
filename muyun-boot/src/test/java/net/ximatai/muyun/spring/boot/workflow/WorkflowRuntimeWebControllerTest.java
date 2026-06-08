@@ -28,6 +28,14 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeAddSignExplanationView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitDraft;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitPreviewView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitReadFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitRequest;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitResult;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowSubmitStatusView;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowActivationResult;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskActionRequest;
@@ -68,6 +76,8 @@ class WorkflowRuntimeWebControllerTest {
     private WorkflowTaskActionFacade taskActionFacade;
     private WorkflowInstanceActionFacade instanceActionFacade;
     private WorkflowModuleTaskRuntimeService moduleTaskRuntimeService;
+    private WorkflowSubmitFacade submitFacade;
+    private WorkflowSubmitReadFacade submitReadFacade;
     private MockMvc mvc;
 
     @BeforeEach
@@ -76,9 +86,11 @@ class WorkflowRuntimeWebControllerTest {
         taskActionFacade = mock(WorkflowTaskActionFacade.class);
         instanceActionFacade = mock(WorkflowInstanceActionFacade.class);
         moduleTaskRuntimeService = mock(WorkflowModuleTaskRuntimeService.class);
+        submitFacade = mock(WorkflowSubmitFacade.class);
+        submitReadFacade = mock(WorkflowSubmitReadFacade.class);
         mvc = MockMvcBuilders
                 .standaloneSetup(new WorkflowRuntimeWebController(runtimeReadFacade, taskActionFacade,
-                        instanceActionFacade, moduleTaskRuntimeService))
+                        instanceActionFacade, moduleTaskRuntimeService, submitFacade, submitReadFacade))
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant-a"))))
                 .build();
@@ -233,6 +245,63 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(jsonPath("$.records[1].routeStatus").value("CANDIDATE"));
 
         verify(runtimeReadFacade).addSignExplanations("inst-1");
+    }
+
+    @Test
+    void shouldExposeRecordSubmitStatusWithOptionalOperator() throws Exception {
+        when(submitReadFacade.status(argThat(request -> "sales.contract".equals(request.moduleAlias())
+                && "record-1".equals(request.recordId())
+                && "operator-1".equals(request.operatorId()))))
+                .thenReturn(WorkflowSubmitStatusView.unsubmitted("sales.contract", "record-1", null));
+
+        mvc.perform(post("/workflow/runtime/record/sales.contract/record-1/submit/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayStatus").value("UNSUBMITTED"));
+    }
+
+    @Test
+    void shouldExposeRecordSubmitPreviewWithOperatorFallback() throws Exception {
+        WorkflowInstance instance = instance("preview-1");
+        when(submitReadFacade.preview(argThat(request -> "sales.contract".equals(request.moduleAlias())
+                && "record-1".equals(request.recordId())
+                && "user-1".equals(request.operatorId())
+                && "leftRoute".equals(request.selectedRouteKey()))))
+                .thenReturn(new WorkflowSubmitPreviewView("SUBMIT_PREVIEW", null, instance, List.of(), List.of(),
+                        List.of(), List.of(), null));
+
+        mvc.perform(post("/workflow/runtime/record/sales.contract/record-1/submit/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"selectedDirectLinkKey\":\"leftRoute\",\"selectedReason\":\"choose left\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("SUBMIT_PREVIEW"))
+                .andExpect(jsonPath("$.instance.id").value("preview-1"));
+    }
+
+    @Test
+    void shouldExposeStaticSubmitApprovalAction() throws Exception {
+        WorkflowSubmitResult submitResult = new WorkflowSubmitResult(
+                new WorkflowSubmitDraft(instance("inst-1"), List.of(), List.of(), List.of(), List.of(),
+                        new WorkflowActivationResult(List.of(), List.of(), List.of(), List.of(), List.of(),
+                                List.of(), false)),
+                true);
+        when(submitFacade.submit(argThat(request -> "sales.contract".equals(request.moduleAlias())
+                && "record-1".equals(request.recordId())
+                && "operator-1".equals(request.operatorId())
+                && "branchA".equals(request.selectedRouteKey()))))
+                .thenReturn(submitResult);
+
+        mvc.perform(post("/workflow/runtime/record/sales.contract/record-1/actions/submitApproval")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operatorId\":\"operator-1\",\"selectedRouteKey\":\"branchA\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draft.instance.id").value("inst-1"))
+                .andExpect(jsonPath("$.approvalSummaryWritten").value(true));
+
+        ArgumentCaptor<WorkflowSubmitRequest> captor = ArgumentCaptor.forClass(WorkflowSubmitRequest.class);
+        verify(submitFacade).submit(captor.capture());
+        assertThat(captor.getValue().approvalRequired()).isTrue();
     }
 
     @Test

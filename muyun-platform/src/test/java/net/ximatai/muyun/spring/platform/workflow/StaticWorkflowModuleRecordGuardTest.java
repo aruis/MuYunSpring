@@ -7,7 +7,10 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -57,6 +60,31 @@ class StaticWorkflowModuleRecordGuardTest {
 
         verify(ability).requireRecordScopeResult(any(ActionExecutionPolicy.class), eq(Set.of("record-1")));
         verify(ability).withDataScopeTenant(eq(scope), any());
+    }
+
+    @Test
+    void shouldUseCurrentActionPolicyWhenSubmittingFromWebActionEndpoint() {
+        @SuppressWarnings("unchecked")
+        DataScopeAbility<DataScopedRecord> ability = mock(DataScopeAbility.class);
+        DataScopedRecord record = new DataScopedRecord();
+        DataScopeCriteriaResult scope = DataScopeCriteriaResult.unrestricted(Criteria.of());
+        ActionExecutionPolicy policy = new ActionExecutionPolicy("submitApproval", PlatformActionLevel.RECORD,
+                null, true, true, null, null);
+        when(ability.getModuleAlias()).thenReturn("sales.contract");
+        when(ability.requireRecordScopeResult(eq(policy), eq(Set.of("record-1")))).thenReturn(scope);
+        when(ability.select("record-1")).thenReturn(record);
+        when(ability.withDataScopeTenant(eq(scope), any())).thenAnswer(invocation -> {
+            Supplier<?> supplier = invocation.getArgument(1);
+            return supplier.get();
+        });
+        StaticWorkflowModuleRecordGuard guard = new StaticWorkflowModuleRecordGuard(List.of(ability));
+
+        try (ActionExecutionContextHolder.Scope ignored = ActionExecutionContextHolder.use(
+                ActionExecutionContext.ofPolicy("sales.contract", policy, Set.of("record-1"), java.util.Optional.empty()))) {
+            guard.beforeSubmit(WorkflowSubmitRequest.approval("sales.contract", "record-1"));
+        }
+
+        verify(ability).requireRecordScopeResult(eq(policy), eq(Set.of("record-1")));
     }
 
     @Test

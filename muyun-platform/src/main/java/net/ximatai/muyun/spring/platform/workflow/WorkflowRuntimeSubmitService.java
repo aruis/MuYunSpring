@@ -96,6 +96,36 @@ public class WorkflowRuntimeSubmitService {
         return draft;
     }
 
+    public WorkflowSubmitDraft preview(WorkflowDefinition definition,
+                                       WorkflowVersion version,
+                                       java.util.List<WorkflowNodeDefinition> nodeDefinitions,
+                                       java.util.List<WorkflowLinkDefinition> linkDefinitions,
+                                       String recordId,
+                                       String operatorId,
+                                       Instant operatedAt,
+                                       String selectedRouteKey,
+                                       String selectedReason,
+                                       List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
+                recordId, null, operatorId, operatedAt, selectedRouteKey, selectedReason, manualRouteSelections);
+    }
+
+    public WorkflowSubmitDraft preview(WorkflowDefinition definition,
+                                       WorkflowVersion version,
+                                       java.util.List<WorkflowNodeDefinition> nodeDefinitions,
+                                       java.util.List<WorkflowLinkDefinition> linkDefinitions,
+                                       String recordId,
+                                       String authOrgId,
+                                       String operatorId,
+                                       Instant operatedAt,
+                                       String selectedRouteKey,
+                                       String selectedReason,
+                                       List<WorkflowManualRouteSelection> manualRouteSelections) {
+        return submitDraftService.build(definition, version, nodeDefinitions, linkDefinitions,
+                recordId, authOrgId, operatorId, operatedAt, selectedRouteKey, selectedReason,
+                manualRouteSelections);
+    }
+
     @Transactional
     public WorkflowSubmitDraft submit(WorkflowDefinition definition,
                                       WorkflowVersion version,

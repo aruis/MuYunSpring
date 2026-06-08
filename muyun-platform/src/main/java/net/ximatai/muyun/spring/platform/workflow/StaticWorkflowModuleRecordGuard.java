@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
@@ -36,7 +37,7 @@ public class StaticWorkflowModuleRecordGuard implements WorkflowModuleRecordGuar
 
     @Override
     public void beforeSubmit(WorkflowSubmitRequest request) {
-        requireRecordAction(request.moduleAlias(), request.recordId(), SUBMIT_POLICY);
+        requireRecordAction(request.moduleAlias(), request.recordId(), currentActionPolicy(request));
     }
 
     @Override
@@ -65,5 +66,13 @@ public class StaticWorkflowModuleRecordGuard implements WorkflowModuleRecordGuar
             return (EntityContract) dataScopeAbility.withDataScopeTenant(scope, () -> ability.select(recordId));
         }
         return (EntityContract) ability.select(recordId);
+    }
+
+    private ActionExecutionPolicy currentActionPolicy(WorkflowSubmitRequest request) {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> request.moduleAlias().equals(context.moduleAlias()))
+                .filter(context -> !context.hasRecordContext() || context.recordIds().contains(request.recordId()))
+                .map(context -> context.actionPolicy())
+                .orElse(SUBMIT_POLICY);
     }
 }

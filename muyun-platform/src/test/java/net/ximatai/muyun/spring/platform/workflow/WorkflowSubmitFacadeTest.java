@@ -98,6 +98,33 @@ class WorkflowSubmitFacadeTest {
                 " leftRoute ", " choose left ", List.of());
     }
 
+    @Test
+    void shouldPreviewThroughSelectedDefinitionWithoutPersistingOrWritingSummary() {
+        WorkflowSubmitRequest request = WorkflowSubmitRequest.approval("sales.contract", "record-1")
+                .withOperator("user-1")
+                .withOperatedAt(Instant.parse("2026-06-05T01:00:00Z"))
+                .withSelectedRoute("leftRoute", "choose left");
+        WorkflowDefinitionSelection selection = selection(true);
+        WorkflowSubmitDraft draft = draft(true);
+        when(selector.select(request)).thenReturn(selection);
+        when(runtimeSubmitService.preview(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", "choose left", List.of()))
+                .thenReturn(draft);
+
+        WorkflowSubmitPreview preview = facade.preview(request);
+
+        assertThat(preview.selection()).isEqualTo(selection);
+        assertThat(preview.draft()).isEqualTo(draft);
+        var order = inOrder(recordGuard, selector, runtimeSubmitService);
+        order.verify(recordGuard).beforeSubmit(request);
+        order.verify(selector).select(request);
+        order.verify(runtimeSubmitService).preview(selection.definition(), selection.version(), selection.nodes(),
+                selection.links(), "record-1", "user-1", Instant.parse("2026-06-05T01:00:00Z"),
+                "leftRoute", "choose left", List.of());
+        verifyNoInteractions(writer);
+    }
+
     private WorkflowDefinitionSelection selection(boolean approvalEnabled) {
         WorkflowDefinition definition = new WorkflowDefinition();
         definition.setId("definition-1");
