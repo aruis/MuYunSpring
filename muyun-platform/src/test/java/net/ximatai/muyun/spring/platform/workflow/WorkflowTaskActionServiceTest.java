@@ -1074,6 +1074,50 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldRejectReplacingAddSignSegmentWhenEditableSegmentHasMultipleExitRoutes() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
+        node.setAllowAddSign(true);
+        WorkflowNodeInstance oldAdd = node("node-old-add", "add-1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.WAITING);
+        oldAdd.setAddedByAddSign(true);
+        oldAdd.setAddSignSourceNodeKey("approve");
+        WorkflowRouteInstance oldEntry = route("route-old-entry", "approve", "add-1",
+                WorkflowRouteStatus.CANDIDATE);
+        oldEntry.setAddedByAddSign(true);
+        oldEntry.setAddSignSourceNodeKey("approve");
+        WorkflowRouteInstance oldExit = route("route-old-exit", "add-1", "next",
+                WorkflowRouteStatus.CANDIDATE);
+        oldExit.setAddedByAddSign(true);
+        oldExit.setAddSignSourceNodeKey("approve");
+        oldExit.setDefaultRoute(true);
+        WorkflowRouteInstance oldSecondExit = route("route-old-second-exit", "add-1", "next2",
+                WorkflowRouteStatus.CANDIDATE);
+        oldSecondExit.setAddedByAddSign(true);
+        oldSecondExit.setAddSignSourceNodeKey("approve");
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(any(), any())).thenReturn(List.of(task), List.of(task));
+        when(nodeDao.query(any(), any())).thenReturn(List.of(oldAdd));
+        when(routeDao.query(any(), any())).thenReturn(List.of(oldEntry, oldExit, oldSecondExit));
+
+        assertThatThrownBy(() -> service.addSign(WorkflowTaskActionRequest.addSign(
+                "task-1", "user-1", segment("add-2", "approve", "next"), "replace review")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("single editable exit route");
+
+        verify(routeDao, never()).deleteById(any());
+        verify(nodeDao, never()).deleteById(any());
+        verify(nodeDao, never()).insert(any());
+        verify(routeDao, never()).insert(any());
+        verify(routeDao, never()).updateByIdAndVersion(any(), any());
+        verifyNoInteractions(eventDao);
+        verifyNoInteractions(progressionService);
+    }
+
+    @Test
     void shouldRejectReplacingAddSignSegmentWhenExistingNodeIsEffective() {
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowNodeInstance node = node(WorkflowApprovalMode.ALL, null);
