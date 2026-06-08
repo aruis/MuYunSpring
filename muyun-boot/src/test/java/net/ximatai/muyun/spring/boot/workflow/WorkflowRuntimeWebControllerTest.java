@@ -325,10 +325,12 @@ class WorkflowRuntimeWebControllerTest {
     void shouldPassNoticeReadStatusAndExposeWorkbenchStats() throws Exception {
         ArgumentCaptor<WorkflowWorkbenchQueryRequest> noticeQueryCaptor =
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
+        ArgumentCaptor<WorkflowWorkbenchQueryRequest> statsQueryCaptor =
+                ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
         when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 noticeQueryCaptor.capture()))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.workbenchStats("notice", "operator-1"))
+        when(runtimeReadFacade.workbenchStats(eq("notice"), eq("operator-1"), statsQueryCaptor.capture()))
                 .thenReturn(new WorkflowWorkbenchStats("NOTICE", List.of(
                         new WorkflowWorkbenchStatItem("ALL", "全部", 2),
                         new WorkflowWorkbenchStatItem("UNREAD", "未读", 1),
@@ -343,13 +345,14 @@ class WorkflowRuntimeWebControllerTest {
 
         mvc.perform(post("/workflow/runtime/workbench/notice/stats")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"operatorId\":\"operator-1\"}"))
+                        .content("{\"operatorId\":\"operator-1\",\"readStatus\":\"READ\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.boardType").value("NOTICE"))
                 .andExpect(jsonPath("$.items[1].code").value("UNREAD"))
                 .andExpect(jsonPath("$.items[1].count").value(1));
 
         assertThat(noticeQueryCaptor.getValue().readStatus()).isEqualTo(WorkflowNoticeReadStatus.READ);
+        assertThat(statsQueryCaptor.getValue().readStatus()).isEqualTo(WorkflowNoticeReadStatus.READ);
     }
 
     @Test

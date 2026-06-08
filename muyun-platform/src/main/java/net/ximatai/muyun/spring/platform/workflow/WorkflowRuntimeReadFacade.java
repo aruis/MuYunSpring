@@ -250,21 +250,27 @@ public class WorkflowRuntimeReadFacade {
     }
 
     public WorkflowWorkbenchStats workbenchStats(String boardType, String operatorId) {
+        return workbenchStats(boardType, operatorId, WorkflowWorkbenchQueryRequest.empty());
+    }
+
+    public WorkflowWorkbenchStats workbenchStats(String boardType, String operatorId,
+                                                 WorkflowWorkbenchQueryRequest request) {
         String normalizedBoard = requireText(boardType, "workflow workbench board type must not be blank")
                 .toUpperCase();
         String validOperatorId = requireText(operatorId, "workflow operator id must not be blank");
+        WorkflowWorkbenchQueryRequest filters = filtersOnly(request);
         return switch (normalizedBoard) {
-            case "TRACKING" -> trackingStats(validOperatorId);
-            case "TODO" -> todoStats(validOperatorId);
-            case "DONE" -> doneStats(validOperatorId);
-            case "NOTICE" -> noticeStats(validOperatorId);
-            case "DELEGATION" -> delegationStats(validOperatorId);
+            case "TRACKING" -> trackingStats(validOperatorId, filters);
+            case "TODO" -> todoStats(validOperatorId, filters);
+            case "DONE" -> doneStats(validOperatorId, filters);
+            case "NOTICE" -> noticeStats(validOperatorId, filters);
+            case "DELEGATION" -> delegationStats(validOperatorId, filters);
             default -> throw new PlatformException("unsupported workflow workbench board type: " + boardType);
         };
     }
 
-    private WorkflowWorkbenchStats trackingStats(String starterId) {
-        List<WorkflowWorkbenchCard> cards = trackingCards(starterId, ALL, WorkflowWorkbenchQueryRequest.empty());
+    private WorkflowWorkbenchStats trackingStats(String starterId, WorkflowWorkbenchQueryRequest request) {
+        List<WorkflowWorkbenchCard> cards = trackingCards(starterId, ALL, request);
         EnumMap<WorkflowInstanceStatus, Long> counts = new EnumMap<>(WorkflowInstanceStatus.class);
         cards.forEach(card -> counts.merge(card.instanceStatus(), 1L, Long::sum));
         return new WorkflowWorkbenchStats("TRACKING", statsWithAll(cards.size(), WorkflowInstanceStatus.values(), counts));
@@ -437,15 +443,15 @@ public class WorkflowRuntimeReadFacade {
                 .thenComparing(WorkflowRouteInstance::getRouteKey, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
-    private WorkflowWorkbenchStats todoStats(String assigneeId) {
-        List<WorkflowWorkbenchCard> cards = todoCards(assigneeId, ALL, WorkflowWorkbenchQueryRequest.empty());
+    private WorkflowWorkbenchStats todoStats(String assigneeId, WorkflowWorkbenchQueryRequest request) {
+        List<WorkflowWorkbenchCard> cards = todoCards(assigneeId, ALL, request);
         EnumMap<WorkflowOvertimeStatus, Long> counts = new EnumMap<>(WorkflowOvertimeStatus.class);
         cards.forEach(card -> counts.merge(overtimeStatus(card), 1L, Long::sum));
         return new WorkflowWorkbenchStats("TODO", statsWithAll(cards.size(), WorkflowOvertimeStatus.values(), counts));
     }
 
-    private WorkflowWorkbenchStats doneStats(String processorId) {
-        List<WorkflowWorkbenchCard> cards = doneCards(processorId, ALL, WorkflowWorkbenchQueryRequest.empty());
+    private WorkflowWorkbenchStats doneStats(String processorId, WorkflowWorkbenchQueryRequest request) {
+        List<WorkflowWorkbenchCard> cards = doneCards(processorId, ALL, request);
         Map<String, Long> counts = new LinkedHashMap<>();
         cards.forEach(card -> counts.merge(doneStatCode(card), 1L, Long::sum));
         return new WorkflowWorkbenchStats("DONE", List.of(
@@ -457,8 +463,8 @@ public class WorkflowRuntimeReadFacade {
         ));
     }
 
-    private WorkflowWorkbenchStats noticeStats(String assigneeId) {
-        List<WorkflowWorkbenchCard> cards = noticeCards(assigneeId, ALL, WorkflowWorkbenchQueryRequest.empty());
+    private WorkflowWorkbenchStats noticeStats(String assigneeId, WorkflowWorkbenchQueryRequest request) {
+        List<WorkflowWorkbenchCard> cards = noticeCards(assigneeId, ALL, request);
         EnumMap<WorkflowNoticeReadStatus, Long> counts = new EnumMap<>(WorkflowNoticeReadStatus.class);
         cards.forEach(card -> counts.merge(card.readStatus(), 1L, Long::sum));
         return new WorkflowWorkbenchStats("NOTICE", List.of(
@@ -468,8 +474,8 @@ public class WorkflowRuntimeReadFacade {
         ));
     }
 
-    private WorkflowWorkbenchStats delegationStats(String principalId) {
-        List<WorkflowWorkbenchCard> cards = delegationCards(principalId, ALL, WorkflowWorkbenchQueryRequest.empty());
+    private WorkflowWorkbenchStats delegationStats(String principalId, WorkflowWorkbenchQueryRequest request) {
+        List<WorkflowWorkbenchCard> cards = delegationCards(principalId, ALL, request);
         EnumMap<WorkflowOvertimeStatus, Long> counts = new EnumMap<>(WorkflowOvertimeStatus.class);
         cards.forEach(card -> counts.merge(overtimeStatus(card), 1L, Long::sum));
         return new WorkflowWorkbenchStats("DELEGATION", statsWithAll(cards.size(), WorkflowOvertimeStatus.values(), counts));
@@ -770,6 +776,18 @@ public class WorkflowRuntimeReadFacade {
                 && inRange(card.completedAt(), normalized.completedFrom(), normalized.completedTo())
                 && inRange(card.lastOperatedAt(), normalized.lastOperatedFrom(), normalized.lastOperatedTo())
                 && inRange(card.dueAt(), normalized.dueFrom(), normalized.dueTo());
+    }
+
+    private WorkflowWorkbenchQueryRequest filtersOnly(WorkflowWorkbenchQueryRequest request) {
+        WorkflowWorkbenchQueryRequest normalized = request == null ? WorkflowWorkbenchQueryRequest.empty() : request;
+        return new WorkflowWorkbenchQueryRequest(normalized.moduleAlias(), normalized.recordId(),
+                normalized.definitionId(), normalized.workflowVersionId(), normalized.definitionVersionId(),
+                normalized.instanceStatus(), normalized.nodeKey(), normalized.taskKind(), normalized.taskStatus(),
+                normalized.assignmentKind(), normalized.overtimeStatus(), normalized.readStatus(),
+                normalized.startedFrom(), normalized.startedTo(), normalized.receivedFrom(), normalized.receivedTo(),
+                normalized.completedFrom(), normalized.completedTo(), normalized.lastOperatedFrom(),
+                normalized.lastOperatedTo(), normalized.dueFrom(), normalized.dueTo(), normalized.addedByAddSign(),
+                normalized.addSignSourceNodeKey(), List.of());
     }
 
     private Comparator<WorkflowWorkbenchCard> sorter(String boardType, WorkflowWorkbenchQueryRequest request) {

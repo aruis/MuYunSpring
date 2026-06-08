@@ -199,7 +199,8 @@ public class WorkflowRuntimeWebController {
             @PathVariable String board,
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return runtimeReadFacade.workbenchStats(board, operatorId(normalized.operatorId()));
+        return runtimeReadFacade.workbenchStats(board, operatorId(normalized.operatorId()),
+                normalized.toQueryRequest());
     }
 
     @GetMapping("/task/{taskId}/module-task/prepare")

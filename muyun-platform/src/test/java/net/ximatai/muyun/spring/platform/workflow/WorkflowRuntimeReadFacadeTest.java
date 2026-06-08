@@ -605,6 +605,28 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldApplyWorkbenchStatsFiltersWithoutChangingNoticeBuckets() {
+        WorkflowTask unread = task("notice-1", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.TODO);
+        WorkflowTask read = task("notice-2", WorkflowTaskKind.NOTICE, WorkflowTaskStatus.NOTICED);
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(unread, read));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "notice"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, WorkflowNoticeReadStatus.READ,
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("rawSql", WorkflowSortDirection.ASC)));
+
+        WorkflowWorkbenchStats stats = facade.workbenchStats("notice", "user-1", request);
+
+        assertThat(stats.items()).extracting(WorkflowWorkbenchStatItem::code)
+                .containsExactly("ALL", "UNREAD", "READ");
+        assertThat(count(stats, "ALL")).isEqualTo(1);
+        assertThat(count(stats, "UNREAD")).isZero();
+        assertThat(count(stats, "READ")).isEqualTo(1);
+    }
+
+    @Test
     void shouldRejectMissingInstance() {
         assertThatThrownBy(() -> facade.renderBundle("missing"))
                 .isInstanceOf(PlatformException.class)
