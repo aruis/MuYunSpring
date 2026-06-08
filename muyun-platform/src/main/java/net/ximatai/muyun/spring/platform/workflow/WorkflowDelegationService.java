@@ -116,14 +116,28 @@ public class WorkflowDelegationService extends AbstractAbilityService<WorkflowDe
     }
 
     public PageResult<WorkflowDelegation> pageByPrincipal(String principalUserId, PageRequest pageRequest) {
-        return pageQuery(Criteria.of().eq("principalUserId", requireText(principalUserId,
-                "workflow delegation principal user id must not be blank")), page(pageRequest),
+        return pageByPrincipal(principalUserId, Criteria.of(), pageRequest);
+    }
+
+    public PageResult<WorkflowDelegation> pageByPrincipal(String principalUserId, Criteria criteria,
+                                                          PageRequest pageRequest) {
+        Criteria scoped = criteria == null ? Criteria.of() : criteria;
+        scoped.eq("principalUserId", requireText(principalUserId,
+                "workflow delegation principal user id must not be blank"));
+        return pageQuery(scoped, page(pageRequest),
                 Sort.desc("updatedAt"), Sort.desc("createdAt"));
     }
 
     public PageResult<WorkflowDelegation> pageByDelegate(String delegateUserId, PageRequest pageRequest) {
-        return pageQuery(Criteria.of().eq("delegateUserId", requireText(delegateUserId,
-                "workflow delegation delegate user id must not be blank")), page(pageRequest),
+        return pageByDelegate(delegateUserId, Criteria.of(), pageRequest);
+    }
+
+    public PageResult<WorkflowDelegation> pageByDelegate(String delegateUserId, Criteria criteria,
+                                                         PageRequest pageRequest) {
+        Criteria scoped = criteria == null ? Criteria.of() : criteria;
+        scoped.eq("delegateUserId", requireText(delegateUserId,
+                "workflow delegation delegate user id must not be blank"));
+        return pageQuery(scoped, page(pageRequest),
                 Sort.desc("updatedAt"), Sort.desc("createdAt"));
     }
 

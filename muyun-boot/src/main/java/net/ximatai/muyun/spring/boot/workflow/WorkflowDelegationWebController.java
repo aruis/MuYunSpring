@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
@@ -14,6 +15,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegation;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegationScopeType;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,12 +25,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping({"/platform.workflow_delegation", "/workflow/delegation"})
 @PlatformStaticModule(application = "platform",
         alias = WorkflowDelegationService.MODULE_ALIAS,
         title = "Workflow Delegation")
 public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelegationService> {
+    private static final Set<String> QUERY_ALLOWED_FIELDS = Set.of(
+            "title", "enabled", "principalCanProcess", "moduleScopeType", "orgScopeType");
+
     private final WorkflowDelegationService service;
 
     public WorkflowDelegationWebController(WorkflowDelegationService service) {
@@ -43,9 +50,9 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @PostMapping("/query")
     @CustomActionEndpoint(value = "query", title = "Delegation Query", level = PlatformActionLevel.LIST)
     public WebPageResponse<WorkflowDelegation> query(@RequestBody(required = false) WebQueryRequest request) {
-        rejectConditions(request);
+        Criteria criteria = criteria(request);
         PageRequest page = page(request);
-        return WebPageResponse.from(service.pageByPrincipal(currentUserId(), page));
+        return WebPageResponse.from(service.pageByPrincipal(currentUserId(), criteria, page));
     }
 
     @PostMapping("/insert")
@@ -87,18 +94,18 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
     @CustomActionEndpoint(value = "delegatedToMeQuery", title = "Delegated To Me Query",
             level = PlatformActionLevel.LIST)
     public WebPageResponse<WorkflowDelegation> delegatedToMe(@RequestBody(required = false) WebQueryRequest request) {
-        rejectConditions(request);
+        Criteria criteria = criteria(request);
         PageRequest page = page(request);
-        return WebPageResponse.from(service.pageByDelegate(currentUserId(), page));
+        return WebPageResponse.from(service.pageByDelegate(currentUserId(), criteria, page));
     }
 
     @PostMapping("/manage/query")
     @CustomActionEndpoint(value = "manageQuery", title = "Delegation Manage Query",
             level = PlatformActionLevel.LIST)
     public WebPageResponse<WorkflowDelegation> manageQuery(@RequestBody(required = false) WebQueryRequest request) {
-        rejectConditions(request);
+        Criteria criteria = criteria(request);
         PageRequest page = page(request);
-        return WebPageResponse.from(service.pageQuery(Criteria.of(), page, Sort.desc("updatedAt"),
+        return WebPageResponse.from(service.pageQuery(criteria, page, Sort.desc("updatedAt"),
                 Sort.desc("createdAt")));
     }
 
@@ -146,10 +153,83 @@ public class WorkflowDelegationWebController implements ScopedWeb<WorkflowDelega
         return PageRequest.of(webPage.pageNum(), webPage.pageSize());
     }
 
-    private void rejectConditions(WebQueryRequest request) {
-        if (request != null && (!request.conditions().isEmpty() || !request.sorts().isEmpty())) {
-            throw new PlatformException("workflow delegation web query does not support custom conditions or sorts");
+    private Criteria criteria(WebQueryRequest request) {
+        rejectSorts(request);
+        Criteria criteria = Criteria.of();
+        if (request == null || request.conditions().isEmpty()) {
+            return criteria;
         }
+        for (WebQueryCondition condition : request.conditions()) {
+            appendCondition(criteria, condition);
+        }
+        return criteria;
+    }
+
+    private void rejectSorts(WebQueryRequest request) {
+        if (request != null && !request.sorts().isEmpty()) {
+            throw new PlatformException("workflow delegation web query does not support custom sorts");
+        }
+    }
+
+    private void appendCondition(Criteria criteria, WebQueryCondition condition) {
+        String field = requireAllowedField(condition.fieldName());
+        requireEqOperator(condition.operator(), field);
+        if (condition.values().isEmpty() || condition.values().getFirst() == null) {
+            return;
+        }
+        Object value = conditionValue(field, condition.values().getFirst());
+        if (value != null) {
+            criteria.eq(field, value);
+        }
+    }
+
+    private String requireAllowedField(String fieldName) {
+        String field = fieldName == null ? "" : fieldName.trim();
+        if (!QUERY_ALLOWED_FIELDS.contains(field)) {
+            throw new PlatformException("workflow delegation web query field is not allowed: " + field);
+        }
+        return field;
+    }
+
+    private void requireEqOperator(String operator, String field) {
+        if (operator == null || operator.isBlank() || "EQ".equalsIgnoreCase(operator) || "=".equals(operator)) {
+            return;
+        }
+        throw new PlatformException("workflow delegation web query only supports EQ operator for field: " + field);
+    }
+
+    private Object conditionValue(String field, Object value) {
+        return switch (field) {
+            case "enabled", "principalCanProcess" -> booleanValue(value, field);
+            case "moduleScopeType", "orgScopeType" -> scopeType(value, field);
+            default -> textValue(value);
+        };
+    }
+
+    private String textValue(Object value) {
+        String text = String.valueOf(value).trim();
+        return text.isBlank() ? null : text;
+    }
+
+    private Boolean booleanValue(Object value, String field) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        String text = String.valueOf(value).trim();
+        if ("true".equalsIgnoreCase(text) || "false".equalsIgnoreCase(text)) {
+            return Boolean.valueOf(text);
+        }
+        throw new PlatformException("workflow delegation web query requires boolean value for field: " + field);
+    }
+
+    private WorkflowDelegationScopeType scopeType(Object value, String field) {
+        String text = String.valueOf(value).trim();
+        for (WorkflowDelegationScopeType type : WorkflowDelegationScopeType.values()) {
+            if (type.name().equalsIgnoreCase(text) || type.getCode().equalsIgnoreCase(text)) {
+                return type;
+            }
+        }
+        throw new PlatformException("workflow delegation web query requires valid scope type for field: " + field);
     }
 
     private String currentUserId() {
