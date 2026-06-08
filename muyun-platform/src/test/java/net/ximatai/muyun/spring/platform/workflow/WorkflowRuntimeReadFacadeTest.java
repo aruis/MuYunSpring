@@ -398,6 +398,43 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortWorkbenchCardsByAddSignIdentityFields() {
+        WorkflowTask normal = task("task-normal", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        normal.setCreatedAt(Instant.parse("2026-06-05T03:00:00Z"));
+        WorkflowTask operatorA = task("task-operator-a", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        operatorA.setNodeInstanceId("node-add-a");
+        operatorA.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowTask operatorB = task("task-operator-b", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        operatorB.setNodeInstanceId("node-add-b");
+        operatorB.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowNodeInstance normalNode = node("node-1", "approve");
+        WorkflowNodeInstance addByA = node("node-add-a", "add-a");
+        addByA.setAddedByAddSign(true);
+        addByA.setAddSignSourceNodeKey("approve");
+        addByA.setAddSignOperatorId("operator-a");
+        WorkflowNodeInstance addByB = node("node-add-b", "add-b");
+        addByB.setAddedByAddSign(true);
+        addByB.setAddSignSourceNodeKey("approve");
+        addByB.setAddSignOperatorId("operator-b");
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(normal, operatorA, operatorB));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(normalNode);
+        when(nodeDao.findById("node-add-a")).thenReturn(addByA);
+        when(nodeDao.findById("node-add-b")).thenReturn(addByB);
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("addedByAddSign", WorkflowSortDirection.DESC),
+                        new WorkflowWorkbenchSort("addSignSourceNodeKey", WorkflowSortDirection.ASC),
+                        new WorkflowWorkbenchSort("addSignOperatorId", WorkflowSortDirection.DESC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId)
+                .containsExactly("task-operator-b", "task-operator-a", "task-normal");
+    }
+
+    @Test
     void shouldRejectUnsupportedWorkbenchSortField() {
         when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
                 .thenReturn(List.of());

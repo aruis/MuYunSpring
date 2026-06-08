@@ -811,7 +811,7 @@ public class WorkflowRuntimeReadFacade {
             case "moduleAlias", "recordId", "definitionId", "workflowVersionId", "definitionVersionId",
                     "instanceStatus", "nodeKey", "taskKind", "taskStatus", "assignmentKind", "overtimeStatus",
                     "readStatus", "startedAt", "receivedAt", "completedAt", "lastOperatedAt", "dueAt", "addSignAt",
-                    "delegationTaskCount" -> {
+                    "addedByAddSign", "addSignSourceNodeKey", "addSignOperatorId", "delegationTaskCount" -> {
             }
             default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
         }
@@ -851,6 +851,9 @@ public class WorkflowRuntimeReadFacade {
             case "lastOperatedAt" -> card.lastOperatedAt();
             case "dueAt" -> card.dueAt();
             case "addSignAt" -> card.addSignAt();
+            case "addedByAddSign" -> card.addedByAddSign();
+            case "addSignSourceNodeKey" -> card.addSignSourceNodeKey();
+            case "addSignOperatorId" -> card.addSignOperatorId();
             case "delegationTaskCount" -> card.delegationTaskCount();
             default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
         };
