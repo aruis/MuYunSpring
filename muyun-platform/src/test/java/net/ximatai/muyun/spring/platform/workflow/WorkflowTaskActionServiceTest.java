@@ -410,6 +410,86 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
+    void shouldRollbackBranchDomainToPreBranchApprovalNode() {
+        WorkflowTask currentTask = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        currentTask.setNodeInstanceId("node-approve2");
+        WorkflowTask branchSiblingTask = task("task-approve3", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        branchSiblingTask.setNodeInstanceId("node-approve3");
+        WorkflowTask previousDoneTask = task("task-prev", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE);
+        previousDoneTask.setNodeInstanceId("node-approve1");
+        previousDoneTask.setActualProcessorId("leader-1");
+        WorkflowInstance instance = instance();
+        instance.setApprovalEnabled(true);
+        WorkflowNodeInstance approve1 = node("node-approve1", "approve1", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance branch = node("node-branch", "branch", WorkflowNodeType.BRANCH,
+                WorkflowNodeStatus.COMPLETED);
+        WorkflowNodeInstance approve2 = node("node-approve2", "approve2", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.ACTIVE);
+        approve2.setActivatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        approve2.setRollbackTargetNodeKey("old");
+        WorkflowNodeInstance approve3 = node("node-approve3", "approve3", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.ACTIVE);
+        WorkflowNodeInstance converge = node("node-converge", "converge", WorkflowNodeType.CONVERGE,
+                WorkflowNodeStatus.WAITING);
+        WorkflowRouteInstance approve1ToBranch = route("route-to-branch", "approve1", "branch",
+                WorkflowRouteStatus.EFFECTIVE);
+        dirtyRoute(approve1ToBranch);
+        WorkflowRouteInstance branchToApprove2 = scopedRoute("route-branch-approve2", "branch", "approve2",
+                WorkflowRouteStatus.EFFECTIVE);
+        WorkflowRouteInstance branchToApprove3 = scopedRoute("route-branch-approve3", "branch", "approve3",
+                WorkflowRouteStatus.EFFECTIVE);
+        WorkflowRouteInstance approve2ToConverge = scopedRoute("route-approve2-converge", "approve2", "converge",
+                WorkflowRouteStatus.CANDIDATE);
+        WorkflowRouteInstance approve3ToConverge = scopedRoute("route-approve3-converge", "approve3", "converge",
+                WorkflowRouteStatus.CANDIDATE);
+        List<WorkflowRouteInstance> allRoutes = List.of(approve1ToBranch, branchToApprove2, branchToApprove3,
+                approve2ToConverge, approve3ToConverge);
+        List<WorkflowNodeInstance> allNodes = List.of(approve1, branch, approve2, approve3, converge);
+        when(taskDao.findById("task-1")).thenReturn(currentTask);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-approve2")).thenReturn(approve2);
+        when(nodeDao.findById("node-approve3")).thenReturn(approve3);
+        when(routeDao.query(any(), any())).thenReturn(List.of(branchToApprove2), List.of(approve1ToBranch),
+                allRoutes);
+        when(nodeDao.query(any(), any())).thenReturn(List.of(branch), List.of(approve1), allNodes);
+        when(taskDao.query(any(), any())).thenReturn(List.of(currentTask, branchSiblingTask),
+                List.of(branchSiblingTask), List.of(previousDoneTask));
+        when(taskDao.updateByIdAndVersion(any(), any())).thenReturn(1);
+        when(nodeDao.updateByIdAndVersion(any(), any())).thenReturn(1);
+        when(routeDao.updateByIdAndVersion(any(), any())).thenReturn(1);
+        when(instanceDao.updateByIdAndVersion(instance, 5)).thenReturn(1);
+
+        WorkflowTaskActionResult result = service.rollback(new WorkflowTaskActionRequest(
+                "task-1", "user-1", null, null, "return to pre-branch",
+                Instant.parse("2026-06-05T03:00:00Z")));
+
+        assertThat(currentTask.getTaskStatus()).isEqualTo(WorkflowTaskStatus.ROLLED_BACK);
+        assertThat(branchSiblingTask.getTaskStatus()).isEqualTo(WorkflowTaskStatus.ROLLED_BACK);
+        assertThat(approve1.getNodeStatus()).isEqualTo(WorkflowNodeStatus.ACTIVE);
+        assertThat(result.createdTask()).isNotNull();
+        assertThat(result.createdTask().getNodeInstanceId()).isEqualTo("node-approve1");
+        assertThat(result.createdTask().getAssigneeId()).isEqualTo("leader-1");
+        assertThat(List.of(branch, approve2, approve3, converge))
+                .extracting(WorkflowNodeInstance::getNodeStatus)
+                .containsOnly(WorkflowNodeStatus.WAITING);
+        assertThat(approve2.getActivatedAt()).isNull();
+        assertThat(approve2.getRollbackTargetNodeKey()).isNull();
+        assertThat(allRoutes).extracting(WorkflowRouteInstance::getRouteStatus)
+                .containsOnly(WorkflowRouteStatus.CANDIDATE);
+        assertThat(branchToApprove2.getSelectedBy()).isNull();
+        assertThat(branchToApprove2.getSelectedAt()).isNull();
+        assertThat(branchToApprove2.getSelectedReason()).isNull();
+        assertThat(branchToApprove2.getArrivedAt()).isNull();
+        assertThat(branchToApprove2.getClosedByRouteId()).isNull();
+        assertThat(branchToApprove2.getClosedReason()).isNull();
+        assertThat(instance.getCurrentNodeKeys()).isEqualTo("approve1");
+        assertThat(result.event().getEventType()).isEqualTo(WorkflowEventType.NODE_ROLLED_BACK);
+        verify(taskDao).insert(result.createdTask());
+        verify(routeDao, times(5)).updateByIdAndVersion(any(), any());
+    }
+
+    @Test
     void shouldRejectRollbackWhenPreviousApprovalNodeIsNotFound() {
         WorkflowTask currentTask = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         WorkflowInstance instance = instance();
@@ -464,6 +544,29 @@ class WorkflowTaskActionServiceTest {
                 "task-1", "user-1", "return")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("single active node");
+
+        verifyNoInteractions(eventDao);
+    }
+
+    @Test
+    void shouldRejectRollbackForNestedBranchRoute() {
+        WorkflowTask currentTask = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        currentTask.setNodeInstanceId("node-approve2");
+        WorkflowInstance instance = instance();
+        WorkflowNodeInstance currentNode = node("node-approve2", "approve2", WorkflowNodeType.APPROVAL,
+                WorkflowNodeStatus.ACTIVE);
+        WorkflowRouteInstance route = scopedRoute("route-nested", "branch", "approve2",
+                WorkflowRouteStatus.EFFECTIVE);
+        route.setParentRouteId("parent-route");
+        when(taskDao.findById("task-1")).thenReturn(currentTask);
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.findById("node-approve2")).thenReturn(currentNode);
+        when(routeDao.query(any(), any())).thenReturn(List.of(route));
+
+        assertThatThrownBy(() -> service.rollback(WorkflowTaskActionRequest.complete(
+                "task-1", "user-1", "return")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("nested branch route");
 
         verifyNoInteractions(eventDao);
     }
@@ -1403,6 +1506,28 @@ class WorkflowTaskActionServiceTest {
         route.setTargetNodeKey(target);
         route.setRouteStatus(status);
         return route;
+    }
+
+    private WorkflowRouteInstance scopedRoute(String id, String source, String target, WorkflowRouteStatus status) {
+        WorkflowRouteInstance route = route(id, source, target, status);
+        route.setBranchNodeKey("branch");
+        route.setBranchRunId("branch:1");
+        route.setConvergeNodeKey("converge");
+        route.setConvergeRunId("converge:1");
+        route.setRouteDepth(1);
+        dirtyRoute(route);
+        return route;
+    }
+
+    private void dirtyRoute(WorkflowRouteInstance route) {
+        route.setRouteReason(WorkflowRouteReason.MANUAL_SELECTED);
+        route.setConditionMatched(true);
+        route.setSelectedBy("selector-1");
+        route.setSelectedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        route.setSelectedReason("choose branch");
+        route.setArrivedAt(Instant.parse("2026-06-05T02:30:00Z"));
+        route.setClosedByRouteId("closed-route");
+        route.setClosedReason("closed");
     }
 
     private WorkflowInstance instance() {

@@ -297,7 +297,7 @@ public class WorkflowTaskActionService {
         actionPolicyService.requireRuntimeAction(instance, "rollback");
         actionPolicyService.requireNodeTaskAction(task, currentNode, "rollback", operatorId, request.reason());
         RollbackTarget target = previousApprovalNode(instance.getId(), currentNode);
-        rejectRollbackWithOtherActiveNodes(instance.getId(), task);
+        rejectRollbackWithOtherActiveNodes(instance.getId(), task, target);
         dispatchTask(instance, currentNode, task, WorkflowRuntimePluginEventType.BEFORE_ROLLBACK, "rollback",
                 operatorId, null, target.node().getNodeKey(), request.reason());
 
@@ -310,21 +310,22 @@ public class WorkflowTaskActionService {
         cancelOtherTodoTasks(instance, task.getId(), WorkflowTaskStatus.ROLLED_BACK, "rollback", operatorId,
                 request.reason(), now);
 
-        currentNode.setNodeStatus(WorkflowNodeStatus.ROLLED_BACK);
-        currentNode.setRollbackTargetNodeKey(target.node().getNodeKey());
-        currentNode.setCompletedAt(now);
-        updateNode(currentNode, now);
+        if (!target.crossBranchDomain()) {
+            currentNode.setNodeStatus(WorkflowNodeStatus.ROLLED_BACK);
+            currentNode.setRollbackTargetNodeKey(target.node().getNodeKey());
+            currentNode.setCompletedAt(now);
+            updateNode(currentNode, now);
+        }
 
         WorkflowNodeInstance previousNode = target.node();
         resetApprovalNodeForRetry(previousNode, now);
         updateNode(previousNode, now);
-        for (WorkflowNodeInstance intermediateNode : target.intermediateNodes()) {
-            intermediateNode.setNodeStatus(WorkflowNodeStatus.WAITING);
-            intermediateNode.setCompletedAt(null);
+        for (WorkflowNodeInstance intermediateNode : target.nodesToReset()) {
+            resetNodeForRetry(intermediateNode);
             updateNode(intermediateNode, now);
         }
 
-        for (WorkflowRouteInstance route : target.routes()) {
+        for (WorkflowRouteInstance route : target.routesToReset()) {
             resetRouteForRetry(route);
             updateRoute(route, now);
         }
@@ -1179,12 +1180,14 @@ public class WorkflowTaskActionService {
         }
     }
 
-    private void rejectRollbackWithOtherActiveNodes(String instanceId, WorkflowTask currentTask) {
+    private void rejectRollbackWithOtherActiveNodes(String instanceId, WorkflowTask currentTask,
+                                                    RollbackTarget target) {
         for (WorkflowTask other : instanceTodoTasks(instanceId)) {
             if (currentTask.getId().equals(other.getId())) {
                 continue;
             }
-            if (!sameText(currentTask.getNodeInstanceId(), other.getNodeInstanceId())) {
+            if (!sameText(currentTask.getNodeInstanceId(), other.getNodeInstanceId())
+                    && !target.containsResetNodeId(other.getNodeInstanceId())) {
                 throw new PlatformException("workflow rollback only supports single active node in first version: "
                         + instanceId);
             }
@@ -1195,6 +1198,8 @@ public class WorkflowTaskActionService {
         WorkflowNodeInstance cursor = currentNode;
         List<WorkflowRouteInstance> pathRoutes = new ArrayList<>();
         List<WorkflowNodeInstance> intermediateNodes = new ArrayList<>();
+        WorkflowRouteInstance branchScopeRoute = null;
+        boolean crossedBranchBoundary = false;
         for (int depth = 0; depth < 64; depth++) {
             List<WorkflowRouteInstance> incoming = requireRouteDao().query(Criteria.of()
                     .eq("instanceId", instanceId)
@@ -1209,19 +1214,42 @@ public class WorkflowTaskActionService {
                         + currentNode.getNodeKey());
             }
             WorkflowRouteInstance route = incoming.get(0);
-            rejectComplexRollbackRoute(route);
+            rejectNestedRollbackRoute(route);
+            if (hasBranchScope(route)) {
+                if (branchScopeRoute == null) {
+                    branchScopeRoute = route;
+                } else if (!sameRollbackBranchScope(branchScopeRoute, route)) {
+                    throw new PlatformException("workflow rollback only supports one branch domain: "
+                            + currentNode.getNodeKey());
+                }
+            } else if (branchScopeRoute == null) {
+                rejectComplexRollbackRoute(route);
+            }
             pathRoutes.add(route);
             WorkflowNodeInstance source = singleNode(instanceId, route.getSourceNodeKey());
             if (source.getNodeType() == WorkflowNodeType.APPROVAL) {
+                if (branchScopeRoute != null && !crossedBranchBoundary) {
+                    throw new PlatformException("workflow rollback only supports branch domain to pre-branch node: "
+                            + source.getNodeKey());
+                }
                 if (source.getNodeStatus() != WorkflowNodeStatus.COMPLETED) {
                     throw new PlatformException("workflow rollback previous approval node is not completed: "
                             + source.getNodeKey());
                 }
-                return new RollbackTarget(source, pathRoutes, intermediateNodes);
+                return branchScopeRoute == null
+                        ? RollbackTarget.linear(source, pathRoutes, intermediateNodes)
+                        : RollbackTarget.crossBranch(source, pathRoutes, intermediateNodes,
+                                branchDomainForRollback(instanceId, branchScopeRoute, source.getNodeKey()));
             }
             if (source.getNodeType() == WorkflowNodeType.BRANCH || source.getNodeType() == WorkflowNodeType.CONVERGE) {
-                throw new PlatformException("workflow rollback does not support branch or converge path: "
-                        + source.getNodeKey());
+                if (branchScopeRoute != null
+                        && source.getNodeType() == WorkflowNodeType.BRANCH
+                        && sameText(source.getNodeKey(), branchScopeRoute.getBranchNodeKey())) {
+                    crossedBranchBoundary = true;
+                } else {
+                    throw new PlatformException("workflow rollback only supports branch domain to pre-branch node: "
+                            + source.getNodeKey());
+                }
             }
             intermediateNodes.add(source);
             cursor = source;
@@ -1248,6 +1276,70 @@ public class WorkflowTaskActionService {
         }
     }
 
+    private void rejectNestedRollbackRoute(WorkflowRouteInstance route) {
+        if (hasText(route.getParentRouteId()) || (route.getRouteDepth() != null && route.getRouteDepth() > 1)) {
+            throw new PlatformException("workflow rollback does not support nested branch route: "
+                    + route.getRouteKey());
+        }
+    }
+
+    private boolean hasBranchScope(WorkflowRouteInstance route) {
+        return hasText(route.getBranchNodeKey()) || hasText(route.getBranchRunId())
+                || hasText(route.getConvergeNodeKey()) || hasText(route.getConvergeRunId());
+    }
+
+    private boolean sameRollbackBranchScope(WorkflowRouteInstance left, WorkflowRouteInstance right) {
+        return sameText(left.getBranchNodeKey(), right.getBranchNodeKey())
+                && sameText(left.getBranchRunId(), right.getBranchRunId())
+                && sameText(left.getConvergeNodeKey(), right.getConvergeNodeKey())
+                && sameText(left.getConvergeRunId(), right.getConvergeRunId())
+                && sameText(left.getParentRouteId(), right.getParentRouteId());
+    }
+
+    private RollbackBranchDomain branchDomainForRollback(String instanceId, WorkflowRouteInstance scopeRoute,
+                                                         String targetNodeKey) {
+        List<WorkflowRouteInstance> routes = requireRouteDao().query(Criteria.of()
+                .eq("instanceId", instanceId), ALL);
+        List<WorkflowRouteInstance> domainRoutes = routes.stream()
+                .filter(route -> sameRollbackBranchScope(scopeRoute, route))
+                .toList();
+        domainRoutes.forEach(this::rejectNestedRollbackRoute);
+        if (domainRoutes.isEmpty()) {
+            throw new PlatformException("workflow rollback branch domain route not found: "
+                    + scopeRoute.getBranchNodeKey());
+        }
+        Set<String> nodeKeys = branchDomainNodeKeys(scopeRoute, domainRoutes);
+        nodeKeys.remove(targetNodeKey);
+        List<WorkflowNodeInstance> nodes = nodeInstanceDao.query(Criteria.of()
+                        .eq("instanceId", instanceId), ALL)
+                .stream()
+                .filter(node -> nodeKeys.contains(node.getNodeKey()))
+                .toList();
+        if (nodes.size() != nodeKeys.size()) {
+            throw new PlatformException("workflow rollback branch domain node not found: "
+                    + scopeRoute.getBranchNodeKey());
+        }
+        return new RollbackBranchDomain(nodes, domainRoutes);
+    }
+
+    private Set<String> branchDomainNodeKeys(WorkflowRouteInstance scopeRoute,
+                                             List<WorkflowRouteInstance> domainRoutes) {
+        Set<String> nodeKeys = new LinkedHashSet<>();
+        if (hasText(scopeRoute.getBranchNodeKey())) {
+            nodeKeys.add(scopeRoute.getBranchNodeKey());
+        }
+        if (hasText(scopeRoute.getConvergeNodeKey())) {
+            nodeKeys.add(scopeRoute.getConvergeNodeKey());
+        }
+        for (WorkflowRouteInstance route : domainRoutes) {
+            nodeKeys.add(route.getSourceNodeKey());
+            if (!sameText(route.getSourceNodeKey(), scopeRoute.getConvergeNodeKey())) {
+                nodeKeys.add(route.getTargetNodeKey());
+            }
+        }
+        return nodeKeys;
+    }
+
     private void resetApprovalNodeForRetry(WorkflowNodeInstance node, Instant now) {
         node.setNodeStatus(WorkflowNodeStatus.ACTIVE);
         node.setCompletedAt(null);
@@ -1258,12 +1350,31 @@ public class WorkflowTaskActionService {
         node.setActivatedAt(now);
     }
 
+    private void resetNodeForRetry(WorkflowNodeInstance node) {
+        node.setNodeStatus(WorkflowNodeStatus.WAITING);
+        node.setRouteId(null);
+        node.setEnterRouteId(null);
+        node.setBranchRunId(null);
+        node.setConvergeRunId(null);
+        node.setRequiredRouteCount(null);
+        node.setArrivedRouteCount(0);
+        node.setCompletedRouteCount(0);
+        node.setRequiredTaskCount(null);
+        node.setCompletedTaskCount(0);
+        node.setApprovedTaskCount(0);
+        node.setRejectedTaskCount(0);
+        node.setRollbackTargetNodeKey(null);
+        node.setActivatedAt(null);
+        node.setCompletedAt(null);
+    }
+
     private void resetRouteForRetry(WorkflowRouteInstance route) {
         route.setRouteStatus(WorkflowRouteStatus.CANDIDATE);
         route.setRouteReason(null);
         route.setConditionMatched(false);
         route.setSelectedBy(null);
         route.setSelectedAt(null);
+        route.setSelectedReason(null);
         route.setArrivedAt(null);
         route.setClosedByRouteId(null);
         route.setClosedReason(null);
@@ -1451,7 +1562,67 @@ public class WorkflowTaskActionService {
     }
 
     private record RollbackTarget(WorkflowNodeInstance node, List<WorkflowRouteInstance> routes,
-                                  List<WorkflowNodeInstance> intermediateNodes) {
+                                  List<WorkflowNodeInstance> intermediateNodes,
+                                  RollbackBranchDomain branchDomain) {
+
+        static RollbackTarget linear(WorkflowNodeInstance node, List<WorkflowRouteInstance> routes,
+                                     List<WorkflowNodeInstance> intermediateNodes) {
+            return new RollbackTarget(node, routes, intermediateNodes, null);
+        }
+
+        static RollbackTarget crossBranch(WorkflowNodeInstance node, List<WorkflowRouteInstance> routes,
+                                          List<WorkflowNodeInstance> intermediateNodes,
+                                          RollbackBranchDomain branchDomain) {
+            return new RollbackTarget(node, routes, intermediateNodes, branchDomain);
+        }
+
+        boolean crossBranchDomain() {
+            return branchDomain != null;
+        }
+
+        List<WorkflowNodeInstance> nodesToReset() {
+            if (branchDomain == null) {
+                return intermediateNodes;
+            }
+            Map<String, WorkflowNodeInstance> result = new LinkedHashMap<>();
+            addNodes(result, intermediateNodes);
+            addNodes(result, branchDomain.nodes());
+            return new ArrayList<>(result.values());
+        }
+
+        List<WorkflowRouteInstance> routesToReset() {
+            Map<String, WorkflowRouteInstance> result = new LinkedHashMap<>();
+            addRoutes(result, routes);
+            if (branchDomain != null) {
+                addRoutes(result, branchDomain.routes());
+            }
+            return new ArrayList<>(result.values());
+        }
+
+        boolean containsResetNodeId(String nodeInstanceId) {
+            if (nodeInstanceId == null || nodeInstanceId.isBlank()) {
+                return false;
+            }
+            return nodesToReset().stream().anyMatch(node -> nodeInstanceId.equals(node.getId()));
+        }
+
+        private static void addRoutes(Map<String, WorkflowRouteInstance> result, List<WorkflowRouteInstance> routes) {
+            for (WorkflowRouteInstance route : routes == null ? List.<WorkflowRouteInstance>of() : routes) {
+                String key = route.getId() != null && !route.getId().isBlank()
+                        ? route.getId() : route.getRouteRunId();
+                result.putIfAbsent(key, route);
+            }
+        }
+
+        private static void addNodes(Map<String, WorkflowNodeInstance> result, List<WorkflowNodeInstance> nodes) {
+            for (WorkflowNodeInstance node : nodes == null ? List.<WorkflowNodeInstance>of() : nodes) {
+                String key = node.getId() != null && !node.getId().isBlank() ? node.getId() : node.getNodeRunId();
+                result.putIfAbsent(key, node);
+            }
+        }
+    }
+
+    private record RollbackBranchDomain(List<WorkflowNodeInstance> nodes, List<WorkflowRouteInstance> routes) {
     }
 
     private record AddSignSegmentPlan(List<WorkflowNodeInstance> nodes,
