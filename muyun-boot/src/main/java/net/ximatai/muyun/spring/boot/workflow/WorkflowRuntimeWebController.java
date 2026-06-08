@@ -33,6 +33,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateV
 import net.ximatai.muyun.spring.platform.workflow.WorkflowOvertimeStatus;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskKind;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTaskStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeAddSignExplanationView;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -91,6 +92,12 @@ public class WorkflowRuntimeWebController {
     @GetMapping("/instance/{instanceId}/events")
     public WebListResponse<WorkflowEvent> instanceEvents(@PathVariable String instanceId) {
         return new WebListResponse<>(runtimeReadFacade.instanceEvents(instanceId));
+    }
+
+    @GetMapping("/instance/{instanceId}/add-sign-explanations")
+    public WebListResponse<WorkflowRuntimeAddSignExplanationView> addSignExplanations(
+            @PathVariable String instanceId) {
+        return new WebListResponse<>(runtimeReadFacade.addSignExplanations(instanceId));
     }
 
     @PostMapping("/instance/{instanceId}/actions")

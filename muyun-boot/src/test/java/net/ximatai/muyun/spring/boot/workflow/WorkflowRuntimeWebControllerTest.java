@@ -25,6 +25,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowManualBranchCandidateV
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRejectResubmitMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteMode;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRouteStatus;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeAddSignExplanationView;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeReadFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowRuntimeRenderBundle;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowTask;
@@ -47,6 +48,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -193,6 +195,44 @@ class WorkflowRuntimeWebControllerTest {
                         .content("{\"operatorId\":\"operator-1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].actionCode").value("complete"));
+    }
+
+    @Test
+    void shouldExposeRuntimeAddSignExplanations() throws Exception {
+        when(runtimeReadFacade.addSignExplanations("inst-1")).thenReturn(List.of(
+                new WorkflowRuntimeAddSignExplanationView("ADD_SIGN", "NODE", Boolean.FALSE,
+                        "node-add", "add-1", WorkflowNodeType.APPROVAL, null,
+                        null, null, null, null, null,
+                        "approve", "审批节点", "operator-1",
+                        Instant.parse("2026-06-05T01:00:00Z")),
+                new WorkflowRuntimeAddSignExplanationView("ADD_SIGN", "ROUTE", Boolean.TRUE,
+                        null, null, null, null,
+                        "route-add", "entry-add", "approve", "add-1", WorkflowRouteStatus.CANDIDATE,
+                        "approve", "审批节点", "operator-1",
+                        Instant.parse("2026-06-05T01:00:00Z"))
+        ));
+
+        mvc.perform(get("/workflow/runtime/instance/inst-1/add-sign-explanations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].originType").value("ADD_SIGN"))
+                .andExpect(jsonPath("$.records[0].dimension").value("NODE"))
+                .andExpect(jsonPath("$.records[0].isAddSignRoute").value(false))
+                .andExpect(jsonPath("$.records[0].nodeInstanceId").value("node-add"))
+                .andExpect(jsonPath("$.records[0].nodeKey").value("add-1"))
+                .andExpect(jsonPath("$.records[0].nodeType").value("APPROVAL"))
+                .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve"))
+                .andExpect(jsonPath("$.records[0].addSignSourceNodeName").value("审批节点"))
+                .andExpect(jsonPath("$.records[0].addSignOperatorId").value("operator-1"))
+                .andExpect(jsonPath("$.records[0].addSignAt").exists())
+                .andExpect(jsonPath("$.records[1].dimension").value("ROUTE"))
+                .andExpect(jsonPath("$.records[1].isAddSignRoute").value(true))
+                .andExpect(jsonPath("$.records[1].routeId").value("route-add"))
+                .andExpect(jsonPath("$.records[1].routeKey").value("entry-add"))
+                .andExpect(jsonPath("$.records[1].routeSourceNodeKey").value("approve"))
+                .andExpect(jsonPath("$.records[1].routeTargetNodeKey").value("add-1"))
+                .andExpect(jsonPath("$.records[1].routeStatus").value("CANDIDATE"));
+
+        verify(runtimeReadFacade).addSignExplanations("inst-1");
     }
 
     @Test

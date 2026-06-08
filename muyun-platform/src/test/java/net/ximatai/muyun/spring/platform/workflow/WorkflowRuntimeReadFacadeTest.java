@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -552,6 +554,100 @@ class WorkflowRuntimeReadFacadeTest {
         verify(taskDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class));
         verify(eventDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class));
         verify(actionPolicyService, times(2)).requireRecordView(any(WorkflowInstance.class));
+    }
+
+    @Test
+    void shouldExplainRuntimeAddSignNodesAndRoutesWithSourceNodeName() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance source = node("node-source", "approve");
+        source.setNodeSnapshotText("{\"nodeName\":\"审批节点\"}");
+        WorkflowNodeInstance addNode = node("node-add", "add-1");
+        addNode.setNodeType(WorkflowNodeType.APPROVAL);
+        addNode.setNodeStatus(WorkflowNodeStatus.WAITING);
+        addNode.setAddedByAddSign(true);
+        addNode.setAddSignSourceNodeKey("approve");
+        addNode.setAddSignOperatorId("operator-1");
+        addNode.setAddSignAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowNodeInstance normalNode = node("node-normal", "normal");
+        WorkflowRouteInstance addRoute = route("route-add", "entry-add", "approve", "add-1",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:01:00Z");
+        addRoute.setAddedByAddSign(true);
+        addRoute.setAddSignSourceNodeKey("approve");
+        addRoute.setAddSignOperatorId("operator-1");
+        addRoute.setAddSignAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowRouteInstance normalRoute = route("route-normal", "normal-route", "normal", "next",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:02:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(source, addNode, normalNode));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(addRoute, normalRoute));
+
+        List<WorkflowRuntimeAddSignExplanationView> views = facade.addSignExplanations("instance-1");
+
+        assertThat(views).hasSize(2);
+        WorkflowRuntimeAddSignExplanationView nodeView = views.getFirst();
+        assertThat(nodeView.originType()).isEqualTo("ADD_SIGN");
+        assertThat(nodeView.dimension()).isEqualTo("NODE");
+        assertThat(nodeView.isAddSignRoute()).isFalse();
+        assertThat(nodeView.nodeInstanceId()).isEqualTo("node-add");
+        assertThat(nodeView.nodeKey()).isEqualTo("add-1");
+        assertThat(nodeView.nodeType()).isEqualTo(WorkflowNodeType.APPROVAL);
+        assertThat(nodeView.nodeStatus()).isEqualTo(WorkflowNodeStatus.WAITING);
+        assertThat(nodeView.addSignSourceNodeKey()).isEqualTo("approve");
+        assertThat(nodeView.addSignSourceNodeName()).isEqualTo("审批节点");
+        assertThat(nodeView.addSignOperatorId()).isEqualTo("operator-1");
+        assertThat(nodeView.addSignAt()).isEqualTo(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowRuntimeAddSignExplanationView routeView = views.get(1);
+        assertThat(routeView.dimension()).isEqualTo("ROUTE");
+        assertThat(routeView.isAddSignRoute()).isTrue();
+        assertThat(routeView.routeId()).isEqualTo("route-add");
+        assertThat(routeView.routeKey()).isEqualTo("entry-add");
+        assertThat(routeView.routeSourceNodeKey()).isEqualTo("approve");
+        assertThat(routeView.routeTargetNodeKey()).isEqualTo("add-1");
+        assertThat(routeView.routeStatus()).isEqualTo(WorkflowRouteStatus.CANDIDATE);
+        assertThat(routeView.addSignSourceNodeKey()).isEqualTo("approve");
+        assertThat(routeView.addSignSourceNodeName()).isEqualTo("审批节点");
+        InOrder inOrder = inOrder(instanceDao, actionPolicyService, nodeDao, routeDao);
+        inOrder.verify(instanceDao).findById("instance-1");
+        inOrder.verify(actionPolicyService).requireRecordView(instance);
+        inOrder.verify(nodeDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class));
+        inOrder.verify(routeDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class));
+    }
+
+    @Test
+    void shouldReturnNoRuntimeAddSignExplanationsWhenNoAddSignMarkers() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance normalNode = node("node-normal", "normal");
+        WorkflowRouteInstance normalRoute = route("route-normal", "normal-route", "normal", "next",
+                WorkflowRouteStatus.CANDIDATE, false, "2026-06-05T01:02:00Z");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(normalNode));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(normalRoute));
+
+        assertThat(facade.addSignExplanations("instance-1")).isEmpty();
+
+        verify(actionPolicyService).requireRecordView(instance);
+    }
+
+    @Test
+    void shouldFallbackAddSignSourceNodeNameToKeyWhenSourceNodeNameMissing() {
+        WorkflowInstance instance = instance("instance-1");
+        WorkflowNodeInstance addNode = node("node-add", "add-1");
+        addNode.setAddedByAddSign(true);
+        addNode.setAddSignSourceNodeKey("approve");
+        when(instanceDao.findById("instance-1")).thenReturn(instance);
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(addNode));
+        when(routeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of());
+
+        List<WorkflowRuntimeAddSignExplanationView> views = facade.addSignExplanations("instance-1");
+
+        assertThat(views).hasSize(1);
+        assertThat(views.getFirst().addSignSourceNodeName()).isEqualTo("approve");
     }
 
     private WorkflowInstance instance(String id) {

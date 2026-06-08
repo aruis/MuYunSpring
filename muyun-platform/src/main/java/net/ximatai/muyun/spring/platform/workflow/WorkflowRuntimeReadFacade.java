@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -9,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
 @Service
 public class WorkflowRuntimeReadFacade {
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Set<WorkflowRouteStatus> MANUAL_BRANCH_CANDIDATE_STATUSES = EnumSet.of(
             WorkflowRouteStatus.CANDIDATE,
             WorkflowRouteStatus.EFFECTIVE,
@@ -154,6 +158,31 @@ public class WorkflowRuntimeReadFacade {
         actionPolicyService.requireRecordView(instance);
         return eventDao.query(Criteria.of().eq("instanceId", instance.getId()), ALL,
                 Sort.asc("occurredAt"), Sort.asc("createdAt"));
+    }
+
+    public List<WorkflowRuntimeAddSignExplanationView> addSignExplanations(String instanceId) {
+        WorkflowInstance instance = requireInstance(instanceId);
+        actionPolicyService.requireRecordView(instance);
+        List<WorkflowNodeInstance> nodes = nodeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        List<WorkflowRouteInstance> routes = routeDao.query(Criteria.of().eq("instanceId", instance.getId()),
+                ALL, Sort.asc("createdAt"));
+        Map<String, WorkflowNodeInstance> nodesByKey = nodes.stream()
+                .filter(node -> node.getNodeKey() != null)
+                .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left,
+                        LinkedHashMap::new));
+        List<WorkflowRuntimeAddSignExplanationView> views = new ArrayList<>();
+        nodes.stream()
+                .filter(node -> Boolean.TRUE.equals(node.getAddedByAddSign()))
+                .sorted(nodeSort())
+                .map(node -> addSignNodeExplanation(node, nodesByKey))
+                .forEach(views::add);
+        routes.stream()
+                .filter(route -> Boolean.TRUE.equals(route.getAddedByAddSign()))
+                .sorted(routeSort())
+                .map(route -> addSignRouteExplanation(route, nodesByKey))
+                .forEach(views::add);
+        return List.copyOf(views);
     }
 
     public List<WorkflowTaskAvailableAction> instanceAvailableActions(String instanceId, String operatorId) {
@@ -323,6 +352,76 @@ public class WorkflowRuntimeReadFacade {
             return ROUTE_ALREADY_DECIDED;
         }
         return selectorResolution.unselectableReason();
+    }
+
+    private WorkflowRuntimeAddSignExplanationView addSignNodeExplanation(
+            WorkflowNodeInstance node,
+            Map<String, WorkflowNodeInstance> nodesByKey) {
+        return new WorkflowRuntimeAddSignExplanationView(
+                WorkflowRuntimeAddSignExplanationView.ORIGIN_TYPE_ADD_SIGN,
+                WorkflowRuntimeAddSignExplanationView.DIMENSION_NODE,
+                Boolean.FALSE,
+                node.getId(),
+                node.getNodeKey(),
+                node.getNodeType(),
+                node.getNodeStatus(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                node.getAddSignSourceNodeKey(),
+                sourceNodeName(node.getAddSignSourceNodeKey(), nodesByKey),
+                node.getAddSignOperatorId(),
+                node.getAddSignAt());
+    }
+
+    private WorkflowRuntimeAddSignExplanationView addSignRouteExplanation(
+            WorkflowRouteInstance route,
+            Map<String, WorkflowNodeInstance> nodesByKey) {
+        return new WorkflowRuntimeAddSignExplanationView(
+                WorkflowRuntimeAddSignExplanationView.ORIGIN_TYPE_ADD_SIGN,
+                WorkflowRuntimeAddSignExplanationView.DIMENSION_ROUTE,
+                Boolean.TRUE,
+                null,
+                null,
+                null,
+                null,
+                route.getId(),
+                route.getRouteKey(),
+                route.getSourceNodeKey(),
+                route.getTargetNodeKey(),
+                route.getRouteStatus(),
+                route.getAddSignSourceNodeKey(),
+                sourceNodeName(route.getAddSignSourceNodeKey(), nodesByKey),
+                route.getAddSignOperatorId(),
+                route.getAddSignAt());
+    }
+
+    private String sourceNodeName(String sourceNodeKey, Map<String, WorkflowNodeInstance> nodesByKey) {
+        String validSourceNodeKey = blankToNull(sourceNodeKey);
+        if (validSourceNodeKey == null) {
+            return null;
+        }
+        WorkflowNodeInstance sourceNode = nodesByKey.get(validSourceNodeKey);
+        return firstText(snapshotText(sourceNode, "nodeName"),
+                firstText(snapshotText(sourceNode, "name"),
+                        firstText(snapshotText(sourceNode, "title"), validSourceNodeKey)));
+    }
+
+    private String snapshotText(WorkflowNodeInstance node, String fieldName) {
+        if (node == null || node.getNodeSnapshotText() == null || node.getNodeSnapshotText().isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode value = OBJECT_MAPPER.readTree(node.getNodeSnapshotText()).path(fieldName);
+            if (value.isMissingNode() || value.isNull()) {
+                return null;
+            }
+            return blankToNull(value.asText(null));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private Comparator<WorkflowNodeInstance> nodeSort() {
@@ -815,6 +914,10 @@ public class WorkflowRuntimeReadFacade {
 
     private String firstText(String first, String second) {
         return first != null && !first.isBlank() ? first : second;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private String requireText(String value, String message) {
