@@ -511,9 +511,10 @@ public class WorkflowRuntimeReadFacade {
         String validStarterId = requireText(starterId, "workflow starter id must not be blank");
         List<WorkflowInstance> instances = instanceDao.query(Criteria.of().eq("startedBy", validStarterId),
                 ALL, Sort.desc("startedAt"), Sort.desc("updatedAt"));
+        Map<String, String> userTitles = userTitles(List.of(), instances);
         List<WorkflowWorkbenchCard> cards = instances.stream()
                 .map(instance -> card("TRACKING", instance, null, currentAddSignNode(instance),
-                        currentAssignees(instance.getId())))
+                        currentAssignees(instance.getId()), userTitles))
                 .filter(card -> matches(card, request))
                 .sorted(sorter("TRACKING", request))
                 .toList();
@@ -558,7 +559,7 @@ public class WorkflowRuntimeReadFacade {
                 nodes.computeIfAbsent(task.getNodeInstanceId(), nodeDao::findById);
             }
         }
-        Map<String, String> userTitles = userTitles(tasks);
+        Map<String, String> userTitles = userTitles(tasks, instances.values());
         return tasks.stream()
                 .map(task -> card(boardType, instances.get(task.getInstanceId()), task,
                         nodes.get(task.getNodeInstanceId()), assigneeIds(task), userTitles))
@@ -604,7 +605,8 @@ public class WorkflowRuntimeReadFacade {
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toList();
-        return card("DELEGATION", instance, representative, node, currentAssigneeIds, userTitles(tasks), tasks.size());
+        return card("DELEGATION", instance, representative, node, currentAssigneeIds,
+                userTitles(tasks, List.of(instance)), tasks.size());
     }
 
     private WorkflowWorkbenchCard card(String boardType,
@@ -657,7 +659,7 @@ public class WorkflowRuntimeReadFacade {
                 noticeReadStatus(task), noticeSourceType(task), delegationTaskCount,
                 Boolean.TRUE.equals(node == null ? null : node.getAddedByAddSign()),
                 addSignSourceNodeKey(node), addSignOperatorId(node), title(addSignOperatorId(node), userTitles),
-                addSignAt(node));
+                addSignAt(node), instance.getStartedBy(), title(instance.getStartedBy(), userTitles));
     }
 
     private String addSignSourceNodeKey(WorkflowNodeInstance node) {
@@ -677,6 +679,10 @@ public class WorkflowRuntimeReadFacade {
     }
 
     private Map<String, String> userTitles(List<WorkflowTask> tasks) {
+        return userTitles(tasks, List.of());
+    }
+
+    private Map<String, String> userTitles(List<WorkflowTask> tasks, Iterable<WorkflowInstance> instances) {
         LinkedHashSet<String> userIds = new LinkedHashSet<>();
         for (WorkflowTask task : tasks == null ? List.<WorkflowTask>of() : tasks) {
             addUserId(userIds, task.getAssigneeId());
@@ -686,6 +692,11 @@ public class WorkflowRuntimeReadFacade {
             addUserId(userIds, task.getDelegatedToUserId());
             addUserId(userIds, task.getTransferredFromUserId());
             addUserId(userIds, task.getTransferredBy());
+        }
+        if (instances != null) {
+            for (WorkflowInstance instance : instances) {
+                addUserId(userIds, instance == null ? null : instance.getStartedBy());
+            }
         }
         Map<String, String> titles = userTitleResolver.titles(userIds);
         return titles == null ? Map.of() : titles;
@@ -859,6 +870,9 @@ public class WorkflowRuntimeReadFacade {
         if (!sameText(normalized.addSignSourceNodeKey(), card.addSignSourceNodeKey())) {
             return false;
         }
+        if (!sameText(normalized.submitterUserId(), card.submitterUserId())) {
+            return false;
+        }
         if (!matchesNodeKey(normalized.nodeKey(), card)) {
             return false;
         }
@@ -878,7 +892,7 @@ public class WorkflowRuntimeReadFacade {
                 normalized.startedFrom(), normalized.startedTo(), normalized.receivedFrom(), normalized.receivedTo(),
                 normalized.completedFrom(), normalized.completedTo(), normalized.lastOperatedFrom(),
                 normalized.lastOperatedTo(), normalized.dueFrom(), normalized.dueTo(), normalized.addedByAddSign(),
-                normalized.addSignSourceNodeKey(), List.of());
+                normalized.addSignSourceNodeKey(), normalized.submitterUserId(), List.of());
     }
 
     private Comparator<WorkflowWorkbenchCard> sorter(String boardType, WorkflowWorkbenchQueryRequest request) {
@@ -905,7 +919,7 @@ public class WorkflowRuntimeReadFacade {
                     "lastOperatedAt", "dueAt", "addSignAt", "addedByAddSign", "addSignSourceNodeKey",
                     "addSignOperatorId", "originalAssigneeId", "delegatedFromUserId", "delegatedToUserId",
                     "principalCanProcess",
-                    "delegationTaskCount" -> {
+                    "delegationTaskCount", "submitterUserId" -> {
             }
             default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
         }
@@ -955,6 +969,7 @@ public class WorkflowRuntimeReadFacade {
             case "delegatedToUserId" -> card.delegatedToUserId();
             case "principalCanProcess" -> card.principalCanProcess();
             case "delegationTaskCount" -> card.delegationTaskCount();
+            case "submitterUserId" -> card.submitterUserId();
             default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
         };
     }

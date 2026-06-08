@@ -325,6 +325,7 @@ class WorkflowRuntimeWebControllerTest {
                                   "page": {"pageNum": 2, "pageSize": 30},
                                   "moduleAlias": "crm.contract",
                                   "nodeKey": "visit",
+                                  "submitterUserId": "starter-1",
                                   "addedByAddSign": true,
                                   "addSignSourceNodeKey": "approve",
                                   "sorts": [
@@ -344,6 +345,7 @@ class WorkflowRuntimeWebControllerTest {
         assertThat(pageCaptor.getValue().getLimit()).isEqualTo(30);
         assertThat(queryCaptor.getValue().moduleAlias()).isEqualTo("crm.contract");
         assertThat(queryCaptor.getValue().nodeKey()).isEqualTo("visit");
+        assertThat(queryCaptor.getValue().submitterUserId()).isEqualTo("starter-1");
         assertThat(queryCaptor.getValue().addedByAddSign()).isTrue();
         assertThat(queryCaptor.getValue().addSignSourceNodeKey()).isEqualTo("approve");
         assertThat(queryCaptor.getValue().sorts().getFirst().field()).isEqualTo("receivedAt");

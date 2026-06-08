@@ -379,18 +379,20 @@ record WorkflowWorkbenchWebRequest(
         Instant dueTo,
         Boolean addedByAddSign,
         String addSignSourceNodeKey,
+        String submitterUserId,
         List<WorkflowWorkbenchSort> sorts) {
     static WorkflowWorkbenchWebRequest empty() {
         return new WorkflowWorkbenchWebRequest(null, WebPageRequest.DEFAULT, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, List.of());
+                null, null, null, List.of());
     }
 
     WorkflowWorkbenchQueryRequest toQueryRequest() {
         return new WorkflowWorkbenchQueryRequest(moduleAlias, recordId, definitionId, workflowVersionId,
                 definitionVersionId, instanceStatus, nodeKey, taskKind, taskStatus, assignmentKind, overtimeStatus,
                 readStatus, startedFrom, startedTo, receivedFrom, receivedTo, completedFrom, completedTo,
-                lastOperatedFrom, lastOperatedTo, dueFrom, dueTo, addedByAddSign, addSignSourceNodeKey, sorts);
+                lastOperatedFrom, lastOperatedTo, dueFrom, dueTo, addedByAddSign, addSignSourceNodeKey,
+                submitterUserId, sorts);
     }
 }
 

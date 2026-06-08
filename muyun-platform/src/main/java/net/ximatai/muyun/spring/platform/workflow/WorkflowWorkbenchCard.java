@@ -42,12 +42,62 @@ public record WorkflowWorkbenchCard(
         String addSignSourceNodeKey,
         String addSignOperatorId,
         String addSignOperatorTitle,
-        Instant addSignAt
+        Instant addSignAt,
+        String submitterUserId,
+        String submitterUserTitle
 ) {
     public WorkflowWorkbenchCard {
         currentAssigneeIds = currentAssigneeIds == null ? List.of() : List.copyOf(currentAssigneeIds);
         currentAssigneeTitles = currentAssigneeTitles == null ? List.of() : List.copyOf(currentAssigneeTitles);
         addedByAddSign = Boolean.TRUE.equals(addedByAddSign);
+    }
+
+    public WorkflowWorkbenchCard(String boardType,
+                                 String instanceId,
+                                 String moduleAlias,
+                                 String recordId,
+                                 String definitionId,
+                                 String workflowVersionId,
+                                 WorkflowInstanceStatus instanceStatus,
+                                 WorkflowApprovalStatus approvalStatus,
+                                 String taskId,
+                                 WorkflowTaskKind taskKind,
+                                 WorkflowTaskStatus taskStatus,
+                                 String nodeKey,
+                                 String nodeTitle,
+                                 String currentNodeKeys,
+                                 List<String> currentAssigneeIds,
+                                 List<String> currentAssigneeTitles,
+                                 Instant startedAt,
+                                 Instant receivedAt,
+                                 Instant completedAt,
+                                 String actionCode,
+                                 WorkflowOvertimeStatus overtimeStatus,
+                                 Instant dueAt,
+                                 Instant lastOperatedAt,
+                                 WorkflowAssignmentKind assignmentKind,
+                                 String originalAssigneeId,
+                                 String originalAssigneeTitle,
+                                 String delegatedFromUserId,
+                                 String delegatedFromUserTitle,
+                                 String delegatedToUserId,
+                                 String delegatedToUserTitle,
+                                 Boolean principalCanProcess,
+                                 WorkflowNoticeReadStatus readStatus,
+                                 String noticeSourceType,
+                                 Integer delegationTaskCount,
+                                 Boolean addedByAddSign,
+                                 String addSignSourceNodeKey,
+                                 String addSignOperatorId,
+                                 String addSignOperatorTitle,
+                                 Instant addSignAt) {
+        this(boardType, instanceId, moduleAlias, recordId, definitionId, workflowVersionId, instanceStatus,
+                approvalStatus, taskId, taskKind, taskStatus, nodeKey, nodeTitle, currentNodeKeys,
+                currentAssigneeIds, currentAssigneeTitles, startedAt, receivedAt, completedAt, actionCode,
+                overtimeStatus, dueAt, lastOperatedAt, assignmentKind, originalAssigneeId, originalAssigneeTitle,
+                delegatedFromUserId, delegatedFromUserTitle, delegatedToUserId, delegatedToUserTitle,
+                principalCanProcess, readStatus, noticeSourceType, delegationTaskCount, addedByAddSign,
+                addSignSourceNodeKey, addSignOperatorId, addSignOperatorTitle, addSignAt, null, null);
     }
 
     public WorkflowWorkbenchCard(String boardType,
@@ -83,6 +133,7 @@ public record WorkflowWorkbenchCard(
                 List.of(),
                 startedAt, receivedAt, completedAt, actionCode, overtimeStatus, dueAt, lastOperatedAt,
                 assignmentKind, originalAssigneeId, null, delegatedFromUserId, null, delegatedToUserId, null,
-                principalCanProcess, null, noticeSourceType, delegationTaskCount, false, null, null, null, null);
+                principalCanProcess, null, noticeSourceType, delegationTaskCount, false, null, null, null, null,
+                null, null);
     }
 }

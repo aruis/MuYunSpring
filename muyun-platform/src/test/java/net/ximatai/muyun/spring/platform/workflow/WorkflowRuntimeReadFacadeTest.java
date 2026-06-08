@@ -257,7 +257,8 @@ class WorkflowRuntimeReadFacadeTest {
                 .thenReturn(List.of(task));
         when(instanceDao.findById("instance-1")).thenReturn(instance);
         when(nodeDao.findById("node-1")).thenReturn(node);
-        WorkflowRuntimeReadFacade facadeWithTitles = facadeWithTitles(Map.of("user-1", "处理人"));
+        WorkflowRuntimeReadFacade facadeWithTitles = facadeWithTitles(Map.of("user-1", "处理人",
+                "starter-1", "提交人"));
 
         List<WorkflowWorkbenchCard> cards = facadeWithTitles.todoCards("user-1", PageRequest.of(1, 20));
 
@@ -269,6 +270,8 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(cards.getFirst().nodeTitle()).isEqualTo("客户回访");
         assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("user-1");
         assertThat(cards.getFirst().currentAssigneeTitles()).containsExactly("处理人");
+        assertThat(cards.getFirst().submitterUserId()).isEqualTo("starter-1");
+        assertThat(cards.getFirst().submitterUserTitle()).isEqualTo("提交人");
         assertThat(cards.getFirst().originalAssigneeTitle()).isEqualTo("处理人");
         assertThat(cards.getFirst().overtimeStatus()).isEqualTo(WorkflowOvertimeStatus.WARNED);
     }
@@ -342,9 +345,10 @@ class WorkflowRuntimeReadFacadeTest {
         WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest("sales.contract", "record-1",
                 "definition-1", "version-1", null, WorkflowInstanceStatus.RUNNING, "visit",
                 WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, WorkflowAssignmentKind.NORMAL,
-                WorkflowOvertimeStatus.WARNED, Instant.parse("2026-06-04T00:00:00Z"),
+                WorkflowOvertimeStatus.WARNED, null, Instant.parse("2026-06-04T00:00:00Z"),
                 Instant.parse("2026-06-06T00:00:00Z"), Instant.parse("2026-06-05T00:00:00Z"),
-                Instant.parse("2026-06-05T02:00:00Z"), null, null, null, null, null, null, List.of());
+                Instant.parse("2026-06-05T02:00:00Z"), null, null, null, null, null, null, null, null,
+                "starter-1", List.of());
 
         List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
 
@@ -353,6 +357,7 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(cards.getFirst().definitionId()).isEqualTo("definition-1");
         assertThat(cards.getFirst().workflowVersionId()).isEqualTo("version-1");
         assertThat(cards.getFirst().startedAt()).isEqualTo(Instant.parse("2026-06-05T00:00:00Z"));
+        assertThat(cards.getFirst().submitterUserId()).isEqualTo("starter-1");
     }
 
     @Test

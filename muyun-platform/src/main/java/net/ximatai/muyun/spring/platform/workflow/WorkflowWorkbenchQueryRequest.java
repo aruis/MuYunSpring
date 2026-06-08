@@ -28,6 +28,7 @@ public record WorkflowWorkbenchQueryRequest(
         Instant dueTo,
         Boolean addedByAddSign,
         String addSignSourceNodeKey,
+        String submitterUserId,
         List<WorkflowWorkbenchSort> sorts
 ) {
     public WorkflowWorkbenchQueryRequest {
@@ -36,7 +37,39 @@ public record WorkflowWorkbenchQueryRequest(
 
     public static WorkflowWorkbenchQueryRequest empty() {
         return new WorkflowWorkbenchQueryRequest(null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, List.of());
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of());
+    }
+
+    public WorkflowWorkbenchQueryRequest(String moduleAlias,
+                                         String recordId,
+                                         String definitionId,
+                                         String workflowVersionId,
+                                         String definitionVersionId,
+                                         WorkflowInstanceStatus instanceStatus,
+                                         String nodeKey,
+                                         WorkflowTaskKind taskKind,
+                                         WorkflowTaskStatus taskStatus,
+                                         WorkflowAssignmentKind assignmentKind,
+                                         WorkflowOvertimeStatus overtimeStatus,
+                                         WorkflowNoticeReadStatus readStatus,
+                                         Instant startedFrom,
+                                         Instant startedTo,
+                                         Instant receivedFrom,
+                                         Instant receivedTo,
+                                         Instant completedFrom,
+                                         Instant completedTo,
+                                         Instant lastOperatedFrom,
+                                         Instant lastOperatedTo,
+                                         Instant dueFrom,
+                                         Instant dueTo,
+                                         Boolean addedByAddSign,
+                                         String addSignSourceNodeKey,
+                                         List<WorkflowWorkbenchSort> sorts) {
+        this(moduleAlias, recordId, definitionId, workflowVersionId, definitionVersionId, instanceStatus, nodeKey,
+                taskKind, taskStatus, assignmentKind, overtimeStatus, readStatus, startedFrom, startedTo,
+                receivedFrom, receivedTo, completedFrom, completedTo, lastOperatedFrom, lastOperatedTo, dueFrom,
+                dueTo, addedByAddSign, addSignSourceNodeKey, null, sorts);
     }
 
     public WorkflowWorkbenchQueryRequest(String moduleAlias,
@@ -64,7 +97,7 @@ public record WorkflowWorkbenchQueryRequest(
         this(moduleAlias, recordId, definitionId, workflowVersionId, definitionVersionId, instanceStatus, nodeKey,
                 taskKind, taskStatus, assignmentKind, overtimeStatus, null, startedFrom, startedTo, receivedFrom,
                 receivedTo, completedFrom, completedTo, lastOperatedFrom, lastOperatedTo, dueFrom, dueTo,
-                null, null, sorts);
+                null, null, null, sorts);
     }
 
     public String effectiveWorkflowVersionId() {
