@@ -809,10 +809,11 @@ public class WorkflowRuntimeReadFacade {
     private void validateSortField(String field) {
         switch (field) {
             case "moduleAlias", "recordId", "definitionId", "workflowVersionId", "definitionVersionId",
-                    "instanceStatus", "nodeKey", "taskKind", "taskStatus", "assignmentKind", "overtimeStatus",
-                    "readStatus", "startedAt", "receivedAt", "completedAt", "lastOperatedAt", "dueAt", "addSignAt",
-                    "addedByAddSign", "addSignSourceNodeKey", "addSignOperatorId", "originalAssigneeId",
-                    "delegatedFromUserId", "delegatedToUserId", "principalCanProcess",
+                    "instanceStatus", "approvalStatus", "nodeKey", "taskKind", "taskStatus", "actionCode",
+                    "assignmentKind", "overtimeStatus", "readStatus", "startedAt", "receivedAt", "completedAt",
+                    "lastOperatedAt", "dueAt", "addSignAt", "addedByAddSign", "addSignSourceNodeKey",
+                    "addSignOperatorId", "originalAssigneeId", "delegatedFromUserId", "delegatedToUserId",
+                    "principalCanProcess",
                     "delegationTaskCount" -> {
             }
             default -> throw new PlatformException("unsupported workflow workbench sort field: " + field);
@@ -841,9 +842,11 @@ public class WorkflowRuntimeReadFacade {
             case "definitionId" -> card.definitionId();
             case "workflowVersionId", "definitionVersionId" -> card.workflowVersionId();
             case "instanceStatus" -> card.instanceStatus();
+            case "approvalStatus" -> card.approvalStatus();
             case "nodeKey" -> card.nodeKey();
             case "taskKind" -> card.taskKind();
             case "taskStatus" -> card.taskStatus();
+            case "actionCode" -> card.actionCode();
             case "assignmentKind" -> card.assignmentKind();
             case "overtimeStatus" -> card.overtimeStatus();
             case "readStatus" -> card.readStatus();

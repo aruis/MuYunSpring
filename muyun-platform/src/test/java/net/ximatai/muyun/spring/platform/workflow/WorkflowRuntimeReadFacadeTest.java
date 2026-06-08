@@ -369,6 +369,29 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortDoneWorkbenchCardsByActionCode() {
+        WorkflowTask approved = task("task-approve", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.DONE);
+        approved.setDecision("approve");
+        approved.setActualProcessorId("user-1");
+        WorkflowTask rejected = task("task-reject", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.REJECTED);
+        rejected.setDecision("reject");
+        rejected.setActualProcessorId("user-1");
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(rejected, approved));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(node("node-1", "approve"));
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("actionCode", WorkflowSortDirection.ASC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.doneCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId)
+                .containsExactly("task-approve", "task-reject");
+        assertThat(cards).extracting(WorkflowWorkbenchCard::actionCode).containsExactly("approve", "reject");
+    }
+
+    @Test
     void shouldSortWorkbenchCardsByAddSignAt() {
         WorkflowTask first = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
         first.setCreatedAt(Instant.parse("2026-06-05T03:00:00Z"));
@@ -512,6 +535,28 @@ class WorkflowRuntimeReadFacadeTest {
         assertThat(cards.getFirst().boardType()).isEqualTo("TRACKING");
         assertThat(cards.getFirst().taskId()).isNull();
         assertThat(cards.getFirst().currentAssigneeIds()).containsExactly("user-1");
+    }
+
+    @Test
+    void shouldSortTrackingWorkbenchCardsByApprovalStatus() {
+        WorkflowInstance approved = instance("instance-approved");
+        approved.setApprovalStatus(WorkflowApprovalStatus.APPROVED);
+        WorkflowInstance processing = instance("instance-processing");
+        processing.setApprovalStatus(WorkflowApprovalStatus.PROCESSING);
+        when(instanceDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(approved, processing));
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of());
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of());
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                List.of(new WorkflowWorkbenchSort("approvalStatus", WorkflowSortDirection.ASC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.trackingCards("starter-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::instanceId)
+                .containsExactly("instance-processing", "instance-approved");
+        assertThat(cards).extracting(WorkflowWorkbenchCard::approvalStatus)
+                .containsExactly(WorkflowApprovalStatus.PROCESSING, WorkflowApprovalStatus.APPROVED);
     }
 
     @Test
