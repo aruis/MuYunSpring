@@ -32,10 +32,15 @@ public record WorkflowWorkbenchCard(
         Boolean principalCanProcess,
         WorkflowNoticeReadStatus readStatus,
         String noticeSourceType,
-        Integer delegationTaskCount
+        Integer delegationTaskCount,
+        Boolean addedByAddSign,
+        String addSignSourceNodeKey,
+        String addSignOperatorId,
+        Instant addSignAt
 ) {
     public WorkflowWorkbenchCard {
         currentAssigneeIds = currentAssigneeIds == null ? List.of() : List.copyOf(currentAssigneeIds);
+        addedByAddSign = Boolean.TRUE.equals(addedByAddSign);
     }
 
     public WorkflowWorkbenchCard(String boardType,
@@ -70,6 +75,6 @@ public record WorkflowWorkbenchCard(
                 approvalStatus, taskId, taskKind, taskStatus, nodeKey, currentNodeKeys, currentAssigneeIds,
                 startedAt, receivedAt, completedAt, actionCode, overtimeStatus, dueAt, lastOperatedAt,
                 assignmentKind, originalAssigneeId, delegatedFromUserId, delegatedToUserId, principalCanProcess,
-                null, noticeSourceType, delegationTaskCount);
+                null, noticeSourceType, delegationTaskCount, false, null, null, null);
     }
 }

@@ -268,6 +268,45 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldExposeAndFilterTodoWorkbenchCardsByAddSignSource() {
+        WorkflowTask addSignTask = task("task-add", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        addSignTask.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowTask normalTask = task("task-normal", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        normalTask.setNodeInstanceId("node-normal");
+        normalTask.setCreatedAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowNodeInstance addSignNode = node("node-1", "add-1");
+        addSignNode.setAddedByAddSign(true);
+        addSignNode.setAddSignSourceNodeKey("approve");
+        addSignNode.setAddSignOperatorId("operator-1");
+        addSignNode.setAddSignAt(Instant.parse("2026-06-05T00:30:00Z"));
+        WorkflowNodeInstance normalNode = node("node-normal", "normal");
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(addSignTask, normalTask));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(addSignNode);
+        when(nodeDao.findById("node-normal")).thenReturn(normalNode);
+
+        List<WorkflowWorkbenchCard> addSignCards = facade.todoCards("user-1", PageRequest.of(1, 20),
+                workbenchRequest(true, null));
+        List<WorkflowWorkbenchCard> sourceCards = facade.todoCards("user-1", PageRequest.of(1, 20),
+                workbenchRequest(null, "approve"));
+        List<WorkflowWorkbenchCard> normalCards = facade.todoCards("user-1", PageRequest.of(1, 20),
+                workbenchRequest(false, null));
+
+        assertThat(addSignCards).hasSize(1);
+        WorkflowWorkbenchCard card = addSignCards.getFirst();
+        assertThat(card.taskId()).isEqualTo("task-add");
+        assertThat(card.addedByAddSign()).isTrue();
+        assertThat(card.addSignSourceNodeKey()).isEqualTo("approve");
+        assertThat(card.addSignOperatorId()).isEqualTo("operator-1");
+        assertThat(card.addSignAt()).isEqualTo(Instant.parse("2026-06-05T00:30:00Z"));
+        assertThat(sourceCards).extracting(WorkflowWorkbenchCard::taskId).containsExactly("task-add");
+        assertThat(normalCards).extracting(WorkflowWorkbenchCard::taskId).containsExactly("task-normal");
+        assertThat(normalCards.getFirst().addedByAddSign()).isFalse();
+        assertThat(normalCards.getFirst().addSignSourceNodeKey()).isNull();
+    }
+
+    @Test
     void shouldFilterWorkbenchCardsByStableRequestFields() {
         WorkflowTask matching = task("task-1", WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO);
         matching.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
@@ -386,6 +425,34 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldExposeAddSignFieldsOnTrackingCardsFromCurrentNode() {
+        WorkflowInstance instance = instance("instance-1");
+        instance.setCurrentNodeKeys("add-1");
+        WorkflowNodeInstance addSignNode = node("node-add", "add-1");
+        addSignNode.setAddedByAddSign(true);
+        addSignNode.setAddSignSourceNodeKey("approve");
+        addSignNode.setAddSignOperatorId("operator-1");
+        addSignNode.setAddSignAt(Instant.parse("2026-06-05T00:30:00Z"));
+        WorkflowTask todo = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        when(instanceDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(instance));
+        when(nodeDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class)))
+                .thenReturn(List.of(addSignNode));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class))).thenReturn(List.of(todo));
+
+        List<WorkflowWorkbenchCard> cards = facade.trackingCards("starter-1", PageRequest.of(1, 20),
+                workbenchRequest(true, "approve"));
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.getFirst().boardType()).isEqualTo("TRACKING");
+        assertThat(cards.getFirst().nodeKey()).isEqualTo("add-1");
+        assertThat(cards.getFirst().addedByAddSign()).isTrue();
+        assertThat(cards.getFirst().addSignSourceNodeKey()).isEqualTo("approve");
+        assertThat(cards.getFirst().addSignOperatorId()).isEqualTo("operator-1");
+        assertThat(cards.getFirst().addSignAt()).isEqualTo(Instant.parse("2026-06-05T00:30:00Z"));
+    }
+
+    @Test
     void shouldBuildDelegationWorkbenchCardsWithDelegationTaskCount() {
         WorkflowTask first = delegatedTask("task-1", "delegate-1");
         first.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
@@ -416,7 +483,7 @@ class WorkflowRuntimeReadFacadeTest {
         when(nodeDao.findById("node-1")).thenReturn(node("node-1", "notice"));
         WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
                 null, null, null, null, null, null, WorkflowNoticeReadStatus.READ,
-                null, null, null, null, null, null, null, null, null, null, List.of());
+                null, null, null, null, null, null, null, null, null, null, null, null, List.of());
 
         List<WorkflowWorkbenchCard> cards = facade.noticeCards("user-1", PageRequest.of(1, 20), request);
 
@@ -730,6 +797,12 @@ class WorkflowRuntimeReadFacadeTest {
         route.setDefaultRoute(defaultRoute);
         route.setCreatedAt(Instant.parse(createdAt));
         return route;
+    }
+
+    private WorkflowWorkbenchQueryRequest workbenchRequest(Boolean addedByAddSign, String addSignSourceNodeKey) {
+        return new WorkflowWorkbenchQueryRequest(null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                addedByAddSign, addSignSourceNodeKey, List.of());
     }
 
     private long count(WorkflowWorkbenchStats stats, String code) {

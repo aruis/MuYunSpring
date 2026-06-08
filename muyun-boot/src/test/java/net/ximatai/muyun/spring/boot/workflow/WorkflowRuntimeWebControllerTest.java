@@ -240,7 +240,8 @@ class WorkflowRuntimeWebControllerTest {
         WorkflowWorkbenchCard card = new WorkflowWorkbenchCard("TODO", "inst-1", "crm.contract", "record-1",
                 "def-1", "ver-1", WorkflowInstanceStatus.RUNNING, WorkflowApprovalStatus.PROCESSING, "task-1",
                 WorkflowTaskKind.BUSINESS, WorkflowTaskStatus.TODO, "visit", "visit", List.of("user-1"),
-                null, null, null, null, null, null, null, null, null, null, "user-1", Boolean.TRUE, null, null);
+                null, null, null, null, null, null, null, null, null, null, "user-1", Boolean.TRUE, null, null,
+                null, Boolean.TRUE, "approve", "operator-1", Instant.parse("2026-06-05T00:30:00Z"));
         ArgumentCaptor<PageRequest> pageCaptor = ArgumentCaptor.forClass(PageRequest.class);
         ArgumentCaptor<WorkflowWorkbenchQueryRequest> queryCaptor =
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
@@ -254,6 +255,8 @@ class WorkflowRuntimeWebControllerTest {
                                   "page": {"pageNum": 2, "pageSize": 30},
                                   "moduleAlias": "crm.contract",
                                   "nodeKey": "visit",
+                                  "addedByAddSign": true,
+                                  "addSignSourceNodeKey": "approve",
                                   "sorts": [
                                     {"field": "receivedAt", "direction": "ASC"}
                                   ]
@@ -261,12 +264,18 @@ class WorkflowRuntimeWebControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].boardType").value("TODO"))
-                .andExpect(jsonPath("$.records[0].taskId").value("task-1"));
+                .andExpect(jsonPath("$.records[0].taskId").value("task-1"))
+                .andExpect(jsonPath("$.records[0].addedByAddSign").value(true))
+                .andExpect(jsonPath("$.records[0].addSignSourceNodeKey").value("approve"))
+                .andExpect(jsonPath("$.records[0].addSignOperatorId").value("operator-1"))
+                .andExpect(jsonPath("$.records[0].addSignAt").exists());
 
         assertThat(pageCaptor.getValue().getOffset()).isEqualTo(30);
         assertThat(pageCaptor.getValue().getLimit()).isEqualTo(30);
         assertThat(queryCaptor.getValue().moduleAlias()).isEqualTo("crm.contract");
         assertThat(queryCaptor.getValue().nodeKey()).isEqualTo("visit");
+        assertThat(queryCaptor.getValue().addedByAddSign()).isTrue();
+        assertThat(queryCaptor.getValue().addSignSourceNodeKey()).isEqualTo("approve");
         assertThat(queryCaptor.getValue().sorts().getFirst().field()).isEqualTo("receivedAt");
     }
 

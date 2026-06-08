@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -484,7 +485,8 @@ public class WorkflowRuntimeReadFacade {
         List<WorkflowInstance> instances = instanceDao.query(Criteria.of().eq("startedBy", validStarterId),
                 ALL, Sort.desc("startedAt"), Sort.desc("updatedAt"));
         List<WorkflowWorkbenchCard> cards = instances.stream()
-                .map(instance -> card("TRACKING", instance, null, null, currentAssignees(instance.getId())))
+                .map(instance -> card("TRACKING", instance, null, currentAddSignNode(instance),
+                        currentAssignees(instance.getId())))
                 .filter(card -> matches(card, request))
                 .sorted(sorter("TRACKING", request))
                 .toList();
@@ -600,7 +602,25 @@ public class WorkflowRuntimeReadFacade {
                 task == null ? null : task.getDelegatedFromUserId(),
                 task == null ? null : firstText(task.getDelegatedToUserId(), task.getAssigneeId()),
                 task == null ? null : task.getPrincipalCanProcess(),
-                noticeReadStatus(task), noticeSourceType(task), delegationTaskCount);
+                noticeReadStatus(task), noticeSourceType(task), delegationTaskCount,
+                Boolean.TRUE.equals(node == null ? null : node.getAddedByAddSign()),
+                addSignSourceNodeKey(node), addSignOperatorId(node), addSignAt(node));
+    }
+
+    private String addSignSourceNodeKey(WorkflowNodeInstance node) {
+        return node != null && Boolean.TRUE.equals(node.getAddedByAddSign())
+                ? blankToNull(node.getAddSignSourceNodeKey())
+                : null;
+    }
+
+    private String addSignOperatorId(WorkflowNodeInstance node) {
+        return node != null && Boolean.TRUE.equals(node.getAddedByAddSign())
+                ? blankToNull(node.getAddSignOperatorId())
+                : null;
+    }
+
+    private Instant addSignAt(WorkflowNodeInstance node) {
+        return node != null && Boolean.TRUE.equals(node.getAddedByAddSign()) ? node.getAddSignAt() : null;
     }
 
     private String noticeSourceType(WorkflowTask task) {
@@ -662,6 +682,33 @@ public class WorkflowRuntimeReadFacade {
                 .toList();
     }
 
+    private WorkflowNodeInstance currentAddSignNode(WorkflowInstance instance) {
+        if (instance == null || instance.getCurrentNodeKeys() == null || instance.getCurrentNodeKeys().isBlank()) {
+            return null;
+        }
+        Map<String, WorkflowNodeInstance> addSignNodesByKey = safeNodes(instance.getId()).stream()
+                .filter(node -> Boolean.TRUE.equals(node.getAddedByAddSign()))
+                .filter(node -> node.getNodeKey() != null)
+                .collect(Collectors.toMap(WorkflowNodeInstance::getNodeKey, Function.identity(), (left, right) -> left,
+                        LinkedHashMap::new));
+        if (addSignNodesByKey.isEmpty()) {
+            return null;
+        }
+        for (String nodeKey : instance.getCurrentNodeKeys().split("[,;\\s]+")) {
+            WorkflowNodeInstance node = addSignNodesByKey.get(nodeKey);
+            if (node != null) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private List<WorkflowNodeInstance> safeNodes(String instanceId) {
+        List<WorkflowNodeInstance> nodes = nodeDao.query(Criteria.of().eq("instanceId", instanceId),
+                ALL, Sort.asc("createdAt"));
+        return nodes == null ? List.of() : nodes;
+    }
+
     private WorkflowInstance requireInstance(String instanceId) {
         String validInstanceId = requireText(instanceId, "workflow instance id must not be blank");
         WorkflowInstance instance = instanceDao.findById(validInstanceId);
@@ -707,6 +754,12 @@ public class WorkflowRuntimeReadFacade {
             return false;
         }
         if (!matchesReadStatus(normalized.readStatus(), card.readStatus())) {
+            return false;
+        }
+        if (!same(normalized.addedByAddSign(), card.addedByAddSign())) {
+            return false;
+        }
+        if (!sameText(normalized.addSignSourceNodeKey(), card.addSignSourceNodeKey())) {
             return false;
         }
         if (!matchesNodeKey(normalized.nodeKey(), card)) {
