@@ -369,6 +369,35 @@ class WorkflowRuntimeReadFacadeTest {
     }
 
     @Test
+    void shouldSortWorkbenchCardsByAddSignAt() {
+        WorkflowTask first = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        first.setCreatedAt(Instant.parse("2026-06-05T03:00:00Z"));
+        WorkflowTask second = task("task-2", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        second.setNodeInstanceId("node-2");
+        second.setCreatedAt(Instant.parse("2026-06-05T01:00:00Z"));
+        WorkflowNodeInstance firstNode = node("node-1", "add-1");
+        firstNode.setAddedByAddSign(true);
+        firstNode.setAddSignSourceNodeKey("approve");
+        firstNode.setAddSignAt(Instant.parse("2026-06-05T02:00:00Z"));
+        WorkflowNodeInstance secondNode = node("node-2", "add-2");
+        secondNode.setAddedByAddSign(true);
+        secondNode.setAddSignSourceNodeKey("approve");
+        secondNode.setAddSignAt(Instant.parse("2026-06-05T01:00:00Z"));
+        when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
+                .thenReturn(List.of(first, second));
+        when(instanceDao.findById("instance-1")).thenReturn(instance("instance-1"));
+        when(nodeDao.findById("node-1")).thenReturn(firstNode);
+        when(nodeDao.findById("node-2")).thenReturn(secondNode);
+        WorkflowWorkbenchQueryRequest request = new WorkflowWorkbenchQueryRequest(null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, true, "approve", List.of(new WorkflowWorkbenchSort("addSignAt", WorkflowSortDirection.ASC)));
+
+        List<WorkflowWorkbenchCard> cards = facade.todoCards("user-1", PageRequest.of(1, 20), request);
+
+        assertThat(cards).extracting(WorkflowWorkbenchCard::taskId).containsExactly("task-2", "task-1");
+    }
+
+    @Test
     void shouldRejectUnsupportedWorkbenchSortField() {
         when(taskDao.query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class)))
                 .thenReturn(List.of());
