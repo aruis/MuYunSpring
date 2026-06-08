@@ -16,8 +16,10 @@ class WorkflowTaskActionAvailabilityServiceTest {
     private final WorkflowTaskDao taskDao = mock(WorkflowTaskDao.class);
     private final WorkflowInstanceDao instanceDao = mock(WorkflowInstanceDao.class);
     private final WorkflowNodeInstanceDao nodeDao = mock(WorkflowNodeInstanceDao.class);
+    private final WorkflowRouteInstanceDao routeDao = mock(WorkflowRouteInstanceDao.class);
     private final WorkflowTaskActionAvailabilityService service =
-            new WorkflowTaskActionAvailabilityService(taskDao, instanceDao, nodeDao);
+            new WorkflowTaskActionAvailabilityService(taskDao, instanceDao, nodeDao, routeDao,
+                    new WorkflowTaskAssignmentPolicyService(), WorkflowUserTitleResolver.NONE);
 
     @Test
     void shouldListApprovalActionsByNodePolicy() {
@@ -34,6 +36,8 @@ class WorkflowTaskActionAvailabilityServiceTest {
         when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(task));
+        when(routeDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(candidateRoute()));
 
         List<WorkflowTaskAvailableAction> actions = service.availableActions("task-1", "user-1");
 
@@ -57,6 +61,22 @@ class WorkflowTaskActionAvailabilityServiceTest {
         when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(task, sibling));
+
+        assertThat(codes(service.availableActions("task-1", "user-1"))).doesNotContain("addSign");
+    }
+
+    @Test
+    void shouldHideAddSignWhenNodeHasNoOutgoingCandidateRoute() {
+        WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
+        WorkflowNodeInstance node = node();
+        node.setAllowAddSign(true);
+        when(taskDao.findById("task-1")).thenReturn(task);
+        when(instanceDao.findById("instance-1")).thenReturn(instance(WorkflowInstanceStatus.RUNNING, null));
+        when(nodeDao.findById("node-1")).thenReturn(node);
+        when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(task));
+        when(routeDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
 
         assertThat(codes(service.availableActions("task-1", "user-1"))).doesNotContain("addSign");
     }
@@ -92,8 +112,10 @@ class WorkflowTaskActionAvailabilityServiceTest {
         when(nodeDao.findById("node-1")).thenReturn(node);
         when(taskDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(task));
+        when(routeDao.query(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(candidateRoute()));
         WorkflowTaskActionAvailabilityService serviceWithTitles = new WorkflowTaskActionAvailabilityService(
-                taskDao, instanceDao, nodeDao, null, userIds -> Map.of(
+                taskDao, instanceDao, nodeDao, routeDao, null, userIds -> Map.of(
                 "principal-1", "原审批人",
                 "delegate-1", "代理人"));
 
@@ -191,5 +213,15 @@ class WorkflowTaskActionAvailabilityServiceTest {
         instance.setInstanceStatus(status);
         instance.setRejectResubmitMode(mode);
         return instance;
+    }
+
+    private WorkflowRouteInstance candidateRoute() {
+        WorkflowRouteInstance route = new WorkflowRouteInstance();
+        route.setId("route-1");
+        route.setInstanceId("instance-1");
+        route.setSourceNodeKey("approve");
+        route.setTargetNodeKey("next");
+        route.setRouteStatus(WorkflowRouteStatus.CANDIDATE);
+        return route;
     }
 }

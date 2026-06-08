@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
@@ -19,20 +22,25 @@ import java.util.Map;
 public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
     public static final String EXECUTOR_KEY = "platform.workflow";
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String ACTION_SUBMIT_APPROVAL = "submitApproval";
     private static final String ACTION_SUBMIT_WORKFLOW = "submitWorkflow";
     private static final String ACTION_TASK_ACTION = "taskAction";
     private static final String ACTION_AVAILABLE_TASK_ACTIONS = "availableTaskActions";
+    private static final List<String> INSTANCE_ACTION_CODES = List.of("revoke", "terminate", "reset");
 
     private final WorkflowModuleSubmitService submitService;
     private final WorkflowTaskActionFacade taskActionFacade;
+    private final WorkflowInstanceActionFacade instanceActionFacade;
     private final PlatformModuleActionService actionService;
 
     public DynamicWorkflowActionExecutor(WorkflowModuleSubmitService submitService,
                                          WorkflowTaskActionFacade taskActionFacade,
+                                         WorkflowInstanceActionFacade instanceActionFacade,
                                          PlatformModuleActionService actionService) {
         this.submitService = submitService;
         this.taskActionFacade = taskActionFacade;
+        this.instanceActionFacade = instanceActionFacade;
         this.actionService = actionService;
     }
 
@@ -64,11 +72,18 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                                                               DynamicActionExecutionRequest request,
                                                               String workflowAction) {
         String definitionAlias = boundWorkflowDefinitionAlias(context);
-        if (definitionAlias == null) {
+        if (definitionAlias != null) {
+            return DynamicActionResultBody.refreshed(
+                    submitWorkflow(context, request, definitionAlias));
+        }
+        if (!WorkflowActionPolicyService.RUNTIME_RECORD_ACTION_CODES.contains(workflowAction)) {
             throw new PlatformException("unsupported dynamic workflow action: " + workflowAction);
         }
-        return DynamicActionResultBody.refreshed(
-                submitWorkflow(context, request, definitionAlias));
+        if (INSTANCE_ACTION_CODES.contains(workflowAction)) {
+            return DynamicActionResultBody.refreshed(instanceActionFacade.execute(workflowAction,
+                    instanceRequest(context, request)));
+        }
+        return DynamicActionResultBody.refreshed(taskActionFacade.execute(workflowAction, taskRequest(request)));
     }
 
     private WorkflowSubmitResult submitApproval(DynamicActionExecutionContext context,
@@ -121,14 +136,52 @@ public class DynamicWorkflowActionExecutor implements DynamicActionExecutor {
                 text(payload(request, "operatorId"), null),
                 text(payload(request, "targetAssigneeId"), null),
                 null,
-                null,
+                addSignSegment(payload(request, "addSignSegment")),
                 rejectResubmitMode(payload(request, "rejectResubmitMode")),
                 text(payload(request, "reason"), null),
                 operatedAt(payload(request, "operatedAt")),
                 selectedRouteKey(request),
                 text(payload(request, "selectedReason"), null),
-                manualRouteSelections(request)
+                manualRouteSelections(request),
+                jsonText(payload(request, "semanticJson")),
+                jsonText(payload(request, "layoutJson"))
         );
+    }
+
+    private WorkflowInstanceActionRequest instanceRequest(DynamicActionExecutionContext context,
+                                                          DynamicActionExecutionRequest request) {
+        return new WorkflowInstanceActionRequest(
+                requireText(payload(request, "instanceId"), "workflow instance id must not be blank"),
+                operatorId(context, request),
+                text(payload(request, "reason"), null),
+                operatedAt(payload(request, "operatedAt")));
+    }
+
+    private WorkflowAddSignSegment addSignSegment(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof WorkflowAddSignSegment segment) {
+            return segment;
+        }
+        return OBJECT_MAPPER.convertValue(value, WorkflowAddSignSegment.class);
+    }
+
+    private String jsonText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof JsonNode node) {
+            return node.isNull() ? null : node.isTextual() ? node.asText() : node.toString();
+        }
+        if (value instanceof String text) {
+            return text.isBlank() ? null : text;
+        }
+        try {
+            return OBJECT_MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            throw new PlatformException("workflow json payload must be serializable");
+        }
     }
 
     private List<WorkflowManualRouteSelection> manualRouteSelections(DynamicActionExecutionRequest request) {

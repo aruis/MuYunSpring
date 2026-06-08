@@ -30,6 +30,8 @@ class WorkflowSubmitDraftServiceTest {
 
         assertThat(draft.instance().getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
         assertThat(draft.instance().getCurrentNodeKeys()).isEqualTo("approve");
+        assertThat(draft.instance().getSemanticJson()).isEqualTo("{\"nodes\":[\"approve\"]}");
+        assertThat(draft.instance().getLayoutJson()).isEqualTo("{\"zoom\":1}");
         assertThat(draft.nodes()).hasSize(2);
         assertThat(draft.nodes()).extracting(WorkflowNodeInstance::getNodeStatus)
                 .containsExactly(WorkflowNodeStatus.COMPLETED, WorkflowNodeStatus.ACTIVE);
@@ -246,6 +248,8 @@ class WorkflowSubmitDraftServiceTest {
         version.setId("version-1");
         version.setVersionNo(1);
         version.setSnapshotText("{}");
+        version.setSemanticJson("{\"nodes\":[\"approve\"]}");
+        version.setLayoutJson("{\"zoom\":1}");
         return version;
     }
 

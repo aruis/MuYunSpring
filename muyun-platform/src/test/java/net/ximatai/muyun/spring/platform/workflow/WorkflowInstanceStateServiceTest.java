@@ -19,6 +19,8 @@ class WorkflowInstanceStateServiceTest {
         assertThat(instance.getApprovalStatus()).isEqualTo(WorkflowApprovalStatus.PROCESSING);
         assertThat(instance.getInstanceStatus()).isEqualTo(WorkflowInstanceStatus.RUNNING);
         assertThat(instance.getModuleAlias()).isEqualTo("crm.customer");
+        assertThat(instance.getSemanticJson()).isEqualTo("{\"nodes\":[\"approve\"]}");
+        assertThat(instance.getLayoutJson()).isEqualTo("{\"zoom\":1}");
     }
 
     @Test
@@ -80,6 +82,8 @@ class WorkflowInstanceStateServiceTest {
         WorkflowVersion version = new WorkflowVersion();
         version.setId("version-1");
         version.setVersionNo(1);
+        version.setSemanticJson("{\"nodes\":[\"approve\"]}");
+        version.setLayoutJson("{\"zoom\":1}");
         return version;
     }
 }

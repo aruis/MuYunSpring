@@ -33,6 +33,9 @@ class WorkflowHistoryQueryServiceTest {
 
         service.queryRecordHistory("sales.contract", "record-1", PageRequest.of(1, 20));
 
+        verify(actionPolicyService).requireRecordView(org.mockito.ArgumentMatchers.argThat(instance ->
+                "sales.contract".equals(instance.getModuleAlias())
+                        && "record-1".equals(instance.getRecordId())));
         verify(historyDao).query(any(Criteria.class), any(PageRequest.class), any(Sort.class), any(Sort.class));
     }
 
@@ -45,6 +48,9 @@ class WorkflowHistoryQueryServiceTest {
                 "sales.contract", "record-1", "starter-1", PageRequest.of(1, 20));
 
         assertThat(histories).extracting(WorkflowHistoryInstance::getId).containsExactly("history-1");
+        verify(actionPolicyService).requireRecordView(org.mockito.ArgumentMatchers.argThat(instance ->
+                "sales.contract".equals(instance.getModuleAlias())
+                        && "record-1".equals(instance.getRecordId())));
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(historyDao).query(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
         assertThat(criteria.getValue().getClauses())
@@ -103,6 +109,47 @@ class WorkflowHistoryQueryServiceTest {
 
         verify(actionPolicyService, org.mockito.Mockito.times(3))
                 .requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
+    }
+
+    @Test
+    void shouldReadRecordHistoryDetailsThroughRecordViewAction() {
+        WorkflowHistoryInstance history = history("history-1");
+        WorkflowEvent event = new WorkflowEvent();
+        event.setId("event-1");
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(snapshot(task("task-1", WorkflowTaskStatus.DONE),
+                List.of(event)));
+
+        assertThat(service.renderBundle("history-1").mode()).isEqualTo("HISTORY");
+        assertThat(service.tasks("history-1")).hasSize(1);
+        assertThat(service.taskViews("history-1")).hasSize(1);
+        assertThat(service.events("history-1")).containsExactly(event);
+        assertThat(service.eventViews("history-1")).hasSize(1);
+
+        verify(actionPolicyService, org.mockito.Mockito.times(5))
+                .requireRecordView(org.mockito.ArgumentMatchers.argThat(instance ->
+                        "sales.contract".equals(instance.getModuleAlias())
+                                && "record-1".equals(instance.getRecordId())));
+    }
+
+    @Test
+    void shouldFallbackToHistoryRenderJsonWhenSnapshotInstanceDoesNotCarryIt() {
+        WorkflowHistoryInstance history = history("history-1");
+        history.setSemanticJson("{\"nodes\":[\"history\"]}");
+        history.setLayoutJson("{\"zoom\":1}");
+        WorkflowInstance snapshotInstance = new WorkflowInstance();
+        snapshotInstance.setSemanticJson(null);
+        snapshotInstance.setLayoutJson(null);
+        when(historyDao.findById("history-1")).thenReturn(history);
+        when(archiveService.parseSnapshot(history)).thenReturn(new WorkflowHistorySnapshot(1,
+                Instant.parse("2026-06-05T04:00:00Z"), WorkflowArchiveReason.RECALLED,
+                snapshotInstance, List.of(), List.of(), List.of(), List.of()));
+
+        WorkflowRuntimeRenderBundle bundle = service.renderBundle("history-1");
+
+        assertThat(bundle.semanticJson()).isEqualTo("{\"nodes\":[\"history\"]}");
+        assertThat(bundle.layoutJson()).isEqualTo("{\"zoom\":1}");
+        verify(actionPolicyService).requireRecordView(org.mockito.ArgumentMatchers.any(WorkflowInstance.class));
     }
 
     @Test
@@ -279,6 +326,8 @@ class WorkflowHistoryQueryServiceTest {
     private WorkflowHistoryInstance history(String id) {
         WorkflowHistoryInstance history = new WorkflowHistoryInstance();
         history.setId(id);
+        history.setModuleAlias("sales.contract");
+        history.setRecordId("record-1");
         return history;
     }
 

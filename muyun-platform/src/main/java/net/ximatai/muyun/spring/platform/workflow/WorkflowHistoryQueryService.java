@@ -65,6 +65,7 @@ public class WorkflowHistoryQueryService {
     public List<WorkflowHistoryInstance> queryRecordHistory(String moduleAlias, String recordId,
                                                             String startedBy,
                                                             PageRequest pageRequest) {
+        requireRecordView(moduleAlias, recordId);
         Criteria criteria = Criteria.of()
                 .eq("moduleAlias", requireText(moduleAlias, "workflow module alias must not be blank"))
                 .eq("recordId", requireText(recordId, "workflow record id must not be blank"));
@@ -96,17 +97,19 @@ public class WorkflowHistoryQueryService {
 
     public WorkflowRuntimeRenderBundle renderAdminBundle(String historyInstanceId) {
         actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
-        return renderBundle(historyInstanceId);
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        WorkflowHistorySnapshot snapshot = archiveService.parseSnapshot(history);
+        return renderBundle(history, snapshot);
     }
 
     public List<WorkflowEvent> adminEvents(String historyInstanceId) {
         actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
-        return events(historyInstanceId);
+        return archiveService.parseSnapshot(requireHistory(historyInstanceId)).events();
     }
 
     public List<WorkflowHistoryEventView> adminEventViews(String historyInstanceId) {
         actionPolicyService.requireManagementAction(WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION);
-        return eventViews(historyInstanceId);
+        return eventViews(archiveService.parseSnapshot(requireHistory(historyInstanceId)));
     }
 
     @Transactional
@@ -118,16 +121,21 @@ public class WorkflowHistoryQueryService {
 
     public WorkflowRuntimeRenderBundle renderBundle(String historyInstanceId) {
         WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        requireRecordView(history);
         WorkflowHistorySnapshot snapshot = archiveService.parseSnapshot(history);
-        return new WorkflowRuntimeRenderBundle("HISTORY", snapshot.instance(), snapshot.nodes(), snapshot.routes());
+        return renderBundle(history, snapshot);
     }
 
     public List<WorkflowTask> tasks(String historyInstanceId) {
-        return archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks();
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        requireRecordView(history);
+        return archiveService.parseSnapshot(history).tasks();
     }
 
     public List<WorkflowHistoryTaskView> taskViews(String historyInstanceId) {
-        List<WorkflowTask> tasks = archiveService.parseSnapshot(requireHistory(historyInstanceId)).tasks();
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        requireRecordView(history);
+        List<WorkflowTask> tasks = archiveService.parseSnapshot(history).tasks();
         Map<String, String> userTitles = userTitles(tasks, List.of());
         return tasks.stream()
                 .map(task -> WorkflowHistoryTaskView.from(task, userTitles))
@@ -135,11 +143,27 @@ public class WorkflowHistoryQueryService {
     }
 
     public List<WorkflowEvent> events(String historyInstanceId) {
-        return archiveService.parseSnapshot(requireHistory(historyInstanceId)).events();
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        requireRecordView(history);
+        return archiveService.parseSnapshot(history).events();
     }
 
     public List<WorkflowHistoryEventView> eventViews(String historyInstanceId) {
-        WorkflowHistorySnapshot snapshot = archiveService.parseSnapshot(requireHistory(historyInstanceId));
+        WorkflowHistoryInstance history = requireHistory(historyInstanceId);
+        requireRecordView(history);
+        return eventViews(archiveService.parseSnapshot(history));
+    }
+
+    private WorkflowRuntimeRenderBundle renderBundle(WorkflowHistoryInstance history, WorkflowHistorySnapshot snapshot) {
+        String semanticJson = firstText(history.getSemanticJson(),
+                snapshot.instance() == null ? null : snapshot.instance().getSemanticJson());
+        String layoutJson = firstText(history.getLayoutJson(),
+                snapshot.instance() == null ? null : snapshot.instance().getLayoutJson());
+        return new WorkflowRuntimeRenderBundle("HISTORY", snapshot.instance(), snapshot.nodes(), snapshot.routes(),
+                semanticJson, layoutJson);
+    }
+
+    private List<WorkflowHistoryEventView> eventViews(WorkflowHistorySnapshot snapshot) {
         Map<String, WorkflowTask> tasksById = snapshot.tasks().stream()
                 .filter(task -> task.getId() != null)
                 .collect(Collectors.toMap(WorkflowTask::getId, Function.identity(), (left, right) -> left));
@@ -155,6 +179,20 @@ public class WorkflowHistoryQueryService {
                 .map(event -> WorkflowHistoryEventView.from(event, tasksById.get(event.getTaskId()),
                         nodesById, nodesByKey, routesByIdOrKey, userTitles))
                 .toList();
+    }
+
+    private void requireRecordView(WorkflowHistoryInstance history) {
+        if (history == null) {
+            throw new PlatformException("workflow history instance must not be null");
+        }
+        requireRecordView(history.getModuleAlias(), history.getRecordId());
+    }
+
+    private void requireRecordView(String moduleAlias, String recordId) {
+        WorkflowInstance viewInstance = new WorkflowInstance();
+        viewInstance.setModuleAlias(requireText(moduleAlias, "workflow module alias must not be blank"));
+        viewInstance.setRecordId(requireText(recordId, "workflow record id must not be blank"));
+        actionPolicyService.requireRecordView(viewInstance);
     }
 
     private Map<String, String> userTitles(List<WorkflowTask> tasks, List<WorkflowEvent> events) {
@@ -212,5 +250,9 @@ public class WorkflowHistoryQueryService {
             throw new PlatformException(message);
         }
         return value;
+    }
+
+    private String firstText(String preferred, String fallback) {
+        return preferred == null || preferred.isBlank() ? fallback : preferred;
     }
 }

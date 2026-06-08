@@ -20,13 +20,14 @@ public class WorkflowTaskActionAvailabilityService {
     private final WorkflowTaskDao taskDao;
     private final WorkflowInstanceDao instanceDao;
     private final WorkflowNodeInstanceDao nodeDao;
+    private final WorkflowRouteInstanceDao routeDao;
     private final WorkflowTaskAssignmentPolicyService assignmentPolicyService;
     private final WorkflowUserTitleResolver userTitleResolver;
 
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao) {
-        this(taskDao, instanceDao, nodeDao, new WorkflowTaskAssignmentPolicyService(),
+        this(taskDao, instanceDao, nodeDao, null, new WorkflowTaskAssignmentPolicyService(),
                 WorkflowUserTitleResolver.NONE);
     }
 
@@ -34,9 +35,10 @@ public class WorkflowTaskActionAvailabilityService {
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao,
+                                                 WorkflowRouteInstanceDao routeDao,
                                                  WorkflowTaskAssignmentPolicyService assignmentPolicyService,
                                                  ObjectProvider<WorkflowUserTitleResolver> userTitleResolver) {
-        this(taskDao, instanceDao, nodeDao, assignmentPolicyService, userTitleResolver == null
+        this(taskDao, instanceDao, nodeDao, routeDao, assignmentPolicyService, userTitleResolver == null
                 ? WorkflowUserTitleResolver.NONE
                 : userTitleResolver.getIfAvailable(() -> WorkflowUserTitleResolver.NONE));
     }
@@ -44,11 +46,13 @@ public class WorkflowTaskActionAvailabilityService {
     public WorkflowTaskActionAvailabilityService(WorkflowTaskDao taskDao,
                                                  WorkflowInstanceDao instanceDao,
                                                  WorkflowNodeInstanceDao nodeDao,
+                                                 WorkflowRouteInstanceDao routeDao,
                                                  WorkflowTaskAssignmentPolicyService assignmentPolicyService,
                                                  WorkflowUserTitleResolver userTitleResolver) {
         this.taskDao = taskDao;
         this.instanceDao = instanceDao;
         this.nodeDao = nodeDao;
+        this.routeDao = routeDao;
         this.assignmentPolicyService = assignmentPolicyService == null
                 ? new WorkflowTaskAssignmentPolicyService()
                 : assignmentPolicyService;
@@ -80,7 +84,8 @@ public class WorkflowTaskActionAvailabilityService {
                     && node != null
                     && node.getNodeType() == WorkflowNodeType.APPROVAL
                     && Boolean.TRUE.equals(node.getAllowAddSign())
-                    && !hasMultipleTodoApprovalTasks(task)) {
+                    && !hasMultipleTodoApprovalTasks(task)
+                    && hasOutgoingCandidateRoute(instance.getId(), node.getNodeKey())) {
                 actions.add(WorkflowTaskAvailableAction.of("addSign", "加签")
                         .requireReason(true));
             }
@@ -139,6 +144,16 @@ public class WorkflowTaskActionAvailabilityService {
                 .filter(nodeTask -> nodeTask.getTaskKind() == WorkflowTaskKind.APPROVAL)
                 .filter(nodeTask -> nodeTask.getTaskStatus() == WorkflowTaskStatus.TODO)
                 .count() > 1;
+    }
+
+    private boolean hasOutgoingCandidateRoute(String instanceId, String nodeKey) {
+        if (routeDao == null || nodeKey == null || nodeKey.isBlank()) {
+            return false;
+        }
+        return routeDao.query(Criteria.of()
+                        .eq("instanceId", instanceId)
+                        .eq("sourceNodeKey", nodeKey), ALL).stream()
+                .anyMatch(route -> route.getRouteStatus() == WorkflowRouteStatus.CANDIDATE);
     }
 
     private String requireText(String value, String message) {

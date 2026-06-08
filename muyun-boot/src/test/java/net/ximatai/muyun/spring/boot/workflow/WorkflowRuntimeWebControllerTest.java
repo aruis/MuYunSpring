@@ -149,7 +149,7 @@ class WorkflowRuntimeWebControllerTest {
     }
 
     @Test
-    void shouldExposeManualBranchCandidatePrechecksWithOperatorFallbackAndParameter() throws Exception {
+    void shouldExposeManualBranchCandidatePrechecksWithCurrentUser() throws Exception {
         when(runtimeReadFacade.manualBranchCandidatePrechecks("inst-1", "user-1")).thenReturn(List.of(
                 new WorkflowManualBranchCandidatePrecheckView("manualBranch", WorkflowRouteMode.MANUAL, "START",
                         Boolean.TRUE, "user-1", "user-1", Boolean.TRUE, null, List.of(
@@ -157,14 +157,6 @@ class WorkflowRuntimeWebControllerTest {
                                 WorkflowNodeType.TASK, WorkflowRouteStatus.CANDIDATE, Boolean.FALSE, Boolean.TRUE,
                                 null)
                 ))));
-        when(runtimeReadFacade.manualBranchCandidatePrechecks("inst-1", "operator-2")).thenReturn(List.of(
-                new WorkflowManualBranchCandidatePrecheckView("manualBranch", WorkflowRouteMode.MANUAL, "START",
-                        Boolean.TRUE, "user-1", "operator-2", Boolean.FALSE, "SELECTOR_NOT_OPERATOR", List.of(
-                        new WorkflowManualBranchCandidatePrecheckView.Candidate("route-1", "leftRoute", "leftTask",
-                                WorkflowNodeType.TASK, WorkflowRouteStatus.CANDIDATE, Boolean.FALSE, Boolean.FALSE,
-                                "SELECTOR_NOT_OPERATOR")
-                ))));
-
         mvc.perform(get("/workflow/runtime/instance/inst-1/manual-branch-candidate-prechecks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].branchNodeKey").value("manualBranch"))
@@ -178,15 +170,11 @@ class WorkflowRuntimeWebControllerTest {
         mvc.perform(get("/workflow/runtime/instance/inst-1/manual-branch-candidate-prechecks")
                         .param("operatorId", "operator-2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].operatorId").value("operator-2"))
-                .andExpect(jsonPath("$.records[0].selectable").value(false))
-                .andExpect(jsonPath("$.records[0].unselectableReason").value("SELECTOR_NOT_OPERATOR"))
-                .andExpect(jsonPath("$.records[0].candidates[0].selectable").value(false))
-                .andExpect(jsonPath("$.records[0].candidates[0].unselectableReason")
-                        .value("SELECTOR_NOT_OPERATOR"));
+                .andExpect(jsonPath("$.records[0].operatorId").value("user-1"))
+                .andExpect(jsonPath("$.records[0].selectable").value(true))
+                .andExpect(jsonPath("$.records[0].candidates[0].selectable").value(true));
 
-        verify(runtimeReadFacade).manualBranchCandidatePrechecks("inst-1", "user-1");
-        verify(runtimeReadFacade).manualBranchCandidatePrechecks("inst-1", "operator-2");
+        verify(runtimeReadFacade, org.mockito.Mockito.times(2)).manualBranchCandidatePrechecks("inst-1", "user-1");
     }
 
     @Test
@@ -197,7 +185,7 @@ class WorkflowRuntimeWebControllerTest {
         task.setTaskStatus(WorkflowTaskStatus.TODO);
         when(runtimeReadFacade.instanceTasks("inst-1")).thenReturn(List.of(task));
         when(runtimeReadFacade.instanceEvents("inst-1")).thenReturn(List.of());
-        when(runtimeReadFacade.instanceAvailableActions("inst-1", "operator-1"))
+        when(runtimeReadFacade.instanceAvailableActions("inst-1", "user-1"))
                 .thenReturn(List.of(WorkflowTaskAvailableAction.of("complete", "通过")));
 
         mvc.perform(get("/workflow/runtime/instance/inst-1/tasks"))
@@ -255,7 +243,7 @@ class WorkflowRuntimeWebControllerTest {
     void shouldExposeRecordSubmitStatusWithOptionalOperator() throws Exception {
         when(submitReadFacade.status(argThat(request -> "sales.contract".equals(request.moduleAlias())
                 && "record-1".equals(request.recordId())
-                && "operator-1".equals(request.operatorId()))))
+                && "user-1".equals(request.operatorId()))))
                 .thenReturn(WorkflowSubmitStatusView.unsubmitted("sales.contract", "record-1", null));
 
         mvc.perform(post("/workflow/runtime/record/sales.contract/record-1/submit/status")
@@ -292,7 +280,7 @@ class WorkflowRuntimeWebControllerTest {
                 true);
         when(submitFacade.submit(argThat(request -> "sales.contract".equals(request.moduleAlias())
                 && "record-1".equals(request.recordId())
-                && "operator-1".equals(request.operatorId())
+                && "user-1".equals(request.operatorId())
                 && "branchA".equals(request.selectedRouteKey()))))
                 .thenReturn(submitResult);
 
@@ -357,18 +345,18 @@ class WorkflowRuntimeWebControllerTest {
 
     @Test
     void shouldExposeDoneNoticeAndTrackingWorkbenchBoards() throws Exception {
-        when(runtimeReadFacade.doneCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+        when(runtimeReadFacade.doneCards(eq("user-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+        when(runtimeReadFacade.noticeCards(eq("user-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.delegationCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+        when(runtimeReadFacade.delegationCards(eq("user-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 org.mockito.ArgumentMatchers.any(WorkflowWorkbenchQueryRequest.class)))
                 .thenReturn(List.of());
         ArgumentCaptor<WorkflowWorkbenchQueryRequest> trackingQueryCaptor =
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
-        when(runtimeReadFacade.trackingCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+        when(runtimeReadFacade.trackingCards(eq("user-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 trackingQueryCaptor.capture()))
                 .thenReturn(List.of());
 
@@ -403,10 +391,10 @@ class WorkflowRuntimeWebControllerTest {
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
         ArgumentCaptor<WorkflowWorkbenchQueryRequest> statsQueryCaptor =
                 ArgumentCaptor.forClass(WorkflowWorkbenchQueryRequest.class);
-        when(runtimeReadFacade.noticeCards(eq("operator-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
+        when(runtimeReadFacade.noticeCards(eq("user-1"), org.mockito.ArgumentMatchers.any(PageRequest.class),
                 noticeQueryCaptor.capture()))
                 .thenReturn(List.of());
-        when(runtimeReadFacade.workbenchStats(eq("notice"), eq("operator-1"), statsQueryCaptor.capture()))
+        when(runtimeReadFacade.workbenchStats(eq("notice"), eq("user-1"), statsQueryCaptor.capture()))
                 .thenReturn(new WorkflowWorkbenchStats("NOTICE", List.of(
                         new WorkflowWorkbenchStatItem("ALL", "全部", 2),
                         new WorkflowWorkbenchStatItem("UNREAD", "未读", 1),
@@ -437,13 +425,13 @@ class WorkflowRuntimeWebControllerTest {
         task.setId("task-1");
         when(taskActionFacade.execute(eq("approve"), argThat(request ->
                 "task-1".equals(request.taskId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && "leftRoute".equals(request.selectedRouteKey())
                         && "choose left".equals(request.selectedReason()))))
                 .thenReturn(WorkflowTaskActionResult.of(task, null));
         when(taskActionFacade.execute(eq("reject"), argThat(request ->
                 "task-1".equals(request.taskId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && request.rejectResubmitMode() == WorkflowRejectResubmitMode.RETURN_TO_ME
                         && "not ok".equals(request.reason()))))
                 .thenReturn(WorkflowTaskActionResult.of(task, null));
@@ -455,7 +443,7 @@ class WorkflowRuntimeWebControllerTest {
                 .thenReturn(WorkflowTaskActionResult.transferred(task, new WorkflowTask(), null));
         when(taskActionFacade.execute(eq("addSign"), argThat(request ->
                 "task-1".equals(request.taskId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && request.targetAssigneeId() == null
                         && request.addSignMode() == null
                         && request.addSignSegment() != null
@@ -470,7 +458,7 @@ class WorkflowRuntimeWebControllerTest {
                 .thenReturn(new WorkflowTaskActionResult(task, null, null, null, null));
         when(taskActionFacade.execute(eq("read"), argThat(request ->
                 "task-1".equals(request.taskId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && "opened".equals(request.reason()))))
                 .thenReturn(WorkflowTaskActionResult.of(task, null));
         when(taskActionFacade.execute(eq("read"), argThat(request ->
@@ -567,7 +555,7 @@ class WorkflowRuntimeWebControllerTest {
         task.setId("task-structured");
         when(taskActionFacade.execute(eq("approve"), argThat(request ->
                 "task-structured".equals(request.taskId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && request.manualRouteSelections().size() == 2
                         && "branchA".equals(request.manualRouteSelections().get(0).branchNodeKey())
                         && "routeA1".equals(request.manualRouteSelections().get(0).routeKey())
@@ -597,7 +585,7 @@ class WorkflowRuntimeWebControllerTest {
         WorkflowInstance instance = instance("inst-1");
         when(instanceActionFacade.execute(eq("revoke"), argThat(request ->
                 "inst-1".equals(request.instanceId())
-                        && "operator-1".equals(request.operatorId())
+                        && "user-1".equals(request.operatorId())
                         && "cancel".equals(request.reason()))))
                 .thenReturn(new WorkflowInstanceActionResult(instance, List.of(), List.of(), List.of(), null));
         when(instanceActionFacade.execute(eq("terminate"), argThat(request ->
@@ -623,7 +611,7 @@ class WorkflowRuntimeWebControllerTest {
         WorkflowModuleTaskProcessBundle bundle = moduleTaskBundle("task-1");
         WorkflowTaskActionResult actionResult = WorkflowTaskActionResult.of(new WorkflowTask(), null);
         when(moduleTaskRuntimeService.prepare("task-1", "user-1")).thenReturn(bundle);
-        when(moduleTaskRuntimeService.checkAndContinue("task-1", "operator-1", "done",
+        when(moduleTaskRuntimeService.checkAndContinue("task-1", "user-1", "done",
                 "leftRoute", "choose left"))
                 .thenReturn(WorkflowModuleTaskContinueResult.continued(actionResult));
 
@@ -647,14 +635,14 @@ class WorkflowRuntimeWebControllerTest {
                 .andExpect(jsonPath("$.continued").value(true));
 
         verify(moduleTaskRuntimeService).prepare("task-1", "user-1");
-        verify(moduleTaskRuntimeService).checkAndContinue("task-1", "operator-1", "done",
+        verify(moduleTaskRuntimeService).checkAndContinue("task-1", "user-1", "done",
                 "leftRoute", "choose left");
     }
 
     @Test
     void shouldPassManualRouteSelectionsToModuleTaskContinue() throws Exception {
         WorkflowTaskActionResult actionResult = WorkflowTaskActionResult.of(new WorkflowTask(), null);
-        when(moduleTaskRuntimeService.checkAndContinue(eq("task-1"), eq("operator-1"), eq("done"),
+        when(moduleTaskRuntimeService.checkAndContinue(eq("task-1"), eq("user-1"), eq("done"),
                 eq(null), eq(null), argThat(selections ->
                         selections.size() == 2
                                 && "branchA".equals(selections.get(0).branchNodeKey())

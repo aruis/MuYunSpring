@@ -582,6 +582,7 @@ public class WorkflowTaskActionService {
             EntityLifecycle.prepareInsert(addedRoute, now);
             routeInstanceDao.insert(addedRoute);
         }
+        updateRenderJsonIfProvided(instance, request.semanticJson(), request.layoutJson(), now);
 
         WorkflowEvent event = eventFactory.addSign(instance, node, task, operatorId, request.reason(),
                 addSignPayload(node.getNodeKey(), plan.addedNodeKeys(), replacedRouteIds, editMode,
@@ -589,6 +590,20 @@ public class WorkflowTaskActionService {
         eventDao.insert(event);
         return WorkflowTaskActionResult.addSign(task, node, instance, event, editMode,
                 plan.addedNodeKeys(), replacedRouteIds);
+    }
+
+    private void updateRenderJsonIfProvided(WorkflowInstance instance, String semanticJson, String layoutJson,
+                                            Instant now) {
+        if ((semanticJson == null || semanticJson.isBlank()) && (layoutJson == null || layoutJson.isBlank())) {
+            return;
+        }
+        if (semanticJson != null && !semanticJson.isBlank()) {
+            instance.setSemanticJson(semanticJson);
+        }
+        if (layoutJson != null && !layoutJson.isBlank()) {
+            instance.setLayoutJson(layoutJson);
+        }
+        updateInstance(instance, now);
     }
 
     @Transactional

@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -162,6 +163,21 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
+    void shouldResolveCustomEndpointModuleAliasFromStaticModuleAnnotation() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/workflow/admin/history/query");
+        StaticModuleActionController controller = new StaticModuleActionController();
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, StaticModuleActionController.class.getMethod("query")));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("platform.workflow_admin");
+            assertThat(context.actionCode()).isEqualTo("workflowAdminQuery");
+            assertThat(context.permissionCode()).isEqualTo("platform.workflow_admin:workflowAdminQuery");
+        });
+    }
+
+    @Test
     void shouldUseRegisteredCustomActionPolicyWhenResolvingWebEndpoint() throws Exception {
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         PlatformModuleAction action = new PlatformModuleAction();
@@ -272,6 +288,13 @@ class ActionEndpointInterceptorTest {
         @Override
         public Object service() {
             return new Object();
+        }
+    }
+
+    @PlatformStaticModule(application = "platform", alias = "platform.workflow_admin", title = "Workflow Admin")
+    private static final class StaticModuleActionController {
+        @net.ximatai.muyun.spring.common.platform.CustomActionEndpoint("workflowAdminQuery")
+        public void query() {
         }
     }
 }

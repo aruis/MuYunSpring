@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -88,6 +89,10 @@ public class ActionEndpointContextResolver {
         Object bean = handlerMethod.getBean();
         if (bean instanceof ScopedWeb<?> scopedWeb) {
             return scopedWeb.webScopeName();
+        }
+        PlatformStaticModule staticModule = handlerMethod.getBeanType().getAnnotation(PlatformStaticModule.class);
+        if (staticModule != null && !staticModule.alias().isBlank()) {
+            return staticModule.alias();
         }
         return null;
     }

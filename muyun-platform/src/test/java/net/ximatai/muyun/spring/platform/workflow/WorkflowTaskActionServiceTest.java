@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.workflow;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,8 @@ import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 
 class WorkflowTaskActionServiceTest {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final WorkflowTaskDao taskDao = mock(WorkflowTaskDao.class);
     private final WorkflowInstanceDao instanceDao = mock(WorkflowInstanceDao.class);
     private final WorkflowNodeInstanceDao nodeDao = mock(WorkflowNodeInstanceDao.class);
@@ -906,7 +910,7 @@ class WorkflowTaskActionServiceTest {
     }
 
     @Test
-    void shouldInsertRuntimeAddSignSegmentWithoutCompletingCurrentTask() {
+    void shouldInsertRuntimeAddSignSegmentWithoutCompletingCurrentTask() throws Exception {
         RecordingPlugin plugin = new RecordingPlugin();
         WorkflowTaskActionService pluginService = serviceWithPlugin(plugin);
         WorkflowTask task = task("task-1", WorkflowTaskKind.APPROVAL, WorkflowTaskStatus.TODO);
@@ -924,6 +928,7 @@ class WorkflowTaskActionServiceTest {
         when(nodeDao.query(any(), any())).thenReturn(List.of(), List.of(node, node("node-next", "next",
                 WorkflowNodeType.END, WorkflowNodeStatus.WAITING)));
         when(routeDao.updateByIdAndVersion(originalRoute, 4)).thenReturn(1);
+        when(instanceDao.updateByIdAndVersion(any(WorkflowInstance.class), any(Integer.class))).thenReturn(1);
 
         WorkflowTaskActionResult result = pluginService.addSign(new WorkflowTaskActionRequest(
                 "task-1", "user-1", null, null, segment("add-1", "approve", "next"), null,
@@ -960,12 +965,16 @@ class WorkflowTaskActionServiceTest {
         assertThat(result.event().getActionCode()).isEqualTo("addSign");
         assertThat(result.event().getTaskId()).isEqualTo("task-1");
         assertThat(result.event().getPayloadText()).contains("\"sourceNodeKey\":\"approve\"");
-        assertThat(result.event().getPayloadText()).contains("\"addedNodeKeys\":[\"add-1\"]");
-        assertThat(result.event().getPayloadText()).contains("\"replacedRouteIds\":[\"route-1\"]");
-        assertThat(result.event().getPayloadText()).contains("\"editMode\":\"create\"");
-        assertThat(result.event().getPayloadText())
-                .contains("\"semanticJson\":\"{\\\"nodes\\\":[\\\"add-1\\\"]}\"");
-        assertThat(result.event().getPayloadText()).contains("\"layoutJson\":\"{\\\"zoom\\\":1}\"");
+        JsonNode payload = OBJECT_MAPPER.readTree(result.event().getPayloadText());
+        assertThat(payload.path("addedNodeKeys").get(0).asText()).isEqualTo("add-1");
+        assertThat(payload.path("replacedRouteIds").get(0).asText()).isEqualTo("route-1");
+        assertThat(payload.path("editMode").asText()).isEqualTo("create");
+        assertThat(payload.path("semanticJson").asText()).isEqualTo("{\"nodes\":[\"add-1\"]}");
+        assertThat(payload.path("layoutJson").asText()).isEqualTo("{\"zoom\":1}");
+        ArgumentCaptor<WorkflowInstance> instanceCaptor = ArgumentCaptor.forClass(WorkflowInstance.class);
+        verify(instanceDao).updateByIdAndVersion(instanceCaptor.capture(), any(Integer.class));
+        assertThat(instanceCaptor.getValue().getSemanticJson()).isEqualTo("{\"nodes\":[\"add-1\"]}");
+        assertThat(instanceCaptor.getValue().getLayoutJson()).isEqualTo("{\"zoom\":1}");
         verify(taskDao, never()).insert(any());
         verify(eventDao).insert(result.event());
         verifyNoInteractions(progressionService);

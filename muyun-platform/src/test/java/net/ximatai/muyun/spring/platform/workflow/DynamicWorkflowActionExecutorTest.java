@@ -22,9 +22,10 @@ import static org.mockito.Mockito.when;
 class DynamicWorkflowActionExecutorTest {
     private final WorkflowModuleSubmitService submitService = mock(WorkflowModuleSubmitService.class);
     private final WorkflowTaskActionFacade taskActionFacade = mock(WorkflowTaskActionFacade.class);
+    private final WorkflowInstanceActionFacade instanceActionFacade = mock(WorkflowInstanceActionFacade.class);
     private final PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
     private final DynamicWorkflowActionExecutor executor =
-            new DynamicWorkflowActionExecutor(submitService, taskActionFacade, actionService);
+            new DynamicWorkflowActionExecutor(submitService, taskActionFacade, instanceActionFacade, actionService);
 
     @Test
     void shouldSubmitApprovalByDynamicRecordAction() {
@@ -164,6 +165,46 @@ class DynamicWorkflowActionExecutorTest {
                                 && "branchB".equals(actionRequest.manualRouteSelections().get(1).branchNodeKey())
                                 && "routeB2".equals(actionRequest.manualRouteSelections().get(1).routeKey())
                                 && "choose B2".equals(actionRequest.manualRouteSelections().get(1).selectedReason())));
+    }
+
+    @Test
+    void shouldRouteRuntimeTaskActionCodeDirectlyThroughFacade() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.empty()
+                .withPayload(Map.of(
+                        "taskId", "task-1",
+                        "operatorId", "manager-1",
+                        "selectedRouteKey", "leftRoute",
+                        "selectedReason", "choose left"
+                ));
+
+        executor.execute(context("approve", null), request);
+
+        verify(taskActionFacade).execute(org.mockito.ArgumentMatchers.eq("approve"),
+                org.mockito.ArgumentMatchers.argThat(actionRequest ->
+                        "task-1".equals(actionRequest.taskId())
+                                && "manager-1".equals(actionRequest.operatorId())
+                                && "leftRoute".equals(actionRequest.selectedRouteKey())
+                                && "choose left".equals(actionRequest.selectedReason())));
+    }
+
+    @Test
+    void shouldRouteRuntimeInstanceActionCodeDirectlyThroughFacade() {
+        DynamicActionExecutionRequest request = DynamicActionExecutionRequest.empty()
+                .withPayload(Map.of(
+                        "instanceId", "instance-1",
+                        "operatorId", "manager-1",
+                        "reason", "stop",
+                        "operatedAt", "2026-06-05T02:00:00Z"
+                ));
+
+        executor.execute(context("terminate", null), request);
+
+        verify(instanceActionFacade).execute(org.mockito.ArgumentMatchers.eq("terminate"),
+                org.mockito.ArgumentMatchers.argThat(actionRequest ->
+                        "instance-1".equals(actionRequest.instanceId())
+                                && "manager-1".equals(actionRequest.operatorId())
+                                && "stop".equals(actionRequest.reason())
+                                && Instant.parse("2026-06-05T02:00:00Z").equals(actionRequest.operatedAt())));
     }
 
     @Test

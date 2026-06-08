@@ -97,7 +97,7 @@ public class WorkflowRuntimeWebController {
             @PathVariable String instanceId,
             @RequestParam(required = false) String operatorId) {
         return new WebListResponse<>(runtimeReadFacade.manualBranchCandidatePrechecks(instanceId,
-                operatorId(operatorId)));
+                currentOperatorId()));
     }
 
     @GetMapping("/instance/{instanceId}/tasks")
@@ -144,7 +144,7 @@ public class WorkflowRuntimeWebController {
             @PathVariable String instanceId,
             @RequestBody(required = false) WorkflowOperatorWebRequest request) {
         return new WebListResponse<>(runtimeReadFacade.instanceAvailableActions(instanceId,
-                operatorIdOrNull(request == null ? null : request.operatorId())));
+                currentOperatorIdOrNull()));
     }
 
     @PostMapping("/instance/{instanceId}/actions/{actionCode}")
@@ -153,7 +153,7 @@ public class WorkflowRuntimeWebController {
             @PathVariable String actionCode,
             @RequestBody(required = false) WorkflowInstanceActionWebRequest request) {
         return instanceActionFacade.execute(actionCode, new WorkflowInstanceActionRequest(instanceId,
-                operatorId(request == null ? null : request.operatorId()),
+                currentOperatorId(),
                 request == null ? null : request.reason(),
                 null));
     }
@@ -164,7 +164,7 @@ public class WorkflowRuntimeWebController {
             @PathVariable String actionCode,
             @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
         return taskActionFacade.execute(actionCode, new WorkflowTaskActionRequest(taskId,
-                operatorId(request == null ? null : request.operatorId()),
+                currentOperatorId(),
                 request == null ? null : request.targetAssigneeId(),
                 null,
                 request == null ? null : request.addSignSegment(),
@@ -183,7 +183,7 @@ public class WorkflowRuntimeWebController {
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowTaskActionWebRequest request) {
         return taskActionFacade.execute("read", new WorkflowTaskActionRequest(taskId,
-                operatorId(request == null ? null : request.operatorId()),
+                currentOperatorId(),
                 null,
                 null,
                 null,
@@ -198,7 +198,7 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowWorkbenchCard> todoCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return new WebListResponse<>(runtimeReadFacade.todoCards(operatorId(normalized.operatorId()),
+        return new WebListResponse<>(runtimeReadFacade.todoCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
@@ -206,7 +206,7 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowWorkbenchCard> doneCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return new WebListResponse<>(runtimeReadFacade.doneCards(operatorId(normalized.operatorId()),
+        return new WebListResponse<>(runtimeReadFacade.doneCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
@@ -214,7 +214,7 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowWorkbenchCard> noticeCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return new WebListResponse<>(runtimeReadFacade.noticeCards(operatorId(normalized.operatorId()),
+        return new WebListResponse<>(runtimeReadFacade.noticeCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
@@ -222,7 +222,7 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowWorkbenchCard> trackingCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return new WebListResponse<>(runtimeReadFacade.trackingCards(operatorId(normalized.operatorId()),
+        return new WebListResponse<>(runtimeReadFacade.trackingCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
@@ -230,7 +230,7 @@ public class WorkflowRuntimeWebController {
     public WebListResponse<WorkflowWorkbenchCard> delegationCards(
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return new WebListResponse<>(runtimeReadFacade.delegationCards(operatorId(normalized.operatorId()),
+        return new WebListResponse<>(runtimeReadFacade.delegationCards(currentOperatorId(),
                 page(normalized.page()), normalized.toQueryRequest()));
     }
 
@@ -239,20 +239,20 @@ public class WorkflowRuntimeWebController {
             @PathVariable String board,
             @RequestBody(required = false) WorkflowWorkbenchWebRequest request) {
         WorkflowWorkbenchWebRequest normalized = normalizeWorkbenchRequest(request);
-        return runtimeReadFacade.workbenchStats(board, operatorId(normalized.operatorId()),
+        return runtimeReadFacade.workbenchStats(board, currentOperatorId(),
                 normalized.toQueryRequest());
     }
 
     @GetMapping("/task/{taskId}/module-task/prepare")
     public WorkflowModuleTaskProcessBundle prepareModuleTask(@PathVariable String taskId) {
-        return moduleTaskRuntimeService.prepare(taskId, operatorId(null));
+        return moduleTaskRuntimeService.prepare(taskId, currentOperatorId());
     }
 
     @PostMapping("/task/{taskId}/module-task/check-and-continue")
     public WorkflowModuleTaskContinueResult checkAndContinueModuleTask(
             @PathVariable String taskId,
             @RequestBody(required = false) WorkflowModuleTaskContinueWebRequest request) {
-        String operatorId = operatorId(request == null ? null : request.operatorId());
+        String operatorId = currentOperatorId();
         if (request != null && request.manualRouteSelections() != null && !request.manualRouteSelections().isEmpty()) {
             return moduleTaskRuntimeService.checkAndContinue(taskId, operatorId, request.reason(),
                     request.selectedRouteKeyOrDirectLinkKey(), request.selectedReason(),
@@ -279,14 +279,14 @@ public class WorkflowRuntimeWebController {
         return PageRequest.of(normalized.pageNum(), normalized.pageSize());
     }
 
-    private String operatorIdOrNull(String operatorId) {
-        return operatorId == null || operatorId.isBlank() ? null : operatorId;
+    private String currentOperatorIdOrNull() {
+        return CurrentUserContext.currentUser()
+                .map(user -> user.userId())
+                .filter(userId -> !userId.isBlank())
+                .orElse(null);
     }
 
-    private String operatorId(String operatorId) {
-        if (operatorId != null && !operatorId.isBlank()) {
-            return operatorId;
-        }
+    private String currentOperatorId() {
         return CurrentUserContext.currentUser()
                 .map(user -> user.userId())
                 .filter(userId -> !userId.isBlank())
@@ -312,8 +312,7 @@ public class WorkflowRuntimeWebController {
         WorkflowSubmitWebRequest normalized = request == null ? WorkflowSubmitWebRequest.empty() : request;
         return WorkflowSubmitRequest.approval(moduleAlias, recordId)
                 .withAuthOrgId(normalized.authOrgId())
-                .withOperator(requireOperator ? operatorId(normalized.operatorId()) : operatorIdOrNull(
-                        normalized.operatorId()))
+                .withOperator(requireOperator ? currentOperatorId() : currentOperatorIdOrNull())
                 .withSelectedRoute(normalized.selectedRouteKeyOrDirectLinkKey(), normalized.selectedReason())
                 .withManualRouteSelections(normalized.manualRouteSelections());
     }
