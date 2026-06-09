@@ -25,6 +25,7 @@ public class ExcelExchangeProtocolValidator {
             if (sheet == null) {
                 throw new PlatformException("exchange workbook plan contains null sheet");
             }
+            validateBusinessSheetName(sheet.sheetName());
             if (!sheetNames.add(sheet.sheetName())) {
                 throw new PlatformException("exchange sheet name duplicated: " + sheet.sheetName());
             }
@@ -49,6 +50,7 @@ public class ExcelExchangeProtocolValidator {
             if (sheet == null) {
                 throw new PlatformException("parsed exchange workbook contains null sheet");
             }
+            validateBusinessSheetName(sheet.sheetName());
             if (!sheetNames.add(sheet.sheetName())) {
                 throw new PlatformException("exchange sheet name duplicated: " + sheet.sheetName());
             }
@@ -77,6 +79,23 @@ public class ExcelExchangeProtocolValidator {
             if (!fieldNames.add(column.fieldName())) {
                 throw new PlatformException("exchange sheet field duplicated: " + sheetName + "." + column.fieldName());
             }
+        }
+    }
+
+    private void validateBusinessSheetName(String sheetName) {
+        if (sheetName == null || sheetName.isBlank()) {
+            throw new PlatformException("exchange sheet name must not be blank");
+        }
+        if (sheetName.length() > 31) {
+            throw new PlatformException("exchange sheet name is too long: " + sheetName);
+        }
+        if (ExcelExchangeProtocol.isInternalSheet(sheetName)) {
+            throw new PlatformException("exchange sheet name is reserved: " + sheetName);
+        }
+        if (sheetName.contains(":") || sheetName.contains("\\") || sheetName.contains("/")
+                || sheetName.contains("?") || sheetName.contains("*")
+                || sheetName.contains("[") || sheetName.contains("]")) {
+            throw new PlatformException("exchange sheet name contains invalid character: " + sheetName);
         }
     }
 

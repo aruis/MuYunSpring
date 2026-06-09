@@ -15,4 +15,10 @@ class PlatformWebPathRulesTest {
                         .map(PlatformAction::code)
                         .toList());
     }
+
+    @Test
+    void shouldReserveStandardDynamicWebRoots() {
+        assertThat(PlatformWebPathRules.reservedWebActionCodes())
+                .contains("actions", "describe", "entities", "exchange", "openapi", "references");
+    }
 }

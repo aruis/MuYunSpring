@@ -11,8 +11,13 @@ import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.DataValidation;
+import org.apache.poi.ss.usermodel.DataValidationConstraint;
+import org.apache.poi.ss.usermodel.DataValidationHelper;
+import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.ByteArrayOutputStream;
@@ -26,6 +31,7 @@ public class ExcelWorkbookPlanWriter {
     private static final int FIRST_DATA_ROW_INDEX = ExcelExchangeProtocol.MIN_HEADER_ROW_COUNT;
     private static final int MIN_COLUMN_WIDTH = 12;
     private static final int MAX_COLUMN_WIDTH = 40;
+    private static final int DEFAULT_VALIDATION_ROWS = 1000;
 
     private final ExcelExchangeProtocolValidator validator;
 
@@ -62,6 +68,7 @@ public class ExcelWorkbookPlanWriter {
                 writeRows(sheet, sheetPlan.columns(), sheetPlan.rows(), dataStyles);
                 applyColumnWidths(sheet, sheetPlan);
             }
+            writeOptionValidations(workbook, plan);
             writeMetaSheet(workbook, plan.meta());
             workbook.write(out);
             out.flush();
@@ -204,6 +211,84 @@ public class ExcelWorkbookPlanWriter {
             int width = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, maxLength + 4));
             sheet.setColumnWidth(columnIndex, width * 256);
         }
+    }
+
+    private void writeOptionValidations(XSSFWorkbook workbook, ExcelWorkbookPlan plan) {
+        Sheet optionsSheet = null;
+        int optionColumnIndex = 0;
+        for (ExcelSheetPlan sheetPlan : plan.sheets()) {
+            Sheet businessSheet = workbook.getSheet(sheetPlan.sheetName());
+            for (int columnIndex = 0; columnIndex < sheetPlan.columns().size(); columnIndex++) {
+                ExcelColumnPlan column = sheetPlan.columns().get(columnIndex);
+                if (column.dropdownOptions().isEmpty()) {
+                    continue;
+                }
+                if (optionsSheet == null) {
+                    optionsSheet = workbook.createSheet(ExcelExchangeProtocol.OPTIONS_SHEET_NAME);
+                }
+                String rangeName = "exchange_options_" + optionColumnIndex;
+                writeOptionColumn(optionsSheet, optionColumnIndex, sheetPlan, column);
+                createOptionName(workbook, rangeName, optionColumnIndex, column.dropdownOptions().size());
+                addOptionValidation(businessSheet, sheetPlan, columnIndex, rangeName);
+                optionColumnIndex++;
+            }
+        }
+        if (optionsSheet != null) {
+            workbook.setSheetHidden(workbook.getSheetIndex(optionsSheet), true);
+        }
+    }
+
+    private void writeOptionColumn(Sheet optionsSheet,
+                                   int optionColumnIndex,
+                                   ExcelSheetPlan sheetPlan,
+                                   ExcelColumnPlan column) {
+        Row header = row(optionsSheet, 0);
+        header.createCell(optionColumnIndex)
+                .setCellValue(sheetPlan.entityAlias() + "." + column.fieldName());
+        for (int index = 0; index < column.dropdownOptions().size(); index++) {
+            row(optionsSheet, index + 1).createCell(optionColumnIndex)
+                    .setCellValue(column.dropdownOptions().get(index));
+        }
+        optionsSheet.setColumnWidth(optionColumnIndex, Math.max(MIN_COLUMN_WIDTH, column.title().length() + 4) * 256);
+    }
+
+    private Row row(Sheet sheet, int rowIndex) {
+        Row row = sheet.getRow(rowIndex);
+        return row == null ? sheet.createRow(rowIndex) : row;
+    }
+
+    private void createOptionName(XSSFWorkbook workbook, String rangeName, int optionColumnIndex, int optionCount) {
+        Name name = workbook.createName();
+        name.setNameName(rangeName);
+        String column = columnName(optionColumnIndex);
+        name.setRefersToFormula("'" + ExcelExchangeProtocol.OPTIONS_SHEET_NAME + "'!$"
+                + column + "$2:$" + column + "$" + (optionCount + 1));
+    }
+
+    private void addOptionValidation(Sheet sheet, ExcelSheetPlan sheetPlan, int columnIndex, String rangeName) {
+        DataValidationHelper helper = sheet.getDataValidationHelper();
+        DataValidationConstraint constraint = helper.createFormulaListConstraint(rangeName);
+        int validationEndRow = FIRST_DATA_ROW_INDEX + Math.max(DEFAULT_VALIDATION_ROWS, sheetPlan.rows().size()) - 1;
+        CellRangeAddressList range = new CellRangeAddressList(
+                FIRST_DATA_ROW_INDEX,
+                validationEndRow,
+                columnIndex,
+                columnIndex
+        );
+        DataValidation validation = helper.createValidation(constraint, range);
+        validation.setShowErrorBox(true);
+        sheet.addValidationData(validation);
+    }
+
+    private String columnName(int zeroBasedColumnIndex) {
+        int column = zeroBasedColumnIndex + 1;
+        StringBuilder name = new StringBuilder();
+        while (column > 0) {
+            int remainder = (column - 1) % 26;
+            name.insert(0, (char) ('A' + remainder));
+            column = (column - 1) / 26;
+        }
+        return name.toString();
     }
 
     private void writeMetaSheet(XSSFWorkbook workbook, ExcelWorkbookMeta meta) {

@@ -50,7 +50,7 @@ public enum PlatformAction {
             ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
     EXPORT(PlatformActionGroup.EXCHANGE, "export", "Export",
             PlatformActionLevel.LIST, 20,
-            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null);
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, VIEW);
 
     private final PlatformActionGroup group;
     private final String code;

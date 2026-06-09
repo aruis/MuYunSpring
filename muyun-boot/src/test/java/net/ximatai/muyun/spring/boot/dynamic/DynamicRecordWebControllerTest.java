@@ -420,7 +420,7 @@ class DynamicRecordWebControllerTest {
         mvc.perform(get("/{moduleAlias}/actions", MODULE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("export"))
-                .andExpect(jsonPath("$[0].permission.permissionCode").value(MODULE + ":export"))
+                .andExpect(jsonPath("$[0].permission.permissionCode").value(MODULE + ":view"))
                 .andExpect(jsonPath("$[1].code").value("submit"))
                 .andExpect(jsonPath("$[1].authInheritActionCode").value("view"))
                 .andExpect(jsonPath("$[1].permission.permissionCode").value(MODULE + ":view"))

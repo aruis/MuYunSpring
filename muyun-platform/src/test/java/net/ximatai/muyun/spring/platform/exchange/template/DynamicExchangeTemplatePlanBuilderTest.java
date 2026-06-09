@@ -1,6 +1,12 @@
-package net.ximatai.muyun.spring.platform.exchange.exporter;
+package net.ximatai.muyun.spring.platform.exchange.template;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionItem;
+import net.ximatai.muyun.spring.common.option.OptionQuery;
+import net.ximatai.muyun.spring.common.option.OptionSource;
+import net.ximatai.muyun.spring.common.option.OptionSourceProvider;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -22,8 +28,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DynamicExportWorkbookPlanBuilderTest {
-    private final DynamicExportWorkbookPlanBuilder builder = new DynamicExportWorkbookPlanBuilder();
+class DynamicExchangeTemplatePlanBuilderTest {
+    private final DynamicExchangeTemplatePlanBuilder builder = new DynamicExchangeTemplatePlanBuilder();
 
     @Test
     void shouldBuildMainSheetFromDynamicModuleDescriptor() {
@@ -129,6 +135,24 @@ class DynamicExportWorkbookPlanBuilderTest {
     }
 
     @Test
+    void shouldLoadDictionaryOptionsIntoTemplateColumns() {
+        DynamicExchangeTemplatePlanBuilder optionBuilder = new DynamicExchangeTemplatePlanBuilder(
+                new OptionSourceRegistry(List.of(dictionaryProvider())));
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        FieldDefinition.string("status", "Status").dictionary("sales", "contract_status")
+                )))
+        ));
+
+        ExcelSheetPlan sheet = optionBuilder.build(descriptor).sheets().getFirst();
+
+        assertThat(sheet.columns().get(1).fieldName()).isEqualTo("status");
+        assertThat(sheet.columns().get(1).dropdownOptions()).containsExactly("draft", "active");
+    }
+
+    @Test
     void shouldRejectMissingMainEntity() {
         DynamicModuleDescriptor descriptor = new DynamicModuleDescriptor(
                 "sales.contract",
@@ -220,5 +244,37 @@ class DynamicExportWorkbookPlanBuilderTest {
         assertThat(column.title()).isEqualTo(ExcelExchangeProtocol.RELATE_ID_TITLE);
         assertThat(column.valueType()).isEqualTo(ExcelValueType.TEXT);
         assertThat(column.required()).isFalse();
+    }
+
+    private OptionSourceProvider dictionaryProvider() {
+        return new OptionSourceProvider() {
+            @Override
+            public String sourceType() {
+                return OptionBinding.DICTIONARY_SOURCE;
+            }
+
+            @Override
+            public boolean supports(OptionBinding binding) {
+                return binding != null && OptionBinding.DICTIONARY_SOURCE.equals(binding.sourceType());
+            }
+
+            @Override
+            public OptionSource source(OptionBinding binding) {
+                return new OptionSource() {
+                    @Override
+                    public OptionBinding binding() {
+                        return binding;
+                    }
+
+                    @Override
+                    public List<OptionItem> options(OptionQuery query) {
+                        return List.of(
+                                new OptionItem("draft", "Draft", true, 1, null),
+                                new OptionItem("active", "Active", true, 2, null)
+                        );
+                    }
+                };
+            }
+        };
     }
 }

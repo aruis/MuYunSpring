@@ -164,6 +164,21 @@ class ExcelExchangeProtocolTest {
     }
 
     @Test
+    void shouldRejectReservedAndInvalidBusinessSheetNames() {
+        assertThatThrownBy(() -> validator.validateWorkbookPlan(new ExcelWorkbookPlan(List.of(
+                sheet(ExcelExchangeProtocol.OPTIONS_SHEET_NAME, "order_main", true, "orderNo")
+        ))))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("reserved");
+
+        assertThatThrownBy(() -> validator.validateWorkbookPlan(new ExcelWorkbookPlan(List.of(
+                sheet("订单/明细", "order_main", true, "orderNo")
+        ))))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("invalid character");
+    }
+
+    @Test
     void shouldRejectDuplicateFieldsInWorkbookPlan() {
         ExcelWorkbookPlan plan = new ExcelWorkbookPlan(List.of(new ExcelSheetPlan(
                 "订单",

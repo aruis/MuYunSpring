@@ -45,7 +45,8 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/import/parse",
                         "/sales.contract/import/execute",
                         "/sales.contract/import/error-file/{token}",
-                        "/sales.contract/export/template",
+                        "/sales.contract/exchange/template",
+                        "/sales.contract/export/data",
                         "/sales.contract/actions",
                         "/sales.contract/actions/{recordId}",
                         "/sales.contract/publish",
@@ -65,6 +66,10 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.operationId()).isEqualTo("salesContractImportErrorFile");
                     assertThat(operation.responseSchema()).isEqualTo("binary");
                 });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/exchange/template")))
+                .singleElement()
+                .satisfies(operation -> assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code()));
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/submit/{recordId}"))
                 .findFirst())
@@ -148,6 +153,7 @@ class DynamicOpenApiGeneratorTest {
                         action("openapi", "OpenAPI", EntityActionLevel.LIST),
                         action("query", "Query", EntityActionLevel.LIST),
                         action("import", "Import", EntityActionLevel.LIST),
+                        action("exchange", "Exchange", EntityActionLevel.LIST),
                         action("export", "Export", EntityActionLevel.LIST),
                         action("enable", "Enable", EntityActionLevel.RECORD),
                         action("disable", "Disable", EntityActionLevel.RECORD),
@@ -161,9 +167,10 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
                 .contains("/sales.contract/openapi", "/sales.contract/query",
-                        "/sales.contract/import/parse", "/sales.contract/export/template")
+                        "/sales.contract/import/parse", "/sales.contract/exchange/template",
+                        "/sales.contract/export/data")
                 .doesNotContain("/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}",
-                        "/sales.contract/import", "/sales.contract/export");
+                        "/sales.contract/import", "/sales.contract/exchange", "/sales.contract/export");
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/openapi")))
                 .singleElement()

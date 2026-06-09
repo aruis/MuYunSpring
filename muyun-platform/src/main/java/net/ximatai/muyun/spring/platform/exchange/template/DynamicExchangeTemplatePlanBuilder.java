@@ -1,6 +1,8 @@
-package net.ximatai.muyun.spring.platform.exchange.exporter;
+package net.ximatai.muyun.spring.platform.exchange.template;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionItem;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldCompanionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
@@ -23,12 +25,22 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class DynamicExportWorkbookPlanBuilder {
+public class DynamicExchangeTemplatePlanBuilder {
+    private final OptionSourceRegistry optionSourceRegistry;
+
+    public DynamicExchangeTemplatePlanBuilder() {
+        this(null);
+    }
+
+    public DynamicExchangeTemplatePlanBuilder(OptionSourceRegistry optionSourceRegistry) {
+        this.optionSourceRegistry = optionSourceRegistry;
+    }
+
     public ExcelWorkbookPlan build(DynamicModuleDescriptor descriptor) {
         validateModule(descriptor);
         Map<String, DynamicEntityDescriptor> entitiesByAlias = entitiesByAlias(descriptor);
         DynamicEntityDescriptor mainEntity = requireEntity(entitiesByAlias, descriptor.mainEntityAlias(),
-                "dynamic export main entity not found");
+                "dynamic exchange template main entity not found");
 
         List<ExcelSheetPlan> sheets = new ArrayList<>();
         sheets.add(buildSheet(mainEntity, true, true));
@@ -41,7 +53,7 @@ public class DynamicExportWorkbookPlanBuilder {
                 continue;
             }
             DynamicEntityDescriptor childEntity = requireEntity(entitiesByAlias, relation.childEntityAlias(),
-                    "dynamic export child entity not found");
+                    "dynamic exchange template child entity not found");
             sheets.add(buildSheet(childEntity, false, false));
         }
 
@@ -56,26 +68,26 @@ public class DynamicExportWorkbookPlanBuilder {
 
     private void validateModule(DynamicModuleDescriptor descriptor) {
         if (descriptor == null) {
-            throw new PlatformException("dynamic export requires module descriptor");
+            throw new PlatformException("dynamic exchange template requires module descriptor");
         }
         if (isBlank(descriptor.moduleAlias())) {
-            throw new PlatformException("dynamic export requires moduleAlias");
+            throw new PlatformException("dynamic exchange template requires moduleAlias");
         }
         if (isBlank(descriptor.mainEntityAlias())) {
-            throw new PlatformException("dynamic export requires mainEntityAlias");
+            throw new PlatformException("dynamic exchange template requires mainEntityAlias");
         }
     }
 
     private Map<String, DynamicEntityDescriptor> entitiesByAlias(DynamicModuleDescriptor descriptor) {
         if (descriptor.entities().isEmpty()) {
-            throw new PlatformException("dynamic export requires module entities");
+            throw new PlatformException("dynamic exchange template requires module entities");
         }
         return descriptor.entities().stream()
                 .collect(Collectors.toMap(
                         DynamicEntityDescriptor::entityAlias,
                         Function.identity(),
                         (left, right) -> {
-                            throw new PlatformException("dynamic export entity duplicated: " + left.entityAlias());
+                            throw new PlatformException("dynamic exchange template entity duplicated: " + left.entityAlias());
                         },
                         LinkedHashMap::new
                 ));
@@ -94,7 +106,8 @@ public class DynamicExportWorkbookPlanBuilder {
     private ExcelSheetPlan buildSheet(DynamicEntityDescriptor entity, boolean main, boolean requireBusinessFields) {
         List<ExcelColumnPlan> columns = buildColumns(entity);
         if (requireBusinessFields && columns.size() == 1) {
-            throw new PlatformException("dynamic export main sheet requires business fields: " + entity.entityAlias());
+            throw new PlatformException("dynamic exchange template main sheet requires business fields: "
+                    + entity.entityAlias());
         }
         return new ExcelSheetPlan(sheetNameOf(entity), entity.entityAlias(), main, columns);
     }
@@ -118,7 +131,7 @@ public class DynamicExportWorkbookPlanBuilder {
                     titleOf(field),
                     field.required(),
                     valueTypeOf(field.type()),
-                    dropdownOptions()
+                    dropdownOptions(field)
             ));
         }
         return columns;
@@ -161,8 +174,19 @@ public class DynamicExportWorkbookPlanBuilder {
         };
     }
 
-    private List<String> dropdownOptions() {
-        return List.of();
+    private List<String> dropdownOptions(DynamicFieldDescriptor field) {
+        if (field.optionBinding() == null || optionSourceRegistry == null) {
+            return List.of();
+        }
+        try {
+            return optionSourceRegistry.source(field.optionBinding())
+                    .options()
+                    .stream()
+                    .map(OptionItem::code)
+                    .toList();
+        } catch (RuntimeException ex) {
+            throw new PlatformException("dynamic exchange template option load failed: " + field.fieldName(), ex);
+        }
     }
 
     private boolean isBlank(String value) {

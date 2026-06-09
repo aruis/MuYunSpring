@@ -1,11 +1,8 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import jakarta.servlet.http.HttpServletResponse;
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
-import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -13,61 +10,61 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
-import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
-import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
-import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
+import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookPlan;
+import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplatePlanBuilder;
+import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.function.Supplier;
 
 @RestController
-@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/export")
-public class DynamicExportWebController {
+@RequestMapping("/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}/exchange")
+public class DynamicExchangeTemplateWebController {
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
-    private final DynamicExportFacade exportFacade;
+    private final DynamicExchangeTemplatePlanBuilder templatePlanBuilder;
+    private final ExcelWorkbookPlanWriter workbookWriter;
 
-    public DynamicExportWebController(DynamicRecordService recordService,
-                                      ActiveTenantVerifier activeTenantVerifier,
-                                      DynamicExportFacade exportFacade) {
-        this.recordService = recordService;
-        this.activeTenantVerifier = activeTenantVerifier;
-        this.exportFacade = exportFacade;
+    public DynamicExchangeTemplateWebController(DynamicRecordService recordService,
+                                                ActiveTenantVerifier activeTenantVerifier,
+                                                OptionSourceRegistry optionSourceRegistry) {
+        this(recordService, activeTenantVerifier,
+                new DynamicExchangeTemplatePlanBuilder(optionSourceRegistry), new ExcelWorkbookPlanWriter());
     }
 
-    @PostMapping("/data")
-    @ActionEndpoint(PlatformAction.EXPORT)
-    public void exportData(@PathVariable String moduleAlias,
-                           @RequestBody(required = false) WebQueryRequest request,
-                           HttpServletResponse response) {
+    DynamicExchangeTemplateWebController(DynamicRecordService recordService,
+                                         ActiveTenantVerifier activeTenantVerifier,
+                                         DynamicExchangeTemplatePlanBuilder templatePlanBuilder,
+                                         ExcelWorkbookPlanWriter workbookWriter) {
+        this.recordService = recordService;
+        this.activeTenantVerifier = activeTenantVerifier;
+        this.templatePlanBuilder = templatePlanBuilder;
+        this.workbookWriter = workbookWriter;
+    }
+
+    @PostMapping("/template")
+    @ActionEndpoint(PlatformAction.IMPORT)
+    public void template(@PathVariable String moduleAlias, HttpServletResponse response) {
         tenantScope(moduleAlias, () -> {
-            DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
-            requireExchangeCapability(descriptor);
-            byte[] bytes = exportFacade.exportWorkbook(exportCommand(moduleAlias, descriptor, request));
-            writeXlsx(response, moduleAlias.replace('.', '_') + "-export.xlsx", bytes);
+            writeTemplate(moduleAlias, response);
             return null;
         });
     }
 
-    private DynamicExportCommand exportCommand(String moduleAlias,
-                                               DynamicModuleDescriptor descriptor,
-                                               WebQueryRequest request) {
-        WebQueryRequest normalized = request == null ? new WebQueryRequest(null, List.of(), List.of()) : request;
-        DynamicEntityOperations operations = recordService.mainEntity(moduleAlias);
-        Criteria criteria = operations.queryCriteria(DynamicWebQueryMapper.queryConditions(normalized.conditions()));
-        PageRequest pageRequest = DynamicWebQueryMapper.page(normalized.pageOrDefault());
-        Sort[] sorts = DynamicWebQueryMapper.sorts(normalized.sorts());
-        return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
+    private void writeTemplate(String moduleAlias, HttpServletResponse response) {
+        DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
+        requireExchangeCapability(descriptor);
+        ExcelWorkbookPlan plan = templatePlanBuilder.build(descriptor);
+        byte[] bytes = workbookWriter.writeToBytes(plan);
+        writeXlsx(response, moduleAlias.replace('.', '_') + "-exchange-template.xlsx", bytes);
     }
 
     private void requireExchangeCapability(DynamicModuleDescriptor descriptor) {
@@ -85,12 +82,12 @@ public class DynamicExportWebController {
         try {
             response.setContentType(DynamicImportWebController.XLSX_CONTENT_TYPE);
             response.setHeader("Content-Disposition", DynamicImportWebController.contentDisposition(fileName));
-            response.setHeader("Access-Control-Expose-Headers", "Content-Disposition,X-Export-FileName");
-            response.setHeader("X-Export-FileName", fileName);
+            response.setHeader("Access-Control-Expose-Headers", "Content-Disposition,X-Exchange-FileName");
+            response.setHeader("X-Exchange-FileName", fileName);
             response.setContentLength(bytes.length);
             response.getOutputStream().write(bytes);
         } catch (IOException ex) {
-            throw new PlatformException("dynamic export workbook write failed", ex);
+            throw new PlatformException("dynamic exchange template write failed", ex);
         }
     }
 

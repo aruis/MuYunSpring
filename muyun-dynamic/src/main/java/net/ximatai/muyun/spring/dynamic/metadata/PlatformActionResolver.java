@@ -35,9 +35,16 @@ final class PlatformActionResolver {
         return new EntityActionDefinition(entity.alias(), action.code(),
                 action.title(), true, level,
                 null, toAccessMode(action.accessMode()), action.actionAuth(),
-                action.dataAuth() && entity.supports(EntityCapability.DATA_SCOPE),
+                dataAuth(entity, action),
                 action.defaultGrantPolicy(), action.inheritActionCode(),
                 null, null, null, null);
+    }
+
+    private static boolean dataAuth(EntityDefinition entity, PlatformAction action) {
+        if (!action.dataAuth()) {
+            return false;
+        }
+        return entity.supports(EntityCapability.DATA_SCOPE) || action == PlatformAction.EXPORT;
     }
 
     private static List<PlatformActionGroup> actionGroupOrder() {

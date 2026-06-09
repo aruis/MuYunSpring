@@ -135,6 +135,37 @@ class ExcelWorkbookPlanWriterTest {
                 .hasMessageContaining("exactly one main sheet");
     }
 
+    @Test
+    void shouldWriteDropdownOptionsToHiddenSheetAndDataValidation() throws IOException {
+        ExcelWorkbookPlan plan = new ExcelWorkbookPlan(
+                new ExcelWorkbookMeta("1", "sales.order", null, null, null),
+                List.of(new ExcelSheetPlan(
+                        "Order",
+                        "order_main",
+                        true,
+                        List.of(
+                                new ExcelColumnPlan("relateId", "关联标识"),
+                                new ExcelColumnPlan("status", "Status", false, ExcelValueType.TEXT,
+                                        List.of("draft", "active"))
+                        )
+                ))
+        );
+
+        byte[] bytes = writer.writeToBytes(plan);
+
+        try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            Sheet options = workbook.getSheet(ExcelExchangeProtocol.OPTIONS_SHEET_NAME);
+            assertThat(options).isNotNull();
+            assertThat(workbook.isSheetHidden(workbook.getSheetIndex(options))).isTrue();
+            assertThat(text(options, 0, 0)).isEqualTo("order_main.status");
+            assertThat(text(options, 1, 0)).isEqualTo("draft");
+            assertThat(text(options, 2, 0)).isEqualTo("active");
+
+            Sheet order = workbook.getSheet("Order");
+            assertThat(order.getDataValidations()).hasSize(1);
+        }
+    }
+
     private String text(Sheet sheet, int rowIndex, int columnIndex) {
         return sheet.getRow(rowIndex).getCell(columnIndex).getStringCellValue();
     }

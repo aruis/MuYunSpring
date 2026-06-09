@@ -70,8 +70,14 @@ class PlatformActionResolverTest {
         assertThat(action(dataScopedActions, PlatformAction.DELETE).dataAuth()).isTrue();
         assertThat(action(dataScopedActions, PlatformAction.QUERY).dataAuth()).isTrue();
         assertThat(action(dataScopedActions, PlatformAction.QUERY).authInheritActionCode()).isEqualTo("view");
+        assertThat(action(EntityStandardActionCatalog.from(entityWith(EntityCapability.EXCHANGE)),
+                PlatformAction.EXPORT).dataAuth()).isTrue();
+        assertThat(action(EntityStandardActionCatalog.from(entityWith(EntityCapability.EXCHANGE)),
+                PlatformAction.EXPORT).authInheritActionCode()).isEqualTo("view");
         assertThat(action(allCapabilityActions, PlatformAction.TREE).authInheritActionCode()).isEqualTo("view");
         assertThat(action(allCapabilityActions, PlatformAction.REFERENCE).authInheritActionCode()).isEqualTo("view");
+        assertThat(action(allCapabilityActions, PlatformAction.EXPORT).dataAuth()).isTrue();
+        assertThat(action(allCapabilityActions, PlatformAction.EXPORT).authInheritActionCode()).isEqualTo("view");
         assertThat(action(allCapabilityActions, PlatformAction.DISABLE).authInheritActionCode()).isEqualTo("enable");
     }
 
