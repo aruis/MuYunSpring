@@ -30,7 +30,7 @@ public record ExcelSheetPlan(
             return List.of();
         }
         return rows.stream()
-                .map(row -> row == null ? List.<Object>of() : List.copyOf(row))
+                .map(row -> row == null ? List.<Object>of() : row.stream().toList())
                 .toList();
     }
 
