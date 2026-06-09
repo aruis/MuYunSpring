@@ -83,6 +83,22 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
                     "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
         }
+        if (standardActionVisible.test(PlatformAction.IMPORT)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/import/parse", operationId(descriptor, "importParse"),
+                    "Parse import workbook " + mainEntity.title(), "DynamicImportParseRequest",
+                    "DynamicImportParseResult", PlatformAction.IMPORT.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/import/execute", operationId(descriptor, "importExecute"),
+                    "Execute import workbook " + mainEntity.title(), "DynamicImportExecuteMultipartRequest",
+                    "DynamicImportUploadResult", PlatformAction.IMPORT.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/import/error-file/{token}",
+                    operationId(descriptor, "importErrorFile"),
+                    "Download import error workbook " + mainEntity.title(), null,
+                    "binary", PlatformAction.IMPORT.code()));
+        }
+        if (standardActionVisible.test(PlatformAction.EXPORT)) {
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/export/template", operationId(descriptor, "exportTemplate"),
+                    "Export template " + mainEntity.title(), null, "binary", PlatformAction.EXPORT.code()));
+        }
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
                 && standardActionVisible.test(PlatformAction.ENABLE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/enable/{id}", operationId(descriptor, "enable"),

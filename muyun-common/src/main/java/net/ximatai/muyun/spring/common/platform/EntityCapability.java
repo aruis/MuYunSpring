@@ -13,7 +13,8 @@ public enum EntityCapability {
     WORKFLOW(CapabilityKind.DEFINITION_DECLARATION),
     APPROVAL(CapabilityKind.FIELD_DECLARATION),
     CHILD_RELATION(CapabilityKind.DEFINITION_DECLARATION),
-    REFERENCE_DEPENDENCY(CapabilityKind.DEFINITION_DECLARATION);
+    REFERENCE_DEPENDENCY(CapabilityKind.DEFINITION_DECLARATION),
+    EXCHANGE(CapabilityKind.DEFINITION_DECLARATION);
 
     private final CapabilityKind kind;
 

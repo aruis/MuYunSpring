@@ -333,6 +333,7 @@ class DynamicTableMapperTest {
         assertThat(EntityCapability.APPROVAL.isDeclaredByEntityFields()).isTrue();
         assertThat(EntityCapability.CHILD_RELATION.isDeclaredByDefinition()).isTrue();
         assertThat(EntityCapability.REFERENCE_DEPENDENCY.isDeclaredByDefinition()).isTrue();
+        assertThat(EntityCapability.EXCHANGE.isDeclaredByDefinition()).isTrue();
 
         EntityDefinition entity = contractEntity();
 

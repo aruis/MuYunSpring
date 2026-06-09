@@ -393,6 +393,38 @@ public class DynamicRecordService {
                 pageRequest, sorts));
     }
 
+    public List<DynamicRecord> listForAction(String moduleAlias,
+                                             String entityAlias,
+                                             PlatformAction action,
+                                             Criteria criteria,
+                                             PageRequest pageRequest,
+                                             Sort... sorts) {
+        requireListAction(moduleAlias, action);
+        DataScopeCriteriaResult scope = readScope(moduleAlias, action, criteria);
+        return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(),
+                pageRequest, sorts));
+    }
+
+    @Transactional
+    public String createForAction(String moduleAlias,
+                                  String entityAlias,
+                                  DynamicRecord record,
+                                  PlatformAction action,
+                                  String traceId) {
+        requireListAction(moduleAlias, action);
+        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
+    }
+
+    @Transactional
+    public int updateForAction(String moduleAlias,
+                               String entityAlias,
+                               DynamicRecord record,
+                               PlatformAction action,
+                               String traceId) {
+        requireListAction(moduleAlias, action);
+        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
+    }
+
     public PageResult<DynamicRecord> page(String moduleAlias, String entityAlias, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).pageQuery(scope.criteria(),
@@ -797,6 +829,18 @@ public class DynamicRecordService {
                 moduleAlias,
                 action,
                 recordIds,
+                CurrentUserContext.currentUser()
+        ));
+    }
+
+    private void requireListAction(String moduleAlias, PlatformAction action) {
+        if (action == null) {
+            throw new IllegalArgumentException("action must not be null");
+        }
+        actionExecutionPolicyService.requireAuthorized(ActionExecutionContext.ofPlatformAction(
+                moduleAlias,
+                action,
+                Set.of(),
                 CurrentUserContext.currentUser()
         ));
     }

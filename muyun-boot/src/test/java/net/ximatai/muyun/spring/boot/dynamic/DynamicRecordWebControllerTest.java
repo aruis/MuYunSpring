@@ -887,20 +887,20 @@ class DynamicRecordWebControllerTest {
 
     @Test
     void shouldExecuteListAndBatchActionsThroughStaticLikePaths() throws Exception {
-        DynamicActionDescriptor export = action("export", EntityActionLevel.LIST);
+        DynamicActionDescriptor publish = action("publish", EntityActionLevel.LIST);
         DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
         DynamicActionDescriptor refreshSelected = action("refreshSelected", EntityActionLevel.ANY);
-        when(service.action(MODULE, "export")).thenReturn(export);
+        when(service.action(MODULE, "publish")).thenReturn(publish);
         when(service.action(MODULE, "archive")).thenReturn(archive);
         when(service.action(MODULE, "refreshSelected")).thenReturn(refreshSelected);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.executeAction(eq(MODULE), eq("export"), any(DynamicActionExecutionRequest.class)))
+        when(service.executeAction(eq(MODULE), eq("publish"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(
-                        new DynamicActionExecutionContext(MODULE, ENTITY, "export", export,
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "publish", publish,
                                 null, "trace-list", "tenant-1", false,
-                                DynamicActionAvailability.available("export")),
+                                DynamicActionAvailability.available("publish")),
                         "ok",
-                        DynamicActionResultBody.redirect("/exports/contract.xlsx", "导出已生成")));
+                        DynamicActionResultBody.redirect("/exports/contract.xlsx", "发布已生成")));
         when(service.executeAction(eq(MODULE), eq("archive"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(
                         new DynamicActionExecutionContext(MODULE, ENTITY, "archive", archive,
@@ -912,7 +912,7 @@ class DynamicRecordWebControllerTest {
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
                         DynamicActionResultBody.refreshed("ok")));
 
-        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "export")
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "publish")
                         .contentType("application/json")
                         .content(json(Map.of("payload", Map.of("format", "xlsx")))))
                 .andExpect(status().isOk())
@@ -920,7 +920,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.body.type").value("NONE"))
                 .andExpect(jsonPath("$.body.value").doesNotExist())
-                .andExpect(jsonPath("$.body.message").value("导出已生成"))
+                .andExpect(jsonPath("$.body.message").value("发布已生成"))
                 .andExpect(jsonPath("$.body.refresh").value(false))
                 .andExpect(jsonPath("$.body.redirectTo").value("/exports/contract.xlsx"));
 
@@ -949,9 +949,9 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
-    void shouldRejectActionPathWhenLevelDoesNotMatch() throws Exception {
+        void shouldRejectActionPathWhenLevelDoesNotMatch() throws Exception {
         when(service.action(MODULE, "submit")).thenReturn(action("submit", EntityActionLevel.RECORD));
-        when(service.action(MODULE, "export")).thenReturn(action("export", EntityActionLevel.LIST));
+        when(service.action(MODULE, "publish")).thenReturn(action("publish", EntityActionLevel.LIST));
         when(service.action(MODULE, "archive")).thenReturn(action("archive", EntityActionLevel.BATCH));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "submit")
@@ -960,11 +960,11 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic action does not support list path: submit"));
 
-        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "export", "contract-1")
+        mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "publish", "contract-1")
                         .contentType("application/json")
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic action does not support record path: export"));
+                .andExpect(jsonPath("$.message").value("dynamic action does not support record path: publish"));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "archive")
                         .contentType("application/json")
@@ -972,11 +972,11 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dynamic action does not support list path: archive"));
 
-        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "export")
+        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "publish")
                         .contentType("application/json")
                         .content(json(Map.of("ids", List.of("contract-1")))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("dynamic action does not support batch path: export"));
+                .andExpect(jsonPath("$.message").value("dynamic action does not support batch path: publish"));
     }
 
     @Test

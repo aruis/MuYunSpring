@@ -10,6 +10,7 @@ testcontainers = "1.21.4"
 lombok = "1.18.42"
 caffeine = "3.2.4"
 jackson = "2.19.0"
+poi = "5.4.1"
 
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
@@ -31,6 +32,7 @@ lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

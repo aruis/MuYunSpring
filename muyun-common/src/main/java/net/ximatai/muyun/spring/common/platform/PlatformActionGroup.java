@@ -6,7 +6,8 @@ public enum PlatformActionGroup {
     SORT(EntityCapability.SORT),
     TREE(EntityCapability.TREE),
     REFERENCE(EntityCapability.REFERENCE),
-    ENABLE(EntityCapability.ENABLE);
+    ENABLE(EntityCapability.ENABLE),
+    EXCHANGE(EntityCapability.EXCHANGE);
 
     private final EntityCapability capability;
 

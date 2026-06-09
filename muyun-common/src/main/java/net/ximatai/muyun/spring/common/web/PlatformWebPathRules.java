@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 public final class PlatformWebPathRules {
     public static final String ACTION_CODE_PATH =
-            "{actionCode:^(?!actions$|delete$|describe$|disable$|enable$|entities$|insert$|openapi$|query$|reference$|references$|sort$|tree$|update$|view$)[A-Za-z][A-Za-z0-9_]*$}";
+            "{actionCode:^(?!actions$|delete$|describe$|disable$|enable$|entities$|export$|import$|insert$|openapi$|query$|reference$|references$|sort$|tree$|update$|view$)[A-Za-z][A-Za-z0-9_]*$}";
 
     private static final Set<String> RESERVED_WEB_ACTION_CODES = reservedCodes();
 

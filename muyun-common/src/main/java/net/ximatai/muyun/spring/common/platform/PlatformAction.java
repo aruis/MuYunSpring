@@ -43,7 +43,14 @@ public enum PlatformAction {
             ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, null),
     DISABLE(PlatformActionGroup.ENABLE, "disable", "Disable",
             PlatformActionLevel.RECORD, 20,
-            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, ENABLE);
+            ActionAccessMode.AUTH_REQUIRED, true, true, ActionDefaultGrantPolicy.NONE, ENABLE),
+
+    IMPORT(PlatformActionGroup.EXCHANGE, "import", "Import",
+            PlatformActionLevel.LIST, 10,
+            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null),
+    EXPORT(PlatformActionGroup.EXCHANGE, "export", "Export",
+            PlatformActionLevel.LIST, 20,
+            ActionAccessMode.AUTH_REQUIRED, true, false, ActionDefaultGrantPolicy.NONE, null);
 
     private final PlatformActionGroup group;
     private final String code;

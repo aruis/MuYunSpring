@@ -4,6 +4,7 @@ dependencies {
 
     implementation(libs.jackson.databind)
     implementation(libs.jackson.datatype.jsr310)
+    implementation(libs.poi.ooxml)
 
     compileOnly(libs.muyun.database.spring.boot.starter)
     compileOnly(libs.spring.context)

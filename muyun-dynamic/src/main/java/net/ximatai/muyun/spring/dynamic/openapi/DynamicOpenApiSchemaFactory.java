@@ -26,6 +26,15 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("WebSort", sortSchema("WebSort"));
         schemas.put("SortWebRequest", sortRequestSchema());
         schemas.put("TreeSortWebRequest", treeSortRequestSchema());
+        schemas.put("DynamicImportParseRequest", importParseRequestSchema());
+        schemas.put("DynamicImportExecuteMultipartRequest", importExecuteMultipartRequestSchema());
+        schemas.put("DynamicImportExecuteRequest", importExecuteRequestSchema());
+        schemas.put("DynamicImportMainSheetRequest", importMainSheetRequestSchema());
+        schemas.put("DynamicImportChildSheetRequest", importChildSheetRequestSchema());
+        schemas.put("DynamicImportParseResult", importParseResultSchema());
+        schemas.put("DynamicImportParseSheet", importParseSheetSchema());
+        schemas.put("DynamicImportParseField", importParseFieldSchema());
+        schemas.put("DynamicImportUploadResult", importUploadResultSchema());
         schemas.put("DynamicWebActionRequest", actionRequestSchema());
         schemas.put("DynamicWebReferenceRequest", referenceRequestSchema());
         schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
@@ -459,6 +468,95 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("nextId", stringProperty(true));
         properties.put("parentId", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("TreeSortWebRequest", "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importParseRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("file", new DynamicOpenApiDocument.Property("string", "binary", true, false,
+                false, null, null, null, null, null, List.of()));
+        return new DynamicOpenApiDocument.Schema("DynamicImportParseRequest", "object", null,
+                List.of("file"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importExecuteMultipartRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("command", objectProperty("DynamicImportExecuteRequest"));
+        properties.put("file", new DynamicOpenApiDocument.Property("string", "binary", true, false,
+                false, null, null, null, null, null, List.of()));
+        return new DynamicOpenApiDocument.Schema("DynamicImportExecuteMultipartRequest", "object", null,
+                List.of("command", "file"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importExecuteRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("mainSheet", objectProperty("DynamicImportMainSheetRequest"));
+        properties.put("childSheets", arrayProperty("DynamicImportChildSheetRequest"));
+        return new DynamicOpenApiDocument.Schema("DynamicImportExecuteRequest", "object", null,
+                List.of("mainSheet"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importMainSheetRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("matchFieldName", stringProperty(false));
+        properties.put("duplicateStrategy", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicImportMainSheetRequest", "object", null,
+                List.of("matchFieldName"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importChildSheetRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("entityAlias", stringProperty(false));
+        properties.put("matchFieldName", stringProperty(false));
+        properties.put("duplicateStrategy", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicImportChildSheetRequest", "object", null,
+                List.of("entityAlias", "matchFieldName"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importParseResultSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("moduleAlias", stringProperty(false));
+        properties.put("mainEntityAlias", stringProperty(false));
+        properties.put("mainSheetName", stringProperty(false));
+        properties.put("sheets", arrayProperty("DynamicImportParseSheet"));
+        return new DynamicOpenApiDocument.Schema("DynamicImportParseResult", "object", null,
+                List.of("moduleAlias", "mainEntityAlias", "sheets"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importParseSheetSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("sheetKey", stringProperty(false));
+        properties.put("sheetName", stringProperty(false));
+        properties.put("entityAlias", stringProperty(false));
+        properties.put("main", booleanProperty(false));
+        properties.put("rowCount", integerProperty(false));
+        properties.put("fields", arrayProperty("DynamicImportParseField"));
+        return new DynamicOpenApiDocument.Schema("DynamicImportParseSheet", "object", null,
+                List.of("sheetKey", "sheetName", "entityAlias", "main"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importParseFieldSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("fieldName", stringProperty(false));
+        properties.put("title", stringProperty(false));
+        properties.put("relateId", booleanProperty(false));
+        properties.put("matchKeyCandidate", booleanProperty(false));
+        return new DynamicOpenApiDocument.Schema("DynamicImportParseField", "object", null,
+                List.of("fieldName", "title"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema importUploadResultSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("created", integerProperty(false));
+        properties.put("updated", integerProperty(false));
+        properties.put("skipped", integerProperty(false));
+        properties.put("errorCount", integerProperty(false));
+        properties.put("partialSuccess", booleanProperty(false));
+        properties.put("message", stringProperty(true));
+        properties.put("errorFileName", stringProperty(true));
+        properties.put("errorFileToken", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicImportUploadResult", "object", null,
+                List.of("created", "updated", "skipped", "errorCount", "partialSuccess"),
+                properties, null);
     }
 
     private DynamicOpenApiDocument.Schema actionRequestSchema() {

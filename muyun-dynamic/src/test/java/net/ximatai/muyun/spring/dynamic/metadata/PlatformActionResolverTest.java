@@ -21,7 +21,8 @@ class PlatformActionResolverTest {
                 FieldDefinition.parentId(),
                 FieldDefinition.sortOrder(),
                 FieldDefinition.enabled()
-        ), Set.of(EntityCapability.TREE, EntityCapability.REFERENCE, EntityCapability.ENABLE));
+        ), Set.of(EntityCapability.TREE, EntityCapability.REFERENCE, EntityCapability.ENABLE,
+                EntityCapability.EXCHANGE));
 
         assertThat(EntityStandardActionCatalog.from(entity))
                 .extracting(EntityActionDefinition::actionCode)
@@ -46,6 +47,9 @@ class PlatformActionResolverTest {
         assertThat(actionCodes(entityWith(EntityCapability.ENABLE)))
                 .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
                         PlatformActionGroup.ENABLE));
+        assertThat(actionCodes(entityWith(EntityCapability.EXCHANGE)))
+                .containsExactlyElementsOf(actionCodes(PlatformActionGroup.MENU, PlatformActionGroup.CRUD,
+                        PlatformActionGroup.EXCHANGE));
     }
 
     @Test
@@ -55,7 +59,7 @@ class PlatformActionResolverTest {
                 EntityStandardActionCatalog.from(entityWith(EntityCapability.DATA_SCOPE));
         List<EntityActionDefinition> allCapabilityActions =
                 EntityStandardActionCatalog.from(entityWith(EntityCapability.DATA_SCOPE, EntityCapability.TREE,
-                        EntityCapability.REFERENCE, EntityCapability.ENABLE));
+                        EntityCapability.REFERENCE, EntityCapability.ENABLE, EntityCapability.EXCHANGE));
 
         assertThat(action(plainActions, PlatformAction.MENU).actionAuth()).isTrue();
         assertThat(action(plainActions, PlatformAction.MENU).dataAuth()).isFalse();

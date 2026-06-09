@@ -42,9 +42,13 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/insert",
                         "/sales.contract/update/{id}",
                         "/sales.contract/delete/{id}",
+                        "/sales.contract/import/parse",
+                        "/sales.contract/import/execute",
+                        "/sales.contract/import/error-file/{token}",
+                        "/sales.contract/export/template",
                         "/sales.contract/actions",
                         "/sales.contract/actions/{recordId}",
-                        "/sales.contract/export",
+                        "/sales.contract/publish",
                         "/sales.contract/submit/{recordId}",
                         "/sales.contract/archive/batch",
                         "/sales.contract/preview",
@@ -52,6 +56,15 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/preview/batch",
                         "/sales.contract/references/customerId/resolve"
                 );
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/import/error-file/{token}"))
+                .findFirst())
+                .get()
+                .satisfies(operation -> {
+                    assertThat(operation.method()).isEqualTo("POST");
+                    assertThat(operation.operationId()).isEqualTo("salesContractImportErrorFile");
+                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/submit/{recordId}"))
                 .findFirst())
@@ -134,6 +147,8 @@ class DynamicOpenApiGeneratorTest {
                 List.of(
                         action("openapi", "OpenAPI", EntityActionLevel.LIST),
                         action("query", "Query", EntityActionLevel.LIST),
+                        action("import", "Import", EntityActionLevel.LIST),
+                        action("export", "Export", EntityActionLevel.LIST),
                         action("enable", "Enable", EntityActionLevel.RECORD),
                         action("disable", "Disable", EntityActionLevel.RECORD),
                         action("sort", "Sort", EntityActionLevel.RECORD),
@@ -145,8 +160,10 @@ class DynamicOpenApiGeneratorTest {
 
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
-                .contains("/sales.contract/openapi", "/sales.contract/query")
-                .doesNotContain("/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}");
+                .contains("/sales.contract/openapi", "/sales.contract/query",
+                        "/sales.contract/import/parse", "/sales.contract/export/template")
+                .doesNotContain("/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}",
+                        "/sales.contract/import", "/sales.contract/export");
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/openapi")))
                 .singleElement()
@@ -357,6 +374,14 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("DynamicReferenceResolveResponse").properties())
                 .containsKeys("options", "results", "offset", "limit", "total")
                 .doesNotContainKeys("pageNum", "pageSize");
+        assertThat(document.schemas().get("DynamicImportParseResult").properties().get("sheets").itemType())
+                .isEqualTo("DynamicImportParseSheet");
+        assertThat(document.schemas().get("DynamicImportExecuteMultipartRequest").properties())
+                .containsKeys("command", "file");
+        assertThat(document.schemas().get("DynamicImportUploadResult").properties())
+                .containsKeys("created", "updated", "skipped", "errorCount", "partialSuccess", "errorFileToken")
+                .doesNotContainKeys("successCount", "failCount");
+        assertThat(document.schemas()).doesNotContainKey("DynamicExportQueryRequest");
     }
 
     @Test
@@ -387,7 +412,7 @@ class DynamicOpenApiGeneratorTest {
     void shouldDefineEveryReferencedSchema() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
         Set<String> primitives = Set.of("string", "object", "array", "integer", "number", "boolean",
-                "scalar", "null");
+                "binary", "scalar", "null");
 
         for (DynamicOpenApiDocument.Operation operation : document.operations()) {
             assertResolvableSchema(operation.requestSchema(), document.schemas(), primitives);
@@ -430,7 +455,7 @@ class DynamicOpenApiGeneratorTest {
                 List.of(),
                 List.of(),
                 List.of(
-                        action("export", "导出", EntityActionLevel.LIST),
+                        action("publish", "发布", EntityActionLevel.LIST),
                         action("submit", "提交", EntityActionLevel.RECORD),
                         action("archive", "归档", EntityActionLevel.BATCH),
                         action("preview", "预览", EntityActionLevel.ANY)
@@ -458,7 +483,7 @@ class DynamicOpenApiGeneratorTest {
                 FieldDefinition.string("customerId", "Customer"),
                 FieldDefinition.zonedTimestamp("signedAt", "Signed At"),
                 FieldDefinition.zonedTimestampTimeZone("signedAt", "signed_at")
-        ));
+        )).withCapabilities(EntityCapability.EXCHANGE);
     }
 
     private EntityDefinition lineEntity() {
