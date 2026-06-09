@@ -83,7 +83,8 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
                     "Delete " + mainEntity.title(), null, "WebCountResponse", PlatformAction.DELETE.code()));
         }
-        if (standardActionVisible.test(PlatformAction.IMPORT)) {
+        boolean exchangeSupported = mainEntity.capabilities().contains(EntityCapability.EXCHANGE.name());
+        if (exchangeSupported && standardActionVisible.test(PlatformAction.IMPORT)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/exchange/template",
                     operationId(descriptor, "exchangeTemplate"),
                     "Download exchange template " + mainEntity.title(), "DynamicExchangeTemplateRequest",
@@ -99,7 +100,7 @@ public class DynamicOpenApiGenerator {
                     "Download import error workbook " + mainEntity.title(), null,
                     "binary", PlatformAction.IMPORT.code()));
         }
-        if (standardActionVisible.test(PlatformAction.EXPORT)) {
+        if (exchangeSupported && standardActionVisible.test(PlatformAction.EXPORT)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/export/data",
                     operationId(descriptor, "exportData"),
                     "Export data " + mainEntity.title(), "WebQueryRequest", "binary", PlatformAction.EXPORT.code()));

@@ -220,6 +220,22 @@ class DynamicOpenApiGeneratorTest {
     }
 
     @Test
+    void shouldExposeExchangeOperationsOnlyWhenMainEntitySupportsExchange() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(
+                new ModuleDefinition("sales.contract", "Contract", List.of(contractEntityWithoutExchange()))));
+
+        assertThat(document.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .doesNotContain(
+                        "/sales.contract/import/parse",
+                        "/sales.contract/import/execute",
+                        "/sales.contract/import/error-file/{token}",
+                        "/sales.contract/exchange/template",
+                        "/sales.contract/export/data"
+                );
+    }
+
+    @Test
     void shouldExposeEnableWebOperationsOnlyWhenMainEntitySupportsEnable() {
         DynamicOpenApiDocument plain = generator.generate(DynamicModuleDescriptor.from(
                 new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()))));
@@ -497,6 +513,12 @@ class DynamicOpenApiGeneratorTest {
                 FieldDefinition.zonedTimestamp("signedAt", "Signed At"),
                 FieldDefinition.zonedTimestampTimeZone("signedAt", "signed_at")
         )).withCapabilities(EntityCapability.EXCHANGE);
+    }
+
+    private EntityDefinition contractEntityWithoutExchange() {
+        return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                FieldDefinition.string("code", "Code").length(64).required()
+        ));
     }
 
     private EntityDefinition lineEntity() {
