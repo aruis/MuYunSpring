@@ -146,7 +146,8 @@ class DynamicRecordWebControllerTest {
                         "code",
                         CodeFieldRole.PRIMARY,
                         "SO-A0001",
-                        null
+                        null,
+                        "2026-06-08T10:00:00"
                 )));
 
         mvc.perform(post("/{moduleAlias}/code/preview", MODULE)
@@ -161,7 +162,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ruleId").value("rule-1"))
                 .andExpect(jsonPath("$[0].fieldName").value("code"))
-                .andExpect(jsonPath("$[0].value").value("SO-A0001"));
+                .andExpect(jsonPath("$[0].value").value("SO-A0001"))
+                .andExpect(jsonPath("$[0].effectiveAt").value("2026-06-08T10:00:00"));
 
         ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
         verify(codeBusinessPreviewService).preview(eq(MODULE), eq(ENTITY), contextCaptor.capture(), eq(null),

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import java.util.Objects;
 
 @Service
 public class CodeBusinessPreviewService {
+    private static final DateTimeFormatter EFFECTIVE_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
     private final CodeRuleService ruleService;
     private final CodePreviewService previewService;
     private final Clock clock;
@@ -72,7 +75,8 @@ public class CodeBusinessPreviewService {
                 rule.getFieldName(),
                 rule.getFieldRole(),
                 result.value(),
-                resolved.resolvedOrganizationId()
+                resolved.resolvedOrganizationId(),
+                at == null ? null : EFFECTIVE_AT_FORMATTER.format(at)
         );
     }
 }

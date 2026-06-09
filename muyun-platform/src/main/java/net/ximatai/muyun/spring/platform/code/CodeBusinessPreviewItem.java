@@ -6,6 +6,7 @@ public record CodeBusinessPreviewItem(
         String fieldName,
         CodeFieldRole fieldRole,
         String value,
-        String organizationId
+        String organizationId,
+        String effectiveAt
 ) {
 }
