@@ -5,12 +5,14 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicMutationContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,6 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @Component
 public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator {
@@ -34,6 +37,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
     private final CodeLedgerEntryService ledgerEntryService;
     private final CodeRecycleEntryService recycleEntryService;
     private final DynamicRecordService recordService;
+    private final CodeBusinessTimeService timeService;
     private final Clock clock;
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
@@ -49,9 +53,10 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                   CodeSequenceStateService sequenceStateService,
                                   CodeLedgerEntryService ledgerEntryService,
                                   CodeRecycleEntryService recycleEntryService,
+                                  CodeBusinessTimeService timeService,
                                   @Lazy DynamicRecordService recordService) {
         this(ruleService, generateService, previewService, sequenceStateService, ledgerEntryService, recycleEntryService,
-                recordService, Clock.systemDefaultZone());
+                recordService, timeService, Clock.systemDefaultZone());
     }
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
@@ -89,6 +94,19 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                   CodeRecycleEntryService recycleEntryService,
                                   DynamicRecordService recordService,
                                   Clock clock) {
+        this(ruleService, generateService, previewService, sequenceStateService, ledgerEntryService, recycleEntryService,
+                recordService, null, clock);
+    }
+
+    public DynamicCodeCoordinator(CodeRuleService ruleService,
+                                  CodeGenerateService generateService,
+                                  CodePreviewService previewService,
+                                  CodeSequenceStateService sequenceStateService,
+                                  CodeLedgerEntryService ledgerEntryService,
+                                  CodeRecycleEntryService recycleEntryService,
+                                  DynamicRecordService recordService,
+                                  CodeBusinessTimeService timeService,
+                                  Clock clock) {
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");
         this.generateService = Objects.requireNonNull(generateService, "generateService must not be null");
         this.previewService = previewService == null ? new CodePreviewService() : previewService;
@@ -97,6 +115,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         this.recycleEntryService = recycleEntryService;
         this.recordService = Objects.requireNonNull(recordService, "recordService must not be null");
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
+        this.timeService = timeService == null ? new CodeBusinessTimeService(this.clock) : timeService;
     }
 
     @Override
@@ -104,8 +123,8 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (record == null) {
             return;
         }
-        LocalDateTime at = LocalDateTime.now(clock);
         String organizationId = resolveOrganizationId(record);
+        LocalDateTime at = businessTime(organizationId);
         List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
                 moduleAlias,
                 entityAlias,
@@ -130,7 +149,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         }
         record.setId(id);
         syncCurrentBindings(moduleAlias, entityAlias, record, recordContext(record), resolveOrganizationId(record),
-                LocalDateTime.now(clock));
+                businessTime(resolveOrganizationId(record)));
     }
 
     @Override
@@ -140,7 +159,26 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                           String childEntityAlias,
                                           DynamicRecord parent,
                                           DynamicRecord child) {
-        beforeCreate(moduleAlias, childEntityAlias, child);
+        if (child == null) {
+            return;
+        }
+        String organizationId = resolveOrganizationId(child, parent);
+        LocalDateTime at = businessTime(organizationId);
+        List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
+                moduleAlias,
+                childEntityAlias,
+                null,
+                null,
+                organizationId,
+                at
+        ));
+        if (resolvedRules.isEmpty()) {
+            return;
+        }
+        Map<String, Object> context = childRecordContext(parentEntityAlias, relationCode, parent, childEntityAlias, child);
+        for (ResolvedCodeRule resolved : resolvedRules) {
+            applyCreateRule(moduleAlias, childEntityAlias, child, resolved, organizationId, at, context);
+        }
     }
 
     @Override
@@ -151,7 +189,14 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                          DynamicRecord parent,
                                          DynamicRecord child,
                                          String id) {
-        afterCreate(moduleAlias, childEntityAlias, child, id);
+        if (child == null || id == null || id.isBlank()) {
+            return;
+        }
+        child.setId(id);
+        String organizationId = resolveOrganizationId(child, parent);
+        syncCurrentBindings(moduleAlias, childEntityAlias, child,
+                childRecordContext(parentEntityAlias, relationCode, parent, childEntityAlias, child), organizationId,
+                businessTime(organizationId));
     }
 
     @Override
@@ -159,8 +204,8 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (before == null || incoming == null) {
             return;
         }
-        LocalDateTime at = LocalDateTime.now(clock);
         String organizationId = resolveOrganizationId(incoming);
+        LocalDateTime at = businessTime(organizationId);
         List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
                 moduleAlias,
                 entityAlias,
@@ -173,8 +218,10 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
             return;
         }
         Map<String, Object> context = mergedRecordContext(before, incoming);
+        Set<String> changedKeys = incoming.explicitFieldCodes();
         for (ResolvedCodeRule resolved : resolvedRules) {
-            applyUpdateRule(moduleAlias, entityAlias, before, incoming, resolved, organizationId, at, context);
+            applyUpdateRule(moduleAlias, entityAlias, before, incoming, resolved, organizationId, at, context,
+                    recordContext(before), changedKeys);
         }
     }
 
@@ -183,8 +230,8 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (before == null || updated == null) {
             return;
         }
-        LocalDateTime at = LocalDateTime.now(clock);
         String organizationId = resolveOrganizationId(updated);
+        LocalDateTime at = businessTime(organizationId);
         List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
                 moduleAlias,
                 entityAlias,
@@ -223,7 +270,32 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                           DynamicRecord parentIncoming,
                                           DynamicRecord childBefore,
                                           DynamicRecord childIncoming) {
-        beforeUpdate(moduleAlias, childEntityAlias, childBefore, childIncoming);
+        if (childBefore == null || childIncoming == null) {
+            return;
+        }
+        String organizationId = resolveOrganizationId(childIncoming, parentIncoming, parentBefore);
+        LocalDateTime at = businessTime(organizationId);
+        List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
+                moduleAlias,
+                childEntityAlias,
+                null,
+                null,
+                organizationId,
+                at
+        ));
+        if (resolvedRules.isEmpty()) {
+            return;
+        }
+        Map<String, Object> context = childMergedRecordContext(parentEntityAlias, relationCode, parentBefore,
+                parentIncoming, childEntityAlias, childBefore, childIncoming);
+        Set<String> changedKeys = childChangedKeys(parentEntityAlias, relationCode, parentIncoming,
+                childEntityAlias, childIncoming);
+        Map<String, Object> beforeContext = childRecordContext(parentEntityAlias, relationCode, parentBefore,
+                childEntityAlias, childBefore);
+        for (ResolvedCodeRule resolved : resolvedRules) {
+            applyUpdateRule(moduleAlias, childEntityAlias, childBefore, childIncoming, resolved, organizationId, at,
+                    context, beforeContext, changedKeys);
+        }
     }
 
     @Override
@@ -235,7 +307,40 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                          DynamicRecord parentUpdated,
                                          DynamicRecord childBefore,
                                          DynamicRecord childUpdated) {
-        afterUpdate(moduleAlias, childEntityAlias, childBefore, childUpdated);
+        if (childBefore == null || childUpdated == null) {
+            return;
+        }
+        String organizationId = resolveOrganizationId(childUpdated, parentUpdated, parentBefore);
+        LocalDateTime at = businessTime(organizationId);
+        List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
+                moduleAlias,
+                childEntityAlias,
+                null,
+                null,
+                organizationId,
+                at
+        ));
+        if (resolvedRules.isEmpty()) {
+            return;
+        }
+        Map<String, Object> beforeContext = childRecordContext(parentEntityAlias, relationCode, parentBefore,
+                childEntityAlias, childBefore);
+        Map<String, Object> currentContext = childMergedRecordContext(parentEntityAlias, relationCode, parentBefore,
+                parentUpdated, childEntityAlias, childBefore, childUpdated);
+        for (ResolvedCodeRule resolved : resolvedRules) {
+            CodeRule rule = resolved.rule();
+            Object oldValue = safeGetValue(childBefore, rule.getFieldName());
+            Object newValue = currentContext.get(rule.getFieldName());
+            if (sameCode(oldValue, newValue)) {
+                syncCurrentBinding(rule, newValue, currentContext, childUpdated.getId(), at);
+                continue;
+            }
+            CodeLedgerAction action = childUpdated.isExplicitlySet(rule.getFieldName())
+                    ? CodeLedgerAction.RELEASED_BY_MANUAL_EDIT
+                    : CodeLedgerAction.RELEASED_BY_LINKED_UPDATE;
+            releaseCode(rule, oldValue, null, beforeContext, childBefore.getId(), action, at);
+            syncCurrentBinding(rule, newValue, currentContext, childUpdated.getId(), at);
+        }
     }
 
     @Override
@@ -254,7 +359,26 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                          String childEntityAlias,
                                          DynamicRecord parentBefore,
                                          DynamicRecord childBefore) {
-        afterDelete(moduleAlias, childEntityAlias, childBefore);
+        if (childBefore == null) {
+            return;
+        }
+        String organizationId = resolveOrganizationId(childBefore, parentBefore);
+        LocalDateTime at = businessTime(organizationId);
+        List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
+                moduleAlias,
+                childEntityAlias,
+                null,
+                null,
+                organizationId,
+                at
+        ));
+        Map<String, Object> beforeContext = childRecordContext(parentEntityAlias, relationCode, parentBefore,
+                childEntityAlias, childBefore);
+        for (ResolvedCodeRule resolved : resolvedRules) {
+            CodeRule rule = resolved.rule();
+            releaseCode(rule, safeGetValue(childBefore, rule.getFieldName()), null, beforeContext, childBefore.getId(),
+                    CodeLedgerAction.RELEASED_BY_DELETE, at);
+        }
     }
 
     @Override
@@ -262,8 +386,8 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (before == null) {
             return;
         }
-        LocalDateTime at = LocalDateTime.now(clock);
         String organizationId = resolveOrganizationId(before);
+        LocalDateTime at = businessTime(organizationId);
         List<ResolvedCodeRule> resolvedRules = ruleService.resolveRules(new ResolveCodeRuleCommand(
                 moduleAlias,
                 entityAlias,
@@ -312,7 +436,9 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                  ResolvedCodeRule resolved,
                                  String organizationId,
                                  LocalDateTime at,
-                                 Map<String, Object> context) {
+                                 Map<String, Object> context,
+                                 Map<String, Object> beforeContext,
+                                 Set<String> changedKeys) {
         CodeRule rule = resolved.rule();
         if (rule.getMode() == CodeMode.MANUAL) {
             return;
@@ -337,7 +463,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (!Boolean.TRUE.equals(rule.getLinkedUpdate())) {
             return;
         }
-        if (dependsOnChangedField(rule, before, incoming)) {
+        if (dependsOnChangedField(rule, beforeContext, context, changedKeys)) {
             generateAndAssign(moduleAlias, entityAlias, incoming, rule, organizationId, at, context, incoming.getId());
         }
     }
@@ -443,7 +569,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (rule == null || !hasText(oldValue) || sameCode(oldValue, newValue)) {
             return;
         }
-        String basisKey = basisKey(rule, previousContext, at);
+        String basisKey = safeBasisKey(rule, previousContext, at);
         String periodKey = periodKey(rule, at);
         CodeLedgerStatus inactiveStatus = Boolean.TRUE.equals(rule.getAllowRecycle())
                 ? CodeLedgerStatus.AVAILABLE
@@ -538,6 +664,14 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         return items.isEmpty() ? CodeSequenceState.DEFAULT_BUCKET : String.join("||", items);
     }
 
+    private String safeBasisKey(CodeRule rule, Map<String, Object> context, LocalDateTime at) {
+        try {
+            return basisKey(rule, context, at);
+        } catch (RuntimeException ignored) {
+            return CodeSequenceState.DEFAULT_BUCKET;
+        }
+    }
+
     private String periodKey(CodeRule rule, LocalDateTime at) {
         if (rule.getSequencePolicy() == null || rule.getSequencePolicy().getResetPolicy() == null) {
             return CodeSequenceState.DEFAULT_BUCKET;
@@ -572,22 +706,84 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         return context;
     }
 
-    private boolean dependsOnChangedField(CodeRule rule, DynamicRecord before, DynamicRecord incoming) {
-        if (rule.getSegments() == null || rule.getSegments().isEmpty() || incoming.explicitFieldCodes().isEmpty()) {
+    private boolean dependsOnChangedField(CodeRule rule,
+                                          Map<String, Object> beforeContext,
+                                          Map<String, Object> afterContext,
+                                          Set<String> changedKeys) {
+        if (rule.getSegments() == null || rule.getSegments().isEmpty() || changedKeys == null || changedKeys.isEmpty()) {
             return false;
         }
-        if (rule.getSegments().stream().anyMatch(segment -> segment.getSegmentType() == CodeSegmentType.FORMULA)) {
-            return true;
+        Set<String> dependencies = dependencyKeys(rule);
+        if (dependencies.isEmpty()) {
+            return rule.getSegments().stream().anyMatch(segment -> segment.getSegmentType() == CodeSegmentType.FORMULA);
         }
-        Set<String> dependencies = rule.getSegments().stream()
+        return changedKeys.stream()
+                .filter(dependencies::contains)
+                .anyMatch(key -> !Objects.equals(valueOf(beforeContext, key), valueOf(afterContext, key)));
+    }
+
+    private Set<String> dependencyKeys(CodeRule rule) {
+        if (rule == null || rule.getSegments() == null || rule.getSegments().isEmpty()) {
+            return Set.of();
+        }
+        return rule.getSegments().stream()
                 .filter(segment -> Set.of(CodeSegmentType.FIELD_VALUE, CodeSegmentType.VALUE_MAPPING,
-                        CodeSegmentType.CONTEXT_VAR).contains(segment.getSegmentType()))
-                .map(CodeRuleSegment::getSourceRef)
+                        CodeSegmentType.CONTEXT_VAR, CodeSegmentType.FORMULA).contains(segment.getSegmentType()))
+                .flatMap(segment -> segment.getSegmentType() == CodeSegmentType.FORMULA
+                        ? formulaDependencies(segment.getFormulaExpr()).stream()
+                        : java.util.stream.Stream.of(segment.getSourceRef()))
                 .filter(this::hasText)
                 .collect(Collectors.toSet());
-        return incoming.explicitFieldCodes().stream()
-                .filter(dependencies::contains)
-                .anyMatch(field -> !sameCode(safeGetValue(before, field), safeGetValue(incoming, field)));
+    }
+
+    private Object valueOf(Map<String, Object> context, String key) {
+        return context == null || key == null ? null : context.get(key);
+    }
+
+    private Set<String> formulaDependencies(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return Set.of();
+        }
+        java.util.LinkedHashSet<String> dependencies = new java.util.LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("\\{([^}]+)}").matcher(expression);
+        while (matcher.find()) {
+            String key = matcher.group(1);
+            if (hasText(key)) {
+                dependencies.add(key);
+            }
+        }
+        return dependencies;
+    }
+
+    private Set<String> childChangedKeys(String parentEntityAlias,
+                                         String relationCode,
+                                         DynamicRecord parentIncoming,
+                                         String childEntityAlias,
+                                         DynamicRecord childIncoming) {
+        java.util.LinkedHashSet<String> changedKeys = new java.util.LinkedHashSet<>();
+        if (parentIncoming != null) {
+            for (String field : parentIncoming.explicitFieldCodes()) {
+                if (hasText(field)) {
+                    addPrefixedKey(changedKeys, parentEntityAlias, field);
+                    addPrefixedKey(changedKeys, relationCode, field);
+                }
+            }
+        }
+        if (childIncoming != null) {
+            for (String field : childIncoming.explicitFieldCodes()) {
+                if (hasText(field)) {
+                    changedKeys.add(field);
+                    addPrefixedKey(changedKeys, childEntityAlias, field);
+                }
+            }
+        }
+        return Set.copyOf(changedKeys);
+    }
+
+    private void addPrefixedKey(Set<String> keys, String prefix, String field) {
+        if (keys != null && hasText(prefix) && hasText(field)) {
+            keys.add(prefix + "." + field);
+        }
     }
 
     private Object safeGetValue(DynamicRecord record, String fieldName) {
@@ -614,11 +810,91 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
     }
 
     private String resolveOrganizationId(DynamicRecord record) {
+        return resolveOrganizationId(record, (DynamicRecord[]) null);
+    }
+
+    private String resolveOrganizationId(DynamicRecord record, DynamicRecord... fallbackRecords) {
         if (record.getAuthOrganizationId() != null && !record.getAuthOrganizationId().isBlank()) {
             return record.getAuthOrganizationId();
+        }
+        if (fallbackRecords != null) {
+            for (DynamicRecord fallback : fallbackRecords) {
+                if (fallback != null && fallback.getAuthOrganizationId() != null
+                        && !fallback.getAuthOrganizationId().isBlank()) {
+                    return fallback.getAuthOrganizationId();
+                }
+            }
         }
         return CurrentUserContext.currentUser()
                 .map(user -> user.organizationId())
                 .orElse(null);
+    }
+
+    private LocalDateTime businessTime(String organizationId) {
+        Instant instant = DynamicMutationContext.current()
+                .map(DynamicMutationContext::startedAt)
+                .orElseGet(clock::instant);
+        return timeService.resolveBusinessLocalDateTime(organizationId, instant);
+    }
+
+    private Map<String, Object> childRecordContext(String parentEntityAlias,
+                                                   String relationCode,
+                                                   DynamicRecord parent,
+                                                   String childEntityAlias,
+                                                   DynamicRecord child) {
+        LinkedHashMap<String, Object> context = new LinkedHashMap<>();
+        if (parent != null) {
+            Map<String, Object> parentContext = recordContext(parent);
+            context.putAll(parentContext);
+            putPrefixedContext(context, parentEntityAlias, parentContext);
+            putPrefixedContext(context, relationCode, parentContext);
+        }
+        if (child != null) {
+            Map<String, Object> childContext = recordContext(child);
+            context.putAll(childContext);
+            putPrefixedContext(context, childEntityAlias, childContext);
+        }
+        return context;
+    }
+
+    private Map<String, Object> childMergedRecordContext(String parentEntityAlias,
+                                                         String relationCode,
+                                                         DynamicRecord parentBefore,
+                                                         DynamicRecord parentIncoming,
+                                                         String childEntityAlias,
+                                                         DynamicRecord childBefore,
+                                                         DynamicRecord childIncoming) {
+        LinkedHashMap<String, Object> context = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> parentContext = new LinkedHashMap<>();
+        if (parentBefore != null) {
+            parentContext.putAll(recordContext(parentBefore));
+        }
+        if (parentIncoming != null) {
+            parentContext.putAll(recordContext(parentIncoming));
+        }
+        context.putAll(parentContext);
+        putPrefixedContext(context, parentEntityAlias, parentContext);
+        putPrefixedContext(context, relationCode, parentContext);
+        LinkedHashMap<String, Object> childContext = new LinkedHashMap<>();
+        if (childBefore != null) {
+            childContext.putAll(recordContext(childBefore));
+        }
+        if (childIncoming != null) {
+            childContext.putAll(recordContext(childIncoming));
+        }
+        context.putAll(childContext);
+        putPrefixedContext(context, childEntityAlias, childContext);
+        return context;
+    }
+
+    private void putPrefixedContext(Map<String, Object> target, String prefix, Map<String, Object> source) {
+        if (target == null || source == null || source.isEmpty() || prefix == null || prefix.isBlank()) {
+            return;
+        }
+        source.forEach((key, value) -> {
+            if (hasText(key)) {
+                target.put(prefix + "." + key, value);
+            }
+        });
     }
 }

@@ -22,6 +22,7 @@ public class CodeGenerateService {
     private final CodeSequenceStateService sequenceStateService;
     private final CodeRecycleEntryService recycleEntryService;
     private final CodeIssueLogService issueLogService;
+    private final CodeBusinessTimeService timeService;
     private final Clock clock;
 
     public CodeGenerateService(CodeRuleService ruleService,
@@ -49,7 +50,16 @@ public class CodeGenerateService {
                                CodeSequenceStateService sequenceStateService,
                                CodeRecycleEntryService recycleEntryService,
                                Clock clock) {
-        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, clock);
+        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, null, clock);
+    }
+
+    public CodeGenerateService(CodeRuleService ruleService,
+                               CodePreviewService previewService,
+                               CodeSequenceStateService sequenceStateService,
+                               CodeRecycleEntryService recycleEntryService,
+                               CodeIssueLogService issueLogService,
+                               Clock clock) {
+        this(ruleService, previewService, sequenceStateService, recycleEntryService, issueLogService, null, clock);
     }
 
     @Autowired
@@ -58,6 +68,7 @@ public class CodeGenerateService {
                                CodeSequenceStateService sequenceStateService,
                                CodeRecycleEntryService recycleEntryService,
                                CodeIssueLogService issueLogService,
+                               CodeBusinessTimeService timeService,
                                Clock clock) {
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");
         this.previewService = Objects.requireNonNull(previewService, "previewService must not be null");
@@ -65,13 +76,14 @@ public class CodeGenerateService {
         this.recycleEntryService = recycleEntryService;
         this.issueLogService = issueLogService;
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
+        this.timeService = timeService == null ? new CodeBusinessTimeService(this.clock) : timeService;
     }
 
     public GenerateCodeResult generate(GenerateCodeCommand command) {
         if (command == null) {
             throw new PlatformException("Code generate command must not be null");
         }
-        LocalDateTime at = command.at() == null ? LocalDateTime.now(clock) : command.at();
+        LocalDateTime at = timeService.resolveBusinessLocalDateTime(command.organizationId(), command.at());
         Map<String, Object> context = command.context() == null
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(command.context());

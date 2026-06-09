@@ -185,6 +185,73 @@ class DynamicCodeCoordinatorTest {
     }
 
     @Test
+    void shouldRecalculateFormulaCodeOnlyWhenFormulaDependencyChanges() {
+        Services services = services();
+        CodeRule rule = rule("orderNo", CodeMode.AUTO);
+        rule.setLinkedUpdate(Boolean.TRUE);
+        rule.setSegments(new java.util.ArrayList<>(rule.getSegments()));
+        CodeRuleSegment titleFormula = new CodeRuleSegment();
+        titleFormula.setSegmentType(CodeSegmentType.FORMULA);
+        titleFormula.setFormulaExpr("UPPER({title})");
+        titleFormula.setSequenceBasis(Boolean.TRUE);
+        rule.getSegments().add(1, titleFormula);
+        services.ruleService.saveRuleTree(rule);
+        DynamicRecordService recordService = dynamicService(services, statefulOperations());
+        DynamicRecord record = recordService.newRecord(MODULE, "main")
+                .setValue("title", "alpha")
+                .setValue("note", "before");
+        recordService.create(MODULE, "main", record);
+
+        DynamicRecord unrelatedUpdate = recordService.newRecord(MODULE, "main")
+                .setValue("note", "after");
+        unrelatedUpdate.setId(record.getId());
+        unrelatedUpdate.setVersion(1);
+        recordService.update(MODULE, "main", unrelatedUpdate);
+
+        assertThat(safeValue(unrelatedUpdate, "orderNo")).isNull();
+        assertThat(recordService.select(MODULE, "main", record.getId()).getValue("orderNo"))
+                .isEqualTo("SO-ALPHA0001");
+
+        DynamicRecord titleUpdate = recordService.newRecord(MODULE, "main")
+                .setValue("title", "beta");
+        titleUpdate.setId(record.getId());
+        titleUpdate.setVersion(2);
+        recordService.update(MODULE, "main", titleUpdate);
+
+        assertThat(titleUpdate.getValue("orderNo")).isEqualTo("SO-BETA0001");
+    }
+
+    @Test
+    void shouldRecalculateMixedSegmentCodeWhenNonFormulaDependencyChanges() {
+        Services services = services();
+        CodeRule rule = rule("orderNo", CodeMode.AUTO);
+        rule.setLinkedUpdate(Boolean.TRUE);
+        rule.setSegments(new java.util.ArrayList<>(rule.getSegments()));
+        CodeRuleSegment category = segment(CodeSegmentType.FIELD_VALUE, null, "category");
+        category.setSequenceBasis(Boolean.TRUE);
+        CodeRuleSegment titleFormula = new CodeRuleSegment();
+        titleFormula.setSegmentType(CodeSegmentType.FORMULA);
+        titleFormula.setFormulaExpr("UPPER({title})");
+        titleFormula.setSequenceBasis(Boolean.TRUE);
+        rule.getSegments().add(1, category);
+        rule.getSegments().add(2, titleFormula);
+        services.ruleService.saveRuleTree(rule);
+        DynamicRecordService recordService = dynamicService(services, statefulOperations());
+        DynamicRecord record = recordService.newRecord(MODULE, "main")
+                .setValue("title", "alpha")
+                .setValue("category", "A");
+        recordService.create(MODULE, "main", record);
+
+        DynamicRecord update = recordService.newRecord(MODULE, "main")
+                .setValue("category", "B");
+        update.setId(record.getId());
+        update.setVersion(1);
+        recordService.update(MODULE, "main", update);
+
+        assertThat(update.getValue("orderNo")).isEqualTo("SO-BALPHA0001");
+    }
+
+    @Test
     void shouldReleaseCurrentCodeBeforeDynamicDelete() {
         Services services = services();
         CodeRule rule = rule("orderNo", CodeMode.AUTO);
@@ -280,6 +347,8 @@ class DynamicCodeCoordinatorTest {
                 "Order",
                 List.of(
                         FieldDefinition.string("title", "Title").required(),
+                        FieldDefinition.string("note", "Note"),
+                        FieldDefinition.string("category", "Category"),
                         FieldDefinition.string("orderNo", "Order No").column("order_no").length(64).unique()
                 ),
                 Set.of(EntityCapability.CRUD)
