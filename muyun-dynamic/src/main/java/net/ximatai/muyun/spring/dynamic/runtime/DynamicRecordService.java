@@ -115,6 +115,10 @@ public class DynamicRecordService {
         return entity(moduleAlias, mainEntityAlias(moduleAlias));
     }
 
+    public DynamicRecordActionGateway recordsForAction(String moduleAlias, PlatformAction action, String traceId) {
+        return new DynamicRecordActionGateway(this, moduleAlias, action, traceId);
+    }
+
     public DynamicEntityDescriptor entityDescriptor(String moduleAlias, String entityAlias) {
         return findEntity(describe(moduleAlias), entityAlias);
     }
@@ -393,36 +397,15 @@ public class DynamicRecordService {
                 pageRequest, sorts));
     }
 
-    public List<DynamicRecord> listForAction(String moduleAlias,
-                                             String entityAlias,
-                                             PlatformAction action,
-                                             Criteria criteria,
-                                             PageRequest pageRequest,
-                                             Sort... sorts) {
-        requireListAction(moduleAlias, action);
+    List<DynamicRecord> listForAction(String moduleAlias,
+                                      String entityAlias,
+                                      PlatformAction action,
+                                      Criteria criteria,
+                                      PageRequest pageRequest,
+                                      Sort... sorts) {
         DataScopeCriteriaResult scope = readScope(moduleAlias, action, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(),
                 pageRequest, sorts));
-    }
-
-    @Transactional
-    public String createForAction(String moduleAlias,
-                                  String entityAlias,
-                                  DynamicRecord record,
-                                  PlatformAction action,
-                                  String traceId) {
-        requireListAction(moduleAlias, action);
-        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
-    }
-
-    @Transactional
-    public int updateForAction(String moduleAlias,
-                               String entityAlias,
-                               DynamicRecord record,
-                               PlatformAction action,
-                               String traceId) {
-        requireListAction(moduleAlias, action);
-        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
     }
 
     public PageResult<DynamicRecord> page(String moduleAlias, String entityAlias, Criteria criteria, PageRequest pageRequest, Sort... sorts) {
@@ -833,7 +816,7 @@ public class DynamicRecordService {
         ));
     }
 
-    private void requireListAction(String moduleAlias, PlatformAction action) {
+    void requireAction(String moduleAlias, PlatformAction action) {
         if (action == null) {
             throw new IllegalArgumentException("action must not be null");
         }

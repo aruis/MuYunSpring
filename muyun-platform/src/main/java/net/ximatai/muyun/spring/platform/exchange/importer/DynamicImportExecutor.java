@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 
 import java.util.ArrayList;
@@ -36,10 +37,12 @@ public class DynamicImportExecutor {
         Map<String, ImportEntityExecutionSummary> summaries = initialSummaries(plan);
         Map<String, DynamicImportPlan.SheetPlan> sheetPlansByKey = sheetPlansByKey(plan);
         Map<String, DynamicRelationDescriptor> mainChildRelations = mainChildRelations(plan);
+        DynamicRecordActionGateway records = recordService.recordsForAction(
+                plan.moduleAlias(), PlatformAction.IMPORT, IMPORT_TRACE_ID);
 
         DynamicImportPlan.SheetPlan mainSheet = plan.mainSheet();
         for (ImportGroup group : workbook.groups().values()) {
-            WriteDecision mainDecision = executeRow(plan.moduleAlias(), mainSheet, group.mainRow(), null, errorRows,
+            WriteDecision mainDecision = executeRow(records, mainSheet, group.mainRow(), null, errorRows,
                     group.groupKey(), summaries);
             if (!mainDecision.success()) {
                 continue;
@@ -59,7 +62,7 @@ public class DynamicImportExecutor {
                     continue;
                 }
                 for (ParsedImportRow childRow : entry.getValue()) {
-                    executeRow(plan.moduleAlias(), childSheet, childRow,
+                    executeRow(records, childSheet, childRow,
                             new ParentContext(relation.childForeignKeyField(), mainDecision.recordId()),
                             errorRows, group.groupKey(), summaries);
                 }
@@ -68,7 +71,7 @@ public class DynamicImportExecutor {
         return DynamicImportExecutionResult.of(summaries, errorRows);
     }
 
-    private WriteDecision executeRow(String moduleAlias,
+    private WriteDecision executeRow(DynamicRecordActionGateway records,
                                      DynamicImportPlan.SheetPlan sheet,
                                      ParsedImportRow row,
                                      ParentContext parent,
@@ -80,8 +83,7 @@ public class DynamicImportExecutor {
         if (parent != null) {
             criteria.eq(parent.foreignKeyField(), parent.parentId());
         }
-        List<DynamicRecord> existing = recordService.listForAction(moduleAlias, sheet.entityAlias(),
-                PlatformAction.IMPORT, criteria, MATCH_PAGE);
+        List<DynamicRecord> existing = records.list(sheet.entityAlias(), criteria, MATCH_PAGE);
         if (existing.size() > 1) {
             addError(sheet.entityAlias(), summaries, errorRows,
                     ImportErrorRow.of(row, "导入匹配到多条已有记录: " + sheet.matchFieldName(), groupIdentity));
@@ -100,29 +102,27 @@ public class DynamicImportExecutor {
                     yield WriteDecision.success(existingRecord.getId());
                 }
                 case OVERWRITE -> {
-                    DynamicRecord record = buildRecord(moduleAlias, sheet, row, parent);
+                    DynamicRecord record = buildRecord(records, sheet, row, parent);
                     record.setId(existingRecord.getId());
                     record.setVersion(existingRecord.getVersion());
-                    recordService.updateForAction(moduleAlias, sheet.entityAlias(), record,
-                            PlatformAction.IMPORT, IMPORT_TRACE_ID);
+                    records.update(sheet.entityAlias(), record);
                     addUpdated(sheet.entityAlias(), summaries);
                     yield WriteDecision.success(existingRecord.getId());
                 }
             };
         }
 
-        DynamicRecord record = buildRecord(moduleAlias, sheet, row, parent);
-        String id = recordService.createForAction(moduleAlias, sheet.entityAlias(), record,
-                PlatformAction.IMPORT, IMPORT_TRACE_ID);
+        DynamicRecord record = buildRecord(records, sheet, row, parent);
+        String id = records.create(sheet.entityAlias(), record);
         addCreated(sheet.entityAlias(), summaries);
         return WriteDecision.success(id);
     }
 
-    private DynamicRecord buildRecord(String moduleAlias,
+    private DynamicRecord buildRecord(DynamicRecordActionGateway records,
                                       DynamicImportPlan.SheetPlan sheet,
                                       ParsedImportRow row,
                                       ParentContext parent) {
-        DynamicRecord record = recordService.newRecord(moduleAlias, sheet.entityAlias());
+        DynamicRecord record = records.newRecord(sheet.entityAlias());
         for (DynamicImportPlan.FieldPlan field : sheet.fields()) {
             if (field.relateId() || field.companion()) {
                 continue;

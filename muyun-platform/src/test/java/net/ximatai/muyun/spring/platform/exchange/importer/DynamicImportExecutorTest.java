@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ class DynamicImportExecutorTest {
     private static final String MODULE = "sales.order";
 
     private final DynamicRecordService recordService = mock(DynamicRecordService.class);
+    private final DynamicRecordActionGateway records = mock(DynamicRecordActionGateway.class);
     private final DynamicImportExecutor executor = new DynamicImportExecutor(recordService);
 
     @BeforeEach
@@ -35,15 +37,16 @@ class DynamicImportExecutorTest {
         when(recordService.relations(MODULE)).thenReturn(List.of(
                 new DynamicRelationDescriptor("lines", "order", "orderLine", "orderId", true, true)
         ));
-        when(recordService.newRecord(eq(MODULE), eq("order"))).thenAnswer(ignored -> new DynamicRecord(orderEntity()));
-        when(recordService.newRecord(eq(MODULE), eq("orderLine"))).thenAnswer(ignored -> new DynamicRecord(lineEntity()));
+        when(recordService.recordsForAction(MODULE, PlatformAction.IMPORT, "dynamic-import")).thenReturn(records);
+        when(records.newRecord("order")).thenAnswer(ignored -> new DynamicRecord(orderEntity()));
+        when(records.newRecord("orderLine")).thenAnswer(ignored -> new DynamicRecord(lineEntity()));
     }
 
     @Test
     void shouldCreateMainRecordWhenNoExistingMatch() {
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
-        when(recordService.createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn("order-1");
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
                 ImportDuplicateStrategy.ERROR), workbook(group("R-1", mainRow("R-1", "SO-1"), List.of()))));
@@ -52,7 +55,7 @@ class DynamicImportExecutorTest {
         assertThat(result.updated()).isZero();
         assertThat(result.errorRows()).isEmpty();
         ArgumentCaptor<DynamicRecord> captor = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(recordService).createForAction(eq(MODULE), eq("order"), captor.capture(), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records).create(eq("order"), captor.capture());
         assertThat(captor.getValue().getValues())
                 .containsEntry("orderNo", "SO-1")
                 .doesNotContainKeys("relateId", "orderNoTimeZone");
@@ -62,16 +65,16 @@ class DynamicImportExecutorTest {
     void shouldOverwriteMainRecordWhenExistingMatchFound() {
         DynamicRecord existing = orderRecord("order-existing", "SO-1");
         existing.setVersion(3);
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(existing));
-        when(recordService.updateForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn(1);
+        when(records.update(eq("order"), any(DynamicRecord.class))).thenReturn(1);
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
                 ImportDuplicateStrategy.ERROR), workbook(group("R-1", mainRow("R-1", "SO-1"), List.of()))));
 
         assertThat(result.updated()).isEqualTo(1);
         ArgumentCaptor<DynamicRecord> captor = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(recordService).updateForAction(eq(MODULE), eq("order"), captor.capture(), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records).update(eq("order"), captor.capture());
         assertThat(captor.getValue().getId()).isEqualTo("order-existing");
         assertThat(captor.getValue().getVersion()).isEqualTo(3);
         assertThat(captor.getValue().getValue("orderNo")).isEqualTo("SO-1");
@@ -79,7 +82,7 @@ class DynamicImportExecutorTest {
 
     @Test
     void shouldSkipMainRecordWhenExistingMatchFound() {
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(orderRecord("order-existing", "SO-1")));
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.SKIP,
@@ -87,13 +90,13 @@ class DynamicImportExecutorTest {
 
         assertThat(result.skipped()).isEqualTo(1);
         assertThat(result.summaries().get("order").skipped()).isEqualTo(1);
-        verify(recordService, never()).createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
-        verify(recordService, never()).updateForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records, never()).create(eq("order"), any(DynamicRecord.class));
+        verify(records, never()).update(eq("order"), any(DynamicRecord.class));
     }
 
     @Test
     void shouldReportErrorWhenMainMatchesMultipleExistingRecords() {
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(orderRecord("order-1", "SO-1"), orderRecord("order-2", "SO-1")));
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
@@ -102,18 +105,18 @@ class DynamicImportExecutorTest {
         assertThat(result.errorRows()).extracting(ImportErrorRow::message)
                 .containsExactly("导入匹配到多条已有记录: orderNo");
         assertThat(result.summaries().get("order").errors()).isEqualTo(1);
-        verify(recordService, never()).createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
-        verify(recordService, never()).updateForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records, never()).create(eq("order"), any(DynamicRecord.class));
+        verify(records, never()).update(eq("order"), any(DynamicRecord.class));
     }
 
     @Test
     void shouldCreateFirstLevelChildWithParentForeignKey() {
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
-        when(recordService.listForAction(eq(MODULE), eq("orderLine"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("orderLine"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
-        when(recordService.createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn("order-1");
-        when(recordService.createForAction(eq(MODULE), eq("orderLine"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn("line-1");
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
+        when(records.create(eq("orderLine"), any(DynamicRecord.class))).thenReturn("line-1");
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
                 ImportDuplicateStrategy.OVERWRITE), workbook(group("R-1", mainRow("R-1", "SO-1"),
@@ -121,7 +124,7 @@ class DynamicImportExecutorTest {
 
         assertThat(result.created()).isEqualTo(2);
         ArgumentCaptor<DynamicRecord> captor = ArgumentCaptor.forClass(DynamicRecord.class);
-        verify(recordService).createForAction(eq(MODULE), eq("orderLine"), captor.capture(), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records).create(eq("orderLine"), captor.capture());
         assertThat(captor.getValue().getValues())
                 .containsEntry("sku", "SKU-1")
                 .containsEntry("qty", 2)
@@ -131,12 +134,12 @@ class DynamicImportExecutorTest {
 
     @Test
     void shouldReportErrorWhenChildMatchesMultipleExistingRecords() {
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
-        when(recordService.listForAction(eq(MODULE), eq("orderLine"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("orderLine"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(lineRecord("line-1", "order-1", "SKU-1"),
                         lineRecord("line-2", "order-1", "SKU-1")));
-        when(recordService.createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn("order-1");
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
                 ImportDuplicateStrategy.OVERWRITE), workbook(group("R-1", mainRow("R-1", "SO-1"),
@@ -148,15 +151,15 @@ class DynamicImportExecutorTest {
                         "orderLine", "导入匹配到多条已有记录: sku"
                 ));
         assertThat(result.summaries().get("orderLine").errors()).isEqualTo(1);
-        verify(recordService, never()).createForAction(eq(MODULE), eq("orderLine"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records, never()).create(eq("orderLine"), any(DynamicRecord.class));
     }
 
     @Test
     void shouldReportMissingRelationErrorOnChildRow() {
         when(recordService.relations(MODULE)).thenReturn(List.of());
-        when(recordService.listForAction(eq(MODULE), eq("order"), eq(PlatformAction.IMPORT), any(Criteria.class), any(PageRequest.class)))
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
-        when(recordService.createForAction(eq(MODULE), eq("order"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"))).thenReturn("order-1");
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
 
         DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
                 ImportDuplicateStrategy.OVERWRITE), workbook(group("R-1", mainRow("R-1", "SO-1"),
@@ -167,7 +170,7 @@ class DynamicImportExecutorTest {
                         "orderLine", "子表未找到主子关系: orderLine"
                 ));
         assertThat(result.summaries().get("orderLine").errors()).isEqualTo(1);
-        verify(recordService, never()).createForAction(eq(MODULE), eq("orderLine"), any(DynamicRecord.class), eq(PlatformAction.IMPORT), eq("dynamic-import"));
+        verify(records, never()).create(eq("orderLine"), any(DynamicRecord.class));
     }
 
     private ExecuteDynamicImportCommand command(DynamicImportPlan plan, GroupedWorkbook workbook) {
