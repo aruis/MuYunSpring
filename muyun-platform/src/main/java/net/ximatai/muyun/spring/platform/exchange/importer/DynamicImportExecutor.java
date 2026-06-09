@@ -2,14 +2,20 @@ package net.ximatai.muyun.spring.platform.exchange.importer;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResult;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +48,7 @@ public class DynamicImportExecutor {
 
         DynamicImportPlan.SheetPlan mainSheet = plan.mainSheet();
         for (ImportGroup group : workbook.groups().values()) {
-            WriteDecision mainDecision = executeRow(records, mainSheet, group.mainRow(), null, errorRows,
+            WriteDecision mainDecision = executeRow(records, plan.moduleAlias(), mainSheet, group.mainRow(), null, errorRows,
                     group.groupKey(), summaries);
             if (!mainDecision.success()) {
                 continue;
@@ -62,7 +68,7 @@ public class DynamicImportExecutor {
                     continue;
                 }
                 for (ParsedImportRow childRow : entry.getValue()) {
-                    executeRow(records, childSheet, childRow,
+                    executeRow(records, plan.moduleAlias(), childSheet, childRow,
                             new ParentContext(relation.childForeignKeyField(), mainDecision.recordId()),
                             errorRows, group.groupKey(), summaries);
                 }
@@ -72,6 +78,7 @@ public class DynamicImportExecutor {
     }
 
     private WriteDecision executeRow(DynamicRecordActionGateway records,
+                                     String moduleAlias,
                                      DynamicImportPlan.SheetPlan sheet,
                                      ParsedImportRow row,
                                      ParentContext parent,
@@ -79,6 +86,10 @@ public class DynamicImportExecutor {
                                      String groupIdentity,
                                      Map<String, ImportEntityExecutionSummary> summaries) {
         Object matchValue = row.convertedValues().get(sheet.matchFieldName());
+        if (!resolveReferenceValues(moduleAlias, sheet, row, errorRows, groupIdentity, summaries)) {
+            return WriteDecision.failed();
+        }
+        matchValue = row.convertedValues().get(sheet.matchFieldName());
         Criteria criteria = Criteria.of().eq(sheet.matchFieldName(), matchValue);
         if (parent != null) {
             criteria.eq(parent.foreignKeyField(), parent.parentId());
@@ -116,6 +127,83 @@ public class DynamicImportExecutor {
         String id = records.create(sheet.entityAlias(), record);
         addCreated(sheet.entityAlias(), summaries);
         return WriteDecision.success(id);
+    }
+
+    private boolean resolveReferenceValues(String moduleAlias,
+                                           DynamicImportPlan.SheetPlan sheet,
+                                           ParsedImportRow row,
+                                           List<ImportErrorRow> errorRows,
+                                           String groupIdentity,
+                                           Map<String, ImportEntityExecutionSummary> summaries) {
+        boolean success = true;
+        for (DynamicImportPlan.FieldPlan field : sheet.fields()) {
+            if (field.reference() == null || field.relateId() || field.companion()) {
+                continue;
+            }
+            String raw = row.valuesByFieldName().get(field.fieldName());
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            List<String> inputs = referenceInputValues(field, raw);
+            DynamicReferenceResolveResponse response = recordService.resolveReference(
+                    moduleAlias,
+                    field.reference().sourceEntityAlias(),
+                    field.reference().sourceField(),
+                    DynamicReferenceResolveRequest.translate(List.copyOf(inputs)).withoutProjections()
+            );
+            DynamicReferenceResolveResult failed = firstUnresolved(response.results(), inputs.size());
+            if (failed == null) {
+                row.convertedValues().put(field.fieldName(), referenceResolvedValue(field, response.results()));
+                continue;
+            }
+            String message = referenceResolveErrorMessage(field, failed);
+            addError(sheet.entityAlias(), summaries, errorRows, ImportErrorRow.of(row, message, groupIdentity));
+            success = false;
+        }
+        return success;
+    }
+
+    private List<String> referenceInputValues(DynamicImportPlan.FieldPlan field, String raw) {
+        if (field.reference().cardinality() != ReferenceCardinality.MANY) {
+            return List.of(raw);
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
+    }
+
+    private DynamicReferenceResolveResult firstUnresolved(List<DynamicReferenceResolveResult> results, int expectedSize) {
+        if (results == null || results.size() != expectedSize) {
+            return new DynamicReferenceResolveResult(null, DynamicReferenceResolveStatus.NOT_FOUND, null, null, List.of());
+        }
+        return results.stream()
+                .filter(result -> result.status() != DynamicReferenceResolveStatus.RESOLVED || result.item() == null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Object referenceResolvedValue(DynamicImportPlan.FieldPlan field,
+                                          List<DynamicReferenceResolveResult> results) {
+        List<String> ids = results.stream()
+                .map(result -> result.item().id())
+                .toList();
+        if (field.reference().cardinality() == ReferenceCardinality.MANY) {
+            return String.join(",", ids);
+        }
+        return ids.getFirst();
+    }
+
+    private String referenceResolveErrorMessage(DynamicImportPlan.FieldPlan field,
+                                                DynamicReferenceResolveResult result) {
+        String prefix = "引用字段无法反推: " + field.title();
+        if (result == null || result.status() == DynamicReferenceResolveStatus.NOT_FOUND) {
+            return prefix + " 未找到";
+        }
+        if (result.status() == DynamicReferenceResolveStatus.AMBIGUOUS) {
+            return prefix + " 匹配多条";
+        }
+        return prefix + " " + result.status();
     }
 
     private DynamicRecord buildRecord(DynamicRecordActionGateway records,

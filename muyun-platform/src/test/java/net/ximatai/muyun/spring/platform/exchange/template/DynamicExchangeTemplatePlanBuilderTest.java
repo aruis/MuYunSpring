@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.option.OptionSourceRegistry;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -153,6 +154,37 @@ class DynamicExchangeTemplatePlanBuilderTest {
     }
 
     @Test
+    void shouldLoadReferenceOptionsIntoTemplateColumnsByDefault() {
+        DynamicExchangeTemplatePlanBuilder referenceBuilder = new DynamicExchangeTemplatePlanBuilder(
+                null,
+                (reference, limit) -> {
+                    assertThat(reference.sourceField()).isEqualTo("customerId");
+                    assertThat(limit).isEqualTo(DynamicExchangeTemplateOptions.DEFAULT_REFERENCE_DROPDOWN_LIMIT);
+                    return List.of("Acme", "Globex");
+                }
+        );
+
+        ExcelSheetPlan sheet = referenceBuilder.build(referenceDescriptor()).sheets().getFirst();
+
+        assertThat(sheet.columns().get(2).fieldName()).isEqualTo("customerId");
+        assertThat(sheet.columns().get(2).dropdownOptions()).containsExactly("Acme", "Globex");
+    }
+
+    @Test
+    void shouldAllowReferenceDropdownToBeDisabledPerField() {
+        DynamicExchangeTemplatePlanBuilder referenceBuilder = new DynamicExchangeTemplatePlanBuilder(
+                null,
+                (reference, limit) -> List.of("Acme")
+        );
+
+        ExcelSheetPlan sheet = referenceBuilder.build(referenceDescriptor(),
+                DynamicExchangeTemplateOptions.of(List.of("order.customerId"), null)).sheets().getFirst();
+
+        assertThat(sheet.columns().get(2).fieldName()).isEqualTo("customerId");
+        assertThat(sheet.columns().get(2).dropdownOptions()).isEmpty();
+    }
+
+    @Test
     void shouldRejectMissingMainEntity() {
         DynamicModuleDescriptor descriptor = new DynamicModuleDescriptor(
                 "sales.contract",
@@ -237,6 +269,24 @@ class DynamicExchangeTemplatePlanBuilderTest {
                 List.of(),
                 List.of()
         );
+    }
+
+    private DynamicModuleDescriptor referenceDescriptor() {
+        return DynamicModuleDescriptor.from(new ModuleDefinition(
+                "sales.order",
+                "Order",
+                List.of(
+                        new EntityDefinition("order", "sales_order", "Order", List.of(
+                                FieldDefinition.string("orderNo", "Order No").column("order_no"),
+                                FieldDefinition.string("customerId", "Customer").column("customer_id")
+                        )),
+                        new EntityDefinition("customer", "sales_customer", "Customer", List.of(
+                                FieldDefinition.titleField()
+                        ))
+                ),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("order", "customerId", "sales.order.customer"))
+        ));
     }
 
     private void assertRelateIdColumn(ExcelColumnPlan column) {

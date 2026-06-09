@@ -2,11 +2,20 @@ package net.ximatai.muyun.spring.platform.exchange.importer;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveItem;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResult;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -59,6 +68,59 @@ class DynamicImportExecutorTest {
         assertThat(captor.getValue().getValues())
                 .containsEntry("orderNo", "SO-1")
                 .doesNotContainKeys("relateId", "orderNoTimeZone");
+    }
+
+    @Test
+    void shouldResolveReferenceTitleBeforeCreatingRecord() {
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of());
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
+        when(recordService.resolveReference(eq(MODULE), eq("order"), eq("customerId"),
+                any(DynamicReferenceResolveRequest.class))).thenReturn(referenceResolved("customer-1", "Acme"));
+
+        DynamicImportExecutionResult result = executor.execute(command(planWithReference(),
+                workbook(group("R-1", mainRowWithReference("R-1", "SO-1", "Acme"), List.of()))));
+
+        assertThat(result.errorRows()).isEmpty();
+        ArgumentCaptor<DynamicRecord> captor = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(records).create(eq("order"), captor.capture());
+        assertThat(captor.getValue().getValues())
+                .containsEntry("orderNo", "SO-1")
+                .containsEntry("customerId", "customer-1");
+    }
+
+    @Test
+    void shouldResolveManyReferenceTitlesBeforeCreatingRecord() {
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of());
+        when(records.create(eq("order"), any(DynamicRecord.class))).thenReturn("order-1");
+        when(recordService.resolveReference(eq(MODULE), eq("order"), eq("tagIds"),
+                any(DynamicReferenceResolveRequest.class))).thenReturn(referenceResolvedMany(
+                List.of(resolvedResult("tag-1", "Urgent"), resolvedResult("tag-2", "Wholesale"))
+        ));
+
+        DynamicImportExecutionResult result = executor.execute(command(planWithManyReference(),
+                workbook(group("R-1", mainRowWithManyReference("R-1", "SO-1", "Urgent,Wholesale"), List.of()))));
+
+        assertThat(result.errorRows()).isEmpty();
+        ArgumentCaptor<DynamicRecord> captor = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(records).create(eq("order"), captor.capture());
+        assertThat(captor.getValue().getValues())
+                .containsEntry("orderNo", "SO-1")
+                .containsEntry("tagIds", "tag-1,tag-2");
+    }
+
+    @Test
+    void shouldReportErrorWhenReferenceTitleCannotResolve() {
+        when(recordService.resolveReference(eq(MODULE), eq("order"), eq("customerId"),
+                any(DynamicReferenceResolveRequest.class))).thenReturn(referenceNotFound("Missing Customer"));
+
+        DynamicImportExecutionResult result = executor.execute(command(planWithReference(),
+                workbook(group("R-1", mainRowWithReference("R-1", "SO-1", "Missing Customer"), List.of()))));
+
+        assertThat(result.errorRows()).extracting(ImportErrorRow::message)
+                .containsExactly("引用字段无法反推: Customer 未找到");
+        verify(records, never()).create(eq("order"), any(DynamicRecord.class));
     }
 
     @Test
@@ -212,6 +274,66 @@ class DynamicImportExecutorTest {
         ));
     }
 
+    private DynamicImportPlan planWithReference() {
+        DynamicReferenceDescriptor reference = new DynamicReferenceDescriptor(
+                "order",
+                "customerId",
+                MODULE,
+                "customer",
+                ReferenceCardinality.ONE,
+                false,
+                "",
+                List.of()
+        );
+        return new DynamicImportPlan(MODULE, null, List.of(
+                new DynamicImportPlan.SheetPlan(
+                        "order",
+                        "order",
+                        "Order",
+                        true,
+                        "orderNo",
+                        ImportDuplicateStrategy.OVERWRITE,
+                        List.of(
+                                new DynamicImportPlan.FieldPlan("order", "relateId", "关联标识", true, false, false),
+                                new DynamicImportPlan.FieldPlan("order", "orderNo", "Order No", FieldType.STRING,
+                                        false, true, false),
+                                new DynamicImportPlan.FieldPlan("order", "customerId", "Customer", FieldType.STRING,
+                                        false, true, false, reference)
+                        )
+                )
+        ));
+    }
+
+    private DynamicImportPlan planWithManyReference() {
+        DynamicReferenceDescriptor reference = new DynamicReferenceDescriptor(
+                "order",
+                "tagIds",
+                MODULE,
+                "tag",
+                ReferenceCardinality.MANY,
+                false,
+                "",
+                List.of()
+        );
+        return new DynamicImportPlan(MODULE, null, List.of(
+                new DynamicImportPlan.SheetPlan(
+                        "order",
+                        "order",
+                        "Order",
+                        true,
+                        "orderNo",
+                        ImportDuplicateStrategy.OVERWRITE,
+                        List.of(
+                                new DynamicImportPlan.FieldPlan("order", "relateId", "关联标识", true, false, false),
+                                new DynamicImportPlan.FieldPlan("order", "orderNo", "Order No", FieldType.STRING,
+                                        false, true, false),
+                                new DynamicImportPlan.FieldPlan("order", "tagIds", "Tags", FieldType.STRING,
+                                        false, true, false, reference)
+                        )
+                )
+        ));
+    }
+
     private GroupedWorkbook workbook(ImportGroup... groups) {
         LinkedHashMap<String, ImportGroup> byKey = new LinkedHashMap<>();
         for (ImportGroup group : groups) {
@@ -241,6 +363,70 @@ class DynamicImportExecutorTest {
         convertedValues.put("orderNo", orderNo);
         convertedValues.put("orderNoTimeZone", "Asia/Shanghai");
         return new ParsedImportRow("order", rawValues, valuesByFieldName, convertedValues);
+    }
+
+    private ParsedImportRow mainRowWithReference(String relateId, String orderNo, String customerTitle) {
+        ParsedImportRow row = mainRow(relateId, orderNo);
+        row.rawValues().put("Customer", customerTitle);
+        row.valuesByFieldName().put("customerId", customerTitle);
+        row.convertedValues().put("customerId", customerTitle);
+        return row;
+    }
+
+    private ParsedImportRow mainRowWithManyReference(String relateId, String orderNo, String tagTitles) {
+        ParsedImportRow row = mainRow(relateId, orderNo);
+        row.rawValues().put("Tags", tagTitles);
+        row.valuesByFieldName().put("tagIds", tagTitles);
+        row.convertedValues().put("tagIds", tagTitles);
+        return row;
+    }
+
+    private DynamicReferenceResolveResponse referenceResolved(String id, String title) {
+        return new DynamicReferenceResolveResponse(
+                DynamicReferenceResolveStatus.RESOLVED,
+                DynamicReferenceResolveMode.TRANSLATE,
+                List.of(),
+                List.of(resolvedResult(id, title)),
+                0,
+                20,
+                1
+        );
+    }
+
+    private DynamicReferenceResolveResponse referenceResolvedMany(List<DynamicReferenceResolveResult> results) {
+        return new DynamicReferenceResolveResponse(
+                DynamicReferenceResolveStatus.RESOLVED,
+                DynamicReferenceResolveMode.TRANSLATE,
+                List.of(),
+                results,
+                0,
+                20,
+                results.size()
+        );
+    }
+
+    private DynamicReferenceResolveResult resolvedResult(String id, String title) {
+        DynamicReferenceResolveItem item = new DynamicReferenceResolveItem(
+                id,
+                title,
+                DynamicReferenceMatchMode.LABEL,
+                java.util.Map.of()
+        );
+        return new DynamicReferenceResolveResult(title, DynamicReferenceResolveStatus.RESOLVED,
+                DynamicReferenceMatchMode.LABEL, item, List.of());
+    }
+
+    private DynamicReferenceResolveResponse referenceNotFound(String title) {
+        return new DynamicReferenceResolveResponse(
+                DynamicReferenceResolveStatus.NOT_FOUND,
+                DynamicReferenceResolveMode.TRANSLATE,
+                List.of(),
+                List.of(new DynamicReferenceResolveResult(title, DynamicReferenceResolveStatus.NOT_FOUND,
+                        DynamicReferenceMatchMode.LABEL, null, List.of())),
+                0,
+                20,
+                1
+        );
     }
 
     private ParsedImportRow childRow(String relateId, String sku, Integer qty) {
@@ -275,7 +461,9 @@ class DynamicImportExecutorTest {
 
     private EntityDefinition orderEntity() {
         return new EntityDefinition("order", "sales_order", "Order", List.of(
-                FieldDefinition.string("orderNo", "Order No").column("order_no")
+                FieldDefinition.string("orderNo", "Order No").column("order_no"),
+                FieldDefinition.string("customerId", "Customer").column("customer_id"),
+                FieldDefinition.string("tagIds", "Tags").column("tag_ids")
         ));
     }
 

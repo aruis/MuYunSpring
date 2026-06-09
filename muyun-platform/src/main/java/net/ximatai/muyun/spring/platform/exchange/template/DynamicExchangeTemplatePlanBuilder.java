@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldCompanionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelColumnPlan;
@@ -27,23 +28,39 @@ import java.util.stream.Collectors;
 
 public class DynamicExchangeTemplatePlanBuilder {
     private final OptionSourceRegistry optionSourceRegistry;
+    private final DynamicReferenceDropdownResolver referenceDropdownResolver;
 
     public DynamicExchangeTemplatePlanBuilder() {
-        this(null);
+        this(null, DynamicReferenceDropdownResolver.NONE);
     }
 
     public DynamicExchangeTemplatePlanBuilder(OptionSourceRegistry optionSourceRegistry) {
+        this(optionSourceRegistry, DynamicReferenceDropdownResolver.NONE);
+    }
+
+    public DynamicExchangeTemplatePlanBuilder(OptionSourceRegistry optionSourceRegistry,
+                                              DynamicReferenceDropdownResolver referenceDropdownResolver) {
         this.optionSourceRegistry = optionSourceRegistry;
+        this.referenceDropdownResolver = referenceDropdownResolver == null
+                ? DynamicReferenceDropdownResolver.NONE
+                : referenceDropdownResolver;
     }
 
     public ExcelWorkbookPlan build(DynamicModuleDescriptor descriptor) {
+        return build(descriptor, DynamicExchangeTemplateOptions.DEFAULT);
+    }
+
+    public ExcelWorkbookPlan build(DynamicModuleDescriptor descriptor, DynamicExchangeTemplateOptions options) {
+        DynamicExchangeTemplateOptions effectiveOptions = options == null
+                ? DynamicExchangeTemplateOptions.DEFAULT
+                : options;
         validateModule(descriptor);
         Map<String, DynamicEntityDescriptor> entitiesByAlias = entitiesByAlias(descriptor);
         DynamicEntityDescriptor mainEntity = requireEntity(entitiesByAlias, descriptor.mainEntityAlias(),
                 "dynamic exchange template main entity not found");
 
         List<ExcelSheetPlan> sheets = new ArrayList<>();
-        sheets.add(buildSheet(mainEntity, true, true));
+        sheets.add(buildSheet(mainEntity, true, true, effectiveOptions));
         Set<String> childEntityAliases = new LinkedHashSet<>();
         for (DynamicRelationDescriptor relation : descriptor.relations()) {
             if (!descriptor.mainEntityAlias().equals(relation.parentEntityAlias())) {
@@ -54,7 +71,7 @@ public class DynamicExchangeTemplatePlanBuilder {
             }
             DynamicEntityDescriptor childEntity = requireEntity(entitiesByAlias, relation.childEntityAlias(),
                     "dynamic exchange template child entity not found");
-            sheets.add(buildSheet(childEntity, false, false));
+            sheets.add(buildSheet(childEntity, false, false, effectiveOptions));
         }
 
         return new ExcelWorkbookPlan(new ExcelWorkbookMeta(
@@ -103,8 +120,11 @@ public class DynamicExchangeTemplatePlanBuilder {
         return entity;
     }
 
-    private ExcelSheetPlan buildSheet(DynamicEntityDescriptor entity, boolean main, boolean requireBusinessFields) {
-        List<ExcelColumnPlan> columns = buildColumns(entity);
+    private ExcelSheetPlan buildSheet(DynamicEntityDescriptor entity,
+                                      boolean main,
+                                      boolean requireBusinessFields,
+                                      DynamicExchangeTemplateOptions options) {
+        List<ExcelColumnPlan> columns = buildColumns(entity, options);
         if (requireBusinessFields && columns.size() == 1) {
             throw new PlatformException("dynamic exchange template main sheet requires business fields: "
                     + entity.entityAlias());
@@ -112,7 +132,7 @@ public class DynamicExchangeTemplatePlanBuilder {
         return new ExcelSheetPlan(sheetNameOf(entity), entity.entityAlias(), main, columns);
     }
 
-    private List<ExcelColumnPlan> buildColumns(DynamicEntityDescriptor entity) {
+    private List<ExcelColumnPlan> buildColumns(DynamicEntityDescriptor entity, DynamicExchangeTemplateOptions options) {
         Set<String> companionFieldNames = companionFieldNames(entity);
         List<ExcelColumnPlan> columns = new ArrayList<>();
         columns.add(new ExcelColumnPlan(
@@ -131,7 +151,7 @@ public class DynamicExchangeTemplatePlanBuilder {
                     titleOf(field),
                     field.required(),
                     valueTypeOf(field.type()),
-                    dropdownOptions(field)
+                    dropdownOptions(entity.entityAlias(), field, options)
             ));
         }
         return columns;
@@ -174,8 +194,20 @@ public class DynamicExchangeTemplatePlanBuilder {
         };
     }
 
-    private List<String> dropdownOptions(DynamicFieldDescriptor field) {
-        if (field.optionBinding() == null || optionSourceRegistry == null) {
+    private List<String> dropdownOptions(String entityAlias,
+                                         DynamicFieldDescriptor field,
+                                         DynamicExchangeTemplateOptions options) {
+        if (field.optionBinding() != null) {
+            return dictionaryOptions(field);
+        }
+        if (field.reference() != null && options.referenceDropdownEnabled(entityAlias, field.fieldName())) {
+            return referenceOptions(field.fieldName(), field.reference(), options.referenceDropdownLimit());
+        }
+        return List.of();
+    }
+
+    private List<String> dictionaryOptions(DynamicFieldDescriptor field) {
+        if (optionSourceRegistry == null) {
             return List.of();
         }
         try {
@@ -186,6 +218,14 @@ public class DynamicExchangeTemplatePlanBuilder {
                     .toList();
         } catch (RuntimeException ex) {
             throw new PlatformException("dynamic exchange template option load failed: " + field.fieldName(), ex);
+        }
+    }
+
+    private List<String> referenceOptions(String fieldName, DynamicReferenceDescriptor reference, int limit) {
+        try {
+            return referenceDropdownResolver.resolve(reference, limit);
+        } catch (RuntimeException ex) {
+            throw new PlatformException("dynamic exchange template reference option load failed: " + fieldName, ex);
         }
     }
 

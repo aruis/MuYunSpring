@@ -12,12 +12,15 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookPlan;
+import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplateOptions;
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplatePlanBuilder;
+import net.ximatai.muyun.spring.platform.exchange.template.DynamicRecordReferenceDropdownResolver;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,7 +40,9 @@ public class DynamicExchangeTemplateWebController {
                                                 ActiveTenantVerifier activeTenantVerifier,
                                                 OptionSourceRegistry optionSourceRegistry) {
         this(recordService, activeTenantVerifier,
-                new DynamicExchangeTemplatePlanBuilder(optionSourceRegistry), new ExcelWorkbookPlanWriter());
+                new DynamicExchangeTemplatePlanBuilder(optionSourceRegistry,
+                        new DynamicRecordReferenceDropdownResolver(recordService)),
+                new ExcelWorkbookPlanWriter());
     }
 
     DynamicExchangeTemplateWebController(DynamicRecordService recordService,
@@ -52,19 +57,33 @@ public class DynamicExchangeTemplateWebController {
 
     @PostMapping("/template")
     @ActionEndpoint(PlatformAction.IMPORT)
-    public void template(@PathVariable String moduleAlias, HttpServletResponse response) {
+    public void template(@PathVariable String moduleAlias,
+                         @RequestBody(required = false) DynamicExchangeTemplateRequest request,
+                         HttpServletResponse response) {
         tenantScope(moduleAlias, () -> {
-            writeTemplate(moduleAlias, response);
+            writeTemplate(moduleAlias, request, response);
             return null;
         });
     }
 
-    private void writeTemplate(String moduleAlias, HttpServletResponse response) {
+    private void writeTemplate(String moduleAlias,
+                               DynamicExchangeTemplateRequest request,
+                               HttpServletResponse response) {
         DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
         requireExchangeCapability(descriptor);
-        ExcelWorkbookPlan plan = templatePlanBuilder.build(descriptor);
+        ExcelWorkbookPlan plan = templatePlanBuilder.build(descriptor, templateOptions(request));
         byte[] bytes = workbookWriter.writeToBytes(plan);
         writeXlsx(response, moduleAlias.replace('.', '_') + "-exchange-template.xlsx", bytes);
+    }
+
+    private DynamicExchangeTemplateOptions templateOptions(DynamicExchangeTemplateRequest request) {
+        if (request == null) {
+            return DynamicExchangeTemplateOptions.DEFAULT;
+        }
+        return DynamicExchangeTemplateOptions.of(
+                request.disabledReferenceDropdownFields(),
+                request.referenceDropdownLimit()
+        );
     }
 
     private void requireExchangeCapability(DynamicModuleDescriptor descriptor) {

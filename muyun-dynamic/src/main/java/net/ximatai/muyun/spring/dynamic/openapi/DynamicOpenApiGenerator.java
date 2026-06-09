@@ -86,7 +86,8 @@ public class DynamicOpenApiGenerator {
         if (standardActionVisible.test(PlatformAction.IMPORT)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/exchange/template",
                     operationId(descriptor, "exchangeTemplate"),
-                    "Download exchange template " + mainEntity.title(), null, "binary", PlatformAction.IMPORT.code()));
+                    "Download exchange template " + mainEntity.title(), "DynamicExchangeTemplateRequest",
+                    "binary", PlatformAction.IMPORT.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/import/parse", operationId(descriptor, "importParse"),
                     "Parse import workbook " + mainEntity.title(), "DynamicImportParseRequest",
                     "DynamicImportParseResult", PlatformAction.IMPORT.code()));

@@ -204,7 +204,8 @@ public class DynamicImportPlanBuilder {
                     relateId ? FieldType.TEXT : fieldDescriptor.type(),
                     relateId,
                     !relateId && !companion,
-                    companion
+                    companion,
+                    relateId || companion ? null : fieldDescriptor.reference()
             ));
         }
         return new DynamicImportPlan.SheetPlan(

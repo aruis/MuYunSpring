@@ -2,7 +2,12 @@ package net.ximatai.muyun.spring.platform.exchange.exporter;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
@@ -13,9 +18,12 @@ import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookPlan;
 import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol;
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplatePlanBuilder;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +46,7 @@ public class DynamicExportExecutor {
     public ExcelWorkbookPlan export(DynamicExportCommand command) {
         DynamicExportCommand normalized = Objects.requireNonNull(command, "command must not be null");
         ExcelWorkbookPlan template = templatePlanBuilder.build(normalized.descriptor());
+        Map<String, Map<String, DynamicReferenceDescriptor>> references = referencesByEntityAndField(normalized.descriptor());
         DynamicRecordActionGateway records = recordService.recordsForAction(
                 normalized.descriptor().moduleAlias(), PlatformAction.EXPORT, EXPORT_TRACE_ID);
         List<DynamicRecord> mainRecords = records.list(
@@ -48,18 +57,20 @@ public class DynamicExportExecutor {
         );
         Map<String, DynamicRelationDescriptor> relationsByChild =
                 firstLevelRelationsByChildEntity(normalized.descriptor().relations(), normalized.descriptor().mainEntityAlias());
-        return new ExcelWorkbookPlan(template.meta(), withRows(template.sheets(), mainRecords, records, relationsByChild));
+        return new ExcelWorkbookPlan(template.meta(), withRows(template.sheets(), mainRecords, records, relationsByChild,
+                references));
     }
 
     private List<ExcelSheetPlan> withRows(List<ExcelSheetPlan> sheets,
                                           List<DynamicRecord> mainRecords,
                                           DynamicRecordActionGateway records,
-                                          Map<String, DynamicRelationDescriptor> relationsByChild) {
+                                          Map<String, DynamicRelationDescriptor> relationsByChild,
+                                          Map<String, Map<String, DynamicReferenceDescriptor>> references) {
         List<ExcelSheetPlan> result = new ArrayList<>();
         for (ExcelSheetPlan sheet : sheets) {
             List<List<Object>> rows = sheet.main()
-                    ? rows(sheet.columns(), mainRecords)
-                    : childRows(sheet, mainRecords, records, relationsByChild.get(sheet.entityAlias()));
+                    ? rows(sheet.entityAlias(), sheet.columns(), mainRecords, references)
+                    : childRows(sheet, mainRecords, records, relationsByChild.get(sheet.entityAlias()), references);
             result.add(new ExcelSheetPlan(
                     sheet.sheetName(),
                     sheet.entityAlias(),
@@ -84,27 +95,51 @@ public class DynamicExportExecutor {
         return Map.copyOf(result);
     }
 
-    private List<List<Object>> rows(List<ExcelColumnPlan> columns, List<DynamicRecord> records) {
+    private Map<String, Map<String, DynamicReferenceDescriptor>> referencesByEntityAndField(
+            DynamicModuleDescriptor descriptor) {
+        Map<String, Map<String, DynamicReferenceDescriptor>> result = new LinkedHashMap<>();
+        for (DynamicEntityDescriptor entity : descriptor.entities()) {
+            Map<String, DynamicReferenceDescriptor> fields = new LinkedHashMap<>();
+            for (DynamicFieldDescriptor field : entity.fields()) {
+                if (field.reference() != null) {
+                    fields.put(field.fieldName(), field.reference());
+                }
+            }
+            if (!fields.isEmpty()) {
+                result.put(entity.entityAlias(), Map.copyOf(fields));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private List<List<Object>> rows(String entityAlias,
+                                    List<ExcelColumnPlan> columns,
+                                    List<DynamicRecord> records,
+                                    Map<String, Map<String, DynamicReferenceDescriptor>> references) {
+        ReferenceTitleLookup titles = titleLookup(entityAlias, columns, records, references);
         return records.stream()
-                .map(record -> row(columns, record))
+                .map(record -> row(columns, record, titles))
                 .toList();
     }
 
-    private List<Object> row(List<ExcelColumnPlan> columns, DynamicRecord record) {
+    private List<Object> row(List<ExcelColumnPlan> columns, DynamicRecord record, ReferenceTitleLookup titles) {
         Map<String, Object> values = record.getValues();
         return columns.stream()
-                .map(column -> value(column, record, values))
+                .map(column -> value(column, record, values, titles))
                 .toList();
     }
 
     private List<List<Object>> childRows(ExcelSheetPlan sheet,
                                          List<DynamicRecord> mainRecords,
                                          DynamicRecordActionGateway records,
-                                         DynamicRelationDescriptor relation) {
+                                         DynamicRelationDescriptor relation,
+                                         Map<String, Map<String, DynamicReferenceDescriptor>> references) {
         if (relation == null || mainRecords.isEmpty()) {
             return List.of();
         }
         Map<String, List<DynamicRecord>> childrenByParentId = childrenByParentId(records, relation, parentIds(mainRecords));
+        ReferenceTitleLookup titles = titleLookup(sheet.entityAlias(), sheet.columns(),
+                childrenByParentId.values().stream().flatMap(Collection::stream).toList(), references);
         List<List<Object>> rows = new ArrayList<>();
         for (DynamicRecord parent : mainRecords) {
             String parentId = parent.getId();
@@ -114,7 +149,7 @@ public class DynamicExportExecutor {
                 continue;
             }
             children.stream()
-                    .map(child -> childRow(sheet.columns(), parentId, child))
+                    .map(child -> childRow(sheet.columns(), parentId, child, titles))
                     .forEach(rows::add);
         }
         return List.copyOf(rows);
@@ -124,7 +159,7 @@ public class DynamicExportExecutor {
         return mainRecords.stream()
                 .map(DynamicRecord::getId)
                 .filter(id -> id != null && !id.isBlank())
-                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private Map<String, List<DynamicRecord>> childrenByParentId(DynamicRecordActionGateway records,
@@ -148,18 +183,24 @@ public class DynamicExportExecutor {
         return Map.copyOf(grouped);
     }
 
-    private List<Object> childRow(List<ExcelColumnPlan> columns, String relateId, DynamicRecord child) {
+    private List<Object> childRow(List<ExcelColumnPlan> columns,
+                                  String relateId,
+                                  DynamicRecord child,
+                                  ReferenceTitleLookup titles) {
         Map<String, Object> values = child.getValues();
         return columns.stream()
-                .map(column -> childValue(column, relateId, values))
+                .map(column -> childValue(column, relateId, values, titles))
                 .toList();
     }
 
-    private Object childValue(ExcelColumnPlan column, String relateId, Map<String, Object> values) {
+    private Object childValue(ExcelColumnPlan column,
+                              String relateId,
+                              Map<String, Object> values,
+                              ReferenceTitleLookup titles) {
         if (ExcelExchangeProtocol.RELATE_ID_FIELD.equals(column.fieldName())) {
             return relateId;
         }
-        return values.get(column.fieldName());
+        return titles.render(column.fieldName(), values.get(column.fieldName()));
     }
 
     private List<Object> emptyChildRow(List<ExcelColumnPlan> columns, String relateId) {
@@ -168,10 +209,120 @@ public class DynamicExportExecutor {
                 .toList();
     }
 
-    private Object value(ExcelColumnPlan column, DynamicRecord record, Map<String, Object> values) {
+    private Object value(ExcelColumnPlan column,
+                         DynamicRecord record,
+                         Map<String, Object> values,
+                         ReferenceTitleLookup titles) {
         if (ExcelExchangeProtocol.RELATE_ID_FIELD.equals(column.fieldName())) {
             return record.getId();
         }
-        return values.get(column.fieldName());
+        return titles.render(column.fieldName(), values.get(column.fieldName()));
+    }
+
+    private ReferenceTitleLookup titleLookup(String entityAlias,
+                                             List<ExcelColumnPlan> columns,
+                                             List<DynamicRecord> records,
+                                             Map<String, Map<String, DynamicReferenceDescriptor>> references) {
+        Map<String, DynamicReferenceDescriptor> entityReferences = references.getOrDefault(entityAlias, Map.of());
+        if (entityReferences.isEmpty() || records.isEmpty()) {
+            return emptyTitleLookup();
+        }
+        Map<String, Map<String, String>> titlesByField = new LinkedHashMap<>();
+        for (ExcelColumnPlan column : columns) {
+            DynamicReferenceDescriptor reference = entityReferences.get(column.fieldName());
+            if (reference == null) {
+                continue;
+            }
+            Set<String> ids = records.stream()
+                    .flatMap(record -> referenceIds(reference, record.getValues().get(column.fieldName())).stream())
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            if (!ids.isEmpty()) {
+                titlesByField.put(column.fieldName(), recordService.titles(reference.targetModuleAlias(),
+                        reference.targetEntityAlias(), ids));
+            }
+        }
+        return titlesByField.isEmpty() ? emptyTitleLookup() : new ReferenceTitleLookup(entityReferences,
+                titlesByField);
+    }
+
+    private ReferenceTitleLookup emptyTitleLookup() {
+        return new ReferenceTitleLookup(Map.of(), Map.of());
+    }
+
+    private List<String> referenceIds(DynamicReferenceDescriptor reference, Object rawValue) {
+        if (rawValue == null) {
+            return List.of();
+        }
+        if (reference.cardinality() == ReferenceCardinality.MANY) {
+            return manyReferenceIds(rawValue);
+        }
+        String value = text(rawValue);
+        return value == null ? List.of() : List.of(value);
+    }
+
+    private List<String> manyReferenceIds(Object rawValue) {
+        if (rawValue instanceof Collection<?> values) {
+            return values.stream()
+                    .map(this::text)
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        if (rawValue.getClass().isArray()) {
+            List<String> result = new ArrayList<>();
+            int length = Array.getLength(rawValue);
+            for (int index = 0; index < length; index++) {
+                String value = text(Array.get(rawValue, index));
+                if (value != null) {
+                    result.add(value);
+                }
+            }
+            return List.copyOf(result);
+        }
+        String value = text(rawValue);
+        if (value == null) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .toList();
+    }
+
+    private String text(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private final class ReferenceTitleLookup {
+        private final Map<String, DynamicReferenceDescriptor> referencesByField;
+        private final Map<String, Map<String, String>> titlesByField;
+
+        private ReferenceTitleLookup(Map<String, DynamicReferenceDescriptor> referencesByField,
+                                     Map<String, Map<String, String>> titlesByField) {
+            this.referencesByField = referencesByField;
+            this.titlesByField = titlesByField;
+        }
+
+        private Object render(String fieldName, Object rawValue) {
+            DynamicReferenceDescriptor reference = referencesByField.get(fieldName);
+            if (reference == null || rawValue == null) {
+                return rawValue;
+            }
+            Map<String, String> titles = titlesByField.getOrDefault(fieldName, Map.of());
+            List<String> ids = referenceIds(reference, rawValue);
+            if (ids.isEmpty()) {
+                return rawValue;
+            }
+            List<String> rendered = ids.stream()
+                    .map(id -> titles.getOrDefault(id, id))
+                    .toList();
+            if (reference.cardinality() == ReferenceCardinality.MANY) {
+                return String.join(",", rendered);
+            }
+            return rendered.getFirst();
+        }
     }
 }

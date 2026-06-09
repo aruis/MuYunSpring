@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.exchange.importer;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 
 import java.util.List;
 
@@ -56,7 +57,8 @@ public record DynamicImportPlan(
             FieldType fieldType,
             boolean relateId,
             boolean matchKeyCandidate,
-            boolean companion
+            boolean companion,
+            DynamicReferenceDescriptor reference
     ) {
         public FieldPlan(String entityAlias,
                          String fieldName,
@@ -65,7 +67,17 @@ public record DynamicImportPlan(
                          boolean matchKeyCandidate,
                          boolean companion) {
             this(entityAlias, fieldName, title, relateId ? FieldType.TEXT : FieldType.STRING,
-                    relateId, matchKeyCandidate, companion);
+                    relateId, matchKeyCandidate, companion, null);
+        }
+
+        public FieldPlan(String entityAlias,
+                         String fieldName,
+                         String title,
+                         FieldType fieldType,
+                         boolean relateId,
+                         boolean matchKeyCandidate,
+                         boolean companion) {
+            this(entityAlias, fieldName, title, fieldType, relateId, matchKeyCandidate, companion, null);
         }
 
         public FieldPlan {

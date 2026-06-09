@@ -26,6 +26,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("WebSort", sortSchema("WebSort"));
         schemas.put("SortWebRequest", sortRequestSchema());
         schemas.put("TreeSortWebRequest", treeSortRequestSchema());
+        schemas.put("DynamicExchangeTemplateRequest", exchangeTemplateRequestSchema());
         schemas.put("DynamicImportParseRequest", importParseRequestSchema());
         schemas.put("DynamicImportExecuteMultipartRequest", importExecuteMultipartRequestSchema());
         schemas.put("DynamicImportExecuteRequest", importExecuteRequestSchema());
@@ -476,6 +477,14 @@ final class DynamicOpenApiSchemaFactory {
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema("DynamicImportParseRequest", "object", null,
                 List.of("file"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema exchangeTemplateRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("disabledReferenceDropdownFields", arrayProperty("string"));
+        properties.put("referenceDropdownLimit", integerProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicExchangeTemplateRequest", "object", null,
+                List.of(), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema importExecuteMultipartRequestSchema() {

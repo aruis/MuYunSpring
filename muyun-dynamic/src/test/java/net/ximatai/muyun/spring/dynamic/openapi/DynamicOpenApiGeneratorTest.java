@@ -69,7 +69,11 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/exchange/template")))
                 .singleElement()
-                .satisfies(operation -> assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code()));
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code());
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicExchangeTemplateRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/submit/{recordId}"))
                 .findFirst())
@@ -383,6 +387,8 @@ class DynamicOpenApiGeneratorTest {
                 .doesNotContainKeys("pageNum", "pageSize");
         assertThat(document.schemas().get("DynamicImportParseResult").properties().get("sheets").itemType())
                 .isEqualTo("DynamicImportParseSheet");
+        assertThat(document.schemas().get("DynamicExchangeTemplateRequest").properties())
+                .containsKeys("disabledReferenceDropdownFields", "referenceDropdownLimit");
         assertThat(document.schemas().get("DynamicImportExecuteMultipartRequest").properties())
                 .containsKeys("command", "file");
         assertThat(document.schemas().get("DynamicImportUploadResult").properties())
