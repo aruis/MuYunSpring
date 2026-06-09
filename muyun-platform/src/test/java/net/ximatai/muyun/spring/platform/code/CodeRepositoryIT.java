@@ -56,6 +56,7 @@ class CodeRepositoryIT {
     private final CodeSequenceStateService stateService;
     private final CodeLedgerEntryService ledgerService;
     private final CodeRecycleEntryService recycleService;
+    private final CodeIssueLogService issueLogService;
     private final TransactionTemplate transactionTemplate;
 
     @Autowired
@@ -64,12 +65,14 @@ class CodeRepositoryIT {
                      CodeSequenceStateService stateService,
                      CodeLedgerEntryService ledgerService,
                      CodeRecycleEntryService recycleService,
+                     CodeIssueLogService issueLogService,
                      PlatformTransactionManager transactionManager) {
         this.ruleService = ruleService;
         this.generateService = generateService;
         this.stateService = stateService;
         this.ledgerService = ledgerService;
         this.recycleService = recycleService;
+        this.issueLogService = issueLogService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -93,6 +96,11 @@ class CodeRepositoryIT {
                 Map.of(),
                 null
         ));
+        assertThat(issueLogService.selectByRuleId(saved.getId(), 10)).singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getStatus()).isEqualTo(CodeIssueLogStatus.SUCCESS);
+                    assertThat(log.getGeneratedValue()).isEqualTo("SO-0001");
+                });
         ledgerService.upsertActiveBinding(rule, generated.value(), generated.basisKey(), generated.periodKey(), "order-1");
         recycleService.record(rule, generated.basisKey(), generated.periodKey(), generated.value(), "order-1");
 
@@ -121,7 +129,7 @@ class CodeRepositoryIT {
                     Map.of(),
                     null
             ));
-            assertThat(generated.value()).isEqualTo("SO-0001");
+        assertThat(generated.value()).isEqualTo("SO-0001");
             assertThat(stateService.selectState(rule.getId(), generated.basisKey(), generated.periodKey()))
                     .isNotNull();
             status.setRollbackOnly();
@@ -371,6 +379,11 @@ class CodeRepositoryIT {
         }
 
         @Bean
+        CodeIssueLogService codeIssueLogService(CodeIssueLogDao issueLogDao) {
+            return new CodeIssueLogService(issueLogDao);
+        }
+
+        @Bean
         CodePreviewService codePreviewService() {
             return new CodePreviewService();
         }
@@ -379,8 +392,10 @@ class CodeRepositoryIT {
         CodeGenerateService codeGenerateService(CodeRuleService ruleService,
                                                 CodePreviewService previewService,
                                                 CodeSequenceStateService stateService,
-                                                CodeRecycleEntryService recycleEntryService) {
-            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService);
+                                                CodeRecycleEntryService recycleEntryService,
+                                                CodeIssueLogService issueLogService) {
+            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
+                    issueLogService, null);
         }
 
         @Bean

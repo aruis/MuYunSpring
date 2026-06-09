@@ -88,6 +88,27 @@ public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleE
         return entry;
     }
 
+    public List<CodeRecycleEntry> selectByRuleId(String ruleId, int limit) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return List.of();
+        }
+        return list(Criteria.of().eq("ruleId", ruleId), PageRequest.of(1, Math.max(1, limit)),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
+    }
+
+    public CodeRecycleEntry adjustStatus(String id, CodeRecycleStatus status) {
+        if (status == null || status == CodeRecycleStatus.USED) {
+            throw new PlatformException("Code recycle governance cannot directly mark an entry USED");
+        }
+        CodeRecycleEntry entry = select(id);
+        if (entry == null) {
+            throw new PlatformException("Code recycle entry does not exist: " + id);
+        }
+        entry.setStatus(status);
+        update(entry);
+        return select(id);
+    }
+
     @Override
     public void beforeInsert(CodeRecycleEntry entry) {
         normalizeAndValidate(entry);

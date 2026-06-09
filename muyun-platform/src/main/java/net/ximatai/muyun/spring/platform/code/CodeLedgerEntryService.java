@@ -1,12 +1,14 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -84,6 +86,29 @@ public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEnt
         return findOne(Criteria.of()
                 .eq("ruleId", ruleId)
                 .eq("codeValue", codeValue));
+    }
+
+    public List<CodeLedgerEntry> selectByRuleId(String ruleId, int limit) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return List.of();
+        }
+        return list(Criteria.of().eq("ruleId", ruleId), PageRequest.of(1, Math.max(1, limit)),
+                net.ximatai.muyun.database.core.orm.Sort.desc("updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
+    }
+
+    public CodeLedgerEntry releaseStaleBinding(CodeLedgerEntry entry, CodeRule rule, CodeLedgerAction action) {
+        if (entry == null) {
+            throw new PlatformException("Code ledger entry does not exist");
+        }
+        CodeLedgerStatus targetStatus = Boolean.TRUE.equals(rule.getAllowRecycle())
+                ? CodeLedgerStatus.AVAILABLE
+                : CodeLedgerStatus.DISCARDED;
+        entry.setSourceRecordId(null);
+        entry.setStatus(targetStatus);
+        entry.setLastAction(action == null ? CodeLedgerAction.RELEASED_BY_GOVERNANCE : action);
+        update(entry);
+        return select(entry.getId());
     }
 
     @Override

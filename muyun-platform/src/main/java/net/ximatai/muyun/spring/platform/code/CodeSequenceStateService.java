@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -87,6 +88,43 @@ public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenc
                 .eq("ruleId", ruleId)
                 .eq("basisKey", normalizeBucket(basisKey))
                 .eq("periodKey", normalizeBucket(periodKey)));
+    }
+
+    public List<CodeSequenceState> selectByRuleId(String ruleId, int limit) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return List.of();
+        }
+        return list(Criteria.of().eq("ruleId", ruleId), PageRequest.of(1, Math.max(1, limit)),
+                net.ximatai.muyun.database.core.orm.Sort.desc("updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
+    }
+
+    public CodeSequenceState setCurrentValue(String ruleId, String basisKey, String periodKey, Long currentValue) {
+        if (currentValue == null || currentValue < 0) {
+            throw new PlatformException("Code sequence currentValue must not be negative");
+        }
+        String effectiveBasisKey = normalizeBucket(basisKey);
+        String effectivePeriodKey = normalizeBucket(periodKey);
+        CodeSequenceState state = selectState(ruleId, effectiveBasisKey, effectivePeriodKey);
+        if (state == null) {
+            state = new CodeSequenceState();
+            state.setRuleId(ruleId);
+            state.setBasisKey(effectiveBasisKey);
+            state.setPeriodKey(effectivePeriodKey);
+            state.setCurrentValue(currentValue);
+            insert(state);
+            return state;
+        }
+        state.setCurrentValue(currentValue);
+        update(state);
+        return select(state.getId());
+    }
+
+    public long previewNextValue(Long currentValue, CodeSequencePolicy policy) {
+        if (policy == null) {
+            throw new PlatformException("Code sequence preview requires sequencePolicy");
+        }
+        return nextValue(currentValue == null ? initialCurrentValue(policy) : currentValue, policy);
     }
 
     public String periodKey(CodeSequencePolicy policy, LocalDateTime at) {

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.boot.code.CodeLedgerEntryWebController;
+import net.ximatai.muyun.spring.boot.code.CodeIssueLogWebController;
 import net.ximatai.muyun.spring.boot.code.CodeRecycleEntryWebController;
 import net.ximatai.muyun.spring.boot.code.CodeRuleWebController;
 import net.ximatai.muyun.spring.boot.code.CodeSequenceStateWebController;
@@ -99,6 +100,7 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(CodeSequenceStateWebController.class);
             context.registerBean(CodeLedgerEntryWebController.class);
             context.registerBean(CodeRecycleEntryWebController.class);
+            context.registerBean(CodeIssueLogWebController.class);
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
@@ -109,15 +111,18 @@ class StaticModuleDefinitionScannerTest {
                     "platform.code_rule",
                     "platform.code_sequence_state",
                     "platform.code_ledger_entry",
-                    "platform.code_recycle_entry");
+                    "platform.code_recycle_entry",
+                    "platform.code_issue_log");
             assertThat(byAlias.get("platform.code_rule").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("menu", "view", "query",
-                            "sort", "enable", "disable", "viewTree", "saveTree", "preview");
+                            "sort", "enable", "disable", "viewTree", "saveTree", "preview", "opsQuery", "opsManage");
             assertThat(byAlias.get("platform.code_sequence_state").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "view", "query");
             assertThat(byAlias.get("platform.code_ledger_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "view", "query");
             assertThat(byAlias.get("platform.code_recycle_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("menu", "view", "query");
+            assertThat(byAlias.get("platform.code_issue_log").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "view", "query");
         }
     }

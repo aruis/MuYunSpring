@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,71 @@ import static org.mockito.Mockito.when;
 class DynamicRelationRuntimeTest {
     private static final String SCHEMA = "public";
     private static final String MODULE = "sales.invoice";
+
+    @Test
+    void shouldNotifyMutationCoordinatorForDynamicRelationChildCreate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        RecordingMutationCoordinator coordinator = new RecordingMutationCoordinator();
+        DynamicRecordService service = new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService(),
+                coordinator
+        );
+        DynamicRecord invoice = service.newRecord(MODULE, "invoice").setValue("title", "I-001");
+        DynamicRecord line = service.newRecord(MODULE, "invoice_line").setValue("title", "L-001");
+        invoice.setChildren("lines", List.of(line));
+
+        service.create(MODULE, "invoice", invoice);
+
+        assertThat(invoice.getId()).isNotBlank();
+        assertThat(line.getId()).isNotBlank();
+        assertThat(line.getValue("invoiceId")).isEqualTo(invoice.getId());
+        assertThat(coordinator.events()).containsExactly(
+                "beforeChildCreate:lines:invoice_line:L-001:" + invoice.getId(),
+                "afterChildCreate:lines:invoice_line:L-001:" + line.getId()
+        );
+    }
+
+    @Test
+    void shouldNotifyMutationCoordinatorForDynamicRelationChildReplace() {
+        IDatabaseOperations<Object> operations = operations();
+        stubInvoiceAndLineRows(operations);
+        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
+        RecordingMutationCoordinator coordinator = new RecordingMutationCoordinator();
+        DynamicRecordService service = new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService(),
+                coordinator
+        );
+        DynamicRecord retainedLine = service.newRecord(MODULE, "invoice_line").setValue("title", "L-001-updated");
+        retainedLine.setId("line-1");
+        retainedLine.setVersion(1);
+        DynamicRecord newLine = service.newRecord(MODULE, "invoice_line").setValue("title", "L-003");
+        DynamicRecord invoice = service.newRecord(MODULE, "invoice").setValue("title", "I-001-updated");
+        invoice.setId("invoice-1");
+        invoice.setVersion(1);
+        invoice.setChildren("lines", List.of(retainedLine, newLine));
+
+        service.update(MODULE, "invoice", invoice);
+
+        assertThat(newLine.getId()).isNotBlank();
+        assertThat(newLine.getValue("invoiceId")).isEqualTo("invoice-1");
+        assertThat(coordinator.events()).containsExactly(
+                "beforeChildUpdate:lines:line-1:L-001-updated",
+                "beforeChildCreate:lines:invoice_line:L-003:invoice-1",
+                "beforeChildDelete:lines:line-2:L-002",
+                "afterChildUpdate:lines:line-1:L-001-updated",
+                "afterChildCreate:lines:invoice_line:L-003:" + newLine.getId(),
+                "afterChildDelete:lines:line-2:L-002"
+        );
+    }
 
     @Test
     void shouldInsertDynamicChildrenThroughSharedChildRelationAbility() {
@@ -1286,5 +1352,84 @@ class DynamicRelationRuntimeTest {
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<Map<String, Object>> mapCaptor() {
         return ArgumentCaptor.forClass(Map.class);
+    }
+
+    private static final class RecordingMutationCoordinator implements DynamicRecordMutationCoordinator {
+        private final List<String> events = new ArrayList<>();
+
+        private List<String> events() {
+            return events;
+        }
+
+        @Override
+        public void beforeRelationChildCreate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parent,
+                                              DynamicRecord child) {
+            events.add("beforeChildCreate:" + relationCode + ":" + childEntityAlias + ":"
+                    + child.getValue("title") + ":" + child.getValue("invoiceId"));
+        }
+
+        @Override
+        public void afterRelationChildCreate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parent,
+                                             DynamicRecord child,
+                                             String id) {
+            events.add("afterChildCreate:" + relationCode + ":" + childEntityAlias + ":"
+                    + child.getValue("title") + ":" + id);
+        }
+
+        @Override
+        public void beforeRelationChildUpdate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord parentIncoming,
+                                              DynamicRecord childBefore,
+                                              DynamicRecord childIncoming) {
+            events.add("beforeChildUpdate:" + relationCode + ":" + childBefore.getId() + ":"
+                    + childIncoming.getValue("title"));
+        }
+
+        @Override
+        public void afterRelationChildUpdate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord parentUpdated,
+                                             DynamicRecord childBefore,
+                                             DynamicRecord childUpdated) {
+            events.add("afterChildUpdate:" + relationCode + ":" + childBefore.getId() + ":"
+                    + childUpdated.getValue("title"));
+        }
+
+        @Override
+        public void beforeRelationChildDelete(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord childBefore) {
+            events.add("beforeChildDelete:" + relationCode + ":" + childBefore.getId() + ":"
+                    + childBefore.getValue("title"));
+        }
+
+        @Override
+        public void afterRelationChildDelete(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord childBefore) {
+            events.add("afterChildDelete:" + relationCode + ":" + childBefore.getId() + ":"
+                    + childBefore.getValue("title"));
+        }
     }
 }

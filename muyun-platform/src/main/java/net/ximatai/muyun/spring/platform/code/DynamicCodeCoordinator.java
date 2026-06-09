@@ -14,12 +14,14 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Component
 public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator {
@@ -28,6 +30,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
     private final CodeRuleService ruleService;
     private final CodeGenerateService generateService;
     private final CodePreviewService previewService;
+    private final CodeSequenceStateService sequenceStateService;
     private final CodeLedgerEntryService ledgerEntryService;
     private final CodeRecycleEntryService recycleEntryService;
     private final DynamicRecordService recordService;
@@ -36,25 +39,26 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
                                   @Lazy DynamicRecordService recordService) {
-        this(ruleService, generateService, null, null, null, recordService, Clock.systemDefaultZone());
+        this(ruleService, generateService, null, null, null, null, recordService, Clock.systemDefaultZone());
     }
 
     @Autowired
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
                                   CodePreviewService previewService,
+                                  CodeSequenceStateService sequenceStateService,
                                   CodeLedgerEntryService ledgerEntryService,
                                   CodeRecycleEntryService recycleEntryService,
                                   @Lazy DynamicRecordService recordService) {
-        this(ruleService, generateService, previewService, ledgerEntryService, recycleEntryService, recordService,
-                Clock.systemDefaultZone());
+        this(ruleService, generateService, previewService, sequenceStateService, ledgerEntryService, recycleEntryService,
+                recordService, Clock.systemDefaultZone());
     }
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
                                   DynamicRecordService recordService,
                                   Clock clock) {
-        this(ruleService, generateService, null, null, null, recordService, clock);
+        this(ruleService, generateService, null, null, null, null, recordService, clock);
     }
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
@@ -63,12 +67,24 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
                                   CodeRecycleEntryService recycleEntryService,
                                   DynamicRecordService recordService,
                                   Clock clock) {
-        this(ruleService, generateService, null, ledgerEntryService, recycleEntryService, recordService, clock);
+        this(ruleService, generateService, null, null, ledgerEntryService, recycleEntryService, recordService, clock);
     }
 
     public DynamicCodeCoordinator(CodeRuleService ruleService,
                                   CodeGenerateService generateService,
                                   CodePreviewService previewService,
+                                  CodeLedgerEntryService ledgerEntryService,
+                                  CodeRecycleEntryService recycleEntryService,
+                                  DynamicRecordService recordService,
+                                  Clock clock) {
+        this(ruleService, generateService, previewService, null, ledgerEntryService, recycleEntryService, recordService,
+                clock);
+    }
+
+    public DynamicCodeCoordinator(CodeRuleService ruleService,
+                                  CodeGenerateService generateService,
+                                  CodePreviewService previewService,
+                                  CodeSequenceStateService sequenceStateService,
                                   CodeLedgerEntryService ledgerEntryService,
                                   CodeRecycleEntryService recycleEntryService,
                                   DynamicRecordService recordService,
@@ -76,6 +92,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");
         this.generateService = Objects.requireNonNull(generateService, "generateService must not be null");
         this.previewService = previewService == null ? new CodePreviewService() : previewService;
+        this.sequenceStateService = sequenceStateService;
         this.ledgerEntryService = ledgerEntryService;
         this.recycleEntryService = recycleEntryService;
         this.recordService = Objects.requireNonNull(recordService, "recordService must not be null");
@@ -114,6 +131,27 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         record.setId(id);
         syncCurrentBindings(moduleAlias, entityAlias, record, recordContext(record), resolveOrganizationId(record),
                 LocalDateTime.now(clock));
+    }
+
+    @Override
+    public void beforeRelationChildCreate(String moduleAlias,
+                                          String parentEntityAlias,
+                                          String relationCode,
+                                          String childEntityAlias,
+                                          DynamicRecord parent,
+                                          DynamicRecord child) {
+        beforeCreate(moduleAlias, childEntityAlias, child);
+    }
+
+    @Override
+    public void afterRelationChildCreate(String moduleAlias,
+                                         String parentEntityAlias,
+                                         String relationCode,
+                                         String childEntityAlias,
+                                         DynamicRecord parent,
+                                         DynamicRecord child,
+                                         String id) {
+        afterCreate(moduleAlias, childEntityAlias, child, id);
     }
 
     @Override
@@ -177,6 +215,49 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
     }
 
     @Override
+    public void beforeRelationChildUpdate(String moduleAlias,
+                                          String parentEntityAlias,
+                                          String relationCode,
+                                          String childEntityAlias,
+                                          DynamicRecord parentBefore,
+                                          DynamicRecord parentIncoming,
+                                          DynamicRecord childBefore,
+                                          DynamicRecord childIncoming) {
+        beforeUpdate(moduleAlias, childEntityAlias, childBefore, childIncoming);
+    }
+
+    @Override
+    public void afterRelationChildUpdate(String moduleAlias,
+                                         String parentEntityAlias,
+                                         String relationCode,
+                                         String childEntityAlias,
+                                         DynamicRecord parentBefore,
+                                         DynamicRecord parentUpdated,
+                                         DynamicRecord childBefore,
+                                         DynamicRecord childUpdated) {
+        afterUpdate(moduleAlias, childEntityAlias, childBefore, childUpdated);
+    }
+
+    @Override
+    public void beforeRelationChildDelete(String moduleAlias,
+                                          String parentEntityAlias,
+                                          String relationCode,
+                                          String childEntityAlias,
+                                          DynamicRecord parentBefore,
+                                          DynamicRecord childBefore) {
+    }
+
+    @Override
+    public void afterRelationChildDelete(String moduleAlias,
+                                         String parentEntityAlias,
+                                         String relationCode,
+                                         String childEntityAlias,
+                                         DynamicRecord parentBefore,
+                                         DynamicRecord childBefore) {
+        afterDelete(moduleAlias, childEntityAlias, childBefore);
+    }
+
+    @Override
     public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
         if (before == null) {
             return;
@@ -216,6 +297,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (explicitlySet && existingValue != null && !String.valueOf(existingValue).isBlank()) {
             if (rule.getMode() == CodeMode.AUTO_WITH_MANUAL_EDIT) {
                 rejectOccupiedCode(rule, existingValue, null);
+                baselineSequenceFromAcceptedValue(rule, existingValue, context, at);
                 return;
             }
             throw new PlatformException("AUTO code field does not accept manual value: " + fieldName);
@@ -245,6 +327,7 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
             }
             rejectOccupiedCode(rule, incomingValue, incoming.getId());
             context.put(fieldName, incomingValue);
+            baselineSequenceFromAcceptedValue(rule, incomingValue, context, at);
             return;
         }
         if (!hasText(oldValue)) {
@@ -371,6 +454,72 @@ public class DynamicCodeCoordinator implements DynamicRecordMutationCoordinator 
         if (ledgerEntryService != null) {
             ledgerEntryService.upsertInactiveBinding(rule, String.valueOf(oldValue), basisKey, periodKey, sourceRecordId,
                     inactiveStatus, action);
+        }
+    }
+
+    private void baselineSequenceFromAcceptedValue(CodeRule rule,
+                                                   Object codeValue,
+                                                   Map<String, Object> context,
+                                                   LocalDateTime at) {
+        if (sequenceStateService == null || rule == null || rule.getSequencePolicy() == null || !hasText(codeValue)) {
+            return;
+        }
+        Long acceptedSequenceValue = parseAcceptedSequenceValue(rule, String.valueOf(codeValue), context, at);
+        if (acceptedSequenceValue == null) {
+            return;
+        }
+        String basisKey = basisKey(rule, context, at);
+        String periodKey = periodKey(rule, at);
+        CodeSequenceState state = sequenceStateService.selectState(rule.getId(), basisKey, periodKey);
+        if (state == null || state.getCurrentValue() == null || state.getCurrentValue() < acceptedSequenceValue) {
+            sequenceStateService.setCurrentValue(rule.getId(), basisKey, periodKey, acceptedSequenceValue);
+        }
+    }
+
+    private Long parseAcceptedSequenceValue(CodeRule rule,
+                                            String codeValue,
+                                            Map<String, Object> context,
+                                            LocalDateTime at) {
+        List<CodeRuleSegment> segments = rule.getSegments() == null ? List.of() : rule.getSegments();
+        if (segments.stream().filter(segment -> segment.getSegmentType() == CodeSegmentType.SEQUENCE).count() != 1) {
+            return null;
+        }
+        CodePreviewResult rendered = previewService.previewDraft(new PreviewCodeRuleCommand(
+                rule,
+                context == null ? Map.of() : context,
+                null,
+                at,
+                0L
+        ));
+        List<CodeRuleSegment> sortedSegments = segments.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(CodeRuleSegment::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                .toList();
+        StringBuilder regex = new StringBuilder("^");
+        int renderedIndex = 0;
+        for (CodeRuleSegment segment : sortedSegments) {
+            if (renderedIndex >= rendered.segments().size()) {
+                break;
+            }
+            CodePreviewSegmentResult renderedSegment = rendered.segments().get(renderedIndex++);
+            if (renderedSegment.segmentType() == CodeSegmentType.SEQUENCE) {
+                regex.append("(\\d+)");
+            } else {
+                regex.append(Pattern.quote(renderedSegment.value() == null ? "" : renderedSegment.value()));
+            }
+            if (segment.getSeparator() != null && !segment.getSeparator().isEmpty()) {
+                regex.append(Pattern.quote(segment.getSeparator()));
+            }
+        }
+        regex.append("$");
+        java.util.regex.Matcher matcher = Pattern.compile(regex.toString()).matcher(codeValue);
+        if (!matcher.matches()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 

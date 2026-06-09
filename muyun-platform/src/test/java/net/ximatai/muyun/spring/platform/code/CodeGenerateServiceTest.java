@@ -25,9 +25,11 @@ class CodeGenerateServiceTest {
             mappingService
     );
     private final CodeSequenceStateService stateService = new CodeSequenceStateService(new TestMemoryDao<>());
+    private final CodeIssueLogService issueLogService = new CodeIssueLogService(new TestMemoryDao<>());
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-08T00:00:00Z"), ZoneOffset.UTC);
     private final CodePreviewService previewService = new CodePreviewService(new FormulaEngine(clock), clock);
-    private final CodeGenerateService generateService = new CodeGenerateService(ruleService, previewService, stateService, clock);
+    private final CodeGenerateService generateService = new CodeGenerateService(
+            ruleService, previewService, stateService, null, issueLogService, clock);
 
     @Test
     void shouldAdvanceFormalSequenceButPreviewDoesNotAdvance() {
@@ -42,6 +44,28 @@ class CodeGenerateServiceTest {
                 Map.of(), null, at("2026-06-08T10:00:00"), null)).value())
                 .isEqualTo("SO-0001");
         assertThat(generate("orderNo", Map.of(), at("2026-06-08T10:00:00")).value()).isEqualTo("SO-0002");
+    }
+
+    @Test
+    void shouldWriteIssueLogWhenCodeGenerated() {
+        CodeRule rule = rule("orderNo", CodeMode.AUTO, CodeSequenceResetPolicy.NONE);
+        ruleService.saveRuleTree(rule);
+
+        GenerateCodeResult generated = generate("orderNo", Map.of(), at("2026-06-08T10:00:00"));
+
+        assertThat(generated.value()).isEqualTo("SO-0001");
+        assertThat(issueLogService.selectByRuleId(rule.getId(), 10))
+                .singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getStatus()).isEqualTo(CodeIssueLogStatus.SUCCESS);
+                    assertThat(log.getGeneratedValue()).isEqualTo("SO-0001");
+                    assertThat(log.getBasisKey()).isEqualTo(CodeSequenceState.DEFAULT_BUCKET);
+                    assertThat(log.getPeriodKey()).isEqualTo(CodeSequenceState.DEFAULT_BUCKET);
+                    assertThat(log.getRetryCount()).isZero();
+                    assertThat(log.getModuleAlias()).isEqualTo("crm.order");
+                    assertThat(log.getEntityAlias()).isEqualTo("main");
+                    assertThat(log.getFieldName()).isEqualTo("orderNo");
+                });
     }
 
     @Test
@@ -96,6 +120,14 @@ class CodeGenerateServiceTest {
         )))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("already exists");
+        assertThat(issueLogService.selectByRuleId(rule.getId(), 10))
+                .singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getStatus()).isEqualTo(CodeIssueLogStatus.FAILED);
+                    assertThat(log.getGeneratedValue()).isEqualTo("SO-0005");
+                    assertThat(log.getRetryCount()).isEqualTo(4);
+                    assertThat(log.getMessage()).contains("already exists");
+                });
     }
 
     @Test

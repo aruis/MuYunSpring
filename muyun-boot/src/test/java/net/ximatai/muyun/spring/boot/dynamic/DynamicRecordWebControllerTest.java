@@ -46,6 +46,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
+import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
+import net.ximatai.muyun.spring.platform.code.CodeFieldRole;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +87,7 @@ class DynamicRecordWebControllerTest {
     private DynamicRecordService service;
     private DynamicEntityOperations mainEntity;
     private ActiveTenantVerifier activeTenantVerifier;
+    private CodeBusinessPreviewService codeBusinessPreviewService;
     private MockMvc mvc;
 
     @BeforeEach
@@ -91,7 +95,9 @@ class DynamicRecordWebControllerTest {
         service = mock(DynamicRecordService.class);
         mainEntity = mock(DynamicEntityOperations.class);
         activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        codeBusinessPreviewService = mock(CodeBusinessPreviewService.class);
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));
         when(service.actionAuthorizationAvailability(eq(MODULE), anyString(), any()))
                 .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(1)));
@@ -100,7 +106,7 @@ class DynamicRecordWebControllerTest {
         objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
                 .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier))
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier, codeBusinessPreviewService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
@@ -129,6 +135,39 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.basePath").value("/" + MODULE))
                 .andExpect(jsonPath("$.operations[0].path").value("/" + MODULE + "/describe"))
                 .andExpect(jsonPath("$.schemas.ContractRecord.type").value("object"));
+    }
+
+    @Test
+    void shouldPreviewBusinessCodesWithoutPersistingRecord() throws Exception {
+        when(codeBusinessPreviewService.preview(eq(MODULE), eq(ENTITY), any(), eq(null), eq(null), eq(null)))
+                .thenReturn(List.of(new CodeBusinessPreviewItem(
+                        "rule-1",
+                        "field-1",
+                        "code",
+                        CodeFieldRole.PRIMARY,
+                        "SO-A0001",
+                        null
+                )));
+
+        mvc.perform(post("/{moduleAlias}/code/preview", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "values": {
+                                    "code": "draft"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruleId").value("rule-1"))
+                .andExpect(jsonPath("$[0].fieldName").value("code"))
+                .andExpect(jsonPath("$[0].value").value("SO-A0001"));
+
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(codeBusinessPreviewService).preview(eq(MODULE), eq(ENTITY), contextCaptor.capture(), eq(null),
+                eq(null), eq(null));
+        assertThat(contextCaptor.getValue()).containsEntry("code", "draft");
+        verify(mainEntity, times(1)).newRecord();
     }
 
     @Test

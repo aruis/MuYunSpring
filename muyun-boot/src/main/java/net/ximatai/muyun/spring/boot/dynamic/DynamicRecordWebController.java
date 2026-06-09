@@ -18,6 +18,10 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
+import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
@@ -39,6 +43,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageConversionException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,12 +75,28 @@ public class DynamicRecordWebController implements
                 DynamicReferenceResolveResponse> {
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
+    private final CodeBusinessPreviewService codeBusinessPreviewService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier) {
+        this(recordService, activeTenantVerifier, (CodeBusinessPreviewService) null);
+    }
+
+    @Autowired
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider) {
+        this(recordService, activeTenantVerifier,
+                codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable());
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
+        this.codeBusinessPreviewService = codeBusinessPreviewService;
     }
 
     @Override
@@ -146,6 +168,26 @@ public class DynamicRecordWebController implements
                 permissionScopedDescriptor(moduleAlias),
                 action -> recordService.actionAuthorizationAvailability(
                         moduleAlias, action.code(), Set.of()).available()));
+    }
+
+    @PostMapping("/code/preview")
+    @ActionEndpoint(PlatformAction.CREATE)
+    public List<CodeBusinessPreviewItem> previewCode(@PathVariable String moduleAlias,
+                                                     @RequestBody(required = false) DynamicRecord record) {
+        return tenantScope(moduleAlias, () -> {
+            if (codeBusinessPreviewService == null) {
+                throw new PlatformException("code business preview service is not configured");
+            }
+            DynamicRecord normalized = record == null ? service().newRecord() : record;
+            return codeBusinessPreviewService.preview(
+                    moduleAlias,
+                    mainEntityAlias(moduleAlias),
+                    normalized.getValues(),
+                    resolveOrganizationId(normalized),
+                    null,
+                    null
+            );
+        });
     }
 
     @Override
@@ -275,6 +317,15 @@ public class DynamicRecordWebController implements
 
     private String mainEntityAlias(String moduleAlias) {
         return recordService.mainEntityAlias(moduleAlias);
+    }
+
+    private String resolveOrganizationId(DynamicRecord record) {
+        if (record != null && record.getAuthOrganizationId() != null && !record.getAuthOrganizationId().isBlank()) {
+            return record.getAuthOrganizationId();
+        }
+        return CurrentUserContext.currentUser()
+                .map(CurrentUser::organizationId)
+                .orElse(null);
     }
 
     private DynamicModuleDescriptor permissionScopedDescriptor(String moduleAlias) {

@@ -21,6 +21,7 @@ public class CodeGenerateService {
     private final CodePreviewService previewService;
     private final CodeSequenceStateService sequenceStateService;
     private final CodeRecycleEntryService recycleEntryService;
+    private final CodeIssueLogService issueLogService;
     private final Clock clock;
 
     public CodeGenerateService(CodeRuleService ruleService,
@@ -33,14 +34,22 @@ public class CodeGenerateService {
                                CodePreviewService previewService,
                                CodeSequenceStateService sequenceStateService,
                                Clock clock) {
-        this(ruleService, previewService, sequenceStateService, null, clock);
+        this(ruleService, previewService, sequenceStateService, null, null, clock);
     }
 
     public CodeGenerateService(CodeRuleService ruleService,
                                CodePreviewService previewService,
                                CodeSequenceStateService sequenceStateService,
                                CodeRecycleEntryService recycleEntryService) {
-        this(ruleService, previewService, sequenceStateService, recycleEntryService, Clock.systemDefaultZone());
+        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, Clock.systemDefaultZone());
+    }
+
+    public CodeGenerateService(CodeRuleService ruleService,
+                               CodePreviewService previewService,
+                               CodeSequenceStateService sequenceStateService,
+                               CodeRecycleEntryService recycleEntryService,
+                               Clock clock) {
+        this(ruleService, previewService, sequenceStateService, recycleEntryService, null, clock);
     }
 
     @Autowired
@@ -48,11 +57,13 @@ public class CodeGenerateService {
                                CodePreviewService previewService,
                                CodeSequenceStateService sequenceStateService,
                                CodeRecycleEntryService recycleEntryService,
+                               CodeIssueLogService issueLogService,
                                Clock clock) {
         this.ruleService = Objects.requireNonNull(ruleService, "ruleService must not be null");
         this.previewService = Objects.requireNonNull(previewService, "previewService must not be null");
         this.sequenceStateService = Objects.requireNonNull(sequenceStateService, "sequenceStateService must not be null");
         this.recycleEntryService = recycleEntryService;
+        this.issueLogService = issueLogService;
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
@@ -97,40 +108,53 @@ public class CodeGenerateService {
         }
         String basisKey = hasSequence ? buildBasisKey(rule, context, at) : CodeSequenceState.DEFAULT_BUCKET;
         String periodKey = hasSequence ? sequenceStateService.periodKey(rule.getSequencePolicy(), at) : CodeSequenceState.DEFAULT_BUCKET;
-        GenerateCodeResult recycled = tryConsumeRecycle(resolved, context, basisKey, periodKey, at, uniquenessChecker);
-        if (recycled != null) {
-            return recycled;
-        }
-
         int retry = 0;
-        while (true) {
-            Long sequenceValue = hasSequence
-                    ? sequenceStateService.allocateNextValue(rule.getId(), basisKey, periodKey, rule.getSequencePolicy())
-                    : null;
-            CodePreviewResult rendered = previewService.previewDraft(new PreviewCodeRuleCommand(
-                    rule,
-                    context,
-                    resolved.resolvedOrganizationId(),
-                    at,
-                    sequenceValue
-            ));
-            if (!isDuplicate(uniquenessChecker, resolved, rendered.value(), context)) {
-                return new GenerateCodeResult(
-                        rendered.value(),
-                        rule.getId(),
-                        rule.getMetadataFieldId(),
-                        rule.getFieldName(),
-                        rule.getFieldRole(),
+        String lastGeneratedValue = null;
+        try {
+            GenerateCodeResult recycled = tryConsumeRecycle(resolved, context, basisKey, periodKey, at, uniquenessChecker);
+            if (recycled != null) {
+                writeIssueLog(rule, basisKey, periodKey, recycled.value(), CodeIssueLogStatus.SUCCESS, retry,
+                        "Reused recycled code");
+                return recycled;
+            }
+
+            while (true) {
+                Long sequenceValue = hasSequence
+                        ? sequenceStateService.allocateNextValue(rule.getId(), basisKey, periodKey, rule.getSequencePolicy())
+                        : null;
+                CodePreviewResult rendered = previewService.previewDraft(new PreviewCodeRuleCommand(
+                        rule,
+                        context,
                         resolved.resolvedOrganizationId(),
-                        basisKey,
-                        periodKey,
+                        at,
                         sequenceValue
-                );
+                ));
+                lastGeneratedValue = rendered.value();
+                if (!isDuplicate(uniquenessChecker, resolved, rendered.value(), context)) {
+                    GenerateCodeResult result = new GenerateCodeResult(
+                            rendered.value(),
+                            rule.getId(),
+                            rule.getMetadataFieldId(),
+                            rule.getFieldName(),
+                            rule.getFieldRole(),
+                            resolved.resolvedOrganizationId(),
+                            basisKey,
+                            periodKey,
+                            sequenceValue
+                    );
+                    writeIssueLog(rule, basisKey, periodKey, rendered.value(), CodeIssueLogStatus.SUCCESS, retry,
+                            "Generated code");
+                    return result;
+                }
+                if (!hasSequence || retry >= DEFAULT_DUPLICATE_RETRY - 1) {
+                    throw new PlatformException("Generated code already exists: " + rendered.value());
+                }
+                retry++;
             }
-            if (!hasSequence || retry >= DEFAULT_DUPLICATE_RETRY - 1) {
-                throw new PlatformException("Generated code already exists: " + rendered.value());
-            }
-            retry++;
+        } catch (RuntimeException ex) {
+            writeIssueLog(rule, basisKey, periodKey, lastGeneratedValue, CodeIssueLogStatus.FAILED, retry,
+                    ex.getMessage());
+            throw ex;
         }
     }
 
@@ -213,5 +237,17 @@ public class CodeGenerateService {
                                 String generatedValue,
                                 Map<String, Object> context) {
         return checker != null && checker.exists(resolved, generatedValue, context);
+    }
+
+    private void writeIssueLog(CodeRule rule,
+                               String basisKey,
+                               String periodKey,
+                               String generatedValue,
+                               CodeIssueLogStatus status,
+                               int retryCount,
+                               String message) {
+        if (issueLogService != null) {
+            issueLogService.write(rule, basisKey, periodKey, generatedValue, status, retryCount, message);
+        }
     }
 }

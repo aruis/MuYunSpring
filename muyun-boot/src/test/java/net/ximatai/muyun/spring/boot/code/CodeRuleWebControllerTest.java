@@ -11,7 +11,14 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.code.CodeLedgerEntry;
 import net.ximatai.muyun.spring.platform.code.CodeLedgerEntryService;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerInspection;
+import net.ximatai.muyun.spring.platform.code.CodeLedgerInconsistencyReason;
 import net.ximatai.muyun.spring.platform.code.CodeLedgerStatus;
+import net.ximatai.muyun.spring.platform.code.CodeIssueLog;
+import net.ximatai.muyun.spring.platform.code.CodeIssueLogService;
+import net.ximatai.muyun.spring.platform.code.CodeIssueLogStatus;
+import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
+import net.ximatai.muyun.spring.platform.code.CodeOpsQueryService;
 import net.ximatai.muyun.spring.platform.code.CodePreviewResult;
 import net.ximatai.muyun.spring.platform.code.CodePreviewSegmentResult;
 import net.ximatai.muyun.spring.platform.code.CodePreviewService;
@@ -19,11 +26,14 @@ import net.ximatai.muyun.spring.platform.code.CodeRecycleEntry;
 import net.ximatai.muyun.spring.platform.code.CodeRecycleEntryService;
 import net.ximatai.muyun.spring.platform.code.CodeRecycleStatus;
 import net.ximatai.muyun.spring.platform.code.CodeRule;
+import net.ximatai.muyun.spring.platform.code.CodeRuleOpsSnapshot;
 import net.ximatai.muyun.spring.platform.code.CodeRuleSegment;
 import net.ximatai.muyun.spring.platform.code.CodeRuleService;
 import net.ximatai.muyun.spring.platform.code.CodeSegmentType;
 import net.ximatai.muyun.spring.platform.code.CodeSequencePolicy;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceBaselineResult;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
+import net.ximatai.muyun.spring.platform.code.CodeSequenceStateLocation;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceStateService;
 import net.ximatai.muyun.spring.platform.code.PreviewCodeRuleCommand;
 import org.junit.jupiter.api.AfterEach;
@@ -57,6 +67,9 @@ class CodeRuleWebControllerTest {
     private CodeSequenceStateService stateService;
     private CodeLedgerEntryService ledgerService;
     private CodeRecycleEntryService recycleService;
+    private CodeIssueLogService issueLogService;
+    private CodeOpsQueryService opsQueryService;
+    private CodeOpsActionService opsActionService;
     private MockMvc mvc;
 
     @BeforeEach
@@ -66,18 +79,23 @@ class CodeRuleWebControllerTest {
         stateService = mock(CodeSequenceStateService.class);
         ledgerService = mock(CodeLedgerEntryService.class);
         recycleService = mock(CodeRecycleEntryService.class);
+        issueLogService = mock(CodeIssueLogService.class);
+        opsQueryService = mock(CodeOpsQueryService.class);
+        opsActionService = mock(CodeOpsActionService.class);
 
-        CodeRuleWebController ruleController = new CodeRuleWebController(previewService);
+        CodeRuleWebController ruleController = new CodeRuleWebController(previewService, opsQueryService, opsActionService);
         CodeSequenceStateWebController stateController = new CodeSequenceStateWebController();
         CodeLedgerEntryWebController ledgerController = new CodeLedgerEntryWebController();
         CodeRecycleEntryWebController recycleController = new CodeRecycleEntryWebController();
+        CodeIssueLogWebController issueLogController = new CodeIssueLogWebController();
         ReflectionTestUtils.setField(ruleController, "service", ruleService);
         ReflectionTestUtils.setField(stateController, "service", stateService);
         ReflectionTestUtils.setField(ledgerController, "service", ledgerService);
         ReflectionTestUtils.setField(recycleController, "service", recycleService);
+        ReflectionTestUtils.setField(issueLogController, "service", issueLogService);
 
         mvc = MockMvcBuilders
-                .standaloneSetup(ruleController, stateController, ledgerController, recycleController)
+                .standaloneSetup(ruleController, stateController, ledgerController, recycleController, issueLogController)
                 .addFilters(new CurrentUserWebFilter(() -> Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant-a"))))
                 .build();
@@ -180,7 +198,7 @@ class CodeRuleWebControllerTest {
     }
 
     @Test
-    void shouldExposeLifecycleStateLedgerAndRecycleAsReadOnlyQueryAndView() throws Exception {
+    void shouldExposeLifecycleStateLedgerRecycleAndIssueLogAsReadOnlyQueryAndView() throws Exception {
         CodeSequenceState state = new CodeSequenceState();
         state.setId("state-1");
         state.setRuleId("rule-1");
@@ -212,6 +230,18 @@ class CodeRuleWebControllerTest {
                 .thenReturn(PageResult.of(List.of(recycle), 1, PageRequest.of(1, 20)));
         when(recycleService.select("recycle-1")).thenReturn(recycle);
 
+        CodeIssueLog issueLog = new CodeIssueLog();
+        issueLog.setId("issue-1");
+        issueLog.setRuleId("rule-1");
+        issueLog.setModuleAlias("crm.order");
+        issueLog.setEntityAlias("main");
+        issueLog.setFieldName("orderNo");
+        issueLog.setGeneratedValue("SO-001");
+        issueLog.setStatus(CodeIssueLogStatus.SUCCESS);
+        when(issueLogService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(issueLog), 1, PageRequest.of(1, 20)));
+        when(issueLogService.select("issue-1")).thenReturn(issueLog);
+
         mvc.perform(post("/platform.code_sequence_state/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -238,6 +268,13 @@ class CodeRuleWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
 
+        mvc.perform(post("/platform.code_issue_log/query"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].generatedValue").value("SO-001"));
+        mvc.perform(get("/platform.code_issue_log/view/issue-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+
         mvc.perform(post("/platform.code_sequence_state/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -248,6 +285,73 @@ class CodeRuleWebControllerTest {
                 .andExpect(status().isNotFound());
         mvc.perform(post("/platform.code_recycle_entry/delete/recycle-1"))
                 .andExpect(status().isNotFound());
+        mvc.perform(post("/platform.code_issue_log/update/issue-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldExposeCodeOpsEndpointsThroughRuleModule() throws Exception {
+        CodeRule rule = rule("rule-1");
+        CodeRuleOpsSnapshot snapshot = new CodeRuleOpsSnapshot(rule, List.of(), List.of(), List.of(), List.of());
+        when(opsQueryService.viewRuleSnapshot("rule-1", 5)).thenReturn(snapshot);
+        when(opsQueryService.locateSequenceState("rule-1", "basis", "202606")).thenReturn(
+                new CodeSequenceStateLocation("rule-1", "basis", "202606", false, null, 1L, "missing"));
+        CodeSequenceState state = new CodeSequenceState();
+        state.setId("state-1");
+        state.setRuleId("rule-1");
+        state.setBasisKey("basis");
+        state.setPeriodKey("202606");
+        state.setCurrentValue(100L);
+        when(opsActionService.setSequenceBaseline("rule-1", "basis", "202606", 100L, "import")).thenReturn(
+                new CodeSequenceBaselineResult(state, null, 100L, 101L, "updated"));
+        CodeLedgerEntry ledger = new CodeLedgerEntry();
+        ledger.setId("ledger-1");
+        ledger.setRuleId("rule-1");
+        ledger.setCodeValue("SO-001");
+        ledger.setStatus(CodeLedgerStatus.ACTIVE);
+        when(opsActionService.inspectLedgerEntry("ledger-1")).thenReturn(new CodeLedgerInspection(
+                ledger,
+                "SO-002",
+                false,
+                CodeLedgerInconsistencyReason.VALUE_CHANGED,
+                true,
+                "changed"
+        ));
+
+        mvc.perform(post("/platform.code_rule/ops/view/rule-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"limitPerCategory":5}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rule.id").value("rule-1"));
+        mvc.perform(post("/platform.code_rule/ops/sequenceState/locate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ruleId":"rule-1","basisKey":"basis","periodKey":"202606"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.found").value(false))
+                .andExpect(jsonPath("$.nextValue").value(1));
+        mvc.perform(post("/platform.code_rule/ops/sequenceState/baseline")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ruleId":"rule-1","basisKey":"basis","periodKey":"202606","currentValue":100,"reason":"import"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.afterValue").value(100))
+                .andExpect(jsonPath("$.nextValue").value(101));
+        mvc.perform(post("/platform.code_rule/ops/ledgerEntry/ledger-1/inspect"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consistent").value(false))
+                .andExpect(jsonPath("$.reason").value("VALUE_CHANGED"));
+
+        verify(opsQueryService).viewRuleSnapshot("rule-1", 5);
+        verify(opsQueryService).locateSequenceState("rule-1", "basis", "202606");
+        verify(opsActionService).setSequenceBaseline("rule-1", "basis", "202606", 100L, "import");
+        verify(opsActionService).inspectLedgerEntry("ledger-1");
     }
 
     @Test

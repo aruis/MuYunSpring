@@ -47,6 +47,29 @@ public final class DynamicRecordMutationCoordinators {
         }
 
         @Override
+        public void beforeRelationChildCreate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parent,
+                                              DynamicRecord child) {
+            delegates.forEach(delegate -> delegate.beforeRelationChildCreate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parent, child));
+        }
+
+        @Override
+        public void afterRelationChildCreate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parent,
+                                             DynamicRecord child,
+                                             String id) {
+            delegates.forEach(delegate -> delegate.afterRelationChildCreate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parent, child, id));
+        }
+
+        @Override
         public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
             delegates.forEach(delegate -> delegate.beforeUpdate(moduleAlias, entityAlias, before, incoming));
         }
@@ -54,6 +77,54 @@ public final class DynamicRecordMutationCoordinators {
         @Override
         public void afterUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord updated) {
             delegates.forEach(delegate -> delegate.afterUpdate(moduleAlias, entityAlias, before, updated));
+        }
+
+        @Override
+        public void beforeRelationChildUpdate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord parentIncoming,
+                                              DynamicRecord childBefore,
+                                              DynamicRecord childIncoming) {
+            delegates.forEach(delegate -> delegate.beforeRelationChildUpdate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, parentIncoming, childBefore, childIncoming));
+        }
+
+        @Override
+        public void afterRelationChildUpdate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord parentUpdated,
+                                             DynamicRecord childBefore,
+                                             DynamicRecord childUpdated) {
+            delegates.forEach(delegate -> delegate.afterRelationChildUpdate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, parentUpdated, childBefore, childUpdated));
+        }
+
+        @Override
+        public void beforeRelationChildDelete(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord childBefore) {
+            delegates.forEach(delegate -> delegate.beforeRelationChildDelete(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, childBefore));
+        }
+
+        @Override
+        public void afterRelationChildDelete(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord childBefore) {
+            delegates.forEach(delegate -> delegate.afterRelationChildDelete(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, childBefore));
         }
 
         @Override
@@ -91,6 +162,29 @@ public final class DynamicRecordMutationCoordinators {
         }
 
         @Override
+        public void beforeRelationChildCreate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parent,
+                                              DynamicRecord child) {
+            delegates().forEach(delegate -> delegate.beforeRelationChildCreate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parent, child));
+        }
+
+        @Override
+        public void afterRelationChildCreate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parent,
+                                             DynamicRecord child,
+                                             String id) {
+            delegates().forEach(delegate -> delegate.afterRelationChildCreate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parent, child, id));
+        }
+
+        @Override
         public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
             delegates().forEach(delegate -> delegate.beforeUpdate(moduleAlias, entityAlias, before, incoming));
         }
@@ -98,6 +192,54 @@ public final class DynamicRecordMutationCoordinators {
         @Override
         public void afterUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord updated) {
             delegates().forEach(delegate -> delegate.afterUpdate(moduleAlias, entityAlias, before, updated));
+        }
+
+        @Override
+        public void beforeRelationChildUpdate(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord parentIncoming,
+                                              DynamicRecord childBefore,
+                                              DynamicRecord childIncoming) {
+            delegates().forEach(delegate -> delegate.beforeRelationChildUpdate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, parentIncoming, childBefore, childIncoming));
+        }
+
+        @Override
+        public void afterRelationChildUpdate(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord parentUpdated,
+                                             DynamicRecord childBefore,
+                                             DynamicRecord childUpdated) {
+            delegates().forEach(delegate -> delegate.afterRelationChildUpdate(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, parentUpdated, childBefore, childUpdated));
+        }
+
+        @Override
+        public void beforeRelationChildDelete(String moduleAlias,
+                                              String parentEntityAlias,
+                                              String relationCode,
+                                              String childEntityAlias,
+                                              DynamicRecord parentBefore,
+                                              DynamicRecord childBefore) {
+            delegates().forEach(delegate -> delegate.beforeRelationChildDelete(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, childBefore));
+        }
+
+        @Override
+        public void afterRelationChildDelete(String moduleAlias,
+                                             String parentEntityAlias,
+                                             String relationCode,
+                                             String childEntityAlias,
+                                             DynamicRecord parentBefore,
+                                             DynamicRecord childBefore) {
+            delegates().forEach(delegate -> delegate.afterRelationChildDelete(moduleAlias, parentEntityAlias,
+                    relationCode, childEntityAlias, parentBefore, childBefore));
         }
 
         @Override

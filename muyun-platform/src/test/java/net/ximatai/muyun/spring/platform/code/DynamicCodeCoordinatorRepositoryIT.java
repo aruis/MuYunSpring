@@ -10,13 +10,16 @@ import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
@@ -353,6 +356,51 @@ class DynamicCodeCoordinatorRepositoryIT {
     }
 
     @Test
+    void shouldContinueSequenceAfterAcceptedEditableAutoCode() {
+        Scenario scenario = publishScenario();
+        CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
+
+        DynamicRecord imported = create(scenario, "imported", "SO-0010");
+        DynamicRecord next = create(scenario, "next");
+
+        assertThat(imported.getValue("orderNo")).isEqualTo("SO-0010");
+        assertThat(next.getValue("orderNo")).isEqualTo("SO-0011");
+        CodeSequenceState state = stateService.selectState(rule.getId(), CodeSequenceState.DEFAULT_BUCKET,
+                CodeSequenceState.DEFAULT_BUCKET);
+        assertThat(state.getCurrentValue()).isEqualTo(11L);
+        CodeLedgerEntry importedLedger = ledgerService.findByRuleAndValue(rule.getId(), "SO-0010");
+        assertThat(importedLedger.getStatus()).isEqualTo(CodeLedgerStatus.ACTIVE);
+        assertThat(importedLedger.getSourceRecordId()).isEqualTo(imported.getId());
+    }
+
+    @Test
+    void shouldContinueSequenceAfterAcceptedEditableAutoCodeThroughImportGateway() {
+        Scenario scenario = publishScenario();
+        CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
+        AtomicReference<String> importedId = new AtomicReference<>();
+
+        transactionTemplate.executeWithoutResult(status -> {
+            try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
+                DynamicRecordActionGateway records = recordService.recordsForAction(
+                        scenario.moduleAlias(), PlatformAction.IMPORT, "dynamic-import-test");
+                DynamicRecord imported = records.newRecord("main")
+                        .setValue("title", "imported")
+                        .setValue("orderNo", "SO-0010");
+                importedId.set(records.create("main", imported));
+            }
+        });
+        DynamicRecord next = create(scenario, "next");
+
+        assertThat(next.getValue("orderNo")).isEqualTo("SO-0011");
+        CodeSequenceState state = stateService.selectState(rule.getId(), CodeSequenceState.DEFAULT_BUCKET,
+                CodeSequenceState.DEFAULT_BUCKET);
+        assertThat(state.getCurrentValue()).isEqualTo(11L);
+        CodeLedgerEntry importedLedger = ledgerService.findByRuleAndValue(rule.getId(), "SO-0010");
+        assertThat(importedLedger.getStatus()).isEqualTo(CodeLedgerStatus.ACTIVE);
+        assertThat(importedLedger.getSourceRecordId()).isEqualTo(importedId.get());
+    }
+
+    @Test
     void shouldRollbackRecycleConsumptionWhenDynamicCreateFailsInOuterTransaction() {
         Scenario scenario = publishScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
@@ -429,6 +477,35 @@ class DynamicCodeCoordinatorRepositoryIT {
         }
     }
 
+    @Test
+    void shouldAssignCodeToDynamicRelationChildOnParentCreate() {
+        Scenario scenario = publishChildScenario();
+        CodeRule childRule = saveChildRule(scenario);
+
+        DynamicRecord invoice;
+        DynamicRecord line;
+        try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
+            invoice = recordService.newRecord(scenario.moduleAlias(), "main")
+                    .setValue("title", "invoice-with-line");
+            line = recordService.newRecord(scenario.moduleAlias(), "line")
+                    .setValue("title", "line-1");
+            invoice.setChildren("lines", List.of(line));
+            recordService.create(scenario.moduleAlias(), "main", invoice);
+        }
+
+        assertThat(invoice.getId()).isNotBlank();
+        assertThat(line.getId()).isNotBlank();
+        assertThat(line.getValue("mainId")).isEqualTo(invoice.getId());
+        assertThat(line.getValue("lineNo")).isEqualTo("LN-0001");
+
+        DynamicRecord selected = recordService.select(scenario.moduleAlias(), "main", invoice.getId());
+        DynamicRecord selectedLine = selected.getChildren("lines").getFirst();
+        assertThat(selectedLine.getValue("lineNo")).isEqualTo("LN-0001");
+        CodeLedgerEntry ledger = ledgerService.findByRuleAndValue(childRule.getId(), "LN-0001");
+        assertThat(ledger.getStatus()).isEqualTo(CodeLedgerStatus.ACTIVE);
+        assertThat(ledger.getSourceRecordId()).isEqualTo(line.getId());
+    }
+
     private DynamicRecord create(Scenario scenario, String title) {
         return create(scenario, title, null);
     }
@@ -486,6 +563,41 @@ class DynamicCodeCoordinatorRepositoryIT {
         return new Scenario(moduleAlias);
     }
 
+    private Scenario publishChildScenario() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String moduleAlias = "crm.code_child_it_" + suffix;
+        String mainTableName = "crm_code_child_main_" + suffix;
+        String lineTableName = "crm_code_child_line_" + suffix;
+        publisher.publish(new ModuleDefinition(
+                moduleAlias,
+                "Code Child IT",
+                List.of(
+                        new EntityDefinition(
+                                "main",
+                                mainTableName,
+                                "Code Child Main",
+                                List.of(FieldDefinition.titleField().required()),
+                                Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)
+                        ),
+                        new EntityDefinition(
+                                "line",
+                                lineTableName,
+                                "Code Child Line",
+                                List.of(
+                                        FieldDefinition.string("mainId", "Main").column("main_id").length(64).required(),
+                                        FieldDefinition.titleField().required(),
+                                        FieldDefinition.string("lineNo", "Line No").column("line_no").length(64)
+                                ),
+                                Set.of(EntityCapability.CRUD, EntityCapability.REFERENCE)
+                        )
+                ),
+                List.of(EntityRelationDefinition.child("lines", "main", "line", "mainId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent())
+        ));
+        return new Scenario(moduleAlias);
+    }
+
     private CodeRule saveRule(Scenario scenario, CodeMode mode, boolean enabled) {
         return saveRule(scenario, mode, enabled, true);
     }
@@ -532,6 +644,31 @@ class DynamicCodeCoordinatorRepositoryIT {
         rule.setSegments(List.of(
                 segment(CodeSegmentType.CONSTANT, "SO-", null),
                 titleBasis,
+                sequenceSegment()
+        ));
+        CodeSequencePolicy policy = new CodeSequencePolicy();
+        policy.setStartValue(1L);
+        policy.setStepValue(1L);
+        policy.setSequenceLength(4);
+        policy.setResetPolicy(CodeSequenceResetPolicy.NONE);
+        rule.setSequencePolicy(policy);
+        try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
+            return ruleService.saveRuleTree(rule);
+        }
+    }
+
+    private CodeRule saveChildRule(Scenario scenario) {
+        CodeRule rule = new CodeRule();
+        rule.setModuleAlias(scenario.moduleAlias());
+        rule.setEntityAlias("line");
+        rule.setFieldName("lineNo");
+        rule.setTitle("lineNo");
+        rule.setFieldRole(CodeFieldRole.NORMAL);
+        rule.setMode(CodeMode.AUTO);
+        rule.setEnabled(Boolean.TRUE);
+        rule.setAllowRecycle(Boolean.TRUE);
+        rule.setSegments(List.of(
+                segment(CodeSegmentType.CONSTANT, "LN-", null),
                 sequenceSegment()
         ));
         CodeSequencePolicy policy = new CodeSequencePolicy();
@@ -603,6 +740,7 @@ class DynamicCodeCoordinatorRepositoryIT {
                                                   CodeRuleService ruleService,
                                                   CodeGenerateService generateService,
                                                   CodePreviewService previewService,
+                                                  CodeSequenceStateService stateService,
                                                   CodeLedgerEntryService ledgerEntryService,
                                                   CodeRecycleEntryService recycleEntryService,
                                                   Clock codeClock) {
@@ -611,6 +749,7 @@ class DynamicCodeCoordinatorRepositoryIT {
                     ruleService,
                     generateService,
                     previewService,
+                    stateService,
                     ledgerEntryService,
                     recycleEntryService,
                     new DynamicRecordServiceProxy(holder),
@@ -676,6 +815,11 @@ class DynamicCodeCoordinatorRepositoryIT {
         }
 
         @Bean
+        CodeIssueLogService codeIssueLogService(CodeIssueLogDao issueLogDao) {
+            return new CodeIssueLogService(issueLogDao);
+        }
+
+        @Bean
         CodePreviewService codePreviewService(Clock codeClock) {
             return new CodePreviewService(new FormulaEngine(codeClock), codeClock);
         }
@@ -685,8 +829,10 @@ class DynamicCodeCoordinatorRepositoryIT {
                                                 CodePreviewService previewService,
                                                 CodeSequenceStateService stateService,
                                                 CodeRecycleEntryService recycleEntryService,
+                                                CodeIssueLogService issueLogService,
                                                 Clock codeClock) {
-            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService, codeClock);
+            return new CodeGenerateService(ruleService, previewService, stateService, recycleEntryService,
+                    issueLogService, codeClock);
         }
 
         @Bean

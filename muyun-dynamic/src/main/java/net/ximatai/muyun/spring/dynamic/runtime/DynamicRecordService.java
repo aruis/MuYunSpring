@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
@@ -40,7 +41,9 @@ import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -266,8 +269,26 @@ public class DynamicRecordService {
             ));
         }
         mutationCoordinator.beforeCreate(moduleAlias, entityAlias, record);
+        List<RelationChildMutation> childMutations = prepareRelationChildrenForCreate(moduleAlias, entityAlias, record);
+        childMutations.forEach(mutation -> mutationCoordinator.beforeRelationChildCreate(
+                moduleAlias,
+                entityAlias,
+                mutation.relation().code(),
+                mutation.relation().childEntityAlias(),
+                record,
+                mutation.incoming()
+        ));
         String id = entityService(moduleAlias, entityAlias).insert(record);
         mutationCoordinator.afterCreate(moduleAlias, entityAlias, record, id);
+        childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildCreate(
+                moduleAlias,
+                entityAlias,
+                mutation.relation().code(),
+                mutation.relation().childEntityAlias(),
+                record,
+                mutation.incoming(),
+                mutation.incoming().getId()
+        ));
         eventPublisher.created(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         return id;
     }
@@ -332,9 +353,34 @@ public class DynamicRecordService {
         }
         DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(record.getId()));
         mutationCoordinator.beforeUpdate(moduleAlias, entityAlias, before, record);
+        List<RelationChildMutation> childMutations = prepareRelationChildrenForUpdate(moduleAlias, entityAlias, before, record);
+        childMutations.forEach(mutation -> {
+            if (mutation.kind() == RelationChildMutationKind.CREATE) {
+                mutationCoordinator.beforeRelationChildCreate(moduleAlias, entityAlias, mutation.relation().code(),
+                        mutation.relation().childEntityAlias(), record, mutation.incoming());
+            } else if (mutation.kind() == RelationChildMutationKind.UPDATE) {
+                mutationCoordinator.beforeRelationChildUpdate(moduleAlias, entityAlias, mutation.relation().code(),
+                        mutation.relation().childEntityAlias(), before, record, mutation.before(), mutation.incoming());
+            } else if (mutation.kind() == RelationChildMutationKind.DELETE) {
+                mutationCoordinator.beforeRelationChildDelete(moduleAlias, entityAlias, mutation.relation().code(),
+                        mutation.relation().childEntityAlias(), before, mutation.before());
+            }
+        });
         int updated = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).update(record));
         if (updated > 0) {
             mutationCoordinator.afterUpdate(moduleAlias, entityAlias, before, record);
+            childMutations.forEach(mutation -> {
+                if (mutation.kind() == RelationChildMutationKind.CREATE) {
+                    mutationCoordinator.afterRelationChildCreate(moduleAlias, entityAlias, mutation.relation().code(),
+                            mutation.relation().childEntityAlias(), record, mutation.incoming(), mutation.incoming().getId());
+                } else if (mutation.kind() == RelationChildMutationKind.UPDATE) {
+                    mutationCoordinator.afterRelationChildUpdate(moduleAlias, entityAlias, mutation.relation().code(),
+                            mutation.relation().childEntityAlias(), before, record, mutation.before(), mutation.incoming());
+                } else if (mutation.kind() == RelationChildMutationKind.DELETE) {
+                    mutationCoordinator.afterRelationChildDelete(moduleAlias, entityAlias, mutation.relation().code(),
+                            mutation.relation().childEntityAlias(), before, mutation.before());
+                }
+            });
             eventPublisher.updated(eventContext(moduleAlias, entityAlias, mutationSource, traceId), record.getId());
         }
         return updated;
@@ -357,9 +403,26 @@ public class DynamicRecordService {
         }
         DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(id));
         mutationCoordinator.beforeDelete(moduleAlias, entityAlias, before);
+        List<RelationChildMutation> childMutations = relationChildrenForCascadeDelete(moduleAlias, entityAlias, before);
+        childMutations.forEach(mutation -> mutationCoordinator.beforeRelationChildDelete(
+                moduleAlias,
+                entityAlias,
+                mutation.relation().code(),
+                mutation.relation().childEntityAlias(),
+                before,
+                mutation.before()
+        ));
         int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).delete(id));
         if (deleted > 0) {
             mutationCoordinator.afterDelete(moduleAlias, entityAlias, before);
+            childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildDelete(
+                    moduleAlias,
+                    entityAlias,
+                    mutation.relation().code(),
+                    mutation.relation().childEntityAlias(),
+                    before,
+                    mutation.before()
+            ));
             eventPublisher.deleted(eventContext(moduleAlias, entityAlias, mutationSource, traceId), id);
         }
         return deleted;
@@ -381,10 +444,30 @@ public class DynamicRecordService {
         }
         List<DynamicRecord> beforeRecords = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias)
                 .list(Criteria.of().in("id", List.copyOf(normalizedIds)), PageRequest.of(1, normalizedIds.size())));
+        List<RelationChildMutation> childMutations = beforeRecords.stream()
+                .flatMap(record -> relationChildrenForCascadeDelete(moduleAlias, entityAlias, record).stream()
+                        .map(mutation -> mutation.withParentBefore(record)))
+                .toList();
         beforeRecords.forEach(record -> mutationCoordinator.beforeDelete(moduleAlias, entityAlias, record));
+        childMutations.forEach(mutation -> mutationCoordinator.beforeRelationChildDelete(
+                moduleAlias,
+                entityAlias,
+                mutation.relation().code(),
+                mutation.relation().childEntityAlias(),
+                mutation.parentBefore(),
+                mutation.before()
+        ));
         int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).deleteBatch(normalizedIds));
         if (deleted > 0) {
             beforeRecords.forEach(record -> mutationCoordinator.afterDelete(moduleAlias, entityAlias, record));
+            childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildDelete(
+                    moduleAlias,
+                    entityAlias,
+                    mutation.relation().code(),
+                    mutation.relation().childEntityAlias(),
+                    mutation.parentBefore(),
+                    mutation.before()
+            ));
             eventPublisher.deletedBatch(eventContext(moduleAlias, entityAlias, mutationSource, traceId),
                     List.copyOf(normalizedIds), deleted);
         }
@@ -552,6 +635,108 @@ public class DynamicRecordService {
         }
         List<String> ids = withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).descendantIds(id));
         return visibleTreeIds(moduleAlias, entityAlias, ids);
+    }
+
+    private List<RelationChildMutation> prepareRelationChildrenForCreate(String moduleAlias,
+                                                                         String entityAlias,
+                                                                         DynamicRecord parent) {
+        if (parent == null || parent.getChildren().isEmpty()) {
+            return List.of();
+        }
+        ensureRecordId(parent);
+        List<RelationChildMutation> mutations = new ArrayList<>();
+        for (DynamicRelationDescriptor relation : childRelations(moduleAlias, entityAlias)) {
+            List<DynamicRecord> children = parent.getChildren(relation.code());
+            if (children == null || children.isEmpty()) {
+                continue;
+            }
+            for (DynamicRecord child : children) {
+                prepareRelationChild(parent, relation, child);
+                mutations.add(RelationChildMutation.create(relation, child));
+            }
+        }
+        return List.copyOf(mutations);
+    }
+
+    private List<RelationChildMutation> prepareRelationChildrenForUpdate(String moduleAlias,
+                                                                         String entityAlias,
+                                                                         DynamicRecord before,
+                                                                         DynamicRecord incoming) {
+        if (incoming == null || incoming.getChildren().isEmpty()) {
+            return List.of();
+        }
+        List<RelationChildMutation> mutations = new ArrayList<>();
+        for (DynamicRelationDescriptor relation : childRelations(moduleAlias, entityAlias)) {
+            if (!incoming.getChildren().containsKey(relation.code())) {
+                continue;
+            }
+            List<DynamicRecord> incomingChildren = incoming.getChildren(relation.code());
+            if (incomingChildren == null) {
+                continue;
+            }
+            Map<String, DynamicRecord> existingById = childrenById(moduleAlias, relation, incoming.getId());
+            for (DynamicRecord child : incomingChildren) {
+                prepareRelationChild(incoming, relation, child);
+                DynamicRecord existing = existingById.remove(child.getId());
+                mutations.add(existing == null
+                        ? RelationChildMutation.create(relation, child)
+                        : RelationChildMutation.update(relation, existing, child));
+            }
+            existingById.values().forEach(child -> mutations.add(RelationChildMutation.delete(relation, child)));
+        }
+        return List.copyOf(mutations);
+    }
+
+    private List<RelationChildMutation> relationChildrenForCascadeDelete(String moduleAlias,
+                                                                         String entityAlias,
+                                                                         DynamicRecord before) {
+        if (before == null || before.getId() == null || before.getId().isBlank()) {
+            return List.of();
+        }
+        List<RelationChildMutation> mutations = new ArrayList<>();
+        for (DynamicRelationDescriptor relation : childRelations(moduleAlias, entityAlias).stream()
+                .filter(DynamicRelationDescriptor::autoDeleteWithParent)
+                .toList()) {
+            childrenById(moduleAlias, relation, before.getId()).values()
+                    .forEach(child -> mutations.add(RelationChildMutation.delete(relation, child)));
+        }
+        return List.copyOf(mutations);
+    }
+
+    private List<DynamicRelationDescriptor> childRelations(String moduleAlias, String parentEntityAlias) {
+        return relations(moduleAlias).stream()
+                .filter(relation -> parentEntityAlias.equals(relation.parentEntityAlias()))
+                .toList();
+    }
+
+    private Map<String, DynamicRecord> childrenById(String moduleAlias,
+                                                    DynamicRelationDescriptor relation,
+                                                    String parentId) {
+        if (parentId == null || parentId.isBlank()) {
+            return Map.of();
+        }
+        LinkedHashMap<String, DynamicRecord> children = new LinkedHashMap<>();
+        entityService(moduleAlias, relation.childEntityAlias())
+                .selectChildRows(Criteria.of().eq(relation.childForeignKeyField(), parentId))
+                .forEach(child -> {
+                    if (child.getId() != null && !child.getId().isBlank()) {
+                        children.put(child.getId(), child);
+                    }
+                });
+        return children;
+    }
+
+    private void prepareRelationChild(DynamicRecord parent,
+                                      DynamicRelationDescriptor relation,
+                                      DynamicRecord child) {
+        ensureRecordId(child);
+        child.putPlatformValue(relation.childForeignKeyField(), parent.getId());
+    }
+
+    private void ensureRecordId(DynamicRecord record) {
+        if (record != null && (record.getId() == null || record.getId().isBlank())) {
+            record.setId(Ids.newId());
+        }
     }
 
     public int enable(String moduleAlias, String entityAlias, String id) {
@@ -1397,6 +1582,38 @@ public class DynamicRecordService {
 
         public DynamicEntityOperations entity(String entityAlias) {
             return service.entity(moduleAlias, entityAlias);
+        }
+    }
+
+    private enum RelationChildMutationKind {
+        CREATE,
+        UPDATE,
+        DELETE
+    }
+
+    private record RelationChildMutation(
+            RelationChildMutationKind kind,
+            DynamicRelationDescriptor relation,
+            DynamicRecord parentBefore,
+            DynamicRecord before,
+            DynamicRecord incoming
+    ) {
+        private static RelationChildMutation create(DynamicRelationDescriptor relation, DynamicRecord incoming) {
+            return new RelationChildMutation(RelationChildMutationKind.CREATE, relation, null, null, incoming);
+        }
+
+        private static RelationChildMutation update(DynamicRelationDescriptor relation,
+                                                    DynamicRecord before,
+                                                    DynamicRecord incoming) {
+            return new RelationChildMutation(RelationChildMutationKind.UPDATE, relation, null, before, incoming);
+        }
+
+        private static RelationChildMutation delete(DynamicRelationDescriptor relation, DynamicRecord before) {
+            return new RelationChildMutation(RelationChildMutationKind.DELETE, relation, null, before, null);
+        }
+
+        private RelationChildMutation withParentBefore(DynamicRecord parentBefore) {
+            return new RelationChildMutation(kind, relation, parentBefore, before, incoming);
         }
     }
 

@@ -109,6 +109,17 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         return rule;
     }
 
+    public List<CodeRule> selectRuleTreesByBusinessObject(String moduleAlias, String entityAlias) {
+        String normalizedModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        String normalizedEntityAlias = PlatformNameRules.requireIdentifier(entityAlias, "entityAlias");
+        return list(Criteria.of()
+                        .eq("moduleAlias", normalizedModuleAlias)
+                        .eq("entityAlias", normalizedEntityAlias),
+                ALL, Sort.asc("sortOrder")).stream()
+                .map(rule -> viewRuleTree(rule.getId()))
+                .toList();
+    }
+
     public List<ResolvedCodeRule> resolveRules(ResolveCodeRuleCommand command) {
         validateResolveCommand(command);
         LocalDateTime effectiveAt = command.at() == null ? LocalDateTime.now() : command.at();
