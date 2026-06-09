@@ -88,6 +88,24 @@ public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEnt
                 .eq("codeValue", codeValue));
     }
 
+    public CodeLedgerEntry findActiveByTargetAndSourceRecord(String moduleAlias,
+                                                             String entityAlias,
+                                                             String fieldName,
+                                                             String sourceRecordId) {
+        if (moduleAlias == null || moduleAlias.isBlank()
+                || entityAlias == null || entityAlias.isBlank()
+                || fieldName == null || fieldName.isBlank()
+                || sourceRecordId == null || sourceRecordId.isBlank()) {
+            return null;
+        }
+        return findOne(Criteria.of()
+                .eq("moduleAlias", moduleAlias)
+                .eq("entityAlias", entityAlias)
+                .eq("fieldName", fieldName)
+                .eq("sourceRecordId", sourceRecordId)
+                .eq("status", CodeLedgerStatus.ACTIVE));
+    }
+
     public List<CodeLedgerEntry> selectByRuleId(String ruleId, int limit) {
         if (ruleId == null || ruleId.isBlank()) {
             return List.of();
