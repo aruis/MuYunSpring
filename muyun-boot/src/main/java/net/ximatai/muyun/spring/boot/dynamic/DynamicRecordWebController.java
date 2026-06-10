@@ -29,6 +29,7 @@ import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFac
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
@@ -394,7 +395,28 @@ public class DynamicRecordWebController implements
             record.setVersion(normalized.version());
         }
         normalized.values().forEach(record::setValue);
+        normalized.children().forEach((relationCode, rows) -> {
+            if (rows == null) {
+                throw new PlatformException("dynamic child relation must be array: " + relationCode);
+            }
+            String childEntityAlias = childEntityAlias(moduleAlias, entityAlias, relationCode);
+            record.setChildren(
+                    relationCode,
+                    rows.stream()
+                            .map(row -> record(moduleAlias, childEntityAlias, row))
+                            .toList()
+            );
+        });
         return record;
+    }
+
+    private String childEntityAlias(String moduleAlias, String parentEntityAlias, String relationCode) {
+        return recordService.relations(moduleAlias).stream()
+                .filter(relation -> relation.parentEntityAlias().equals(parentEntityAlias))
+                .filter(relation -> relation.code().equals(relationCode))
+                .map(DynamicRelationDescriptor::childEntityAlias)
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("unknown dynamic child relation: " + relationCode));
     }
 
     private String mainEntityAlias(String moduleAlias) {

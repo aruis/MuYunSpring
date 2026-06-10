@@ -2,15 +2,20 @@ package net.ximatai.muyun.spring.platform.generation;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceAffectDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceFilterDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
@@ -24,6 +29,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationEvent;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactOriginCoordinator;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelationService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
@@ -56,10 +62,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class RecordGenerationWriteBackOrchestrationContractTest {
+    private static final String GENERATION_RULE_ID = "generate-contract-invoice";
+
     @Test
     void shouldGenerateTargetDraftSaveOriginRelationAndWriteBackSourceRecord() {
         RuntimeFixture fixture = runtimeFixture();
         DynamicRecord contract = fixture.service.newRecord("sales.contract", "contract")
+                .setValue("title", "C-GEN")
                 .setValue("contractNo", "C-GEN")
                 .setValue("amount", new BigDecimal("100.00"));
         fixture.service.create("sales.contract", "contract", contract);
@@ -73,6 +82,7 @@ class RecordGenerationWriteBackOrchestrationContractTest {
         RecordGenerationResult generation = (RecordGenerationResult) result.value();
         RecordGenerationDraft draft = generation.drafts().getFirst();
         DynamicRecord resetContract = fixture.service.newRecord("sales.contract", "contract")
+                .setValue("title", "C-GEN")
                 .setValue("contractNo", "C-GEN")
                 .setValue("amount", BigDecimal.ZERO);
         resetContract.setId(contractId);
@@ -106,6 +116,7 @@ class RecordGenerationWriteBackOrchestrationContractTest {
     void shouldConfirmAllGeneratedDraftsAndReturnCommittedRecordIds() {
         RuntimeFixture fixture = runtimeFixture();
         DynamicRecord contract = fixture.service.newRecord("sales.contract", "contract")
+                .setValue("title", "C-GEN")
                 .setValue("contractNo", "C-GEN")
                 .setValue("amount", new BigDecimal("100.00"));
         fixture.service.create("sales.contract", "contract", contract);
@@ -125,6 +136,51 @@ class RecordGenerationWriteBackOrchestrationContractTest {
         assertThat(commit.targetModuleAlias()).isEqualTo("finance.invoice");
         assertThat(commit.recordIds()).singleElement()
                 .isEqualTo(String.valueOf(fixture.table("app_invoice").getFirst().get("id")));
+    }
+
+    @Test
+    void shouldResolveReferenceGenerateDraftAndConfirmOriginRelation() {
+        RuntimeFixture fixture = runtimeFixture();
+        DynamicRecord contract = fixture.service.newRecord("sales.contract", "contract")
+                .setValue("title", "C-REF")
+                .setValue("contractNo", "C-REF")
+                .setValue("region", "north")
+                .setValue("amount", new BigDecimal("200.00"));
+        fixture.service.create("sales.contract", "contract", contract);
+        String contractId = String.valueOf(fixture.table("app_contract").getFirst().get("id"));
+        RecordGenerationRule generationRule = fixture.generationRuleService.saveRuleTree(generationRule());
+
+        var candidates = fixture.service.resolveReference(
+                "finance.invoice",
+                "invoice",
+                "contractId",
+                DynamicReferenceResolveRequest.query(null)
+                        .withFormValues(Map.of("contractRegion", "north"))
+        );
+
+        assertThat(candidates.options()).singleElement()
+                .satisfies(option -> {
+                    assertThat(option.id()).isEqualTo(contractId);
+                    assertThat(option.title()).isEqualTo("C-REF");
+                    assertThat(option.affectPatch()).containsEntry("contractRegion", "north");
+                });
+        ReferenceRecordGenerationFacade facade = new ReferenceRecordGenerationFacade(
+                fixture.service, fixture.generationRuleService);
+        RecordGenerationResult generation = facade.generateFromReference(
+                "finance.invoice",
+                "invoice",
+                "contractId",
+                contractId);
+        RecordGenerationCommitResult commit = facade.confirmAll(generation);
+
+        assertThat(generation.ruleId()).isEqualTo(generationRule.getId());
+        assertThat(generation.drafts()).singleElement()
+                .satisfies(draft -> assertThat(draft.record().getValue("receivedAmount"))
+                        .isEqualTo(new BigDecimal("200.00")));
+        assertThat(commit.recordIds()).singleElement()
+                .isEqualTo(String.valueOf(fixture.table("app_invoice").getFirst().get("id")));
+        assertThat(fixture.impactRelationService.hasGeneratedTarget(
+                "sales.contract", contractId, "finance.invoice", generationRule.getId())).isTrue();
     }
 
     private RuntimeFixture runtimeFixture() {
@@ -173,6 +229,7 @@ class RecordGenerationWriteBackOrchestrationContractTest {
 
     private RecordGenerationRule generationRule() {
         RecordGenerationRule rule = new RecordGenerationRule();
+        rule.setId(GENERATION_RULE_ID);
         rule.setSourceModuleAlias("sales.contract");
         rule.setTargetModuleAlias("finance.invoice");
         rule.setActionCode("generateInvoice");
@@ -236,9 +293,11 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                 "sales.contract",
                 "Contract",
                 List.of(new EntityDefinition("contract", "app_contract", "Contract", List.of(
+                        FieldDefinition.titleField(),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
+                        FieldDefinition.string("region", "Region"),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
-                )).withCapabilities(EntityCapability.DATA_SCOPE)),
+                )).withCapabilities(EntityCapability.DATA_SCOPE, EntityCapability.REFERENCE)),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -266,11 +325,23 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                 "finance.invoice",
                 "Invoice",
                 List.of(new EntityDefinition("invoice", "app_invoice", "Invoice", List.of(
+                        FieldDefinition.string("contractId", "Contract").column("contract_id"),
+                        FieldDefinition.string("contractRegion", "Contract Region").column("contract_region"),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                         FieldDefinition.decimal("receivedAmount", "Received Amount")
                                 .column("received_amount")
                                 .precision(18, 2)
-                )))
+                ))),
+                List.of(),
+                List.of(EntityReferenceDefinition.to("invoice", "contractId",
+                                ReferenceTarget.of("sales.contract", "contract"))
+                        .withRuntimeConfig("id", "contractNo", GENERATION_RULE_ID, "contract-query",
+                                java.util.Set.of("region"))
+                        .withInteractionRules(
+                                List.of(new EntityReferenceFilterDefinition(
+                                        "contractRegion", "region", DynamicQueryOperator.EQ)),
+                                List.of(new EntityReferenceAffectDefinition("region", "contractRegion"))
+                        ))
         );
     }
 
@@ -355,10 +426,7 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                 if (value instanceof Boolean && !row.containsValue(value)) {
                     return false;
                 }
-                if (value instanceof String text && !text.isBlank()
-                        && !text.equals(row.get("id"))
-                        && !text.equals(row.get("contract_no"))
-                        && !text.equals(row.get("tenant_id"))) {
+                if (value instanceof String text && !text.isBlank() && !row.containsValue(text)) {
                     return false;
                 }
             }

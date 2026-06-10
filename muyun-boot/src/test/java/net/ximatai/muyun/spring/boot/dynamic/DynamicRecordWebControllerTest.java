@@ -39,6 +39,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveItem;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
@@ -61,6 +63,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -1221,6 +1224,125 @@ class DynamicRecordWebControllerTest {
                         "dynamic generation confirm targetModuleAlias mismatch: finance.invoice != " + MODULE));
 
         verifyNoInteractions(referenceGenerationFacade);
+    }
+
+    @Test
+    void shouldRejectGeneratedDraftConfirmWhenChildRelationIsNotArray() throws Exception {
+        Map<String, Object> children = new java.util.LinkedHashMap<>();
+        children.put("lines", null);
+
+        mvc.perform(post("/{moduleAlias}/generation/confirm", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "targetModuleAlias", MODULE,
+                                "targetEntityAlias", ENTITY,
+                                "record", Map.of(
+                                        "values", Map.of("code", "C-001"),
+                                        "children", children
+                                )
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic child relation must be array: lines"));
+
+        verifyNoInteractions(referenceGenerationFacade);
+    }
+
+    @Test
+    void shouldCompleteReferenceGenerationAndConfirmThroughDynamicWebEntries() throws Exception {
+        RecordOriginContext originContext = new RecordOriginContext(
+                RecordImpactType.GENERATE_PUSH,
+                "sales.opportunity",
+                "opp-1",
+                MODULE,
+                "rule-1",
+                "generateContract",
+                "batch-1",
+                "contract:1"
+        );
+        DynamicRecord draft = new DynamicRecord(entity())
+                .setValue("code", "C-001")
+                .setValue("amount", new BigDecimal("100.00"));
+        draft.setChildren("lines", List.of(new DynamicRecord(lineEntity())
+                .setValue("lineNo", "L-001")
+                .setValue("lineAmount", new BigDecimal("100.00"))));
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        when(service.newRecord(MODULE, "contract_line")).thenAnswer(invocation -> new DynamicRecord(lineEntity()));
+        when(service.resolveFieldReference(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new DynamicReferenceResolveResponse(
+                        DynamicReferenceResolveStatus.OK,
+                        DynamicReferenceResolveMode.QUERY,
+                        List.of(new DynamicReferenceResolveItem(
+                                "opp-1",
+                                "OPP-001",
+                                DynamicReferenceMatchMode.AUTO,
+                                Map.of("opportunityNo", "OPP-001"),
+                                Map.of("code", "C-001")
+                        )),
+                        List.of(),
+                        0,
+                        20,
+                        1
+                ));
+        when(referenceGenerationFacade.generateFromReference(MODULE, ENTITY, "opportunityId", "opp-1"))
+                .thenReturn(new RecordGenerationResult(
+                        "rule-1",
+                        "generateContract",
+                        "sales.opportunity",
+                        "opp-1",
+                        MODULE,
+                        "batch-1",
+                        List.of(new RecordGenerationDraft(MODULE, ENTITY, draft, originContext))
+                ));
+        when(referenceGenerationFacade.confirmDraft(any(RecordGenerationDraft.class))).thenReturn("contract-1");
+
+        mvc.perform(post("/{moduleAlias}/references/{fieldName}/resolve", MODULE, "opportunityId")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "fuzzy", "OPP",
+                                "formValues", Map.of("region", "north")
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.options[0].id").value("opp-1"))
+                .andExpect(jsonPath("$.options[0].affectPatch.code").value("C-001"));
+        MvcResult generationResult = mvc.perform(post("/{moduleAlias}/references/{fieldName}/generate", MODULE, "opportunityId")
+                        .contentType("application/json")
+                        .content(json(Map.of("sourceRecordId", "opp-1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.drafts[0].record.values.code").value("C-001"))
+                .andExpect(jsonPath("$.drafts[0].originContext.batchId").value("batch-1"))
+                .andReturn();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> generationBody = objectMapper.readValue(
+                generationResult.getResponse().getContentAsString(),
+                Map.class
+        );
+        @SuppressWarnings("unchecked")
+        Map<String, Object> draftBody = (Map<String, Object>) ((List<?>) generationBody.get("drafts")).getFirst();
+
+        mvc.perform(post("/{moduleAlias}/generation/confirm", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "targetModuleAlias", draftBody.get("targetModuleAlias"),
+                                "targetEntityAlias", draftBody.get("targetEntityAlias"),
+                                "record", draftBody.get("record"),
+                                "originContext", draftBody.get("originContext")
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recordIds[0]").value("contract-1"));
+
+        ArgumentCaptor<DynamicReferenceResolveRequest> resolveRequest =
+                ArgumentCaptor.forClass(DynamicReferenceResolveRequest.class);
+        verify(service).resolveFieldReference(eq(MODULE), eq(ENTITY), eq("opportunityId"), resolveRequest.capture());
+        assertThat(resolveRequest.getValue().formValues()).containsEntry("region", "north");
+        verify(referenceGenerationFacade).generateFromReference(MODULE, ENTITY, "opportunityId", "opp-1");
+        ArgumentCaptor<RecordGenerationDraft> confirmedDraft = ArgumentCaptor.forClass(RecordGenerationDraft.class);
+        verify(referenceGenerationFacade).confirmDraft(confirmedDraft.capture());
+        assertThat(confirmedDraft.getValue().record().getValue("code")).isEqualTo("C-001");
+        assertThat(confirmedDraft.getValue().record().getChildren("lines")).singleElement()
+                .satisfies(line -> assertThat(line.getValue("lineNo")).isEqualTo("L-001"));
+        assertThat(confirmedDraft.getValue().originContext().batchId()).isEqualTo("batch-1");
     }
 
     @Test

@@ -341,6 +341,10 @@ class RecordWriteBackRuntimeServiceTest {
                     assertThat(log.getTargetRecordId()).isEqualTo("invoice-1");
                     assertThat(log.getPatchSnapshot()).isEqualTo("{}");
                 });
+        assertThat(logService.selectByStatus("sales.contract", RecordWriteBackExecutionStatus.NOOP, null))
+                .singleElement()
+                .satisfies(log -> assertThat(log.getRuleId()).isEqualTo(rule.getId()));
+        assertThat(logService.selectFailed("sales.contract", null)).isEmpty();
         assertThat(effectLogService.selectByTarget("finance.invoice", "invoice-1", null)).hasSize(1);
     }
 

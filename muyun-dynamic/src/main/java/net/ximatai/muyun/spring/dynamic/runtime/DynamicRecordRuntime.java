@@ -151,6 +151,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
                 lifecycle,
                 module,
                 childEntityAliasCode -> entityService(moduleAlias, childEntityAliasCode),
+                target -> entityService(target.moduleAlias(), target.entityAlias()),
                 cacheNamespacePrefix,
                 fieldValueValidator,
                 fieldCryptoProvider,

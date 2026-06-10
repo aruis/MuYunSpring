@@ -84,9 +84,18 @@ public class RecordWriteBackExecutionLogService extends AbstractAbilityService<R
     }
 
     public List<RecordWriteBackExecutionLog> selectFailed(String triggerModuleAlias, PageRequest pageRequest) {
+        return selectByStatus(triggerModuleAlias, RecordWriteBackExecutionStatus.FAILED, pageRequest);
+    }
+
+    public List<RecordWriteBackExecutionLog> selectByStatus(String triggerModuleAlias,
+                                                            RecordWriteBackExecutionStatus status,
+                                                            PageRequest pageRequest) {
+        if (status == null) {
+            throw new PlatformException("Record write-back execution status must not be null");
+        }
         return list(Criteria.of()
                         .eq("triggerModuleAlias", requireText(triggerModuleAlias, "triggerModuleAlias"))
-                        .eq("status", RecordWriteBackExecutionStatus.FAILED),
+                        .eq("status", status),
                 pageOrDefault(pageRequest),
                 Sort.desc("createdAt"));
     }

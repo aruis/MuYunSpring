@@ -63,6 +63,7 @@ public class DynamicEntityService implements
     private final DynamicRecordLifecycle lifecycle;
     private final ModuleDefinition module;
     private final Function<String, DynamicEntityService> relationServiceResolver;
+    private final Function<ReferenceTarget, DynamicEntityService> referenceServiceResolver;
     private final String cacheNamespace;
     private final DynamicFieldValueValidator fieldValueValidator;
     private final FieldCryptoProvider fieldCryptoProvider;
@@ -93,7 +94,8 @@ public class DynamicEntityService implements
                                 ModuleDefinition module,
                                 Function<String, DynamicEntityService> relationServiceResolver,
                                 String cacheNamespacePrefix) {
-        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix, DynamicFieldValueValidator.NONE);
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, cacheNamespacePrefix,
+                DynamicFieldValueValidator.NONE);
     }
 
     public DynamicEntityService(DynamicRecordDao dao,
@@ -116,11 +118,34 @@ public class DynamicEntityService implements
                                 DynamicFieldValueValidator fieldValueValidator,
                                 FieldCryptoProvider fieldCryptoProvider,
                                 FieldSigner fieldSigner) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver,
+                target -> {
+                    if (!Objects.equals(requireModuleAlias(moduleAlias), target.moduleAlias())) {
+                        throw new IllegalArgumentException(
+                                "cross module dynamic reference is not supported: " + target.qualifiedName());
+                    }
+                    return relationServiceResolver.apply(target.entityAlias());
+                },
+                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner);
+    }
+
+    public DynamicEntityService(DynamicRecordDao dao,
+                                String moduleAlias,
+                                DynamicRecordLifecycle lifecycle,
+                                ModuleDefinition module,
+                                Function<String, DynamicEntityService> relationServiceResolver,
+                                Function<ReferenceTarget, DynamicEntityService> referenceServiceResolver,
+                                String cacheNamespacePrefix,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                FieldCryptoProvider fieldCryptoProvider,
+                                FieldSigner fieldSigner) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
         this.module = module;
         this.relationServiceResolver = Objects.requireNonNull(relationServiceResolver, "relationServiceResolver must not be null");
+        this.referenceServiceResolver = Objects.requireNonNull(referenceServiceResolver,
+                "referenceServiceResolver must not be null");
         this.cacheNamespace = resolveCacheNamespace(cacheNamespacePrefix);
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
         this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
@@ -615,10 +640,7 @@ public class DynamicEntityService implements
     }
 
     private DynamicEntityService referenceService(ReferenceTarget target) {
-        if (!moduleAlias.equals(target.moduleAlias())) {
-            throw new IllegalArgumentException("cross module dynamic reference title is not supported: " + target.qualifiedName());
-        }
-        return relationServiceResolver.apply(target.entityAlias());
+        return referenceServiceResolver.apply(target);
     }
 
     private Object referenceTitleValue(List<String> ids, Map<String, String> titles, ReferencePlan plan) {
@@ -840,10 +862,10 @@ public class DynamicEntityService implements
     }
 
     private void validateReferenceIds(ReferencePlan plan, List<String> ids) {
-        if (ids.isEmpty() || !moduleAlias.equals(plan.target().moduleAlias())) {
+        if (ids.isEmpty()) {
             return;
         }
-        DynamicEntityService targetService = relationServiceResolver.apply(plan.target().entityAlias());
+        DynamicEntityService targetService = referenceService(plan.target());
         for (String id : ids) {
             if (targetService.activeRaw(id) == null) {
                 throw new IllegalArgumentException("dynamic reference target not found: "
@@ -867,7 +889,7 @@ public class DynamicEntityService implements
         }
     }
 
-    private String requireModuleAlias(String value) {
+    private static String requireModuleAlias(String value) {
         Objects.requireNonNull(value, "moduleAlias must not be null");
         if (!value.contains(".")) {
             throw new IllegalArgumentException("dynamic moduleAlias must be a platform module alias: " + value);

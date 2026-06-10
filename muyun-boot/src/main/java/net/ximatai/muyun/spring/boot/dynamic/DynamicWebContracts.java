@@ -21,17 +21,29 @@ import java.util.Collection;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-record DynamicRecordPayload(String id, Integer version, Map<String, Object> values) {
+record DynamicRecordPayload(String id,
+                            Integer version,
+                            Map<String, Object> values,
+                            Map<String, List<DynamicRecordPayload>> children) {
     DynamicRecordPayload {
         values = values == null ? Map.of() : Map.copyOf(values);
+        if (children == null) {
+            children = Map.of();
+        } else {
+            Map<String, List<DynamicRecordPayload>> normalizedChildren = new LinkedHashMap<>();
+            children.forEach((relationCode, rows) ->
+                    normalizedChildren.put(relationCode, rows == null ? null : List.copyOf(rows)));
+            children = Collections.unmodifiableMap(normalizedChildren);
+        }
     }
 
     static DynamicRecordPayload empty() {
-        return new DynamicRecordPayload(null, null, Map.of());
+        return new DynamicRecordPayload(null, null, Map.of(), Map.of());
     }
 }
 
