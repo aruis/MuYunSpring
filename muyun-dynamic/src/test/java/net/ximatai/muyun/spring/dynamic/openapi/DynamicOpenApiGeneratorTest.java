@@ -38,6 +38,7 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/describe",
                         "/sales.contract/openapi",
                         "/sales.contract/query",
+                        "/sales.contract/query/summary",
                         "/sales.contract/view/{id}",
                         "/sales.contract/insert",
                         "/sales.contract/update/{id}",
@@ -73,6 +74,14 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code());
                     assertThat(operation.requestSchema()).isEqualTo("DynamicExchangeTemplateRequest");
                     assertThat(operation.responseSchema()).isEqualTo("binary");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/query/summary")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.QUERY.code());
+                    assertThat(operation.requestSchema()).isEqualTo("WebQueryRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("DynamicSummaryItemList");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/submit/{recordId}"))
@@ -344,6 +353,8 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(property.itemType()).isEqualTo("WebQueryCondition");
                     assertThat(property.companionFields()).isEmpty();
                 });
+        assertThat(document.schemas().get("WebQueryRequest").properties())
+                .containsKeys("uiConfigId", "queryTemplateId", "externalQueryValues", "navigationSession");
         assertThat(document.errors())
                 .containsEntry("DYNAMIC_BAD_REQUEST",
                         new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"))

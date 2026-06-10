@@ -80,6 +80,8 @@ import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -946,6 +948,200 @@ class DynamicRecordWebControllerTest {
         assertThat(externalValues.getValue()).containsEntry("optional", null);
         verify(mainEntity).queryCriteria(any());
         verify(snapshotService, times(2)).snapshot(MODULE);
+    }
+
+    @Test
+    void shouldSummarizePublishedListConfigWithSameQueryContext() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc summaryMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, queryItemService, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        uiConfig.setLayoutJson("""
+                {
+                  "summaryPanel": {
+                    "items": [
+                      {
+                        "detailId": "module-field-amount",
+                        "calcType": "sum",
+                        "label": "Amount Total",
+                        "precision": 2,
+                        "formatter": "currency"
+                      },
+                      {
+                        "detailId": "module-field-code",
+                        "calcType": "count",
+                        "label": "Contract Count"
+                      },
+                      {
+                        "detailId": "module-field-line-amount",
+                        "calcType": "sum",
+                        "label": "Line Amount"
+                      }
+                    ]
+                  }
+                }
+                """);
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setId("tpl-active");
+        template.setModuleAlias(MODULE);
+        template.setAlias("active");
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(),
+                List.of(template),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
+                "module-field-amount", "amount"));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-line-amount")).thenReturn(new ResolvedModuleMetadataField(
+                "module-field-line-amount",
+                MODULE,
+                "relation-lines",
+                "lines",
+                RelationRole.CHILD,
+                "metadata-line",
+                "contract_line",
+                "Contract Line",
+                "line-amount",
+                "lineAmount",
+                "line_amount",
+                "Line Amount",
+                "decimal"
+        ));
+        Criteria templateCriteria = Criteria.of().eq("status", "active");
+        Criteria manualCriteria = Criteria.of().eq("code", "C-001");
+        when(queryItemService.compile(eq("tpl-active"), any())).thenReturn(templateCriteria);
+        when(mainEntity.queryCriteria(any())).thenReturn(manualCriteria);
+        DynamicRecord first = new DynamicRecord(entity())
+                .setValue("code", "C-001")
+                .setValue("amount", new BigDecimal("10.00"));
+        DynamicRecord second = new DynamicRecord(entity())
+                .setValue("code", "C-002")
+                .setValue("amount", new BigDecimal("5.50"));
+        DynamicRecord blankCode = new DynamicRecord(entity())
+                .setValue("code", "")
+                .setValue("amount", new BigDecimal("0.50"));
+        when(mainEntity.count(any(Criteria.class))).thenReturn(3L);
+        when(mainEntity.list(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(first, second, blankCode));
+
+        summaryMvc.perform(post("/{moduleAlias}/query/summary", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryTemplateId": "tpl-active",
+                                  "externalQueryValues": {
+                                    "owner": "user-1"
+                                  },
+                                  "conditions": [
+                                    {
+                                      "fieldName": "code",
+                                      "operator": "EQ",
+                                      "values": ["C-001"]
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].detailId").value("module-field-amount"))
+                .andExpect(jsonPath("$[0].calcType").value("sum"))
+                .andExpect(jsonPath("$[0].label").value("Amount Total"))
+                .andExpect(jsonPath("$[0].precision").value(2))
+                .andExpect(jsonPath("$[0].formatter").value("currency"))
+                .andExpect(jsonPath("$[0].value").value(16.0))
+                .andExpect(jsonPath("$[1].detailId").value("module-field-code"))
+                .andExpect(jsonPath("$[1].value").value(2))
+                .andExpect(jsonPath("$[2].detailId").value("module-field-line-amount"))
+                .andExpect(jsonPath("$[2].value").doesNotExist());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> externalValues = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<Criteria> countCriteria = ArgumentCaptor.forClass(Criteria.class);
+        ArgumentCaptor<Criteria> listCriteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(queryItemService).compile(eq("tpl-active"), externalValues.capture());
+        verify(mainEntity).queryCriteria(any());
+        verify(mainEntity).count(countCriteria.capture());
+        verify(mainEntity).list(listCriteria.capture(), any(PageRequest.class));
+        assertThat(externalValues.getValue()).containsEntry("owner", "user-1");
+        assertThat(listCriteria.getValue()).isSameAs(countCriteria.getValue());
+        assertThat(listCriteria.getValue()).isNotSameAs(templateCriteria);
+        assertThat(listCriteria.getValue()).isNotSameAs(manualCriteria);
+        assertThat(listCriteria.getValue().isEmpty()).isFalse();
+    }
+
+    @Test
+    void shouldRejectSummaryWhenQueryMatchesTooManyRecords() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc summaryMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        uiConfig.setLayoutJson("""
+                {
+                  "summaryPanel": {
+                    "items": [
+                      {
+                        "detailId": "module-field-amount",
+                        "calcType": "sum"
+                      }
+                    ]
+                  }
+                }
+                """);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        when(mainEntity.count(any(Criteria.class))).thenReturn(10_001L);
+
+        summaryMvc.perform(post("/{moduleAlias}/query/summary", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of("uiConfigId", "ui-list"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Summary panel query exceeds max records: 10000"));
+
+        verify(mainEntity).count(any(Criteria.class));
+        verify(mainEntity, org.mockito.Mockito.never()).list(any(Criteria.class), any(PageRequest.class));
     }
 
     @Test
