@@ -46,6 +46,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("RecordDuplicateMatch", duplicateMatchSchema());
         schemas.put("RecordAttachmentCommand", attachmentCommandSchema());
         schemas.put("RecordAttachment", attachmentSchema());
+        schemas.put("RecordAttachmentAccess", attachmentAccessSchema());
         schemas.put("RecordAttachmentList", arraySchema("RecordAttachmentList", "RecordAttachment"));
         schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
         schemas.put("DynamicPageResponse", pageResponseSchema("DynamicPageResponse"));
@@ -679,6 +680,19 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("remark", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("RecordAttachment", "object", null,
                 List.of("id", "moduleAlias", "recordId", "fileId"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema attachmentAccessSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("mode", stringProperty(false));
+        properties.put("fileId", stringProperty(true));
+        properties.put("accessToken", stringProperty(true));
+        properties.put("url", stringProperty(true));
+        properties.put("expiresAt", new DynamicOpenApiDocument.Property("string", "date-time", false, true,
+                false, null, null, null, null, null, List.of()));
+        properties.put("metadata", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("RecordAttachmentAccess", "object", null,
+                List.of("mode"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema summaryItemSchema() {

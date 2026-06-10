@@ -21,6 +21,9 @@ public class DynamicOpenApiGenerator {
     private static final String METHOD_POST = "POST";
     private static final List<String> DEFAULT_ERRORS = List.of(
             "DYNAMIC_BAD_REQUEST",
+            "DYNAMIC_UI_VALIDATION",
+            "DYNAMIC_ATTACHMENT_ERROR",
+            "DYNAMIC_DUPLICATE_CHECK_ERROR",
             "DYNAMIC_ACTION_FAILED",
             "DYNAMIC_CONFLICT"
     );
@@ -77,6 +80,14 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/query",
                     operationId(descriptor, "queryAttachments"),
                     "Query attachments " + mainEntity.title(), null, "RecordAttachmentList", PlatformAction.VIEW.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/{attachmentId}/preview-ticket",
+                    operationId(descriptor, "attachmentPreviewTicket"),
+                    "Issue attachment preview ticket " + mainEntity.title(), null, "RecordAttachmentAccess",
+                    PlatformAction.VIEW.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/{attachmentId}/download-ticket",
+                    operationId(descriptor, "attachmentDownloadTicket"),
+                    "Issue attachment download ticket " + mainEntity.title(), null, "RecordAttachmentAccess",
+                    PlatformAction.VIEW.code()));
         }
         if (standardActionVisible.test(PlatformAction.CREATE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/insert", operationId(descriptor, "insert"),
@@ -88,6 +99,10 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/add",
                     operationId(descriptor, "addAttachment"),
                     "Add attachment " + mainEntity.title(), "RecordAttachmentCommand", "RecordAttachmentList",
+                    PlatformAction.UPDATE.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/upload-ticket",
+                    operationId(descriptor, "attachmentUploadTicket"),
+                    "Issue attachment upload ticket " + mainEntity.title(), null, "RecordAttachmentAccess",
                     PlatformAction.UPDATE.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/update/{attachmentId}",
                     operationId(descriptor, "updateAttachment"),
@@ -300,6 +315,9 @@ public class DynamicOpenApiGenerator {
     private Map<String, DynamicOpenApiDocument.ErrorResponse> errors() {
         return Map.of(
                 "DYNAMIC_BAD_REQUEST", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"),
+                "DYNAMIC_UI_VALIDATION", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_UI_VALIDATION", 400, "DynamicWebError"),
+                "DYNAMIC_ATTACHMENT_ERROR", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ATTACHMENT_ERROR", 400, "DynamicWebError"),
+                "DYNAMIC_DUPLICATE_CHECK_ERROR", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, "DynamicWebError"),
                 "DYNAMIC_ACTION_FAILED", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "DynamicWebActionError"),
                 "DYNAMIC_CONFLICT", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_CONFLICT", 409, "DynamicWebError")
         );

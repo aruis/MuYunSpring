@@ -33,6 +33,8 @@ import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccess;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccessService;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentCommand;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
@@ -130,6 +132,7 @@ public class DynamicRecordWebController implements
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
     private final RecordAttachmentService recordAttachmentService;
+    private final RecordAttachmentAccessService recordAttachmentAccessService;
     private final RecordDuplicateCheckService duplicateCheckService;
     private final PlatformRecordNavigationService navigationService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
@@ -151,6 +154,7 @@ public class DynamicRecordWebController implements
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
                                       ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
                                       ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider,
+                                      ObjectProvider<RecordAttachmentAccessService> recordAttachmentAccessServiceProvider,
                                       ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider,
                                       ObjectProvider<PlatformRecordNavigationService> navigationServiceProvider) {
         this(recordService, activeTenantVerifier,
@@ -160,6 +164,7 @@ public class DynamicRecordWebController implements
                 queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
                 moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
                 recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable(),
+                recordAttachmentAccessServiceProvider == null ? null : recordAttachmentAccessServiceProvider.getIfAvailable(),
                 duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable(),
                 navigationServiceProvider == null ? null : navigationServiceProvider.getIfAvailable());
     }
@@ -175,7 +180,7 @@ public class DynamicRecordWebController implements
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -186,7 +191,7 @@ public class DynamicRecordWebController implements
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null, null);
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -198,7 +203,8 @@ public class DynamicRecordWebController implements
                                       ModuleMetadataFieldService moduleMetadataFieldService,
                                       RecordAttachmentService recordAttachmentService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService, null, null);
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
+                null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -212,7 +218,7 @@ public class DynamicRecordWebController implements
                                       RecordDuplicateCheckService duplicateCheckService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
                 pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
-                duplicateCheckService, null);
+                null, duplicateCheckService, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -225,6 +231,22 @@ public class DynamicRecordWebController implements
                                       RecordAttachmentService recordAttachmentService,
                                       RecordDuplicateCheckService duplicateCheckService,
                                       PlatformRecordNavigationService navigationService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
+                null, duplicateCheckService, navigationService);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      RecordAttachmentService recordAttachmentService,
+                                      RecordAttachmentAccessService recordAttachmentAccessService,
+                                      RecordDuplicateCheckService duplicateCheckService,
+                                      PlatformRecordNavigationService navigationService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
@@ -233,6 +255,7 @@ public class DynamicRecordWebController implements
         this.queryItemService = queryItemService;
         this.moduleMetadataFieldService = moduleMetadataFieldService;
         this.recordAttachmentService = recordAttachmentService;
+        this.recordAttachmentAccessService = recordAttachmentAccessService;
         this.duplicateCheckService = duplicateCheckService;
         this.navigationService = navigationService;
     }
@@ -395,6 +418,44 @@ public class DynamicRecordWebController implements
         });
     }
 
+    @PostMapping("/view/{id}/attachments/upload-ticket")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public RecordAttachmentAccess issueAttachmentUploadTicket(@PathVariable String id) {
+        return webScope(() -> {
+            requireAttachmentAccessService();
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            return recordAttachmentAccessService.issueUploadAccess(DynamicWebRequest.moduleAlias(), id);
+        });
+    }
+
+    @PostMapping("/view/{id}/attachments/{attachmentId}/preview-ticket")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public RecordAttachmentAccess issueAttachmentPreviewTicket(@PathVariable String id,
+                                                              @PathVariable String attachmentId) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireAttachmentAccessService();
+            requireDataScopeRecord(PlatformAction.VIEW, id);
+            RecordAttachment attachment = recordAttachmentService.requireAttachment(
+                    DynamicWebRequest.moduleAlias(), id, attachmentId);
+            return recordAttachmentAccessService.issuePreviewAccess(DynamicWebRequest.moduleAlias(), id, attachment);
+        });
+    }
+
+    @PostMapping("/view/{id}/attachments/{attachmentId}/download-ticket")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public RecordAttachmentAccess issueAttachmentDownloadTicket(@PathVariable String id,
+                                                               @PathVariable String attachmentId) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireAttachmentAccessService();
+            requireDataScopeRecord(PlatformAction.VIEW, id);
+            RecordAttachment attachment = recordAttachmentService.requireAttachment(
+                    DynamicWebRequest.moduleAlias(), id, attachmentId);
+            return recordAttachmentAccessService.issueDownloadAccess(DynamicWebRequest.moduleAlias(), id, attachment);
+        });
+    }
+
     @PostMapping("/view/{id}/attachments/update/{attachmentId}")
     @ActionEndpoint(PlatformAction.UPDATE)
     public List<RecordAttachment> updateAttachment(@PathVariable String id,
@@ -454,6 +515,12 @@ public class DynamicRecordWebController implements
     private void requireAttachmentService() {
         if (recordAttachmentService == null) {
             throw new PlatformException("record attachment service is not configured");
+        }
+    }
+
+    private void requireAttachmentAccessService() {
+        if (recordAttachmentAccessService == null) {
+            throw new PlatformException("record attachment access service is not configured");
         }
     }
 
@@ -758,14 +825,14 @@ public class DynamicRecordWebController implements
         if (!(uiConfigIdValue instanceof String uiConfigId) || !hasText(uiConfigId)) {
             return;
         }
-        requireLowCodeQueryServices();
+        requireLowCodePageServices();
         PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
         PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
                 .filter(config -> Objects.equals(config.getId(), uiConfigId))
                 .findFirst()
                 .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
                         + uiConfigId));
-        Map<String, FieldDefinition> fields = record.getEntity().fields().stream()
+        Map<String, FieldDefinition> mainFields = record.getEntity().fields().stream()
                 .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
         for (PlatformUiConfigField uiField : snapshot.uiFields()) {
             if (!Objects.equals(uiField.getUiConfigId(), uiConfig.getId())
@@ -773,33 +840,60 @@ public class DynamicRecordWebController implements
                 continue;
             }
             ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(uiField.getModuleMetadataFieldId());
-            if (resolved.relationRole() != RelationRole.MAIN) {
-                throw new PlatformException("Form UI config only supports main relation fields for save validation: "
-                        + uiField.getModuleMetadataFieldId());
+            if (resolved.relationRole() == RelationRole.MAIN) {
+                validateUiRecordField(record, uiField, mainFields.get(resolved.fieldName()), resolved.fieldName());
+            } else if (resolved.relationRole() == RelationRole.CHILD) {
+                validateUiChildField(record, uiField, resolved);
             }
-            FieldDefinition field = fields.get(resolved.fieldName());
-            if (field == null) {
-                continue;
-            }
-            validateUiReadOnly(record, uiField, field);
-            validateUiRequired(record, uiField, field);
         }
     }
 
-    private void validateUiReadOnly(DynamicRecord record, PlatformUiConfigField uiField, FieldDefinition field) {
+    private void validateUiChildField(DynamicRecord record,
+                                      PlatformUiConfigField uiField,
+                                      ResolvedModuleMetadataField resolved) {
+        List<DynamicRecord> rows = record.getChildren(resolved.relationAlias());
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        for (DynamicRecord row : rows) {
+            Map<String, FieldDefinition> fields = row.getEntity().fields().stream()
+                    .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
+            validateUiRecordField(row, uiField, fields.get(resolved.fieldName()),
+                    resolved.relationAlias() + "." + resolved.fieldName());
+        }
+    }
+
+    private void validateUiRecordField(DynamicRecord record,
+                                       PlatformUiConfigField uiField,
+                                       FieldDefinition field,
+                                       String fieldPath) {
+        if (field == null) {
+            return;
+        }
+        validateUiReadOnly(record, uiField, field, fieldPath);
+        validateUiRequired(record, uiField, field, fieldPath);
+    }
+
+    private void validateUiReadOnly(DynamicRecord record,
+                                    PlatformUiConfigField uiField,
+                                    FieldDefinition field,
+                                    String fieldPath) {
         if (Boolean.TRUE.equals(uiField.getReadOnly()) && record.isExplicitlySet(field.fieldName())) {
-            throw new PlatformException("UI read-only field cannot be saved: " + field.fieldName());
+            throw new PlatformException("UI read-only field cannot be saved: " + fieldPath);
         }
     }
 
-    private void validateUiRequired(DynamicRecord record, PlatformUiConfigField uiField, FieldDefinition field) {
+    private void validateUiRequired(DynamicRecord record,
+                                    PlatformUiConfigField uiField,
+                                    FieldDefinition field,
+                                    String fieldPath) {
         boolean required = Boolean.TRUE.equals(uiField.getRequiredOverride()) || field.isRequired();
         if (!required) {
             return;
         }
         Object value = record.getValues().get(field.fieldName());
         if (value == null || value instanceof String text && text.isBlank()) {
-            throw new PlatformException("UI required field is missing: " + field.fieldName());
+            throw new PlatformException("UI required field is missing: " + fieldPath);
         }
     }
 
@@ -1243,13 +1337,13 @@ public class DynamicRecordWebController implements
     @ExceptionHandler({IllegalArgumentException.class, ModuleDefinitionException.class, PlatformException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public DynamicWebError handleBadRequest(RuntimeException exception) {
-        return DynamicWebError.badRequest(exception.getMessage());
+        return badRequest(exception.getMessage());
     }
 
     @ExceptionHandler(HttpMessageConversionException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public DynamicWebError handleMessageConversion(HttpMessageConversionException exception) {
-        return DynamicWebError.badRequest(rootMessage(exception));
+        return badRequest(rootMessage(exception));
     }
 
     @ExceptionHandler(DynamicActionExecutionException.class)
@@ -1262,6 +1356,22 @@ public class DynamicRecordWebController implements
     @ResponseStatus(HttpStatus.CONFLICT)
     public DynamicWebError handleOptimisticLock(OptimisticLockException exception) {
         return DynamicWebError.conflict(exception.getMessage());
+    }
+
+    private DynamicWebError badRequest(String message) {
+        if (message != null && (message.startsWith("UI required field ")
+                || message.startsWith("UI read-only field "))) {
+            return DynamicWebError.uiValidation(message);
+        }
+        if (message != null && (message.startsWith("record attachment ")
+                || message.startsWith("dynamic record attachment")
+                || message.startsWith("attachment "))) {
+            return DynamicWebError.attachment(message);
+        }
+        if (message != null && message.startsWith("duplicate ")) {
+            return DynamicWebError.duplicateCheck(message);
+        }
+        return DynamicWebError.badRequest(message);
     }
 
     private DynamicRecord record(String moduleAlias, String entityAlias, DynamicRecordPayload payload) {

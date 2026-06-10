@@ -42,6 +42,9 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/view/{id}",
                         "/sales.contract/view/{id}/attachments/query",
                         "/sales.contract/view/{id}/attachments/add",
+                        "/sales.contract/view/{id}/attachments/upload-ticket",
+                        "/sales.contract/view/{id}/attachments/{attachmentId}/preview-ticket",
+                        "/sales.contract/view/{id}/attachments/{attachmentId}/download-ticket",
                         "/sales.contract/view/{id}/attachments/update/{attachmentId}",
                         "/sales.contract/view/{id}/attachments/delete/{attachmentId}",
                         "/sales.contract/insert",
@@ -134,6 +137,27 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.UPDATE.code());
                     assertThat(operation.requestSchema()).isEqualTo("RecordAttachmentCommand");
                     assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentList");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/attachments/upload-ticket")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.UPDATE.code());
+                    assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentAccess");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/attachments/{attachmentId}/preview-ticket")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.VIEW.code());
+                    assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentAccess");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/attachments/{attachmentId}/download-ticket")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.VIEW.code());
+                    assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentAccess");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/submit/duplicate/check")))
@@ -395,6 +419,8 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("RecordAttachmentCommand");
         assertThat(document.schemas().get("RecordAttachmentCommand").required()).containsExactly("fileId");
         assertThat(document.schemas().get("RecordAttachmentList").items().type()).isEqualTo("RecordAttachment");
+        assertThat(document.schemas().get("RecordAttachmentAccess").properties())
+                .containsKeys("mode", "fileId", "accessToken", "url", "expiresAt", "metadata");
         assertThat(document.schemas().get("DynamicWebDuplicateCheckRequest").properties())
                 .containsKeys("recordId", "values");
         assertThat(document.schemas().get("RecordDuplicateCheckResult").properties())
@@ -402,6 +428,12 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.errors())
                 .containsEntry("DYNAMIC_BAD_REQUEST",
                         new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"))
+                .containsEntry("DYNAMIC_UI_VALIDATION",
+                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_UI_VALIDATION", 400, "DynamicWebError"))
+                .containsEntry("DYNAMIC_ATTACHMENT_ERROR",
+                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ATTACHMENT_ERROR", 400, "DynamicWebError"))
+                .containsEntry("DYNAMIC_DUPLICATE_CHECK_ERROR",
+                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, "DynamicWebError"))
                 .containsEntry("DYNAMIC_ACTION_FAILED",
                         new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "DynamicWebActionError"))
                 .containsEntry("DYNAMIC_CONFLICT",

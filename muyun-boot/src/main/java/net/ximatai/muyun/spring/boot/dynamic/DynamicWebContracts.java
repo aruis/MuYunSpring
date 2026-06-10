@@ -237,6 +237,18 @@ record DynamicWebError(String code,
         return new DynamicWebError("DYNAMIC_BAD_REQUEST", 400, message, null);
     }
 
+    static DynamicWebError uiValidation(String message) {
+        return new DynamicWebError("DYNAMIC_UI_VALIDATION", 400, message, null);
+    }
+
+    static DynamicWebError attachment(String message) {
+        return new DynamicWebError("DYNAMIC_ATTACHMENT_ERROR", 400, message, null);
+    }
+
+    static DynamicWebError duplicateCheck(String message) {
+        return new DynamicWebError("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, message, null);
+    }
+
     static DynamicWebError conflict(String message) {
         return new DynamicWebError("DYNAMIC_CONFLICT", 409, message, null);
     }

@@ -53,6 +53,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccess;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccessService;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentCommand;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
@@ -372,18 +374,30 @@ class DynamicRecordWebControllerTest {
         codeField.setRequiredOverride(true);
         PlatformUiConfigField amountField = uiField("ui-form", "module-field-amount");
         amountField.setReadOnly(true);
+        PlatformUiConfigField lineNoField = uiField("ui-form", "module-field-line-no");
+        lineNoField.setRequiredOverride(true);
+        PlatformUiConfigField lineAmountField = uiField("ui-form", "module-field-line-amount");
+        lineAmountField.setReadOnly(true);
         when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
                 MODULE,
                 List.of(),
                 List.of(uiConfig),
-                List.of(codeField, amountField),
+                List.of(codeField, amountField, lineNoField, lineAmountField),
                 List.of(),
                 List.of()
         ));
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        when(service.newRecord(MODULE, "contract_line")).thenAnswer(invocation -> new DynamicRecord(lineEntity()));
         when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
                 "module-field-code", "code"));
         when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
                 "module-field-amount", "amount"));
+        when(moduleFieldService.resolve("module-field-line-no")).thenReturn(resolvedModuleField(
+                "module-field-line-no", "lineNo", RelationRole.CHILD, "lines", "string"));
+        when(moduleFieldService.resolve("module-field-line-amount")).thenReturn(resolvedModuleField(
+                "module-field-line-amount", "lineAmount", RelationRole.CHILD, "lines", "decimal"));
         DynamicRecord created = new DynamicRecord(entity()).setValue("code", "C-001");
         created.setId("contract-1");
         DynamicRecord saved = new DynamicRecord(entity()).setValue("code", "C-002");
@@ -442,11 +456,61 @@ class DynamicRecordWebControllerTest {
                                 {
                                   "uiConfigId": "ui-form",
                                   "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    },
+                                    "children": {
+                                      "lines": [
+                                        {
+                                          "values": {}
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("UI required field is missing: lines.lineNo"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    },
+                                    "children": {
+                                      "lines": [
+                                        {
+                                          "values": {
+                                            "lineNo": "L-001",
+                                            "lineAmount": 10
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: lines.lineAmount"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
                                     "values": {}
                                   }
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
                 .andExpect(jsonPath("$.message").value("UI required field is missing: code"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
@@ -464,6 +528,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
                 .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: amount"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
@@ -479,25 +544,8 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("UI config is not published in module snapshot: missing-ui"));
-
-        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
-                "module-field-code", "code", RelationRole.CHILD));
-        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "uiConfigId": "ui-form",
-                                  "record": {
-                                    "values": {
-                                      "code": "C-001"
-                                    }
-                                  }
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(
-                        "Form UI config only supports main relation fields for save validation: module-field-code"));
     }
 
     @Test
@@ -607,6 +655,75 @@ class DynamicRecordWebControllerTest {
         verify(attachmentService).updateAttachment(eq(MODULE), eq("contract-1"), eq("att-1"),
                 any(RecordAttachmentCommand.class));
         verify(attachmentService).deleteAttachment(MODULE, "contract-1", "att-1");
+    }
+
+    @Test
+    void shouldIssueAttachmentAccessTicketsThroughConfiguredAdapter() throws Exception {
+        RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
+        RecordAttachmentAccessService accessService = mock(RecordAttachmentAccessService.class);
+        MockMvc attachmentMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, attachmentService, accessService, null, null))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicRecord visible = new DynamicRecord(entity()).setValue("code", "C-001");
+        visible.setId("contract-1");
+        RecordAttachment attachment = attachment("att-1", "file-1", "contract.pdf");
+        when(mainEntity.select("contract-1")).thenReturn(visible);
+        when(attachmentService.requireAttachment(MODULE, "contract-1", "att-1")).thenReturn(attachment);
+        when(accessService.issueUploadAccess(MODULE, "contract-1")).thenReturn(new RecordAttachmentAccess(
+                "UPLOAD", null, "upload-token", "/api/v1/public/files?access_token=upload-token",
+                "2026-06-01T00:10:00Z", Map.of("purpose", "upload")));
+        when(accessService.issuePreviewAccess(MODULE, "contract-1", attachment)).thenReturn(new RecordAttachmentAccess(
+                "PREVIEW", "file-1", "preview-token", "/view/public/files/file-1?access_token=preview-token",
+                "2026-06-01T00:10:00Z", Map.of()));
+        when(accessService.issueDownloadAccess(MODULE, "contract-1", attachment)).thenReturn(new RecordAttachmentAccess(
+                "DOWNLOAD", "file-1", "download-token", "/api/v1/public/files/file-1/download?access_token=download-token",
+                "2026-06-01T00:10:00Z", Map.of()));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/upload-ticket", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("UPLOAD"))
+                .andExpect(jsonPath("$.accessToken").value("upload-token"))
+                .andExpect(jsonPath("$.metadata.purpose").value("upload"));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/{attachmentId}/preview-ticket",
+                        MODULE, "contract-1", "att-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("PREVIEW"))
+                .andExpect(jsonPath("$.fileId").value("file-1"));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/{attachmentId}/download-ticket",
+                        MODULE, "contract-1", "att-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("DOWNLOAD"))
+                .andExpect(jsonPath("$.url").value("/api/v1/public/files/file-1/download?access_token=download-token"));
+
+        verify(attachmentService, times(2)).requireAttachment(MODULE, "contract-1", "att-1");
+        verify(accessService).issueUploadAccess(MODULE, "contract-1");
+        verify(accessService).issuePreviewAccess(MODULE, "contract-1", attachment);
+        verify(accessService).issueDownloadAccess(MODULE, "contract-1", attachment);
+    }
+
+    @Test
+    void shouldReturnAttachmentErrorCodeWhenAttachmentAccessAdapterMissing() throws Exception {
+        RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
+        MockMvc attachmentMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, attachmentService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/upload-ticket", MODULE, "contract-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_ATTACHMENT_ERROR"))
+                .andExpect(jsonPath("$.message").value("record attachment access service is not configured"));
     }
 
     @Test
@@ -2422,21 +2539,29 @@ class DynamicRecordWebControllerTest {
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
                                                            String fieldName,
                                                            RelationRole relationRole) {
-        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "string");
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "main", "string");
     }
 
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
                                                            String fieldName,
                                                            RelationRole relationRole,
                                                            String fieldTypeAlias) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "main", fieldTypeAlias);
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
+                                                           String fieldName,
+                                                           RelationRole relationRole,
+                                                           String relationAlias,
+                                                           String fieldTypeAlias) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
                 MODULE,
                 "rel-main",
-                "main",
+                relationAlias,
                 relationRole,
                 "metadata-1",
-                ENTITY,
+                relationRole == RelationRole.MAIN ? ENTITY : "contract_line",
                 "Contract",
                 "metadata-field-" + fieldName,
                 fieldName,
