@@ -34,6 +34,11 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappin
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinition;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDelegation;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowEvent;
@@ -149,6 +154,28 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(MetadataViewField.class)))
                 .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "field_ui_type_alias", "read_only",
                         "required_override", "title", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(PlatformUiSet.class)))
+                .contains("id", "module_alias", "alias", "set_type", "default_set", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(PlatformUiSet.class)))
+                .contains(List.of("tenant_id", "module_alias", "alias"));
+        assertThat(columnNames(mapper.toTable(PlatformUiConfig.class)))
+                .contains("id", "ui_set_id", "client_type", "layout_json", "published", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(PlatformUiConfig.class)))
+                .contains(List.of("tenant_id", "ui_set_id", "client_type"));
+        assertThat(columnNames(mapper.toTable(PlatformUiConfigField.class)))
+                .contains("id", "ui_config_id", "module_metadata_field_id", "field_ui_type_alias", "visible",
+                        "read_only", "required_override", "placeholder", "default_value", "width", "align",
+                        "fixed_position", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(PlatformUiConfigField.class)))
+                .contains(List.of("tenant_id", "ui_config_id", "module_metadata_field_id"));
+        assertThat(columnNames(mapper.toTable(PlatformQueryTemplate.class)))
+                .contains("id", "module_alias", "alias", "default_template", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(PlatformQueryTemplate.class)))
+                .contains(List.of("tenant_id", "module_alias", "alias"));
+        assertThat(columnNames(mapper.toTable(PlatformQueryItem.class)))
+                .contains("id", "query_template_id", "parent_id", "group_operator", "module_metadata_field_id",
+                        "operator", "default_value", "allow_external_value", "external_value_key", "time_zone",
+                        "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(PlatformModuleAction.class)))
                 .contains("id", "module_alias", "entity_alias", "action_code", "permission_action_code", "title",
                         "category", "available_expression", "unavailable_message", "executor_type", "executor_key",
