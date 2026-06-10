@@ -1,0 +1,259 @@
+package net.ximatai.muyun.spring.platform.menu;
+
+import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigFieldService;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class MenuEntryBootstrapContractTest {
+    private final TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformUiSet> uiSetDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformUiConfig> uiConfigDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformUiConfigField> uiFieldDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformQueryTemplate> queryTemplateDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformQueryItem> queryItemDao = new TestMemoryDao<>();
+
+    private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
+    private final MenuSchemeService schemeService = new MenuSchemeService(schemeDao);
+    private final PlatformUiSetService uiSetService = new PlatformUiSetService(uiSetDao, moduleService);
+    private final PlatformUiConfigService uiConfigService = new PlatformUiConfigService(uiConfigDao, uiSetService);
+    private final PlatformQueryTemplateService queryTemplateService =
+            new PlatformQueryTemplateService(queryTemplateDao, moduleService);
+    private final PlatformUiConfigFieldService uiFieldService = new PlatformUiConfigFieldService(
+            uiFieldDao, uiConfigService, uiSetService, null, null, null, null);
+    private final PlatformQueryItemService queryItemService =
+            new PlatformQueryItemService(queryItemDao, queryTemplateService, null, null);
+    private final MenuVisibilityPolicyService allowAllMenu = (moduleAlias, currentUser) -> true;
+    private final MenuService menuService = new MenuService(menuDao, schemeService, moduleService,
+            Optional.of(allowAllMenu), uiConfigService, uiSetService, queryTemplateService);
+    private final PlatformPageConfigSnapshotService snapshotService = new PlatformPageConfigSnapshotService(
+            uiSetService, uiConfigService, uiFieldService, queryTemplateService, queryItemService);
+    private final PlatformPageBootstrapService bootstrapService =
+            new PlatformPageBootstrapService(menuService, snapshotService);
+
+    @BeforeEach
+    void setUp() {
+        try (TenantContext.Scope ignored = TenantContext.system("seed modules")) {
+            insertModule("crm.customer");
+            insertModule("crm.contract");
+        }
+    }
+
+    @AfterEach
+    void tearDown() {
+        CurrentUserContext.clear();
+        TenantContext.clear();
+    }
+
+    @Test
+    void shouldValidateModuleMenuEntryConfig() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String schemeId = schemeService.insert(scheme());
+            String uiConfigId = publishedUiConfig("crm.customer", "list", PlatformUiSetType.LIST, true);
+            String templateId = queryTemplate("crm.customer", "default", true);
+            Menu menu = moduleMenu(schemeId, "客户", "crm.customer");
+            menu.setDefaultUiConfigId(uiConfigId);
+            menu.setDefaultQueryTemplateId(templateId);
+            menu.setEntryParamsJson("{\"source\":\"menu\"}");
+
+            String menuId = menuService.insert(menu);
+
+            Menu saved = menuService.select(menuId);
+            assertThat(saved.getPageMode()).isEqualTo(MenuPageMode.LIST);
+            assertThat(saved.getDefaultUiConfigId()).isEqualTo(uiConfigId);
+            assertThat(saved.getDefaultQueryTemplateId()).isEqualTo(templateId);
+            assertThat(saved.getEntryParamsJson()).contains("source");
+        }
+    }
+
+    @Test
+    void shouldRejectInvalidMenuEntryConfig() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String schemeId = schemeService.insert(scheme());
+            String draftConfigId = publishedUiConfig("crm.customer", "draft", PlatformUiSetType.LIST, false);
+            String formConfigId = publishedUiConfig("crm.customer", "form", PlatformUiSetType.FORM, true);
+            String contractConfigId = publishedUiConfig("crm.contract", "list", PlatformUiSetType.LIST, true);
+            String contractTemplateId = queryTemplate("crm.contract", "default", true);
+            String disabledTemplateId = queryTemplate("crm.customer", "disabled", false);
+            queryTemplateService.disable(disabledTemplateId);
+
+            Menu draftMenu = moduleMenu(schemeId, "客户", "crm.customer");
+            draftMenu.setDefaultUiConfigId(draftConfigId);
+            assertThatThrownBy(() -> menuService.insert(draftMenu))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("published");
+
+            Menu wrongUiModule = moduleMenu(schemeId, "客户", "crm.customer");
+            wrongUiModule.setDefaultUiConfigId(contractConfigId);
+            assertThatThrownBy(() -> menuService.insert(wrongUiModule))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("belong to module");
+
+            Menu wrongQueryModule = moduleMenu(schemeId, "客户", "crm.customer");
+            wrongQueryModule.setDefaultQueryTemplateId(contractTemplateId);
+            assertThatThrownBy(() -> menuService.insert(wrongQueryModule))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("belong to module");
+
+            Menu disabledQuery = moduleMenu(schemeId, "客户", "crm.customer");
+            disabledQuery.setDefaultQueryTemplateId(disabledTemplateId);
+            assertThatThrownBy(() -> menuService.insert(disabledQuery))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("enabled");
+
+            Menu mismatchedPageMode = moduleMenu(schemeId, "客户", "crm.customer");
+            mismatchedPageMode.setPageMode(MenuPageMode.LIST);
+            mismatchedPageMode.setDefaultUiConfigId(formConfigId);
+            assertThatThrownBy(() -> menuService.insert(mismatchedPageMode))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("page mode");
+
+            Menu group = groupMenu(schemeId, "分组");
+            group.setPageMode(MenuPageMode.LIST);
+            assertThatThrownBy(() -> menuService.insert(group))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("low-code entry");
+        }
+    }
+
+    @Test
+    void shouldBootstrapByVisibleMenuOrModule() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            try (CurrentUserContext.Scope userScope = CurrentUserContext.use(
+                    CurrentUser.tenantUser("u1", "alice", "tenant-a", "org-1"))) {
+                String schemeId = schemeService.insert(scheme());
+                String uiConfigId = publishedUiConfig("crm.customer", "list", PlatformUiSetType.LIST, true);
+                String templateId = queryTemplate("crm.customer", "default", true);
+                Menu menu = moduleMenu(schemeId, "客户", "crm.customer");
+                menu.setDefaultUiConfigId(uiConfigId);
+                menu.setDefaultQueryTemplateId(templateId);
+                String menuId = menuService.insert(menu);
+
+                PlatformPageBootstrap menuBootstrap = bootstrapService.bootstrapByMenu(menuId);
+                PlatformPageBootstrap moduleBootstrap = bootstrapService.bootstrapByModule("crm.customer");
+
+                assertThat(menuBootstrap.entry().menuId()).isEqualTo(menuId);
+                assertThat(menuBootstrap.entry().defaultUiConfigId()).isEqualTo(uiConfigId);
+                assertThat(menuBootstrap.entry().defaultQueryTemplateId()).isEqualTo(templateId);
+                assertThat(moduleBootstrap.entry().menuId()).isEqualTo(menuId);
+                assertThat(moduleBootstrap.entry().defaultUiConfigId()).isEqualTo(uiConfigId);
+                assertThat(moduleBootstrap.pageConfig().uiConfigs()).extracting(PlatformUiConfig::getPublished)
+                        .containsExactly(Boolean.TRUE);
+            }
+        }
+    }
+
+    @Test
+    void shouldRejectBootstrapWhenMenuIsNotVisible() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            try (CurrentUserContext.Scope userScope = CurrentUserContext.use(
+                    CurrentUser.tenantUser("u1", "alice", "tenant-a", "org-1"))) {
+                String schemeId = schemeService.insert(scheme());
+                Menu menu = moduleMenu(schemeId, "客户", "crm.customer");
+                String menuId = menuService.insert(menu);
+                MenuService deniedMenuService = new MenuService(menuDao, schemeService, moduleService,
+                        Optional.of((moduleAlias, currentUser) -> false), uiConfigService, uiSetService,
+                        queryTemplateService);
+                PlatformPageBootstrapService deniedBootstrapService =
+                        new PlatformPageBootstrapService(deniedMenuService, snapshotService);
+
+                assertThatThrownBy(() -> deniedBootstrapService.bootstrapByMenu(menuId))
+                        .isInstanceOf(PlatformException.class)
+                        .hasMessageContaining("not visible");
+                assertThatThrownBy(() -> deniedBootstrapService.bootstrapByModule("crm.customer"))
+                        .isInstanceOf(PlatformException.class)
+                        .hasMessageContaining("not visible");
+            }
+        }
+    }
+
+    private void insertModule(String moduleAlias) {
+        PlatformModule module = new PlatformModule();
+        module.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
+        module.setAlias(moduleAlias);
+        module.setTitle(moduleAlias);
+        module.setParentId(TreeAbility.ROOT_ID);
+        module.setModuleKind(ModuleKind.DYNAMIC);
+        moduleService.insert(module);
+    }
+
+    private MenuScheme scheme() {
+        MenuScheme scheme = new MenuScheme();
+        scheme.setAlias("default");
+        scheme.setScopeType(MenuScopeType.TENANT);
+        scheme.setTitle("默认");
+        return scheme;
+    }
+
+    private Menu moduleMenu(String schemeId, String title, String moduleAlias) {
+        Menu menu = new Menu();
+        menu.setSchemeId(schemeId);
+        menu.setParentId(TreeAbility.ROOT_ID);
+        menu.setTitle(title);
+        menu.setMenuType(MenuType.MODULE);
+        menu.setModuleAlias(moduleAlias);
+        return menu;
+    }
+
+    private Menu groupMenu(String schemeId, String title) {
+        Menu menu = new Menu();
+        menu.setSchemeId(schemeId);
+        menu.setParentId(TreeAbility.ROOT_ID);
+        menu.setTitle(title);
+        menu.setMenuType(MenuType.GROUP);
+        return menu;
+    }
+
+    private String publishedUiConfig(String moduleAlias, String alias, PlatformUiSetType setType, boolean published) {
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setModuleAlias(moduleAlias);
+        uiSet.setAlias(alias);
+        uiSet.setSetType(setType);
+        uiSet.setDefaultSet(true);
+        String uiSetId = uiSetService.insert(uiSet);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setUiSetId(uiSetId);
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(published);
+        return uiConfigService.insert(uiConfig);
+    }
+
+    private String queryTemplate(String moduleAlias, String alias, boolean defaultTemplate) {
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setModuleAlias(moduleAlias);
+        template.setAlias(alias);
+        template.setDefaultTemplate(defaultTemplate);
+        return queryTemplateService.insert(template);
+    }
+}

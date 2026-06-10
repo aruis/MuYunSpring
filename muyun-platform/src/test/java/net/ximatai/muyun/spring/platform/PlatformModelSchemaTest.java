@@ -196,7 +196,8 @@ class PlatformModelSchemaTest {
                 .doesNotContain("parent_id", "application_alias");
         assertThat(columnNames(mapper.toTable(Menu.class)))
                 .contains("id", "tenant_id", "scheme_id", "parent_id", "menu_type", "module_alias",
-                        "route", "external_url", "title", "enabled", "sort_order")
+                        "route", "external_url", "page_mode", "default_ui_config_id", "default_query_template_id",
+                        "entry_params_json", "title", "enabled", "sort_order")
                 .doesNotContain("application_alias");
     }
 

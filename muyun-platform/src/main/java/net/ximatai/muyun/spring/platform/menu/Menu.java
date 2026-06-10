@@ -27,4 +27,17 @@ public class Menu extends StandardEnabledTreeEntity {
 
     @Column(name = "external_url", type = ColumnType.VARCHAR, length = 512, comment = "External url")
     private String externalUrl;
+
+    @Column(name = "page_mode", type = ColumnType.VARCHAR, length = 32, comment = "Low-code page mode")
+    private MenuPageMode pageMode;
+
+    @Column(name = "default_ui_config_id", type = ColumnType.VARCHAR, length = 32, comment = "Default UI config id")
+    private String defaultUiConfigId;
+
+    @Column(name = "default_query_template_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Default query template id")
+    private String defaultQueryTemplateId;
+
+    @Column(name = "entry_params_json", type = ColumnType.TEXT, comment = "Entry params JSON")
+    private String entryParamsJson;
 }
