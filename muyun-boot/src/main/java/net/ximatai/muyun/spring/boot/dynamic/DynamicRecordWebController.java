@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot.dynamic;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.ActionWeb;
@@ -26,6 +28,9 @@ import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
 import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFacade;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
@@ -46,6 +51,12 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,7 +71,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -82,6 +95,9 @@ public class DynamicRecordWebController implements
     private final ActiveTenantVerifier activeTenantVerifier;
     private final CodeBusinessPreviewService codeBusinessPreviewService;
     private final ReferenceRecordGenerationFacade referenceRecordGenerationFacade;
+    private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
+    private final PlatformQueryItemService queryItemService;
+    private final ModuleMetadataFieldService moduleMetadataFieldService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -94,10 +110,16 @@ public class DynamicRecordWebController implements
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
                                       ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider,
-                                      ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider) {
+                                      ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider,
+                                      ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
+                                      ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
+                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider) {
         this(recordService, activeTenantVerifier,
                 codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
-                referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable());
+                referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
+                pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
+                queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
+                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -110,10 +132,24 @@ public class DynamicRecordWebController implements
                                       ActiveTenantVerifier activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                null, null, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
         this.referenceRecordGenerationFacade = referenceRecordGenerationFacade;
+        this.pageConfigSnapshotService = pageConfigSnapshotService;
+        this.queryItemService = queryItemService;
+        this.moduleMetadataFieldService = moduleMetadataFieldService;
     }
 
     @Override
@@ -128,10 +164,25 @@ public class DynamicRecordWebController implements
 
     @Override
     public Criteria queryCriteria(WebQueryRequest request) {
-        if (request == null || request.conditions().isEmpty()) {
-            return Criteria.of();
+        Criteria templateCriteria = Criteria.of();
+        if (request != null && hasText(request.queryTemplateId())) {
+            requireLowCodeQueryServices();
+            validateQueryTemplateBelongsToModule(DynamicWebRequest.moduleAlias(), request.queryTemplateId());
+            templateCriteria = queryItemService.compile(request.queryTemplateId(), request.externalQueryValues());
         }
-        return service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        if (request == null || request.conditions().isEmpty()) {
+            return templateCriteria;
+        }
+        Criteria manualCriteria = service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        if (templateCriteria.isEmpty()) {
+            return manualCriteria;
+        }
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(templateCriteria.getRoot());
+        if (!manualCriteria.isEmpty()) {
+            criteria.andGroup(manualCriteria.getRoot());
+        }
+        return criteria;
     }
 
     @Override
@@ -140,6 +191,83 @@ public class DynamicRecordWebController implements
             return new Sort[0];
         }
         return DynamicWebQueryMapper.sorts(request.sorts());
+    }
+
+    @Override
+    public PageResult<DynamicRecord> queryRecords(WebQueryRequest request) {
+        PageResult<DynamicRecord> page = CrudWeb.super.queryRecords(request);
+        if (request == null || !hasText(request.uiConfigId())) {
+            return page;
+        }
+        Set<String> projectionFields = projectionFields(DynamicWebRequest.moduleAlias(), request);
+        List<DynamicRecord> records = page.getRecords().stream()
+                .map(record -> project(record, projectionFields))
+                .toList();
+        return PageResult.of(records, page.getTotal(), PageRequest.of(page.getPageNum(), page.getPageSize()));
+    }
+
+    private Set<String> projectionFields(String moduleAlias, WebQueryRequest request) {
+        requireLowCodeQueryServices();
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
+                .filter(config -> Objects.equals(config.getId(), request.uiConfigId()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
+                        + request.uiConfigId()));
+        Set<String> fields = new LinkedHashSet<>();
+        for (PlatformUiConfigField field : snapshot.uiFields()) {
+            if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
+                    || !Boolean.TRUE.equals(field.getVisible())) {
+                continue;
+            }
+            ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
+            if (resolved.relationRole() != RelationRole.MAIN) {
+                throw new PlatformException("List UI config only supports main relation fields: "
+                        + field.getModuleMetadataFieldId());
+            }
+            fields.add(resolved.fieldName());
+        }
+        return fields;
+    }
+
+    private void validateQueryTemplateBelongsToModule(String moduleAlias, String queryTemplateId) {
+        if (!hasText(queryTemplateId)) {
+            return;
+        }
+        requireLowCodeQueryServices();
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformQueryTemplate template = snapshot.queryTemplates().stream()
+                .filter(item -> Objects.equals(item.getId(), queryTemplateId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Query template is not enabled in module snapshot: "
+                        + queryTemplateId));
+        if (!Objects.equals(template.getModuleAlias(), moduleAlias)) {
+            throw new PlatformException("Query template must belong to module: " + moduleAlias);
+        }
+    }
+
+    private DynamicRecord project(DynamicRecord source, Set<String> fields) {
+        DynamicRecord projected = new DynamicRecord(source.getEntity());
+        projected.setId(source.getId());
+        projected.setTenantId(source.getTenantId());
+        projected.setVersion(source.getVersion());
+        for (String field : fields) {
+            Map<String, Object> values = source.getValues();
+            if (values.containsKey(field)) {
+                projected.setValue(field, values.get(field));
+            }
+        }
+        return projected;
+    }
+
+    private void requireLowCodeQueryServices() {
+        if (pageConfigSnapshotService == null || queryItemService == null || moduleMetadataFieldService == null) {
+            throw new PlatformException("dynamic low-code query services are not configured");
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     @Override

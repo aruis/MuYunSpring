@@ -58,6 +58,16 @@ import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
 import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFacade;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -405,6 +415,86 @@ class DynamicRecordWebControllerTest {
         assertThat(page.getValue().getOffset()).isEqualTo(30);
         assertThat(page.getValue().getLimit()).isEqualTo(30);
         assertThat(sorts.getValue()[0].getField()).isEqualTo("amount");
+    }
+
+    @Test
+    void shouldApplyLowCodeQueryTemplateAndProjectByUiConfig() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, queryItemService, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField codeField = new PlatformUiConfigField();
+        codeField.setUiConfigId("ui-list");
+        codeField.setModuleMetadataFieldId("module-field-code");
+        codeField.setVisible(true);
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setId("tpl-active");
+        template.setModuleAlias(MODULE);
+        template.setAlias("active");
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(),
+                List.of(uiConfig),
+                List.of(codeField),
+                List.of(template),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        Criteria templateCriteria = Criteria.of().eq("code", "C-001");
+        when(queryItemService.compile(eq("tpl-active"), any())).thenReturn(templateCriteria);
+        DynamicRecord record = new DynamicRecord(entity())
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+        record.setId("contract-1");
+        when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().eq("amount", BigDecimal.TEN));
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryTemplateId": "tpl-active",
+                                  "externalQueryValues": {
+                                    "owner": "user-1",
+                                    "optional": null
+                                  },
+                                  "conditions": [
+                                    {
+                                      "fieldName": "amount",
+                                      "operator": "EQ",
+                                      "values": [10]
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"))
+                .andExpect(jsonPath("$.records[0].values.code").value("C-001"))
+                .andExpect(jsonPath("$.records[0].values.amount").doesNotExist())
+                .andExpect(jsonPath("$.total").value(1));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> externalValues = ArgumentCaptor.forClass(Map.class);
+        verify(queryItemService).compile(eq("tpl-active"), externalValues.capture());
+        assertThat(externalValues.getValue()).containsEntry("owner", "user-1");
+        assertThat(externalValues.getValue()).containsEntry("optional", null);
+        verify(mainEntity).queryCriteria(any());
+        verify(snapshotService, times(2)).snapshot(MODULE);
     }
 
     @Test
@@ -1461,6 +1551,24 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
         ));
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId, String fieldName) {
+        return new ResolvedModuleMetadataField(
+                moduleFieldId,
+                MODULE,
+                "rel-main",
+                "main",
+                RelationRole.MAIN,
+                "metadata-1",
+                ENTITY,
+                "Contract",
+                "metadata-field-" + fieldName,
+                fieldName,
+                fieldName,
+                fieldName,
+                "string"
+        );
     }
 
     private EntityDefinition lineEntity() {
