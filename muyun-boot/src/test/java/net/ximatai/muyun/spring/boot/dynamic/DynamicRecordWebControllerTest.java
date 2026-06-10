@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -254,13 +255,29 @@ class DynamicRecordWebControllerTest {
         DynamicRecord updated = new DynamicRecord(entity()).setValue("amount", BigDecimal.TEN);
         updated.setId("contract-1");
         updated.setVersion(4);
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        when(service.newRecord(MODULE, "contract_line")).thenAnswer(invocation -> new DynamicRecord(lineEntity()));
         when(mainEntity.insert(any(DynamicRecord.class))).thenReturn("contract-1");
         when(mainEntity.select("contract-1")).thenReturn(created, updated);
         when(mainEntity.update(any(DynamicRecord.class))).thenReturn(1);
 
         mvc.perform(post("/{moduleAlias}/insert", MODULE)
                         .contentType("application/json")
-                        .content(json(Map.of("values", Map.of("code", "C-001", "amount", 12)))))
+                        .content(json(Map.of(
+                                "originContext", Map.of(
+                                        "impactType", "GENERATE_PUSH",
+                                        "sourceModuleAlias", "sales.opportunity",
+                                        "sourceRecordId", "opp-1",
+                                        "targetModuleAlias", MODULE,
+                                        "generationRuleId", "rule-1",
+                                        "actionCode", "generateContract",
+                                        "batchId", "batch-1",
+                                        "draftKey", "draft-1"),
+                                "values", Map.of("code", "C-001", "amount", 12),
+                                "children", Map.of("lines", List.of(Map.of(
+                                        "values", Map.of("lineNo", "L-001", "lineAmount", 7))))))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("contract-1"))
                 .andExpect(jsonPath("$.values.code").value("C-001"));
@@ -269,6 +286,13 @@ class DynamicRecordWebControllerTest {
         verify(mainEntity).insert(createRecord.capture());
         assertThat(createRecord.getValue().getValue("code")).isEqualTo("C-001");
         assertThat(createRecord.getValue().getValue("amount")).isEqualTo(12);
+        assertThat(createRecord.getValue().getValues()).doesNotContainKey("originContext");
+        assertThat(createRecord.getValue().mutationMetadata()).containsKey("originContext");
+        assertThat(createRecord.getValue().getChildren("lines")).singleElement()
+                .satisfies(line -> {
+                    assertThat(line.getValue("lineNo")).isEqualTo("L-001");
+                    assertThat(line.getValue("lineAmount")).isEqualTo(7);
+                });
 
         mvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
                         .contentType("application/json")
@@ -282,6 +306,40 @@ class DynamicRecordWebControllerTest {
         assertThat(updateRecord.getValue().getId()).isEqualTo("contract-1");
         assertThat(updateRecord.getValue().getVersion()).isEqualTo(3);
         assertThat(updateRecord.getValue().getValue("amount")).isEqualTo(10);
+    }
+
+    @Test
+    void shouldRejectUnknownDynamicChildRelationInRequest() throws Exception {
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        Map<String, Object> body = Map.of(
+                "values", Map.of("code", "C-001"),
+                "children", Map.of("unknownLines", List.of(Map.of(
+                        "values", Map.of("lineNo", "L-001")))));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("unknown dynamic child relation: unknownLines"));
+    }
+
+    @Test
+    void shouldRejectNonArrayDynamicChildRelationInRequest() throws Exception {
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        Map<String, Object> body = Map.of(
+                "values", Map.of("code", "C-001"),
+                "children", Map.of("lines", Map.of(
+                        "values", Map.of("lineNo", "L-001"))));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic child relation must be array: lines"));
     }
 
     @Test
@@ -1183,6 +1241,13 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
+        ));
+    }
+
+    private EntityDefinition lineEntity() {
+        return new EntityDefinition("contract_line", "sales_contract_line", "Contract Line", List.of(
+                FieldDefinition.string("lineNo", "Line No").column("line_no").length(64).required(),
+                FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
         ));
     }
 

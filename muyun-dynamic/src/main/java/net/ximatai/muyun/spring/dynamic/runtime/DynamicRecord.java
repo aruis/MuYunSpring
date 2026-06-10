@@ -41,7 +41,9 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     private final Map<String, Object> values = new LinkedHashMap<>();
     private final Map<String, Object> loadedValues = new LinkedHashMap<>();
     private final Map<String, List<DynamicRecord>> children = new LinkedHashMap<>();
+    private final Set<String> partialChildRelations = new LinkedHashSet<>();
     private final Set<String> explicitFields = new HashSet<>();
+    private final Map<String, Object> mutationMetadata = new LinkedHashMap<>();
     private final Map<String, FieldCompanionDefinition> companionFields;
     private FormulaRuntimeReport formulaReport = new FormulaRuntimeReport();
 
@@ -137,6 +139,16 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return this;
     }
 
+    public DynamicRecord setPartialChildren(String relationCode, List<DynamicRecord> records) {
+        setChildren(relationCode, records);
+        partialChildRelations.add(relationCode);
+        return this;
+    }
+
+    public boolean isPartialChildren(String relationCode) {
+        return partialChildRelations.contains(relationCode);
+    }
+
     public List<DynamicRecord> getChildren(String relationCode) {
         return children.get(relationCode);
     }
@@ -145,15 +157,33 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return Collections.unmodifiableMap(new LinkedHashMap<>(children));
     }
 
+    public DynamicRecord putMutationMetadata(String key, Object value) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("mutation metadata key must not be blank");
+        }
+        if (value == null) {
+            mutationMetadata.remove(key);
+        } else {
+            mutationMetadata.put(key, value);
+        }
+        return this;
+    }
+
+    public Map<String, Object> mutationMetadata() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(mutationMetadata));
+    }
+
     public DynamicRecord copy() {
         DynamicRecord copy = new DynamicRecord(entity);
         values.forEach((fieldCode, value) -> copy.values.put(fieldCode, copyValue(value)));
         loadedValues.forEach((fieldCode, value) -> copy.loadedValues.put(fieldCode, copyValue(value)));
+        mutationMetadata.forEach((key, value) -> copy.mutationMetadata.put(key, copyValue(value)));
         copy.explicitFields.addAll(explicitFields);
         children.forEach((relationCode, records) -> copy.children.put(
                 relationCode,
                 records == null ? null : records.stream().map(DynamicRecord::copy).toList()
         ));
+        copy.partialChildRelations.addAll(partialChildRelations);
         copy.id = id;
         copy.tenantId = tenantId;
         copy.version = version;

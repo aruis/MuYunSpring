@@ -96,6 +96,14 @@ public final class DynamicEntityOperations implements
         return service.create(moduleAlias, entityAlias, record);
     }
 
+    public String create(DynamicRecord record, Map<String, Object> mutationMetadata) {
+        return service.create(moduleAlias, entityAlias, record, mutationMetadata);
+    }
+
+    public String createWriteBack(DynamicRecord record, DynamicWriteBackContext writeBackContext) {
+        return service.createWriteBack(moduleAlias, entityAlias, record, writeBackContext);
+    }
+
     @Override
     public String insert(DynamicRecord record) {
         return create(record);
@@ -114,6 +122,14 @@ public final class DynamicEntityOperations implements
     @Override
     public int update(DynamicRecord record) {
         return service.update(moduleAlias, entityAlias, record);
+    }
+
+    public int update(DynamicRecord record, Map<String, Object> mutationMetadata) {
+        return service.update(moduleAlias, entityAlias, record, mutationMetadata);
+    }
+
+    public int updateWriteBack(DynamicRecord record, DynamicWriteBackContext writeBackContext) {
+        return service.updateWriteBack(moduleAlias, entityAlias, record, writeBackContext);
     }
 
     @Override

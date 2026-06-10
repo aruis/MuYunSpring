@@ -264,15 +264,29 @@ public class DynamicRecordService {
 
     @Transactional
     public String create(String moduleAlias, String entityAlias, DynamicRecord record) {
-        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null);
+        return create(moduleAlias, entityAlias, record, mutationMetadata(record));
+    }
+
+    @Transactional
+    public String create(String moduleAlias,
+                         String entityAlias,
+                         DynamicRecord record,
+                         Map<String, Object> mutationMetadata) {
+        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null, mutationMetadata);
     }
 
     String createFromAction(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
-        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
+        return create(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId, Map.of());
     }
 
-    private String create(String moduleAlias, String entityAlias, DynamicRecord record, RuntimeMutationSource mutationSource, String traceId) {
-        try (DynamicMutationContext ignored = DynamicMutationContext.open(mutationClock)) {
+    private String create(String moduleAlias,
+                          String entityAlias,
+                          DynamicRecord record,
+                          RuntimeMutationSource mutationSource,
+                          String traceId,
+                          Map<String, Object> mutationMetadata) {
+        try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
+                traceId, mutationMetadata)) {
             if (mutationSource == RuntimeMutationSource.BUSINESS) {
                 actionExecutionPolicyService.requireAuthorized(ActionExecutionContext.ofPlatformAction(
                         moduleAlias,
@@ -293,6 +307,16 @@ public class DynamicRecordService {
             ));
             String id = entityService(moduleAlias, entityAlias).insert(record);
             mutationCoordinator.afterCreate(moduleAlias, entityAlias, record, id);
+            mutationCoordinator.afterMutation(mutationEvent(
+                    DynamicRecordMutationEventType.AFTER_SAVE,
+                    moduleAlias,
+                    entityAlias,
+                    id,
+                    DynamicRecordSaveOperation.CREATE,
+                    null,
+                    record,
+                    mutationContext
+            ));
             childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildCreate(
                     moduleAlias,
                     entityAlias,
@@ -344,20 +368,78 @@ public class DynamicRecordService {
 
     @Transactional
     public int update(String moduleAlias, String entityAlias, DynamicRecord record) {
-        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null);
+        return update(moduleAlias, entityAlias, record, mutationMetadata(record));
+    }
+
+    @Transactional
+    public int update(String moduleAlias,
+                      String entityAlias,
+                      DynamicRecord record,
+                      Map<String, Object> mutationMetadata) {
+        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.BUSINESS, null, mutationMetadata);
     }
 
     @Transactional
     public int updateSystem(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
-        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, traceId);
+        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, traceId, Map.of());
+    }
+
+    @Transactional
+    public String createWriteBack(String moduleAlias,
+                                  String entityAlias,
+                                  DynamicRecord record,
+                                  DynamicWriteBackContext writeBackContext) {
+        return createWriteBack(moduleAlias, entityAlias, record, writeBackContext, Map.of());
+    }
+
+    @Transactional
+    public String createWriteBack(String moduleAlias,
+                                  String entityAlias,
+                                  DynamicRecord record,
+                                  DynamicWriteBackContext writeBackContext,
+                                  Map<String, Object> mutationMetadata) {
+        try (DynamicMutationContext ignored = DynamicMutationContext.openWriteBack(mutationClock,
+                writeBackContext, mutationMetadata)) {
+            DynamicMutationContext context = DynamicMutationContext.current().orElseThrow();
+            return create(moduleAlias, entityAlias, record, RuntimeMutationSource.WRITE_BACK,
+                    context.traceId(), mutationMetadata);
+        }
+    }
+
+    @Transactional
+    public int updateWriteBack(String moduleAlias,
+                               String entityAlias,
+                               DynamicRecord record,
+                               DynamicWriteBackContext writeBackContext) {
+        return updateWriteBack(moduleAlias, entityAlias, record, writeBackContext, Map.of());
+    }
+
+    @Transactional
+    public int updateWriteBack(String moduleAlias,
+                               String entityAlias,
+                               DynamicRecord record,
+                               DynamicWriteBackContext writeBackContext,
+                               Map<String, Object> mutationMetadata) {
+        try (DynamicMutationContext ignored = DynamicMutationContext.openWriteBack(mutationClock,
+                writeBackContext, mutationMetadata)) {
+            DynamicMutationContext context = DynamicMutationContext.current().orElseThrow();
+            return update(moduleAlias, entityAlias, record, RuntimeMutationSource.WRITE_BACK,
+                    context.traceId(), mutationMetadata);
+        }
     }
 
     int updateFromAction(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
-        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId);
+        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId, Map.of());
     }
 
-    private int update(String moduleAlias, String entityAlias, DynamicRecord record, RuntimeMutationSource mutationSource, String traceId) {
-        try (DynamicMutationContext ignored = DynamicMutationContext.open(mutationClock)) {
+    private int update(String moduleAlias,
+                       String entityAlias,
+                       DynamicRecord record,
+                       RuntimeMutationSource mutationSource,
+                       String traceId,
+                       Map<String, Object> mutationMetadata) {
+        try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
+                traceId, mutationMetadata)) {
             if (record == null) {
                 throw new PlatformException("dynamic record must not be null");
             }
@@ -366,7 +448,8 @@ public class DynamicRecordService {
                 Set<String> recordIds = normalizeRecordId(record == null ? null : record.getId());
                 mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.UPDATE, recordIds);
             }
-            DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(record.getId()));
+            DynamicRecord before = withTenantScope(mutationScope,
+                    () -> entityService(moduleAlias, entityAlias).selectActiveRaw(record.getId()));
             mutationCoordinator.beforeUpdate(moduleAlias, entityAlias, before, record);
             List<RelationChildMutation> childMutations = prepareRelationChildrenForUpdate(moduleAlias, entityAlias, before, record);
             childMutations.forEach(mutation -> {
@@ -384,6 +467,16 @@ public class DynamicRecordService {
             int updated = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).update(record));
             if (updated > 0) {
                 mutationCoordinator.afterUpdate(moduleAlias, entityAlias, before, record);
+                mutationCoordinator.afterMutation(mutationEvent(
+                        DynamicRecordMutationEventType.AFTER_SAVE,
+                        moduleAlias,
+                        entityAlias,
+                        record.getId(),
+                        DynamicRecordSaveOperation.UPDATE,
+                        before,
+                        record,
+                        mutationContext
+                ));
                 childMutations.forEach(mutation -> {
                     if (mutation.kind() == RelationChildMutationKind.CREATE) {
                         mutationCoordinator.afterRelationChildCreate(moduleAlias, entityAlias, mutation.relation().code(),
@@ -402,6 +495,37 @@ public class DynamicRecordService {
         }
     }
 
+    private Map<String, Object> mutationMetadata(DynamicRecord record) {
+        return record == null ? Map.of() : record.mutationMetadata();
+    }
+
+    private DynamicRecordMutationEvent mutationEvent(DynamicRecordMutationEventType eventType,
+                                                     String moduleAlias,
+                                                     String entityAlias,
+                                                     String recordId,
+                                                     DynamicRecordSaveOperation saveOperation,
+                                                     DynamicRecord before,
+                                                     DynamicRecord after,
+                                                     DynamicMutationContext context) {
+        DynamicMutationContext effectiveContext = context == null ? DynamicMutationContext.current().orElse(null) : context;
+        return new DynamicRecordMutationEvent(
+                null,
+                eventType,
+                moduleAlias,
+                entityAlias,
+                recordId,
+                saveOperation,
+                before == null ? null : before.copy(),
+                after == null ? null : after.copy(),
+                effectiveContext == null ? RuntimeMutationSource.BUSINESS : effectiveContext.mutationSource(),
+                effectiveContext == null ? null : effectiveContext.traceId(),
+                effectiveContext == null ? 0 : effectiveContext.depth(),
+                effectiveContext == null ? null : effectiveContext.parentExecutionId(),
+                effectiveContext == null || effectiveContext.cascadeAllowed(),
+                effectiveContext == null ? Map.of() : effectiveContext.metadata()
+        );
+    }
+
     @Transactional
     public int delete(String moduleAlias, String entityAlias, String id) {
         return delete(moduleAlias, entityAlias, id, RuntimeMutationSource.BUSINESS, null);
@@ -412,13 +536,15 @@ public class DynamicRecordService {
     }
 
     private int delete(String moduleAlias, String entityAlias, String id, RuntimeMutationSource mutationSource, String traceId) {
-        try (DynamicMutationContext ignored = DynamicMutationContext.open(mutationClock)) {
+        try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
+                traceId, Map.of())) {
             DataScopeCriteriaResult mutationScope = DataScopeCriteriaResult.unrestricted(Criteria.of());
             if (mutationSource == RuntimeMutationSource.BUSINESS) {
                 Set<String> recordIds = normalizeRecordId(id);
                 mutationScope = requireBusinessRecordMutation(moduleAlias, entityAlias, PlatformAction.DELETE, recordIds);
             }
-            DynamicRecord before = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).select(id));
+            DynamicRecord before = withTenantScope(mutationScope,
+                    () -> entityService(moduleAlias, entityAlias).selectActiveRaw(id));
             mutationCoordinator.beforeDelete(moduleAlias, entityAlias, before);
             List<RelationChildMutation> childMutations = relationChildrenForCascadeDelete(moduleAlias, entityAlias, before);
             childMutations.forEach(mutation -> mutationCoordinator.beforeRelationChildDelete(
@@ -432,6 +558,16 @@ public class DynamicRecordService {
             int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).delete(id));
             if (deleted > 0) {
                 mutationCoordinator.afterDelete(moduleAlias, entityAlias, before);
+                mutationCoordinator.afterMutation(mutationEvent(
+                        DynamicRecordMutationEventType.AFTER_DELETE,
+                        moduleAlias,
+                        entityAlias,
+                        id,
+                        null,
+                        before,
+                        null,
+                        mutationContext
+                ));
                 childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildDelete(
                         moduleAlias,
                         entityAlias,
@@ -452,7 +588,8 @@ public class DynamicRecordService {
     }
 
     private int deleteBatch(String moduleAlias, String entityAlias, Collection<String> ids, RuntimeMutationSource mutationSource, String traceId) {
-        try (DynamicMutationContext ignored = DynamicMutationContext.open(mutationClock)) {
+        try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
+                traceId, Map.of())) {
             Set<String> normalizedIds = normalizeRecordIds(ids);
             if (normalizedIds.isEmpty()) {
                 return 0;
@@ -478,7 +615,19 @@ public class DynamicRecordService {
             ));
             int deleted = withTenantScope(mutationScope, () -> entityService(moduleAlias, entityAlias).deleteBatch(normalizedIds));
             if (deleted > 0) {
-                beforeRecords.forEach(record -> mutationCoordinator.afterDelete(moduleAlias, entityAlias, record));
+                beforeRecords.forEach(record -> {
+                    mutationCoordinator.afterDelete(moduleAlias, entityAlias, record);
+                    mutationCoordinator.afterMutation(mutationEvent(
+                            DynamicRecordMutationEventType.AFTER_DELETE,
+                            moduleAlias,
+                            entityAlias,
+                            record.getId(),
+                            null,
+                            record,
+                            null,
+                            mutationContext
+                    ));
+                });
                 childMutations.forEach(mutation -> mutationCoordinator.afterRelationChildDelete(
                         moduleAlias,
                         entityAlias,
@@ -498,6 +647,14 @@ public class DynamicRecordService {
         DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(),
                 pageRequest, sorts));
+    }
+
+    public List<DynamicRecord> listSystem(String moduleAlias,
+                                          String entityAlias,
+                                          Criteria criteria,
+                                          PageRequest pageRequest,
+                                          Sort... sorts) {
+        return entityService(moduleAlias, entityAlias).list(criteria, pageRequest, sorts);
     }
 
     List<DynamicRecord> listForAction(String moduleAlias,
@@ -702,7 +859,9 @@ public class DynamicRecordService {
                         ? RelationChildMutation.create(relation, child)
                         : RelationChildMutation.update(relation, existing, child));
             }
-            existingById.values().forEach(child -> mutations.add(RelationChildMutation.delete(relation, child)));
+            if (!incoming.isPartialChildren(relation.code())) {
+                existingById.values().forEach(child -> mutations.add(RelationChildMutation.delete(relation, child)));
+            }
         }
         return List.copyOf(mutations);
     }
@@ -1343,21 +1502,9 @@ public class DynamicRecordService {
             return new DynamicStandardActionExecutor(this, moduleAlias, entityAlias, traceId)
                     .execute(action.code(), request);
         }
-        if (action.executorType() == EntityActionExecutorType.SERVICE) {
-            DynamicActionExecutor executor;
-            try {
-                executor = runtime.actionExecutorRegistry().require(action.executorKey());
-            } catch (IllegalArgumentException e) {
-                throw new DynamicActionExecutionException(e.getMessage(), context, e);
-            }
-            try {
-                return actionResultBody(executor.execute(context, request,
-                        actionOperations(moduleAlias, entityAlias, traceId, policy)));
-            } catch (DynamicActionExecutionException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                throw new DynamicActionExecutionException(e.getMessage(), context, e);
-            }
+        if (action.executorType() == EntityActionExecutorType.SERVICE
+                || action.executorType() == EntityActionExecutorType.GENERATE) {
+            return executeRegisteredAction(moduleAlias, entityAlias, action, request, context, traceId, policy);
         }
         if (action.executorType() == EntityActionExecutorType.DIALOG) {
             return DynamicActionResultBody.dialog(dialogKey(action), action.title());
@@ -1366,6 +1513,29 @@ public class DynamicRecordService {
                 "dynamic action executor is not supported: " + action.executorType(),
                 context
         );
+    }
+
+    private DynamicActionResultBody executeRegisteredAction(String moduleAlias,
+                                                            String entityAlias,
+                                                            DynamicActionDescriptor action,
+                                                            DynamicActionExecutionRequest request,
+                                                            DynamicActionExecutionContext context,
+                                                            String traceId,
+                                                            ActionExecutionPolicy policy) {
+        DynamicActionExecutor executor;
+        try {
+            executor = runtime.actionExecutorRegistry().require(action.executorKey());
+        } catch (IllegalArgumentException e) {
+            throw new DynamicActionExecutionException(e.getMessage(), context, e);
+        }
+        try {
+            return actionResultBody(executor.execute(context, request,
+                    actionOperations(moduleAlias, entityAlias, traceId, policy)));
+        } catch (DynamicActionExecutionException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new DynamicActionExecutionException(e.getMessage(), context, e);
+        }
     }
 
     private String dialogKey(DynamicActionDescriptor action) {
@@ -1394,8 +1564,23 @@ public class DynamicRecordService {
             }
 
             @Override
+            public DynamicRecord newRecord(String targetModuleAlias, String targetEntityAlias) {
+                return DynamicRecordService.this.newRecord(targetModuleAlias, targetEntityAlias);
+            }
+
+            @Override
             public DynamicRecord select(String id) {
                 return DynamicRecordService.this.select(moduleAlias, entityAlias, id);
+            }
+
+            @Override
+            public DynamicRecord select(String targetModuleAlias, String targetEntityAlias, String id) {
+                return DynamicRecordService.this.select(targetModuleAlias, targetEntityAlias, id);
+            }
+
+            @Override
+            public void requireAction(String targetModuleAlias, PlatformAction action) {
+                DynamicRecordService.this.requireAction(targetModuleAlias, action);
             }
 
             @Override
@@ -1403,7 +1588,7 @@ public class DynamicRecordService {
                 DataScopeCriteriaResult scope = requireActionRecordDataScope(moduleAlias, entityAlias, policy,
                         normalizeRecordId(record == null ? null : record.getId()));
                 return withTenantScope(scope, () -> DynamicRecordService.this.update(moduleAlias, entityAlias, record,
-                        RuntimeMutationSource.ACTION, traceId));
+                        RuntimeMutationSource.ACTION, traceId, Map.of()));
             }
 
             @Override

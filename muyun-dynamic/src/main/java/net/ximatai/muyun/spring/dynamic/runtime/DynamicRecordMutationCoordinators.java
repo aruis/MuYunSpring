@@ -136,6 +136,11 @@ public final class DynamicRecordMutationCoordinators {
         public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
             delegates.forEach(delegate -> delegate.afterDelete(moduleAlias, entityAlias, before));
         }
+
+        @Override
+        public void afterMutation(DynamicRecordMutationEvent event) {
+            delegates.forEach(delegate -> delegate.afterMutation(event));
+        }
     }
 
     private record LazyComposite(Supplier<List<DynamicRecordMutationCoordinator>> coordinators)
@@ -250,6 +255,11 @@ public final class DynamicRecordMutationCoordinators {
         @Override
         public void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
             delegates().forEach(delegate -> delegate.afterDelete(moduleAlias, entityAlias, before));
+        }
+
+        @Override
+        public void afterMutation(DynamicRecordMutationEvent event) {
+            delegates().forEach(delegate -> delegate.afterMutation(event));
         }
     }
 }

@@ -74,4 +74,7 @@ public interface DynamicRecordMutationCoordinator {
 
     default void afterDelete(String moduleAlias, String entityAlias, DynamicRecord before) {
     }
+
+    default void afterMutation(DynamicRecordMutationEvent event) {
+    }
 }

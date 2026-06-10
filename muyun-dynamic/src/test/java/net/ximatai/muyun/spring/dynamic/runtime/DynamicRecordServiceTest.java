@@ -104,6 +104,117 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeMutationMetadataToCoordinatorDuringCreate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        AtomicReference<Object> captured = new AtomicReference<>();
+        DynamicRecordMutationCoordinator coordinator = new DynamicRecordMutationCoordinator() {
+            @Override
+            public void afterCreate(String moduleAlias, String entityAlias, DynamicRecord record, String id) {
+                captured.set(DynamicMutationContext.current()
+                        .map(context -> context.metadata("originContext"))
+                        .orElse(null));
+            }
+        };
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                RuntimeEventPublisher.noop()
+        ).register(new ModuleDefinition(MODULE, "Contract", List.of(contractEntity())));
+        DynamicRecordService service = new DynamicRecordService(runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService(),
+                coordinator);
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-001");
+        record.setId("contract-1");
+
+        service.create(MODULE, "contract", record, Map.of("originContext", "ctx-1"));
+
+        assertThat(captured).hasValue("ctx-1");
+    }
+
+    @Test
+    void shouldPublishMutationSnapshotEventsToCoordinator() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        List<DynamicRecordMutationEvent> events = new ArrayList<>();
+        DynamicRecordService service = serviceWithCoordinator(operations, contractEntity(), new DynamicRecordMutationCoordinator() {
+            @Override
+            public void afterMutation(DynamicRecordMutationEvent event) {
+                events.add(event);
+            }
+        });
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-001");
+        record.setId("contract-1");
+
+        service.create(MODULE, "contract", record);
+        service.update(MODULE, "contract", record.setValue("amount", BigDecimal.ONE));
+        service.delete(MODULE, "contract", "contract-1");
+
+        assertThat(events).hasSize(3);
+        assertThat(events.get(0).eventType()).isEqualTo(DynamicRecordMutationEventType.AFTER_SAVE);
+        assertThat(events.get(0).saveOperation()).isEqualTo(DynamicRecordSaveOperation.CREATE);
+        assertThat(events.get(0).beforeRecord()).isNull();
+        assertThat(events.get(0).afterRecord().getId()).isEqualTo("contract-1");
+        assertThat(events.get(1).saveOperation()).isEqualTo(DynamicRecordSaveOperation.UPDATE);
+        assertThat(events.get(1).beforeRecord().getId()).isEqualTo("contract-1");
+        assertThat(events.get(1).afterRecord().getValue("amount")).isEqualTo(BigDecimal.ONE);
+        assertThat(events.get(2).eventType()).isEqualTo(DynamicRecordMutationEventType.AFTER_DELETE);
+        assertThat(events.get(2).beforeRecord().getId()).isEqualTo("contract-1");
+        assertThat(events.get(2).afterRecord()).isNull();
+    }
+
+    @Test
+    void shouldMarkWriteBackMutationContextOnSystemSave() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        AtomicReference<DynamicRecordMutationEvent> captured = new AtomicReference<>();
+        DynamicRecordService service = serviceWithCoordinator(operations, contractEntity(), new DynamicRecordMutationCoordinator() {
+            @Override
+            public void afterMutation(DynamicRecordMutationEvent event) {
+                captured.set(event);
+            }
+        });
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-002");
+        record.setId("contract-1");
+        DynamicWriteBackContext context = new DynamicWriteBackContext("trace-1", 2, "exec-1", false);
+
+        service.updateWriteBack(MODULE, "contract", record, context);
+
+        assertThat(captured.get().mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
+        assertThat(captured.get().traceId()).isEqualTo("trace-1");
+        assertThat(captured.get().depth()).isEqualTo(2);
+        assertThat(captured.get().parentExecutionId()).isEqualTo("exec-1");
+        assertThat(captured.get().cascadeAllowed()).isFalse();
+        assertThat(captured.get().shouldSkipForSingleHopCascade()).isTrue();
+    }
+
+    @Test
+    void shouldRestoreOuterMutationContextAfterNestedWriteBackContext() {
+        try (DynamicMutationContext outer = DynamicMutationContext.open(null,
+                RuntimeMutationSource.BUSINESS, "trace-root", Map.of("originContext", "ctx-1"))) {
+            assertThat(DynamicMutationContext.current().orElseThrow().mutationSource())
+                    .isEqualTo(RuntimeMutationSource.BUSINESS);
+            try (DynamicMutationContext ignored = DynamicMutationContext.openWriteBack(null,
+                    new DynamicWriteBackContext("trace-wb", 1, "exec-1", true), Map.of())) {
+                DynamicMutationContext current = DynamicMutationContext.current().orElseThrow();
+                assertThat(current.mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
+                assertThat(current.traceId()).isEqualTo("trace-wb");
+                assertThat(current.depth()).isEqualTo(1);
+            }
+            DynamicMutationContext restored = DynamicMutationContext.current().orElseThrow();
+            assertThat(restored).isSameAs(outer);
+            assertThat(restored.mutationSource()).isEqualTo(RuntimeMutationSource.BUSINESS);
+            assertThat(restored.metadata("originContext")).isEqualTo("ctx-1");
+        }
+        assertThat(DynamicMutationContext.current()).isEmpty();
+    }
+
+    @Test
     void shouldRejectNullRecordOnUpdateWithClearMessage() {
         DynamicRecordService service = service(operations(), contractEntity());
 
@@ -2234,7 +2345,9 @@ class DynamicRecordServiceTest {
     @Test
     void shouldBypassTenantScopeWhenUpdatingDynamicRecordWithCrossTenantDataScope() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false, "tenant-b")));
+        when(operations.query(anyString(), anyMap()))
+                .thenReturn(List.of(row("contract-1", "C-001", 0, false, "tenant-b")))
+                .thenReturn(List.of(row("contract-1", "C-001", 0, false, "tenant-b")));
         DynamicRecordService service = service(operations, contractEntity(), RuntimeEventPublisher.noop(),
                 new CrossTenantAllDataScopeCriteriaService());
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -2322,6 +2435,24 @@ class DynamicRecordServiceTest {
                 runtime,
                 new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
                 dataScopeCriteriaService
+        );
+    }
+
+    private DynamicRecordService serviceWithCoordinator(IDatabaseOperations<Object> operations,
+                                                        EntityDefinition entity,
+                                                        DynamicRecordMutationCoordinator coordinator) {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                RuntimeEventPublisher.noop()
+        )
+                .register(new ModuleDefinition(MODULE, "Contract", List.of(entity)));
+        return new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService(),
+                coordinator
         );
     }
 
