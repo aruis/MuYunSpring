@@ -1,0 +1,114 @@
+package net.ximatai.muyun.spring.platform.ui;
+
+import net.ximatai.muyun.spring.ability.AbstractAbilityService;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+@Service
+public class PlatformRecordNavigationService extends AbstractAbilityService<PlatformRecordNavigationSession> {
+    public static final String MODULE_ALIAS = "platform.record_navigation_session";
+
+    public PlatformRecordNavigationService(BaseDao<PlatformRecordNavigationSession, String> sessionDao) {
+        super(MODULE_ALIAS, PlatformRecordNavigationSession.class, sessionDao);
+    }
+
+    @Transactional
+    public PlatformRecordNavigationContext createCurrentUserSession(String moduleAlias,
+                                                                    String entityAlias,
+                                                                    List<String> recordIds,
+                                                                    int pageNum,
+                                                                    int pageSize,
+                                                                    long total) {
+        List<String> normalizedIds = normalizeRecordIds(recordIds);
+        if (normalizedIds.isEmpty()) {
+            return null;
+        }
+        PlatformRecordNavigationSession session = new PlatformRecordNavigationSession();
+        session.setUserId(currentUserId());
+        session.setModuleAlias(PlatformNameRules.requireModuleAlias(moduleAlias));
+        session.setEntityAlias(PlatformNameRules.requireIdentifier(entityAlias, "entityAlias"));
+        session.setRecordIds(String.join(",", normalizedIds));
+        session.setPageNum(pageNum);
+        session.setPageSize(pageSize);
+        session.setTotal(total);
+        insert(session);
+        return context(session);
+    }
+
+    public PlatformRecordNavigationMove move(String moduleAlias, String sessionId, String currentRecordId) {
+        PlatformRecordNavigationSession session = select(requireText(sessionId, "sessionId"));
+        if (session == null
+                || !Objects.equals(session.getUserId(), currentUserId())
+                || !Objects.equals(session.getModuleAlias(), PlatformNameRules.requireModuleAlias(moduleAlias))) {
+            throw new PlatformException("record navigation session is not available: " + sessionId);
+        }
+        List<String> ids = recordIds(session);
+        String normalizedCurrent = requireText(currentRecordId, "currentRecordId");
+        int index = ids.indexOf(normalizedCurrent);
+        if (index < 0) {
+            throw new PlatformException("record is not in navigation session: " + currentRecordId);
+        }
+        String previous = index == 0 ? null : ids.get(index - 1);
+        String next = index >= ids.size() - 1 ? null : ids.get(index + 1);
+        return new PlatformRecordNavigationMove(session.getId(), normalizedCurrent, previous, next,
+                previous == null, next == null);
+    }
+
+    private PlatformRecordNavigationContext context(PlatformRecordNavigationSession session) {
+        return new PlatformRecordNavigationContext(
+                session.getId(),
+                session.getModuleAlias(),
+                session.getEntityAlias(),
+                recordIds(session),
+                session.getPageNum() == null ? 1 : session.getPageNum(),
+                session.getPageSize() == null ? 0 : session.getPageSize(),
+                session.getTotal() == null ? -1 : session.getTotal()
+        );
+    }
+
+    private List<String> recordIds(PlatformRecordNavigationSession session) {
+        if (session == null || session.getRecordIds() == null || session.getRecordIds().isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(session.getRecordIds().split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
+    }
+
+    private List<String> normalizeRecordIds(List<String> recordIds) {
+        if (recordIds == null || recordIds.isEmpty()) {
+            return List.of();
+        }
+        return recordIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    private String currentUserId() {
+        CurrentUser user = CurrentUserContext.currentUser()
+                .orElseThrow(() -> new PlatformException("record navigation requires current user"));
+        if (user.system()) {
+            throw new PlatformException("record navigation requires tenant user");
+        }
+        return user.userId();
+    }
+
+    private String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new PlatformException("record navigation " + fieldName + " must not be blank");
+        }
+        return value.trim();
+    }
+}

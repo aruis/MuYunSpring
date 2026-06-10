@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -67,6 +68,9 @@ import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationContext;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationMove;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import org.springframework.http.HttpStatus;
@@ -114,6 +118,7 @@ public class DynamicRecordWebController implements
     private final ModuleMetadataFieldService moduleMetadataFieldService;
     private final RecordAttachmentService recordAttachmentService;
     private final RecordDuplicateCheckService duplicateCheckService;
+    private final PlatformRecordNavigationService navigationService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -131,7 +136,8 @@ public class DynamicRecordWebController implements
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
                                       ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
                                       ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider,
-                                      ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider) {
+                                      ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider,
+                                      ObjectProvider<PlatformRecordNavigationService> navigationServiceProvider) {
         this(recordService, activeTenantVerifier,
                 codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
                 referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
@@ -139,7 +145,8 @@ public class DynamicRecordWebController implements
                 queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
                 moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
                 recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable(),
-                duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable());
+                duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable(),
+                navigationServiceProvider == null ? null : navigationServiceProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -153,7 +160,7 @@ public class DynamicRecordWebController implements
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -164,7 +171,7 @@ public class DynamicRecordWebController implements
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null);
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -176,7 +183,7 @@ public class DynamicRecordWebController implements
                                       ModuleMetadataFieldService moduleMetadataFieldService,
                                       RecordAttachmentService recordAttachmentService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService, null);
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -188,6 +195,21 @@ public class DynamicRecordWebController implements
                                       ModuleMetadataFieldService moduleMetadataFieldService,
                                       RecordAttachmentService recordAttachmentService,
                                       RecordDuplicateCheckService duplicateCheckService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService,
+                duplicateCheckService, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      RecordAttachmentService recordAttachmentService,
+                                      RecordDuplicateCheckService duplicateCheckService,
+                                      PlatformRecordNavigationService navigationService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
@@ -197,6 +219,7 @@ public class DynamicRecordWebController implements
         this.moduleMetadataFieldService = moduleMetadataFieldService;
         this.recordAttachmentService = recordAttachmentService;
         this.duplicateCheckService = duplicateCheckService;
+        this.navigationService = navigationService;
     }
 
     @Override
@@ -251,6 +274,17 @@ public class DynamicRecordWebController implements
                 .map(record -> project(record, projectionFields))
                 .toList();
         return PageResult.of(records, page.getTotal(), PageRequest.of(page.getPageNum(), page.getPageSize()));
+    }
+
+    @Override
+    @PostMapping("/query")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public WebPageResponse<DynamicRecord> query(@RequestBody(required = false) WebQueryRequest request) {
+        return webScope(() -> {
+            PageResult<DynamicRecord> page = queryRecords(request);
+            PageResult<DynamicRecord> output = WebOutputSupport.page(service(), page, FieldOutputContext.LIST);
+            return WebPageResponse.from(output, navigationContext(request, output));
+        });
     }
 
     @Override
@@ -588,6 +622,20 @@ public class DynamicRecordWebController implements
                         moduleAlias, action.code(), Set.of()).available()));
     }
 
+    @GetMapping("/navigation/{sessionId}/{recordId}")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public PlatformRecordNavigationMove navigation(@PathVariable String sessionId,
+                                                   @PathVariable String recordId) {
+        return webScope(() -> {
+            requireNavigationService();
+            PlatformRecordNavigationMove move = navigationService.move(DynamicWebRequest.moduleAlias(), sessionId, recordId);
+            requireNavigationViewScope(move.currentRecordId());
+            requireNavigationViewScope(move.previousRecordId());
+            requireNavigationViewScope(move.nextRecordId());
+            return move;
+        });
+    }
+
     @PostMapping("/code/preview")
     @ActionEndpoint(PlatformAction.CREATE)
     public List<CodeBusinessPreviewItem> previewCode(@PathVariable String moduleAlias,
@@ -779,6 +827,40 @@ public class DynamicRecordWebController implements
         if (duplicateCheckService == null) {
             throw new PlatformException("record duplicate check service is not configured");
         }
+    }
+
+    private void requireNavigationService() {
+        if (navigationService == null) {
+            throw new PlatformException("record navigation service is not configured");
+        }
+    }
+
+    private void requireNavigationViewScope(String recordId) {
+        if (recordId != null && !recordId.isBlank()) {
+            DynamicRecord visible = recordService.select(
+                    DynamicWebRequest.moduleAlias(),
+                    mainEntityAlias(DynamicWebRequest.moduleAlias()),
+                    recordId);
+            if (visible == null) {
+                throw new PlatformException("record navigation record is not visible: " + recordId);
+            }
+        }
+    }
+
+    private PlatformRecordNavigationContext navigationContext(WebQueryRequest request,
+                                                             PageResult<DynamicRecord> page) {
+        if (request == null || !request.navigationSessionEnabled() || page.getRecords().isEmpty()) {
+            return null;
+        }
+        requireNavigationService();
+        return navigationService.createCurrentUserSession(
+                DynamicWebRequest.moduleAlias(),
+                mainEntityAlias(DynamicWebRequest.moduleAlias()),
+                page.getRecords().stream().map(DynamicRecord::getId).toList(),
+                page.getPageNum(),
+                page.getPageSize(),
+                page.getTotal()
+        );
     }
 
     private String requireText(String value, String fieldName) {

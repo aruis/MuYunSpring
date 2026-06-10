@@ -72,6 +72,9 @@ import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationContext;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationMove;
+import net.ximatai.muyun.spring.platform.ui.PlatformRecordNavigationService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
@@ -765,6 +768,99 @@ class DynamicRecordWebControllerTest {
         assertThat(page.getValue().getOffset()).isEqualTo(30);
         assertThat(page.getValue().getLimit()).isEqualTo(30);
         assertThat(sorts.getValue()[0].getField()).isEqualTo("amount");
+    }
+
+    @Test
+    void shouldCreateNavigationSessionWhenDynamicQueryRequestsIt() throws Exception {
+        PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
+        MockMvc navigationMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, null, null, navigationService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicRecord first = new DynamicRecord(entity()).setValue("code", "C-001");
+        first.setId("contract-1");
+        DynamicRecord second = new DynamicRecord(entity()).setValue("code", "C-002");
+        second.setId("contract-2");
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(first, second), 2, PageRequest.of(1, 20)));
+        when(navigationService.createCurrentUserSession(eq(MODULE), eq(ENTITY),
+                eq(List.of("contract-1", "contract-2")), eq(1), eq(20), eq(2L)))
+                .thenReturn(new PlatformRecordNavigationContext("nav-1", MODULE, ENTITY,
+                        List.of("contract-1", "contract-2"), 1, 20, 2));
+
+        navigationMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "navigationSession": true,
+                                  "page": {
+                                    "pageNum": 1,
+                                    "pageSize": 20
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.navigation.sessionId").value("nav-1"))
+                .andExpect(jsonPath("$.navigation.recordIds[0]").value("contract-1"))
+                .andExpect(jsonPath("$.records[1].id").value("contract-2"));
+    }
+
+    @Test
+    void shouldResolveRecordNavigationMove() throws Exception {
+        PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
+        MockMvc navigationMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, null, null, navigationService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(navigationService.move(MODULE, "nav-1", "contract-2"))
+                .thenReturn(new PlatformRecordNavigationMove("nav-1", "contract-2",
+                        "contract-1", "contract-3", false, false));
+        when(service.select(eq(MODULE), eq(ENTITY), anyString()))
+                .thenAnswer(invocation -> {
+                    DynamicRecord record = new DynamicRecord(entity());
+                    record.setId(invocation.getArgument(2));
+                    return record;
+                });
+
+        navigationMvc.perform(get("/{moduleAlias}/navigation/{sessionId}/{recordId}", MODULE, "nav-1", "contract-2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previousRecordId").value("contract-1"))
+                .andExpect(jsonPath("$.nextRecordId").value("contract-3"));
+        verify(service).select(MODULE, ENTITY, "contract-1");
+        verify(service).select(MODULE, ENTITY, "contract-2");
+        verify(service).select(MODULE, ENTITY, "contract-3");
+    }
+
+    @Test
+    void shouldRejectRecordNavigationWhenNeighborIsNotVisible() throws Exception {
+        PlatformRecordNavigationService navigationService = mock(PlatformRecordNavigationService.class);
+        MockMvc navigationMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, null, null, navigationService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(navigationService.move(MODULE, "nav-1", "contract-2"))
+                .thenReturn(new PlatformRecordNavigationMove("nav-1", "contract-2",
+                        "hidden", null, false, true));
+        DynamicRecord current = new DynamicRecord(entity()).setValue("code", "C-002");
+        current.setId("contract-2");
+        when(service.select(MODULE, ENTITY, "contract-2")).thenReturn(current);
+        when(service.select(MODULE, ENTITY, "hidden")).thenReturn(null);
+
+        navigationMvc.perform(get("/{moduleAlias}/navigation/{sessionId}/{recordId}", MODULE, "nav-1", "contract-2"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("record navigation record is not visible: hidden"));
     }
 
     @Test

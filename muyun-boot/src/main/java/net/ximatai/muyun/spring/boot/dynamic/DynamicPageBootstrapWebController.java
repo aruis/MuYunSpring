@@ -50,7 +50,8 @@ public class DynamicPageBootstrapWebController {
                 bootstrap.clientType(),
                 descriptor,
                 descriptor.mainEntityAlias(),
-                bootstrap.resolvedConfig()
+                bootstrap.resolvedConfig(),
+                "/" + moduleAlias + "/openapi"
         );
     }
 

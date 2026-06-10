@@ -10,7 +10,8 @@ public record WebQueryRequest(WebPageRequest page,
                               List<WebSort> sorts,
                               String uiConfigId,
                               String queryTemplateId,
-                              Map<String, Object> externalQueryValues) {
+                              Map<String, Object> externalQueryValues,
+                              Boolean navigationSession) {
     public WebQueryRequest {
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
         sorts = sorts == null ? List.of() : List.copyOf(sorts);
@@ -22,10 +23,14 @@ public record WebQueryRequest(WebPageRequest page,
     public WebQueryRequest(WebPageRequest page,
                            List<WebQueryCondition> conditions,
                            List<WebSort> sorts) {
-        this(page, conditions, sorts, null, null, Map.of());
+        this(page, conditions, sorts, null, null, Map.of(), null);
     }
 
     public WebPageRequest pageOrDefault() {
         return page == null ? WebPageRequest.DEFAULT : page;
+    }
+
+    public boolean navigationSessionEnabled() {
+        return Boolean.TRUE.equals(navigationSession);
     }
 }

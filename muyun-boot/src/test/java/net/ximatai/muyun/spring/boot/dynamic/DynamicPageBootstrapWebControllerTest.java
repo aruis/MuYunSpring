@@ -80,6 +80,7 @@ class DynamicPageBootstrapWebControllerTest {
                     .andExpect(jsonPath("$.moduleDescriptor.actions.length()").value(1))
                     .andExpect(jsonPath("$.moduleDescriptor.actions[0].code").value("query"))
                     .andExpect(jsonPath("$.mainEntityAlias").value("customer"))
+                    .andExpect(jsonPath("$.openApiPath").value("/crm.customer/openapi"))
                     .andExpect(jsonPath("$.pageConfig").doesNotExist())
                     .andExpect(jsonPath("$.resolvedConfig.uiFields.length()").value(0));
             mvc.perform(get("/platform.menu/menu-1/entry"))

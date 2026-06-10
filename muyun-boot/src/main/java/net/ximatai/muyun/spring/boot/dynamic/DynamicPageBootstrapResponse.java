@@ -10,6 +10,7 @@ public record DynamicPageBootstrapResponse(
         PlatformUiClientType clientType,
         DynamicModuleDescriptor moduleDescriptor,
         String mainEntityAlias,
-        PlatformResolvedPageConfig resolvedConfig
+        PlatformResolvedPageConfig resolvedConfig,
+        String openApiPath
 ) {
 }
