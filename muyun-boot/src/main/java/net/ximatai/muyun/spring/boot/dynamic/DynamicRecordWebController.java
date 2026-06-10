@@ -32,6 +32,8 @@ import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentCommand;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
+import net.ximatai.muyun.spring.platform.duplicate.RecordDuplicateCheckResult;
+import net.ximatai.muyun.spring.platform.duplicate.RecordDuplicateCheckService;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
@@ -111,6 +113,7 @@ public class DynamicRecordWebController implements
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
     private final RecordAttachmentService recordAttachmentService;
+    private final RecordDuplicateCheckService duplicateCheckService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -127,14 +130,16 @@ public class DynamicRecordWebController implements
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
                                       ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
-                                      ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider) {
+                                      ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider,
+                                      ObjectProvider<RecordDuplicateCheckService> duplicateCheckServiceProvider) {
         this(recordService, activeTenantVerifier,
                 codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
                 referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
                 pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
                 queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
                 moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
-                recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable());
+                recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable(),
+                duplicateCheckServiceProvider == null ? null : duplicateCheckServiceProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -148,7 +153,7 @@ public class DynamicRecordWebController implements
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -159,7 +164,7 @@ public class DynamicRecordWebController implements
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null);
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -170,6 +175,19 @@ public class DynamicRecordWebController implements
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService,
                                       RecordAttachmentService recordAttachmentService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, recordAttachmentService, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      RecordAttachmentService recordAttachmentService,
+                                      RecordDuplicateCheckService duplicateCheckService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
@@ -178,6 +196,7 @@ public class DynamicRecordWebController implements
         this.queryItemService = queryItemService;
         this.moduleMetadataFieldService = moduleMetadataFieldService;
         this.recordAttachmentService = recordAttachmentService;
+        this.duplicateCheckService = duplicateCheckService;
     }
 
     @Override
@@ -644,6 +663,34 @@ public class DynamicRecordWebController implements
         return executeAction(moduleAlias, actionCode, recordId, request);
     }
 
+    @PostMapping("/{actionCode}/duplicate/check")
+    public RecordDuplicateCheckResult checkDuplicate(@PathVariable String actionCode,
+                                                     @RequestBody(required = false) DynamicWebDuplicateCheckRequest request) {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        requireActionLevel(moduleAlias, actionCode, Set.of(EntityActionLevel.RECORD, EntityActionLevel.ANY),
+                "dynamic duplicate action must be record action: ");
+        return webScope(() -> {
+            requireDuplicateCheckService();
+            DynamicWebDuplicateCheckRequest normalized = request == null
+                    ? DynamicWebDuplicateCheckRequest.empty()
+                    : request;
+            DynamicActionAvailability availability = recordService.actionAuthorizationAvailability(
+                    moduleAlias, actionCode, duplicateRecordIds(normalized));
+            if (!availability.available()) {
+                throw new PlatformException(hasText(availability.message())
+                        ? availability.message()
+                        : "dynamic duplicate action is not available: " + actionCode);
+            }
+            return duplicateCheckService.check(moduleAlias, actionCode, normalized.recordId(), normalized.values());
+        });
+    }
+
+    private Set<String> duplicateRecordIds(DynamicWebDuplicateCheckRequest request) {
+        return request.recordId() == null || request.recordId().isBlank()
+                ? Set.of()
+                : Set.of(request.recordId().trim());
+    }
+
     @Override
     @PostMapping("/references/{fieldName}/resolve")
     @ActionEndpoint(PlatformAction.REFERENCE)
@@ -726,6 +773,12 @@ public class DynamicRecordWebController implements
             throw new PlatformException("reference record generation facade is not configured");
         }
         return referenceRecordGenerationFacade;
+    }
+
+    private void requireDuplicateCheckService() {
+        if (duplicateCheckService == null) {
+            throw new PlatformException("record duplicate check service is not configured");
+        }
     }
 
     private String requireText(String value, String fieldName) {

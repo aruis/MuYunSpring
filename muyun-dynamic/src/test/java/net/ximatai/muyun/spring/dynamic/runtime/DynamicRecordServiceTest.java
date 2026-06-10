@@ -561,6 +561,46 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldApplyActionAuthorizationAndDataScopeToPageForAction() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("visible", "C-001", "draft")));
+        RecordingActionPolicyService policyService = new RecordingActionPolicyService();
+        DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
+        when(dataScope.resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
+                .thenAnswer(invocation -> {
+                    Criteria criteria = invocation.getArgument(2);
+                    Criteria scoped = Criteria.of();
+                    if (criteria != null && !criteria.isEmpty()) {
+                        scoped.andGroup(criteria.getRoot());
+                    }
+                    scoped.eq("id", "visible");
+                    return DataScopeCriteriaResult.restricted(scoped);
+                });
+        DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(),
+                new TestActionExecutor("contractSubmit"), dataAuthSubmitAction("contractSubmit"),
+                DynamicActionTransactionOperator.none(), policyService, dataScope);
+
+        assertThat(service.pageForAction(MODULE, "contract", "submit",
+                Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10)).getRecords())
+                .singleElement()
+                .extracting(DynamicRecord::getId)
+                .isEqualTo("visible");
+
+        assertThat(policyService.context).isNotNull();
+        assertThat(policyService.context.actionCode()).isEqualTo("submit");
+        ArgumentCaptor<ActionExecutionPolicy> policy = ArgumentCaptor.forClass(ActionExecutionPolicy.class);
+        verify(dataScope).resolveReadScope(eq(MODULE), policy.capture(), any(Criteria.class), any());
+        assertThat(policy.getValue().actionCode()).isEqualTo("submit");
+        assertThat(policy.getValue().requiresDataScope()).isTrue();
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
+                .contains("\"code\" =")
+                .contains("\"id\" ="));
+    }
+
+    @Test
     void shouldNotHideUnexpectedFailureWhenCheckingDynamicActionAuthorizationAvailability() {
         DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(),
                 new TestActionExecutor("contractSubmit"), dataAuthSubmitAction("contractSubmit"),

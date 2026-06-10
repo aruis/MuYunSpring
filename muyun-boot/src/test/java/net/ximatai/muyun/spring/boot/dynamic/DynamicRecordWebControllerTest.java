@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
@@ -55,6 +56,9 @@ import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeFieldRole;
+import net.ximatai.muyun.spring.platform.duplicate.RecordDuplicateCheckResult;
+import net.ximatai.muyun.spring.platform.duplicate.RecordDuplicateCheckService;
+import net.ximatai.muyun.spring.platform.duplicate.RecordDuplicateMatch;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
@@ -83,6 +87,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -592,6 +597,88 @@ class DynamicRecordWebControllerTest {
         verify(attachmentService).updateAttachment(eq(MODULE), eq("contract-1"), eq("att-1"),
                 any(RecordAttachmentCommand.class));
         verify(attachmentService).deleteAttachment(MODULE, "contract-1", "att-1");
+    }
+
+    @Test
+    void shouldExposeDuplicateCheckThroughActionScopedPath() throws Exception {
+        RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
+        MockMvc duplicateMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, null, duplicateCheckService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(service.action(MODULE, "duplicate_contract"))
+                .thenReturn(action("duplicate_contract", EntityActionLevel.RECORD));
+        when(duplicateCheckService.check(eq(MODULE), eq("duplicate_contract"), eq("contract-1"), any()))
+                .thenReturn(new RecordDuplicateCheckResult(
+                        "rule-1",
+                        "duplicate_contract",
+                        List.of("code"),
+                        true,
+                        List.of(new RecordDuplicateMatch("contract-2", 5, Map.of("code", "C-001")))));
+
+        duplicateMvc.perform(post("/{moduleAlias}/{actionCode}/duplicate/check", MODULE, "duplicate_contract")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "recordId": "contract-1",
+                                  "values": {
+                                    "code": "C-001"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicated").value(true))
+                .andExpect(jsonPath("$.matches[0].recordId").value("contract-2"))
+                .andExpect(jsonPath("$.matches[0].values.code").value("C-001"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> values = ArgumentCaptor.forClass(Map.class);
+        verify(duplicateCheckService).check(eq(MODULE), eq("duplicate_contract"), eq("contract-1"), values.capture());
+        assertThat(values.getValue()).containsEntry("code", "C-001");
+    }
+
+    @Test
+    void shouldRejectDuplicateCheckWhenActionIsNotAuthorized() throws Exception {
+        RecordDuplicateCheckService duplicateCheckService = mock(RecordDuplicateCheckService.class);
+        MockMvc duplicateMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, null, duplicateCheckService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        when(service.action(MODULE, "duplicate_contract"))
+                .thenReturn(action("duplicate_contract", EntityActionLevel.RECORD));
+        when(service.actionAuthorizationAvailability(eq(MODULE), eq("duplicate_contract"), any()))
+                .thenReturn(DynamicActionAvailability.unavailable("duplicate_contract", "action permission denied"));
+
+        duplicateMvc.perform(post("/{moduleAlias}/{actionCode}/duplicate/check", MODULE, "duplicate_contract")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "recordId": "contract-1",
+                                  "values": {
+                                    "code": "C-001"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("action permission denied"));
+
+        verifyNoInteractions(duplicateCheckService);
+    }
+
+    @Test
+    void shouldNotDeclareStaticActionEndpointForDuplicateCheck() throws Exception {
+        Method method = DynamicRecordWebController.class.getMethod(
+                "checkDuplicate", String.class, DynamicWebDuplicateCheckRequest.class);
+
+        assertThat(method.getAnnotation(ActionEndpoint.class)).isNull();
     }
 
     @Test

@@ -676,6 +676,25 @@ public class DynamicRecordService {
                 pageRequest, sorts));
     }
 
+    public PageResult<DynamicRecord> pageForAction(String moduleAlias,
+                                                   String entityAlias,
+                                                   String actionCode,
+                                                   Criteria criteria,
+                                                   PageRequest pageRequest,
+                                                   Sort... sorts) {
+        DynamicActionDescriptor action = findAction(moduleAlias, entityDescriptor(moduleAlias, entityAlias), actionCode);
+        ActionExecutionPolicy policy = actionPolicy(action);
+        actionExecutionPolicyService.authorize(ActionExecutionContext.ofPolicy(
+                moduleAlias,
+                policy,
+                Set.of(),
+                CurrentUserContext.currentUser()
+        ));
+        DataScopeCriteriaResult scope = readScope(moduleAlias, policy, criteria);
+        return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).pageQuery(scope.criteria(),
+                pageRequest, sorts));
+    }
+
     public long count(String moduleAlias, String entityAlias, Criteria criteria) {
         DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).count(scope.criteria()));

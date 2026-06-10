@@ -98,6 +98,17 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
 record DynamicWebReferenceGenerationRequest(String sourceRecordId) {
 }
 
+record DynamicWebDuplicateCheckRequest(String recordId,
+                                       Map<String, Object> values) {
+    DynamicWebDuplicateCheckRequest {
+        values = values == null ? Map.of() : Map.copyOf(values);
+    }
+
+    static DynamicWebDuplicateCheckRequest empty() {
+        return new DynamicWebDuplicateCheckRequest(null, Map.of());
+    }
+}
+
 record DynamicWebGenerationConfirmRequest(String targetModuleAlias,
                                           String targetEntityAlias,
                                           DynamicRecordPayload record,
