@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class PlatformPageBootstrapService {
@@ -35,6 +36,11 @@ public class PlatformPageBootstrapService {
     }
 
     public PlatformPageBootstrap bootstrapByMenu(String menuId) {
+        return bootstrapByMenu(menuId, PlatformUiClientType.WEB);
+    }
+
+    public PlatformPageBootstrap bootstrapByMenu(String menuId, PlatformUiClientType clientType) {
+        PlatformUiClientType requestedClientType = clientType == null ? PlatformUiClientType.WEB : clientType;
         Menu menu = menuService.currentUserVisibleMenu(menuId);
         if (menu == null) {
             throw new PlatformException("Menu is not visible or does not exist: " + menuId);
@@ -46,14 +52,19 @@ public class PlatformPageBootstrapService {
         MenuPageMode pageMode = menu.getPageMode() == null ? MenuPageMode.LIST : menu.getPageMode();
         return new PlatformPageBootstrap(
                 PlatformPageEntryContext.from(menu,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode),
+                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
                         resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
-                snapshot,
-                resolveConfig(snapshot)
+                requestedClientType,
+                resolveConfig(snapshot, requestedClientType)
         );
     }
 
     public PlatformPageBootstrap bootstrapByModule(String moduleAlias) {
+        return bootstrapByModule(moduleAlias, PlatformUiClientType.WEB);
+    }
+
+    public PlatformPageBootstrap bootstrapByModule(String moduleAlias, PlatformUiClientType clientType) {
+        PlatformUiClientType requestedClientType = clientType == null ? PlatformUiClientType.WEB : clientType;
         String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         Menu menu = menuService.currentUserVisibleModuleMenu(validAlias);
         if (menu == null) {
@@ -63,16 +74,17 @@ public class PlatformPageBootstrapService {
         MenuPageMode pageMode = menu.getPageMode() == null ? MenuPageMode.LIST : menu.getPageMode();
         return new PlatformPageBootstrap(
                 PlatformPageEntryContext.from(menu,
-                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode),
+                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
                         resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
-                snapshot,
-                resolveConfig(snapshot)
+                requestedClientType,
+                resolveConfig(snapshot, requestedClientType)
         );
     }
 
     private String resolveDefaultUiConfigId(PlatformPageConfigSnapshot snapshot,
                                             String requestedUiConfigId,
-                                            MenuPageMode pageMode) {
+                                            MenuPageMode pageMode,
+                                            PlatformUiClientType clientType) {
         if (requestedUiConfigId != null && !requestedUiConfigId.isBlank()) {
             boolean exists = snapshot.uiConfigs().stream().anyMatch(config -> Objects.equals(config.getId(), requestedUiConfigId));
             if (!exists) {
@@ -89,6 +101,10 @@ public class PlatformPageBootstrapService {
             if (set.getSetType() != uiSetType(pageMode)) {
                 throw new PlatformException("Default UI config type must match page mode: " + pageMode);
             }
+            if (config.getClientType() != clientType) {
+                throw new PlatformException("Default UI config client type must match requested client type: "
+                        + clientType);
+            }
             return requestedUiConfigId;
         }
         PlatformUiSetType targetType = uiSetType(pageMode);
@@ -96,7 +112,8 @@ public class PlatformPageBootstrapService {
                 .filter(set -> set.getSetType() == targetType)
                 .filter(set -> Boolean.TRUE.equals(set.getDefaultSet()))
                 .flatMap(set -> snapshot.uiConfigs().stream()
-                        .filter(config -> Objects.equals(config.getUiSetId(), set.getId())))
+                        .filter(config -> Objects.equals(config.getUiSetId(), set.getId()))
+                        .filter(config -> config.getClientType() == clientType))
                 .map(PlatformUiConfig::getId)
                 .findFirst()
                 .orElse(null);
@@ -129,11 +146,17 @@ public class PlatformPageBootstrapService {
         return PlatformUiSetType.LIST;
     }
 
-    private PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot) {
+    private PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot,
+                                                     PlatformUiClientType clientType) {
         if (moduleFieldService == null) {
             return PlatformResolvedPageConfig.empty();
         }
+        Set<String> clientUiConfigIds = snapshot.uiConfigs().stream()
+                .filter(config -> config.getClientType() == clientType)
+                .map(PlatformUiConfig::getId)
+                .collect(java.util.stream.Collectors.toSet());
         List<PlatformResolvedUiField> uiFields = snapshot.uiFields().stream()
+                .filter(field -> clientUiConfigIds.contains(field.getUiConfigId()))
                 .map(this::resolvedUiField)
                 .toList();
         List<PlatformResolvedQueryItem> queryItems = snapshot.queryItems().stream()

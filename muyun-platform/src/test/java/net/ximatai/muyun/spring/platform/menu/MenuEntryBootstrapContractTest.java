@@ -6,12 +6,16 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
@@ -22,6 +26,7 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigFieldService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedUiField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
@@ -33,6 +38,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MenuEntryBootstrapContractTest {
     private final TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
@@ -168,10 +175,85 @@ class MenuEntryBootstrapContractTest {
                 assertThat(menuBootstrap.entry().defaultQueryTemplateId()).isEqualTo(templateId);
                 assertThat(moduleBootstrap.entry().menuId()).isEqualTo(menuId);
                 assertThat(moduleBootstrap.entry().defaultUiConfigId()).isEqualTo(uiConfigId);
-                assertThat(moduleBootstrap.pageConfig().uiConfigs()).extracting(PlatformUiConfig::getPublished)
-                        .containsExactly(Boolean.TRUE);
+                assertThat(moduleBootstrap.clientType()).isEqualTo(PlatformUiClientType.WEB);
             }
         }
+    }
+
+    @Test
+    void shouldResolveDefaultUiConfigByRequestedClientType() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            try (CurrentUserContext.Scope userScope = CurrentUserContext.use(
+                    CurrentUser.tenantUser("u1", "alice", "tenant-a", "org-1"))) {
+                String schemeId = schemeService.insert(scheme());
+                String uiSetId = uiSet("crm.customer", "list_client", PlatformUiSetType.LIST);
+                String webConfigId = publishedUiConfig(uiSetId, PlatformUiClientType.WEB, true);
+                String appConfigId = publishedUiConfig(uiSetId, PlatformUiClientType.APP, true);
+                Menu menu = moduleMenu(schemeId, "客户", "crm.customer");
+                String menuId = menuService.insert(menu);
+
+                PlatformPageBootstrap webBootstrap = bootstrapService.bootstrapByMenu(menuId);
+                PlatformPageBootstrap appBootstrap = bootstrapService.bootstrapByMenu(menuId, PlatformUiClientType.APP);
+
+                assertThat(webBootstrap.entry().defaultUiConfigId()).isEqualTo(webConfigId);
+                assertThat(webBootstrap.clientType()).isEqualTo(PlatformUiClientType.WEB);
+                assertThat(appBootstrap.entry().defaultUiConfigId()).isEqualTo(appConfigId);
+                assertThat(appBootstrap.clientType()).isEqualTo(PlatformUiClientType.APP);
+            }
+        }
+    }
+
+    @Test
+    void shouldRejectRequestedDefaultUiConfigWhenClientTypeDoesNotMatch() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            try (CurrentUserContext.Scope userScope = CurrentUserContext.use(
+                    CurrentUser.tenantUser("u1", "alice", "tenant-a", "org-1"))) {
+                String schemeId = schemeService.insert(scheme());
+                String webConfigId = publishedUiConfig("crm.customer", "list_web",
+                        PlatformUiSetType.LIST, PlatformUiClientType.WEB, true);
+                Menu menu = moduleMenu(schemeId, "客户", "crm.customer");
+                menu.setDefaultUiConfigId(webConfigId);
+                String menuId = menuService.insert(menu);
+
+                assertThatThrownBy(() -> bootstrapService.bootstrapByMenu(menuId, PlatformUiClientType.APP))
+                        .isInstanceOf(PlatformException.class)
+                        .hasMessageContaining("client type");
+            }
+        }
+    }
+
+    @Test
+    void shouldResolveOnlyRequestedClientUiFields() {
+        MenuService mockedMenuService = mock(MenuService.class);
+        PlatformPageConfigSnapshotService mockedSnapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService mockedModuleFieldService = mock(ModuleMetadataFieldService.class);
+        PlatformPageBootstrapService service = new PlatformPageBootstrapService(
+                mockedMenuService, mockedSnapshotService, mockedModuleFieldService);
+        Menu menu = moduleMenu("scheme-1", "客户", "crm.customer");
+        menu.setId("menu-1");
+        when(mockedMenuService.currentUserVisibleMenu("menu-1")).thenReturn(menu);
+        PlatformUiSet uiSet = uiSetRecord("set-1", "crm.customer", PlatformUiSetType.LIST);
+        PlatformUiConfig webConfig = uiConfigRecord("ui-web", "set-1", PlatformUiClientType.WEB);
+        PlatformUiConfig appConfig = uiConfigRecord("ui-app", "set-1", PlatformUiClientType.APP);
+        PlatformUiConfigField webField = uiField("ui-web", "field-web");
+        PlatformUiConfigField appField = uiField("ui-app", "field-app");
+        when(mockedSnapshotService.snapshot("crm.customer")).thenReturn(new PlatformPageConfigSnapshot(
+                "crm.customer",
+                java.util.List.of(uiSet),
+                java.util.List.of(webConfig, appConfig),
+                java.util.List.of(webField, appField),
+                java.util.List.of(),
+                java.util.List.of()
+        ));
+        when(mockedModuleFieldService.resolve("field-web")).thenReturn(resolvedField("field-web", "webName"));
+        when(mockedModuleFieldService.resolve("field-app")).thenReturn(resolvedField("field-app", "appName"));
+
+        PlatformPageBootstrap appBootstrap = service.bootstrapByMenu("menu-1", PlatformUiClientType.APP);
+
+        assertThat(appBootstrap.resolvedConfig().uiFields())
+                .extracting(PlatformResolvedUiField::moduleMetadataFieldId)
+                .containsExactly("field-app");
+        assertThat(appBootstrap.entry().defaultUiConfigId()).isEqualTo("ui-app");
     }
 
     @Test
@@ -236,15 +318,27 @@ class MenuEntryBootstrapContractTest {
     }
 
     private String publishedUiConfig(String moduleAlias, String alias, PlatformUiSetType setType, boolean published) {
+        return publishedUiConfig(moduleAlias, alias, setType, PlatformUiClientType.WEB, published);
+    }
+
+    private String publishedUiConfig(String moduleAlias, String alias, PlatformUiSetType setType,
+                                     PlatformUiClientType clientType, boolean published) {
+        return publishedUiConfig(uiSet(moduleAlias, alias, setType), clientType, published);
+    }
+
+    private String uiSet(String moduleAlias, String alias, PlatformUiSetType setType) {
         PlatformUiSet uiSet = new PlatformUiSet();
         uiSet.setModuleAlias(moduleAlias);
         uiSet.setAlias(alias);
         uiSet.setSetType(setType);
         uiSet.setDefaultSet(true);
-        String uiSetId = uiSetService.insert(uiSet);
+        return uiSetService.insert(uiSet);
+    }
+
+    private String publishedUiConfig(String uiSetId, PlatformUiClientType clientType, boolean published) {
         PlatformUiConfig uiConfig = new PlatformUiConfig();
         uiConfig.setUiSetId(uiSetId);
-        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setClientType(clientType);
         uiConfig.setPublished(published);
         return uiConfigService.insert(uiConfig);
     }
@@ -255,5 +349,50 @@ class MenuEntryBootstrapContractTest {
         template.setAlias(alias);
         template.setDefaultTemplate(defaultTemplate);
         return queryTemplateService.insert(template);
+    }
+
+    private PlatformUiSet uiSetRecord(String id, String moduleAlias, PlatformUiSetType setType) {
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId(id);
+        uiSet.setModuleAlias(moduleAlias);
+        uiSet.setAlias(id);
+        uiSet.setSetType(setType);
+        uiSet.setDefaultSet(true);
+        return uiSet;
+    }
+
+    private PlatformUiConfig uiConfigRecord(String id, String uiSetId, PlatformUiClientType clientType) {
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId(id);
+        uiConfig.setUiSetId(uiSetId);
+        uiConfig.setClientType(clientType);
+        uiConfig.setPublished(true);
+        return uiConfig;
+    }
+
+    private PlatformUiConfigField uiField(String uiConfigId, String moduleFieldId) {
+        PlatformUiConfigField field = new PlatformUiConfigField();
+        field.setUiConfigId(uiConfigId);
+        field.setModuleMetadataFieldId(moduleFieldId);
+        field.setFieldUiTypeAlias("text");
+        return field;
+    }
+
+    private ResolvedModuleMetadataField resolvedField(String moduleFieldId, String fieldName) {
+        return new ResolvedModuleMetadataField(
+                moduleFieldId,
+                "crm.customer",
+                "rel-main",
+                "main",
+                RelationRole.MAIN,
+                "metadata-1",
+                "customer",
+                "客户",
+                "metadata-field-" + fieldName,
+                fieldName,
+                fieldName,
+                fieldName,
+                "text"
+        );
     }
 }

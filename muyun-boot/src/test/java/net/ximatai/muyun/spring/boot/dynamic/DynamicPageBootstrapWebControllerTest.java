@@ -13,8 +13,9 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
-import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageEntryContext;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,9 +49,17 @@ class DynamicPageBootstrapWebControllerTest {
         PlatformPageBootstrap bootstrap = new PlatformPageBootstrap(
                 new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
                         "ui-1", "query-1", "{\"source\":\"menu\"}"),
-                new PlatformPageConfigSnapshot("crm.customer", List.of(), List.of(), List.of(), List.of(), List.of())
+                PlatformUiClientType.APP,
+                PlatformResolvedPageConfig.empty()
         );
-        when(bootstrapService.bootstrapByMenu("menu-1")).thenReturn(bootstrap);
+        PlatformPageBootstrap webBootstrap = new PlatformPageBootstrap(
+                new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
+                        "ui-web", "query-1", "{\"source\":\"menu\"}"),
+                PlatformUiClientType.WEB,
+                PlatformResolvedPageConfig.empty()
+        );
+        when(bootstrapService.bootstrapByMenu("menu-1", PlatformUiClientType.APP)).thenReturn(bootstrap);
+        when(bootstrapService.bootstrapByMenu("menu-1", PlatformUiClientType.WEB)).thenReturn(webBootstrap);
         DynamicActionDescriptor visibleAction = action("query");
         DynamicActionDescriptor hiddenAction = action("delete");
         when(recordService.describe("crm.customer")).thenReturn(new DynamicModuleDescriptor(
@@ -61,19 +71,24 @@ class DynamicPageBootstrapWebControllerTest {
                 .thenReturn(DynamicActionAvailability.unavailable("delete", "denied"));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/platform.menu/menu-1/entry"))
+            mvc.perform(get("/platform.menu/menu-1/entry").param("clientType", "APP"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.entry.menuId").value("menu-1"))
                     .andExpect(jsonPath("$.entry.moduleAlias").value("crm.customer"))
+                    .andExpect(jsonPath("$.clientType").value("APP"))
                     .andExpect(jsonPath("$.moduleDescriptor.moduleAlias").value("crm.customer"))
                     .andExpect(jsonPath("$.moduleDescriptor.actions.length()").value(1))
                     .andExpect(jsonPath("$.moduleDescriptor.actions[0].code").value("query"))
                     .andExpect(jsonPath("$.mainEntityAlias").value("customer"))
-                    .andExpect(jsonPath("$.pageConfig.moduleAlias").value("crm.customer"))
+                    .andExpect(jsonPath("$.pageConfig").doesNotExist())
                     .andExpect(jsonPath("$.resolvedConfig.uiFields.length()").value(0));
+            mvc.perform(get("/platform.menu/menu-1/entry"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.clientType").value("WEB"))
+                    .andExpect(jsonPath("$.entry.defaultUiConfigId").value("ui-web"));
         }
 
-        verify(activeTenantVerifier).verifyActiveTenant("tenant-a");
+        verify(activeTenantVerifier, times(2)).verifyActiveTenant("tenant-a");
     }
 
     private DynamicActionDescriptor action(String code) {

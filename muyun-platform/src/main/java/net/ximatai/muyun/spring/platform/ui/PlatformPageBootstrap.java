@@ -2,10 +2,7 @@ package net.ximatai.muyun.spring.platform.ui;
 
 public record PlatformPageBootstrap(
         PlatformPageEntryContext entry,
-        PlatformPageConfigSnapshot pageConfig,
+        PlatformUiClientType clientType,
         PlatformResolvedPageConfig resolvedConfig
 ) {
-    public PlatformPageBootstrap(PlatformPageEntryContext entry, PlatformPageConfigSnapshot pageConfig) {
-        this(entry, pageConfig, PlatformResolvedPageConfig.empty());
-    }
 }

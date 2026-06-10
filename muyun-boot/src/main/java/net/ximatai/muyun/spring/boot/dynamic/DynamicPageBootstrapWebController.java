@@ -9,9 +9,11 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -33,9 +35,10 @@ public class DynamicPageBootstrapWebController {
     }
 
     @GetMapping("/{menuId}/entry")
-    public DynamicPageBootstrapResponse entry(@PathVariable String menuId) {
+    public DynamicPageBootstrapResponse entry(@PathVariable String menuId,
+                                              @RequestParam(defaultValue = "WEB") PlatformUiClientType clientType) {
         requireTenantContext();
-        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu(menuId);
+        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu(menuId, clientType);
         return response(bootstrap);
     }
 
@@ -44,9 +47,9 @@ public class DynamicPageBootstrapWebController {
         DynamicModuleDescriptor descriptor = permissionScopedDescriptor(moduleAlias);
         return new DynamicPageBootstrapResponse(
                 bootstrap.entry(),
+                bootstrap.clientType(),
                 descriptor,
                 descriptor.mainEntityAlias(),
-                bootstrap.pageConfig(),
                 bootstrap.resolvedConfig()
         );
     }
