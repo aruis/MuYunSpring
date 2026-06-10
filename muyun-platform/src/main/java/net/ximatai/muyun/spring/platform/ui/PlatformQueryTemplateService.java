@@ -37,14 +37,25 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
     @Override
     public void beforeInsert(PlatformQueryTemplate template) {
         normalizeAndValidate(template);
+        rejectDirectPublish(template);
     }
 
     @Override
     public void beforeUpdate(PlatformQueryTemplate template) {
-        normalizeAndValidate(template);
         PlatformQueryTemplate existing = selectIncludingDeleted(template.getId());
+        rejectDirectPublish(existing, template);
+        rejectPublishedEdit(existing, template);
+        normalizeAndValidate(template);
         rejectChanged(existing, template, "Query template moduleAlias", PlatformQueryTemplate::getModuleAlias);
         rejectChanged(existing, template, "Query template alias", PlatformQueryTemplate::getAlias);
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        PlatformQueryTemplate existing = select(id);
+        if (existing != null && Boolean.TRUE.equals(existing.getPublished())) {
+            throw new PlatformException("Published query template cannot be deleted; unpublish first: " + id);
+        }
     }
 
     @Override
@@ -73,6 +84,14 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
                 ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
+    public List<PlatformQueryTemplate> listPublishedByModule(String moduleAlias) {
+        String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        return list(enabledCriteria(Criteria.of()
+                        .eq("moduleAlias", validAlias)
+                        .eq("published", Boolean.TRUE)),
+                ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
     private void normalizeAndValidate(PlatformQueryTemplate template) {
         String moduleAlias = PlatformNameRules.requireModuleAlias(template.getModuleAlias());
         PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
@@ -88,6 +107,9 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
         if (template.getDefaultTemplate() == null) {
             template.setDefaultTemplate(Boolean.FALSE);
         }
+        if (template.getPublished() == null) {
+            template.setPublished(Boolean.FALSE);
+        }
         rejectDuplicate(template, Criteria.of()
                         .eq("moduleAlias", moduleAlias)
                         .eq("alias", alias),
@@ -97,6 +119,39 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
                             .eq("moduleAlias", moduleAlias)
                             .eq("defaultTemplate", Boolean.TRUE),
                     "Only one default query template is allowed for module: " + moduleAlias);
+        }
+    }
+
+    private void rejectPublishedEdit(PlatformQueryTemplate existing, PlatformQueryTemplate updated) {
+        if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
+            return;
+        }
+        if (Boolean.FALSE.equals(updated.getPublished())
+                && Objects.equals(existing.getModuleAlias(), updated.getModuleAlias())
+                && Objects.equals(existing.getAlias(), updated.getAlias())
+                && Objects.equals(existing.getDefaultTemplate(), updated.getDefaultTemplate())
+                && Objects.equals(existing.getTitle(), updated.getTitle())
+                && Objects.equals(existing.getEnabled(), updated.getEnabled())
+                && Objects.equals(existing.getSortOrder(), updated.getSortOrder())) {
+            return;
+        }
+        throw new PlatformException("Published query template cannot be edited; unpublish first: " + existing.getId());
+    }
+
+    private void rejectDirectPublish(PlatformQueryTemplate template) {
+        if (Boolean.TRUE.equals(template.getPublished()) && !PlatformPageConfigPublishContext.active()) {
+            throw new PlatformException("Query template can only be published through publish service: "
+                    + template.getId());
+        }
+    }
+
+    private void rejectDirectPublish(PlatformQueryTemplate existing, PlatformQueryTemplate updated) {
+        if (PlatformPageConfigPublishContext.active() || updated == null || !Boolean.TRUE.equals(updated.getPublished())) {
+            return;
+        }
+        if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
+            throw new PlatformException("Query template can only be published through publish service: "
+                    + updated.getId());
         }
     }
 }

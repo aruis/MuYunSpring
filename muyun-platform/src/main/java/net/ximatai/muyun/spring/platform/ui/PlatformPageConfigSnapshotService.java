@@ -41,7 +41,7 @@ public class PlatformPageConfigSnapshotService {
         List<PlatformUiConfigField> uiFields = uiConfigFieldService.listByUiConfigIds(uiConfigs.stream()
                 .map(PlatformUiConfig::getId)
                 .toList());
-        List<PlatformQueryTemplate> queryTemplates = queryTemplateService.listByModule(validAlias);
+        List<PlatformQueryTemplate> queryTemplates = queryTemplateService.listPublishedByModule(validAlias);
         List<PlatformQueryItem> queryItems = queryItemService.listByTemplateIds(queryTemplates.stream()
                 .map(PlatformQueryTemplate::getId)
                 .toList());

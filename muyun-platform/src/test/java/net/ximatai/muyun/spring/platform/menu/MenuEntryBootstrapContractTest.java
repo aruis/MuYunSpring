@@ -112,8 +112,8 @@ class MenuEntryBootstrapContractTest {
             String formConfigId = publishedUiConfig("crm.customer", "form", PlatformUiSetType.FORM, true);
             String contractConfigId = publishedUiConfig("crm.contract", "list", PlatformUiSetType.LIST, true);
             String contractTemplateId = queryTemplate("crm.contract", "default", true);
-            String disabledTemplateId = queryTemplate("crm.customer", "disabled", false);
-            queryTemplateService.disable(disabledTemplateId);
+            String disabledTemplateId = queryTemplate("crm.customer", "disabled", false, true, false);
+            String draftTemplateId = queryTemplate("crm.customer", "draft", false, false, true);
 
             Menu draftMenu = moduleMenu(schemeId, "客户", "crm.customer");
             draftMenu.setDefaultUiConfigId(draftConfigId);
@@ -138,6 +138,12 @@ class MenuEntryBootstrapContractTest {
             assertThatThrownBy(() -> menuService.insert(disabledQuery))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("enabled");
+
+            Menu draftQuery = moduleMenu(schemeId, "客户", "crm.customer");
+            draftQuery.setDefaultQueryTemplateId(draftTemplateId);
+            assertThatThrownBy(() -> menuService.insert(draftQuery))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("published");
 
             Menu mismatchedPageMode = moduleMenu(schemeId, "客户", "crm.customer");
             mismatchedPageMode.setPageMode(MenuPageMode.LIST);
@@ -339,16 +345,33 @@ class MenuEntryBootstrapContractTest {
         PlatformUiConfig uiConfig = new PlatformUiConfig();
         uiConfig.setUiSetId(uiSetId);
         uiConfig.setClientType(clientType);
-        uiConfig.setPublished(published);
-        return uiConfigService.insert(uiConfig);
+        String id = uiConfigService.insert(uiConfig);
+        if (published) {
+            PlatformUiConfig saved = uiConfigService.select(id);
+            saved.setPublished(true);
+            uiConfigDao.updateById(saved);
+        }
+        return id;
     }
 
     private String queryTemplate(String moduleAlias, String alias, boolean defaultTemplate) {
+        return queryTemplate(moduleAlias, alias, defaultTemplate, true, true);
+    }
+
+    private String queryTemplate(String moduleAlias, String alias, boolean defaultTemplate,
+                                 boolean published, boolean enabled) {
         PlatformQueryTemplate template = new PlatformQueryTemplate();
         template.setModuleAlias(moduleAlias);
         template.setAlias(alias);
         template.setDefaultTemplate(defaultTemplate);
-        return queryTemplateService.insert(template);
+        template.setEnabled(enabled);
+        String id = queryTemplateService.insert(template);
+        if (published) {
+            PlatformQueryTemplate saved = queryTemplateService.select(id);
+            saved.setPublished(true);
+            queryTemplateDao.updateById(saved);
+        }
+        return id;
     }
 
     private PlatformUiSet uiSetRecord(String id, String moduleAlias, PlatformUiSetType setType) {

@@ -24,4 +24,8 @@ public class PlatformQueryTemplate extends StandardEnabledSortableEntity {
     @Column(name = "default_template", type = ColumnType.BOOLEAN, comment = "Default query template",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean defaultTemplate = Boolean.FALSE;
+
+    @Column(name = "published", type = ColumnType.BOOLEAN, comment = "Published query template flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean published = Boolean.FALSE;
 }

@@ -740,7 +740,7 @@ public class DynamicRecordWebController implements
         PlatformQueryTemplate template = snapshot.queryTemplates().stream()
                 .filter(item -> Objects.equals(item.getId(), queryTemplateId))
                 .findFirst()
-                .orElseThrow(() -> new PlatformException("Query template is not enabled in module snapshot: "
+                .orElseThrow(() -> new PlatformException("Query template is not published or enabled in module snapshot: "
                         + queryTemplateId));
         if (!Objects.equals(template.getModuleAlias(), moduleAlias)) {
             throw new PlatformException("Query template must belong to module: " + moduleAlias);

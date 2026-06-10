@@ -124,7 +124,7 @@ public class PlatformPageBootstrapService {
             boolean exists = snapshot.queryTemplates().stream()
                     .anyMatch(template -> Objects.equals(template.getId(), requestedTemplateId));
             if (!exists) {
-                throw new PlatformException("Default query template is not enabled in module snapshot: "
+                throw new PlatformException("Default query template is not published or enabled in module snapshot: "
                         + requestedTemplateId);
             }
             return requestedTemplateId;

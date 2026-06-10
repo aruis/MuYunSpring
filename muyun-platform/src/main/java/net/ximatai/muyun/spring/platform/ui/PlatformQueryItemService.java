@@ -53,14 +53,24 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
 
     @Override
     public void beforeInsert(PlatformQueryItem item) {
+        requireDraftQueryTemplate(item.getQueryTemplateId());
         normalizeAndValidate(item);
     }
 
     @Override
     public void beforeUpdate(PlatformQueryItem item) {
-        normalizeAndValidate(item);
         PlatformQueryItem existing = selectIncludingDeleted(item.getId());
+        requireDraftQueryTemplate(existing == null ? item.getQueryTemplateId() : existing.getQueryTemplateId());
+        normalizeAndValidate(item);
         rejectChanged(existing, item, "Query item template", PlatformQueryItem::getQueryTemplateId);
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        PlatformQueryItem existing = select(id);
+        if (existing != null) {
+            requireDraftQueryTemplate(existing.getQueryTemplateId());
+        }
     }
 
     @Override
@@ -356,5 +366,13 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             return collection.isEmpty();
         }
         return false;
+    }
+
+    private void requireDraftQueryTemplate(String queryTemplateId) {
+        PlatformQueryTemplate template = queryTemplateService.requireQueryTemplate(queryTemplateId);
+        if (Boolean.TRUE.equals(template.getPublished())) {
+            throw new PlatformException("Published query template items cannot be edited; unpublish first: "
+                    + template.getId());
+        }
     }
 }

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PlatformUiConfigurationServiceContractTest {
@@ -69,6 +70,8 @@ class PlatformUiConfigurationServiceContractTest {
             new PlatformQueryTemplateService(queryTemplateDao, moduleService);
     private final PlatformQueryItemService queryItemService =
             new PlatformQueryItemService(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService);
+    private final PlatformPageConfigPublishService publishService = new PlatformPageConfigPublishService(
+            uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService);
     private final PlatformPageConfigSnapshotService snapshotService = new PlatformPageConfigSnapshotService(
             uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService);
 
@@ -79,13 +82,14 @@ class PlatformUiConfigurationServiceContractTest {
         String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
 
         String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
-        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
         String appDraftConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.APP, false));
         PlatformUiConfigField field = uiField(uiConfigId, customerNameField, "text");
         field.setWidth(180);
         uiConfigFieldService.insert(uiField(appDraftConfigId, customerNameField, "text"));
 
         uiConfigFieldService.insert(field);
+        publishService.publishUiConfig(uiConfigId);
 
         PlatformPageConfigSnapshot snapshot = snapshotService.snapshot("crm.customer");
         assertThat(snapshot.moduleAlias()).isEqualTo("crm.customer");
@@ -105,7 +109,7 @@ class PlatformUiConfigurationServiceContractTest {
         seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
         String leadNameField = seedModuleField("crm.lead", "lead", "leadName", "lead_name", "string");
         String uiSetId = uiSetService.insert(uiSet("crm.customer", "form", PlatformUiSetType.FORM, true));
-        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
 
         assertThatThrownBy(() -> uiConfigFieldService.insert(uiField(uiConfigId, leadNameField, "text")))
                 .isInstanceOf(PlatformException.class)
@@ -119,7 +123,7 @@ class PlatformUiConfigurationServiceContractTest {
         seedUiType("number", "decimal");
         String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
         String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
-        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
 
         assertThatThrownBy(() -> uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "number")))
                 .isInstanceOf(PlatformException.class)
@@ -136,7 +140,7 @@ class PlatformUiConfigurationServiceContractTest {
         String customerNameField = seedModuleField(
                 "crm.customer", "customer", "customerName", "customer_name", "string", true);
         String uiSetId = uiSetService.insert(uiSet("crm.customer", "form", PlatformUiSetType.FORM, true));
-        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
 
         assertThatThrownBy(() -> uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, null)))
                 .isInstanceOf(PlatformException.class)
@@ -147,6 +151,47 @@ class PlatformUiConfigurationServiceContractTest {
         assertThatThrownBy(() -> uiConfigFieldService.insert(weakRequired))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("cannot weaken required");
+    }
+
+    @Test
+    void shouldPublishAndUnpublishUiConfigThroughValidatedBoundary() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("at least one visible field");
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("{bad-json");
+        uiConfigService.update(config);
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("layout JSON");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "summaryPanel": {
+                    "items": []
+                  }
+                }
+                """);
+        uiConfigService.update(config);
+        publishService.publishUiConfig(uiConfigId);
+
+        PlatformPageConfigSnapshot snapshot = snapshotService.snapshot("crm.customer");
+        assertThat(snapshot.uiConfigs()).extracting(PlatformUiConfig::getId).containsExactly(uiConfigId);
+        assertThat(snapshot.uiFields()).extracting(PlatformUiConfigField::getModuleMetadataFieldId)
+                .containsExactly(customerNameField);
+
+        publishService.unpublishUiConfig(uiConfigId);
+        assertThat(snapshotService.snapshot("crm.customer").uiConfigs()).isEmpty();
+        assertThat(snapshotService.snapshot("crm.customer").uiFields()).isEmpty();
     }
 
     @Test
@@ -168,6 +213,198 @@ class PlatformUiConfigurationServiceContractTest {
         assertThat(clauses.getFirst().getField()).isEqualTo("customerName");
         assertThat(clauses.getFirst().getOperator()).isEqualTo(CriteriaOperator.LIKE);
         assertThat(clauses.getFirst().getValues()).containsExactly("acme");
+    }
+
+    @Test
+    void shouldPublishPageConfigAndKeepDraftsOutOfOnlineSnapshot() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String draftUiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(draftUiConfigId, customerNameField, "text"));
+        String draftTemplateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        queryItemService.insert(queryLeaf(draftTemplateId, TreeAbility.ROOT_ID, customerNameField,
+                DynamicQueryOperator.LIKE));
+
+        PlatformPageConfigSnapshot draftSnapshot = snapshotService.snapshot("crm.customer");
+        assertThat(draftSnapshot.uiConfigs()).isEmpty();
+        assertThat(draftSnapshot.queryTemplates()).isEmpty();
+
+        publishService.publishUiConfig(draftUiConfigId);
+        publishService.publishQueryTemplate(draftTemplateId);
+        PlatformPageConfigSnapshot onlineSnapshot = snapshotService.snapshot("crm.customer");
+
+        assertThat(onlineSnapshot.uiConfigs()).extracting(PlatformUiConfig::getId).containsExactly(draftUiConfigId);
+        assertThat(onlineSnapshot.queryTemplates()).extracting(PlatformQueryTemplate::getId)
+                .containsExactly(draftTemplateId);
+        assertThat(onlineSnapshot.queryItems()).extracting(PlatformQueryItem::getQueryTemplateId)
+                .containsExactly(draftTemplateId);
+    }
+
+    @Test
+    void shouldRequireUnpublishBeforeEditingPublishedPageConfig() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        String fieldId = uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        publishService.publishUiConfig(uiConfigId);
+
+        PlatformUiConfig publishedConfig = uiConfigUpdate(uiConfigService.select(uiConfigId));
+        publishedConfig.setLayoutJson("{\"changed\":true}");
+        PlatformUiConfig editedPublishedConfig = publishedConfig;
+        assertThatThrownBy(() -> uiConfigService.update(editedPublishedConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published UI config cannot be edited");
+
+        PlatformUiConfigField publishedField = uiFieldUpdate(uiConfigFieldService.select(fieldId));
+        publishedField.setVisible(false);
+        assertThatThrownBy(() -> uiConfigFieldService.update(publishedField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published UI config fields cannot be edited");
+        assertThatThrownBy(() -> uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published UI config fields cannot be edited");
+
+        publishService.unpublishUiConfig(uiConfigId);
+        publishedConfig = uiConfigUpdate(uiConfigService.select(uiConfigId));
+        publishedConfig.setLayoutJson("{\"changed\":true}");
+        PlatformUiConfig editedDraftConfig = publishedConfig;
+        assertThatCode(() -> uiConfigService.update(editedDraftConfig)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldRejectDirectUiConfigPublishOutsidePublishService() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+
+        assertThatThrownBy(() -> uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, true)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only be published through publish service");
+
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        PlatformUiConfig directPublish = uiConfigUpdate(uiConfigService.select(uiConfigId));
+        directPublish.setPublished(true);
+        assertThatThrownBy(() -> uiConfigService.update(directPublish))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only be published through publish service");
+
+        assertThatCode(() -> publishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldRequireUnpublishBeforeEditingPublishedQueryTemplate() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        String itemId = queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField,
+                DynamicQueryOperator.LIKE));
+        publishService.publishQueryTemplate(templateId);
+
+        PlatformQueryTemplate publishedTemplate = queryTemplateUpdate(queryTemplateService.select(templateId));
+        publishedTemplate.setTitle("Changed");
+        PlatformQueryTemplate editedPublishedTemplate = publishedTemplate;
+        assertThatThrownBy(() -> queryTemplateService.update(editedPublishedTemplate))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published query template cannot be edited");
+
+        PlatformQueryItem publishedItem = queryItemUpdate(queryItemService.select(itemId));
+        publishedItem.setDefaultValue("changed");
+        assertThatThrownBy(() -> queryItemService.update(publishedItem))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published query template items cannot be edited");
+        assertThatThrownBy(() -> queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID,
+                customerNameField, DynamicQueryOperator.LIKE)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Published query template items cannot be edited");
+
+        publishService.unpublishQueryTemplate(templateId);
+        publishedTemplate = queryTemplateUpdate(queryTemplateService.select(templateId));
+        publishedTemplate.setTitle("Changed");
+        PlatformQueryTemplate editedDraftTemplate = publishedTemplate;
+        assertThatCode(() -> queryTemplateService.update(editedDraftTemplate)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldRejectDirectQueryTemplatePublishOutsidePublishService() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+
+        PlatformQueryTemplate directInsert = queryTemplate("crm.customer", "direct", true);
+        directInsert.setPublished(true);
+        assertThatThrownBy(() -> queryTemplateService.insert(directInsert))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only be published through publish service");
+
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField,
+                DynamicQueryOperator.LIKE));
+        PlatformQueryTemplate directPublish = queryTemplateUpdate(queryTemplateService.select(templateId));
+        directPublish.setPublished(true);
+        assertThatThrownBy(() -> queryTemplateService.update(directPublish))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only be published through publish service");
+
+        assertThatCode(() -> publishService.publishQueryTemplate(templateId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldRejectBrokenConfigBeforePublish() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedFieldType("decimal", FieldType.DECIMAL, DynamicQueryOperator.EQ);
+        seedUiType("text", "string");
+        seedUiType("number", "decimal");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        String uiFieldId = uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        PlatformUiConfigField brokenUiField = uiConfigFieldService.select(uiFieldId);
+        brokenUiField.setFieldUiTypeAlias("number");
+        uiConfigFieldDao.updateById(brokenUiField);
+
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("mismatch");
+
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        String itemId = queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField,
+                DynamicQueryOperator.LIKE));
+        PlatformQueryItem detached = queryItemService.select(itemId);
+        detached.setParentId("missing-parent");
+        queryItemDao.updateById(detached);
+
+        assertThatThrownBy(() -> publishService.publishQueryTemplate(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("outside root tree");
+    }
+
+    @Test
+    void shouldValidateQueryTemplateBeforePublishingBoundary() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        queryItemService.insert(queryGroup(templateId, TreeAbility.ROOT_ID, PlatformQueryGroupOperator.AND));
+
+        assertThatCode(() -> publishService.validateQueryTemplatePublishable(templateId))
+                .doesNotThrowAnyException();
+
+        String detachedId = queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField,
+                DynamicQueryOperator.LIKE));
+        PlatformQueryItem detached = queryItemService.select(detachedId);
+        detached.setParentId("missing-parent");
+        queryItemDao.updateById(detached);
+
+        assertThatThrownBy(() -> publishService.validateQueryTemplatePublishable(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("outside root tree");
     }
 
     @Test
@@ -344,6 +581,21 @@ class PlatformUiConfigurationServiceContractTest {
         return uiConfig;
     }
 
+    private PlatformUiConfig uiConfigUpdate(PlatformUiConfig source) {
+        PlatformUiConfig target = new PlatformUiConfig();
+        target.setId(source.getId());
+        target.setTenantId(source.getTenantId());
+        target.setVersion(source.getVersion());
+        target.setUiSetId(source.getUiSetId());
+        target.setClientType(source.getClientType());
+        target.setLayoutJson(source.getLayoutJson());
+        target.setTitle(source.getTitle());
+        target.setEnabled(source.getEnabled());
+        target.setSortOrder(source.getSortOrder());
+        target.setPublished(source.getPublished());
+        return target;
+    }
+
     private PlatformUiConfigField uiField(String uiConfigId, String moduleMetadataFieldId, String fieldUiTypeAlias) {
         PlatformUiConfigField field = new PlatformUiConfigField();
         field.setUiConfigId(uiConfigId);
@@ -352,12 +604,49 @@ class PlatformUiConfigurationServiceContractTest {
         return field;
     }
 
+    private PlatformUiConfigField uiFieldUpdate(PlatformUiConfigField source) {
+        PlatformUiConfigField target = new PlatformUiConfigField();
+        target.setId(source.getId());
+        target.setTenantId(source.getTenantId());
+        target.setVersion(source.getVersion());
+        target.setUiConfigId(source.getUiConfigId());
+        target.setModuleMetadataFieldId(source.getModuleMetadataFieldId());
+        target.setFieldUiTypeAlias(source.getFieldUiTypeAlias());
+        target.setVisible(source.getVisible());
+        target.setRequiredOverride(source.getRequiredOverride());
+        target.setReadOnly(source.getReadOnly());
+        target.setPlaceholder(source.getPlaceholder());
+        target.setDefaultValue(source.getDefaultValue());
+        target.setWidth(source.getWidth());
+        target.setAlign(source.getAlign());
+        target.setFixedPosition(source.getFixedPosition());
+        target.setTitle(source.getTitle());
+        target.setEnabled(source.getEnabled());
+        target.setSortOrder(source.getSortOrder());
+        return target;
+    }
+
     private PlatformQueryTemplate queryTemplate(String moduleAlias, String alias, boolean defaultTemplate) {
         PlatformQueryTemplate template = new PlatformQueryTemplate();
         template.setModuleAlias(moduleAlias);
         template.setAlias(alias);
         template.setDefaultTemplate(defaultTemplate);
         return template;
+    }
+
+    private PlatformQueryTemplate queryTemplateUpdate(PlatformQueryTemplate source) {
+        PlatformQueryTemplate target = new PlatformQueryTemplate();
+        target.setId(source.getId());
+        target.setTenantId(source.getTenantId());
+        target.setVersion(source.getVersion());
+        target.setModuleAlias(source.getModuleAlias());
+        target.setAlias(source.getAlias());
+        target.setDefaultTemplate(source.getDefaultTemplate());
+        target.setTitle(source.getTitle());
+        target.setEnabled(source.getEnabled());
+        target.setSortOrder(source.getSortOrder());
+        target.setPublished(source.getPublished());
+        return target;
     }
 
     private PlatformQueryItem queryGroup(String templateId, String parentId, PlatformQueryGroupOperator groupOperator) {
@@ -379,6 +668,23 @@ class PlatformUiConfigurationServiceContractTest {
         item.setOperator(operator);
         item.setDefaultValue("default");
         return item;
+    }
+
+    private PlatformQueryItem queryItemUpdate(PlatformQueryItem source) {
+        PlatformQueryItem target = new PlatformQueryItem();
+        target.setId(source.getId());
+        target.setTenantId(source.getTenantId());
+        target.setVersion(source.getVersion());
+        target.setQueryTemplateId(source.getQueryTemplateId());
+        target.setParentId(source.getParentId());
+        target.setGroupOperator(source.getGroupOperator());
+        target.setModuleMetadataFieldId(source.getModuleMetadataFieldId());
+        target.setOperator(source.getOperator());
+        target.setDefaultValue(source.getDefaultValue());
+        target.setTitle(source.getTitle());
+        target.setEnabled(source.getEnabled());
+        target.setSortOrder(source.getSortOrder());
+        return target;
     }
 
     private List<CriteriaClause> clauses(Criteria criteria) {

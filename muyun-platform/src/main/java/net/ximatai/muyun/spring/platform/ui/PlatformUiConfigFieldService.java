@@ -57,16 +57,26 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
 
     @Override
     public void beforeInsert(PlatformUiConfigField field) {
+        requireDraftUiConfig(field.getUiConfigId());
         normalizeAndValidate(field);
     }
 
     @Override
     public void beforeUpdate(PlatformUiConfigField field) {
-        normalizeAndValidate(field);
         PlatformUiConfigField existing = selectIncludingDeleted(field.getId());
+        requireDraftUiConfig(existing == null ? field.getUiConfigId() : existing.getUiConfigId());
+        normalizeAndValidate(field);
         rejectChanged(existing, field, "UI config field config", PlatformUiConfigField::getUiConfigId);
         rejectChanged(existing, field, "UI config field module field",
                 PlatformUiConfigField::getModuleMetadataFieldId);
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        PlatformUiConfigField existing = select(id);
+        if (existing != null) {
+            requireDraftUiConfig(existing.getUiConfigId());
+        }
     }
 
     @Override
@@ -87,6 +97,13 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         }
         return list(enabledCriteria(Criteria.of().in("uiConfigId", uiConfigIds)),
                 ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    public void validateUiConfigFields(String uiConfigId) {
+        PlatformUiConfig uiConfig = uiConfigService.requireUiConfig(uiConfigId);
+        for (PlatformUiConfigField field : listByUiConfigIds(List.of(uiConfig.getId()))) {
+            normalizeAndValidate(field);
+        }
     }
 
     private void normalizeAndValidate(PlatformUiConfigField field) {
@@ -151,6 +168,14 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         if (metadataField != null && Boolean.TRUE.equals(metadataField.getRequired())) {
             throw new PlatformException("UI config field cannot weaken required metadata field: "
                     + moduleField.fieldName());
+        }
+    }
+
+    private void requireDraftUiConfig(String uiConfigId) {
+        PlatformUiConfig uiConfig = uiConfigService.requireUiConfig(uiConfigId);
+        if (Boolean.TRUE.equals(uiConfig.getPublished())) {
+            throw new PlatformException("Published UI config fields cannot be edited; unpublish first: "
+                    + uiConfig.getId());
         }
     }
 }

@@ -317,6 +317,9 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         if (!Boolean.TRUE.equals(template.getEnabled())) {
             throw new PlatformException("Menu default query template must be enabled: " + menu.getDefaultQueryTemplateId());
         }
+        if (!Boolean.TRUE.equals(template.getPublished())) {
+            throw new PlatformException("Menu default query template must be published: " + menu.getDefaultQueryTemplateId());
+        }
         menu.setDefaultQueryTemplateId(template.getId());
     }
 

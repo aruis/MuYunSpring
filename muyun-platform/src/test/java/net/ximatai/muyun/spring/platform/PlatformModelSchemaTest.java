@@ -169,7 +169,8 @@ class PlatformModelSchemaTest {
         assertThat(uniqueIndexes(mapper.toTable(PlatformUiConfigField.class)))
                 .contains(List.of("tenant_id", "ui_config_id", "module_metadata_field_id"));
         assertThat(columnNames(mapper.toTable(PlatformQueryTemplate.class)))
-                .contains("id", "module_alias", "alias", "default_template", "title", "enabled", "sort_order");
+                .contains("id", "module_alias", "alias", "default_template", "published", "title",
+                        "enabled", "sort_order");
         assertThat(uniqueIndexes(mapper.toTable(PlatformQueryTemplate.class)))
                 .contains(List.of("tenant_id", "module_alias", "alias"));
         assertThat(columnNames(mapper.toTable(PlatformQueryItem.class)))

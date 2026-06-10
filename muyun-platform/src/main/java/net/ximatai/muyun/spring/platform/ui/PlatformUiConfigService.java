@@ -34,14 +34,25 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
     @Override
     public void beforeInsert(PlatformUiConfig uiConfig) {
         normalizeAndValidate(uiConfig);
+        rejectDirectPublish(uiConfig);
     }
 
     @Override
     public void beforeUpdate(PlatformUiConfig uiConfig) {
-        normalizeAndValidate(uiConfig);
         PlatformUiConfig existing = selectIncludingDeleted(uiConfig.getId());
+        rejectDirectPublish(existing, uiConfig);
+        rejectPublishedEdit(existing, uiConfig);
+        normalizeAndValidate(uiConfig);
         rejectChanged(existing, uiConfig, "UI config set", PlatformUiConfig::getUiSetId);
         rejectChanged(existing, uiConfig, "UI config client", PlatformUiConfig::getClientType);
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        PlatformUiConfig existing = select(id);
+        if (existing != null && Boolean.TRUE.equals(existing.getPublished())) {
+            throw new PlatformException("Published UI config cannot be deleted; unpublish first: " + id);
+        }
     }
 
     @Override
@@ -97,5 +108,36 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
                         .eq("clientType", uiConfig.getClientType()),
                 "UI config client must be unique in UI set: " + uiSet.getId() + "." + uiConfig.getClientType());
         uiConfig.setUiSetId(uiSet.getId());
+    }
+
+    private void rejectPublishedEdit(PlatformUiConfig existing, PlatformUiConfig updated) {
+        if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
+            return;
+        }
+        if (Boolean.FALSE.equals(updated.getPublished())
+                && Objects.equals(existing.getUiSetId(), updated.getUiSetId())
+                && Objects.equals(existing.getClientType(), updated.getClientType())
+                && Objects.equals(existing.getLayoutJson(), updated.getLayoutJson())
+                && Objects.equals(existing.getTitle(), updated.getTitle())
+                && Objects.equals(existing.getEnabled(), updated.getEnabled())
+                && Objects.equals(existing.getSortOrder(), updated.getSortOrder())) {
+            return;
+        }
+        throw new PlatformException("Published UI config cannot be edited; unpublish first: " + existing.getId());
+    }
+
+    private void rejectDirectPublish(PlatformUiConfig uiConfig) {
+        if (Boolean.TRUE.equals(uiConfig.getPublished()) && !PlatformPageConfigPublishContext.active()) {
+            throw new PlatformException("UI config can only be published through publish service: " + uiConfig.getId());
+        }
+    }
+
+    private void rejectDirectPublish(PlatformUiConfig existing, PlatformUiConfig updated) {
+        if (PlatformPageConfigPublishContext.active() || updated == null || !Boolean.TRUE.equals(updated.getPublished())) {
+            return;
+        }
+        if (existing == null || !Boolean.TRUE.equals(existing.getPublished())) {
+            throw new PlatformException("UI config can only be published through publish service: " + updated.getId());
+        }
     }
 }
