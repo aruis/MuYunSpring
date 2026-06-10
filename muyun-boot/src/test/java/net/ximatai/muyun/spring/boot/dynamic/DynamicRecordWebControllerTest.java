@@ -49,6 +49,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentCommand;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeFieldRole;
@@ -82,6 +85,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -479,6 +483,115 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
                         "Form UI config only supports main relation fields for save validation: module-field-code"));
+    }
+
+    @Test
+    void shouldSyncAttachmentsWhenSavingDynamicRecord() throws Exception {
+        RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
+        MockMvc attachmentMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, attachmentService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicRecord created = new DynamicRecord(entity()).setValue("code", "C-001");
+        created.setId("contract-1");
+        when(mainEntity.insert(any(DynamicRecord.class))).thenReturn("contract-1");
+        when(mainEntity.select("contract-1")).thenReturn(created);
+
+        attachmentMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    },
+                                    "attachments": [
+                                      {
+                                        "fileId": "file-1",
+                                        "displayName": "contract.pdf",
+                                        "sort": 10,
+                                        "remark": "signed"
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("contract-1"));
+
+        ArgumentCaptor<DynamicRecord> inserted = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(mainEntity).insert(inserted.capture());
+        assertThat(inserted.getValue().getValues()).doesNotContainKey("attachments");
+        assertThat(inserted.getValue().mutationMetadata()).containsKey("attachments");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<RecordAttachmentCommand>> commands = ArgumentCaptor.forClass(Collection.class);
+        verify(attachmentService).replaceRecordAttachments(eq(MODULE), eq("contract-1"), commands.capture());
+        RecordAttachmentCommand command = commands.getValue().iterator().next();
+        assertThat(command.fileId()).isEqualTo("file-1");
+        assertThat(command.displayName()).isEqualTo("contract.pdf");
+        assertThat(command.sort()).isEqualTo(10);
+        assertThat(command.remark()).isEqualTo("signed");
+    }
+
+    @Test
+    void shouldExposeSavedRecordAttachmentMaintenanceEndpoints() throws Exception {
+        RecordAttachmentService attachmentService = mock(RecordAttachmentService.class);
+        MockMvc attachmentMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        null, null, null, attachmentService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        RecordAttachment attachment = attachment("att-1", "file-1", "contract.pdf");
+        when(attachmentService.listByRecord(MODULE, "contract-1")).thenReturn(List.of(attachment));
+        when(attachmentService.deleteAttachment(MODULE, "contract-1", "att-1")).thenReturn(List.of());
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/query", MODULE, "contract-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("att-1"))
+                .andExpect(jsonPath("$[0].fileId").value("file-1"))
+                .andExpect(jsonPath("$[0].displayName").value("contract.pdf"));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/add", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "fileId": "file-2",
+                                  "displayName": "supplement.pdf",
+                                  "sort": 20
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fileId").value("file-1"));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/update/{attachmentId}",
+                        MODULE, "contract-1", "att-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "fileId": "file-1",
+                                  "displayName": "contract-final.pdf",
+                                  "sort": 30
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("att-1"));
+
+        attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/delete/{attachmentId}",
+                        MODULE, "contract-1", "att-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").doesNotExist());
+
+        verify(attachmentService).add(eq(MODULE), eq("contract-1"), any(RecordAttachmentCommand.class));
+        verify(attachmentService).updateAttachment(eq(MODULE), eq("contract-1"), eq("att-1"),
+                any(RecordAttachmentCommand.class));
+        verify(attachmentService).deleteAttachment(MODULE, "contract-1", "att-1");
     }
 
     @Test
@@ -1733,6 +1846,16 @@ class DynamicRecordWebControllerTest {
         field.setModuleMetadataFieldId(moduleFieldId);
         field.setVisible(true);
         return field;
+    }
+
+    private RecordAttachment attachment(String id, String fileId, String displayName) {
+        RecordAttachment attachment = new RecordAttachment();
+        attachment.setId(id);
+        attachment.setModuleAlias(MODULE);
+        attachment.setRecordId("contract-1");
+        attachment.setFileId(fileId);
+        attachment.setDisplayName(displayName);
+        return attachment;
     }
 
     private EntityDefinition lineEntity() {

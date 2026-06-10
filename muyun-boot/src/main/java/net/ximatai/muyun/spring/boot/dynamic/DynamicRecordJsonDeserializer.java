@@ -30,6 +30,7 @@ final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord
         DynamicRecord record = record(moduleAlias, recordService.mainEntityAlias(moduleAlias), recordRoot, parser, context);
         readUiConfigId(record, root);
         readOriginContext(record, root.has("originContext") ? root : recordRoot, parser, context);
+        readAttachments(record, recordRoot, parser, context);
         readChildren(moduleAlias, record, recordRoot, parser, context);
         return record;
     }
@@ -90,6 +91,23 @@ final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord
         }
     }
 
+    private void readAttachments(DynamicRecord record,
+                                 JsonNode root,
+                                 JsonParser parser,
+                                 DeserializationContext context) throws IOException {
+        if (!root.has("attachments") || root.get("attachments").isNull()) {
+            return;
+        }
+        JsonNode attachments = root.get("attachments");
+        if (!attachments.isArray()) {
+            throw new IllegalArgumentException("dynamic record attachments must be array");
+        }
+        try (JsonParser attachmentsParser = attachments.traverse(parser.getCodec())) {
+            attachmentsParser.nextToken();
+            record.putMutationMetadata("attachments", context.readValue(attachmentsParser, Object.class));
+        }
+    }
+
     private void readChildren(String moduleAlias,
                               DynamicRecord record,
                               JsonNode root,
@@ -138,6 +156,7 @@ final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord
                 || "record".equals(fieldName)
                 || "values".equals(fieldName)
                 || "children".equals(fieldName)
+                || "attachments".equals(fieldName)
                 || "originContext".equals(fieldName);
     }
 }

@@ -27,6 +27,9 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.web.PlatformWebPathRules;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentCommand;
+import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentService;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult;
@@ -68,6 +71,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,6 +82,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -105,6 +110,7 @@ public class DynamicRecordWebController implements
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformQueryItemService queryItemService;
     private final ModuleMetadataFieldService moduleMetadataFieldService;
+    private final RecordAttachmentService recordAttachmentService;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -120,13 +126,15 @@ public class DynamicRecordWebController implements
                                       ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider,
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
                                       ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
-                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider) {
+                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider,
+                                      ObjectProvider<RecordAttachmentService> recordAttachmentServiceProvider) {
         this(recordService, activeTenantVerifier,
                 codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
                 referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable(),
                 pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
                 queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
-                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable());
+                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable(),
+                recordAttachmentServiceProvider == null ? null : recordAttachmentServiceProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -140,7 +148,7 @@ public class DynamicRecordWebController implements
                                       CodeBusinessPreviewService codeBusinessPreviewService,
                                       ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
-                null, null, null);
+                null, null, null, null);
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
@@ -150,6 +158,18 @@ public class DynamicRecordWebController implements
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService,
                                       ModuleMetadataFieldService moduleMetadataFieldService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, referenceRecordGenerationFacade,
+                pageConfigSnapshotService, queryItemService, moduleMetadataFieldService, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService,
+                                      RecordAttachmentService recordAttachmentService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
@@ -157,6 +177,7 @@ public class DynamicRecordWebController implements
         this.pageConfigSnapshotService = pageConfigSnapshotService;
         this.queryItemService = queryItemService;
         this.moduleMetadataFieldService = moduleMetadataFieldService;
+        this.recordAttachmentService = recordAttachmentService;
     }
 
     @Override
@@ -217,11 +238,13 @@ public class DynamicRecordWebController implements
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
+    @Transactional
     public DynamicRecord insert(@RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             String id = service().insert(normalized);
+            syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
             return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
         });
     }
@@ -229,6 +252,7 @@ public class DynamicRecordWebController implements
     @Override
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
+    @Transactional
     public DynamicRecord update(@PathVariable String id, @RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
@@ -236,8 +260,93 @@ public class DynamicRecordWebController implements
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(normalized);
+            syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
             return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
         });
+    }
+
+    @PostMapping("/view/{id}/attachments/query")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public List<RecordAttachment> queryAttachments(@PathVariable String id) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireDataScopeRecord(PlatformAction.VIEW, id);
+            return recordAttachmentService.listByRecord(DynamicWebRequest.moduleAlias(), id);
+        });
+    }
+
+    @PostMapping("/view/{id}/attachments/add")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public List<RecordAttachment> addAttachment(@PathVariable String id,
+                                                @RequestBody RecordAttachmentCommand command) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            recordAttachmentService.add(DynamicWebRequest.moduleAlias(), id, command);
+            return recordAttachmentService.listByRecord(DynamicWebRequest.moduleAlias(), id);
+        });
+    }
+
+    @PostMapping("/view/{id}/attachments/update/{attachmentId}")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public List<RecordAttachment> updateAttachment(@PathVariable String id,
+                                                   @PathVariable String attachmentId,
+                                                   @RequestBody RecordAttachmentCommand command) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            recordAttachmentService.updateAttachment(DynamicWebRequest.moduleAlias(), id, attachmentId, command);
+            return recordAttachmentService.listByRecord(DynamicWebRequest.moduleAlias(), id);
+        });
+    }
+
+    @PostMapping("/view/{id}/attachments/delete/{attachmentId}")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public List<RecordAttachment> deleteAttachment(@PathVariable String id,
+                                                   @PathVariable String attachmentId) {
+        return webScope(() -> {
+            requireAttachmentService();
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            return recordAttachmentService.deleteAttachment(DynamicWebRequest.moduleAlias(), id, attachmentId);
+        });
+    }
+
+    private void syncAttachmentsIfPresent(String moduleAlias, String recordId, DynamicRecord record) {
+        if (!record.mutationMetadata().containsKey("attachments")) {
+            return;
+        }
+        requireAttachmentService();
+        recordAttachmentService.replaceRecordAttachments(moduleAlias, recordId,
+                attachmentCommands(record.mutationMetadata().get("attachments")));
+    }
+
+    private List<RecordAttachmentCommand> attachmentCommands(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof List<?> values)) {
+            throw new PlatformException("dynamic record attachments must be array");
+        }
+        List<RecordAttachmentCommand> commands = new ArrayList<>();
+        for (Object item : values) {
+            if (!(item instanceof Map<?, ?> map)) {
+                throw new PlatformException("dynamic record attachment must be object");
+            }
+            commands.add(new RecordAttachmentCommand(
+                    text(map.get("id")),
+                    text(map.get("fileId")),
+                    text(map.get("displayName")),
+                    intValue(map.get("sort")),
+                    text(map.get("remark"))
+            ));
+        }
+        return commands;
+    }
+
+    private void requireAttachmentService() {
+        if (recordAttachmentService == null) {
+            throw new PlatformException("record attachment service is not configured");
+        }
     }
 
     private DynamicRecord selectForAction(PlatformAction action, String id) {
@@ -391,6 +500,28 @@ public class DynamicRecordWebController implements
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String text(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isBlank() ? null : text;
+    }
+
+    private Integer intValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException ex) {
+            throw new PlatformException("dynamic record attachment sort must be number", ex);
+        }
     }
 
     @Override
