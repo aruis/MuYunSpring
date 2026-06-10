@@ -74,14 +74,29 @@ public class DynamicOpenApiGenerator {
         if (standardActionVisible.test(PlatformAction.VIEW)) {
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
                     "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/query",
+                    operationId(descriptor, "queryAttachments"),
+                    "Query attachments " + mainEntity.title(), null, "RecordAttachmentList", PlatformAction.VIEW.code()));
         }
         if (standardActionVisible.test(PlatformAction.CREATE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/insert", operationId(descriptor, "insert"),
-                    "Insert " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.CREATE.code()));
+                    "Insert " + mainEntity.title(), "DynamicRecordSaveRequest", "DynamicRecordResponse", PlatformAction.CREATE.code()));
         }
         if (standardActionVisible.test(PlatformAction.UPDATE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/update/{id}", operationId(descriptor, "update"),
-                    "Update " + mainEntity.title(), "DynamicRecordPayload", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
+                    "Update " + mainEntity.title(), "DynamicRecordSaveRequest", "DynamicRecordResponse", PlatformAction.UPDATE.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/add",
+                    operationId(descriptor, "addAttachment"),
+                    "Add attachment " + mainEntity.title(), "RecordAttachmentCommand", "RecordAttachmentList",
+                    PlatformAction.UPDATE.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/update/{attachmentId}",
+                    operationId(descriptor, "updateAttachment"),
+                    "Update attachment " + mainEntity.title(), "RecordAttachmentCommand", "RecordAttachmentList",
+                    PlatformAction.UPDATE.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/delete/{attachmentId}",
+                    operationId(descriptor, "deleteAttachment"),
+                    "Delete attachment " + mainEntity.title(), null, "RecordAttachmentList",
+                    PlatformAction.UPDATE.code()));
         }
         if (standardActionVisible.test(PlatformAction.DELETE)) {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/delete/{id}", operationId(descriptor, "delete"),
@@ -144,6 +159,20 @@ public class DynamicOpenApiGenerator {
                 .filter(action -> !PlatformWebPathRules.isReservedWebActionCode(action.code()))
                 .filter(action -> action.actionLevel() != null)
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
+        descriptor.actions().stream()
+                .filter(DynamicActionDescriptor::enabled)
+                .filter(action -> action.actionLevel() == EntityActionLevel.RECORD
+                        || action.actionLevel() == EntityActionLevel.ANY)
+                .filter(action -> action.category() != EntityActionCategory.STANDARD)
+                .filter(action -> !PlatformWebPathRules.isReservedWebActionCode(action.code()))
+                .forEach(action -> operations.add(operationWithPermissionCode(descriptor.moduleAlias(),
+                        basePath + "/" + action.code() + "/duplicate/check",
+                        operationId(descriptor, "duplicateCheck" + upperName(action.code())),
+                        "Duplicate check " + action.title(),
+                        "DynamicWebDuplicateCheckRequest",
+                        "RecordDuplicateCheckResult",
+                        action.code(),
+                        actionPermissionCode(descriptor.moduleAlias(), action))));
         if (standardActionVisible.test(PlatformAction.REFERENCE)) {
             mainEntity.fields().stream()
                     .filter(field -> field.reference() != null)

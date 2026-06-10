@@ -19,6 +19,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put(schemaName(entity.entityAlias(), "Values"), valuesSchema(entity));
         schemas.put(schemaName(entity.entityAlias(), "Record"), recordSchema(entity));
         schemas.put("DynamicRecordPayload", recordPayloadSchema(entity));
+        schemas.put("DynamicRecordSaveRequest", recordSaveRequestSchema());
         schemas.put("DynamicRecordResponse", recordResponseSchema(entity));
         schemas.put("WebQueryRequest", queryRequestSchema("WebQueryRequest", "WebQueryCondition", "WebPageRequest", "WebSort"));
         schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
@@ -40,6 +41,12 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicImportUploadResult", importUploadResultSchema());
         schemas.put("DynamicWebActionRequest", actionRequestSchema());
         schemas.put("DynamicWebReferenceRequest", referenceRequestSchema());
+        schemas.put("DynamicWebDuplicateCheckRequest", duplicateCheckRequestSchema());
+        schemas.put("RecordDuplicateCheckResult", duplicateCheckResultSchema());
+        schemas.put("RecordDuplicateMatch", duplicateMatchSchema());
+        schemas.put("RecordAttachmentCommand", attachmentCommandSchema());
+        schemas.put("RecordAttachment", attachmentSchema());
+        schemas.put("RecordAttachmentList", arraySchema("RecordAttachmentList", "RecordAttachment"));
         schemas.put("WebPageResponse", pageResponseSchema("WebPageResponse"));
         schemas.put("DynamicPageResponse", pageResponseSchema("DynamicPageResponse"));
         schemas.put("DynamicWebActionExecutionResponse", actionExecutionResponseSchema());
@@ -99,7 +106,16 @@ final class DynamicOpenApiSchemaFactory {
 
     private DynamicOpenApiDocument.Schema recordPayloadSchema(DynamicEntityDescriptor entity) {
         Map<String, DynamicOpenApiDocument.Property> properties = recordEnvelopeProperties(entity);
+        properties.put("attachments", arrayProperty("RecordAttachmentCommand"));
         return new DynamicOpenApiDocument.Schema("DynamicRecordPayload", "object", null,
+                List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema recordSaveRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("uiConfigId", stringProperty(true));
+        properties.put("record", objectProperty("DynamicRecordPayload"));
+        return new DynamicOpenApiDocument.Schema("DynamicRecordSaveRequest", "object", null,
                 List.of(), properties, null);
     }
 
@@ -602,6 +618,59 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("includeProjections", new DynamicOpenApiDocument.Property("boolean", null, false, true,
                 false, null, null, null, null, null, List.of()));
         return new DynamicOpenApiDocument.Schema("DynamicWebReferenceRequest", "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema duplicateCheckRequestSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("recordId", stringProperty(true));
+        properties.put("values", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("DynamicWebDuplicateCheckRequest", "object", null,
+                List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema duplicateCheckResultSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("ruleId", stringProperty(true));
+        properties.put("actionCode", stringProperty(false));
+        properties.put("fieldNames", arrayProperty("string"));
+        properties.put("duplicated", booleanProperty(false));
+        properties.put("matches", arrayProperty("RecordDuplicateMatch"));
+        return new DynamicOpenApiDocument.Schema("RecordDuplicateCheckResult", "object", null,
+                List.of("actionCode", "fieldNames", "duplicated", "matches"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema duplicateMatchSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("recordId", stringProperty(false));
+        properties.put("version", integerProperty(true));
+        properties.put("values", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("RecordDuplicateMatch", "object", null,
+                List.of("recordId", "values"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema attachmentCommandSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("id", stringProperty(true));
+        properties.put("fileId", stringProperty(false));
+        properties.put("displayName", stringProperty(true));
+        properties.put("sort", integerProperty(true));
+        properties.put("remark", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("RecordAttachmentCommand", "object", null,
+                List.of("fileId"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema attachmentSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("id", stringProperty(false));
+        properties.put("version", integerProperty(true));
+        properties.put("moduleAlias", stringProperty(false));
+        properties.put("recordId", stringProperty(false));
+        properties.put("fileId", stringProperty(false));
+        properties.put("displayName", stringProperty(true));
+        properties.put("sort", integerProperty(true));
+        properties.put("remark", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("RecordAttachment", "object", null,
+                List.of("id", "moduleAlias", "recordId", "fileId"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema summaryItemSchema() {

@@ -40,6 +40,10 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/query",
                         "/sales.contract/query/summary",
                         "/sales.contract/view/{id}",
+                        "/sales.contract/view/{id}/attachments/query",
+                        "/sales.contract/view/{id}/attachments/add",
+                        "/sales.contract/view/{id}/attachments/update/{attachmentId}",
+                        "/sales.contract/view/{id}/attachments/delete/{attachmentId}",
                         "/sales.contract/insert",
                         "/sales.contract/update/{id}",
                         "/sales.contract/delete/{id}",
@@ -52,9 +56,11 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/actions/{recordId}",
                         "/sales.contract/publish",
                         "/sales.contract/submit/{recordId}",
+                        "/sales.contract/submit/duplicate/check",
                         "/sales.contract/archive/batch",
                         "/sales.contract/preview",
                         "/sales.contract/preview/{recordId}",
+                        "/sales.contract/preview/duplicate/check",
                         "/sales.contract/preview/batch",
                         "/sales.contract/references/customerId/resolve"
                 );
@@ -101,7 +107,7 @@ class DynamicOpenApiGeneratorTest {
                 .findFirst())
                 .get()
                 .satisfies(operation -> {
-                    assertThat(operation.requestSchema()).isEqualTo("DynamicRecordPayload");
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicRecordSaveRequest");
                     assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.CREATE.code());
                     assertThat(operation.permissionCode()).isEqualTo("sales.contract:create");
@@ -110,8 +116,34 @@ class DynamicOpenApiGeneratorTest {
                 .filter(operation -> operation.path().equals("/sales.contract/update/{id}"))
                 .findFirst())
                 .get()
-                .extracting(DynamicOpenApiDocument.Operation::responseSchema)
-                .isEqualTo("DynamicRecordResponse");
+                .satisfies(operation -> {
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicRecordSaveRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("DynamicRecordResponse");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/attachments/query")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.VIEW.code());
+                    assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentList");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/attachments/add")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.UPDATE.code());
+                    assertThat(operation.requestSchema()).isEqualTo("RecordAttachmentCommand");
+                    assertThat(operation.responseSchema()).isEqualTo("RecordAttachmentList");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/submit/duplicate/check")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicWebDuplicateCheckRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("RecordDuplicateCheckResult");
+                    assertThat(operation.actionCode()).isEqualTo("submit");
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:submit");
+                });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/view/{id}"))
                 .findFirst())
@@ -355,6 +387,17 @@ class DynamicOpenApiGeneratorTest {
                 });
         assertThat(document.schemas().get("WebQueryRequest").properties())
                 .containsKeys("uiConfigId", "queryTemplateId", "externalQueryValues", "navigationSession");
+        assertThat(document.schemas().get("DynamicRecordSaveRequest").properties())
+                .containsKeys("uiConfigId", "record")
+                .doesNotContainKey("attachments");
+        assertThat(document.schemas().get("DynamicRecordPayload").properties().get("attachments").itemType())
+                .isEqualTo("RecordAttachmentCommand");
+        assertThat(document.schemas().get("RecordAttachmentCommand").required()).containsExactly("fileId");
+        assertThat(document.schemas().get("RecordAttachmentList").items().type()).isEqualTo("RecordAttachment");
+        assertThat(document.schemas().get("DynamicWebDuplicateCheckRequest").properties())
+                .containsKeys("recordId", "values");
+        assertThat(document.schemas().get("RecordDuplicateCheckResult").properties())
+                .containsKeys("ruleId", "actionCode", "fieldNames", "duplicated", "matches");
         assertThat(document.errors())
                 .containsEntry("DYNAMIC_BAD_REQUEST",
                         new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"))
