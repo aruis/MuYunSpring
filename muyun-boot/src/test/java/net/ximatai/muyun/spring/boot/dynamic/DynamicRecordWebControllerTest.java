@@ -332,6 +332,156 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldValidateUiConfigWhenSavingDynamicRecord() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, queryItemService, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-form");
+        uiConfig.setUiSetId("set-form");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField codeField = uiField("ui-form", "module-field-code");
+        codeField.setRequiredOverride(true);
+        PlatformUiConfigField amountField = uiField("ui-form", "module-field-amount");
+        amountField.setReadOnly(true);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(),
+                List.of(uiConfig),
+                List.of(codeField, amountField),
+                List.of(),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
+                "module-field-amount", "amount"));
+        DynamicRecord created = new DynamicRecord(entity()).setValue("code", "C-001");
+        created.setId("contract-1");
+        DynamicRecord saved = new DynamicRecord(entity()).setValue("code", "C-002");
+        saved.setId("contract-1");
+        saved.setVersion(5);
+        when(mainEntity.insert(any(DynamicRecord.class))).thenReturn("contract-1");
+        when(mainEntity.update(any(DynamicRecord.class))).thenReturn(1);
+        when(mainEntity.select("contract-1")).thenReturn(created, saved);
+
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("contract-1"));
+
+        ArgumentCaptor<DynamicRecord> inserted = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(mainEntity).insert(inserted.capture());
+        assertThat(inserted.getValue().getValue("code")).isEqualTo("C-001");
+        assertThat(inserted.getValue().mutationMetadata()).containsEntry("uiConfigId", "ui-form");
+
+        lowCodeMvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "version": 4,
+                                    "values": {
+                                      "code": "C-002"
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("contract-1"))
+                .andExpect(jsonPath("$.version").value(5));
+
+        ArgumentCaptor<DynamicRecord> updated = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(mainEntity).update(updated.capture());
+        assertThat(updated.getValue().getId()).isEqualTo("contract-1");
+        assertThat(updated.getValue().getVersion()).isEqualTo(4);
+        assertThat(updated.getValue().getValue("code")).isEqualTo("C-002");
+
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "values": {}
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("UI required field is missing: code"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "version": 3,
+                                    "values": {
+                                      "code": "C-001",
+                                      "amount": 10
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: amount"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "missing-ui",
+                                  "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("UI config is not published in module snapshot: missing-ui"));
+
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code", RelationRole.CHILD));
+        lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-form",
+                                  "record": {
+                                    "values": {
+                                      "code": "C-001"
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "Form UI config only supports main relation fields for save validation: module-field-code"));
+    }
+
+    @Test
     void shouldRejectUnknownDynamicChildRelationInRequest() throws Exception {
         when(service.relations(MODULE)).thenReturn(List.of(
                 new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
@@ -1554,12 +1704,18 @@ class DynamicRecordWebControllerTest {
     }
 
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId, String fieldName) {
+        return resolvedModuleField(moduleFieldId, fieldName, RelationRole.MAIN);
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
+                                                           String fieldName,
+                                                           RelationRole relationRole) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
                 MODULE,
                 "rel-main",
                 "main",
-                RelationRole.MAIN,
+                relationRole,
                 "metadata-1",
                 ENTITY,
                 "Contract",
@@ -1569,6 +1725,14 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 "string"
         );
+    }
+
+    private PlatformUiConfigField uiField(String uiConfigId, String moduleFieldId) {
+        PlatformUiConfigField field = new PlatformUiConfigField();
+        field.setUiConfigId(uiConfigId);
+        field.setModuleMetadataFieldId(moduleFieldId);
+        field.setVisible(true);
+        return field;
     }
 
     private EntityDefinition lineEntity() {

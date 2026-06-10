@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.spring.boot.web.ActionWeb;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
@@ -12,10 +13,14 @@ import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
+import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -36,7 +41,9 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
@@ -206,8 +213,67 @@ public class DynamicRecordWebController implements
         return PageResult.of(records, page.getTotal(), PageRequest.of(page.getPageNum(), page.getPageSize()));
     }
 
+    @Override
+    @PostMapping("/insert")
+    @ActionEndpoint(PlatformAction.CREATE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public DynamicRecord insert(@RequestBody DynamicRecord record) {
+        return webScope(() -> {
+            DynamicRecord normalized = record == null ? service().newRecord() : record;
+            validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
+            String id = service().insert(normalized);
+            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+        });
+    }
+
+    @Override
+    @PostMapping("/update/{id}")
+    @ActionEndpoint(PlatformAction.UPDATE)
+    public DynamicRecord update(@PathVariable String id, @RequestBody DynamicRecord record) {
+        return webScope(() -> {
+            DynamicRecord normalized = record == null ? service().newRecord() : record;
+            normalized.setId(id);
+            validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
+            requireDataScopeRecord(PlatformAction.UPDATE, id);
+            service().update(normalized);
+            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
+        });
+    }
+
+    private DynamicRecord selectForAction(PlatformAction action, String id) {
+        Object operations = service();
+        if (operations instanceof DataScopeAbility<?> dataScopeAbility) {
+            return selectFromDataScope(dataScopeAbility, action, id);
+        }
+        return service().select(id);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private DynamicRecord selectFromDataScope(DataScopeAbility dataScopeAbility, PlatformAction action, String id) {
+        return (DynamicRecord) dataScopeAbility.selectForAction(action, id);
+    }
+
+    private void requireDataScopeRecord(PlatformAction action, String id) {
+        Object operations = service();
+        if (operations instanceof DataScopeAbility<?> dataScopeAbility) {
+            requireRecordScope(dataScopeAbility, actionPolicy(action), id);
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void requireRecordScope(DataScopeAbility dataScopeAbility, ActionExecutionPolicy policy, String id) {
+        dataScopeAbility.requireRecordScope(policy, java.util.List.of(id));
+    }
+
+    private ActionExecutionPolicy actionPolicy(PlatformAction fallback) {
+        return ActionExecutionContextHolder.current()
+                .filter(context -> context.moduleAlias().equals(webScopeName()))
+                .map(ActionExecutionContext::actionPolicy)
+                .orElseGet(fallback::executionPolicy);
+    }
+
     private Set<String> projectionFields(String moduleAlias, WebQueryRequest request) {
-        requireLowCodeQueryServices();
+        requireLowCodePageServices();
         PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
         PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
                 .filter(config -> Objects.equals(config.getId(), request.uiConfigId()))
@@ -230,11 +296,61 @@ public class DynamicRecordWebController implements
         return fields;
     }
 
+    private void validateUiSave(String moduleAlias, DynamicRecord record) {
+        Object uiConfigIdValue = record.mutationMetadata().get("uiConfigId");
+        if (!(uiConfigIdValue instanceof String uiConfigId) || !hasText(uiConfigId)) {
+            return;
+        }
+        requireLowCodeQueryServices();
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
+                .filter(config -> Objects.equals(config.getId(), uiConfigId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
+                        + uiConfigId));
+        Map<String, FieldDefinition> fields = record.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
+        for (PlatformUiConfigField uiField : snapshot.uiFields()) {
+            if (!Objects.equals(uiField.getUiConfigId(), uiConfig.getId())
+                    || !Boolean.TRUE.equals(uiField.getVisible())) {
+                continue;
+            }
+            ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(uiField.getModuleMetadataFieldId());
+            if (resolved.relationRole() != RelationRole.MAIN) {
+                throw new PlatformException("Form UI config only supports main relation fields for save validation: "
+                        + uiField.getModuleMetadataFieldId());
+            }
+            FieldDefinition field = fields.get(resolved.fieldName());
+            if (field == null) {
+                continue;
+            }
+            validateUiReadOnly(record, uiField, field);
+            validateUiRequired(record, uiField, field);
+        }
+    }
+
+    private void validateUiReadOnly(DynamicRecord record, PlatformUiConfigField uiField, FieldDefinition field) {
+        if (Boolean.TRUE.equals(uiField.getReadOnly()) && record.isExplicitlySet(field.fieldName())) {
+            throw new PlatformException("UI read-only field cannot be saved: " + field.fieldName());
+        }
+    }
+
+    private void validateUiRequired(DynamicRecord record, PlatformUiConfigField uiField, FieldDefinition field) {
+        boolean required = Boolean.TRUE.equals(uiField.getRequiredOverride()) || field.isRequired();
+        if (!required) {
+            return;
+        }
+        Object value = record.getValues().get(field.fieldName());
+        if (value == null || value instanceof String text && text.isBlank()) {
+            throw new PlatformException("UI required field is missing: " + field.fieldName());
+        }
+    }
+
     private void validateQueryTemplateBelongsToModule(String moduleAlias, String queryTemplateId) {
         if (!hasText(queryTemplateId)) {
             return;
         }
-        requireLowCodeQueryServices();
+        requireLowCodePageServices();
         PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
         PlatformQueryTemplate template = snapshot.queryTemplates().stream()
                 .filter(item -> Objects.equals(item.getId(), queryTemplateId))
@@ -260,8 +376,15 @@ public class DynamicRecordWebController implements
         return projected;
     }
 
+    private void requireLowCodePageServices() {
+        if (pageConfigSnapshotService == null || moduleMetadataFieldService == null) {
+            throw new PlatformException("dynamic low-code page services are not configured");
+        }
+    }
+
     private void requireLowCodeQueryServices() {
-        if (pageConfigSnapshotService == null || queryItemService == null || moduleMetadataFieldService == null) {
+        requireLowCodePageServices();
+        if (queryItemService == null) {
             throw new PlatformException("dynamic low-code query services are not configured");
         }
     }

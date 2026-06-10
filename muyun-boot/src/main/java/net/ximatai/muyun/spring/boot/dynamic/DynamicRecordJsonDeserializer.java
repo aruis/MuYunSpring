@@ -26,10 +26,19 @@ final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord
     public DynamicRecord deserialize(JsonParser parser, DeserializationContext context) throws IOException {
         String moduleAlias = DynamicWebRequest.moduleAlias();
         JsonNode root = parser.getCodec().readTree(parser);
-        DynamicRecord record = record(moduleAlias, recordService.mainEntityAlias(moduleAlias), root, parser, context);
-        readOriginContext(record, root, parser, context);
-        readChildren(moduleAlias, record, root, parser, context);
+        JsonNode recordRoot = root.has("record") && root.get("record").isObject() ? root.get("record") : root;
+        DynamicRecord record = record(moduleAlias, recordService.mainEntityAlias(moduleAlias), recordRoot, parser, context);
+        readUiConfigId(record, root);
+        readOriginContext(record, root.has("originContext") ? root : recordRoot, parser, context);
+        readChildren(moduleAlias, record, recordRoot, parser, context);
         return record;
+    }
+
+    private void readUiConfigId(DynamicRecord record, JsonNode root) {
+        JsonNode uiConfigId = root.get("uiConfigId");
+        if (uiConfigId != null && !uiConfigId.isNull() && !uiConfigId.asText().isBlank()) {
+            record.putMutationMetadata("uiConfigId", uiConfigId.asText());
+        }
     }
 
     private DynamicRecord record(String moduleAlias,
@@ -125,6 +134,8 @@ final class DynamicRecordJsonDeserializer extends JsonDeserializer<DynamicRecord
     private boolean isEnvelopeField(String fieldName) {
         return "id".equals(fieldName)
                 || "version".equals(fieldName)
+                || "uiConfigId".equals(fieldName)
+                || "record".equals(fieldName)
                 || "values".equals(fieldName)
                 || "children".equals(fieldName)
                 || "originContext".equals(fieldName);
