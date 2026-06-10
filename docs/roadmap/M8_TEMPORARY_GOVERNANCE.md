@@ -1,11 +1,13 @@
 # M8 Temporary Governance
 
-本文是 M8 与 neo 颗粒度对齐后的临时专项治理清单。它不替代 M8 稳定契约，也不重新扩大 M8 里程碑范围；只记录两类事项：
+本文是 M8 与 neo 颗粒度对齐后的临时专项治理清单。当前清单已回收到 `M8_STABLE_CONTRACT.md` 和 `MILESTONES.md`，后续只作为阶段性回看索引，不再作为并行待办路线。
 
-1. M8 页面交付闭环已经声明或已经进入运行主链路，但颗粒度还需要补齐的能力。
-2. 原本属于 M9/M10，但如果当前实现 M8 收尾项时顺手补一个薄挂点、校验或文档，可以降低后续返工的事项。
+它不替代 M8 稳定契约，也不重新扩大 M8 里程碑范围；原记录两类事项：
 
-本清单完成后应被回收到 `M8_STABLE_CONTRACT.md`、后续里程碑或技术债记录中，不长期保留为并行路线。
+1. M8 页面交付闭环已经声明或已经进入运行主链路，但当时颗粒度还需要补齐的能力。
+2. 原本属于 M9/M10，但在实现 M8 收尾项时顺手补一个薄挂点、校验或文档即可降低后续返工的事项。
+
+本清单完成后应被回收到 `M8_STABLE_CONTRACT.md`、后续里程碑或技术债记录中，不长期保留为并行路线。当前状态：已回收。
 
 ## 治理原则
 
@@ -14,20 +16,20 @@
 3. 所有页面能力必须回到动态运行态、动作权限、数据权限、审计、乐观锁、附件业务关系和事务边界，不建立绕过平台底座的页面内核。
 4. M8 只补页面交付闭环的缺口；动态弹窗、复杂关联视图、局部信息编辑、模块任务和完整设计器仍按 M9/M10 承接。
 
-## M8 必补项
+## 原 M8 必补项
 
-| 编号 | 事项 | 目标 | 验收口径 | 边界 |
-| --- | --- | --- | --- | --- |
-| M8-G01 | UI 类型目录输出 | 让前端能从 bootstrap 或目录入口读取字段 UI 类型、属性 schema 和字段映射 | 已发布页面解析字段时，不只得到 `fieldUiTypeAlias`，还能得到对应属性、默认值和映射规则；非法 UI 类型继续 fail-fast | 不使用逗号串、`expendMap` 或 neo 字段袋 |
-| M8-G02 | 默认 UI 配置脚手架 | 降低配置器创建 LIST/FORM/DETAIL/REFERENCE 配置的初始成本 | 提供显式服务或管理入口，可为 UI Set 生成 WEB/APP 默认配置和基础字段明细；结果仍需显式发布后才进入在线页面 | 不放进保存 hook 做隐藏副作用 |
-| M8-G03 | `layoutJson` 最小语义校验 | 发布前拦住明显无效的页面布局结构 | 发布 UI 配置时至少校验 summary panel、引用候选、子表区块等 M8 已承诺结构；错误返回可定位到 layout path | 不提前做完整拖拽设计器 schema |
-| M8-G04 | 快速查询 | 补齐列表页常用的 quick/fuzzy 查询体验 | 列表查询请求可携带快速查询值；后端只在已发布 LIST 配置声明的字段范围内编译为 Criteria，并继续叠加数据权限 | 不开放前端任意字段模糊搜索 |
-| M8-G05 | 引用候选双上下文 | 让引用选择弹窗具备目标列表配置和来源表单校验 | 引用候选入口显式区分来源 `sourceUiConfigId` 与目标候选 `uiConfigId/queryTemplateId`；权限使用 `REFERENCE`，不复用普通 query 授权 | 不把引用生单重新塞回 resolve 的隐式副作用 |
-| M8-G06 | 子表 UI 保存校验 | 将表单保存 wrapper 的 required/readOnly 语义覆盖到基础子表 | `children.{relationCode}` 提交时按已发布 UI 配置校验本次提交子行的必填；基础只读字段显式提交应拒绝 | 条件只读、动作级字段白名单进入 M9 |
-| M8-G07 | 附件 fileserver 薄对接 | 明确 MuYunSpring 与文件服务的页面交付边界 | 提供 upload ticket、preview/download ticket 或 redirect 的后端入口；附件列表能得到前端展示所需 metadata 或快照 | MuYunSpring 不实现文件存储、预览、下载和物理删除策略 |
-| M8-G08 | 保存与版本前端契约 | 把 wrapper、children、乐观锁和错误语义写成可交付口径 | OpenAPI 和 handoff 文档说明 `uiConfigId + record`、`children` 缺省/null/空数组/partial、update/delete version、409 `DYNAMIC_CONFLICT` | 不引入审批任务上下文；审批相关进入 M6/M9 |
-| M8-G09 | 查重与附件错误码 | 让前端能稳定分支处理页面辅助错误 | 查重命中、附件票据失败、UI 校验失败、乐观锁冲突有稳定 code/status/message/traceId 语义 | 不回退到只靠中文 message 判断 |
-| M8-G10 | 前端 handoff 索引 | 将 M8 后端契约整理为前端可消费文档 | 至少覆盖 bootstrap、query/summary/quick、save wrapper/children/version、reference、attachments、duplicate/error、OpenAPI 入口 | 不复制 neo 全量文档，只写 MuYun 稳定协议 |
+| 编号 | 事项 | 回收状态 |
+| --- | --- | --- |
+| M8-G01 | UI 类型目录输出 | 已回收到页面 bootstrap、UI 类型目录输出和 M8 稳定契约。 |
+| M8-G02 | 默认 UI 配置脚手架 | 已回收到 UI 配置脚手架服务和 M8 配置交付口径。 |
+| M8-G03 | `layoutJson` 最小语义校验 | 已回收到发布校验契约。 |
+| M8-G04 | 快速查询 | 已回收到 M8 运行态查询契约和 OpenAPI。 |
+| M8-G05 | 引用候选双上下文 | 已回收到引用候选 Web 契约和 OpenAPI。 |
+| M8-G06 | 子表 UI 保存校验 | 已回收到 M8 保存契约。 |
+| M8-G07 | 附件 fileserver 薄对接 | 已回收到附件 access ticket 契约；具体文件服务 adapter 后续按部署形态接入。 |
+| M8-G08 | 保存与版本前端契约 | 已回收到 `M8_STABLE_CONTRACT.md` 前端 handoff 索引。 |
+| M8-G09 | 查重与附件错误码 | 已回收到稳定错误码契约和 OpenAPI。 |
+| M8-G10 | 前端 handoff 索引 | 已回收到 `M8_STABLE_CONTRACT.md`。 |
 
 ## 顺手治理项
 
@@ -57,4 +59,4 @@
 
 1. 每个 M8 必补项至少有服务或 Web contract 测试覆盖；涉及真实查询、保存、附件、引用和发布边界时优先补真实路径 contract。
 2. 文档只保留稳定协议、字段语义、错误语义和后续边界，不记录执行流水。
-3. 完成本清单后，能合并进 `M8_STABLE_CONTRACT.md` 的内容应迁移过去；纯后续项转入 M9/M10 或技术债记录。
+3. 本清单已回收到 `M8_STABLE_CONTRACT.md`、`MILESTONES.md` 和后续里程碑边界，不再作为新的开发入口。
