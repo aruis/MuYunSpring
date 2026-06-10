@@ -11,6 +11,7 @@
 - [平台配置与元数据自举](../architecture/PLATFORM_CONFIG_BOOTSTRAP.md)
 - [命名与边界](../architecture/NAMING_AND_BOUNDARIES.md)
 - [技术债记录](../TECHNICAL_DEBT.md)
+- [M7 稳定契约](M7_STABLE_CONTRACT.md)
 
 ## 里程碑总览
 
