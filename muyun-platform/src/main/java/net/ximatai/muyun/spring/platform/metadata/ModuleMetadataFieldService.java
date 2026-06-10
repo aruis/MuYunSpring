@@ -102,6 +102,34 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         return list(Criteria.of().eq("relationId", relationId), ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
+    public List<ModuleMetadataField> listByModuleAlias(String moduleAlias) {
+        String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        List<String> relationIds = relationService.list(Criteria.of().eq("moduleAlias", validAlias),
+                        ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .map(ModuleMetadataRelation::getId)
+                .toList();
+        if (relationIds.isEmpty()) {
+            return List.of();
+        }
+        return list(Criteria.of().in("relationId", relationIds), ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    public List<ModuleMetadataField> listMainByModuleAlias(String moduleAlias) {
+        String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        List<String> relationIds = relationService.list(Criteria.of()
+                                .eq("moduleAlias", validAlias)
+                                .eq("relationRole", RelationRole.MAIN),
+                        ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .map(ModuleMetadataRelation::getId)
+                .toList();
+        if (relationIds.isEmpty()) {
+            return List.of();
+        }
+        return list(Criteria.of().in("relationId", relationIds), ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
     public ResolvedModuleMetadataField resolve(String moduleMetadataFieldId) {
         ModuleMetadataField moduleField = moduleMetadataFieldId == null || moduleMetadataFieldId.isBlank()
                 ? null

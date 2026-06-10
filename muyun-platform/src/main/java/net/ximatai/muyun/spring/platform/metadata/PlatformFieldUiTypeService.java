@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class PlatformFieldUiTypeService extends AbstractAbilityService<PlatformFieldUiType> implements
         SoftDeleteAbility<PlatformFieldUiType>,
@@ -56,6 +58,22 @@ public class PlatformFieldUiTypeService extends AbstractAbilityService<PlatformF
             throw new PlatformException("Field UI type requires existing type: " + validAlias);
         }
         return fieldUiType;
+    }
+
+    public List<PlatformFieldUiType> listEnabledByAliases(List<String> aliases) {
+        if (aliases == null || aliases.isEmpty()) {
+            return List.of();
+        }
+        return list(enabledCriteria(Criteria.of().in("alias", aliases)),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
+    }
+
+    public List<PlatformFieldUiType> listEnabledForDefaultFieldType(String fieldTypeAlias) {
+        String validAlias = PlatformNameRules.requireIdentifier(fieldTypeAlias, "fieldTypeAlias");
+        return list(enabledCriteria(Criteria.of().eq("defaultFieldTypeAlias", validAlias)),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     private void normalizeAndValidate(PlatformFieldUiType fieldUiType) {

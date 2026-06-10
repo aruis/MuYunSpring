@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.ui;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -10,6 +11,8 @@ import java.util.List;
 @Service
 public class PlatformPageConfigPublishService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final java.util.Set<String> SUMMARY_AGGREGATES = java.util.Set.of(
+            "sum", "avg", "max", "min", "count", "distinctCount");
 
     private final PlatformUiSetService uiSetService;
     private final PlatformUiConfigService uiConfigService;
@@ -88,10 +91,130 @@ public class PlatformPageConfigPublishService {
             return;
         }
         try {
-            OBJECT_MAPPER.readTree(layoutJson);
+            JsonNode root = OBJECT_MAPPER.readTree(layoutJson);
+            validateLayoutRoot(root, uiConfig.getId());
         } catch (JsonProcessingException exception) {
             throw new PlatformException("UI config layout JSON cannot be decoded: " + uiConfig.getId());
         }
+    }
+
+    private void validateLayoutRoot(JsonNode root, String uiConfigId) {
+        if (root == null || !root.isObject()) {
+            throw new PlatformException("UI config layout JSON root must be object: " + uiConfigId);
+        }
+        validateSummaryPanel(root.get("summaryPanel"), uiConfigId);
+        validateReferenceCandidate(root.get("referenceCandidate"), "referenceCandidate", uiConfigId);
+        validateReferenceCandidateArray(root.get("referenceCandidates"), "referenceCandidates", uiConfigId);
+        validateChildSections(root.get("children"), "children", uiConfigId);
+        validateChildSections(root.get("childSections"), "childSections", uiConfigId);
+        validateKnownBlocks(root.get("blocks"), uiConfigId);
+    }
+
+    private void validateSummaryPanel(JsonNode summaryPanel, String uiConfigId) {
+        if (summaryPanel == null || summaryPanel.isNull()) {
+            return;
+        }
+        if (!summaryPanel.isObject()) {
+            throw layoutException(uiConfigId, "summaryPanel must be object");
+        }
+        JsonNode items = summaryPanel.get("items");
+        if (items == null || items.isNull()) {
+            return;
+        }
+        if (!items.isArray()) {
+            throw layoutException(uiConfigId, "summaryPanel.items must be array");
+        }
+        for (int i = 0; i < items.size(); i++) {
+            JsonNode item = items.get(i);
+            if (!item.isObject()) {
+                throw layoutException(uiConfigId, "summaryPanel.items[" + i + "] must be object");
+            }
+            JsonNode aggregate = item.get("aggregate");
+            if (aggregate == null || !aggregate.isTextual() || aggregate.asText().isBlank()) {
+                throw layoutException(uiConfigId, "summaryPanel.items[" + i + "].aggregate is required");
+            }
+            if (!SUMMARY_AGGREGATES.contains(aggregate.asText())) {
+                throw layoutException(uiConfigId, "summaryPanel.items[" + i + "].aggregate is unsupported");
+            }
+            JsonNode fieldName = item.get("fieldName");
+            if (fieldName != null && !fieldName.isNull() && !fieldName.isTextual()) {
+                throw layoutException(uiConfigId, "summaryPanel.items[" + i + "].fieldName must be string");
+            }
+        }
+    }
+
+    private void validateReferenceCandidateArray(JsonNode candidates, String path, String uiConfigId) {
+        if (candidates == null || candidates.isNull()) {
+            return;
+        }
+        if (!candidates.isArray()) {
+            throw layoutException(uiConfigId, path + " must be array");
+        }
+        for (int i = 0; i < candidates.size(); i++) {
+            validateReferenceCandidate(candidates.get(i), path + "[" + i + "]", uiConfigId);
+        }
+    }
+
+    private void validateReferenceCandidate(JsonNode candidate, String path, String uiConfigId) {
+        if (candidate == null || candidate.isNull()) {
+            return;
+        }
+        if (!candidate.isObject()) {
+            throw layoutException(uiConfigId, path + " must be object");
+        }
+        validateOptionalText(candidate, "sourceUiConfigId", path, uiConfigId);
+        validateOptionalText(candidate, "uiConfigId", path, uiConfigId);
+        validateOptionalText(candidate, "queryTemplateId", path, uiConfigId);
+    }
+
+    private void validateChildSections(JsonNode sections, String path, String uiConfigId) {
+        if (sections == null || sections.isNull()) {
+            return;
+        }
+        if (!sections.isArray()) {
+            throw layoutException(uiConfigId, path + " must be array");
+        }
+        for (int i = 0; i < sections.size(); i++) {
+            JsonNode section = sections.get(i);
+            String sectionPath = path + "[" + i + "]";
+            if (!section.isObject()) {
+                throw layoutException(uiConfigId, sectionPath + " must be object");
+            }
+            JsonNode relationCode = section.get("relationCode");
+            if (relationCode == null || !relationCode.isTextual() || relationCode.asText().isBlank()) {
+                throw layoutException(uiConfigId, sectionPath + ".relationCode is required");
+            }
+            validateOptionalText(section, "uiConfigId", sectionPath, uiConfigId);
+        }
+    }
+
+    private void validateKnownBlocks(JsonNode blocks, String uiConfigId) {
+        if (blocks == null || blocks.isNull()) {
+            return;
+        }
+        if (!blocks.isArray()) {
+            throw layoutException(uiConfigId, "blocks must be array");
+        }
+        for (int i = 0; i < blocks.size(); i++) {
+            JsonNode block = blocks.get(i);
+            String path = "blocks[" + i + "]";
+            if (!block.isObject()) {
+                throw layoutException(uiConfigId, path + " must be object");
+            }
+            validateOptionalText(block, "type", path, uiConfigId);
+            validateOptionalText(block, "key", path, uiConfigId);
+        }
+    }
+
+    private void validateOptionalText(JsonNode node, String field, String path, String uiConfigId) {
+        JsonNode value = node.get(field);
+        if (value != null && !value.isNull() && !value.isTextual()) {
+            throw layoutException(uiConfigId, path + "." + field + " must be string");
+        }
+    }
+
+    private PlatformException layoutException(String uiConfigId, String message) {
+        return new PlatformException("UI config layout JSON invalid at " + message + ": " + uiConfigId);
     }
 
     private PlatformUiConfig copyForPublish(PlatformUiConfig source, boolean published) {

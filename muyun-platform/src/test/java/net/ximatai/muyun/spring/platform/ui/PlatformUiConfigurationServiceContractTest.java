@@ -20,7 +20,12 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -45,6 +50,8 @@ class PlatformUiConfigurationServiceContractTest {
     private final TestMemoryDao<ModuleMetadataField> moduleFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformFieldUiType> fieldUiTypeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformFieldUiTypeAttribute> fieldUiTypeAttributeDao = new TestMemoryDao<>();
+    private final TestMemoryDao<PlatformFieldUiTypeFieldMapping> fieldUiTypeFieldMappingDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiSet> uiSetDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiConfig> uiConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformUiConfigField> uiConfigFieldDao = new TestMemoryDao<>();
@@ -56,6 +63,10 @@ class PlatformUiConfigurationServiceContractTest {
     private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao, fieldUiTypeDao);
     private final PlatformFieldUiTypeService fieldUiTypeService =
             new PlatformFieldUiTypeService(fieldUiTypeDao, fieldTypeService);
+    private final PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService =
+            new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
+    private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
+            new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
@@ -74,6 +85,9 @@ class PlatformUiConfigurationServiceContractTest {
             uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService);
     private final PlatformPageConfigSnapshotService snapshotService = new PlatformPageConfigSnapshotService(
             uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService);
+    private final PlatformUiConfigScaffoldService scaffoldService = new PlatformUiConfigScaffoldService(
+            uiSetService, uiConfigService, uiConfigFieldService, moduleFieldService, fieldTypeService,
+            fieldUiTypeService);
 
     @Test
     void shouldCreateUiConfigWithFieldsAndSnapshotByModule() {
@@ -192,6 +206,89 @@ class PlatformUiConfigurationServiceContractTest {
         publishService.unpublishUiConfig(uiConfigId);
         assertThat(snapshotService.snapshot("crm.customer").uiConfigs()).isEmpty();
         assertThat(snapshotService.snapshot("crm.customer").uiFields()).isEmpty();
+    }
+
+    @Test
+    void shouldRejectSemanticallyInvalidLayoutJsonBeforePublish() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "summaryPanel": {
+                    "items": {"aggregate":"sum"}
+                  }
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("summaryPanel.items must be array");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "children": [
+                    {"title":"明细"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("children[0].relationCode is required");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "referenceCandidates": [
+                    {"sourceUiConfigId":"ui-form", "uiConfigId":"ui-ref", "queryTemplateId":"q-ref"}
+                  ],
+                  "blocks": [
+                    {"type":"associationView", "key":"contracts"},
+                    {"type":"dialog", "key":"submitDialog"},
+                    {"type":"taskPanel", "key":"completion"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatCode(() -> publishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldScaffoldDefaultClientConfigsForUiSet() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String levelField = addModuleField("crm.customer", "level", "level", "string");
+        String childField = addChildModuleField("crm.customer", "contact", "contactName", "contact_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "form", PlatformUiSetType.FORM, true));
+
+        List<String> configIds = scaffoldService.scaffoldDefaultClientConfigs(uiSetId);
+
+        assertThat(configIds).hasSize(2);
+        assertThat(uiConfigService.listByUiSetIds(List.of(uiSetId)))
+                .extracting(PlatformUiConfig::getClientType)
+                .containsExactly(PlatformUiClientType.WEB, PlatformUiClientType.APP);
+        assertThat(uiConfigFieldService.listByUiConfigIds(configIds))
+                .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
+                .contains(customerNameField, levelField);
+        assertThat(uiConfigFieldService.listByUiConfigIds(configIds))
+                .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
+                .doesNotContain(childField);
+        assertThat(uiConfigFieldService.listByUiConfigIds(configIds))
+                .extracting(PlatformUiConfigField::getFieldUiTypeAlias)
+                .containsOnly("text");
+
+        uiConfigService.disable(configIds.getFirst());
+        List<String> secondRun = scaffoldService.scaffoldDefaultClientConfigs(uiSetId);
+        assertThat(secondRun).containsExactlyElementsOf(configIds);
+        assertThat(uiConfigDao.query(Criteria.of().eq("uiSetId", uiSetId), new PageRequest(0, 10))).hasSize(2);
     }
 
     @Test
@@ -494,6 +591,23 @@ class PlatformUiConfigurationServiceContractTest {
         fieldUiTypeService.insert(uiType);
     }
 
+    private void seedUiTypeAttribute(String fieldUiTypeAlias, String attributeAlias, String valueFieldTypeAlias,
+                                     String defaultValue) {
+        PlatformFieldUiTypeAttribute attribute = new PlatformFieldUiTypeAttribute();
+        attribute.setFieldUiTypeAlias(fieldUiTypeAlias);
+        attribute.setAttributeAlias(attributeAlias);
+        attribute.setValueFieldTypeAlias(valueFieldTypeAlias);
+        attribute.setDefaultValue(defaultValue);
+        fieldUiTypeAttributeService.insert(attribute);
+    }
+
+    private void seedUiTypeFieldMapping(String fieldUiTypeAlias, String sourceKey) {
+        PlatformFieldUiTypeFieldMapping mapping = new PlatformFieldUiTypeFieldMapping();
+        mapping.setFieldUiTypeAlias(fieldUiTypeAlias);
+        mapping.setSourceKey(sourceKey);
+        fieldUiTypeFieldMappingService.insert(mapping);
+    }
+
     private String seedModuleField(String moduleAlias,
                                    String metadataAlias,
                                    String fieldName,
@@ -559,6 +673,47 @@ class PlatformUiConfigurationServiceContractTest {
 
         ModuleMetadataField moduleField = new ModuleMetadataField();
         moduleField.setRelationId(relation.getId());
+        moduleField.setMetadataFieldId(fieldId);
+        moduleField.setTitle(fieldName);
+        return moduleFieldService.insert(moduleField);
+    }
+
+    private String addChildModuleField(String moduleAlias,
+                                       String metadataAlias,
+                                       String fieldName,
+                                       String columnName,
+                                       String fieldTypeAlias) {
+        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
+        ModuleMetadataRelation mainRelation = relationDao
+                .query(Criteria.of()
+                        .eq("moduleAlias", moduleAlias)
+                        .eq("relationRole", RelationRole.MAIN), new PageRequest(0, 1))
+                .getFirst();
+        Metadata metadata = new Metadata();
+        metadata.setApplicationAlias(applicationAlias);
+        metadata.setAlias(metadataAlias);
+        metadata.setTitle(metadataAlias);
+        String metadataId = metadataService.insert(metadata);
+
+        MetadataField field = new MetadataField();
+        field.setMetadataId(metadataId);
+        field.setFieldName(fieldName);
+        field.setColumnName(columnName);
+        field.setFieldTypeAlias(fieldTypeAlias);
+        field.setTitle(fieldName);
+        String fieldId = fieldService.insert(field);
+
+        ModuleMetadataRelation relation = new ModuleMetadataRelation();
+        relation.setModuleAlias(moduleAlias);
+        relation.setMetadataId(metadataId);
+        relation.setRelationAlias(metadataAlias);
+        relation.setRelationRole(RelationRole.CHILD);
+        relation.setParentMetadataId(mainRelation.getMetadataId());
+        relation.setForeignKey("customerId");
+        String relationId = relationService.insert(relation);
+
+        ModuleMetadataField moduleField = new ModuleMetadataField();
+        moduleField.setRelationId(relationId);
         moduleField.setMetadataFieldId(fieldId);
         moduleField.setTitle(fieldName);
         return moduleFieldService.insert(moduleField);

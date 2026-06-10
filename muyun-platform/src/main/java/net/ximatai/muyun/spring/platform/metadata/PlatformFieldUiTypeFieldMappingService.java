@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -45,6 +46,15 @@ public class PlatformFieldUiTypeFieldMappingService extends AbstractAbilityServi
         if (!Objects.equals(left.getFieldUiTypeAlias(), right.getFieldUiTypeAlias())) {
             throw new PlatformException("Field UI type mapping sort can only move records within the same UI type");
         }
+    }
+
+    public List<PlatformFieldUiTypeFieldMapping> listByFieldUiTypeAliases(List<String> aliases) {
+        if (aliases == null || aliases.isEmpty()) {
+            return List.of();
+        }
+        return list(Criteria.of().in("fieldUiTypeAlias", aliases),
+                new net.ximatai.muyun.database.core.orm.PageRequest(0, Integer.MAX_VALUE),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     private void normalizeAndValidate(PlatformFieldUiTypeFieldMapping mapping) {

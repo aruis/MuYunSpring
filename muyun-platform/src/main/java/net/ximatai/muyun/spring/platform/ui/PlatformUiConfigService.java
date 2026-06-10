@@ -82,6 +82,15 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
         return list(enabledCriteria(Criteria.of().in("uiSetId", uiSetIds)), ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
+    public PlatformUiConfig findByUiSetAndClient(String uiSetId, PlatformUiClientType clientType) {
+        if (uiSetId == null || uiSetId.isBlank() || clientType == null) {
+            return null;
+        }
+        return findOne(Criteria.of()
+                .eq("uiSetId", uiSetId)
+                .eq("clientType", clientType));
+    }
+
     public List<PlatformUiConfig> listPublishedByUiSetIds(List<String> uiSetIds) {
         if (uiSetIds == null || uiSetIds.isEmpty()) {
             return List.of();
