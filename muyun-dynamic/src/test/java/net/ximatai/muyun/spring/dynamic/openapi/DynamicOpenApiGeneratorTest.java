@@ -386,7 +386,8 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(property.companionFields()).isEmpty();
                 });
         assertThat(document.schemas().get("WebQueryRequest").properties())
-                .containsKeys("uiConfigId", "queryTemplateId", "externalQueryValues", "navigationSession");
+                .containsKeys("uiConfigId", "queryTemplateId", "externalQueryValues", "navigationSession",
+                        "quickSearch", "quickSearchFields", "navigationQueryKey");
         assertThat(document.schemas().get("DynamicRecordSaveRequest").properties())
                 .containsKeys("uiConfigId", "record")
                 .doesNotContainKey("attachments");
@@ -452,6 +453,9 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("WebQueryCondition");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("page").type())
                 .isEqualTo("WebPageRequest");
+        assertThat(document.schemas().get("DynamicWebReferenceRequest").properties())
+                .containsKeys("formValues", "sourceUiConfigId", "uiConfigId", "queryTemplateId",
+                        "externalQueryValues");
         assertThat(document.schemas().get("DynamicReferenceResolveResponse").properties())
                 .containsKeys("options", "results", "offset", "limit", "total")
                 .doesNotContainKeys("pageNum", "pageSize");

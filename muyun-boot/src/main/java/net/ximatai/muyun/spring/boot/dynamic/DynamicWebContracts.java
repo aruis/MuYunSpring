@@ -81,17 +81,22 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
                                   List<WebQueryCondition> conditions,
                                   WebPageRequest page,
                                   Boolean includeProjections,
-                                  Map<String, Object> formValues) {
+                                  Map<String, Object> formValues,
+                                  String sourceUiConfigId,
+                                  String uiConfigId,
+                                  String queryTemplateId,
+                                  Map<String, Object> externalQueryValues) {
     DynamicWebReferenceRequest {
         values = values == null ? List.of() : List.copyOf(values);
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
         includeProjections = includeProjections == null || includeProjections;
         formValues = formValues == null ? Map.of() : Map.copyOf(formValues);
+        externalQueryValues = externalQueryValues == null ? Map.of() : Map.copyOf(externalQueryValues);
     }
 
     static DynamicWebReferenceRequest empty() {
         return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(),
-                WebPageRequest.DEFAULT, true, Map.of());
+                WebPageRequest.DEFAULT, true, Map.of(), null, null, null, Map.of());
     }
 }
 

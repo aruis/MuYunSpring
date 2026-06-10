@@ -35,4 +35,7 @@ public class PlatformRecordNavigationSession extends StandardEntity {
 
     @Column(name = "total_count", type = ColumnType.BIGINT, comment = "Total count")
     private Long total;
+
+    @Column(name = "query_snapshot_key", type = ColumnType.VARCHAR, length = 128, comment = "Query snapshot key")
+    private String querySnapshotKey;
 }

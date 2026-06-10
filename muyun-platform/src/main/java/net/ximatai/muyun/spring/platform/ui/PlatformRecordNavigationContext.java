@@ -9,6 +9,7 @@ public record PlatformRecordNavigationContext(
         List<String> recordIds,
         int pageNum,
         int pageSize,
-        long total
+        long total,
+        String querySnapshotKey
 ) {
 }

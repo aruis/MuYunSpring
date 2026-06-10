@@ -11,19 +11,23 @@ public record WebQueryRequest(WebPageRequest page,
                               String uiConfigId,
                               String queryTemplateId,
                               Map<String, Object> externalQueryValues,
-                              Boolean navigationSession) {
+                              Boolean navigationSession,
+                              String quickSearch,
+                              List<String> quickSearchFields,
+                              String navigationQueryKey) {
     public WebQueryRequest {
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
         sorts = sorts == null ? List.of() : List.copyOf(sorts);
         externalQueryValues = externalQueryValues == null
                 ? Map.of()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(externalQueryValues));
+        quickSearchFields = quickSearchFields == null ? List.of() : List.copyOf(quickSearchFields);
     }
 
     public WebQueryRequest(WebPageRequest page,
                            List<WebQueryCondition> conditions,
                            List<WebSort> sorts) {
-        this(page, conditions, sorts, null, null, Map.of(), null);
+        this(page, conditions, sorts, null, null, Map.of(), null, null, List.of(), null);
     }
 
     public WebPageRequest pageOrDefault() {

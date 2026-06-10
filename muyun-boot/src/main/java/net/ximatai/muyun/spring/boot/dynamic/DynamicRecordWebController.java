@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -101,6 +102,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -253,17 +255,33 @@ public class DynamicRecordWebController implements
             validateQueryTemplateBelongsToModule(DynamicWebRequest.moduleAlias(), request.queryTemplateId());
             templateCriteria = queryItemService.compile(request.queryTemplateId(), request.externalQueryValues());
         }
-        if (request == null || request.conditions().isEmpty()) {
-            return templateCriteria;
+        Criteria manualCriteria = request == null || request.conditions().isEmpty()
+                ? Criteria.of()
+                : service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        Criteria quickCriteria = quickSearchCriteria(DynamicWebRequest.moduleAlias(), request);
+        return andCriteria(templateCriteria, manualCriteria, quickCriteria);
+    }
+
+    private Criteria andCriteria(Criteria... criteriaList) {
+        Criteria single = null;
+        int size = 0;
+        for (Criteria item : criteriaList) {
+            if (item != null && !item.isEmpty()) {
+                single = item;
+                size++;
+            }
         }
-        Criteria manualCriteria = service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
-        if (templateCriteria.isEmpty()) {
-            return manualCriteria;
+        if (size == 0) {
+            return Criteria.of();
+        }
+        if (size == 1) {
+            return single;
         }
         Criteria criteria = Criteria.of();
-        criteria.andGroup(templateCriteria.getRoot());
-        if (!manualCriteria.isEmpty()) {
-            criteria.andGroup(manualCriteria.getRoot());
+        for (Criteria item : criteriaList) {
+            if (item != null && !item.isEmpty()) {
+                criteria.andGroup(item.getRoot());
+            }
         }
         return criteria;
     }
@@ -638,6 +656,64 @@ public class DynamicRecordWebController implements
         return text.isBlank() ? null : text;
     }
 
+    private Criteria quickSearchCriteria(String moduleAlias, WebQueryRequest request) {
+        if (request == null || !hasText(request.quickSearch())) {
+            return Criteria.of();
+        }
+        if (!hasText(request.uiConfigId())) {
+            throw new PlatformException("Quick search requires published LIST uiConfigId");
+        }
+        String keyword = request.quickSearch().trim();
+        List<String> fields = quickSearchFields(moduleAlias, request);
+        if (fields.isEmpty()) {
+            throw new PlatformException("Quick search requires at least one searchable field");
+        }
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(group -> {
+            for (String field : fields) {
+                group.or(field, CriteriaOperator.LIKE, keyword);
+            }
+        });
+        return criteria;
+    }
+
+    private List<String> quickSearchFields(String moduleAlias, WebQueryRequest request) {
+        requireLowCodePageServices();
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
+        requireListUiConfig(snapshot, uiConfig);
+        Set<String> visibleFields = new LinkedHashSet<>();
+        for (PlatformUiConfigField field : snapshot.uiFields()) {
+            if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
+                    || !Boolean.TRUE.equals(field.getVisible())) {
+                continue;
+            }
+            ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
+            if (resolved.relationRole() == RelationRole.MAIN && searchableTextField(resolved)) {
+                visibleFields.add(resolved.fieldName());
+            }
+        }
+        if (request.quickSearchFields().isEmpty()) {
+            return List.copyOf(visibleFields);
+        }
+        List<String> requestedFields = request.quickSearchFields().stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        for (String field : requestedFields) {
+            if (!visibleFields.contains(field)) {
+                throw new PlatformException("Quick search field is not searchable in UI config: " + field);
+            }
+        }
+        return requestedFields;
+    }
+
+    private boolean searchableTextField(ResolvedModuleMetadataField field) {
+        String alias = field.fieldTypeAlias();
+        return alias != null && Set.of("string", "text").contains(alias.trim().toLowerCase(Locale.ROOT));
+    }
+
     private void requireDataScopeRecord(PlatformAction action, String id) {
         Object operations = service();
         if (operations instanceof DataScopeAbility<?> dataScopeAbility) {
@@ -660,11 +736,7 @@ public class DynamicRecordWebController implements
     private Set<String> projectionFields(String moduleAlias, WebQueryRequest request) {
         requireLowCodePageServices();
         PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
-        PlatformUiConfig uiConfig = snapshot.uiConfigs().stream()
-                .filter(config -> Objects.equals(config.getId(), request.uiConfigId()))
-                .findFirst()
-                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
-                        + request.uiConfigId()));
+        PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
         Set<String> fields = new LinkedHashSet<>();
         for (PlatformUiConfigField field : snapshot.uiFields()) {
             if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
@@ -744,6 +816,55 @@ public class DynamicRecordWebController implements
                         + queryTemplateId));
         if (!Objects.equals(template.getModuleAlias(), moduleAlias)) {
             throw new PlatformException("Query template must belong to module: " + moduleAlias);
+        }
+    }
+
+    private void validateReferenceUiContexts(String sourceModuleAlias,
+                                             DynamicReferenceDescriptor reference,
+                                             DynamicWebReferenceRequest request) {
+        if (request == null || (!hasText(request.sourceUiConfigId())
+                && !hasText(request.uiConfigId())
+                && !hasText(request.queryTemplateId()))) {
+            return;
+        }
+        if (hasText(request.sourceUiConfigId())) {
+            requireLowCodePageServices();
+            PlatformPageConfigSnapshot sourceSnapshot = pageConfigSnapshotService.snapshot(sourceModuleAlias);
+            PlatformUiConfig sourceConfig = publishedUiConfig(sourceSnapshot, request.sourceUiConfigId());
+            requireUiConfigTypes(sourceSnapshot, sourceConfig, Set.of(PlatformUiSetType.FORM, PlatformUiSetType.DETAIL),
+                    "Reference source UI config");
+        }
+        if (hasText(request.uiConfigId())) {
+            requireLowCodePageServices();
+            PlatformPageConfigSnapshot targetSnapshot = pageConfigSnapshotService.snapshot(reference.targetModuleAlias());
+            PlatformUiConfig targetConfig = publishedUiConfig(targetSnapshot, request.uiConfigId());
+            requireUiConfigTypes(targetSnapshot, targetConfig, Set.of(PlatformUiSetType.LIST, PlatformUiSetType.REFERENCE),
+                    "Reference target UI config");
+        }
+        if (hasText(request.queryTemplateId())) {
+            validateQueryTemplateBelongsToModule(reference.targetModuleAlias(), request.queryTemplateId());
+        }
+    }
+
+    private PlatformUiConfig publishedUiConfig(PlatformPageConfigSnapshot snapshot, String uiConfigId) {
+        return snapshot.uiConfigs().stream()
+                .filter(config -> Objects.equals(config.getId(), uiConfigId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
+                        + uiConfigId));
+    }
+
+    private void requireUiConfigTypes(PlatformPageConfigSnapshot snapshot,
+                                      PlatformUiConfig uiConfig,
+                                      Set<PlatformUiSetType> allowedTypes,
+                                      String label) {
+        PlatformUiSet uiSet = snapshot.uiSets().stream()
+                .filter(set -> Objects.equals(set.getId(), uiConfig.getUiSetId()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config set is not published in module snapshot: "
+                        + uiConfig.getUiSetId()));
+        if (!allowedTypes.contains(uiSet.getSetType())) {
+            throw new PlatformException(label + " type is not allowed: " + uiSet.getSetType());
         }
     }
 
@@ -1027,12 +1148,13 @@ public class DynamicRecordWebController implements
         String entityAlias = mainEntityAlias(moduleAlias);
         DynamicWebReferenceRequest normalized = request == null ? DynamicWebReferenceRequest.empty() : request;
         DynamicReferenceDescriptor reference = recordService.reference(moduleAlias, entityAlias, fieldName);
+        validateReferenceUiContexts(moduleAlias, reference, normalized);
         return recordService.resolveFieldReference(moduleAlias, entityAlias, fieldName, new DynamicReferenceResolveRequest(
                 normalized.mode(),
                 normalized.matchMode(),
                 normalized.fuzzy(),
                 normalized.values(),
-                referenceCriteria(reference, normalized.conditions()),
+                referenceCriteria(reference, normalized),
                 DynamicWebQueryMapper.page(normalized.page()),
                 normalized.includeProjections(),
                 normalized.formValues()
@@ -1040,23 +1162,19 @@ public class DynamicRecordWebController implements
     }
 
     private Criteria referenceCriteria(DynamicReferenceDescriptor reference,
-                                       List<WebQueryCondition> conditions) {
+                                       DynamicWebReferenceRequest request) {
         Criteria templateCriteria = Criteria.of();
-        if (reference != null && hasText(reference.queryTemplateId())) {
+        String queryTemplateId = hasText(request.queryTemplateId())
+                ? request.queryTemplateId()
+                : reference == null ? null : reference.queryTemplateId();
+        if (reference != null && hasText(queryTemplateId)) {
             requireLowCodeQueryServices();
-            validateQueryTemplateBelongsToModule(reference.targetModuleAlias(), reference.queryTemplateId());
-            templateCriteria = queryItemService.compile(reference.queryTemplateId(), Map.of());
+            validateQueryTemplateBelongsToModule(reference.targetModuleAlias(), queryTemplateId);
+            templateCriteria = queryItemService.compile(queryTemplateId, request.externalQueryValues());
         }
-        Criteria manualCriteria = criteria(reference.targetModuleAlias(), reference.targetEntityAlias(), conditions);
-        if (templateCriteria.isEmpty()) {
-            return manualCriteria;
-        }
-        Criteria criteria = Criteria.of();
-        criteria.andGroup(templateCriteria.getRoot());
-        if (!manualCriteria.isEmpty()) {
-            criteria.andGroup(manualCriteria.getRoot());
-        }
-        return criteria;
+        Criteria manualCriteria = criteria(reference.targetModuleAlias(), reference.targetEntityAlias(),
+                request.conditions());
+        return andCriteria(templateCriteria, manualCriteria);
     }
 
     private ReferenceRecordGenerationFacade referenceGenerationFacade() {
@@ -1102,7 +1220,8 @@ public class DynamicRecordWebController implements
                 page.getRecords().stream().map(DynamicRecord::getId).toList(),
                 page.getPageNum(),
                 page.getPageSize(),
-                page.getTotal()
+                page.getTotal(),
+                request.navigationQueryKey()
         );
     }
 

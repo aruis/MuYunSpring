@@ -27,11 +27,13 @@ class PlatformRecordNavigationServiceTest {
                 CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
             PlatformRecordNavigationContext context = service.createCurrentUserSession(
                     "sales.contract", "contract", List.of("contract-1", "contract-2", "contract-3"),
-                    2, 30, 90);
+                    2, 30, 90, " query-1 ");
 
             PlatformRecordNavigationMove move = service.move("sales.contract", context.sessionId(), "contract-2");
 
             assertThat(context.recordIds()).containsExactly("contract-1", "contract-2", "contract-3");
+            assertThat(context.querySnapshotKey()).isEqualTo("query-1");
+            assertThat(service.select(context.sessionId()).getQuerySnapshotKey()).isEqualTo("query-1");
             assertThat(move.previousRecordId()).isEqualTo("contract-1");
             assertThat(move.nextRecordId()).isEqualTo("contract-3");
             assertThat(move.first()).isFalse();

@@ -450,6 +450,9 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("queryTemplateId", stringProperty(true));
         properties.put("externalQueryValues", objectProperty("object"));
         properties.put("navigationSession", booleanProperty(true));
+        properties.put("quickSearch", stringProperty(true));
+        properties.put("quickSearchFields", arrayProperty("string"));
+        properties.put("navigationQueryKey", stringProperty(true));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 
@@ -617,6 +620,11 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("page", objectProperty("WebPageRequest"));
         properties.put("includeProjections", new DynamicOpenApiDocument.Property("boolean", null, false, true,
                 false, null, null, null, null, null, List.of()));
+        properties.put("formValues", objectProperty("object"));
+        properties.put("sourceUiConfigId", stringProperty(true));
+        properties.put("uiConfigId", stringProperty(true));
+        properties.put("queryTemplateId", stringProperty(true));
+        properties.put("externalQueryValues", objectProperty("object"));
         return new DynamicOpenApiDocument.Schema("DynamicWebReferenceRequest", "object", null, List.of(), properties, null);
     }
 

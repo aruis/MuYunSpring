@@ -28,6 +28,17 @@ public class PlatformRecordNavigationService extends AbstractAbilityService<Plat
                                                                     int pageNum,
                                                                     int pageSize,
                                                                     long total) {
+        return createCurrentUserSession(moduleAlias, entityAlias, recordIds, pageNum, pageSize, total, null);
+    }
+
+    @Transactional
+    public PlatformRecordNavigationContext createCurrentUserSession(String moduleAlias,
+                                                                    String entityAlias,
+                                                                    List<String> recordIds,
+                                                                    int pageNum,
+                                                                    int pageSize,
+                                                                    long total,
+                                                                    String querySnapshotKey) {
         List<String> normalizedIds = normalizeRecordIds(recordIds);
         if (normalizedIds.isEmpty()) {
             return null;
@@ -40,6 +51,7 @@ public class PlatformRecordNavigationService extends AbstractAbilityService<Plat
         session.setPageNum(pageNum);
         session.setPageSize(pageSize);
         session.setTotal(total);
+        session.setQuerySnapshotKey(normalizeOptionalText(querySnapshotKey));
         insert(session);
         return context(session);
     }
@@ -71,7 +83,8 @@ public class PlatformRecordNavigationService extends AbstractAbilityService<Plat
                 recordIds(session),
                 session.getPageNum() == null ? 1 : session.getPageNum(),
                 session.getPageSize() == null ? 0 : session.getPageSize(),
-                session.getTotal() == null ? -1 : session.getTotal()
+                session.getTotal() == null ? -1 : session.getTotal(),
+                session.getQuerySnapshotKey()
         );
     }
 
@@ -110,5 +123,9 @@ public class PlatformRecordNavigationService extends AbstractAbilityService<Plat
             throw new PlatformException("record navigation " + fieldName + " must not be blank");
         }
         return value.trim();
+    }
+
+    private String normalizeOptionalText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

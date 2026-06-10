@@ -795,15 +795,16 @@ class DynamicRecordWebControllerTest {
         when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(first, second), 2, PageRequest.of(1, 20)));
         when(navigationService.createCurrentUserSession(eq(MODULE), eq(ENTITY),
-                eq(List.of("contract-1", "contract-2")), eq(1), eq(20), eq(2L)))
+                eq(List.of("contract-1", "contract-2")), eq(1), eq(20), eq(2L), eq("query-1")))
                 .thenReturn(new PlatformRecordNavigationContext("nav-1", MODULE, ENTITY,
-                        List.of("contract-1", "contract-2"), 1, 20, 2));
+                        List.of("contract-1", "contract-2"), 1, 20, 2, "query-1"));
 
         navigationMvc.perform(post("/{moduleAlias}/query", MODULE)
                         .contentType("application/json")
                         .content("""
                                 {
                                   "navigationSession": true,
+                                  "navigationQueryKey": "query-1",
                                   "page": {
                                     "pageNum": 1,
                                     "pageSize": 20
@@ -812,6 +813,7 @@ class DynamicRecordWebControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.navigation.sessionId").value("nav-1"))
+                .andExpect(jsonPath("$.navigation.querySnapshotKey").value("query-1"))
                 .andExpect(jsonPath("$.navigation.recordIds[0]").value("contract-1"))
                 .andExpect(jsonPath("$.records[1].id").value("contract-2"));
     }
@@ -948,6 +950,82 @@ class DynamicRecordWebControllerTest {
         assertThat(externalValues.getValue()).containsEntry("optional", null);
         verify(mainEntity).queryCriteria(any());
         verify(snapshotService, times(2)).snapshot(MODULE);
+    }
+
+    @Test
+    void shouldApplyQuickSearchWithinPublishedListUiConfig() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField codeField = new PlatformUiConfigField();
+        codeField.setUiConfigId("ui-list");
+        codeField.setModuleMetadataFieldId("module-field-code");
+        codeField.setVisible(true);
+        PlatformUiConfigField amountField = new PlatformUiConfigField();
+        amountField.setUiConfigId("ui-list");
+        amountField.setModuleMetadataFieldId("module-field-amount");
+        amountField.setVisible(true);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(codeField, amountField),
+                List.of(),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
+                "module-field-amount", "amount", RelationRole.MAIN, "decimal"));
+        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
+        record.setId("contract-1");
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["code"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(mainEntity).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(criteria.getValue().isEmpty()).isFalse();
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["amount"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Quick search field is not searchable in UI config: amount"));
     }
 
     @Test
@@ -1882,25 +1960,51 @@ class DynamicRecordWebControllerTest {
     void shouldApplyReferenceQueryTemplateBeforeResolvingCandidates() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
         MockMvc referenceMvc = MockMvcBuilders
                 .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade,
-                        snapshotService, queryItemService, null))
+                        snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
+        PlatformUiSet sourceSet = new PlatformUiSet();
+        sourceSet.setId("source-form-set");
+        sourceSet.setModuleAlias(MODULE);
+        sourceSet.setAlias("form");
+        sourceSet.setSetType(PlatformUiSetType.FORM);
+        PlatformUiConfig sourceConfig = new PlatformUiConfig();
+        sourceConfig.setId("source-form");
+        sourceConfig.setUiSetId("source-form-set");
+        sourceConfig.setPublished(true);
+        PlatformUiSet targetSet = new PlatformUiSet();
+        targetSet.setId("target-reference-set");
+        targetSet.setModuleAlias("crm.customer");
+        targetSet.setAlias("reference");
+        targetSet.setSetType(PlatformUiSetType.REFERENCE);
+        PlatformUiConfig targetConfig = new PlatformUiConfig();
+        targetConfig.setId("target-reference");
+        targetConfig.setUiSetId("target-reference-set");
+        targetConfig.setPublished(true);
         PlatformQueryTemplate template = new PlatformQueryTemplate();
         template.setId("customer-active");
         template.setModuleAlias("crm.customer");
         template.setAlias("active");
+        PlatformQueryTemplate overrideTemplate = new PlatformQueryTemplate();
+        overrideTemplate.setId("customer-region");
+        overrideTemplate.setModuleAlias("crm.customer");
+        overrideTemplate.setAlias("region");
         when(service.reference(MODULE, ENTITY, "customerId"))
                 .thenReturn(reference("customerId", "customer-active"));
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE, List.of(sourceSet), List.of(sourceConfig), List.of(), List.of(), List.of()));
         when(snapshotService.snapshot("crm.customer")).thenReturn(new PlatformPageConfigSnapshot(
-                "crm.customer", List.of(), List.of(), List.of(), List.of(template), List.of()));
-        Criteria templateCriteria = Criteria.of().eq("status", "active");
+                "crm.customer", List.of(targetSet), List.of(targetConfig), List.of(),
+                List.of(template, overrideTemplate), List.of()));
+        Criteria templateCriteria = Criteria.of().eq("region", "north");
         Criteria manualCriteria = Criteria.of().eq("customerType", "VIP");
-        when(queryItemService.compile("customer-active", Map.of())).thenReturn(templateCriteria);
+        when(queryItemService.compile(eq("customer-region"), any())).thenReturn(templateCriteria);
         when(service.queryCriteria(eq("crm.customer"), eq("customer"), any())).thenReturn(manualCriteria);
         when(service.resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), any(DynamicReferenceResolveRequest.class)))
                 .thenReturn(new DynamicReferenceResolveResponse(
@@ -1917,6 +2021,10 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of(
                                 "includeProjections", false,
+                                "sourceUiConfigId", "source-form",
+                                "uiConfigId", "target-reference",
+                                "queryTemplateId", "customer-region",
+                                "externalQueryValues", Map.of("region", "north"),
                                 "conditions", List.of(Map.of(
                                         "fieldName", "customerType",
                                         "operator", "EQ",
@@ -1930,8 +2038,59 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().criteria()).isNotSameAs(templateCriteria);
         assertThat(request.getValue().criteria()).isNotSameAs(manualCriteria);
         assertThat(request.getValue().criteria().isEmpty()).isFalse();
-        verify(queryItemService).compile("customer-active", Map.of());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> externalValues = ArgumentCaptor.forClass(Map.class);
+        verify(queryItemService).compile(eq("customer-region"), externalValues.capture());
+        assertThat(externalValues.getValue()).containsEntry("region", "north");
         verify(service).queryCriteria(eq("crm.customer"), eq("customer"), any());
+    }
+
+    @Test
+    void shouldOverrideReferenceQueryTemplateWithoutUiContextFieldService() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        MockMvc referenceMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, queryItemService, null))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setId("customer-region");
+        template.setModuleAlias("crm.customer");
+        template.setAlias("region");
+        when(service.reference(MODULE, ENTITY, "customerId"))
+                .thenReturn(reference("customerId", "customer-active"));
+        when(snapshotService.snapshot("crm.customer")).thenReturn(new PlatformPageConfigSnapshot(
+                "crm.customer", List.of(), List.of(), List.of(), List.of(template), List.of()));
+        Criteria templateCriteria = Criteria.of().eq("region", "north");
+        when(queryItemService.compile(eq("customer-region"), any())).thenReturn(templateCriteria);
+        when(service.resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), any(DynamicReferenceResolveRequest.class)))
+                .thenReturn(new DynamicReferenceResolveResponse(
+                        DynamicReferenceResolveStatus.OK,
+                        DynamicReferenceResolveMode.QUERY,
+                        List.of(),
+                        List.of(),
+                        0,
+                        20,
+                        0
+                ));
+
+        referenceMvc.perform(post("/{moduleAlias}/references/{fieldName}/resolve", MODULE, "customerId")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "queryTemplateId", "customer-region",
+                                "externalQueryValues", Map.of("region", "north")
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OK"));
+
+        ArgumentCaptor<DynamicReferenceResolveRequest> request = ArgumentCaptor.forClass(DynamicReferenceResolveRequest.class);
+        verify(service).resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), request.capture());
+        assertThat(request.getValue().criteria()).isSameAs(templateCriteria);
+        verify(queryItemService).compile(eq("customer-region"), any());
     }
 
     @Test
@@ -2263,6 +2422,13 @@ class DynamicRecordWebControllerTest {
     private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
                                                            String fieldName,
                                                            RelationRole relationRole) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, "string");
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
+                                                           String fieldName,
+                                                           RelationRole relationRole,
+                                                           String fieldTypeAlias) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
                 MODULE,
@@ -2276,7 +2442,7 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                "string"
+                fieldTypeAlias
         );
     }
 
