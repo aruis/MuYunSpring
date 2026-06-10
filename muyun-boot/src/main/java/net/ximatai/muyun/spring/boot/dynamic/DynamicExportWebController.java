@@ -17,6 +17,12 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 @RestController
@@ -36,13 +43,36 @@ public class DynamicExportWebController {
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
     private final DynamicExportFacade exportFacade;
+    private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
+    private final PlatformQueryItemService queryItemService;
 
     public DynamicExportWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
                                       DynamicExportFacade exportFacade) {
+        this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null, null);
+    }
+
+    @Autowired
+    public DynamicExportWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      DynamicExportFacade exportFacade,
+                                      ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
+                                      ObjectProvider<PlatformQueryItemService> queryItemServiceProvider) {
+        this(recordService, activeTenantVerifier, exportFacade,
+                pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
+                queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable());
+    }
+
+    public DynamicExportWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      DynamicExportFacade exportFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.exportFacade = exportFacade;
+        this.pageConfigSnapshotService = pageConfigSnapshotService;
+        this.queryItemService = queryItemService;
     }
 
     @PostMapping("/data")
@@ -64,10 +94,52 @@ public class DynamicExportWebController {
                                                WebQueryRequest request) {
         WebQueryRequest normalized = request == null ? new WebQueryRequest(null, List.of(), List.of()) : request;
         DynamicEntityOperations operations = recordService.mainEntity(moduleAlias);
-        Criteria criteria = operations.queryCriteria(DynamicWebQueryMapper.queryConditions(normalized.conditions()));
+        Criteria criteria = queryCriteria(moduleAlias, operations, normalized);
         PageRequest pageRequest = DynamicWebQueryMapper.page(normalized.pageOrDefault());
         Sort[] sorts = DynamicWebQueryMapper.sorts(normalized.sorts());
         return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
+    }
+
+    private Criteria queryCriteria(String moduleAlias,
+                                   DynamicEntityOperations operations,
+                                   WebQueryRequest request) {
+        Criteria templateCriteria = Criteria.of();
+        if (request != null && hasText(request.queryTemplateId())) {
+            requireLowCodeQueryServices();
+            validateQueryTemplateBelongsToModule(moduleAlias, request.queryTemplateId());
+            templateCriteria = queryItemService.compile(request.queryTemplateId(), request.externalQueryValues());
+        }
+        if (request == null || request.conditions().isEmpty()) {
+            return templateCriteria;
+        }
+        Criteria manualCriteria = operations.queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        if (templateCriteria.isEmpty()) {
+            return manualCriteria;
+        }
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(templateCriteria.getRoot());
+        if (!manualCriteria.isEmpty()) {
+            criteria.andGroup(manualCriteria.getRoot());
+        }
+        return criteria;
+    }
+
+    private void validateQueryTemplateBelongsToModule(String moduleAlias, String queryTemplateId) {
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformQueryTemplate template = snapshot.queryTemplates().stream()
+                .filter(item -> Objects.equals(item.getId(), queryTemplateId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("Query template is not enabled in module snapshot: "
+                        + queryTemplateId));
+        if (!Objects.equals(template.getModuleAlias(), moduleAlias)) {
+            throw new PlatformException("Query template must belong to module: " + moduleAlias);
+        }
+    }
+
+    private void requireLowCodeQueryServices() {
+        if (pageConfigSnapshotService == null || queryItemService == null) {
+            throw new PlatformException("dynamic low-code query services are not configured");
+        }
     }
 
     private void requireExchangeCapability(DynamicModuleDescriptor descriptor) {
@@ -92,6 +164,10 @@ public class DynamicExportWebController {
         } catch (IOException ex) {
             throw new PlatformException("dynamic export workbook write failed", ex);
         }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private <T> T tenantScope(String moduleAlias, Supplier<T> action) {

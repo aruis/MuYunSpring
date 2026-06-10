@@ -45,6 +45,7 @@ import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -512,7 +513,7 @@ public class DynamicRecordWebController implements
         if (!hasText(queryTemplateId)) {
             return;
         }
-        requireLowCodePageServices();
+        requireLowCodeQueryServices();
         PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
         PlatformQueryTemplate template = snapshot.queryTemplates().stream()
                 .filter(item -> Objects.equals(item.getId(), queryTemplateId))
@@ -545,8 +546,7 @@ public class DynamicRecordWebController implements
     }
 
     private void requireLowCodeQueryServices() {
-        requireLowCodePageServices();
-        if (queryItemService == null) {
+        if (pageConfigSnapshotService == null || queryItemService == null) {
             throw new PlatformException("dynamic low-code query services are not configured");
         }
     }
@@ -804,16 +804,37 @@ public class DynamicRecordWebController implements
         String moduleAlias = DynamicWebRequest.moduleAlias();
         String entityAlias = mainEntityAlias(moduleAlias);
         DynamicWebReferenceRequest normalized = request == null ? DynamicWebReferenceRequest.empty() : request;
+        DynamicReferenceDescriptor reference = recordService.reference(moduleAlias, entityAlias, fieldName);
         return recordService.resolveFieldReference(moduleAlias, entityAlias, fieldName, new DynamicReferenceResolveRequest(
                 normalized.mode(),
                 normalized.matchMode(),
                 normalized.fuzzy(),
                 normalized.values(),
-                criteria(moduleAlias, entityAlias, normalized.conditions()),
+                referenceCriteria(reference, normalized.conditions()),
                 DynamicWebQueryMapper.page(normalized.page()),
                 normalized.includeProjections(),
                 normalized.formValues()
         ));
+    }
+
+    private Criteria referenceCriteria(DynamicReferenceDescriptor reference,
+                                       List<WebQueryCondition> conditions) {
+        Criteria templateCriteria = Criteria.of();
+        if (reference != null && hasText(reference.queryTemplateId())) {
+            requireLowCodeQueryServices();
+            validateQueryTemplateBelongsToModule(reference.targetModuleAlias(), reference.queryTemplateId());
+            templateCriteria = queryItemService.compile(reference.queryTemplateId(), Map.of());
+        }
+        Criteria manualCriteria = criteria(reference.targetModuleAlias(), reference.targetEntityAlias(), conditions);
+        if (templateCriteria.isEmpty()) {
+            return manualCriteria;
+        }
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(templateCriteria.getRoot());
+        if (!manualCriteria.isEmpty()) {
+            criteria.andGroup(manualCriteria.getRoot());
+        }
+        return criteria;
     }
 
     private ReferenceRecordGenerationFacade referenceGenerationFacade() {

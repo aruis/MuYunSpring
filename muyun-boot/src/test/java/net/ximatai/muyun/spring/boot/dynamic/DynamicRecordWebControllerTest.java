@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
@@ -29,6 +30,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
+import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
@@ -96,6 +98,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -132,6 +135,8 @@ class DynamicRecordWebControllerTest {
         referenceGenerationFacade = mock(ReferenceRecordGenerationFacade.class);
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.reference(eq(MODULE), eq(ENTITY), anyString()))
+                .thenAnswer(invocation -> reference(invocation.getArgument(2), null));
         when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));
         when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
         when(service.actionAuthorizationAvailability(eq(MODULE), anyString(), any()))
@@ -1640,7 +1645,7 @@ class DynamicRecordWebControllerTest {
     void shouldResolveMainEntityReferenceWithoutEntityLevelPath() throws Exception {
         Criteria criteria = Criteria.of().eq("customerType", "VIP");
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
-        when(service.queryCriteria(eq(MODULE), eq(ENTITY), any())).thenReturn(criteria);
+        when(service.queryCriteria(eq("crm.customer"), eq("customer"), any())).thenReturn(criteria);
         when(service.resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), any(DynamicReferenceResolveRequest.class)))
                 .thenReturn(new DynamicReferenceResolveResponse(
                         DynamicReferenceResolveStatus.OK,
@@ -1675,6 +1680,62 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().criteria()).isSameAs(criteria);
         assertThat(request.getValue().includeProjections()).isFalse();
         assertThat(request.getValue().formValues()).containsEntry("customerRegion", "north");
+    }
+
+    @Test
+    void shouldApplyReferenceQueryTemplateBeforeResolvingCandidates() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        MockMvc referenceMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, queryItemService, null))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setId("customer-active");
+        template.setModuleAlias("crm.customer");
+        template.setAlias("active");
+        when(service.reference(MODULE, ENTITY, "customerId"))
+                .thenReturn(reference("customerId", "customer-active"));
+        when(snapshotService.snapshot("crm.customer")).thenReturn(new PlatformPageConfigSnapshot(
+                "crm.customer", List.of(), List.of(), List.of(), List.of(template), List.of()));
+        Criteria templateCriteria = Criteria.of().eq("status", "active");
+        Criteria manualCriteria = Criteria.of().eq("customerType", "VIP");
+        when(queryItemService.compile("customer-active", Map.of())).thenReturn(templateCriteria);
+        when(service.queryCriteria(eq("crm.customer"), eq("customer"), any())).thenReturn(manualCriteria);
+        when(service.resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), any(DynamicReferenceResolveRequest.class)))
+                .thenReturn(new DynamicReferenceResolveResponse(
+                        DynamicReferenceResolveStatus.OK,
+                        DynamicReferenceResolveMode.QUERY,
+                        List.of(),
+                        List.of(),
+                        0,
+                        20,
+                        0
+                ));
+
+        referenceMvc.perform(post("/{moduleAlias}/references/{fieldName}/resolve", MODULE, "customerId")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "includeProjections", false,
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "customerType",
+                                        "operator", "EQ",
+                                        "values", List.of("VIP")
+                                ))
+                        ))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<DynamicReferenceResolveRequest> request = ArgumentCaptor.forClass(DynamicReferenceResolveRequest.class);
+        verify(service).resolveFieldReference(eq(MODULE), eq(ENTITY), eq("customerId"), request.capture());
+        assertThat(request.getValue().criteria()).isNotSameAs(templateCriteria);
+        assertThat(request.getValue().criteria()).isNotSameAs(manualCriteria);
+        assertThat(request.getValue().criteria().isEmpty()).isFalse();
+        verify(queryItemService).compile("customer-active", Map.of());
+        verify(service).queryCriteria(eq("crm.customer"), eq("customer"), any());
     }
 
     @Test
@@ -2029,6 +2090,26 @@ class DynamicRecordWebControllerTest {
         field.setModuleMetadataFieldId(moduleFieldId);
         field.setVisible(true);
         return field;
+    }
+
+    private DynamicReferenceDescriptor reference(String sourceField, String queryTemplateId) {
+        return new DynamicReferenceDescriptor(
+                ENTITY,
+                sourceField,
+                "crm.customer",
+                "customer",
+                ReferenceCardinality.ONE,
+                true,
+                null,
+                List.of(),
+                "id",
+                "title",
+                null,
+                queryTemplateId,
+                Set.of(),
+                List.of(),
+                List.of()
+        );
     }
 
     private RecordAttachment attachment(String id, String fileId, String displayName) {

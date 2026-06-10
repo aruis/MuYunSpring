@@ -17,6 +17,10 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
+import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
+import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,11 +29,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -87,6 +93,58 @@ class DynamicExportWebControllerTest {
         assertThat(captor.getValue().pageRequest().getOffset()).isEqualTo(50);
         assertThat(captor.getValue().pageRequest().getLimit()).isEqualTo(50);
         assertThat(captor.getValue().sorts()).hasSize(1);
+    }
+
+    @Test
+    void shouldReuseLowCodeQueryTemplateWhenExportingData() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        MockMvc exportMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicExportWebController(
+                        recordService, activeTenantVerifier, exportFacade, snapshotService, queryItemService))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        PlatformQueryTemplate template = new PlatformQueryTemplate();
+        template.setId("tpl-active");
+        template.setModuleAlias(MODULE);
+        template.setAlias("active");
+        Criteria templateCriteria = Criteria.of().eq("status", "active");
+        Criteria manualCriteria = Criteria.of().eq("ownerId", "user-1");
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE, List.of(), List.of(), List.of(), List.of(template), List.of()));
+        when(queryItemService.compile(eq("tpl-active"), org.mockito.ArgumentMatchers.anyMap()))
+                .thenReturn(templateCriteria);
+        when(operations.queryCriteria(org.mockito.ArgumentMatchers.anyList())).thenReturn(manualCriteria);
+        when(exportFacade.exportWorkbook(org.mockito.ArgumentMatchers.any(DynamicExportCommand.class)))
+                .thenReturn(new byte[]{1, 2, 3});
+
+        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(Map.of(
+                                "queryTemplateId", "tpl-active",
+                                "externalQueryValues", Map.of("owner", "user-1"),
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "ownerId",
+                                        "operator", "EQ",
+                                        "values", List.of("user-1")
+                                ))
+                        ))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
+        verify(exportFacade).exportWorkbook(captor.capture());
+        assertThat(captor.getValue().criteria()).isNotSameAs(templateCriteria);
+        assertThat(captor.getValue().criteria()).isNotSameAs(manualCriteria);
+        assertThat(captor.getValue().criteria().isEmpty()).isFalse();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> externalValues = ArgumentCaptor.forClass(Map.class);
+        verify(queryItemService).compile(eq("tpl-active"), externalValues.capture());
+        assertThat(externalValues.getValue()).containsEntry("owner", "user-1");
     }
 
     @Test
