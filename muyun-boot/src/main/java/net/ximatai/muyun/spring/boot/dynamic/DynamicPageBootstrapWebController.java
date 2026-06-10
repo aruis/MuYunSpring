@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/page-bootstrap")
+@RequestMapping("/platform.menu")
 public class DynamicPageBootstrapWebController {
     private final PlatformPageBootstrapService bootstrapService;
     private final DynamicRecordService recordService;
@@ -32,17 +32,11 @@ public class DynamicPageBootstrapWebController {
         this.activeTenantVerifier = activeTenantVerifier;
     }
 
-    @GetMapping("/menu/{menuId}")
-    public DynamicPageBootstrapResponse byMenu(@PathVariable String menuId) {
+    @GetMapping("/{menuId}/entry")
+    public DynamicPageBootstrapResponse entry(@PathVariable String menuId) {
         requireTenantContext();
         PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu(menuId);
         return response(bootstrap);
-    }
-
-    @GetMapping("/module/{moduleAlias:[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+}")
-    public DynamicPageBootstrapResponse byModule(@PathVariable String moduleAlias) {
-        requireTenantContext();
-        return response(bootstrapService.bootstrapByModule(moduleAlias));
     }
 
     private DynamicPageBootstrapResponse response(PlatformPageBootstrap bootstrap) {

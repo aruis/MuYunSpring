@@ -61,7 +61,7 @@ class DynamicPageBootstrapWebControllerTest {
                 .thenReturn(DynamicActionAvailability.unavailable("delete", "denied"));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/page-bootstrap/menu/menu-1"))
+            mvc.perform(get("/platform.menu/menu-1/entry"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.entry.menuId").value("menu-1"))
                     .andExpect(jsonPath("$.entry.moduleAlias").value("crm.customer"))
