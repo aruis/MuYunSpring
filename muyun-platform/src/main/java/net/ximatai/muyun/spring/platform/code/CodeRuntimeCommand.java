@@ -6,6 +6,7 @@ import java.util.Map;
 public record CodeRuntimeCommand(
         String moduleAlias,
         String entityAlias,
+        String moduleMetadataFieldId,
         String metadataFieldId,
         String fieldName,
         String organizationId,
@@ -14,6 +15,19 @@ public record CodeRuntimeCommand(
         String sourceRecordId,
         CodeValueUniquenessChecker uniquenessChecker
 ) {
+    public CodeRuntimeCommand(String moduleAlias,
+                              String entityAlias,
+                              String metadataFieldId,
+                              String fieldName,
+                              String organizationId,
+                              LocalDateTime at,
+                              Map<String, Object> context,
+                              String sourceRecordId,
+                              CodeValueUniquenessChecker uniquenessChecker) {
+        this(moduleAlias, entityAlias, null, metadataFieldId, fieldName, organizationId, at, context, sourceRecordId,
+                uniquenessChecker);
+    }
+
     public static Builder builder(String moduleAlias, String entityAlias, String fieldName) {
         return new Builder(moduleAlias, entityAlias, fieldName);
     }
@@ -22,6 +36,7 @@ public record CodeRuntimeCommand(
         return new GenerateCodeCommand(
                 moduleAlias,
                 entityAlias,
+                moduleMetadataFieldId,
                 metadataFieldId,
                 fieldName,
                 organizationId,
@@ -35,6 +50,7 @@ public record CodeRuntimeCommand(
         return new CodeRuntimeCommand(
                 moduleAlias,
                 entityAlias,
+                moduleMetadataFieldId,
                 metadataFieldId,
                 fieldName,
                 organizationId,
@@ -49,6 +65,7 @@ public record CodeRuntimeCommand(
         private final String moduleAlias;
         private final String entityAlias;
         private final String fieldName;
+        private String moduleMetadataFieldId;
         private String metadataFieldId;
         private String organizationId;
         private LocalDateTime at;
@@ -60,6 +77,11 @@ public record CodeRuntimeCommand(
             this.moduleAlias = moduleAlias;
             this.entityAlias = entityAlias;
             this.fieldName = fieldName;
+        }
+
+        public Builder moduleMetadataFieldId(String moduleMetadataFieldId) {
+            this.moduleMetadataFieldId = moduleMetadataFieldId;
+            return this;
         }
 
         public Builder metadataFieldId(String metadataFieldId) {
@@ -96,6 +118,7 @@ public record CodeRuntimeCommand(
             return new CodeRuntimeCommand(
                     moduleAlias,
                     entityAlias,
+                    moduleMetadataFieldId,
                     metadataFieldId,
                     fieldName,
                     organizationId,

@@ -23,6 +23,10 @@ public class RecordGenerationSplitPolicy extends StandardSortableEntity {
     @Column(name = "quantity_field", type = ColumnType.VARCHAR, length = 64, comment = "Quantity field")
     private String quantityField;
 
+    @Column(name = "quantity_module_metadata_field_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Quantity module metadata field id")
+    private String quantityModuleMetadataFieldId;
+
     @Column(name = "quantity_step", type = ColumnType.INT, comment = "Quantity step")
     private Integer quantityStep;
 

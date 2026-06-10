@@ -50,7 +50,7 @@ final class DynamicViewDescriptors {
                 entity.name(),
                 entity.fields().stream()
                         .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true,
-                                controlType(field), companions(field), false, field.isRequired()))
+                                controlType(field), field.defaultUiTypeAlias(), companions(field), false, field.isRequired()))
                         .toList()
         );
     }
@@ -71,10 +71,17 @@ final class DynamicViewDescriptors {
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
                 viewField.visible(),
                 effectiveControlType(viewField, field),
+                effectiveFieldUiTypeAlias(viewField, field),
                 companions(field),
                 Boolean.TRUE.equals(viewField.readOnly()),
                 field.isRequired() || Boolean.TRUE.equals(viewField.required())
         );
+    }
+
+    private static String effectiveFieldUiTypeAlias(EntityViewFieldDefinition viewField, FieldDefinition field) {
+        return viewField.fieldUiTypeAlias() == null || viewField.fieldUiTypeAlias().isBlank()
+                ? field.defaultUiTypeAlias()
+                : viewField.fieldUiTypeAlias();
     }
 
     private static List<DynamicFieldCompanionDescriptor> companions(FieldDefinition field) {

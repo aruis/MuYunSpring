@@ -44,20 +44,38 @@ class PlatformMetadataServiceContractTest {
     private final MemoryDao<Metadata> metadataDao = new MemoryDao<>();
     private final MemoryDao<MetadataField> fieldDao = new MemoryDao<>();
     private final MemoryDao<PlatformFieldType> fieldTypeDao = new MemoryDao<>();
+    private final MemoryDao<PlatformFieldUiType> fieldUiTypeDao = new MemoryDao<>();
+    private final MemoryDao<PlatformFieldUiTypeAttribute> fieldUiTypeAttributeDao = new MemoryDao<>();
+    private final MemoryDao<PlatformFieldUiTypeFieldMapping> fieldUiTypeFieldMappingDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldConfig> fieldConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldProtectionConfig> protectionConfigDao = new MemoryDao<>();
     private final MemoryDao<MetadataFieldReferenceConfig> referenceConfigDao = new MemoryDao<>();
     private final MemoryDao<ModuleMetadataRelation> relationDao = new MemoryDao<>();
+    private final MemoryDao<ModuleMetadataField> moduleFieldDao = new MemoryDao<>();
+    private final MemoryDao<ModuleMetadataFieldFilter> moduleFieldFilterDao = new MemoryDao<>();
+    private final MemoryDao<ModuleMetadataFieldAffect> moduleFieldAffectDao = new MemoryDao<>();
     private final MemoryDao<MetadataView> viewDao = new MemoryDao<>();
     private final MemoryDao<MetadataViewField> viewFieldDao = new MemoryDao<>();
     private final MemoryDao<DictionaryCategory> categoryDao = new MemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
     private final DictionaryCategoryService categoryService = new DictionaryCategoryService(categoryDao);
-    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao);
+    private final PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(fieldTypeDao, fieldUiTypeDao);
+    private final PlatformFieldUiTypeService fieldUiTypeService =
+            new PlatformFieldUiTypeService(fieldUiTypeDao, fieldTypeService);
+    private final PlatformFieldUiTypeAttributeService fieldUiTypeAttributeService =
+            new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
+    private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
+            new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+    private final ModuleMetadataFieldService moduleFieldService =
+            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService);
+    private final ModuleMetadataFieldFilterService moduleFieldFilterService =
+            new ModuleMetadataFieldFilterService(moduleFieldFilterDao, moduleFieldService);
+    private final ModuleMetadataFieldAffectService moduleFieldAffectService =
+            new ModuleMetadataFieldAffectService(moduleFieldAffectDao, moduleFieldService);
     private final MetadataFieldProtectionConfigService protectionConfigService =
             new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao);
     private final MetadataFieldConfigService fieldConfigService =
@@ -70,12 +88,18 @@ class PlatformMetadataServiceContractTest {
                     fieldTypeService, moduleService, relationService);
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
-            new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService);
+            new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService,
+                    fieldUiTypeService, fieldTypeService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
+        fieldTypeService.insert(fieldType("text", FieldType.TEXT, null));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
+        fieldTypeService.insert(fieldType("decimal", FieldType.DECIMAL, null));
         fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
+        fieldTypeService.insert(fieldType("date", FieldType.DATE, null));
+        fieldTypeService.insert(fieldType("datetime", FieldType.TIMESTAMP, null));
+        fieldTypeService.insert(fieldType("zoned_datetime", FieldType.ZONED_TIMESTAMP, null));
         fieldTypeService.insert(fieldType("json", FieldType.JSON, null));
     }
 
@@ -135,6 +159,41 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.isRequired()).isTrue();
         assertThat(definition.isTitle()).isTrue();
         assertThat(definition.length()).isEqualTo(128);
+    }
+
+    @Test
+    void shouldNormalizeMetadataFieldOwnershipAndForm() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+
+        fieldService.insert(field);
+
+        MetadataField saved = fieldService.select(field.getId());
+        assertThat(saved.getFieldOwnership()).isEqualTo(MetadataFieldOwnership.BUSINESS);
+        assertThat(saved.getFieldForm()).isEqualTo(MetadataFieldForm.PHYSICAL);
+        assertThat(saved.getSystemManaged()).isFalse();
+    }
+
+    @Test
+    void shouldRequireOwnerForCompanionOrShadowField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField owner = field(metadataId, "startAt", "start_at", FieldType.STRING);
+        fieldService.insert(owner);
+
+        MetadataField companion = field(metadataId, "startAtTimeZone", "start_at_timezone", FieldType.STRING);
+        companion.setFieldForm(MetadataFieldForm.COMPANION);
+        companion.setFieldRole(MetadataFieldRole.TIME_ZONE);
+        assertThatThrownBy(() -> fieldService.insert(companion))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("owner field");
+
+        companion.setOwnerFieldId(owner.getId());
+        fieldService.insert(companion);
+
+        MetadataField saved = fieldService.select(companion.getId());
+        assertThat(saved.getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
+        assertThat(saved.getFieldRole()).isEqualTo(MetadataFieldRole.TIME_ZONE);
+        assertThat(saved.getOwnerFieldId()).isEqualTo(owner.getId());
     }
 
     @Test
@@ -228,6 +287,125 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getDefaultQueryOperator()).isEqualTo(DynamicQueryOperator.LIKE);
         assertThat(saved.getQueryOperators()).containsExactly("EQ", "LIKE");
         assertThat(saved.queryDefinition().operators()).contains(DynamicQueryOperator.EQ, DynamicQueryOperator.LIKE);
+    }
+
+    @Test
+    void shouldNormalizeFieldTypeUiAliases() {
+        fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
+        fieldUiTypeService.insert(fieldUiType("select", "下拉单选", "string", ViewControlType.SELECT));
+        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiTypeAlias(" text ");
+        type.setUiTypeAliases(java.util.Set.of(" text ", "select"));
+
+        String id = fieldTypeService.insert(type);
+
+        PlatformFieldType saved = fieldTypeService.select(id);
+        assertThat(saved.getDefaultUiTypeAlias()).isEqualTo("text");
+        assertThat(saved.getUiTypeAliases()).containsExactlyInAnyOrder("text", "select");
+    }
+
+    @Test
+    void shouldRejectFieldTypeDefaultUiTypeOutsideAllowedSet() {
+        fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
+        fieldUiTypeService.insert(fieldUiType("select", "下拉单选", "string", ViewControlType.SELECT));
+        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiTypeAlias("text");
+        type.setUiTypeAliases(java.util.Set.of("select"));
+
+        assertThatThrownBy(() -> fieldTypeService.insert(type))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("default UI type must be included");
+    }
+
+    @Test
+    void shouldRejectFieldTypeUnknownUiAlias() {
+        PlatformFieldType type = fieldType("customer_code", FieldType.STRING, 64);
+        type.setDefaultUiTypeAlias("missing_ui");
+
+        assertThatThrownBy(() -> fieldTypeService.insert(type))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("requires existing UI type");
+    }
+
+    @Test
+    void shouldValidateFieldTypeUiAliasesByUiTypeAliasNotRecordId() {
+        PlatformFieldUiType uiType = fieldUiType("text_alias", "输入框", "string", ViewControlType.TEXT);
+        uiType.setId("custom_ui_type_id");
+        fieldUiTypeService.insert(uiType);
+        PlatformFieldType displayString = fieldType("display_string", FieldType.STRING, 128);
+        displayString.setDefaultUiTypeAlias("text_alias");
+        displayString.setUiTypeAliases(java.util.Set.of("text_alias"));
+
+        fieldTypeService.insert(displayString);
+
+        assertThat(fieldTypeService.select(displayString.getId()).getDefaultUiTypeAlias()).isEqualTo("text_alias");
+    }
+
+    @Test
+    void shouldManageFieldUiTypesWithAttributesAndFieldMappings() {
+        String uiTypeId = fieldUiTypeService.insert(fieldUiType("date_time_with_time_zone", "日期时间（含时区）",
+                "zoned_datetime", ViewControlType.DATETIME));
+        fieldUiTypeAttributeService.insert(fieldUiTypeAttribute("date_time_with_time_zone", "format", "格式",
+                "string", "YYYY-MM-DD HH:mm:ss"));
+        fieldUiTypeFieldMappingService.insert(fieldUiTypeMapping("date_time_with_time_zone", "timeZone", "时区"));
+
+        PlatformFieldUiType saved = fieldUiTypeService.select(uiTypeId);
+        assertThat(saved.getAlias()).isEqualTo("date_time_with_time_zone");
+        assertThat(saved.getDefaultFieldTypeAlias()).isEqualTo("zoned_datetime");
+        assertThat(saved.getControlType()).isEqualTo(ViewControlType.DATETIME);
+        assertThat(fieldUiTypeAttributeService.list(Criteria.of().eq("fieldUiTypeAlias", "date_time_with_time_zone"),
+                new PageRequest(0, 10), Sort.asc("sortOrder")))
+                .extracting(PlatformFieldUiTypeAttribute::getAttributeAlias)
+                .containsExactly("format");
+        assertThat(fieldUiTypeFieldMappingService.list(Criteria.of().eq("fieldUiTypeAlias", "date_time_with_time_zone"),
+                new PageRequest(0, 10), Sort.asc("sortOrder")))
+                .extracting(PlatformFieldUiTypeFieldMapping::getSourceKey)
+                .containsExactly("timeZone");
+    }
+
+    @Test
+    void shouldRejectUnknownFieldTypeOnFieldUiTypeAttribute() {
+        fieldUiTypeService.insert(fieldUiType("text_input", "输入框", "string", ViewControlType.TEXT));
+        PlatformFieldUiTypeAttribute attribute = fieldUiTypeAttribute("text_input", "maxLength", "字数限制",
+                "missing_type", null);
+
+        assertThatThrownBy(() -> fieldUiTypeAttributeService.insert(attribute))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Field type requires existing type");
+    }
+
+    @Test
+    void shouldExposePresetFieldUiTypeBusinessGranularity() {
+        assertThat(PlatformFieldUiTypePresetCatalog.fieldUiTypes())
+                .extracting(PlatformFieldUiType::getAlias)
+                .contains("text", "textarea", "amount", "select", "multi_select", "date_time_with_time_zone");
+        assertThat(PlatformFieldUiTypePresetCatalog.attributes())
+                .anySatisfy(attribute -> {
+                    assertThat(attribute.getFieldUiTypeAlias()).isEqualTo("date_time_with_time_zone");
+                    assertThat(attribute.getAttributeAlias()).isEqualTo("format");
+                });
+        assertThat(PlatformFieldUiTypePresetCatalog.fieldMappings())
+                .anySatisfy(mapping -> {
+                    assertThat(mapping.getFieldUiTypeAlias()).isEqualTo("date_time_with_time_zone");
+                    assertThat(mapping.getSourceKey()).isEqualTo("timeZone");
+                });
+    }
+
+    @Test
+    void shouldCompileDefaultUiTypeFromFieldType() {
+        fieldUiTypeService.insert(fieldUiType("text", "输入框", "string", ViewControlType.TEXT));
+        PlatformFieldType displayString = fieldType("display_string", FieldType.STRING, 128);
+        displayString.setDefaultUiTypeAlias("text");
+        displayString.setUiTypeAliases(java.util.Set.of("text"));
+        fieldTypeService.insert(displayString);
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "displayName", "display_name", FieldType.STRING);
+        field.setFieldTypeAlias("display_string");
+        fieldService.insert(field);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+
+        assertThat(definition.defaultUiTypeAlias()).isEqualTo("text");
     }
 
     @Test
@@ -568,11 +746,12 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(titleField(metadataId));
         MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
         fieldService.insert(status);
+        fieldUiTypeService.insert(fieldUiType("select", "下拉单选", "string", ViewControlType.SELECT));
         String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
         MetadataView view = metadataView(relationId, EntityViewType.LIST);
         String viewId = viewService.insert(view);
         MetadataViewField viewField = metadataViewField(viewId, status.getId());
-        viewField.setControlType(ViewControlType.SELECT);
+        viewField.setFieldUiTypeAlias("select");
         viewField.setReadOnly(true);
         viewField.setRequiredOverride(true);
 
@@ -583,8 +762,27 @@ class PlatformMetadataServiceContractTest {
                 .containsExactly(viewId);
         assertThat(definition.fieldName()).isEqualTo("status");
         assertThat(definition.controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(definition.fieldUiTypeAlias()).isEqualTo("select");
         assertThat(definition.readOnly()).isTrue();
         assertThat(definition.required()).isTrue();
+    }
+
+    @Test
+    void shouldRejectViewFieldUiTypeOutsideFieldTypeAllowedSet() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        status.setFieldTypeAlias("string");
+        fieldService.insert(status);
+        fieldUiTypeService.insert(fieldUiType("amount", "金额", "decimal", ViewControlType.DECIMAL));
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        String viewId = viewService.insert(metadataView(relationId, EntityViewType.FORM));
+        MetadataViewField viewField = metadataViewField(viewId, status.getId());
+        viewField.setFieldUiTypeAlias("amount");
+
+        assertThatThrownBy(() -> viewFieldService.insert(viewField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("default field type mismatch");
     }
 
     @Test
@@ -705,6 +903,205 @@ class PlatformMetadataServiceContractTest {
                 .containsExactly(RelationRole.MAIN, RelationRole.CHILD);
     }
 
+    @Test
+    void shouldEnsureAndResolveRelationScopedFields() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField title = titleField(customerMetadataId);
+        title.setSortOrder(10);
+        fieldService.insert(title);
+        MetadataField status = field(customerMetadataId, "status", "status", FieldType.STRING);
+        status.setSortOrder(20);
+        fieldService.insert(status);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+
+        List<ModuleMetadataField> fields = moduleFieldService.ensureForRelation(relationId);
+
+        assertThat(fields).extracting(ModuleMetadataField::getMetadataFieldId)
+                .containsExactly(title.getId(), status.getId());
+        ResolvedModuleMetadataField resolved = moduleFieldService.resolve(fields.get(1).getId());
+        assertThat(resolved.moduleAlias()).isEqualTo("crm.customer");
+        assertThat(resolved.relationId()).isEqualTo(relationId);
+        assertThat(resolved.relationAlias()).isEqualTo("customer");
+        assertThat(resolved.metadataAlias()).isEqualTo("customer");
+        assertThat(resolved.fieldName()).isEqualTo("status");
+        assertThat(resolved.fieldTypeAlias()).isEqualTo("string");
+    }
+
+    @Test
+    void shouldSaveModuleScopedFieldBehaviorAndReferenceConfig() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField customerId = field(customerMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        ModuleMetadataField moduleField = new ModuleMetadataField();
+        moduleField.setRelationId(relationId);
+        moduleField.setMetadataFieldId(customerId.getId());
+        moduleField.setDefaultValue("guest");
+        moduleField.setCloneable(true);
+        moduleField.setValidationRegex("[a-z]+");
+        moduleField.setDictionaryApplicationAlias("crm");
+        moduleField.setDictionaryCategoryAlias("customer_level");
+        moduleField.setReferenceModuleAlias("crm.customer");
+        moduleField.setReferenceModuleKeyField("id");
+        moduleField.setReferenceModuleLabelField("title");
+        moduleField.setReferenceModulePlusFields(java.util.Set.of("code", "ownerName"));
+
+        String id = moduleFieldService.insert(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(id);
+        assertThat(saved.getDefaultValue()).isEqualTo("guest");
+        assertThat(saved.getCloneable()).isTrue();
+        assertThat(saved.getReferenceModuleAlias()).isEqualTo("crm.customer");
+        assertThat(saved.getReferenceModulePlusFields()).containsExactlyInAnyOrder("code", "ownerName");
+    }
+
+    @Test
+    void shouldRejectReferenceDependentConfigWithoutReferenceModule() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField customerId = field(customerMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        ModuleMetadataField moduleField = new ModuleMetadataField();
+        moduleField.setRelationId(relationId);
+        moduleField.setMetadataFieldId(customerId.getId());
+        moduleField.setReferenceModuleKeyField("id");
+
+        assertThatThrownBy(() -> moduleFieldService.insert(moduleField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("referenceModuleAlias");
+    }
+
+    @Test
+    void shouldSaveReferenceFiltersAndAffectsAroundModuleMetadataField() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String orderMetadataId = metadataService.insert(metadata("crm", "order"));
+        MetadataField customerId = field(orderMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        MetadataField customerRegion = field(orderMetadataId, "customerRegion", "customer_region", FieldType.STRING);
+        fieldService.insert(customerRegion);
+        String orderRelationId = relationService.insert(mainRelation("crm.order", orderMetadataId));
+        List<ModuleMetadataField> orderFields = moduleFieldService.ensureForRelation(orderRelationId);
+        ModuleMetadataField owner = moduleField(orderFields, customerId.getId());
+        owner.setReferenceModuleAlias("crm.customer");
+        owner.setReferenceModuleKeyField("id");
+        owner.setReferenceModuleLabelField("title");
+        moduleFieldService.update(owner);
+        ModuleMetadataField formRegion = moduleField(orderFields, customerRegion.getId());
+
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField title = titleField(customerMetadataId);
+        fieldService.insert(title);
+        MetadataField region = field(customerMetadataId, "region", "region", FieldType.STRING);
+        fieldService.insert(region);
+        String customerRelationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        List<ModuleMetadataField> customerFields = moduleFieldService.ensureForRelation(customerRelationId);
+        ModuleMetadataField referenceRegion = moduleField(customerFields, region.getId());
+        ModuleMetadataField referenceTitle = moduleField(customerFields, title.getId());
+
+        ModuleMetadataFieldFilter filter = new ModuleMetadataFieldFilter();
+        filter.setModuleMetadataFieldId(owner.getId());
+        filter.setFormFieldId(formRegion.getId());
+        filter.setReferenceFieldId(referenceRegion.getId());
+        filter.setOperator(DynamicQueryOperator.EQ);
+        moduleFieldFilterService.insert(filter);
+        ModuleMetadataFieldAffect affect = new ModuleMetadataFieldAffect();
+        affect.setModuleMetadataFieldId(owner.getId());
+        affect.setReferenceFieldId(referenceTitle.getId());
+        affect.setTargetFieldId(formRegion.getId());
+        moduleFieldAffectService.insert(affect);
+
+        assertThat(moduleFieldFilterService.list(Criteria.of().eq("moduleMetadataFieldId", owner.getId()), PageRequest.of(1, 10)))
+                .hasSize(1);
+        assertThat(moduleFieldAffectService.list(Criteria.of().eq("moduleMetadataFieldId", owner.getId()), PageRequest.of(1, 10)))
+                .hasSize(1);
+    }
+
+    @Test
+    void shouldRejectReferenceFilterOrAffectOnNonReferenceModuleMetadataField() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String orderMetadataId = metadataService.insert(metadata("crm", "order"));
+        MetadataField customerId = field(orderMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        MetadataField customerRegion = field(orderMetadataId, "customerRegion", "customer_region", FieldType.STRING);
+        fieldService.insert(customerRegion);
+        String orderRelationId = relationService.insert(mainRelation("crm.order", orderMetadataId));
+        List<ModuleMetadataField> orderFields = moduleFieldService.ensureForRelation(orderRelationId);
+        ModuleMetadataField owner = moduleField(orderFields, customerId.getId());
+        ModuleMetadataField formRegion = moduleField(orderFields, customerRegion.getId());
+
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField region = field(customerMetadataId, "region", "region", FieldType.STRING);
+        fieldService.insert(region);
+        String customerRelationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        ModuleMetadataField referenceRegion = moduleField(
+                moduleFieldService.ensureForRelation(customerRelationId), region.getId());
+
+        ModuleMetadataFieldFilter filter = new ModuleMetadataFieldFilter();
+        filter.setModuleMetadataFieldId(owner.getId());
+        filter.setFormFieldId(formRegion.getId());
+        filter.setReferenceFieldId(referenceRegion.getId());
+        assertThatThrownBy(() -> moduleFieldFilterService.insert(filter))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("referenceModuleAlias");
+
+        ModuleMetadataFieldAffect affect = new ModuleMetadataFieldAffect();
+        affect.setModuleMetadataFieldId(owner.getId());
+        affect.setReferenceFieldId(referenceRegion.getId());
+        affect.setTargetFieldId(formRegion.getId());
+        assertThatThrownBy(() -> moduleFieldAffectService.insert(affect))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("referenceModuleAlias");
+    }
+
+    @Test
+    void shouldRejectRelationFieldOutsideRelationMetadata() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        String profileMetadataId = metadataService.insert(metadata("crm", "profile"));
+        MetadataField profileName = titleField(profileMetadataId);
+        fieldService.insert(profileName);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        ModuleMetadataField node = new ModuleMetadataField();
+        node.setRelationId(relationId);
+        node.setMetadataFieldId(profileName.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.insert(node))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("field in relation metadata");
+    }
+
+    @Test
+    void shouldRejectDuplicateRelationField() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField title = titleField(customerMetadataId);
+        fieldService.insert(title);
+        String relationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+        ModuleMetadataField first = new ModuleMetadataField();
+        first.setRelationId(relationId);
+        first.setMetadataFieldId(title.getId());
+        moduleFieldService.insert(first);
+        ModuleMetadataField duplicate = new ModuleMetadataField();
+        duplicate.setRelationId(relationId);
+        duplicate.setMetadataFieldId(title.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.insert(duplicate))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must be unique");
+    }
+
+    private ModuleMetadataField moduleField(List<ModuleMetadataField> fields, String metadataFieldId) {
+        return fields.stream()
+                .filter(field -> field.getMetadataFieldId().equals(metadataFieldId))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private Metadata metadata(String applicationAlias, String alias) {
         Metadata metadata = new Metadata();
         metadata.setApplicationAlias(applicationAlias);
@@ -738,6 +1135,40 @@ class PlatformMetadataServiceContractTest {
         type.setDefaultQueryOperator(DynamicQueryOperator.defaultOperator(fieldType));
         type.setQueryOperators(DynamicQueryOperator.names(DynamicQueryOperator.defaultOperators(fieldType)));
         return type;
+    }
+
+    private PlatformFieldUiType fieldUiType(String alias,
+                                            String title,
+                                            String defaultFieldTypeAlias,
+                                            ViewControlType controlType) {
+        PlatformFieldUiType type = new PlatformFieldUiType();
+        type.setAlias(alias);
+        type.setTitle(title);
+        type.setDefaultFieldTypeAlias(defaultFieldTypeAlias);
+        type.setControlType(controlType);
+        return type;
+    }
+
+    private PlatformFieldUiTypeAttribute fieldUiTypeAttribute(String fieldUiTypeAlias,
+                                                              String attributeAlias,
+                                                              String title,
+                                                              String valueFieldTypeAlias,
+                                                              String defaultValue) {
+        PlatformFieldUiTypeAttribute attribute = new PlatformFieldUiTypeAttribute();
+        attribute.setFieldUiTypeAlias(fieldUiTypeAlias);
+        attribute.setAttributeAlias(attributeAlias);
+        attribute.setTitle(title);
+        attribute.setValueFieldTypeAlias(valueFieldTypeAlias);
+        attribute.setDefaultValue(defaultValue);
+        return attribute;
+    }
+
+    private PlatformFieldUiTypeFieldMapping fieldUiTypeMapping(String fieldUiTypeAlias, String sourceKey, String title) {
+        PlatformFieldUiTypeFieldMapping mapping = new PlatformFieldUiTypeFieldMapping();
+        mapping.setFieldUiTypeAlias(fieldUiTypeAlias);
+        mapping.setSourceKey(sourceKey);
+        mapping.setTitle(title);
+        return mapping;
     }
 
     private MetadataFieldConfig fieldConfig(String fieldId) {

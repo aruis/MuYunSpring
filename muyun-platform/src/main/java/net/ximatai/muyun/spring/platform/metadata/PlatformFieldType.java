@@ -42,6 +42,12 @@ public class PlatformFieldType extends StandardEnabledSortableEntity {
     @Column(name = "query_operators", type = ColumnType.JSON_SET, comment = "Allowed query operators")
     private Set<String> queryOperators;
 
+    @Column(name = "default_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Default field UI type alias")
+    private String defaultUiTypeAlias;
+
+    @Column(name = "ui_type_aliases", type = ColumnType.JSON_SET, comment = "Allowed field UI type aliases")
+    private Set<String> uiTypeAliases;
+
     public FieldQueryDefinition queryDefinition() {
         if (defaultQueryOperator == null && (queryOperators == null || queryOperators.isEmpty())) {
             return FieldQueryDefinition.disabled();

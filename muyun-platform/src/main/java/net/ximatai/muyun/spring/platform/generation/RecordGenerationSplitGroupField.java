@@ -20,4 +20,8 @@ public class RecordGenerationSplitGroupField extends StandardSortableEntity {
     @Column(name = "field_name", type = ColumnType.VARCHAR, length = 64, nullable = false,
             comment = "Group field name")
     private String fieldName;
+
+    @Column(name = "module_metadata_field_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Module metadata field id")
+    private String moduleMetadataFieldId;
 }

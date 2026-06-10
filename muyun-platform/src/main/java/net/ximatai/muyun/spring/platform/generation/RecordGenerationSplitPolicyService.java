@@ -44,6 +44,9 @@ public class RecordGenerationSplitPolicyService extends AbstractAbilityService<R
         if (policy.getQuantityField() != null) {
             policy.setQuantityField(PlatformNameRules.requireFieldName(policy.getQuantityField(), "quantityField"));
         }
+        if (policy.getQuantityModuleMetadataFieldId() != null && !policy.getQuantityModuleMetadataFieldId().isBlank()) {
+            policy.setQuantityModuleMetadataFieldId(policy.getQuantityModuleMetadataFieldId().trim());
+        }
         if (policy.getQuantityStep() != null && policy.getQuantityStep() <= 0) {
             throw new PlatformException("Split policy quantityStep must be positive");
         }

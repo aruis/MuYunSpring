@@ -25,6 +25,23 @@ public class MetadataField extends StandardEnabledSortableEntity {
     @Column(name = "field_type_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Field type alias")
     private String fieldTypeAlias;
 
+    @Column(name = "field_ownership", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Field ownership")
+    private MetadataFieldOwnership fieldOwnership = MetadataFieldOwnership.BUSINESS;
+
+    @Column(name = "field_form", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Field form")
+    private MetadataFieldForm fieldForm = MetadataFieldForm.PHYSICAL;
+
+    @Column(name = "owner_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Owner metadata field id")
+    private String ownerFieldId;
+
+    @Column(name = "field_role", type = ColumnType.VARCHAR, length = 32, comment = "Field role")
+    private MetadataFieldRole fieldRole;
+
+    @Column(name = "system_managed", type = ColumnType.BOOLEAN, comment = "System managed flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean systemManaged = Boolean.FALSE;
+
     @Column(name = "required", type = ColumnType.BOOLEAN, comment = "Required flag",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean required = Boolean.FALSE;

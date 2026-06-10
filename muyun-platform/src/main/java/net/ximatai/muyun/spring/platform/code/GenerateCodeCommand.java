@@ -6,6 +6,7 @@ import java.util.Map;
 public record GenerateCodeCommand(
         String moduleAlias,
         String entityAlias,
+        String moduleMetadataFieldId,
         String metadataFieldId,
         String fieldName,
         String organizationId,
@@ -13,4 +14,14 @@ public record GenerateCodeCommand(
         Map<String, Object> context,
         CodeValueUniquenessChecker uniquenessChecker
 ) {
+    public GenerateCodeCommand(String moduleAlias,
+                               String entityAlias,
+                               String metadataFieldId,
+                               String fieldName,
+                               String organizationId,
+                               LocalDateTime at,
+                               Map<String, Object> context,
+                               CodeValueUniquenessChecker uniquenessChecker) {
+        this(moduleAlias, entityAlias, null, metadataFieldId, fieldName, organizationId, at, context, uniquenessChecker);
+    }
 }

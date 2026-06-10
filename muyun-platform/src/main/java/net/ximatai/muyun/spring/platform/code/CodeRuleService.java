@@ -17,6 +17,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,7 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
     private final CodeValueMappingService mappingService;
     private final Optional<PlatformModuleService> moduleService;
     private final Optional<ModuleMetadataRelationService> relationService;
+    private final Optional<ModuleMetadataFieldService> moduleFieldService;
     private final Optional<MetadataService> metadataService;
     private final Optional<MetadataFieldService> fieldService;
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
@@ -54,6 +57,7 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                            CodeValueMappingService mappingService,
                            Optional<PlatformModuleService> moduleService,
                            Optional<ModuleMetadataRelationService> relationService,
+                           Optional<ModuleMetadataFieldService> moduleFieldService,
                            Optional<MetadataService> metadataService,
                            Optional<MetadataFieldService> fieldService,
                            Optional<OrganizationHierarchyService> organizationHierarchyService) {
@@ -63,6 +67,7 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         this.mappingService = Objects.requireNonNull(mappingService, "mappingService must not be null");
         this.moduleService = moduleService == null ? Optional.empty() : moduleService;
         this.relationService = relationService == null ? Optional.empty() : relationService;
+        this.moduleFieldService = moduleFieldService == null ? Optional.empty() : moduleFieldService;
         this.metadataService = metadataService == null ? Optional.empty() : metadataService;
         this.fieldService = fieldService == null ? Optional.empty() : fieldService;
         this.organizationHierarchyService = organizationHierarchyService == null ? Optional.empty() : organizationHierarchyService;
@@ -73,7 +78,20 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                            CodeSequencePolicyService sequencePolicyService,
                            CodeValueMappingService mappingService) {
         this(ruleDao, segmentService, sequencePolicyService, mappingService,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    public CodeRuleService(BaseDao<CodeRule, String> ruleDao,
+                           CodeRuleSegmentService segmentService,
+                           CodeSequencePolicyService sequencePolicyService,
+                           CodeValueMappingService mappingService,
+                           Optional<PlatformModuleService> moduleService,
+                           Optional<ModuleMetadataRelationService> relationService,
+                           Optional<MetadataService> metadataService,
+                           Optional<MetadataFieldService> fieldService,
+                           Optional<OrganizationHierarchyService> organizationHierarchyService) {
+        this(ruleDao, segmentService, sequencePolicyService, mappingService, moduleService, relationService,
+                Optional.empty(), metadataService, fieldService, organizationHierarchyService);
     }
 
     @Transactional
@@ -129,7 +147,8 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                 ALL, Sort.asc("sortOrder")).stream()
                 .filter(rule -> Boolean.TRUE.equals(rule.getEnabled()))
                 .filter(rule -> isEffective(rule, effectiveAt))
-                .filter(rule -> matchesRequestedField(rule, command.metadataFieldId(), command.fieldName()))
+                .filter(rule -> matchesRequestedField(rule, command.moduleMetadataFieldId(),
+                        command.metadataFieldId(), command.fieldName()))
                 .map(rule -> viewRuleTree(rule.getId()))
                 .toList();
         if (candidates.isEmpty()) {
@@ -237,9 +256,19 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
     private void normalizeAndValidate(CodeRule rule) {
         rule.setModuleAlias(PlatformNameRules.requireModuleAlias(rule.getModuleAlias()));
         rule.setEntityAlias(PlatformNameRules.requireIdentifier(rule.getEntityAlias(), "entityAlias"));
+        if (rule.getModuleMetadataFieldId() != null && !rule.getModuleMetadataFieldId().isBlank()) {
+            rule.setModuleMetadataFieldId(rule.getModuleMetadataFieldId().trim());
+        }
         if (rule.getMetadataFieldId() != null && !rule.getMetadataFieldId().isBlank()) {
             rule.setMetadataFieldId(PlatformNameRules.requireIdentifier(rule.getMetadataFieldId(), "metadataFieldId"));
         }
+        if (rule.getFieldName() != null && rule.getFieldName().isBlank()) {
+            rule.setFieldName(null);
+        }
+        if (rule.getFieldName() != null) {
+            rule.setFieldName(PlatformNameRules.requireFieldName(rule.getFieldName(), "fieldName"));
+        }
+        validateTargetExists(rule);
         rule.setFieldName(PlatformNameRules.requireFieldName(rule.getFieldName(), "fieldName"));
         if (rule.getTitle() == null || rule.getTitle().isBlank()) {
             rule.setTitle(rule.getFieldName());
@@ -260,7 +289,6 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         if (rule.getAllowRecycle() == null) {
             rule.setAllowRecycle(Boolean.FALSE);
         }
-        validateTargetExists(rule);
         validatePrimaryUniqueness(rule);
         validateSequencePolicy(rule);
     }
@@ -284,6 +312,17 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
             }
         });
         if (relationService.isEmpty() || fieldService.isEmpty()) {
+            return;
+        }
+        ResolvedModuleMetadataField resolvedModuleField = resolveModuleMetadataField(rule);
+        if (resolvedModuleField != null) {
+            if (!Objects.equals(resolvedModuleField.moduleAlias(), rule.getModuleAlias())
+                    || !Objects.equals(resolvedModuleField.relationAlias(), rule.getEntityAlias())) {
+                throw new PlatformException("Code rule moduleMetadataFieldId does not belong to target object: "
+                        + rule.getModuleMetadataFieldId());
+            }
+            rule.setMetadataFieldId(resolvedModuleField.metadataFieldId());
+            rule.setFieldName(resolvedModuleField.fieldName());
             return;
         }
         ModuleMetadataRelation relation = relationService.get().list(Criteria.of()
@@ -315,6 +354,16 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
             rule.setMetadataFieldId(field.getId());
         }
         rule.setFieldName(field.getFieldName());
+    }
+
+    private ResolvedModuleMetadataField resolveModuleMetadataField(CodeRule rule) {
+        if (rule.getModuleMetadataFieldId() == null || rule.getModuleMetadataFieldId().isBlank()) {
+            return null;
+        }
+        if (moduleFieldService.isEmpty()) {
+            throw new PlatformException("Code rule moduleMetadataFieldId requires ModuleMetadataFieldService");
+        }
+        return moduleFieldService.get().resolve(rule.getModuleMetadataFieldId());
     }
 
     private MetadataField resolveField(String metadataId, CodeRule rule) {
@@ -542,7 +591,13 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                 && (rule.getEffectiveTo() == null || !rule.getEffectiveTo().isBefore(at));
     }
 
-    private boolean matchesRequestedField(CodeRule rule, String metadataFieldId, String fieldName) {
+    private boolean matchesRequestedField(CodeRule rule,
+                                          String moduleMetadataFieldId,
+                                          String metadataFieldId,
+                                          String fieldName) {
+        if (moduleMetadataFieldId != null && !moduleMetadataFieldId.isBlank()) {
+            return Objects.equals(rule.getModuleMetadataFieldId(), moduleMetadataFieldId);
+        }
         if (metadataFieldId != null && !metadataFieldId.isBlank()) {
             return Objects.equals(rule.getMetadataFieldId(), metadataFieldId);
         }
@@ -553,6 +608,9 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
     }
 
     private String targetFieldKey(CodeRule rule) {
+        if (rule.getModuleMetadataFieldId() != null && !rule.getModuleMetadataFieldId().isBlank()) {
+            return rule.getModuleMetadataFieldId();
+        }
         return rule.getMetadataFieldId() == null || rule.getMetadataFieldId().isBlank()
                 ? rule.getFieldName()
                 : rule.getMetadataFieldId();

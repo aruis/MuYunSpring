@@ -1,6 +1,18 @@
 package net.ximatai.muyun.spring.platform.generation;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.metadata.Metadata;
+import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.module.ModuleActionContributionRegistrar;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -162,6 +174,66 @@ class RecordGenerationRuleServiceTest {
     }
 
     @Test
+    void shouldResolveModuleMetadataFieldIdsInGenerationMappings() {
+        PlatformModuleService moduleService = new PlatformModuleService(new TestMemoryDao<>());
+        MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
+        PlatformFieldTypeService fieldTypeService = new PlatformFieldTypeService(new TestMemoryDao<>());
+        MetadataFieldService fieldService = new MetadataFieldService(new TestMemoryDao<>(), metadataService, fieldTypeService);
+        ModuleMetadataRelationService relationService = new ModuleMetadataRelationService(
+                new TestMemoryDao<>(), moduleService, metadataService);
+        ModuleMetadataFieldService moduleFieldService = new ModuleMetadataFieldService(
+                new TestMemoryDao<>(), relationService, metadataService, fieldService);
+        PlatformFieldType stringType = new PlatformFieldType();
+        stringType.setAlias("string");
+        stringType.setFieldType(FieldType.STRING);
+        fieldTypeService.insert(stringType);
+        moduleService.insert(module("sales.contract"));
+        moduleService.insert(module("finance.invoice"));
+        List<ModuleMetadataField> sourceFields = moduleFields(moduleFieldService, relationService, metadataService,
+                fieldService, "sales.contract", "main", "source_no", "quantity", "product_id");
+        List<ModuleMetadataField> targetFields = moduleFields(moduleFieldService, relationService, metadataService,
+                fieldService, "finance.invoice", "main", "contract_no");
+        ModuleMetadataField sourceNo = moduleField(sourceFields, "sourceNo");
+        ModuleMetadataField quantity = moduleField(sourceFields, "quantity");
+        ModuleMetadataField productId = moduleField(sourceFields, "productId");
+        ModuleMetadataField contractNo = moduleField(targetFields, "contractNo");
+        RecordGenerationRuleService ruleService = new RecordGenerationRuleService(
+                new TestMemoryDao<>(),
+                objectMappingService,
+                fieldMappingService,
+                splitPolicyService,
+                splitGroupFieldService,
+                Optional.of(moduleFieldService),
+                Optional.empty());
+        RecordGenerationFieldMapping fieldMapping = fieldMapping(null, null);
+        fieldMapping.setSourceModuleMetadataFieldId(sourceNo.getId());
+        fieldMapping.setTargetModuleMetadataFieldId(contractNo.getId());
+        RecordGenerationSplitPolicy splitPolicy = groupSplit(null);
+        splitPolicy.setQuantityModuleMetadataFieldId(quantity.getId());
+        splitPolicy.setQuantityStep(1);
+        splitPolicy.getGroupFields().getFirst().setModuleMetadataFieldId(productId.getId());
+        RecordGenerationObjectMapping mapping = objectMapping(fieldMapping);
+        mapping.setSplitDriver(Boolean.TRUE);
+        mapping.setSplitPolicy(splitPolicy);
+        RecordGenerationRule rule = baseRule();
+        rule.setObjectMappings(List.of(mapping));
+
+        RecordGenerationRule saved = ruleService.saveRuleTree(rule);
+
+        RecordGenerationObjectMapping savedMapping = saved.getObjectMappings().getFirst();
+        RecordGenerationFieldMapping savedField = savedMapping.getFieldMappings().getFirst();
+        assertThat(savedField.getSourceModuleMetadataFieldId()).isEqualTo(sourceNo.getId());
+        assertThat(savedField.getSourceField()).isEqualTo("sourceNo");
+        assertThat(savedField.getTargetModuleMetadataFieldId()).isEqualTo(contractNo.getId());
+        assertThat(savedField.getTargetField()).isEqualTo("contractNo");
+        assertThat(savedMapping.getSplitPolicy().getQuantityModuleMetadataFieldId()).isEqualTo(quantity.getId());
+        assertThat(savedMapping.getSplitPolicy().getQuantityField()).isEqualTo("quantity");
+        assertThat(savedMapping.getSplitPolicy().getGroupFields().getFirst().getModuleMetadataFieldId())
+                .isEqualTo(productId.getId());
+        assertThat(savedMapping.getSplitPolicy().getGroupFields().getFirst().getFieldName()).isEqualTo("productId");
+    }
+
+    @Test
     void shouldRejectSplitPolicyOnNonDriverObjectMapping() {
         RecordGenerationRuleService ruleService = ruleServiceWithoutContributor();
         RecordGenerationRule rule = baseRule();
@@ -237,6 +309,64 @@ class RecordGenerationRuleServiceTest {
         groupField.setFieldName(fieldName);
         policy.setGroupFields(List.of(groupField));
         return policy;
+    }
+
+    private List<ModuleMetadataField> moduleFields(ModuleMetadataFieldService moduleFieldService,
+                                                   ModuleMetadataRelationService relationService,
+                                                   MetadataService metadataService,
+                                                   MetadataFieldService fieldService,
+                                                   String moduleAlias,
+                                                   String relationAlias,
+                                                   String... columnNames) {
+        Metadata metadata = new Metadata();
+        metadata.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
+        metadata.setAlias(relationAlias);
+        metadata.setTableName(moduleAlias.replace('.', '_') + "_" + relationAlias);
+        metadataService.insert(metadata);
+        for (String columnName : columnNames) {
+            MetadataField field = new MetadataField();
+            field.setMetadataId(metadata.getId());
+            field.setFieldName(toFieldName(columnName));
+            field.setColumnName(columnName);
+            field.setTitle(toFieldName(columnName));
+            field.setFieldTypeAlias("string");
+            fieldService.insert(field);
+        }
+        ModuleMetadataRelation relation = new ModuleMetadataRelation();
+        relation.setModuleAlias(moduleAlias);
+        relation.setMetadataId(metadata.getId());
+        relation.setRelationRole(RelationRole.MAIN);
+        relation.setRelationAlias(relationAlias);
+        String relationId = relationService.insert(relation);
+        return moduleFieldService.ensureForRelation(relationId);
+    }
+
+    private ModuleMetadataField moduleField(List<ModuleMetadataField> fields, String fieldName) {
+        return fields.stream()
+                .filter(field -> moduleFieldServiceFieldName(field).equals(fieldName))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private String moduleFieldServiceFieldName(ModuleMetadataField moduleField) {
+        if (moduleField.getMetadataFieldId() == null) {
+            return "";
+        }
+        return moduleField.getTitle();
+    }
+
+    private String toFieldName(String columnName) {
+        StringBuilder builder = new StringBuilder();
+        boolean upperNext = false;
+        for (char ch : columnName.toCharArray()) {
+            if (ch == '_') {
+                upperNext = true;
+            } else {
+                builder.append(upperNext ? Character.toUpperCase(ch) : ch);
+                upperNext = false;
+            }
+        }
+        return builder.toString();
     }
 
     private PlatformModule module(String alias) {

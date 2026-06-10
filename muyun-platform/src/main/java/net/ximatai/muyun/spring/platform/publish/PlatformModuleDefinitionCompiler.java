@@ -33,6 +33,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -42,13 +44,17 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.workflow.DynamicWorkflowActionExecutor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class PlatformModuleDefinitionCompiler {
@@ -64,6 +70,7 @@ public class PlatformModuleDefinitionCompiler {
     private final MetadataViewFieldService viewFieldService;
     private final PlatformModuleActionService actionService;
     private final ModuleMetadataFormulaRuleService formulaRuleService;
+    private final ModuleMetadataFieldService moduleFieldService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -77,7 +84,23 @@ public class PlatformModuleDefinitionCompiler {
                                             PlatformModuleActionService actionService,
                                             ModuleMetadataFormulaRuleService formulaRuleService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService, actionService, formulaRuleService,
+                viewService, viewFieldService, actionService, formulaRuleService, null,
+                new ModuleDefinitionValidator());
+    }
+
+    public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
+                                            MetadataService metadataService,
+                                            MetadataFieldService fieldService,
+                                            MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
+                                            MetadataFieldReferenceConfigService referenceConfigService,
+                                            ModuleMetadataRelationService relationService,
+                                            MetadataViewService viewService,
+                                            MetadataViewFieldService viewFieldService,
+                                            PlatformModuleActionService actionService,
+                                            ModuleMetadataFormulaRuleService formulaRuleService,
+                                            ModuleMetadataFieldService moduleFieldService) {
+        this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
+                viewService, viewFieldService, actionService, formulaRuleService, moduleFieldService,
                 new ModuleDefinitionValidator());
     }
 
@@ -92,6 +115,23 @@ public class PlatformModuleDefinitionCompiler {
                                             PlatformModuleActionService actionService,
                                             ModuleMetadataFormulaRuleService formulaRuleService,
                                             ModuleDefinitionValidator validator) {
+        this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
+                viewService, viewFieldService, actionService, formulaRuleService, null, validator);
+    }
+
+    @Autowired
+    public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
+                                            MetadataService metadataService,
+                                            MetadataFieldService fieldService,
+                                            MetadataFieldDefinitionCompiler fieldDefinitionCompiler,
+                                            MetadataFieldReferenceConfigService referenceConfigService,
+                                            ModuleMetadataRelationService relationService,
+                                            MetadataViewService viewService,
+                                            MetadataViewFieldService viewFieldService,
+                                            PlatformModuleActionService actionService,
+                                            ModuleMetadataFormulaRuleService formulaRuleService,
+                                            ModuleMetadataFieldService moduleFieldService,
+                                            ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.fieldService = fieldService;
@@ -102,6 +142,7 @@ public class PlatformModuleDefinitionCompiler {
         this.viewFieldService = viewFieldService;
         this.actionService = actionService;
         this.formulaRuleService = formulaRuleService;
+        this.moduleFieldService = moduleFieldService;
         this.validator = validator;
     }
 
@@ -198,9 +239,35 @@ public class PlatformModuleDefinitionCompiler {
     }
 
     private List<FieldDefinition> fields(String metadataId, String relationId) {
-        return metadataFields(metadataId).stream()
+        List<MetadataField> metadataFields = metadataFields(metadataId);
+        if (moduleFieldService != null) {
+            List<ModuleMetadataField> moduleFields = moduleFieldService.listByRelationId(relationId);
+            if (!moduleFields.isEmpty()) {
+                List<FieldDefinition> definitions = new ArrayList<>();
+                Set<String> configuredFieldIds = new LinkedHashSet<>();
+                for (ModuleMetadataField moduleField : moduleFields) {
+                    configuredFieldIds.add(moduleField.getMetadataFieldId());
+                    definitions.add(fieldDefinitionCompiler.compile(requireField(moduleField), relationId, moduleField));
+                }
+                metadataFields.stream()
+                        .filter(field -> !configuredFieldIds.contains(field.getId()))
+                        .map(field -> fieldDefinitionCompiler.compile(field, relationId))
+                        .forEach(definitions::add);
+                return definitions;
+            }
+        }
+        return metadataFields.stream()
                 .map(field -> fieldDefinitionCompiler.compile(field, relationId))
                 .toList();
+    }
+
+    private MetadataField requireField(ModuleMetadataField moduleField) {
+        MetadataField field = fieldService.select(moduleField.getMetadataFieldId());
+        if (field == null) {
+            throw new PlatformException("Module field points to missing metadata field: "
+                    + moduleField.getMetadataFieldId());
+        }
+        return field;
     }
 
     private List<MetadataField> metadataFields(String metadataId) {

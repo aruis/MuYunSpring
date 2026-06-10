@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,23 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
     private final RecordGenerationSplitPolicyService splitPolicyService;
     private final RecordGenerationSplitGroupFieldService splitGroupFieldService;
     private final Optional<GenerationModuleActionContributor> actionContributor;
+    private final Optional<ModuleMetadataFieldService> moduleFieldService;
+
+    public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
+                                       RecordGenerationObjectMappingService objectMappingService,
+                                       RecordGenerationFieldMappingService fieldMappingService,
+                                       RecordGenerationSplitPolicyService splitPolicyService,
+                                       RecordGenerationSplitGroupFieldService splitGroupFieldService,
+                                       Optional<ModuleMetadataFieldService> moduleFieldService,
+                                       Optional<GenerationModuleActionContributor> actionContributor) {
+        super(MODULE_ALIAS, RecordGenerationRule.class, ruleDao);
+        this.objectMappingService = Objects.requireNonNull(objectMappingService, "objectMappingService must not be null");
+        this.fieldMappingService = Objects.requireNonNull(fieldMappingService, "fieldMappingService must not be null");
+        this.splitPolicyService = Objects.requireNonNull(splitPolicyService, "splitPolicyService must not be null");
+        this.splitGroupFieldService = Objects.requireNonNull(splitGroupFieldService, "splitGroupFieldService must not be null");
+        this.moduleFieldService = moduleFieldService == null ? Optional.empty() : moduleFieldService;
+        this.actionContributor = actionContributor == null ? Optional.empty() : actionContributor;
+    }
 
     public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
                                        RecordGenerationObjectMappingService objectMappingService,
@@ -40,12 +59,8 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
                                        RecordGenerationSplitPolicyService splitPolicyService,
                                        RecordGenerationSplitGroupFieldService splitGroupFieldService,
                                        Optional<GenerationModuleActionContributor> actionContributor) {
-        super(MODULE_ALIAS, RecordGenerationRule.class, ruleDao);
-        this.objectMappingService = Objects.requireNonNull(objectMappingService, "objectMappingService must not be null");
-        this.fieldMappingService = Objects.requireNonNull(fieldMappingService, "fieldMappingService must not be null");
-        this.splitPolicyService = Objects.requireNonNull(splitPolicyService, "splitPolicyService must not be null");
-        this.splitGroupFieldService = Objects.requireNonNull(splitGroupFieldService, "splitGroupFieldService must not be null");
-        this.actionContributor = actionContributor == null ? Optional.empty() : actionContributor;
+        this(ruleDao, objectMappingService, fieldMappingService, splitPolicyService, splitGroupFieldService,
+                Optional.empty(), actionContributor);
     }
 
     public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
@@ -54,7 +69,7 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
                                        RecordGenerationSplitPolicyService splitPolicyService,
                                        RecordGenerationSplitGroupFieldService splitGroupFieldService) {
         this(ruleDao, objectMappingService, fieldMappingService, splitPolicyService, splitGroupFieldService,
-                Optional.empty());
+                Optional.empty(), Optional.empty());
     }
 
     @Transactional
@@ -221,14 +236,14 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         validateUniqueAction(rule);
         int splitDrivers = 0;
         for (RecordGenerationObjectMapping objectMapping : objectMappings) {
-            validateFieldMappingTargets(objectMapping);
+            validateFieldMappingTargets(rule, objectMapping);
             if (Boolean.TRUE.equals(objectMapping.getSplitDriver())) {
                 splitDrivers++;
             }
             if (objectMapping.getSplitPolicy() != null && !Boolean.TRUE.equals(objectMapping.getSplitDriver())) {
                 throw new PlatformException("Generation split policy requires splitDriver object mapping");
             }
-            validateSplitPolicy(objectMapping.getSplitPolicy());
+            validateSplitPolicy(rule, objectMapping, objectMapping.getSplitPolicy());
         }
         if (splitDrivers > 1) {
             throw new PlatformException("Generation rule can only declare one split driver object mapping");
@@ -247,13 +262,14 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         }
     }
 
-    private void validateFieldMappingTargets(RecordGenerationObjectMapping objectMapping) {
+    private void validateFieldMappingTargets(RecordGenerationRule rule, RecordGenerationObjectMapping objectMapping) {
         List<RecordGenerationFieldMapping> fieldMappings = objectMapping.getFieldMappings() == null
                 ? List.of()
                 : objectMapping.getFieldMappings();
         Set<String> targetFields = new LinkedHashSet<>();
         for (RecordGenerationFieldMapping fieldMapping : fieldMappings) {
-            String targetField = PlatformNameRules.requireFieldName(fieldMapping.getTargetField(), "targetField");
+            resolveFieldMappingFields(rule, objectMapping, fieldMapping);
+            String targetField = targetFieldKey(fieldMapping);
             if (!targetFields.add(targetField)) {
                 throw new PlatformException("Field mappings cannot duplicate targetField in one object mapping: "
                         + targetField);
@@ -261,10 +277,43 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         }
     }
 
-    private void validateSplitPolicy(RecordGenerationSplitPolicy splitPolicy) {
+    private void resolveFieldMappingFields(RecordGenerationRule rule,
+                                           RecordGenerationObjectMapping objectMapping,
+                                           RecordGenerationFieldMapping fieldMapping) {
+        if (fieldMapping.getSourceModuleMetadataFieldId() != null
+                && !fieldMapping.getSourceModuleMetadataFieldId().isBlank()) {
+            ResolvedModuleMetadataField source = resolveModuleField(fieldMapping.getSourceModuleMetadataFieldId(),
+                    rule.getSourceModuleAlias(), sourceObjectAlias(objectMapping), "sourceModuleMetadataFieldId");
+            if (source != null) {
+                fieldMapping.setSourceField(source.fieldName());
+            }
+        }
+        if (fieldMapping.getTargetModuleMetadataFieldId() != null
+                && !fieldMapping.getTargetModuleMetadataFieldId().isBlank()) {
+            ResolvedModuleMetadataField target = resolveModuleField(fieldMapping.getTargetModuleMetadataFieldId(),
+                    rule.getTargetModuleAlias(), objectMapping.getTargetObjectAlias(), "targetModuleMetadataFieldId");
+            if (target != null) {
+                fieldMapping.setTargetField(target.fieldName());
+            }
+        }
+        fieldMapping.setTargetField(PlatformNameRules.requireFieldName(fieldMapping.getTargetField(), "targetField"));
+    }
+
+    private String targetFieldKey(RecordGenerationFieldMapping fieldMapping) {
+        if (fieldMapping.getTargetModuleMetadataFieldId() != null
+                && !fieldMapping.getTargetModuleMetadataFieldId().isBlank()) {
+            return fieldMapping.getTargetModuleMetadataFieldId();
+        }
+        return PlatformNameRules.requireFieldName(fieldMapping.getTargetField(), "targetField");
+    }
+
+    private void validateSplitPolicy(RecordGenerationRule rule,
+                                     RecordGenerationObjectMapping objectMapping,
+                                     RecordGenerationSplitPolicy splitPolicy) {
         if (splitPolicy == null) {
             return;
         }
+        resolveSplitPolicyFields(rule, objectMapping, splitPolicy);
         List<RecordGenerationSplitGroupField> groupFields = splitPolicy.getGroupFields() == null
                 ? List.of()
                 : splitPolicy.getGroupFields();
@@ -274,14 +323,59 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         }
         Set<String> groupFieldNames = new LinkedHashSet<>();
         for (RecordGenerationSplitGroupField groupField : groupFields) {
-            String fieldName = PlatformNameRules.requireFieldName(groupField.getFieldName(), "fieldName");
-            if (!groupFieldNames.add(fieldName)) {
-                throw new PlatformException("Split policy cannot duplicate group field: " + fieldName);
+            if (groupField.getModuleMetadataFieldId() != null && !groupField.getModuleMetadataFieldId().isBlank()) {
+                ResolvedModuleMetadataField resolved = resolveModuleField(groupField.getModuleMetadataFieldId(),
+                        rule.getSourceModuleAlias(), sourceObjectAlias(objectMapping), "moduleMetadataFieldId");
+                if (resolved != null) {
+                    groupField.setFieldName(resolved.fieldName());
+                }
+            }
+            String fieldKey = groupField.getModuleMetadataFieldId() == null || groupField.getModuleMetadataFieldId().isBlank()
+                    ? PlatformNameRules.requireFieldName(groupField.getFieldName(), "fieldName")
+                    : groupField.getModuleMetadataFieldId();
+            if (!groupFieldNames.add(fieldKey)) {
+                throw new PlatformException("Split policy cannot duplicate group field: " + fieldKey);
             }
         }
         if (quantityDriver && splitPolicy.getQuantityStep() == null) {
             splitPolicy.setQuantityStep(1);
         }
+    }
+
+    private void resolveSplitPolicyFields(RecordGenerationRule rule,
+                                          RecordGenerationObjectMapping objectMapping,
+                                          RecordGenerationSplitPolicy splitPolicy) {
+        if (splitPolicy.getQuantityModuleMetadataFieldId() == null
+                || splitPolicy.getQuantityModuleMetadataFieldId().isBlank()) {
+            return;
+        }
+        ResolvedModuleMetadataField resolved = resolveModuleField(splitPolicy.getQuantityModuleMetadataFieldId(),
+                rule.getSourceModuleAlias(), sourceObjectAlias(objectMapping), "quantityModuleMetadataFieldId");
+        if (resolved != null) {
+            splitPolicy.setQuantityField(resolved.fieldName());
+        }
+    }
+
+    private ResolvedModuleMetadataField resolveModuleField(String moduleMetadataFieldId,
+                                                          String expectedModuleAlias,
+                                                          String expectedObjectAlias,
+                                                          String label) {
+        if (moduleFieldService.isEmpty()) {
+            throw new PlatformException("Generation " + label + " requires ModuleMetadataFieldService");
+        }
+        ResolvedModuleMetadataField resolved = moduleFieldService.get().resolve(moduleMetadataFieldId);
+        if (!Objects.equals(resolved.moduleAlias(), expectedModuleAlias)
+                || !Objects.equals(resolved.relationAlias(), expectedObjectAlias)) {
+            throw new PlatformException("Generation " + label + " does not belong to expected object: "
+                    + expectedModuleAlias + "/" + expectedObjectAlias);
+        }
+        return resolved;
+    }
+
+    private String sourceObjectAlias(RecordGenerationObjectMapping objectMapping) {
+        return objectMapping.getSourceObjectAlias() == null || objectMapping.getSourceObjectAlias().isBlank()
+                ? objectMapping.getTargetObjectAlias()
+                : objectMapping.getSourceObjectAlias();
     }
 
     private String defaultActionCode(String targetModuleAlias) {

@@ -11,6 +11,9 @@ import net.ximatai.muyun.spring.platform.code.CodeRule;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationFieldMapping;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationSplitGroupField;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationSplitPolicy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -20,8 +23,14 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffect;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
+import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -83,15 +92,27 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(Metadata.class)))
                 .contains("id", "application_alias", "alias", "schema_name", "table_name", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(MetadataField.class)))
-                .contains("id", "metadata_id", "field_name", "column_name", "field_type_alias", "required",
+                .contains("id", "metadata_id", "field_name", "column_name", "field_type_alias",
+                        "field_ownership", "field_form", "owner_field_id", "field_role", "system_managed", "required",
                         "unique_field", "indexed", "sortable_field", "title_field")
                 .doesNotContain("dictionary_application_alias", "dictionary_category_alias", "queryable");
         assertThat(columnNames(mapper.toTable(PlatformFieldType.class)))
                 .contains("id", "alias", "title", "field_type", "default_length", "default_precision",
-                        "default_scale", "default_query_operator", "query_operators")
+                        "default_scale", "default_query_operator", "query_operators",
+                        "default_ui_type_alias", "ui_type_aliases")
                 .doesNotContain("verify_regex");
         assertThat(columnType(mapper.toTable(PlatformFieldType.class), "query_operators"))
                 .isEqualTo(ColumnType.JSON_SET);
+        assertThat(columnType(mapper.toTable(PlatformFieldType.class), "ui_type_aliases"))
+                .isEqualTo(ColumnType.JSON_SET);
+        assertThat(columnNames(mapper.toTable(PlatformFieldUiType.class)))
+                .contains("id", "alias", "title", "default_field_type_alias", "control_type", "icon",
+                        "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(PlatformFieldUiTypeAttribute.class)))
+                .contains("id", "field_ui_type_alias", "attribute_alias", "title", "value_field_type_alias",
+                        "default_value", "sort_order");
+        assertThat(columnNames(mapper.toTable(PlatformFieldUiTypeFieldMapping.class)))
+                .contains("id", "field_ui_type_alias", "source_key", "title", "sort_order");
         assertThat(columnNames(mapper.toTable(MetadataFieldConfig.class)))
                 .contains("id", "metadata_field_id", "relation_id", "dictionary_application_alias", "dictionary_category_alias",
                         "selection_mode", "field_length", "precision", "scale", "queryable", "default_query_operator",
@@ -107,10 +128,26 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(ModuleMetadataRelation.class)))
                 .contains("id", "module_alias", "metadata_id", "relation_role", "parent_metadata_id",
                         "foreign_key", "relation_alias", "auto_populate", "cascade_delete", "sort_order");
+        assertThat(columnNames(mapper.toTable(ModuleMetadataField.class)))
+                .contains("id", "relation_id", "metadata_field_id", "default_value", "cloneable",
+                        "validation_regex", "dictionary_application_alias", "dictionary_category_alias",
+                        "reference_module_alias", "reference_module_key_field", "reference_module_label_field",
+                        "reference_generate_rule_id", "reference_query_template_id",
+                        "reference_module_plus_fields", "title", "sort_order");
+        assertThat(columnType(mapper.toTable(ModuleMetadataField.class), "reference_module_plus_fields"))
+                .isEqualTo(ColumnType.JSON_SET);
+        assertThat(uniqueIndexes(mapper.toTable(ModuleMetadataField.class)))
+                .contains(List.of("tenant_id", "relation_id", "metadata_field_id"));
+        assertThat(columnNames(mapper.toTable(ModuleMetadataFieldFilter.class)))
+                .contains("id", "module_metadata_field_id", "form_field_id", "reference_field_id",
+                        "operator", "title", "sort_order");
+        assertThat(columnNames(mapper.toTable(ModuleMetadataFieldAffect.class)))
+                .contains("id", "module_metadata_field_id", "reference_field_id", "target_field_id",
+                        "title", "sort_order");
         assertThat(columnNames(mapper.toTable(MetadataView.class)))
                 .contains("id", "relation_id", "view_type", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(MetadataViewField.class)))
-                .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "read_only",
+                .contains("id", "view_id", "metadata_field_id", "visible", "control_type", "field_ui_type_alias", "read_only",
                         "required_override", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(PlatformModuleAction.class)))
                 .contains("id", "module_alias", "entity_alias", "action_code", "permission_action_code", "title",
@@ -179,7 +216,8 @@ class PlatformModelSchemaTest {
     @Test
     void shouldMapCodeLifecycleModelsAsPlatformTables() {
         assertThat(columnNames(mapper.toTable(CodeRule.class)))
-                .contains("id", "module_alias", "entity_alias", "metadata_field_id", "field_name",
+                .contains("id", "module_alias", "entity_alias", "module_metadata_field_id",
+                        "metadata_field_id", "field_name",
                         "field_role", "mode", "org_scope_type", "org_scope_id", "global_default",
                         "effective_from", "effective_to", "linked_update", "allow_recycle")
                 .doesNotContain("field_code");
@@ -202,6 +240,20 @@ class PlatformModelSchemaTest {
                 .contains(List.of("tenant_id", "rule_id", "code_value"));
         assertThat(uniqueIndexes(mapper.toTable(CodeRecycleEntry.class)))
                 .contains(List.of("tenant_id", "rule_id", "basis_key", "period_key", "recycled_value"));
+    }
+
+    @Test
+    void shouldMapGenerationFieldCoordinatesAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(RecordGenerationFieldMapping.class)))
+                .contains("id", "object_mapping_id", "source_field", "source_module_metadata_field_id",
+                        "target_field", "target_module_metadata_field_id", "mapping_type",
+                        "constant_value", "formula_expr", "default_value", "sort_order");
+        assertThat(columnNames(mapper.toTable(RecordGenerationSplitPolicy.class)))
+                .contains("id", "object_mapping_id", "quantity_field", "quantity_module_metadata_field_id",
+                        "quantity_step", "sort_order");
+        assertThat(columnNames(mapper.toTable(RecordGenerationSplitGroupField.class)))
+                .contains("id", "split_policy_id", "field_name", "module_metadata_field_id",
+                        "title", "sort_order");
     }
 
     @Test

@@ -20,9 +20,17 @@ public class RecordGenerationFieldMapping extends StandardSortableEntity {
     @Column(name = "source_field", type = ColumnType.VARCHAR, length = 64, comment = "Source field")
     private String sourceField;
 
+    @Column(name = "source_module_metadata_field_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Source module metadata field id")
+    private String sourceModuleMetadataFieldId;
+
     @Column(name = "target_field", type = ColumnType.VARCHAR, length = 64, nullable = false,
             comment = "Target field")
     private String targetField;
+
+    @Column(name = "target_module_metadata_field_id", type = ColumnType.VARCHAR, length = 32,
+            comment = "Target module metadata field id")
+    private String targetModuleMetadataFieldId;
 
     @Column(name = "mapping_type", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Field mapping type")

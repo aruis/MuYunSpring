@@ -9,7 +9,9 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,15 +29,29 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
     private final MetadataViewService viewService;
     private final MetadataFieldService fieldService;
     private final ModuleMetadataRelationService relationService;
+    private final PlatformFieldUiTypeService fieldUiTypeService;
+    private final PlatformFieldTypeService fieldTypeService;
 
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,
                                     ModuleMetadataRelationService relationService) {
+        this(viewFieldDao, viewService, fieldService, relationService, null, null);
+    }
+
+    @Autowired
+    public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
+                                    MetadataViewService viewService,
+                                    MetadataFieldService fieldService,
+                                    ModuleMetadataRelationService relationService,
+                                    PlatformFieldUiTypeService fieldUiTypeService,
+                                    PlatformFieldTypeService fieldTypeService) {
         super(MODULE_ALIAS, MetadataViewField.class, viewFieldDao);
         this.viewService = viewService;
         this.fieldService = fieldService;
         this.relationService = relationService;
+        this.fieldUiTypeService = fieldUiTypeService;
+        this.fieldTypeService = fieldTypeService;
     }
 
     @Override
@@ -79,6 +95,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                 title,
                 !Boolean.FALSE.equals(viewField.getVisible()),
                 viewField.getControlType(),
+                viewField.getFieldUiTypeAlias(),
                 viewField.getReadOnly(),
                 viewField.getRequiredOverride()
         );
@@ -103,6 +120,17 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         if (viewField.getReadOnly() == null) {
             viewField.setReadOnly(Boolean.FALSE);
         }
+        if (viewField.getFieldUiTypeAlias() != null && !viewField.getFieldUiTypeAlias().isBlank()) {
+            viewField.setFieldUiTypeAlias(PlatformNameRules.requireIdentifier(
+                    viewField.getFieldUiTypeAlias(), "fieldUiTypeAlias"));
+            if (fieldUiTypeService != null) {
+                PlatformFieldUiType fieldUiType = fieldUiTypeService.requireFieldUiType(viewField.getFieldUiTypeAlias());
+                validateUiTypeCompatibility(field, fieldUiType);
+                if (viewField.getControlType() == null) {
+                    viewField.setControlType(fieldUiType.getControlType());
+                }
+            }
+        }
         if (Boolean.TRUE.equals(field.getRequired()) && Boolean.FALSE.equals(viewField.getRequiredOverride())) {
             throw new PlatformException("View field cannot make required metadata field optional: " + field.getFieldName());
         }
@@ -110,6 +138,25 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                         .eq("viewId", viewField.getViewId())
                         .eq("metadataFieldId", viewField.getMetadataFieldId()),
                 "metadata view field must be unique in view: " + viewField.getMetadataFieldId());
+    }
+
+    private void validateUiTypeCompatibility(MetadataField field, PlatformFieldUiType fieldUiType) {
+        if (fieldTypeService == null) {
+            return;
+        }
+        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        if (fieldType.getUiTypeAliases() != null && !fieldType.getUiTypeAliases().isEmpty()) {
+            if (!fieldType.getUiTypeAliases().contains(fieldUiType.getAlias())) {
+                throw new PlatformException("Field UI type is not allowed by field type: "
+                        + field.getFieldName() + "." + fieldUiType.getAlias());
+            }
+            return;
+        }
+        if (fieldUiType.getDefaultFieldTypeAlias() != null
+                && !fieldUiType.getDefaultFieldTypeAlias().equals(fieldType.getAlias())) {
+            throw new PlatformException("Field UI type default field type mismatch: "
+                    + field.getFieldName() + "." + fieldUiType.getAlias());
+        }
     }
 
     private MetadataView requireView(String viewId) {

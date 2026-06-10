@@ -41,6 +41,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
@@ -72,6 +74,7 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<MetadataViewField> viewFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformModuleAction> actionDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataFormulaRule> formulaRuleDao = new TestMemoryDao<>();
+    private final TestMemoryDao<ModuleMetadataField> moduleFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -95,10 +98,12 @@ class PlatformModuleDefinitionCompilerTest {
             new PlatformModuleActionService(actionDao, moduleService);
     private final ModuleMetadataFormulaRuleService formulaRuleService =
             new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
+    private final ModuleMetadataFieldService moduleFieldService =
+            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
                     referenceConfigService, relationService, viewService, viewFieldService, actionService,
-                    formulaRuleService);
+                    formulaRuleService, moduleFieldService);
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -137,6 +142,31 @@ class PlatformModuleDefinitionCompilerTest {
                 .containsExactly("title", "status", "sortOrder", "enabled", "parentId");
         assertThat(definition.entities().getFirst().fields().get(1).dictionaryBinding().categoryAlias())
                 .isEqualTo("customer_status");
+    }
+
+    @Test
+    void shouldCompileModuleMetadataFieldOverridesIntoDynamicFieldDefinition() {
+        moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
+        MetadataField status = field(metadataId, "status", "status", FieldType.STRING);
+        fieldService.insert(status);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+        ModuleMetadataField moduleField = moduleFieldService.ensureForRelation(relationId).getFirst();
+        moduleField.setDefaultValue("draft");
+        moduleField.setValidationRegex("[a-z]+");
+        moduleField.setCloneable(Boolean.FALSE);
+        moduleField.setDictionaryApplicationAlias("crm");
+        moduleField.setDictionaryCategoryAlias("customer_status");
+        moduleFieldService.update(moduleField);
+
+        ModuleDefinition definition = compiler.compile("crm.customer");
+
+        FieldDefinition compiled = field(definition, "status");
+        assertThat(compiled.behavior().defaultValue()).isEqualTo("draft");
+        assertThat(compiled.behavior().validationRegex()).isEqualTo("[a-z]+");
+        assertThat(compiled.behavior().copyable()).isFalse();
+        assertThat(compiled.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
     }
 
     @Test

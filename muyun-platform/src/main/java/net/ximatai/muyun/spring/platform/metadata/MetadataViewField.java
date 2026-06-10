@@ -29,6 +29,9 @@ public class MetadataViewField extends StandardEnabledSortableEntity {
     @Column(name = "control_type", type = ColumnType.VARCHAR, length = 32, comment = "View control type")
     private ViewControlType controlType;
 
+    @Column(name = "field_ui_type_alias", type = ColumnType.VARCHAR, length = 64, comment = "Field UI type alias")
+    private String fieldUiTypeAlias;
+
     @Column(name = "read_only", type = ColumnType.BOOLEAN, comment = "Read only flag",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean readOnly = Boolean.FALSE;

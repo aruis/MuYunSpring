@@ -9,6 +9,7 @@ public record DynamicViewFieldDescriptor(
         String title,
         boolean visible,
         ViewControlType controlType,
+        String fieldUiTypeAlias,
         List<DynamicFieldCompanionDescriptor> companions,
         boolean readOnly,
         boolean required

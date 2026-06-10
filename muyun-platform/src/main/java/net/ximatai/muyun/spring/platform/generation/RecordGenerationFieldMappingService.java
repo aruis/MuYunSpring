@@ -67,6 +67,12 @@ public class RecordGenerationFieldMappingService extends AbstractAbilityService<
         if (mapping.getSourceField() != null) {
             mapping.setSourceField(PlatformNameRules.requireFieldName(mapping.getSourceField(), "sourceField"));
         }
+        if (mapping.getSourceModuleMetadataFieldId() != null && !mapping.getSourceModuleMetadataFieldId().isBlank()) {
+            mapping.setSourceModuleMetadataFieldId(mapping.getSourceModuleMetadataFieldId().trim());
+        }
+        if (mapping.getTargetModuleMetadataFieldId() != null && !mapping.getTargetModuleMetadataFieldId().isBlank()) {
+            mapping.setTargetModuleMetadataFieldId(mapping.getTargetModuleMetadataFieldId().trim());
+        }
         mapping.setTargetField(PlatformNameRules.requireFieldName(mapping.getTargetField(), "targetField"));
         if (mapping.getMappingType() == RecordGenerationFieldSourceType.DIRECT
                 && (mapping.getSourceField() == null || mapping.getSourceField().isBlank())) {

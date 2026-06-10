@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -237,6 +239,8 @@ class CodeRuleServiceContractTest {
         MetadataFieldService fieldService = new MetadataFieldService(new TestMemoryDao<>(), metadataService, fieldTypeService);
         ModuleMetadataRelationService relationService = new ModuleMetadataRelationService(
                 new TestMemoryDao<>(), moduleService, metadataService);
+        ModuleMetadataFieldService moduleFieldService = new ModuleMetadataFieldService(
+                new TestMemoryDao<>(), relationService, metadataService, fieldService);
 
         PlatformModule module = new PlatformModule();
         module.setApplicationAlias("crm");
@@ -263,7 +267,8 @@ class CodeRuleServiceContractTest {
         relation.setMetadataId(metadata.getId());
         relation.setRelationRole(RelationRole.MAIN);
         relation.setRelationAlias("main");
-        relationService.insert(relation);
+        String relationId = relationService.insert(relation);
+        ModuleMetadataField moduleField = moduleFieldService.ensureForRelation(relationId).getFirst();
 
         CodeRuleService validatingService = new CodeRuleService(
                 new TestMemoryDao<>(),
@@ -272,17 +277,31 @@ class CodeRuleServiceContractTest {
                 new CodeValueMappingService(new TestMemoryDao<>()),
                 Optional.of(moduleService),
                 Optional.of(relationService),
+                Optional.of(moduleFieldService),
                 Optional.of(metadataService),
                 Optional.of(fieldService),
                 Optional.empty()
         );
-        CodeRule rule = baseRule("orderNo", CodeFieldRole.PRIMARY);
+        CodeRule rule = baseRule("legacyOrderNo", CodeFieldRole.PRIMARY);
+        rule.setFieldName(null);
+        rule.setModuleMetadataFieldId(moduleField.getId());
         rule.setSegments(List.of(segment(CodeSegmentType.CONSTANT, "SO", null)));
 
         CodeRule saved = validatingService.saveRuleTree(rule);
 
+        assertThat(saved.getModuleMetadataFieldId()).isEqualTo(moduleField.getId());
         assertThat(saved.getMetadataFieldId()).isEqualTo(orderNo.getId());
         assertThat(saved.getFieldName()).isEqualTo("orderNo");
+        ResolvedCodeRule resolvedByModuleField = validatingService.resolveRule(new ResolveCodeRuleCommand(
+                "crm.order",
+                "main",
+                moduleField.getId(),
+                null,
+                "legacyOrderNo",
+                null,
+                null
+        ));
+        assertThat(resolvedByModuleField.rule().getId()).isEqualTo(saved.getId());
 
         CodeRule missingField = baseRule("missingField", CodeFieldRole.NORMAL);
         missingField.setSegments(List.of(segment(CodeSegmentType.CONSTANT, "X", null)));

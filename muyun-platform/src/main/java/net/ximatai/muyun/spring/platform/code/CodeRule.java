@@ -27,6 +27,10 @@ public class CodeRule extends StandardEnabledSortableEntity {
     private String entityAlias;
 
     @Indexed
+    @Column(name = "module_metadata_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Module metadata field id")
+    private String moduleMetadataFieldId;
+
+    @Indexed
     @Column(name = "metadata_field_id", type = ColumnType.VARCHAR, length = 64, comment = "Metadata field id")
     private String metadataFieldId;
 

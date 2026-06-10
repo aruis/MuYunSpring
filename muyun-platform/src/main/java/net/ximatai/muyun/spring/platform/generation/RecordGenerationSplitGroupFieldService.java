@@ -58,6 +58,9 @@ public class RecordGenerationSplitGroupFieldService extends AbstractAbilityServi
         if (groupField.getSplitPolicyId() == null || groupField.getSplitPolicyId().isBlank()) {
             throw new PlatformException("Split group field requires splitPolicyId");
         }
+        if (groupField.getModuleMetadataFieldId() != null && !groupField.getModuleMetadataFieldId().isBlank()) {
+            groupField.setModuleMetadataFieldId(groupField.getModuleMetadataFieldId().trim());
+        }
         groupField.setFieldName(PlatformNameRules.requireFieldName(groupField.getFieldName(), "fieldName"));
         if (groupField.getTitle() == null || groupField.getTitle().isBlank()) {
             groupField.setTitle(groupField.getFieldName());

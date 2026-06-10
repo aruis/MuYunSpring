@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.metadata;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,10 @@ public class MetadataFieldDefinitionCompiler {
     }
 
     public FieldDefinition compile(MetadataField field, String relationId) {
+        return compile(field, relationId, null);
+    }
+
+    public FieldDefinition compile(MetadataField field, String relationId, ModuleMetadataField moduleField) {
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
         MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
@@ -41,6 +46,9 @@ public class MetadataFieldDefinitionCompiler {
         MetadataFieldConfig dictionaryConfig = relationConfig != null && relationConfig.hasDictionaryBinding()
                 ? relationConfig
                 : defaultConfig;
+        boolean hasModuleDictionary = moduleField != null
+                && moduleField.getDictionaryCategoryAlias() != null
+                && !moduleField.getDictionaryCategoryAlias().isBlank();
         FieldQueryDefinition queryDefinition = queryConfig == null
                 ? fieldType.queryDefinition()
                 : queryConfig.queryDefinition(fieldType);
@@ -62,12 +70,17 @@ public class MetadataFieldDefinitionCompiler {
                 scale,
                 null,
                 queryDefinition,
-                behavior(fieldType, defaultConfig, relationConfig, field.getId()),
+                fieldType.getDefaultUiTypeAlias(),
+                behavior(fieldType, defaultConfig, relationConfig, moduleField, field.getId()),
                 protectionConfigService == null
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
                         : protectionConfigService.definition(field.getId())
         );
-        if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
+        if (hasModuleDictionary) {
+            validateModuleDictionary(fieldType, moduleField, field.getId());
+            definition = definition.dictionary(moduleField.getDictionaryApplicationAlias(),
+                    moduleField.getDictionaryCategoryAlias());
+        } else if (dictionaryConfig != null && dictionaryConfig.hasDictionaryBinding()) {
             definition = definition.dictionary(dictionaryConfig.getDictionaryApplicationAlias(),
                     dictionaryConfig.getDictionaryCategoryAlias(),
                     dictionaryConfig.getSelectionMode());
@@ -103,5 +116,47 @@ public class MetadataFieldDefinitionCompiler {
         net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport.validateBehavior(
                 fieldType.getFieldType(), behavior, fieldId);
         return behavior;
+    }
+
+    private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,
+                                             MetadataFieldConfig defaultConfig,
+                                             MetadataFieldConfig relationConfig,
+                                             ModuleMetadataField moduleField,
+                                             String fieldId) {
+        FieldBehaviorDefinition inherited = behavior(fieldType, defaultConfig, relationConfig, fieldId);
+        if (moduleField == null) {
+            return inherited;
+        }
+        String defaultValue = moduleField.getDefaultValue() != null
+                ? moduleField.getDefaultValue()
+                : inherited.defaultValue();
+        String validationRegex = moduleField.getValidationRegex() != null
+                ? moduleField.getValidationRegex()
+                : inherited.validationRegex();
+        boolean copyable = moduleField.getCloneable() == null
+                ? inherited.copyable()
+                : Boolean.TRUE.equals(moduleField.getCloneable());
+        FieldBehaviorDefinition behavior = new FieldBehaviorDefinition(
+                defaultValue,
+                validationRegex,
+                copyable,
+                inherited.writeProtected()
+        );
+        net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport.validateBehavior(
+                fieldType.getFieldType(), behavior, fieldId);
+        return behavior;
+    }
+
+    private void validateModuleDictionary(PlatformFieldType fieldType,
+                                          ModuleMetadataField moduleField,
+                                          String fieldId) {
+        FieldType type = fieldType.getFieldType();
+        if (type != FieldType.STRING && type != FieldType.TEXT) {
+            throw new IllegalArgumentException("module field dictionary binding requires string field: " + fieldId);
+        }
+        if (moduleField.getDictionaryApplicationAlias() == null
+                || moduleField.getDictionaryApplicationAlias().isBlank()) {
+            throw new IllegalArgumentException("module field dictionaryApplicationAlias must not be blank: " + fieldId);
+        }
     }
 }

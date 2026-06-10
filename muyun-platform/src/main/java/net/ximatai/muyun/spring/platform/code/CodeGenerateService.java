@@ -90,6 +90,7 @@ public class CodeGenerateService {
         ResolvedCodeRule resolved = ruleService.resolveRule(new ResolveCodeRuleCommand(
                 command.moduleAlias(),
                 command.entityAlias(),
+                command.moduleMetadataFieldId(),
                 command.metadataFieldId(),
                 command.fieldName(),
                 command.organizationId(),
@@ -146,6 +147,7 @@ public class CodeGenerateService {
                     GenerateCodeResult result = new GenerateCodeResult(
                             rendered.value(),
                             rule.getId(),
+                            rule.getModuleMetadataFieldId(),
                             rule.getMetadataFieldId(),
                             rule.getFieldName(),
                             rule.getFieldRole(),
@@ -192,6 +194,7 @@ public class CodeGenerateService {
         return new GenerateCodeResult(
                 entry.getRecycledValue(),
                 rule.getId(),
+                rule.getModuleMetadataFieldId(),
                 rule.getMetadataFieldId(),
                 rule.getFieldName(),
                 rule.getFieldRole(),

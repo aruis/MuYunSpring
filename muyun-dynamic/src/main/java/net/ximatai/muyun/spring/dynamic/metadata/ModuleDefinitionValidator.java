@@ -236,6 +236,9 @@ public class ModuleDefinitionValidator {
         if (field.type() == null) {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
+        if (field.defaultUiTypeAlias() != null && !field.defaultUiTypeAlias().isBlank()) {
+            requireIdentifier(field.defaultUiTypeAlias(), "field default UI type alias");
+        }
         if (field.dictionaryBinding() != null) {
             if (field.dictionaryBinding().selectionMode() == OptionSelectionMode.MULTIPLE) {
                 if (field.type() != FieldType.JSON) {
@@ -336,6 +339,9 @@ public class ModuleDefinitionValidator {
             if (field.title() != null && field.title().isBlank()) {
                 throw new ModuleDefinitionException("view field title must not be blank: "
                         + view.entityAlias() + "." + field.fieldName());
+            }
+            if (field.fieldUiTypeAlias() != null && !field.fieldUiTypeAlias().isBlank()) {
+                requireIdentifier(field.fieldUiTypeAlias(), "view field UI type alias");
             }
         }
     }

@@ -76,6 +76,7 @@ class DynamicModuleDescriptorTest {
                                 FieldDefinition.titleField().queryable(),
                         FieldDefinition.string("status", "Status")
                                         .dictionary("crm", "customer_status")
+                                        .defaultUiType("select")
                                         .defaultValue("active")
                                         .validationRegex("[a-z_]+")
                                         .notCopyable(),
@@ -154,6 +155,7 @@ class DynamicModuleDescriptorTest {
                 .extracting(DynamicViewFieldDescriptor::fieldName)
                 .containsExactly("title", "status", "tags");
         assertThat(listView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(listView.fields().get(1).fieldUiTypeAlias()).isEqualTo("select");
         assertThat(listView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
                 .isEqualTo(DynamicQueryOperator.LIKE.name());
@@ -417,7 +419,9 @@ class DynamicModuleDescriptorTest {
                 List.of(
                         new EntityDefinition("customer", "crm_customer", "Customer", List.of(
                                 FieldDefinition.titleField(),
-                                FieldDefinition.string("status", "Status").dictionary("crm", "customer_status"),
+                                FieldDefinition.string("status", "Status")
+                                        .dictionary("crm", "customer_status")
+                                        .defaultUiType("select"),
                                 FieldDefinition.of("tags", FieldType.JSON, "Tags")
                                         .dictionary("crm", "customer_tag", OptionSelectionMode.MULTIPLE),
                                 FieldDefinition.text("description", "Description")
@@ -453,6 +457,7 @@ class DynamicModuleDescriptorTest {
                 .containsExactly("title", "status", "tags", "description");
         assertThat(formView.fields().getFirst().title()).isEqualTo("Customer name");
         assertThat(formView.fields().get(1).controlType()).isEqualTo(ViewControlType.SELECT);
+        assertThat(formView.fields().get(1).fieldUiTypeAlias()).isEqualTo("select");
         assertThat(formView.fields().get(1).readOnly()).isTrue();
         assertThat(formView.fields().get(2).controlType()).isEqualTo(ViewControlType.MULTI_SELECT);
         assertThat(formView.fields().get(3).visible()).isFalse();

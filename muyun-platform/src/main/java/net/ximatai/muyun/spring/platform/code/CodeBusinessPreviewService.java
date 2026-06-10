@@ -71,6 +71,7 @@ public class CodeBusinessPreviewService {
         ));
         return new CodeBusinessPreviewItem(
                 rule.getId(),
+                rule.getModuleMetadataFieldId(),
                 rule.getMetadataFieldId(),
                 rule.getFieldName(),
                 rule.getFieldRole(),
