@@ -31,10 +31,12 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescrip
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceFilterDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
@@ -1287,9 +1289,11 @@ public class DynamicRecordService {
         DynamicReferenceResolveRequest normalized = request == null
                 ? DynamicReferenceResolveRequest.query(null)
                 : request;
-        DataScopeCriteriaResult scope = readScope(reference.targetModuleAlias(), PlatformAction.REFERENCE, normalized.criteria());
+        Criteria criteria = referenceCriteria(normalized.criteria(), reference, normalized.formValues());
+        DynamicReferenceResolveRequest effective = normalized.withCriteria(criteria);
+        DataScopeCriteriaResult scope = readScope(reference.targetModuleAlias(), PlatformAction.REFERENCE, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias)
-                .resolveReference(sourceField, normalized.withCriteria(scope.criteria())));
+                .resolveReference(sourceField, effective.withCriteria(scope.criteria())));
     }
 
     public DynamicReferenceResolveResponse resolveFieldReference(String moduleAlias,
@@ -1297,6 +1301,69 @@ public class DynamicRecordService {
                                                                  String fieldName,
                                                                  DynamicReferenceResolveRequest request) {
         return resolveReference(moduleAlias, entityAlias, fieldName, request);
+    }
+
+    private Criteria referenceCriteria(Criteria base,
+                                       DynamicReferenceDescriptor reference,
+                                       Map<String, Object> formValues) {
+        Criteria criteria = Criteria.of();
+        if (base != null && !base.isEmpty()) {
+            criteria.andGroup(base.getRoot());
+        }
+        if (reference.filters().isEmpty() || formValues == null || formValues.isEmpty()) {
+            return criteria;
+        }
+        for (DynamicReferenceFilterDescriptor filter : reference.filters()) {
+            Object value = formValues.get(filter.formField());
+            if (isBlankReferenceFilterValue(value)) {
+                continue;
+            }
+            appendReferenceFilter(criteria, filter, value);
+        }
+        return criteria;
+    }
+
+    private boolean isBlankReferenceFilterValue(Object value) {
+        return value == null || (value instanceof String text && text.isBlank());
+    }
+
+    private void appendReferenceFilter(Criteria criteria,
+                                       DynamicReferenceFilterDescriptor filter,
+                                       Object value) {
+        String fieldName = filter.referenceField();
+        DynamicQueryOperator operator = filter.operator() == null ? DynamicQueryOperator.EQ : filter.operator();
+        switch (operator) {
+            case EQ -> criteria.eq(fieldName, value);
+            case LIKE -> criteria.like(fieldName, String.valueOf(value));
+            case IN -> criteria.in(fieldName, referenceFilterValues(value));
+            case BETWEEN -> {
+                List<?> values = referenceFilterValues(value);
+                if (values.size() != 2) {
+                    throw new ModuleDefinitionException("reference filter BETWEEN requires exactly two values: "
+                            + filter.formField() + " -> " + fieldName);
+                }
+                criteria.between(fieldName, values.get(0), values.get(1));
+            }
+            case GT -> criteria.gt(fieldName, value);
+            case GTE -> criteria.gte(fieldName, value);
+            case LT -> criteria.lt(fieldName, value);
+            case LTE -> criteria.lte(fieldName, value);
+        }
+    }
+
+    private List<?> referenceFilterValues(Object value) {
+        if (value instanceof Collection<?> collection) {
+            return List.copyOf(collection);
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            List<Object> values = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                values.add(java.lang.reflect.Array.get(value, i));
+            }
+            return values;
+        }
+        return List.of(value);
     }
 
     private DynamicActionExecutionResult executeAction(String moduleAlias,

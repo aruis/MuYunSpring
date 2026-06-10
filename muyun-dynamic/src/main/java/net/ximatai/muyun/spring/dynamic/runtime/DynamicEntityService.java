@@ -506,8 +506,9 @@ public class DynamicEntityService implements
 
     public DynamicReferenceResolveResponse resolveReference(String sourceField,
                                                             DynamicReferenceResolveRequest request) {
-        ReferencePlan plan = referencePlan(sourceField);
-        return new DynamicReferenceResolver(this, plan, referenceService(plan.target())).resolve(request);
+        EntityReferenceDefinition reference = referenceDefinition(sourceField);
+        ReferencePlan plan = reference.plan();
+        return new DynamicReferenceResolver(this, plan, referenceService(plan.target()), reference.affects()).resolve(request);
     }
 
     @Override
@@ -587,11 +588,20 @@ public class DynamicEntityService implements
     }
 
     private ReferencePlan referencePlan(String sourceField) {
+        return referenceDefinition(sourceField).plan();
+    }
+
+    private EntityReferenceDefinition referenceDefinition(String sourceField) {
         if (sourceField == null || sourceField.isBlank()) {
             throw new ModuleDefinitionException("reference sourceField must not be blank");
         }
-        return referencePlans().stream()
-                .filter(plan -> sourceField.equals(plan.sourceField()))
+        if (module == null) {
+            throw new ModuleDefinitionException("unknown dynamic reference: "
+                    + moduleAlias + "." + dao.getEntity().alias() + "." + sourceField);
+        }
+        return module.references().stream()
+                .filter(reference -> dao.getEntity().alias().equals(reference.sourceEntityAlias()))
+                .filter(reference -> sourceField.equals(reference.sourceField()))
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic reference: "
                         + moduleAlias + "." + dao.getEntity().alias() + "." + sourceField));

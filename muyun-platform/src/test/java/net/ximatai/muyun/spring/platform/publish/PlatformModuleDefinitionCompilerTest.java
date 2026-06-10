@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
@@ -42,6 +43,10 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffect;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffectService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
@@ -58,6 +63,7 @@ import net.ximatai.muyun.spring.platform.workflow.DynamicWorkflowActionExecutor;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,6 +81,8 @@ class PlatformModuleDefinitionCompilerTest {
     private final TestMemoryDao<PlatformModuleAction> actionDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataFormulaRule> formulaRuleDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataField> moduleFieldDao = new TestMemoryDao<>();
+    private final TestMemoryDao<ModuleMetadataFieldFilter> moduleFieldFilterDao = new TestMemoryDao<>();
+    private final TestMemoryDao<ModuleMetadataFieldAffect> moduleFieldAffectDao = new TestMemoryDao<>();
     private final TestMemoryDao<DictionaryCategory> categoryDao = new TestMemoryDao<>();
     private final PlatformModuleService moduleService = new PlatformModuleService(moduleDao);
     private final MetadataService metadataService = new MetadataService(metadataDao);
@@ -99,11 +107,18 @@ class PlatformModuleDefinitionCompilerTest {
     private final ModuleMetadataFormulaRuleService formulaRuleService =
             new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
     private final ModuleMetadataFieldService moduleFieldService =
-            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService);
+            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService,
+                    Optional.of((ruleId, referenceModuleAlias, ownerModuleAlias) -> {
+                    }));
+    private final ModuleMetadataFieldFilterService moduleFieldFilterService =
+            new ModuleMetadataFieldFilterService(moduleFieldFilterDao, moduleFieldService);
+    private final ModuleMetadataFieldAffectService moduleFieldAffectService =
+            new ModuleMetadataFieldAffectService(moduleFieldAffectDao, moduleFieldService);
     private final PlatformModuleDefinitionCompiler compiler =
             new PlatformModuleDefinitionCompiler(moduleService, metadataService, fieldService, fieldDefinitionCompiler,
                     referenceConfigService, relationService, viewService, viewFieldService, actionService,
-                    formulaRuleService, moduleFieldService);
+                    formulaRuleService, moduleFieldService, moduleFieldFilterService, moduleFieldAffectService,
+                    new net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator());
 
     {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
@@ -167,6 +182,82 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(compiled.behavior().validationRegex()).isEqualTo("[a-z]+");
         assertThat(compiled.behavior().copyable()).isFalse();
         assertThat(compiled.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
+    }
+
+    @Test
+    void shouldCompileModuleMetadataFieldReferenceIntoDynamicReferenceDefinition() {
+        moduleService.insert(module("crm.order", ModuleKind.DYNAMIC));
+        moduleService.insert(module("crm.customer", ModuleKind.DYNAMIC));
+        String orderMetadataId = metadataService.insert(metadata("crm", "order"));
+        MetadataField customerId = field(orderMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        MetadataField customerRegion = field(orderMetadataId, "customerRegion", "customer_region", FieldType.STRING);
+        fieldService.insert(customerRegion);
+        String orderRelationId = relationService.insert(mainRelation("crm.order", orderMetadataId));
+
+        String customerMetadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField id = field(customerMetadataId, "id", "id", FieldType.STRING);
+        fieldService.insert(id);
+        MetadataField title = titleField(customerMetadataId);
+        fieldService.insert(title);
+        MetadataField region = field(customerMetadataId, "region", "region", FieldType.STRING);
+        fieldService.insert(region);
+        String customerRelationId = relationService.insert(mainRelation("crm.customer", customerMetadataId));
+
+        List<ModuleMetadataField> orderFields = moduleFieldService.ensureForRelation(orderRelationId);
+        ModuleMetadataField customerField = moduleField(orderFields, customerId.getId());
+        ModuleMetadataField formRegion = moduleField(orderFields, customerRegion.getId());
+        customerField.setReferenceModuleAlias("crm.customer");
+        customerField.setReferenceModuleKeyField("id");
+        customerField.setReferenceModuleLabelField("title");
+        customerField.setReferenceGenerateRuleId("generate-order");
+        customerField.setReferenceQueryTemplateId("customer-query");
+        customerField.setReferenceModulePlusFields(java.util.Set.of("region"));
+        moduleFieldService.update(customerField);
+        ModuleMetadataField referenceRegion = moduleField(
+                moduleFieldService.ensureForRelation(customerRelationId),
+                region.getId());
+        ModuleMetadataFieldFilter filter = new ModuleMetadataFieldFilter();
+        filter.setModuleMetadataFieldId(customerField.getId());
+        filter.setFormFieldId(formRegion.getId());
+        filter.setReferenceFieldId(referenceRegion.getId());
+        filter.setOperator(DynamicQueryOperator.EQ);
+        moduleFieldFilterService.insert(filter);
+        ModuleMetadataFieldAffect affect = new ModuleMetadataFieldAffect();
+        affect.setModuleMetadataFieldId(customerField.getId());
+        affect.setReferenceFieldId(referenceRegion.getId());
+        affect.setTargetFieldId(formRegion.getId());
+        moduleFieldAffectService.insert(affect);
+
+        ModuleDefinition definition = compiler.compile("crm.order");
+
+        EntityReferenceDefinition reference = definition.references().getFirst();
+        assertThat(reference.sourceField()).isEqualTo("customerId");
+        assertThat(reference.targetQualifiedName()).isEqualTo("crm.customer.customer");
+        assertThat(reference.keyField()).isEqualTo("id");
+        assertThat(reference.labelField()).isEqualTo("title");
+        assertThat(reference.generateRuleId()).isEqualTo("generate-order");
+        assertThat(reference.queryTemplateId()).isEqualTo("customer-query");
+        assertThat(reference.plusFields()).containsExactlyInAnyOrder("region");
+        assertThat(reference.filters()).singleElement()
+                .satisfies(compiledFilter -> {
+                    assertThat(compiledFilter.formField()).isEqualTo("customerRegion");
+                    assertThat(compiledFilter.referenceField()).isEqualTo("region");
+                    assertThat(compiledFilter.operator()).isEqualTo(DynamicQueryOperator.EQ);
+                });
+        assertThat(reference.affects()).singleElement()
+                .satisfies(compiledAffect -> {
+                    assertThat(compiledAffect.referenceField()).isEqualTo("region");
+                    assertThat(compiledAffect.targetField()).isEqualTo("customerRegion");
+                });
+        var descriptorReference = DynamicModuleDescriptor.from(definition).references().getFirst();
+        assertThat(descriptorReference.generateRuleId()).isEqualTo("generate-order");
+        assertThat(descriptorReference.filters()).singleElement()
+                .extracting(filterDescriptor -> filterDescriptor.formField(), filterDescriptor -> filterDescriptor.referenceField())
+                .containsExactly("customerRegion", "region");
+        assertThat(descriptorReference.affects()).singleElement()
+                .extracting(affectDescriptor -> affectDescriptor.referenceField(), affectDescriptor -> affectDescriptor.targetField())
+                .containsExactly("region", "customerRegion");
     }
 
     @Test
@@ -790,6 +881,13 @@ class PlatformModuleDefinitionCompilerTest {
     private FieldDefinition field(ModuleDefinition definition, String fieldName) {
         return definition.entities().getFirst().fields().stream()
                 .filter(field -> field.fieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private ModuleMetadataField moduleField(List<ModuleMetadataField> fields, String metadataFieldId) {
+        return fields.stream()
+                .filter(field -> field.getMetadataFieldId().equals(metadataFieldId))
                 .findFirst()
                 .orElseThrow();
     }

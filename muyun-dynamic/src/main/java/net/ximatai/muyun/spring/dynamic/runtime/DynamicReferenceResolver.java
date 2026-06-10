@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.reference.ReferencePlan;
 import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceAffectDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,13 +18,22 @@ final class DynamicReferenceResolver {
     private final DynamicEntityService sourceService;
     private final ReferencePlan plan;
     private final DynamicEntityService targetService;
+    private final List<EntityReferenceAffectDefinition> affects;
 
     DynamicReferenceResolver(DynamicEntityService sourceService,
                              ReferencePlan plan,
                              DynamicEntityService targetService) {
+        this(sourceService, plan, targetService, List.of());
+    }
+
+    DynamicReferenceResolver(DynamicEntityService sourceService,
+                             ReferencePlan plan,
+                             DynamicEntityService targetService,
+                             List<EntityReferenceAffectDefinition> affects) {
         this.sourceService = Objects.requireNonNull(sourceService, "sourceService must not be null");
         this.plan = Objects.requireNonNull(plan, "plan must not be null");
         this.targetService = Objects.requireNonNull(targetService, "targetService must not be null");
+        this.affects = affects == null ? List.of() : List.copyOf(affects);
     }
 
     DynamicReferenceResolveResponse resolve(DynamicReferenceResolveRequest request) {
@@ -146,7 +156,8 @@ final class DynamicReferenceResolver {
                 record.getId(),
                 targetService.referenceTitle(record),
                 matchedBy,
-                projectionValues(record, includeProjections)
+                projectionValues(record, includeProjections),
+                affectPatch(record)
         );
     }
 
@@ -159,6 +170,21 @@ final class DynamicReferenceResolver {
             values.put(projection.outputField(), targetService.maskProtectedValue(
                     projection.targetField(),
                     record.getValue(projection.targetField()),
+                    FieldOutputContext.REFERENCE
+            ));
+        }
+        return values;
+    }
+
+    private Map<String, Object> affectPatch(DynamicRecord record) {
+        if (affects.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> values = new LinkedHashMap<>();
+        for (EntityReferenceAffectDefinition affect : affects) {
+            values.put(affect.targetField(), targetService.maskProtectedValue(
+                    affect.referenceField(),
+                    record.getValue(affect.referenceField()),
                     FieldOutputContext.REFERENCE
             ));
         }

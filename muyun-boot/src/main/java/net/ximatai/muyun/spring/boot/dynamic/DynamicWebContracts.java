@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 
 import java.util.Collection;
 import java.time.Instant;
@@ -67,17 +68,28 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
                                   List<Object> values,
                                   List<WebQueryCondition> conditions,
                                   WebPageRequest page,
-                                  Boolean includeProjections) {
+                                  Boolean includeProjections,
+                                  Map<String, Object> formValues) {
     DynamicWebReferenceRequest {
         values = values == null ? List.of() : List.copyOf(values);
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
         includeProjections = includeProjections == null || includeProjections;
+        formValues = formValues == null ? Map.of() : Map.copyOf(formValues);
     }
 
     static DynamicWebReferenceRequest empty() {
         return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(),
-                WebPageRequest.DEFAULT, true);
+                WebPageRequest.DEFAULT, true, Map.of());
     }
+}
+
+record DynamicWebReferenceGenerationRequest(String sourceRecordId) {
+}
+
+record DynamicWebGenerationConfirmRequest(String targetModuleAlias,
+                                          String targetEntityAlias,
+                                          DynamicRecordPayload record,
+                                          RecordOriginContext originContext) {
 }
 
 record DynamicRecordResponse(String id,

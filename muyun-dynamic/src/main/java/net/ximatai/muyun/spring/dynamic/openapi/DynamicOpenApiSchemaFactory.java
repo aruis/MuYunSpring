@@ -706,6 +706,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("title", stringProperty(false));
         properties.put("matchedBy", stringProperty(true));
         properties.put("projections", objectProperty("object"));
+        properties.put("affectPatch", objectProperty("object"));
         return new DynamicOpenApiDocument.Schema("DynamicReferenceResolveItem", "object", null,
                 List.of("id", "title"), properties, null);
     }

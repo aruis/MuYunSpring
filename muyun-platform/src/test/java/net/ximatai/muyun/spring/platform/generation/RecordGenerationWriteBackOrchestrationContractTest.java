@@ -77,8 +77,9 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                 .setValue("amount", BigDecimal.ZERO);
         resetContract.setId(contractId);
         fixture.service.update("sales.contract", "contract", resetContract);
-        draft.record().putMutationMetadata(RecordImpactOriginCoordinator.ORIGIN_CONTEXT_KEY, draft.originContext());
-        fixture.service.create("finance.invoice", "invoice", draft.record());
+        ReferenceRecordGenerationFacade facade = new ReferenceRecordGenerationFacade(
+                fixture.service, fixture.generationRuleService);
+        String invoiceId = facade.confirmDraft(draft);
 
         assertThat(fixture.impactRelationService.hasGeneratedTarget(
                 "sales.contract", contractId, "finance.invoice", generationRule.getId())).isTrue();
@@ -88,6 +89,7 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                 .satisfies(relation -> {
                     assertThat(relation.getBatchId()).isEqualTo(generation.batchId());
                     assertThat(relation.getDraftKey()).isEqualTo("invoice:1");
+                    assertThat(relation.getTargetRecordId()).isEqualTo(invoiceId);
                 });
         assertThat(fixture.table("app_contract")).singleElement()
                 .satisfies(row -> assertThat(row.get("amount")).isEqualTo(new BigDecimal("100.00")));
@@ -98,6 +100,31 @@ class RecordGenerationWriteBackOrchestrationContractTest {
                     assertThat(effect.getTargetField()).isEqualTo("amount");
                     assertThat(effect.getAfterValue()).isEqualTo("100.00");
                 });
+    }
+
+    @Test
+    void shouldConfirmAllGeneratedDraftsAndReturnCommittedRecordIds() {
+        RuntimeFixture fixture = runtimeFixture();
+        DynamicRecord contract = fixture.service.newRecord("sales.contract", "contract")
+                .setValue("contractNo", "C-GEN")
+                .setValue("amount", new BigDecimal("100.00"));
+        fixture.service.create("sales.contract", "contract", contract);
+        String contractId = String.valueOf(fixture.table("app_contract").getFirst().get("id"));
+
+        RecordGenerationRule generationRule = fixture.generationRuleService.saveRuleTree(generationRule());
+        DynamicActionExecutionResult result = fixture.service.entity("sales.contract", "contract")
+                .executeAction("generateInvoice", DynamicActionExecutionRequest.id(contractId));
+        RecordGenerationResult generation = (RecordGenerationResult) result.value();
+        ReferenceRecordGenerationFacade facade = new ReferenceRecordGenerationFacade(
+                fixture.service, fixture.generationRuleService);
+
+        RecordGenerationCommitResult commit = facade.confirmAll(generation);
+
+        assertThat(commit.ruleId()).isEqualTo(generationRule.getId());
+        assertThat(commit.batchId()).isEqualTo(generation.batchId());
+        assertThat(commit.targetModuleAlias()).isEqualTo("finance.invoice");
+        assertThat(commit.recordIds()).singleElement()
+                .isEqualTo(String.valueOf(fixture.table("app_invoice").getFirst().get("id")));
     }
 
     private RuntimeFixture runtimeFixture() {

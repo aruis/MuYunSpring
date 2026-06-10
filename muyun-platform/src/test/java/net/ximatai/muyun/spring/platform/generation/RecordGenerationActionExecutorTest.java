@@ -6,12 +6,14 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -32,6 +34,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -82,6 +85,32 @@ class RecordGenerationActionExecutorTest {
             assertThat(draft.originContext().actionCode()).isEqualTo("generateContract");
             assertThat(draft.originContext().batchId()).isEqualTo(generation.batchId());
         });
+        assertThat(policyService.actions())
+                .contains("sales.opportunity:generateContract:[opp-1]", "sales.contract:create:[]");
+    }
+
+    @Test
+    void shouldGenerateTargetDraftsFromReferenceFieldFacade() {
+        stubSourceQueries();
+        RecordGenerationRule rule = generationRule();
+        rule.setObjectMappings(List.of(objectMapping(fieldMapping("contractNo", "opportunityNo"))));
+        ruleService.saveRuleTree(rule);
+        DynamicRecordService recordService = recordServiceWithReference(rule);
+        ReferenceRecordGenerationFacade facade = new ReferenceRecordGenerationFacade(recordService, ruleService);
+
+        RecordGenerationResult generation = facade.generateFromReference(
+                "sales.contract",
+                "contract",
+                "opportunityId",
+                "opp-1"
+        );
+
+        assertThat(generation.ruleId()).isEqualTo(rule.getId());
+        assertThat(generation.sourceModuleAlias()).isEqualTo("sales.opportunity");
+        assertThat(generation.sourceRecordId()).isEqualTo("opp-1");
+        assertThat(generation.targetModuleAlias()).isEqualTo("sales.contract");
+        assertThat(generation.drafts()).singleElement()
+                .satisfies(draft -> assertThat(draft.record().getValue("contractNo")).isEqualTo("OPP-001"));
         assertThat(policyService.actions())
                 .contains("sales.opportunity:generateContract:[opp-1]", "sales.contract:create:[]");
     }
@@ -291,6 +320,19 @@ class RecordGenerationActionExecutorTest {
         return new DynamicRecordService(runtime, policyService);
     }
 
+    private DynamicRecordService recordServiceWithReference(RecordGenerationRule rule) {
+        DynamicActionExecutorRegistry executors = new DynamicActionExecutorRegistry(
+                List.of(new RecordGenerationActionExecutor(ruleService)));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                null,
+                executors
+        ).register(sourceModule()).register(targetModuleWithReference(rule));
+        return new DynamicRecordService(runtime, policyService);
+    }
+
     private RecordGenerationRule generationRule() {
         RecordGenerationRule rule = new RecordGenerationRule();
         rule.setSourceModuleAlias("sales.opportunity");
@@ -374,6 +416,7 @@ class RecordGenerationActionExecutorTest {
                 "sales.contract",
                 "Contract",
                 List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        FieldDefinition.string("opportunityId", "Opportunity").column("opportunity_id"),
                         FieldDefinition.string("contractNo", "Contract No").column("contract_no"),
                         FieldDefinition.string("status", "Status"),
                         FieldDefinition.decimal("amountWithTax", "Amount With Tax").column("amount_with_tax").precision(18, 2)
@@ -384,6 +427,18 @@ class RecordGenerationActionExecutorTest {
                                 FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
                         ))),
                 List.of(EntityRelationDefinition.child("lines", "contract", "contract_line", "contractId"))
+        );
+    }
+
+    private ModuleDefinition targetModuleWithReference(RecordGenerationRule rule) {
+        return new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                targetModule().entities(),
+                targetModule().relations(),
+                List.of(EntityReferenceDefinition.to("contract", "opportunityId",
+                                ReferenceTarget.of("sales.opportunity", "opportunity"))
+                        .withRuntimeConfig(null, null, rule.getId(), null, Set.of()))
         );
     }
 

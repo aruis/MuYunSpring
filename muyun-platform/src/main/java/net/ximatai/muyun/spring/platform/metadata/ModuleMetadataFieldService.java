@@ -10,11 +10,13 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -27,15 +29,28 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     private final ModuleMetadataRelationService relationService;
     private final MetadataService metadataService;
     private final MetadataFieldService fieldService;
+    private final ModuleMetadataFieldReferenceGenerateRuleValidator referenceGenerateRuleValidator;
 
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService) {
+        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataService metadataService,
+                                      MetadataFieldService fieldService,
+                                      Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
         super(MODULE_ALIAS, ModuleMetadataField.class, moduleMetadataFieldDao);
         this.relationService = relationService;
         this.metadataService = metadataService;
         this.fieldService = fieldService;
+        this.referenceGenerateRuleValidator = referenceGenerateRuleValidator == null
+                ? null
+                : referenceGenerateRuleValidator.orElse(null);
     }
 
     @Override
@@ -125,7 +140,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
             throw new PlatformException("Module metadata field requires field in relation metadata: "
                     + moduleField.getMetadataFieldId());
         }
-        normalizeReferenceConfig(moduleField, metadata);
+        normalizeReferenceConfig(moduleField, metadata, relation);
         rejectDuplicate(moduleField, Criteria.of()
                         .eq("relationId", relation.getId())
                         .eq("metadataFieldId", field.getId()),
@@ -134,7 +149,9 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         moduleField.setMetadataFieldId(field.getId());
     }
 
-    private void normalizeReferenceConfig(ModuleMetadataField moduleField, Metadata metadata) {
+    private void normalizeReferenceConfig(ModuleMetadataField moduleField,
+                                          Metadata metadata,
+                                          ModuleMetadataRelation relation) {
         if (moduleField.getCloneable() == null) {
             moduleField.setCloneable(Boolean.FALSE);
         }
@@ -161,6 +178,15 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     moduleField.getReferenceModuleKeyField(), "referenceModuleKeyField"));
             moduleField.setReferenceModuleLabelField(PlatformNameRules.requireFieldName(
                     moduleField.getReferenceModuleLabelField(), "referenceModuleLabelField"));
+            if (hasText(moduleField.getReferenceGenerateRuleId()) && referenceGenerateRuleValidator == null) {
+                throw new PlatformException("referenceGenerateRuleId requires generate rule validator");
+            }
+            if (hasText(moduleField.getReferenceGenerateRuleId())) {
+                referenceGenerateRuleValidator.validateReferenceGenerateRule(
+                        moduleField.getReferenceGenerateRuleId(),
+                        moduleField.getReferenceModuleAlias(),
+                        relation.getModuleAlias());
+            }
         } else if (hasReferenceDependentConfig(moduleField)) {
             throw new PlatformException("reference module config requires referenceModuleAlias");
         }

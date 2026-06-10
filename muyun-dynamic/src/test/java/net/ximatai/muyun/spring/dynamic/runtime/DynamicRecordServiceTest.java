@@ -32,12 +32,15 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceAffectDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceFilterDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiDocument;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -1682,6 +1685,53 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldApplyReferenceFiltersAndReturnAffectPatch() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            return params.containsValue("north")
+                    ? Map.of("total_count", 1)
+                    : Map.of("total_count", 0);
+        });
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = invocation.getArgument(1);
+            assertThat(sql).contains("\"region\"");
+            assertThat(params).containsValue("north");
+            return List.of(referenceRow("contract-1", "Contract One", "north"));
+        });
+        EntityReferenceDefinition reference = EntityReferenceDefinition
+                .to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
+                .withAutoTitle("contractTitle")
+                .withProjection("code", "contractCode")
+                .withInteractionRules(
+                        List.of(new EntityReferenceFilterDefinition("contractRegion", "region", DynamicQueryOperator.EQ)),
+                        List.of(new EntityReferenceAffectDefinition("region", "contractRegion"))
+                );
+        DynamicRecordService service = referenceResolvingService(
+                operations,
+                referenceEntityWithRegion(),
+                lineEntityWithRegion(),
+                reference
+        );
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Contract")
+                        .withFormValues(Map.of("contractRegion", "north"))
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.OK);
+        assertThat(response.options()).hasSize(1);
+        assertThat(response.options().getFirst().affectPatch())
+                .containsEntry("contractRegion", "north");
+    }
+
+    @Test
     void shouldTranslateDynamicReferenceValuesThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenAnswer(invocation -> {
@@ -2668,14 +2718,32 @@ class DynamicRecordServiceTest {
 
     private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations,
                                                            DataScopeCriteriaService dataScopeCriteriaService) {
+        return referenceResolvingService(operations, referenceEntity(), lineEntity(),
+                EntityReferenceDefinition.to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
+                        .withAutoTitle("contractTitle")
+                        .withProjection("code", "contractCode"),
+                dataScopeCriteriaService);
+    }
+
+    private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations,
+                                                           EntityDefinition referenceEntity,
+                                                           EntityDefinition sourceEntity,
+                                                           EntityReferenceDefinition reference) {
+        return referenceResolvingService(operations, referenceEntity, sourceEntity, reference,
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+    }
+
+    private DynamicRecordService referenceResolvingService(IDatabaseOperations<Object> operations,
+                                                           EntityDefinition referenceEntity,
+                                                           EntityDefinition sourceEntity,
+                                                           EntityReferenceDefinition reference,
+                                                           DataScopeCriteriaService dataScopeCriteriaService) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
-                List.of(referenceEntity(), lineEntity()),
+                List.of(referenceEntity, sourceEntity),
                 List.of(),
-                List.of(EntityReferenceDefinition.to("line", "contractId", ReferenceTarget.of(MODULE, "contract"))
-                        .withAutoTitle("contractTitle")
-                        .withProjection("code", "contractCode"))
+                List.of(reference)
         );
         return new DynamicRecordService(
                 new DynamicRecordRuntime(operations).register(module),
@@ -2850,6 +2918,19 @@ class DynamicRecordServiceTest {
         ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
     }
 
+    private EntityDefinition referenceEntityWithRegion() {
+        return new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.titleField().required(),
+                        FieldDefinition.string("region", "Region").length(32)
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
+    }
+
     private EntityDefinition lineEntity() {
         return new EntityDefinition(
                 "line",
@@ -2857,6 +2938,19 @@ class DynamicRecordServiceTest {
                 "Contract Line",
                 List.of(
                         FieldDefinition.string("contractId", "Contract").column("contract_id").length(32),
+                        FieldDefinition.string("summary", "Summary").length(128)
+                )
+        );
+    }
+
+    private EntityDefinition lineEntityWithRegion() {
+        return new EntityDefinition(
+                "line",
+                "app_contract_line",
+                "Contract Line",
+                List.of(
+                        FieldDefinition.string("contractId", "Contract").column("contract_id").length(32),
+                        FieldDefinition.string("contractRegion", "Contract Region").column("contract_region").length(32),
                         FieldDefinition.string("summary", "Summary").length(128)
                 )
         );
@@ -2942,6 +3036,17 @@ class DynamicRecordServiceTest {
                 "id", id,
                 "code", id.toUpperCase(),
                 "title", name,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> referenceRow(String id, String name, String region) {
+        return Map.of(
+                "id", id,
+                "code", id.toUpperCase(),
+                "title", name,
+                "region", region,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );

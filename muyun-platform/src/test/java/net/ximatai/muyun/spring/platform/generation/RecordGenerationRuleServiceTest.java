@@ -133,6 +133,21 @@ class RecordGenerationRuleServiceTest {
     }
 
     @Test
+    void shouldValidateReferenceGenerateRuleDirection() {
+        RecordGenerationRuleService ruleService = ruleServiceWithoutContributor();
+        RecordGenerationRule saved = ruleService.saveRuleTree(baseRule());
+        RecordGenerationReferenceGenerateRuleValidator validator =
+                new RecordGenerationReferenceGenerateRuleValidator(ruleService.getDao());
+
+        validator.validateReferenceGenerateRule(saved.getId(), "sales.contract", "finance.invoice");
+
+        assertThatThrownBy(() -> validator.validateReferenceGenerateRule(saved.getId(),
+                "finance.invoice", "sales.contract"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("generation rule direction");
+    }
+
+    @Test
     void shouldRejectMultipleSplitDriverObjectMappings() {
         RecordGenerationRuleService ruleService = ruleServiceWithoutContributor();
         RecordGenerationRule rule = baseRule();

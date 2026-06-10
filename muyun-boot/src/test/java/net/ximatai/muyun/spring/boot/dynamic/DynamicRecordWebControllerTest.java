@@ -50,6 +50,12 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeFieldRole;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
+import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFacade;
+import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
+import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,6 +95,7 @@ class DynamicRecordWebControllerTest {
     private DynamicEntityOperations mainEntity;
     private ActiveTenantVerifier activeTenantVerifier;
     private CodeBusinessPreviewService codeBusinessPreviewService;
+    private ReferenceRecordGenerationFacade referenceGenerationFacade;
     private MockMvc mvc;
 
     @BeforeEach
@@ -97,9 +104,11 @@ class DynamicRecordWebControllerTest {
         mainEntity = mock(DynamicEntityOperations.class);
         activeTenantVerifier = mock(ActiveTenantVerifier.class);
         codeBusinessPreviewService = mock(CodeBusinessPreviewService.class);
+        referenceGenerationFacade = mock(ReferenceRecordGenerationFacade.class);
         when(service.mainEntity(MODULE)).thenReturn(mainEntity);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(mainEntity.newRecord()).thenAnswer(invocation -> new DynamicRecord(entity()));
+        when(service.newRecord(MODULE, ENTITY)).thenAnswer(invocation -> new DynamicRecord(entity()));
         when(service.actionAuthorizationAvailability(eq(MODULE), anyString(), any()))
                 .thenAnswer(invocation -> DynamicActionAvailability.available(invocation.getArgument(1)));
         when(service.actionAuthorizationAvailability(eq(MODULE), eq(ENTITY), anyString(), any()))
@@ -107,7 +116,8 @@ class DynamicRecordWebControllerTest {
         objectMapper.registerModule(new DynamicRecordJacksonConfiguration()
                 .dynamicRecordJacksonModule(service));
         mvc = MockMvcBuilders
-                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier, codeBusinessPreviewService))
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
@@ -1113,7 +1123,8 @@ class DynamicRecordWebControllerTest {
                                         "fieldName", "customerType",
                                         "operator", "EQ",
                                         "values", List.of("VIP")
-                                ))
+                                )),
+                                "formValues", Map.of("customerRegion", "north")
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("OK"))
@@ -1124,6 +1135,92 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().fuzzy()).isEqualTo("ximatai");
         assertThat(request.getValue().criteria()).isSameAs(criteria);
         assertThat(request.getValue().includeProjections()).isFalse();
+        assertThat(request.getValue().formValues()).containsEntry("customerRegion", "north");
+    }
+
+    @Test
+    void shouldGenerateDraftsFromReferenceFieldWithoutExposingRuleAction() throws Exception {
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(referenceGenerationFacade.generateFromReference(MODULE, ENTITY, "opportunityId", "opp-1"))
+                .thenReturn(new RecordGenerationResult(
+                        "rule-1",
+                        "generateContract",
+                        "sales.opportunity",
+                        "opp-1",
+                        MODULE,
+                        "batch-1",
+                        List.of()
+                ));
+
+        mvc.perform(post("/{moduleAlias}/references/{fieldName}/generate", MODULE, "opportunityId")
+                        .contentType("application/json")
+                        .content(json(Map.of("sourceRecordId", "opp-1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ruleId").value("rule-1"))
+                .andExpect(jsonPath("$.sourceRecordId").value("opp-1"))
+                .andExpect(jsonPath("$.targetModuleAlias").value(MODULE));
+
+        verify(referenceGenerationFacade).generateFromReference(MODULE, ENTITY, "opportunityId", "opp-1");
+    }
+
+    @Test
+    void shouldConfirmGeneratedDraftWithOriginContext() throws Exception {
+        RecordOriginContext originContext = new RecordOriginContext(
+                RecordImpactType.GENERATE_PUSH,
+                "sales.opportunity",
+                "opp-1",
+                MODULE,
+                "rule-1",
+                "generateContract",
+                "batch-1",
+                "contract:1"
+        );
+        when(referenceGenerationFacade.confirmDraft(any(RecordGenerationDraft.class))).thenReturn("contract-1");
+
+        mvc.perform(post("/{moduleAlias}/generation/confirm", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "targetModuleAlias", MODULE,
+                                "targetEntityAlias", ENTITY,
+                                "record", Map.of("values", Map.of("code", "C-001")),
+                                "originContext", Map.of(
+                                        "impactType", "GENERATE_PUSH",
+                                        "sourceModuleAlias", "sales.opportunity",
+                                        "sourceRecordId", "opp-1",
+                                        "targetModuleAlias", MODULE,
+                                        "generationRuleId", "rule-1",
+                                        "actionCode", "generateContract",
+                                        "batchId", "batch-1",
+                                        "draftKey", "contract:1"
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ruleId").value("rule-1"))
+                .andExpect(jsonPath("$.batchId").value("batch-1"))
+                .andExpect(jsonPath("$.recordIds[0]").value("contract-1"));
+
+        ArgumentCaptor<RecordGenerationDraft> draft = ArgumentCaptor.forClass(RecordGenerationDraft.class);
+        verify(referenceGenerationFacade).confirmDraft(draft.capture());
+        assertThat(draft.getValue().targetModuleAlias()).isEqualTo(MODULE);
+        assertThat(draft.getValue().targetEntityAlias()).isEqualTo(ENTITY);
+        assertThat(draft.getValue().record().getValue("code")).isEqualTo("C-001");
+        assertThat(draft.getValue().originContext()).isEqualTo(originContext);
+    }
+
+    @Test
+    void shouldRejectGeneratedDraftConfirmForDifferentPathModule() throws Exception {
+        mvc.perform(post("/{moduleAlias}/generation/confirm", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "targetModuleAlias", "finance.invoice",
+                                "targetEntityAlias", "invoice",
+                                "record", Map.of("values", Map.of())
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "dynamic generation confirm targetModuleAlias mismatch: finance.invoice != " + MODULE));
+
+        verifyNoInteractions(referenceGenerationFacade);
     }
 
     @Test

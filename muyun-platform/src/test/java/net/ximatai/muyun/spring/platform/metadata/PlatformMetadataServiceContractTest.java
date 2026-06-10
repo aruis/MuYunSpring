@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -955,6 +956,49 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getCloneable()).isTrue();
         assertThat(saved.getReferenceModuleAlias()).isEqualTo("crm.customer");
         assertThat(saved.getReferenceModulePlusFields()).containsExactlyInAnyOrder("code", "ownerName");
+    }
+
+    @Test
+    void shouldValidateReferenceGenerateRuleDirectionWhenValidatorIsAvailable() {
+        moduleService.insert(module("crm.order", "crm", ModuleKind.DYNAMIC));
+        String orderMetadataId = metadataService.insert(metadata("crm", "order"));
+        MetadataField customerId = field(orderMetadataId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerId);
+        String relationId = relationService.insert(mainRelation("crm.order", orderMetadataId));
+        ModuleMetadataFieldService validatingService = new ModuleMetadataFieldService(
+                new MemoryDao<>(),
+                relationService,
+                metadataService,
+                fieldService,
+                Optional.of((ruleId, referenceModuleAlias, ownerModuleAlias) -> {
+                    if (!"generate-order".equals(ruleId)
+                            || !"crm.customer".equals(referenceModuleAlias)
+                            || !"crm.order".equals(ownerModuleAlias)) {
+                        throw new PlatformException("invalid direction");
+                    }
+                }));
+        ModuleMetadataField moduleField = new ModuleMetadataField();
+        moduleField.setRelationId(relationId);
+        moduleField.setMetadataFieldId(customerId.getId());
+        moduleField.setReferenceModuleAlias("crm.customer");
+        moduleField.setReferenceModuleKeyField("id");
+        moduleField.setReferenceModuleLabelField("title");
+        moduleField.setReferenceGenerateRuleId("generate-order");
+
+        String id = validatingService.insert(moduleField);
+
+        assertThat(validatingService.select(id).getReferenceGenerateRuleId()).isEqualTo("generate-order");
+
+        ModuleMetadataField invalid = new ModuleMetadataField();
+        invalid.setRelationId(relationId);
+        invalid.setMetadataFieldId(customerId.getId());
+        invalid.setReferenceModuleAlias("crm.customer");
+        invalid.setReferenceModuleKeyField("id");
+        invalid.setReferenceModuleLabelField("title");
+        invalid.setReferenceGenerateRuleId("wrong-rule");
+        assertThatThrownBy(() -> validatingService.insert(invalid))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("invalid direction");
     }
 
     @Test

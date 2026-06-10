@@ -19,7 +19,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceAffectDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceFilterDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
@@ -34,6 +36,10 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffect;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffectService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
@@ -71,6 +77,8 @@ public class PlatformModuleDefinitionCompiler {
     private final PlatformModuleActionService actionService;
     private final ModuleMetadataFormulaRuleService formulaRuleService;
     private final ModuleMetadataFieldService moduleFieldService;
+    private final ModuleMetadataFieldFilterService moduleFieldFilterService;
+    private final ModuleMetadataFieldAffectService moduleFieldAffectService;
     private final ModuleDefinitionValidator validator;
 
     public PlatformModuleDefinitionCompiler(PlatformModuleService moduleService,
@@ -84,7 +92,7 @@ public class PlatformModuleDefinitionCompiler {
                                             PlatformModuleActionService actionService,
                                             ModuleMetadataFormulaRuleService formulaRuleService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService, actionService, formulaRuleService, null,
+                viewService, viewFieldService, actionService, formulaRuleService, null, null, null,
                 new ModuleDefinitionValidator());
     }
 
@@ -100,7 +108,7 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataFormulaRuleService formulaRuleService,
                                             ModuleMetadataFieldService moduleFieldService) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService, actionService, formulaRuleService, moduleFieldService,
+                viewService, viewFieldService, actionService, formulaRuleService, moduleFieldService, null, null,
                 new ModuleDefinitionValidator());
     }
 
@@ -116,7 +124,7 @@ public class PlatformModuleDefinitionCompiler {
                                             ModuleMetadataFormulaRuleService formulaRuleService,
                                             ModuleDefinitionValidator validator) {
         this(moduleService, metadataService, fieldService, fieldDefinitionCompiler, referenceConfigService, relationService,
-                viewService, viewFieldService, actionService, formulaRuleService, null, validator);
+                viewService, viewFieldService, actionService, formulaRuleService, null, null, null, validator);
     }
 
     @Autowired
@@ -131,6 +139,8 @@ public class PlatformModuleDefinitionCompiler {
                                             PlatformModuleActionService actionService,
                                             ModuleMetadataFormulaRuleService formulaRuleService,
                                             ModuleMetadataFieldService moduleFieldService,
+                                            ModuleMetadataFieldFilterService moduleFieldFilterService,
+                                            ModuleMetadataFieldAffectService moduleFieldAffectService,
                                             ModuleDefinitionValidator validator) {
         this.moduleService = moduleService;
         this.metadataService = metadataService;
@@ -143,6 +153,8 @@ public class PlatformModuleDefinitionCompiler {
         this.actionService = actionService;
         this.formulaRuleService = formulaRuleService;
         this.moduleFieldService = moduleFieldService;
+        this.moduleFieldFilterService = moduleFieldFilterService;
+        this.moduleFieldAffectService = moduleFieldAffectService;
         this.validator = validator;
     }
 
@@ -348,10 +360,112 @@ public class PlatformModuleDefinitionCompiler {
                                                        ModuleMetadataRelation relation,
                                                        Map<String, Metadata> metadataById) {
         Metadata sourceMetadata = metadataById.get(relation.getMetadataId());
-        return metadataFields(sourceMetadata.getId()).stream()
+        List<EntityReferenceDefinition> references = new java.util.ArrayList<>();
+        Set<String> moduleReferenceFieldIds = new LinkedHashSet<>();
+        if (moduleFieldService != null) {
+            for (ModuleMetadataField moduleField : moduleFieldService.listByRelationId(relation.getId())) {
+                if (moduleField.getReferenceModuleAlias() != null && !moduleField.getReferenceModuleAlias().isBlank()) {
+                    moduleReferenceFieldIds.add(moduleField.getMetadataFieldId());
+                    references.add(moduleReference(moduleField, sourceMetadata));
+                }
+            }
+        }
+        references.addAll(metadataFields(sourceMetadata.getId()).stream()
+                .filter(field -> !moduleReferenceFieldIds.contains(field.getId()))
                 .map(field -> reference(moduleAlias, relation, sourceMetadata, field, metadataById))
                 .filter(Objects::nonNull)
+                .toList());
+        return references;
+    }
+
+    private EntityReferenceDefinition moduleReference(ModuleMetadataField moduleField,
+                                                      Metadata sourceMetadata) {
+        MetadataField sourceField = requireField(moduleField);
+        ModuleMetadataRelation targetRelation = mainRelation(moduleField.getReferenceModuleAlias());
+        Metadata targetMetadata = metadataService.select(targetRelation.getMetadataId());
+        if (targetMetadata == null) {
+            throw new PlatformException("Reference module points to missing metadata: "
+                    + targetRelation.getMetadataId());
+        }
+        validateReferenceFields(moduleField, targetMetadata);
+        return new EntityReferenceDefinition(
+                sourceMetadata.getAlias(),
+                sourceField.getFieldName(),
+                targetRelation.getModuleAlias() + "." + targetMetadata.getAlias()
+        ).withRuntimeConfig(
+                moduleField.getReferenceModuleKeyField(),
+                moduleField.getReferenceModuleLabelField(),
+                moduleField.getReferenceGenerateRuleId(),
+                moduleField.getReferenceQueryTemplateId(),
+                moduleField.getReferenceModulePlusFields()
+        ).withInteractionRules(
+                referenceFilters(moduleField),
+                referenceAffects(moduleField)
+        );
+    }
+
+    private List<EntityReferenceFilterDefinition> referenceFilters(ModuleMetadataField moduleField) {
+        if (moduleFieldFilterService == null) {
+            return List.of();
+        }
+        return moduleFieldFilterService.list(Criteria.of().eq("moduleMetadataFieldId", moduleField.getId()),
+                        ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .map(filter -> new EntityReferenceFilterDefinition(
+                        moduleFieldName(filter.getFormFieldId()),
+                        moduleFieldName(filter.getReferenceFieldId()),
+                        filter.getOperator()))
                 .toList();
+    }
+
+    private List<EntityReferenceAffectDefinition> referenceAffects(ModuleMetadataField moduleField) {
+        if (moduleFieldAffectService == null) {
+            return List.of();
+        }
+        return moduleFieldAffectService.list(Criteria.of().eq("moduleMetadataFieldId", moduleField.getId()),
+                        ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .map(affect -> new EntityReferenceAffectDefinition(
+                        moduleFieldName(affect.getReferenceFieldId()),
+                        moduleFieldName(affect.getTargetFieldId())))
+                .toList();
+    }
+
+    private String moduleFieldName(String moduleMetadataFieldId) {
+        if (moduleFieldService == null) {
+            throw new PlatformException("Module field interaction rule requires moduleFieldService");
+        }
+        return moduleFieldService.resolve(moduleMetadataFieldId).fieldName();
+    }
+
+    private ModuleMetadataRelation mainRelation(String moduleAlias) {
+        return relationService.list(Criteria.of()
+                        .eq("moduleAlias", moduleAlias)
+                        .eq("relationRole", RelationRole.MAIN),
+                ALL).stream().findFirst().orElseThrow(() ->
+                new PlatformException("Reference module requires main relation: " + moduleAlias));
+    }
+
+    private void validateReferenceFields(ModuleMetadataField moduleField, Metadata targetMetadata) {
+        Set<String> fieldNames = metadataFields(targetMetadata.getId()).stream()
+                .map(MetadataField::getFieldName)
+                .collect(java.util.stream.Collectors.toSet());
+        requireReferenceTargetField(fieldNames, moduleField.getReferenceModuleKeyField(), "reference key field");
+        requireReferenceTargetField(fieldNames, moduleField.getReferenceModuleLabelField(), "reference label field");
+        if (moduleField.getReferenceModulePlusFields() != null) {
+            for (String plusField : moduleField.getReferenceModulePlusFields()) {
+                requireReferenceTargetField(fieldNames, plusField, "reference plus field");
+            }
+        }
+    }
+
+    private void requireReferenceTargetField(Set<String> fieldNames, String fieldName, String label) {
+        if (fieldName == null || fieldName.isBlank()) {
+            return;
+        }
+        if (!fieldNames.contains(fieldName)) {
+            throw new PlatformException(label + " does not exist in reference target: " + fieldName);
+        }
     }
 
     private EntityReferenceDefinition reference(String moduleAlias,

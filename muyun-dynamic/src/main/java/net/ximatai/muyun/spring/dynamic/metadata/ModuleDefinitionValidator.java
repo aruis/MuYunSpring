@@ -649,6 +649,33 @@ public class ModuleDefinitionValidator {
             requireReferenceOutputField(source, outputField, "reference title output field");
             requireUnique(outputFields, outputField, "reference output field");
         }
+        validateReferenceInteractionRules(reference, source, target, entities, moduleAlias);
+    }
+
+    private void validateReferenceInteractionRules(EntityReferenceDefinition reference,
+                                                   EntityDefinition source,
+                                                   ReferenceTarget target,
+                                                   Map<String, EntityDefinition> entities,
+                                                   String moduleAlias) {
+        EntityDefinition targetEntity = moduleAlias != null && moduleAlias.equals(target.moduleAlias())
+                ? requireEntity(entities, target.entityAlias(), "reference target entity")
+                : null;
+        for (EntityReferenceFilterDefinition filter : reference.filters()) {
+            requireFieldName(filter.formField(), "reference filter form field");
+            requireField(source, filter.formField(), "reference filter form field");
+            requireFieldName(filter.referenceField(), "reference filter target field");
+            if (targetEntity != null) {
+                requireField(targetEntity, filter.referenceField(), "reference filter target field");
+            }
+        }
+        for (EntityReferenceAffectDefinition affect : reference.affects()) {
+            requireFieldName(affect.referenceField(), "reference affect source field");
+            if (targetEntity != null) {
+                requireField(targetEntity, affect.referenceField(), "reference affect source field");
+            }
+            requireFieldName(affect.targetField(), "reference affect target field");
+            requireField(source, affect.targetField(), "reference affect target field");
+        }
     }
 
     private ReferencePlan referencePlan(EntityReferenceDefinition reference) {

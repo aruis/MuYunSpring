@@ -22,6 +22,10 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewItem;
 import net.ximatai.muyun.spring.platform.code.CodeBusinessPreviewService;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationCommitResult;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationDraft;
+import net.ximatai.muyun.spring.platform.generation.RecordGenerationResult;
+import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFacade;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
@@ -76,27 +80,39 @@ public class DynamicRecordWebController implements
     private final DynamicRecordService recordService;
     private final ActiveTenantVerifier activeTenantVerifier;
     private final CodeBusinessPreviewService codeBusinessPreviewService;
+    private final ReferenceRecordGenerationFacade referenceRecordGenerationFacade;
     private final DynamicOpenApiGenerator openApiGenerator = new DynamicOpenApiGenerator();
 
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier) {
-        this(recordService, activeTenantVerifier, (CodeBusinessPreviewService) null);
+        this(recordService, activeTenantVerifier, (CodeBusinessPreviewService) null,
+                (ReferenceRecordGenerationFacade) null);
     }
 
     @Autowired
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
-                                      ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider) {
+                                      ObjectProvider<CodeBusinessPreviewService> codeBusinessPreviewServiceProvider,
+                                      ObjectProvider<ReferenceRecordGenerationFacade> referenceGenerationFacadeProvider) {
         this(recordService, activeTenantVerifier,
-                codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable());
+                codeBusinessPreviewServiceProvider == null ? null : codeBusinessPreviewServiceProvider.getIfAvailable(),
+                referenceGenerationFacadeProvider == null ? null : referenceGenerationFacadeProvider.getIfAvailable());
     }
 
     public DynamicRecordWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
                                       CodeBusinessPreviewService codeBusinessPreviewService) {
+        this(recordService, activeTenantVerifier, codeBusinessPreviewService, null);
+    }
+
+    public DynamicRecordWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      CodeBusinessPreviewService codeBusinessPreviewService,
+                                      ReferenceRecordGenerationFacade referenceRecordGenerationFacade) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.codeBusinessPreviewService = codeBusinessPreviewService;
+        this.referenceRecordGenerationFacade = referenceRecordGenerationFacade;
     }
 
     @Override
@@ -253,6 +269,49 @@ public class DynamicRecordWebController implements
         return ReferenceWeb.super.reference(fieldName, request);
     }
 
+    @PostMapping("/references/{fieldName}/generate")
+    @ActionEndpoint(PlatformAction.REFERENCE)
+    public RecordGenerationResult generateFromReference(@PathVariable String fieldName,
+                                                        @RequestBody(required = false) DynamicWebReferenceGenerationRequest request) {
+        return webScope(() -> {
+            DynamicWebReferenceGenerationRequest normalized = request == null
+                    ? new DynamicWebReferenceGenerationRequest(null)
+                    : request;
+            return referenceGenerationFacade().generateFromReference(
+                    DynamicWebRequest.moduleAlias(),
+                    mainEntityAlias(DynamicWebRequest.moduleAlias()),
+                    fieldName,
+                    normalized.sourceRecordId()
+            );
+        });
+    }
+
+    @PostMapping("/generation/confirm")
+    @ActionEndpoint(PlatformAction.CREATE)
+    public RecordGenerationCommitResult confirmGeneratedDraft(@RequestBody(required = false) DynamicWebGenerationConfirmRequest request) {
+        return webScope(() -> {
+            DynamicWebGenerationConfirmRequest normalized = request == null
+                    ? new DynamicWebGenerationConfirmRequest(null, null, null, null)
+                    : request;
+            String targetModuleAlias = requireText(normalized.targetModuleAlias(), "targetModuleAlias");
+            String targetEntityAlias = requireText(normalized.targetEntityAlias(), "targetEntityAlias");
+            requirePathModule(targetModuleAlias);
+            DynamicRecord draft = record(targetModuleAlias, targetEntityAlias, normalized.record());
+            String id = referenceGenerationFacade().confirmDraft(new RecordGenerationDraft(
+                    targetModuleAlias,
+                    targetEntityAlias,
+                    draft,
+                    normalized.originContext()
+            ));
+            return new RecordGenerationCommitResult(
+                    normalized.originContext() == null ? null : normalized.originContext().generationRuleId(),
+                    normalized.originContext() == null ? null : normalized.originContext().batchId(),
+                    targetModuleAlias,
+                    List.of(id)
+            );
+        });
+    }
+
     private DynamicWebActionExecutionResponse executeAction(String moduleAlias,
                                                             String actionCode,
                                                             String pathRecordId,
@@ -274,8 +333,31 @@ public class DynamicRecordWebController implements
                 normalized.values(),
                 criteria(moduleAlias, entityAlias, normalized.conditions()),
                 DynamicWebQueryMapper.page(normalized.page()),
-                normalized.includeProjections()
+                normalized.includeProjections(),
+                normalized.formValues()
         ));
+    }
+
+    private ReferenceRecordGenerationFacade referenceGenerationFacade() {
+        if (referenceRecordGenerationFacade == null) {
+            throw new PlatformException("reference record generation facade is not configured");
+        }
+        return referenceRecordGenerationFacade;
+    }
+
+    private String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new PlatformException("dynamic generation confirm requires " + fieldName);
+        }
+        return value.trim();
+    }
+
+    private void requirePathModule(String targetModuleAlias) {
+        String pathModuleAlias = DynamicWebRequest.moduleAlias();
+        if (!pathModuleAlias.equals(targetModuleAlias)) {
+            throw new PlatformException("dynamic generation confirm targetModuleAlias mismatch: "
+                    + targetModuleAlias + " != " + pathModuleAlias);
+        }
     }
 
     @ExceptionHandler({IllegalArgumentException.class, ModuleDefinitionException.class, PlatformException.class})
