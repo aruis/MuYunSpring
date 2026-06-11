@@ -11,6 +11,7 @@ public final class ActionEventPayload {
     public static final String INTERACTION_ONLY = "interactionOnly";
     public static final String MESSAGE = "message";
     public static final String REFRESH = "refresh";
+    public static final String REFRESH_STRATEGY = "refreshStrategy";
     public static final String REDIRECT_TO = "redirectTo";
     public static final String RESULT = "result";
     public static final String FAILURE_STAGE = "failureStage";
@@ -28,7 +29,8 @@ public final class ActionEventPayload {
                                                String redirectTo,
                                                boolean interactionOnly,
                                                Object simpleResult) {
-        return executed(executorType, null, resultType, message, refresh, redirectTo, interactionOnly, simpleResult);
+        return executed(executorType, null, resultType, message, refresh, redirectTo, null,
+                interactionOnly, simpleResult);
     }
 
     public static Map<String, Object> executed(String executorType,
@@ -37,6 +39,19 @@ public final class ActionEventPayload {
                                                String message,
                                                boolean refresh,
                                                String redirectTo,
+                                               boolean interactionOnly,
+                                               Object simpleResult) {
+        return executed(executorType, actionLevel, resultType, message, refresh, redirectTo, null,
+                interactionOnly, simpleResult);
+    }
+
+    public static Map<String, Object> executed(String executorType,
+                                               String actionLevel,
+                                               String resultType,
+                                               String message,
+                                               boolean refresh,
+                                               String redirectTo,
+                                               Object refreshStrategy,
                                                boolean interactionOnly,
                                                Object simpleResult) {
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -49,6 +64,9 @@ public final class ActionEventPayload {
         putText(payload, MESSAGE, message);
         if (refresh) {
             payload.put(REFRESH, true);
+        }
+        if (refreshStrategy != null) {
+            payload.put(REFRESH_STRATEGY, refreshStrategy);
         }
         putText(payload, REDIRECT_TO, redirectTo);
         if (simpleResult != null) {

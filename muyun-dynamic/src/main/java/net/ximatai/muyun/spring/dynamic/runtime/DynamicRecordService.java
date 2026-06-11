@@ -1719,7 +1719,9 @@ public class DynamicRecordService {
                 submitActionPath(moduleAlias, submitAction, recordId),
                 recordId,
                 submitActionCode != null,
-                null
+                null,
+                submitActionCode == null ? DynamicActionRefreshStrategy.none()
+                        : DynamicActionRefreshStrategy.listAndDetail()
         );
     }
 

@@ -95,6 +95,7 @@ final class DynamicRecordEventPublisher {
                         body.message(),
                         body.refresh(),
                         body.redirectTo(),
+                        body.refreshStrategy(),
                         context.action().executorType() == EntityActionExecutorType.DIALOG,
                         isSimpleEventValue(body.value()) ? body.value() : null
                 )),

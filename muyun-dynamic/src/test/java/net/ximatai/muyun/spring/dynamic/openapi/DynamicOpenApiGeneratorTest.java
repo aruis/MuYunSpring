@@ -472,7 +472,7 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("DynamicWebActionContext").required())
                 .containsExactly("moduleAlias", "actionCode", "actionLevel", "executorType");
         assertThat(document.schemas().get("DynamicWebActionResultBody").properties())
-                .containsKeys("type", "value", "message", "refresh", "redirectTo");
+                .containsKeys("type", "value", "message", "refresh", "redirectTo", "refreshStrategy");
         assertThat(document.schemas().get("DynamicWebActionResultBody").valueShapeByResultType())
                 .containsEntry("DIALOG", "DynamicActionDialog")
                 .containsEntry("RECORD", "DynamicRecordResponse")
@@ -482,7 +482,9 @@ class DynamicOpenApiGeneratorTest {
                 .containsExactly("dialogKey");
         assertThat(document.schemas().get("DynamicActionDialog").properties())
                 .containsKeys("dialogKey", "title", "actionCode", "submitActionCode", "submitPath", "recordId",
-                        "refreshOnSuccess", "redirectTo");
+                        "refreshOnSuccess", "redirectTo", "refreshStrategy");
+        assertThat(document.schemas().get("DynamicActionRefreshStrategy").properties())
+                .containsKeys("list", "detail", "redirectToDetail", "redirectRecordId", "redirectModuleAlias");
         assertThat(document.schemas().get("DynamicWebActionAvailabilityResponse").properties())
                 .containsKeys("action", "available", "message");
         assertThat(document.schemas().get("DynamicWebActionExecutionResponse").properties().get("body").type())

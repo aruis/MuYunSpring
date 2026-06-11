@@ -79,6 +79,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicWebActionContext", actionContextSchema());
         schemas.put("DynamicWebActionResultBody", actionResultBodySchema());
         schemas.put("DynamicActionDialog", actionDialogSchema());
+        schemas.put("DynamicActionRefreshStrategy", actionRefreshStrategySchema());
         schemas.put("DynamicReferenceResolveItem", referenceResolveItemSchema());
         schemas.put("DynamicReferenceResolveResult", referenceResolveResultSchema());
         schemas.put("WebCountResponse", countResponseSchema("WebCountResponse"));
@@ -774,6 +775,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("refresh", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("redirectTo", stringProperty(true));
+        properties.put("refreshStrategy", objectProperty("DynamicActionRefreshStrategy"));
         return new DynamicOpenApiDocument.Schema("DynamicWebActionResultBody", "object", null,
                 List.of("type", "refresh"), properties, null, actionResultValueShapeByType());
     }
@@ -789,8 +791,23 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("refreshOnSuccess", new DynamicOpenApiDocument.Property("boolean", null, false, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("redirectTo", stringProperty(true));
+        properties.put("refreshStrategy", objectProperty("DynamicActionRefreshStrategy"));
         return new DynamicOpenApiDocument.Schema("DynamicActionDialog", "object", null,
                 List.of("dialogKey"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema actionRefreshStrategySchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("list", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("detail", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("redirectToDetail", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("redirectRecordId", stringProperty(true));
+        properties.put("redirectModuleAlias", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicActionRefreshStrategy", "object", null,
+                List.of("list", "detail", "redirectToDetail"), properties, null);
     }
 
     private Map<String, String> actionResultValueShapeByType() {

@@ -8,10 +8,23 @@ public record DynamicActionDialog(
         String submitPath,
         String recordId,
         boolean refreshOnSuccess,
-        String redirectTo
+        String redirectTo,
+        DynamicActionRefreshStrategy refreshStrategy
 ) {
     public DynamicActionDialog(String dialogKey, String title) {
-        this(dialogKey, title, null, null, null, null, false, null);
+        this(dialogKey, title, null, null, null, null, false, null, null);
+    }
+
+    public DynamicActionDialog(String dialogKey,
+                               String title,
+                               String actionCode,
+                               String submitActionCode,
+                               String submitPath,
+                               String recordId,
+                               boolean refreshOnSuccess,
+                               String redirectTo) {
+        this(dialogKey, title, actionCode, submitActionCode, submitPath, recordId,
+                refreshOnSuccess, redirectTo, null);
     }
 
     public DynamicActionDialog {
@@ -25,5 +38,9 @@ public record DynamicActionDialog(
         submitPath = submitPath == null || submitPath.isBlank() ? null : submitPath.trim();
         recordId = recordId == null || recordId.isBlank() ? null : recordId.trim();
         redirectTo = redirectTo == null || redirectTo.isBlank() ? null : redirectTo.trim();
+        refreshStrategy = refreshStrategy == null
+                ? refreshOnSuccess ? DynamicActionRefreshStrategy.listAndDetail() : DynamicActionRefreshStrategy.none()
+                : refreshStrategy;
+        refreshOnSuccess = refreshOnSuccess || refreshStrategy.active();
     }
 }

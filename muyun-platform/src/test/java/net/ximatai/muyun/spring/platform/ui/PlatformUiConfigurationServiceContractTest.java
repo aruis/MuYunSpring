@@ -330,6 +330,18 @@ class PlatformUiConfigurationServiceContractTest {
                 List.of(new DynamicAssociationViewDescriptor("contracts", "customer", "crm.contract", "contract",
                         AssociationViewDisplayMode.INLINE_LIST, "contracts", null, EntityViewType.LIST, true))
         ));
+        org.mockito.Mockito.when(recordService.describe("crm.contract")).thenReturn(new DynamicModuleDescriptor(
+                "crm.contract",
+                "Contract",
+                "contract",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        org.mockito.Mockito.when(recordService.describe("crm.missing"))
+                .thenThrow(new PlatformException("unknown module"));
         PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
                 uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
                 recordService);
@@ -382,6 +394,18 @@ class PlatformUiConfigurationServiceContractTest {
                 List.of(new DynamicAssociationViewDescriptor("contracts", "customer", "crm.contract", "contract",
                         AssociationViewDisplayMode.INLINE_LIST, "contracts", null, EntityViewType.LIST, true))
         ));
+        org.mockito.Mockito.when(recordService.describe("crm.contract")).thenReturn(new DynamicModuleDescriptor(
+                "crm.contract",
+                "Contract",
+                "contract",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+        org.mockito.Mockito.when(recordService.describe("crm.missing"))
+                .thenThrow(new PlatformException("unknown module"));
         PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
                 uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
                 recordService);
@@ -418,13 +442,32 @@ class PlatformUiConfigurationServiceContractTest {
                   "blocks": [
                     {
                       "type":"taskPanel",
+                      "key":"generated",
+                      "checkType":"GENERATED_RELATION",
+                      "targetModuleAlias":"crm.missing"
+                    }
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("targetModuleAlias is unknown");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {
+                      "type":"taskPanel",
                       "key":"ready",
                       "checkType":"QUERY_TEMPLATE",
                       "queryTemplateId":"%s",
                       "externalRecordIdKey":"recordId",
                       "diagnosticPath":"/crm.customer/query"
                     },
-                    {"type":"taskPanel", "key":"contracts", "checkType":"ASSOCIATION_VIEW", "associationViewCode":"contracts"}
+                    {"type":"taskPanel", "key":"contracts", "checkType":"ASSOCIATION_VIEW", "associationViewCode":"contracts"},
+                    {"type":"taskPanel", "key":"generated", "checkType":"GENERATED_RELATION", "targetModuleAlias":"crm.contract"}
                   ]
                 }
                 """.formatted(templateId));

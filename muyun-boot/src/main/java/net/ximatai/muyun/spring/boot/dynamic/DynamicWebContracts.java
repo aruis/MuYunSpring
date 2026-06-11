@@ -222,14 +222,16 @@ record DynamicWebActionResultBody(String type,
                                   Object value,
                                   String message,
                                   boolean refresh,
-                                  String redirectTo) {
+                                  String redirectTo,
+                                  Object refreshStrategy) {
     static DynamicWebActionResultBody from(DynamicActionResultBody body) {
         return new DynamicWebActionResultBody(
                 body.type().name(),
                 DynamicWebValues.webValue(body.value()),
                 body.message(),
                 body.refresh(),
-                body.redirectTo()
+                body.redirectTo(),
+                DynamicWebValues.webValue(body.refreshStrategy())
         );
     }
 }

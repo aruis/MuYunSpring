@@ -46,7 +46,41 @@ final class PlatformTaskBlockLayoutResolver {
                     text(block, "associationViewCode"),
                     text(block, "queryTemplateId"),
                     text(block, "externalRecordIdKey"),
-                    text(block, "diagnosticPath")
+                    text(block, "diagnosticPath"),
+                    text(block, "targetModuleAlias"),
+                    text(block, "generationRuleId"),
+                    positiveInt(block, "expectedCount"),
+                    checks(block)
+            ));
+        }
+        return resolved;
+    }
+
+    private static List<PlatformTaskCheckBlock> checks(JsonNode block) {
+        JsonNode checks = block.get("checks");
+        if (checks == null || checks.isNull()) {
+            return List.of();
+        }
+        if (!checks.isArray()) {
+            throw new PlatformException("taskPanel.checks must be array");
+        }
+        if (checks.isEmpty()) {
+            throw new PlatformException("taskPanel.checks must not be empty");
+        }
+        ArrayList<PlatformTaskCheckBlock> resolved = new ArrayList<>();
+        for (JsonNode check : checks) {
+            if (check == null || !check.isObject()) {
+                continue;
+            }
+            resolved.add(new PlatformTaskCheckBlock(
+                    taskCheckType(text(check, "checkType")),
+                    text(check, "associationViewCode"),
+                    text(check, "queryTemplateId"),
+                    text(check, "externalRecordIdKey"),
+                    text(check, "targetModuleAlias"),
+                    text(check, "generationRuleId"),
+                    positiveInt(check, "expectedCount"),
+                    firstText(text(check, "diagnosticPath"), text(block, "diagnosticPath"))
             ));
         }
         return resolved;
@@ -69,5 +103,20 @@ final class PlatformTaskBlockLayoutResolver {
             return null;
         }
         return value.asText().trim();
+    }
+
+    private static Integer positiveInt(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isInt() || value.asInt() <= 0) {
+            throw new PlatformException("taskPanel." + field + " must be positive integer");
+        }
+        return value.asInt();
+    }
+
+    private static String firstText(String first, String second) {
+        return first != null ? first : second;
     }
 }

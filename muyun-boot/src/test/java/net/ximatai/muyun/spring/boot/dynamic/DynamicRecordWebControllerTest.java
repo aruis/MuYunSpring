@@ -2043,6 +2043,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.body.value.submitPath").value("/" + MODULE + "/submit/contract-1"))
                 .andExpect(jsonPath("$.body.value.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.body.value.refreshOnSuccess").value(true))
+                .andExpect(jsonPath("$.body.value.refreshStrategy.list").value(true))
+                .andExpect(jsonPath("$.body.value.refreshStrategy.detail").value(true))
                 .andExpect(jsonPath("$.body.refresh").value(false));
     }
 
@@ -2224,7 +2226,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.body.type").value("COUNT"))
                 .andExpect(jsonPath("$.body.value").value(2))
                 .andExpect(jsonPath("$.body.message").value("已归档 2 条"))
-                .andExpect(jsonPath("$.body.refresh").value(true));
+                .andExpect(jsonPath("$.body.refresh").value(true))
+                .andExpect(jsonPath("$.body.refreshStrategy.list").value(true))
+                .andExpect(jsonPath("$.body.refreshStrategy.detail").value(true));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "refreshSelected")
                         .contentType("application/json")
@@ -2232,7 +2236,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.body.type").value("VALUE"))
                 .andExpect(jsonPath("$.body.value").value("ok"))
-                .andExpect(jsonPath("$.body.refresh").value(true));
+                .andExpect(jsonPath("$.body.refresh").value(true))
+                .andExpect(jsonPath("$.body.refreshStrategy.list").value(true))
+                .andExpect(jsonPath("$.body.refreshStrategy.detail").value(true));
 
         ArgumentCaptor<DynamicActionExecutionRequest> batchRequest = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
         verify(service).executeAction(eq(MODULE), eq("archive"), batchRequest.capture());

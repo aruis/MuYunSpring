@@ -1115,6 +1115,7 @@ class DynamicRecordServiceTest {
                         DynamicActionDialog::submitPath)
                 .containsExactly("submitDialog", null, null);
         assertThat(result.body().refresh()).isFalse();
+        assertThat(((DynamicActionDialog) result.value()).refreshStrategy().active()).isFalse();
         assertThat(result.context().action().executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
         assertThat(events.events()).singleElement()
                 .satisfies(event -> {
@@ -1148,6 +1149,10 @@ class DynamicRecordServiceTest {
                         DynamicActionDialog::recordId, DynamicActionDialog::refreshOnSuccess)
                 .containsExactly("contractSubmitDialog", "submitDialog", "submit",
                         "/" + MODULE + "/submit/contract-1", "contract-1", true);
+        assertThat(((DynamicActionDialog) result.value()).refreshStrategy())
+                .extracting(DynamicActionRefreshStrategy::list, DynamicActionRefreshStrategy::detail,
+                        DynamicActionRefreshStrategy::redirectToDetail)
+                .containsExactly(true, true, false);
     }
 
     @Test
@@ -1324,9 +1329,12 @@ class DynamicRecordServiceTest {
         assertThat(recordId.type()).isEqualTo(DynamicActionResultType.RECORD_ID);
         assertThat(recordId.value()).isEqualTo("contract-1");
         assertThat(recordId.refresh()).isTrue();
+        assertThat(recordId.refreshStrategy().detail()).isTrue();
         assertThat(changedCount.type()).isEqualTo(DynamicActionResultType.COUNT);
         assertThat(changedCount.value()).isEqualTo(2);
         assertThat(changedCount.refresh()).isTrue();
+        assertThat(changedCount.refreshStrategy().list()).isTrue();
+        assertThat(changedCount.refreshStrategy().detail()).isTrue();
         assertThat(changedCountWithMessage.message()).isEqualTo("已归档 2 条");
         assertThat(unchangedCount.refresh()).isFalse();
         assertThat(notice.type()).isEqualTo(DynamicActionResultType.NONE);
@@ -1334,6 +1342,8 @@ class DynamicRecordServiceTest {
         assertThat(notice.message()).isEqualTo("无需刷新");
         assertThat(refresh.type()).isEqualTo(DynamicActionResultType.NONE);
         assertThat(refresh.refresh()).isTrue();
+        assertThat(refresh.refreshStrategy().list()).isTrue();
+        assertThat(refresh.refreshStrategy().detail()).isTrue();
         assertThat(refreshedNotice.refresh()).isTrue();
         assertThat(refreshedNotice.message()).isEqualTo("已提交");
         assertThat(redirect.type()).isEqualTo(DynamicActionResultType.NONE);
@@ -1345,6 +1355,15 @@ class DynamicRecordServiceTest {
                 .containsExactly("contractSubmitDialog", "提交合同");
         assertThat(((DynamicActionDialog) dialog.value()).refreshOnSuccess()).isFalse();
         assertThat(dialog.refresh()).isFalse();
+
+        DynamicActionResultBody redirectToDetail = DynamicActionResultBody.none()
+                .withRefreshStrategy(DynamicActionRefreshStrategy.redirectToDetail("contract-2", "crm.contract"));
+        assertThat(redirectToDetail.refresh()).isTrue();
+        assertThat(redirectToDetail.refreshStrategy())
+                .extracting(DynamicActionRefreshStrategy::redirectToDetail,
+                        DynamicActionRefreshStrategy::redirectRecordId,
+                        DynamicActionRefreshStrategy::redirectModuleAlias)
+                .containsExactly(true, "contract-2", "crm.contract");
     }
 
     @Test

@@ -292,11 +292,38 @@ public class PlatformPageConfigPublishService {
         validateRequiredText(block, "key", path, uiConfigId);
         validateOptionalText(block, "title", path, uiConfigId);
         validateOptionalText(block, "diagnosticPath", path, uiConfigId);
+        validateOptionalPositiveInt(block, "expectedCount", path, uiConfigId);
+        JsonNode checks = block.get("checks");
+        if (checks != null && !checks.isNull()) {
+            if (!checks.isArray()) {
+                throw layoutException(uiConfigId, path + ".checks must be array");
+            }
+            if (checks.isEmpty()) {
+                throw layoutException(uiConfigId, path + ".checks must not be empty");
+            }
+            int index = 0;
+            for (JsonNode check : checks) {
+                if (check == null || !check.isObject()) {
+                    throw layoutException(uiConfigId, path + ".checks[" + index + "] must be object");
+                }
+                validateTaskCheck(moduleAlias, check, path + ".checks[" + index + "]", uiConfigId);
+                index++;
+            }
+            return;
+        }
+        validateTaskCheck(moduleAlias, block, path, uiConfigId);
+    }
+
+    private void validateTaskCheck(String moduleAlias, JsonNode block, String path, String uiConfigId) {
         PlatformTaskCheckType checkType = validateTaskCheckType(block, path, uiConfigId);
+        validateOptionalText(block, "diagnosticPath", path, uiConfigId);
+        validateOptionalPositiveInt(block, "expectedCount", path, uiConfigId);
         if (checkType == PlatformTaskCheckType.MANUAL) {
             validateOptionalText(block, "associationViewCode", path, uiConfigId);
             validateOptionalText(block, "queryTemplateId", path, uiConfigId);
             validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+            validateOptionalText(block, "targetModuleAlias", path, uiConfigId);
+            validateOptionalText(block, "generationRuleId", path, uiConfigId);
             return;
         }
         if (checkType == PlatformTaskCheckType.ASSOCIATION_VIEW) {
@@ -304,11 +331,24 @@ public class PlatformPageConfigPublishService {
             validateAssociationViewCode(moduleAlias, viewCode, path + ".associationViewCode", uiConfigId);
             validateOptionalText(block, "queryTemplateId", path, uiConfigId);
             validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+            validateOptionalText(block, "targetModuleAlias", path, uiConfigId);
+            validateOptionalText(block, "generationRuleId", path, uiConfigId);
             return;
         }
-        String queryTemplateId = validateRequiredText(block, "queryTemplateId", path, uiConfigId);
-        validateQueryTemplate(moduleAlias, queryTemplateId, path, uiConfigId);
+        if (checkType == PlatformTaskCheckType.QUERY_TEMPLATE) {
+            String queryTemplateId = validateRequiredText(block, "queryTemplateId", path, uiConfigId);
+            validateQueryTemplate(moduleAlias, queryTemplateId, path, uiConfigId);
+            validateOptionalText(block, "associationViewCode", path, uiConfigId);
+            validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+            validateOptionalText(block, "targetModuleAlias", path, uiConfigId);
+            validateOptionalText(block, "generationRuleId", path, uiConfigId);
+            return;
+        }
+        String targetModuleAlias = validateRequiredText(block, "targetModuleAlias", path, uiConfigId);
+        validateModuleAlias(targetModuleAlias, path + ".targetModuleAlias", uiConfigId);
+        validateOptionalText(block, "generationRuleId", path, uiConfigId);
         validateOptionalText(block, "associationViewCode", path, uiConfigId);
+        validateOptionalText(block, "queryTemplateId", path, uiConfigId);
         validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
     }
 
@@ -327,6 +367,16 @@ public class PlatformPageConfigPublishService {
         }
     }
 
+    private void validateOptionalPositiveInt(JsonNode block, String field, String path, String uiConfigId) {
+        JsonNode value = block.get(field);
+        if (value == null || value.isNull()) {
+            return;
+        }
+        if (!value.isInt() || value.asInt() <= 0) {
+            throw layoutException(uiConfigId, path + "." + field + " must be positive integer");
+        }
+    }
+
     private void validateQueryTemplate(String moduleAlias, String queryTemplateId, String path, String uiConfigId) {
         PlatformQueryTemplate template = queryTemplateService.requireQueryTemplate(queryTemplateId);
         if (!moduleAlias.equals(template.getModuleAlias())) {
@@ -334,6 +384,17 @@ public class PlatformPageConfigPublishService {
         }
         if (!Boolean.TRUE.equals(template.getPublished()) || !Boolean.TRUE.equals(template.getEnabled())) {
             throw layoutException(uiConfigId, path + ".queryTemplateId must be published and enabled");
+        }
+    }
+
+    private void validateModuleAlias(String moduleAlias, String path, String uiConfigId) {
+        if (recordService == null) {
+            return;
+        }
+        try {
+            recordService.describe(moduleAlias);
+        } catch (RuntimeException exception) {
+            throw layoutException(uiConfigId, path + " is unknown");
         }
     }
 

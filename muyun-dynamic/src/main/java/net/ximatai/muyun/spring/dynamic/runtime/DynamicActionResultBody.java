@@ -10,24 +10,29 @@ public record DynamicActionResultBody(
         Object value,
         String message,
         boolean refresh,
-        String redirectTo
+        String redirectTo,
+        DynamicActionRefreshStrategy refreshStrategy
 ) {
     public DynamicActionResultBody {
         type = type == null ? inferType(value) : type;
         message = message == null || message.isBlank() ? null : message.trim();
         redirectTo = redirectTo == null || redirectTo.isBlank() ? null : redirectTo.trim();
+        refreshStrategy = refreshStrategy == null ? DynamicActionRefreshStrategy.none() : refreshStrategy;
+        refresh = refresh || refreshStrategy.active();
     }
 
     public static DynamicActionResultBody of(Object value) {
-        return new DynamicActionResultBody(null, value, null, false, null);
+        return new DynamicActionResultBody(null, value, null, false, null, null);
     }
 
     public static DynamicActionResultBody createdRecordId(String value) {
-        return new DynamicActionResultBody(DynamicActionResultType.RECORD_ID, value, null, true, null);
+        return new DynamicActionResultBody(DynamicActionResultType.RECORD_ID, value, null, true, null,
+                DynamicActionRefreshStrategy.detailRefresh());
     }
 
     public static DynamicActionResultBody changedCount(int value) {
-        return new DynamicActionResultBody(DynamicActionResultType.COUNT, value, null, value > 0, null);
+        return new DynamicActionResultBody(DynamicActionResultType.COUNT, value, null, value > 0, null,
+                value > 0 ? DynamicActionRefreshStrategy.listAndDetail() : null);
     }
 
     public static DynamicActionResultBody changedCount(int value, String message) {
@@ -35,7 +40,7 @@ public record DynamicActionResultBody(
     }
 
     public static DynamicActionResultBody none() {
-        return new DynamicActionResultBody(DynamicActionResultType.NONE, null, null, false, null);
+        return new DynamicActionResultBody(DynamicActionResultType.NONE, null, null, false, null, null);
     }
 
     public static DynamicActionResultBody notice(String message) {
@@ -67,19 +72,23 @@ public record DynamicActionResultBody(
     }
 
     public static DynamicActionResultBody dialog(DynamicActionDialog dialog) {
-        return new DynamicActionResultBody(DynamicActionResultType.DIALOG, dialog, null, false, null);
+        return new DynamicActionResultBody(DynamicActionResultType.DIALOG, dialog, null, false, null, null);
     }
 
     public DynamicActionResultBody message(String value) {
-        return new DynamicActionResultBody(type, this.value, value, refresh, redirectTo);
+        return new DynamicActionResultBody(type, this.value, value, refresh, redirectTo, refreshStrategy);
     }
 
     public DynamicActionResultBody withRefresh() {
-        return new DynamicActionResultBody(type, value, message, true, redirectTo);
+        return withRefreshStrategy(DynamicActionRefreshStrategy.listAndDetail());
+    }
+
+    public DynamicActionResultBody withRefreshStrategy(DynamicActionRefreshStrategy strategy) {
+        return new DynamicActionResultBody(type, value, message, refresh, redirectTo, strategy);
     }
 
     public DynamicActionResultBody redirectTo(String value) {
-        return new DynamicActionResultBody(type, this.value, message, refresh, value);
+        return new DynamicActionResultBody(type, this.value, message, refresh, value, refreshStrategy);
     }
 
     private static DynamicActionResultType inferType(Object value) {
