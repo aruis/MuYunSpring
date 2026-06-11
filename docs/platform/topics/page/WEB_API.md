@@ -70,4 +70,4 @@
 | `/{moduleAlias}/references/{fieldName}/generate` | 记录联动。 |
 | `/{moduleAlias}/generation/confirm` | 记录联动。 |
 | `/{moduleAlias}/code/preview` | 编码规则。 |
-| `/{moduleAlias}/exchange/template`、`/{moduleAlias}/import/*`、`/{moduleAlias}/export/data` | 数据交换。 |
+| `/{moduleAlias}/exchange/template`、`/{moduleAlias}/import/*`、`/{moduleAlias}/export/*` | 数据交换。 |

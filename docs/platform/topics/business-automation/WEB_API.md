@@ -22,6 +22,7 @@
 - `/{moduleAlias}/import/execute`：执行导入。
 - `/{moduleAlias}/import/error-file/{token}`：下载导入错误文件。
 - `/{moduleAlias}/export/data`：导出动态模块数据。
+- `/{moduleAlias}/export/selected`：导出选中动态模块记录。
 
 ## 记录联动
 

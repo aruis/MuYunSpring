@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
@@ -113,6 +114,20 @@ public class DynamicExportWebController {
         });
     }
 
+    @PostMapping("/selected")
+    @ActionEndpoint(PlatformAction.EXPORT)
+    public void exportSelected(@PathVariable String moduleAlias,
+                               @RequestBody(required = false) DynamicSelectedExportRequest request,
+                               HttpServletResponse response) {
+        tenantScope(moduleAlias, () -> {
+            DynamicModuleDescriptor descriptor = recordService.describe(moduleAlias);
+            requireExchangeCapability(descriptor);
+            byte[] bytes = exportFacade.exportWorkbook(selectedExportCommand(moduleAlias, descriptor, request));
+            writeXlsx(response, moduleAlias.replace('.', '_') + "-selected-export.xlsx", bytes);
+            return null;
+        });
+    }
+
     private DynamicExportCommand exportCommand(String moduleAlias,
                                                DynamicModuleDescriptor descriptor,
                                                WebQueryRequest request) {
@@ -121,6 +136,24 @@ public class DynamicExportWebController {
         Criteria criteria = queryCriteria(moduleAlias, operations, normalized);
         PageRequest pageRequest = DynamicWebQueryMapper.page(normalized.pageOrDefault());
         Sort[] sorts = DynamicWebQueryMapper.sorts(normalized.sorts());
+        return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
+    }
+
+    private DynamicExportCommand selectedExportCommand(String moduleAlias,
+                                                       DynamicModuleDescriptor descriptor,
+                                                       DynamicSelectedExportRequest request) {
+        DynamicSelectedExportRequest normalized = request == null
+                ? new DynamicSelectedExportRequest(List.of(), null)
+                : request;
+        WebQueryRequest query = normalized.query();
+        List<String> selectedIds = selectedIds(normalized.ids());
+        DynamicEntityOperations operations = recordService.mainEntity(moduleAlias);
+        Criteria queryCriteria = queryCriteria(moduleAlias, operations, query);
+        Criteria selectedCriteria = Criteria.of().in(StandardEntitySchema.ID_FIELD, selectedIds);
+        Criteria criteria = andCriteria(queryCriteria, selectedCriteria);
+        WebQueryRequest queryOrDefault = query == null ? new WebQueryRequest(null, List.of(), List.of()) : query;
+        PageRequest pageRequest = DynamicWebQueryMapper.page(queryOrDefault.pageOrDefault());
+        Sort[] sorts = DynamicWebQueryMapper.sorts(queryOrDefault.sorts());
         return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
     }
 
@@ -298,6 +331,21 @@ public class DynamicExportWebController {
         return value != null && !value.isBlank();
     }
 
+    private List<String> selectedIds(List<String> ids) {
+        if (ids == null) {
+            throw new PlatformException("dynamic selected export ids must not be empty");
+        }
+        List<String> selected = ids.stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (selected.isEmpty()) {
+            throw new PlatformException("dynamic selected export ids must not be empty");
+        }
+        return selected;
+    }
+
     private <T> T tenantScope(String moduleAlias, Supplier<T> action) {
         String tenantId = TenantContext.currentTenantId()
                 .orElseThrow(() -> new PlatformException(moduleAlias + " requires tenant context"));
@@ -310,4 +358,7 @@ public class DynamicExportWebController {
     public DynamicWebError handleBadRequest(RuntimeException exception) {
         return DynamicWebError.badRequest(exception.getMessage());
     }
+}
+
+record DynamicSelectedExportRequest(List<String> ids, WebQueryRequest query) {
 }

@@ -68,6 +68,27 @@ class DynamicExportExecutorTest {
     }
 
     @Test
+    void shouldKeepSelectedCriteriaOnExportActionGateway() {
+        EntityDefinition entity = new EntityDefinition("order", "sales_order", "Order", List.of(
+                FieldDefinition.string("orderNo", "Order No").column("order_no")
+        ));
+        DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
+                MODULE,
+                "Order",
+                List.of(entity)
+        ));
+        Criteria selectedCriteria = Criteria.of().in("id", List.of("order-1", "order-2"));
+        PageRequest pageRequest = PageRequest.of(1, 20);
+        when(recordService.recordsForAction(MODULE, PlatformAction.EXPORT, "dynamic-export")).thenReturn(records);
+        when(records.list("order", selectedCriteria, pageRequest)).thenReturn(List.of());
+
+        executor.export(new DynamicExportCommand(descriptor, selectedCriteria, pageRequest, List.of()));
+
+        verify(recordService).recordsForAction(MODULE, PlatformAction.EXPORT, "dynamic-export");
+        verify(records).list("order", selectedCriteria, pageRequest);
+    }
+
+    @Test
     void shouldExportFirstLevelChildRowsWithParentRelateId() {
         EntityDefinition order = new EntityDefinition("order", "sales_order", "Order", List.of(
                 FieldDefinition.string("orderNo", "Order No").column("order_no")

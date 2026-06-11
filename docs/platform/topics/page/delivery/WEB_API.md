@@ -87,4 +87,4 @@ preview/download 会先校验记录权限和附件归属。文件二进制、文
 | `/{moduleAlias}/references/{fieldName}/generate` | 记录联动。 |
 | `/{moduleAlias}/generation/confirm` | 记录联动。 |
 | `/{moduleAlias}/code/preview` | 编码规则。 |
-| `/{moduleAlias}/exchange/template`、`/{moduleAlias}/import/*`、`/{moduleAlias}/export/data` | 数据交换。 |
+| `/{moduleAlias}/exchange/template`、`/{moduleAlias}/import/*`、`/{moduleAlias}/export/*` | 数据交换。 |

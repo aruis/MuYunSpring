@@ -158,6 +158,10 @@ public class DynamicOpenApiGenerator {
             operations.add(operation(descriptor.moduleAlias(), basePath + "/export/data",
                     operationId(descriptor, "exportData"),
                     "Export data " + mainEntity.title(), "WebQueryRequest", "binary", PlatformAction.EXPORT.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/export/selected",
+                    operationId(descriptor, "exportSelected"),
+                    "Export selected data " + mainEntity.title(), "DynamicSelectedExportRequest",
+                    "binary", PlatformAction.EXPORT.code()));
         }
         if (mainEntity.capabilities().contains(EntityCapability.ENABLE.name())
                 && standardActionVisible.test(PlatformAction.ENABLE)) {

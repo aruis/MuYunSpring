@@ -162,6 +162,47 @@ class DynamicExportWebControllerTest {
     }
 
     @Test
+    void shouldExportSelectedDataWorkbookThroughFacade() throws Exception {
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        Criteria statusCriteria = Criteria.of().eq("status", "active");
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(operations.queryCriteria(org.mockito.ArgumentMatchers.anyList())).thenReturn(statusCriteria);
+        when(exportFacade.exportWorkbook(org.mockito.ArgumentMatchers.any(DynamicExportCommand.class)))
+                .thenReturn(new byte[]{1, 3, 5});
+
+        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": ["order-1", "order-2", "order-1"],
+                                  "query": {
+                                    "conditions": [
+                                      {"fieldName": "status", "operator": "EQ", "values": ["active"]}
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Export-FileName", "sales_order-selected-export.xlsx"))
+                .andExpect(content().bytes(new byte[]{1, 3, 5}));
+
+        ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
+        verify(exportFacade).exportWorkbook(captor.capture());
+        List<CriteriaClause> clauses = clauses(captor.getValue().criteria());
+        assertThat(clauses).anySatisfy(clause -> {
+            assertThat(clause.getField()).isEqualTo("id");
+            assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.IN);
+            assertThat(clause.getValues()).containsExactly("order-1", "order-2");
+        });
+        assertThat(clauses).anySatisfy(clause -> {
+            assertThat(clause.getField()).isEqualTo("status");
+            assertThat(clause.getValues()).contains("active");
+        });
+    }
+
+    @Test
     void shouldExportDataWithNestedCriteriaAndQuickSearch() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
@@ -234,6 +275,16 @@ class DynamicExportWebControllerTest {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
         mvc.perform(post("/{moduleAlias}/export/data", MODULE))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectSelectedExportWithoutIds() throws Exception {
+        when(recordService.describe(MODULE)).thenReturn(descriptor());
+
+        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[]}"))
                 .andExpect(status().isBadRequest());
     }
 

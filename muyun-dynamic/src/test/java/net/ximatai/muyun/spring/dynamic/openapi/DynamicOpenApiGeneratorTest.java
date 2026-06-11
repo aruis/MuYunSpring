@@ -56,6 +56,7 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/import/error-file/{token}",
                         "/sales.contract/exchange/template",
                         "/sales.contract/export/data",
+                        "/sales.contract/export/selected",
                         "/sales.contract/actions",
                         "/sales.contract/actions/{recordId}",
                         "/sales.contract/publish",
@@ -83,6 +84,14 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(operation -> {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.IMPORT.code());
                     assertThat(operation.requestSchema()).isEqualTo("DynamicExchangeTemplateRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("binary");
+                });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/export/selected")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.EXPORT.code());
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicSelectedExportRequest");
                     assertThat(operation.responseSchema()).isEqualTo("binary");
                 });
         assertThat(document.operations().stream()
@@ -245,7 +254,7 @@ class DynamicOpenApiGeneratorTest {
                 .extracting(DynamicOpenApiDocument.Operation::path)
                 .contains("/sales.contract/openapi", "/sales.contract/query",
                         "/sales.contract/import/parse", "/sales.contract/exchange/template",
-                        "/sales.contract/export/data")
+                        "/sales.contract/export/data", "/sales.contract/export/selected")
                 .doesNotContain("/sales.contract/openapi/{recordId}", "/sales.contract/query/{recordId}",
                         "/sales.contract/import", "/sales.contract/exchange", "/sales.contract/export");
         assertThat(document.operations().stream()
@@ -329,7 +338,8 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/import/execute",
                         "/sales.contract/import/error-file/{token}",
                         "/sales.contract/exchange/template",
-                        "/sales.contract/export/data"
+                        "/sales.contract/export/data",
+                        "/sales.contract/export/selected"
                 );
     }
 
@@ -531,6 +541,9 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("DynamicImportParseSheet");
         assertThat(document.schemas().get("DynamicExchangeTemplateRequest").properties())
                 .containsKeys("disabledReferenceDropdownFields", "referenceDropdownLimit");
+        assertThat(document.schemas().get("DynamicSelectedExportRequest").properties())
+                .containsKeys("ids", "query");
+        assertThat(document.schemas().get("DynamicSelectedExportRequest").required()).containsExactly("ids");
         assertThat(document.schemas().get("DynamicImportExecuteMultipartRequest").properties())
                 .containsKeys("command", "file");
         assertThat(document.schemas().get("DynamicImportUploadResult").properties())
