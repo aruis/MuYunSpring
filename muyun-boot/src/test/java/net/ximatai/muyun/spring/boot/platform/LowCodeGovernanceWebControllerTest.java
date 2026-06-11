@@ -1,0 +1,255 @@
+package net.ximatai.muyun.spring.boot.platform;
+
+import net.ximatai.muyun.spring.platform.config.LowCodeConfigBundle;
+import net.ximatai.muyun.spring.platform.config.LowCodeConfigHealthReport;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishResult;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigVersion;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthContext;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackage;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportDraft;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
+import net.ximatai.muyun.spring.platform.config.LowCodePackageBundleType;
+import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunResult;
+import net.ximatai.muyun.spring.platform.config.LowCodePackageMode;
+import net.ximatai.muyun.spring.platform.config.LowCodePackagePublishManifest;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class LowCodeGovernanceWebControllerTest {
+    @BeforeEach
+    void setUp() {
+        TenantContext.setTenantId("tenant-a");
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void shouldCheckPackageHealthThroughGovernanceEndpoint() throws Exception {
+        LowCodeModuleHealthService healthService = mock(LowCodeModuleHealthService.class);
+        LowCodeConfigHealthReport report = LowCodeConfigHealthReport.of("crm.contract", List.of());
+        when(healthService.check(any(LowCodeModuleHealthContext.class))).thenReturn(report);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(healthService)).build();
+        mvc.perform(post("/platform.low_code_governance/packages/health")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(packageJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"))
+                .andExpect(jsonPath("$.status").value("PASS"));
+
+        ArgumentCaptor<LowCodeModuleHealthContext> captor =
+                ArgumentCaptor.forClass(LowCodeModuleHealthContext.class);
+        verify(healthService).check(captor.capture());
+        assertThat(captor.getValue().moduleAlias()).isEqualTo("crm.contract");
+    }
+
+    @Test
+    void shouldPublishPackageThroughPublishFacade() throws Exception {
+        LowCodeModuleConfigPublishFacade publishFacade = mock(LowCodeModuleConfigPublishFacade.class);
+        LowCodeModuleConfigVersion version = version("version-1");
+        when(publishFacade.publish(any(LowCodeModulePackage.class), any(), any()))
+                .thenReturn(new LowCodeModuleConfigPublishResult(version,
+                        LowCodeConfigHealthReport.of("crm.contract", List.of())));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(publishFacade)).build();
+        mvc.perform(post("/platform.low_code_governance/packages/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "modulePackage": %s,
+                                  "operatorId": "u-1",
+                                  "remark": "上线"
+                                }
+                                """.formatted(packageJson())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.id").value("version-1"))
+                .andExpect(jsonPath("$.version.moduleAlias").value("crm.contract"));
+
+        ArgumentCaptor<LowCodeModulePackage> packageCaptor = ArgumentCaptor.forClass(LowCodeModulePackage.class);
+        verify(publishFacade).publish(packageCaptor.capture(), org.mockito.ArgumentMatchers.eq("u-1"),
+                org.mockito.ArgumentMatchers.eq("上线"));
+        assertThat(packageCaptor.getValue().moduleAlias()).isEqualTo("crm.contract");
+    }
+
+    @Test
+    void shouldRollbackPackageVersionThroughPublishFacade() throws Exception {
+        LowCodeModuleConfigPublishFacade publishFacade = mock(LowCodeModuleConfigPublishFacade.class);
+        when(publishFacade.rollback("crm.contract", "version-1")).thenReturn(version("version-1"));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(publishFacade)).build();
+        mvc.perform(post("/platform/low-code-governance/modules/crm.contract/versions/version-1/rollback"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("version-1"))
+                .andExpect(jsonPath("$.currentVersion").value(true));
+
+        verify(publishFacade).rollback("crm.contract", "version-1");
+    }
+
+    @Test
+    void shouldExportCurrentAndVersionPackageThroughExchangeService() throws Exception {
+        LowCodeModulePackageExchangeService exchangeService = mock(LowCodeModulePackageExchangeService.class);
+        LowCodeModulePackage modulePackage = modulePackage();
+        when(exchangeService.exportCurrentPackage("crm.contract")).thenReturn(packageJson());
+        when(exchangeService.exportVersionPackage("version-1")).thenReturn(packageJson());
+        when(exchangeService.parsePackage(packageJson())).thenReturn(modulePackage);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(exchangeService)).build();
+        mvc.perform(get("/platform.low_code_governance/modules/crm.contract/package"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"));
+        mvc.perform(get("/platform.low_code_governance/versions/version-1/package"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moduleAlias").value("crm.contract"));
+
+        verify(exchangeService).exportCurrentPackage("crm.contract");
+        verify(exchangeService).exportVersionPackage("version-1");
+    }
+
+    @Test
+    void shouldPrepareAndPublishImportDraftThroughImportService() throws Exception {
+        LowCodeModulePackageExchangeService exchangeService = mock(LowCodeModulePackageExchangeService.class);
+        LowCodeModulePackageImportService importService = mock(LowCodeModulePackageImportService.class);
+        LowCodeModulePackage modulePackage = modulePackage();
+        LowCodePackageDryRunResult dryRun = new LowCodePackageDryRunResult(
+                modulePackage, null, LowCodeConfigHealthReport.of("crm.contract", List.of()), List.of());
+        LowCodeModulePackageImportDraft draft = new LowCodeModulePackageImportDraft(
+                "draft-1", modulePackage, dryRun, null, Instant.EPOCH);
+        when(exchangeService.dryRunImport(any(LowCodeModulePackage.class))).thenReturn(dryRun);
+        when(importService.prepareDraft(any(LowCodeModulePackage.class))).thenReturn(draft);
+        when(importService.publishDraft(any(LowCodeModulePackageImportDraft.class), any(), any()))
+                .thenReturn(new LowCodeModuleConfigPublishResult(version("version-1"), dryRun.healthReport()));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(exchangeService, importService)).build();
+        mvc.perform(post("/platform.low_code_governance/imports/dry-run")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(packageJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"));
+        mvc.perform(post("/platform.low_code_governance/imports/drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(packageJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftId").value("draft-1"));
+        mvc.perform(post("/platform.low_code_governance/imports/drafts/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "draft": {
+                                    "draftId": "draft-1",
+                                    "modulePackage": %s,
+                                    "dryRunResult": {
+                                      "modulePackage": %s,
+                                      "healthReport": {"moduleAlias": "crm.contract", "items": []},
+                                      "conflicts": []
+                                    },
+                                    "createdAt": "1970-01-01T00:00:00Z"
+                                  },
+                                  "operatorId": "u-1",
+                                  "remark": "导入"
+                                }
+                                """.formatted(packageJson(), packageJson())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version.id").value("version-1"));
+
+        verify(exchangeService).dryRunImport(any(LowCodeModulePackage.class));
+        verify(importService).prepareDraft(any(LowCodeModulePackage.class));
+        verify(importService).publishDraft(any(LowCodeModulePackageImportDraft.class),
+                org.mockito.ArgumentMatchers.eq("u-1"), org.mockito.ArgumentMatchers.eq("导入"));
+    }
+
+    private LowCodeGovernanceWebController controller(LowCodeModuleHealthService healthService) {
+        return new LowCodeGovernanceWebController(
+                mock(LowCodeModuleConfigPublishFacade.class),
+                healthService,
+                mock(LowCodeModulePackageExchangeService.class),
+                mock(LowCodeModulePackageImportService.class));
+    }
+
+    private LowCodeGovernanceWebController controller(LowCodeModuleConfigPublishFacade publishFacade) {
+        return new LowCodeGovernanceWebController(
+                publishFacade,
+                mock(LowCodeModuleHealthService.class),
+                mock(LowCodeModulePackageExchangeService.class),
+                mock(LowCodeModulePackageImportService.class));
+    }
+
+    private LowCodeGovernanceWebController controller(LowCodeModulePackageExchangeService exchangeService) {
+        return controller(exchangeService, mock(LowCodeModulePackageImportService.class));
+    }
+
+    private LowCodeGovernanceWebController controller(LowCodeModulePackageExchangeService exchangeService,
+                                                     LowCodeModulePackageImportService importService) {
+        return new LowCodeGovernanceWebController(
+                mock(LowCodeModuleConfigPublishFacade.class),
+                mock(LowCodeModuleHealthService.class),
+                exchangeService,
+                importService);
+    }
+
+    private LowCodeModulePackage modulePackage() {
+        return new LowCodeModulePackage(
+                "1.0",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of("moduleAlias", "crm.contract"))),
+                null,
+                LowCodePackagePublishManifest.draft("1.0"));
+    }
+
+    private LowCodeModuleConfigVersion version(String id) {
+        LowCodeModuleConfigVersion version = new LowCodeModuleConfigVersion();
+        version.setId(id);
+        version.setModuleAlias("crm.contract");
+        version.setVersionNo(1);
+        version.setCurrentVersion(Boolean.TRUE);
+        version.setPackageSnapshotText(packageJson());
+        version.setPackageHash("hash");
+        return version;
+    }
+
+    private String packageJson() {
+        return """
+                {
+                  "protocolVersion": "1.0",
+                  "mode": "MODULE_FULL",
+                  "applicationAlias": "crm",
+                  "moduleAlias": "crm.contract",
+                  "bundles": [
+                    {
+                      "type": "METADATA",
+                      "included": true,
+                      "content": {"moduleAlias": "crm.contract"}
+                    }
+                  ]
+                }
+                """;
+    }
+}

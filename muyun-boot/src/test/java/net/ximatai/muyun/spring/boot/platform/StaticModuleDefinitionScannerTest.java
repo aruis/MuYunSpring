@@ -18,6 +18,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.code.CodePreviewService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class StaticModuleDefinitionScannerTest {
     @Test
@@ -241,6 +246,39 @@ class StaticModuleDefinitionScannerTest {
                             "publishQueryTemplate", "unpublishQueryTemplate");
             assertThat(definition.actions()).allSatisfy(action ->
                     assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD));
+        }
+    }
+
+    @Test
+    void shouldRegisterLowCodeGovernanceActionsAsStaticModuleActions() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(LowCodeModuleConfigPublishFacade.class,
+                    () -> mock(LowCodeModuleConfigPublishFacade.class));
+            context.registerBean(LowCodeModuleHealthService.class, () -> mock(LowCodeModuleHealthService.class));
+            context.registerBean(LowCodeModulePackageExchangeService.class,
+                    () -> mock(LowCodeModulePackageExchangeService.class));
+            context.registerBean(LowCodeModulePackageImportService.class,
+                    () -> mock(LowCodeModulePackageImportService.class));
+            context.registerBean(LowCodeGovernanceWebController.class);
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("platform.low_code_governance");
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("checkPackageHealth", "publishPackage", "rollbackPackageVersion",
+                            "exportCurrentPackage", "exportVersionPackage", "dryRunImportPackage",
+                            "prepareImportDraft", "publishImportDraft");
+            Map<String, StaticModuleActionDefinition> actions = definition.actions().stream()
+                    .collect(Collectors.toMap(StaticModuleActionDefinition::actionCode, Function.identity()));
+            assertThat(actions.get("checkPackageHealth").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("publishPackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("dryRunImportPackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("prepareImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("publishImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("rollbackPackageVersion").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+            assertThat(actions.get("exportCurrentPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+            assertThat(actions.get("exportVersionPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
         }
     }
 

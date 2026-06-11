@@ -78,6 +78,12 @@
 
 `LowCodeModulePackageImportService` 当前只提供最小导入门面：`prepareDraft` 在 dry-run 不阻断时生成内存草稿，`publishDraft` 校验基线版本未变化后，只允许 `MODULE_FULL` 草稿交给发布门面生成配置版本。当前不持久化草稿、不批量写真实配置表、不做字段级 diff、审批流或合并策略。
 
+## Web 暴露面
+
+配置治理通过 `platform.low_code_governance` 静态模块入口开放。当前 Web 层只承接已有治理门面，覆盖配置包健康检查、发布、回滚、当前/历史版本导出、导入 dry-run、导入草稿和草稿发布；具体 URL 见 `WEB_API.md`。
+
+模板服务当前还没有稳定模板仓库和管理模型，暂不开放独立 Web API。模板实例化结果仍可作为 `LowCodeModulePackage` 进入 dry-run 和发布链路。
+
 ## 模板复用
 
 `LowCodeModuleTemplateService` 从已发布 `MODULE_FULL + METADATA` 版本创建模板。模板底包使用 `TEMPLATE` 模式，实例化时生成新的 `MODULE_FULL` 包。
