@@ -1,13 +1,15 @@
 # 平台治理台账
 
-本文档用于记录平台能力复盘后尚未治理完成的事项。它是治理过程台账，不替代业务专题文档。
+本文档用于记录平台能力复盘后的治理收口结论。它是治理过程台账，不替代业务专题文档。
 
 治理项完成并形成稳定能力后，再回流到对应专题的 `OVERVIEW.md` 和 `WEB_API.md`。专题文档只描述已稳定的能力、边界和接口线索，不承载过程性待办。
 
+当前本轮治理已收口，没有 `待治理` 或 `治理中` 项；后续新增治理项再追加到本台账。
+
 ## 使用原则
 
-1. 只记录已经经过专题复盘确认的缺口或待判断项。
-2. 优先描述能力缺口和 Web 暴露面缺口，不展开 Java 底层设计。
+1. 只记录已经经过专题复盘确认的治理项、暂不吸收项和后续触发条件。
+2. 优先描述能力判断和 Web 暴露面结论，不展开 Java 底层设计。
 3. 状态使用 `待治理`、`治理中`、`已完成`、`暂不吸收`。
 4. 优先级使用 `P0`、`P1`、`P2`：
    - `P0`：平台能力已有明显基础，但缺少必要 Web 暴露面或交接入口。
@@ -16,7 +18,7 @@
 
 ## 总览
 
-| 优先级 | 专题 | 治理项 | 当前判断 | 状态 |
+| 优先级 | 专题 | 治理项 | 治理结论 | 状态 |
 | --- | --- | --- | --- | --- |
 | P0 | 配置与元数据 | UI 配置管理 Web 暴露面 | 已补齐 UI 配置集、UI 配置、字段配置和发布入口。 | 已完成 |
 | P0 | 配置与元数据 | 查询模板管理 Web 暴露面 | 已补齐查询模板、查询项和发布入口。 | 已完成 |
@@ -66,10 +68,10 @@
 
 1. MuYun 已覆盖动态 CRUD、动作、引用、OpenAPI、页面 bootstrap、页面偏好、导入导出、编码规则运维、工作流运行态和生单/回写运行态主链路。
 2. neo 的大一统 `ModuleWeb`、独立动态弹窗接口、专用生单 URL、专用批量删除 URL、直链附件访问等形态不吸收；MuYun 继续保持按平台对象聚合、动作主链路和 access envelope/ticket 边界。
-3. 新确认的 P1 缺口集中在“配置态交接面”：菜单维护、字段 UI 类型属性/映射、生单/回写规则配置、工作流定义与发布配置。
-4. P2 缺口主要是需要进一步判断边界的体验和模型能力：公式即时计算、元数据视图、模板复用管理、标准批量删除动作贡献。
+3. 已治理的 P1 配置态交接面包括：菜单维护、字段 UI 类型属性/映射、生单/回写规则配置、工作流定义与发布配置。
+4. 已治理的 P2 体验和模型能力包括：公式即时计算、元数据视图、模板复用管理、标准批量删除动作贡献。
 
-## 待治理详情
+## 治理详情
 
 ### 配置与元数据
 
@@ -77,7 +79,7 @@
 
 - 优先级：P0
 - 状态：已完成
-- 当前判断：`PlatformUiSetService`、`PlatformUiConfigService`、`PlatformUiConfigFieldService` 已通过平台配置 URL 暴露。
+- 治理前判断：`PlatformUiSetService`、`PlatformUiConfigService`、`PlatformUiConfigFieldService` 已通过平台配置 URL 暴露。
 - 治理结果：提供 UI 配置集、配置项、字段配置的查询和维护入口，并通过专门发布入口控制发布状态。
 - 回流目标：`configuration/WEB_API.md`、`page/delivery/WEB_API.md`
 
@@ -85,7 +87,7 @@
 
 - 优先级：P0
 - 状态：已完成
-- 当前判断：`PlatformQueryTemplateService`、`PlatformQueryItemService` 已通过平台配置 URL 暴露。
+- 治理前判断：`PlatformQueryTemplateService`、`PlatformQueryItemService` 已通过平台配置 URL 暴露。
 - 治理结果：提供查询模板、查询项的轻量 CRUD、排序、启停和发布入口；已复用标准嵌套 Web 支撑。
 - 回流目标：`configuration/WEB_API.md`、`runtime/WEB_API.md`
 
@@ -93,7 +95,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：MuYun 已有字段引用、字段保护、模块字段引用过滤、引用回填和公式规则等稳定服务。
+- 治理前判断：MuYun 已有字段引用、字段保护、模块字段引用过滤、引用回填和公式规则等稳定服务。
 - 治理结果：补齐对应配置 Web 入口，并按元数据字段、模块关系和模块字段归属聚合；未引入新的字段行为模型。
 - 回流目标：`configuration/OVERVIEW.md`、`configuration/WEB_API.md`
 
@@ -101,7 +103,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：`MenuSchemeService`、`MenuService` 已存在，菜单消费入口、菜单 entry 和菜单授权视图也已存在，但缺少配置维护入口。
+- 治理前判断：`MenuSchemeService`、`MenuService` 已存在，菜单消费入口、菜单 entry 和菜单授权视图也已存在，但缺少配置维护入口。
 - 治理结果：补齐菜单方案维护入口 `/platform.menu_scheme`，以及方案内菜单树维护入口 `/platform.menu-scheme/{schemeId}/menus`；维护入口按平台静态模块和方案聚合，不照搬 neo 大一统模块维护接口。
 - 回流目标：`configuration/WEB_API.md`、`page/delivery/WEB_API.md`
 
@@ -109,7 +111,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：字段类型和字段 UI 类型目录已开放；`PlatformFieldUiTypeAttributeService`、`PlatformFieldUiTypeFieldMappingService` 已存在但缺少 Web 暴露面。
+- 治理前判断：字段类型和字段 UI 类型目录已开放；`PlatformFieldUiTypeAttributeService`、`PlatformFieldUiTypeFieldMappingService` 已存在但缺少 Web 暴露面。
 - 治理结果：按字段 UI 类型 alias 聚合属性和字段映射配置入口，新增和更新时以后端 URL 中的 `fieldUiTypeAlias` 为准，支撑页面 bootstrap 和字段渲染配置交接。
 - 回流目标：`configuration/WEB_API.md`、`page/delivery/WEB_API.md`
 
@@ -117,7 +119,7 @@
 
 - 优先级：P2
 - 状态：已完成
-- 当前判断：`MetadataViewService`、`MetadataViewFieldService` 已存在，并被模块定义编译链路引用；但它可能与 UI 配置集、UI 配置字段存在边界重叠。
+- 治理前判断：`MetadataViewService`、`MetadataViewFieldService` 已存在，并被模块定义编译链路引用；但它可能与 UI 配置集、UI 配置字段存在边界重叠。
 - 治理结果：元数据视图是模块定义发布前的视图真相源，已按 `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views` 和其下 `/{viewId}/fields` 补齐轻量维护入口；页面布局、区块、端侧差异仍归 UI 配置专题。
 - 回流目标：`configuration/WEB_API.md`
 
@@ -127,7 +129,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：当前已有角色、动作授权、数据权限等基础能力，单点授权和矩阵回显可用。
+- 治理前判断：当前已有角色、动作授权、数据权限等基础能力，单点授权和矩阵回显可用。
 - 治理结果：补充按角色批量授权和批量撤销接口，矩阵回显继续使用 `/iam.role/permissionMatrix/{roleId}`。
 - 回流目标：`identity-permission/WEB_API.md`
 
@@ -135,7 +137,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：当前用户菜单和菜单剪枝能力已存在，菜单可见性由模块 `menu` 动作授权决定。
+- 治理前判断：当前用户菜单和菜单剪枝能力已存在，菜单可见性由模块 `menu` 动作授权决定。
 - 治理结果：补充角色菜单矩阵视图；不新增角色-菜单表，保存继续走标准模块动作授权。
 - 回流目标：`identity-permission/WEB_API.md`
 
@@ -143,7 +145,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：用户 CRUD 已有基础，配置和授权场景需要轻量选择器。
+- 治理前判断：用户 CRUD 已有基础，配置和授权场景需要轻量选择器。
 - 治理结果：补充用户选择器查询，支持角色、组织、关键字和启用状态过滤，不替代用户管理 CRUD。
 - 回流目标：`identity-permission/WEB_API.md`
 
@@ -153,7 +155,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：导出主链路已有，选中导出应作为同一导出能力的显式入口。
+- 治理前判断：导出主链路已有，选中导出应作为同一导出能力的显式入口。
 - 治理结果：补充 `POST /{moduleAlias}/export/selected`，按选中 ID 导出并可叠加查询上下文，继续复用现有导出执行链路。
 - 回流目标：`business-automation/data-exchange/WEB_API.md`
 
@@ -161,7 +163,7 @@
 
 - 优先级：P1
 - 状态：暂不吸收
-- 当前判断：当前只有个人化导出字段、排序等体验诉求，尚不足以抽象系统级导出模板模型。
+- 治理前判断：当前只有个人化导出字段、排序等体验诉求，尚不足以抽象系统级导出模板模型。
 - 治理结果：用户级导出配置先由页面偏好承载；只有出现可共享、可发布的系统模板场景时再单独治理。
 - 回流目标：`business-automation/data-exchange/OVERVIEW.md`
 
@@ -169,7 +171,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：当前偏好主要服务页面交付和当前用户体验，不改变平台配置真相源。
+- 治理前判断：当前偏好主要服务页面交付和当前用户体验，不改变平台配置真相源。
 - 治理结果：复用 `/platform.page-preference/{moduleAlias}` 读取和保存当前用户偏好，可承载列表列宽、排序、筛选和个人化导出配置。
 - 回流目标：`page/OVERVIEW.md`、`page/WEB_API.md`
 
@@ -177,7 +179,7 @@
 
 - 优先级：P2
 - 状态：已完成
-- 当前判断：编码规则、预览、取号、台账、回收池已覆盖主链路；状态行级调整属于运维增强。
+- 治理前判断：编码规则、预览、取号、台账、回收池已覆盖主链路；状态行级调整属于运维增强。
 - 治理结果：补齐 `POST /platform.code_sequence_state/adjust/{id}`，从状态行发起基线调整，底层复用 `CodeOpsActionService` 的规则校验、治理日志和下一值预览。
 - 回流目标：`business-automation/code-rule/WEB_API.md`
 
@@ -185,8 +187,8 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：生单、回写运行态已由动作和写事件触发链路覆盖；`RecordGenerationRuleService`、`RecordWriteBackRuleService` 已存在，但配置维护 Web 面不足。
-- 治理方向：按 MuYun 平台风格补齐规则配置入口，优先考虑模块聚合的独立静态模块或嵌套资源，不照搬 neo `ModuleWeb` 中的规则维护方法。
+- 治理前判断：生单、回写运行态已由动作和写事件触发链路覆盖；`RecordGenerationRuleService`、`RecordWriteBackRuleService` 已存在，但配置维护 Web 面不足。
+- 治理方式：按 MuYun 平台风格补齐规则配置入口，优先考虑模块聚合的独立静态模块或嵌套资源，不照搬 neo `ModuleWeb` 中的规则维护方法。
 - 治理结果：补齐 `/platform.module/{moduleAlias}/generation-rules` 和 `/platform.module/{moduleAlias}/write-back-rules`，以规则树为配置交接单位，支持查询、查看、保存、启停、排序和删除；路径模块分别锁定生单 `sourceModuleAlias` 与回写 `triggerModuleAlias`。
 - 回流目标：`business-automation/record-linkage/WEB_API.md`
 
@@ -196,8 +198,8 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：工作流运行态、管理端、委托和工作台入口已覆盖；`WorkflowDefinitionService`、`WorkflowVersionService`、`WorkflowPublishFacade` 已存在，但定义、版本、发布配置入口不足。
-- 治理方向：补齐工作流定义、版本和发布配置的 Web 面，保持配置态和运行态分离。
+- 治理前判断：工作流运行态、管理端、委托和工作台入口已覆盖；`WorkflowDefinitionService`、`WorkflowVersionService`、`WorkflowPublishFacade` 已存在，但定义、版本、发布配置入口不足。
+- 治理方式：补齐工作流定义、版本和发布配置的 Web 面，保持配置态和运行态分离。
 - 治理结果：补齐 `/platform.module/{moduleAlias}/workflow-definitions` 和 `/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions`，普通维护只面向草稿；发布、停用和归档统一走 `WorkflowPublishFacade`，保持模块动作贡献和定义状态同步。
 - 回流目标：`workflow-task/WEB_API.md`
 
@@ -207,7 +209,7 @@
 
 - 优先级：P2
 - 状态：已完成
-- 当前判断：MuYun 已有公式规则配置、保存校验和运行态公式能力，但缺少面向页面 onchange/试算的只读 Web 入口。
+- 治理前判断：MuYun 已有公式规则配置、保存校验和运行态公式能力，但缺少面向页面 onchange/试算的只读 Web 入口。
 - 治理结果：补齐 `/{moduleAlias}/formula/preview`，复用动态公式运行态，基于页面当前记录 payload 试算，不落库、不读取已有记录原值，返回试算记录、变更字段和结构化诊断。字段可见和可编辑范围仍由页面 bootstrap、动作配置和保存链路兜底。
 - 回流目标：`page/interaction/WEB_API.md`、`runtime/WEB_API.md`
 
@@ -217,7 +219,7 @@
 
 - 优先级：P1
 - 状态：已完成
-- 当前判断：治理专题已记录配置包、健康检查、版本发布、回滚、迁移 dry-run 等能力线索，已有服务门面可承接 Web 暴露。
+- 治理前判断：治理专题已记录配置包、健康检查、版本发布、回滚、迁移 dry-run 等能力线索，已有服务门面可承接 Web 暴露。
 - 治理结果：补齐 `platform.low_code_governance` 静态模块入口，开放配置包健康检查、发布、回滚、导出、导入 dry-run、导入草稿和草稿发布接口；模板复用入口按无状态工具单独治理。
 - 回流目标：`governance/OVERVIEW.md`、`governance/WEB_API.md`
 
@@ -225,7 +227,7 @@
 
 - 优先级：P2
 - 状态：已完成
-- 当前判断：`LowCodeModuleTemplateService` 已提供从版本生成模板和实例化包的服务能力，但缺少稳定模板仓库、持久化管理模型和 Web API。
+- 治理前判断：`LowCodeModuleTemplateService` 已提供从版本生成模板和实例化包的服务能力，但缺少稳定模板仓库、持久化管理模型和 Web API。
 - 治理结果：不建设模板仓库、模板市场、模板版本和持久化管理模型；补齐治理模块下的无状态工具入口，从已发布版本派生 `LowCodeModuleTemplate`，再由客户端提交模板和实例化参数生成新的 `MODULE_FULL` 包。实例化结果继续走导入预检和发布链路。
 - 回流目标：`governance/OVERVIEW.md`、`governance/WEB_API.md`
 
@@ -235,7 +237,7 @@
 
 - 优先级：P2
 - 状态：已完成
-- 当前判断：MuYun 已有通用批量动作宿主 `/{moduleAlias}/{actionCode}/batch`，但是否需要平台默认贡献标准批量删除动作仍未明确。
+- 治理前判断：MuYun 已有通用批量动作宿主 `/{moduleAlias}/{actionCode}/batch`，但是否需要平台默认贡献标准批量删除动作仍未明确。
 - 治理结果：不新增 `/deleteBatch` 平行 URL；动态 CRUD 模块贡献标准 `batchDelete` 批量动作，通过 `/{moduleAlias}/batchDelete/batch` 执行，复用软删、动作目录、`delete` 权限、数据范围和运行事件链路。
 - 回流目标：`runtime/WEB_API.md`
 

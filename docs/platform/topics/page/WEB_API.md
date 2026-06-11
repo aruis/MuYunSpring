@@ -49,6 +49,7 @@
 | `POST` | `/{moduleAlias}/{actionCode}` | 执行列表级动作。 |
 | `POST` | `/{moduleAlias}/{actionCode}/{recordId}` | 执行记录级动作。 |
 | `POST` | `/{moduleAlias}/{actionCode}/batch` | 执行批量动作。 |
+| `POST` | `/{moduleAlias}/formula/preview` | 按页面当前记录 payload 执行公式即时试算。 |
 | `GET` | `/{moduleAlias}/tasks/definitions` | 读取模块任务定义。 |
 | `POST` | `/{moduleAlias}/view/{id}/tasks/check` | 返回模块任务状态列表。 |
 | `POST` | `/{moduleAlias}/view/{id}/tasks/evaluate` | 返回模块任务检查完整结果。 |
