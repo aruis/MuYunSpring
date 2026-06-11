@@ -151,6 +151,29 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @Test
+    void shouldScanMenuMaintenanceModules() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(MenuSchemeWebController.class);
+            context.registerBean(MenuManagementWebController.class);
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
+
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder("platform.menu_scheme", "platform.menu");
+            assertThat(byAlias.get("platform.menu_scheme").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
+                            "sort", "enable", "disable");
+            assertThat(byAlias.get("platform.menu").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("create", "view", "update", "delete", "query",
+                            "tree", "sort", "enable", "disable");
+        }
+    }
+
+    @Test
     void shouldAssembleWorkflowActionsFromStaticModuleCapabilities() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(WorkflowEnabledWeb.class);

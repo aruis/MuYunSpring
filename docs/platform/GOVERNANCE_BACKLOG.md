@@ -28,7 +28,7 @@
 | P1 | 业务自动化 | 用户导出模板 | 用户级导出字段、排序等个人化配置先由页面偏好承载，不新增模板模型。 | 暂不吸收 |
 | P1 | 业务自动化 | 通用用户偏好 | 已确认通过页面偏好接口承载当前用户页面与导出个人化配置。 | 已完成 |
 | P1 | 治理 | 配置发布、包、导入导出 Web 暴露面 | 已补齐配置包健康检查、发布、回滚、导出、导入预检和导入草稿发布入口。 | 已完成 |
-| P1 | 配置与元数据 | 菜单方案、菜单维护 Web 暴露面 | 当前主要暴露菜单消费入口，配置维护入口仍需补齐。 | 待治理 |
+| P1 | 配置与元数据 | 菜单方案、菜单维护 Web 暴露面 | 已补齐菜单方案和方案内菜单树维护入口。 | 已完成 |
 | P1 | 配置与元数据 | 字段 UI 类型属性和字段映射配置入口 | 字段 UI 类型目录已暴露，属性和映射配置服务已有但缺 Web 入口。 | 待治理 |
 | P1 | 记录联动 | 生单、回写配置 Web 暴露面 | 运行态已覆盖，配置态规则维护入口仍需补齐。 | 待治理 |
 | P1 | 工作流任务 | 工作流定义与发布配置 Web 暴露面 | 运行态已覆盖，定义、版本和发布配置入口仍需补齐。 | 待治理 |
@@ -49,6 +49,7 @@
 | 配置与元数据 | 查询模板管理 Web 暴露面 | 已补齐模块查询模板、模板下查询项和发布/取消发布入口。 | `configuration/WEB_API.md`、`runtime/WEB_API.md` |
 | 配置与元数据 | 字段行为配置 Web 暴露面 | 已补齐字段引用、字段保护、模块字段引用过滤、引用回填和公式规则配置入口。 | `configuration/WEB_API.md` |
 | 配置与元数据 | 嵌套资源标准 Web 支撑 | 已抽出嵌套 CRUD、排序、启停支撑，避免配置接口退化成各自手写业务代码。 | `configuration/OVERVIEW.md` |
+| 配置与元数据 | 菜单方案、菜单维护 Web 暴露面 | 已补齐 `/platform.menu_scheme` 和 `/platform.menu-scheme/{schemeId}/menus`，菜单消费入口继续保持 `/platform.menu/mine` 和 `/platform.menu/{menuId}/entry`。 | `configuration/WEB_API.md`、`page/delivery/WEB_API.md` |
 | 运行态与权限 | 静态模块注解优先解析 | 已修正动作端点上下文解析，保证平台配置接口优先使用自身静态模块语义。 | `runtime/OVERVIEW.md`、`identity-permission/OVERVIEW.md` |
 | 身份权限 | 当前用户上下文接口 | 已补齐 `GET /iam.auth/context`，用于前端和接手方识别当前用户身份。 | `identity-permission/WEB_API.md` |
 | 身份权限 | 权限配置与授权工作台 | 已补齐角色批量授权/撤销、角色菜单矩阵和用户选择器入口；菜单授权继续复用模块 `menu` 动作。 | `identity-permission/WEB_API.md` |
@@ -97,9 +98,9 @@
 #### 菜单方案、菜单维护 Web 暴露面
 
 - 优先级：P1
-- 状态：待治理
-- 当前判断：`MenuSchemeService`、`MenuService` 已存在，当前 Web 主要开放当前用户菜单、菜单 entry 和菜单授权视图，缺少配置维护入口。
-- 治理方向：补齐菜单方案和菜单树维护的配置入口，继续按平台静态模块和树形资源聚合，不照搬 neo 大一统模块维护接口。
+- 状态：已完成
+- 当前判断：`MenuSchemeService`、`MenuService` 已存在，菜单消费入口、菜单 entry 和菜单授权视图也已存在，但缺少配置维护入口。
+- 治理结果：补齐菜单方案维护入口 `/platform.menu_scheme`，以及方案内菜单树维护入口 `/platform.menu-scheme/{schemeId}/menus`；维护入口按平台静态模块和方案聚合，不照搬 neo 大一统模块维护接口。
 - 回流目标：`configuration/WEB_API.md`、`page/delivery/WEB_API.md`
 
 #### 字段 UI 类型属性和字段映射配置入口

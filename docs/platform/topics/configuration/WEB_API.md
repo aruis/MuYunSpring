@@ -29,8 +29,8 @@
 | 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
 | 数据字典类目 | `DictionaryCategoryService` | 当前未暴露独立 Web Controller |
 | 数据字典项目 | `DictionaryItemService` | 当前未暴露独立 Web Controller |
-| 菜单方案 | `MenuSchemeService` | 当前未暴露独立 Web Controller |
-| 菜单维护 | `MenuService` | 仅暴露当前用户菜单消费入口；基础维护当前未暴露独立 Web Controller |
+| 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
+| 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
 ## 标准维护接口
 
@@ -75,6 +75,29 @@
 | 字段 UI 类型 | `POST` | `/platform.field_ui_type/delete/{id}` | 删除字段 UI 类型 |
 | 字段 UI 类型 | `POST` | `/platform.field_ui_type/enable/{id}`、`/disable/{id}` | 启用或停用字段 UI 类型 |
 | 字段 UI 类型 | `POST` | `/platform.field_ui_type/sort/{id}` | 调整字段 UI 类型排序 |
+
+## 菜单配置
+
+菜单配置维护面分为菜单方案和方案内菜单树。菜单消费入口仍是 `/platform.menu/mine` 和 `/platform.menu/{menuId}/entry`，不替代配置维护接口。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 菜单方案 | `POST` | `/platform.menu_scheme/query` | 查询菜单方案，支持按别名、作用域、启停状态等字段过滤 |
+| 菜单方案 | `GET` | `/platform.menu_scheme/view/{id}` | 查看菜单方案 |
+| 菜单方案 | `POST` | `/platform.menu_scheme/insert` | 新增菜单方案 |
+| 菜单方案 | `POST` | `/platform.menu_scheme/update/{id}` | 更新菜单方案；方案身份字段不可随意改动 |
+| 菜单方案 | `POST` | `/platform.menu_scheme/delete/{id}` | 删除菜单方案 |
+| 菜单方案 | `POST` | `/platform.menu_scheme/enable/{id}`、`/disable/{id}` | 启用或停用菜单方案 |
+| 菜单方案 | `POST` | `/platform.menu_scheme/sort/{id}` | 在同一作用域下调整菜单方案顺序 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/query` | 查询指定方案下的菜单节点 |
+| 菜单节点 | `GET` | `/platform.menu-scheme/{schemeId}/menus/tree` | 获取指定方案下的菜单树，可用 `flat=true` 返回扁平列表 |
+| 菜单节点 | `GET` | `/platform.menu-scheme/{schemeId}/menus/tree/{id}` | 获取指定菜单节点下的子树 |
+| 菜单节点 | `GET` | `/platform.menu-scheme/{schemeId}/menus/view/{id}` | 查看菜单节点，并校验节点属于该方案 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/insert` | 新增菜单节点；后端以 URL 中的 `schemeId` 为准 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/update/{id}` | 更新菜单节点，并保持方案归属不跨方案 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/delete/{id}` | 删除菜单节点 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/enable/{id}`、`/disable/{id}` | 启用或停用菜单节点 |
+| 菜单节点 | `POST` | `/platform.menu-scheme/{schemeId}/menus/sort/{id}` | 在同一方案和父节点范围内调整菜单顺序 |
 
 ## 元数据字段
 
