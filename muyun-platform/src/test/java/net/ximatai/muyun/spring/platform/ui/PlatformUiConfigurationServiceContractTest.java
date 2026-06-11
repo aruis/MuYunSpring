@@ -361,6 +361,78 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldValidateTaskPanelCheckConfiguration() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "detail", PlatformUiSetType.DETAIL, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "ready", false));
+        publishService.publishQueryTemplate(templateId);
+        DynamicRecordService recordService = org.mockito.Mockito.mock(DynamicRecordService.class);
+        org.mockito.Mockito.when(recordService.describe("crm.customer")).thenReturn(new DynamicModuleDescriptor(
+                "crm.customer",
+                "Customer",
+                "customer",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new DynamicAssociationViewDescriptor("contracts", "customer", "crm.contract", "contract",
+                        AssociationViewDisplayMode.INLINE_LIST, "contracts", null, EntityViewType.LIST, true))
+        ));
+        PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
+                uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
+                recordService);
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"taskPanel", "checkType":"QUERY_TEMPLATE", "queryTemplateId":"%s"}
+                  ]
+                }
+                """.formatted(templateId));
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].key is required");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"taskPanel", "key":"ready", "checkType":"ASSOCIATION_VIEW", "associationViewCode":"missing"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("associationViewCode.viewCode is unknown");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {
+                      "type":"taskPanel",
+                      "key":"ready",
+                      "checkType":"QUERY_TEMPLATE",
+                      "queryTemplateId":"%s",
+                      "externalRecordIdKey":"recordId",
+                      "diagnosticPath":"/crm.customer/query"
+                    },
+                    {"type":"taskPanel", "key":"contracts", "checkType":"ASSOCIATION_VIEW", "associationViewCode":"contracts"}
+                  ]
+                }
+                """.formatted(templateId));
+        uiConfigService.update(config);
+        assertThatCode(() -> verifyingPublishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
     void shouldValidateActionBlocksAgainstDynamicDescriptorWhenAvailable() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");

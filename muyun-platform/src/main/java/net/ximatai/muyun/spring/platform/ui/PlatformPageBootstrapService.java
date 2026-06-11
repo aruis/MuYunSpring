@@ -195,7 +195,8 @@ public class PlatformPageBootstrapService {
                 .toList();
         return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiTypes(uiFields),
                 associationBlocks(snapshot, clientType, defaultUiConfigId),
-                actionBlocks(snapshot, clientType, defaultUiConfigId));
+                actionBlocks(snapshot, clientType, defaultUiConfigId),
+                taskBlocks(snapshot, clientType, defaultUiConfigId));
     }
 
     private List<PlatformAssociationBlock> associationBlocks(PlatformPageConfigSnapshot snapshot,
@@ -299,6 +300,19 @@ public class PlatformPageBootstrapService {
             ));
         }
         return resolved;
+    }
+
+    private List<PlatformTaskBlock> taskBlocks(PlatformPageConfigSnapshot snapshot,
+                                               PlatformUiClientType clientType,
+                                               String defaultUiConfigId) {
+        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
+            return List.of();
+        }
+        return snapshot.uiConfigs().stream()
+                .filter(config -> config.getClientType() == clientType)
+                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
+                .flatMap(config -> PlatformTaskBlockLayoutResolver.resolve(config).stream())
+                .toList();
     }
 
     private String text(JsonNode node, String field) {

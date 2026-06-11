@@ -223,6 +223,7 @@ public class PlatformPageConfigPublishService {
             validateAssociationBlock(moduleAlias, block, path, uiConfigId);
             validateActionBlock(moduleAlias, block, path, uiConfigId);
             validateLocalEditBlock(moduleAlias, block, path, uiConfigId);
+            validateTaskBlock(moduleAlias, block, path, uiConfigId);
         }
     }
 
@@ -283,10 +284,67 @@ public class PlatformPageConfigPublishService {
         validateOptionalText(block, "position", path, uiConfigId);
     }
 
+    private void validateTaskBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
+        JsonNode type = block.get("type");
+        if (type == null || type.isNull() || !"taskPanel".equals(type.asText())) {
+            return;
+        }
+        validateRequiredText(block, "key", path, uiConfigId);
+        validateOptionalText(block, "title", path, uiConfigId);
+        validateOptionalText(block, "diagnosticPath", path, uiConfigId);
+        PlatformTaskCheckType checkType = validateTaskCheckType(block, path, uiConfigId);
+        if (checkType == PlatformTaskCheckType.MANUAL) {
+            validateOptionalText(block, "associationViewCode", path, uiConfigId);
+            validateOptionalText(block, "queryTemplateId", path, uiConfigId);
+            validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+            return;
+        }
+        if (checkType == PlatformTaskCheckType.ASSOCIATION_VIEW) {
+            String viewCode = validateRequiredText(block, "associationViewCode", path, uiConfigId);
+            validateAssociationViewCode(moduleAlias, viewCode, path + ".associationViewCode", uiConfigId);
+            validateOptionalText(block, "queryTemplateId", path, uiConfigId);
+            validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+            return;
+        }
+        String queryTemplateId = validateRequiredText(block, "queryTemplateId", path, uiConfigId);
+        validateQueryTemplate(moduleAlias, queryTemplateId, path, uiConfigId);
+        validateOptionalText(block, "associationViewCode", path, uiConfigId);
+        validateOptionalText(block, "externalRecordIdKey", path, uiConfigId);
+    }
+
+    private PlatformTaskCheckType validateTaskCheckType(JsonNode block, String path, String uiConfigId) {
+        JsonNode checkType = block.get("checkType");
+        if (checkType == null || checkType.isNull()) {
+            return PlatformTaskCheckType.MANUAL;
+        }
+        if (!checkType.isTextual() || checkType.asText().isBlank()) {
+            throw layoutException(uiConfigId, path + ".checkType must be string");
+        }
+        try {
+            return PlatformTaskCheckType.valueOf(checkType.asText().trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw layoutException(uiConfigId, path + ".checkType is unsupported");
+        }
+    }
+
+    private void validateQueryTemplate(String moduleAlias, String queryTemplateId, String path, String uiConfigId) {
+        PlatformQueryTemplate template = queryTemplateService.requireQueryTemplate(queryTemplateId);
+        if (!moduleAlias.equals(template.getModuleAlias())) {
+            throw layoutException(uiConfigId, path + ".queryTemplateId must belong to module");
+        }
+        if (!Boolean.TRUE.equals(template.getPublished()) || !Boolean.TRUE.equals(template.getEnabled())) {
+            throw layoutException(uiConfigId, path + ".queryTemplateId must be published and enabled");
+        }
+    }
+
     private String validateRequiredActionCode(JsonNode block, String path, String uiConfigId) {
-        JsonNode actionCode = block.get("actionCode");
+        return validateRequiredText(block, "actionCode", path, uiConfigId);
+    }
+
+    private String validateRequiredText(JsonNode block, String field, String path, String uiConfigId) {
+        JsonNode actionCode = block.get(field);
         if (actionCode == null || !actionCode.isTextual() || actionCode.asText().isBlank()) {
-            throw layoutException(uiConfigId, path + ".actionCode is required");
+            throw layoutException(uiConfigId, path + "." + field + " is required");
         }
         return actionCode.asText().trim();
     }

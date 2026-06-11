@@ -75,7 +75,8 @@ public class DynamicPageBootstrapWebController {
                 config.queryItems(),
                 config.fieldUiTypes(),
                 config.associationBlocks(),
-                actionBlocks
+                actionBlocks,
+                config.taskBlocks()
         );
     }
 

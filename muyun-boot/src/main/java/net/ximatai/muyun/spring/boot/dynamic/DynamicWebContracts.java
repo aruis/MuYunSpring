@@ -137,6 +137,9 @@ record DynamicWebGenerationConfirmRequest(String targetModuleAlias,
                                           RecordOriginContext originContext) {
 }
 
+record DynamicModuleTaskCheckRequest(String uiConfigId) {
+}
+
 record DynamicRecordResponse(String id,
                              Integer version,
                              Map<String, Object> values,

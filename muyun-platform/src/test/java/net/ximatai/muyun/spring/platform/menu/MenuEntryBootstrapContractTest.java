@@ -35,6 +35,8 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigFieldService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
 import net.ximatai.muyun.spring.platform.ui.PlatformResolvedUiField;
+import net.ximatai.muyun.spring.platform.ui.PlatformTaskBlock;
+import net.ximatai.muyun.spring.platform.ui.PlatformTaskCheckType;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
@@ -334,6 +336,14 @@ class MenuEntryBootstrapContractTest {
                       "actionCode": "submitDialog",
                       "title": "提交",
                       "position": "recordToolbar"
+                    },
+                    {
+                      "type": "taskPanel",
+                      "key": "contractReady",
+                      "title": "合同齐备",
+                      "checkType": "ASSOCIATION_VIEW",
+                      "associationViewCode": "contracts",
+                      "diagnosticPath": "/crm.customer/view/{id}/associations/contracts/query"
                     }
                   ]
                 }
@@ -372,6 +382,13 @@ class MenuEntryBootstrapContractTest {
         PlatformActionBlock actionBlock = bootstrap.resolvedConfig().actionBlocks().getFirst();
         assertThat(actionBlock.type()).isEqualTo("dialog");
         assertThat(actionBlock.position()).isEqualTo("recordToolbar");
+        assertThat(bootstrap.resolvedConfig().taskBlocks())
+                .extracting(PlatformTaskBlock::key)
+                .containsExactly("contractReady");
+        PlatformTaskBlock taskBlock = bootstrap.resolvedConfig().taskBlocks().getFirst();
+        assertThat(taskBlock.checkType()).isEqualTo(PlatformTaskCheckType.ASSOCIATION_VIEW);
+        assertThat(taskBlock.associationViewCode()).isEqualTo("contracts");
+        assertThat(taskBlock.diagnosticPath()).isEqualTo("/crm.customer/view/{id}/associations/contracts/query");
     }
 
     @Test

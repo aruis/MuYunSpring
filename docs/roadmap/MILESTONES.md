@@ -396,7 +396,7 @@ M9 当前按三个战役推进：
 
 1. 关联视图与局部信息编辑战役：建设模块上下游关系、关联视图、关联查询映射、详情关联区块和局部信息编辑动作。关联视图复用 M8 查询模板和 M7 生成关系事实，信息编辑必须作为独立动作走动作授权、字段范围校验、UI 配置保存和乐观锁，不退化成标准 edit 的展示变体。当前已启动关联视图查询入口，详情页可按 association view code 查询子表关联列表或引用目标记录页，并复用 M8 查询请求协议；详情 UI 配置可通过 `layoutJson.blocks[].type=associationView` 声明关联区块，bootstrap 下发 `associationBlocks`、目标 UI 配置、默认查询模板和查询路径；局部信息编辑通过内置 `muyun.localEdit` 动态 action executor 承载，动作自身负责授权，执行器按发布 UI 配置限制主表字段范围并复用动态乐观锁更新。
 2. 动态弹窗与动作交互战役：建设动态弹窗动作的初始化与提交协议、动作按钮位置与可用性、动作前后刷新/跳转策略和前端状态刷新契约。动态弹窗只承载“先补参数再执行业务”的动作交互，不作为任意脚本、任意组件注册或完整页面引擎。当前已启动弹窗交互协议：DIALOG action 作为弹窗初始化入口，`executorKey` 可用 `dialogKey#submitActionCode` 绑定后续业务动作；初始化结果返回 `dialogKey/actionCode/submitActionCode/submitPath/recordId/refreshOnSuccess`，提交仍走动态 action 主链路；默认 UI 配置可通过 `layoutJson.blocks[].type=dialog|action|localEdit` 声明动作区块，bootstrap 下发 `actionBlocks` 供前端结合已授权动作和可用性渲染按钮。
-3. 模块任务与业务完成项战役：建设模块级业务完成项、默认引导、后端可验证 check、托管来源同步和业务编排诊断。模块任务不是审批待办，不存处理人、委托、加签或办理状态；完成判定应复用公式、查询模板、关联视图、生成关系、审批状态和工作流上下文，不新增平行条件语言。
+3. 模块任务与业务完成项战役：建设模块级业务完成项、默认引导、后端可验证 check、托管来源同步和业务编排诊断。模块任务不是审批待办，不存处理人、委托、加签或办理状态；完成判定应复用公式、查询模板、关联视图、生成关系、审批状态和工作流上下文，不新增平行条件语言。当前已启动任务区块与后端 check 协议：详情 UI 配置可通过 `layoutJson.blocks[].type=taskPanel` 声明业务完成项，bootstrap 下发 `taskBlocks`；`POST /{moduleAlias}/view/{id}/tasks/check` 按 `VIEW` 权限检查当前记录完成状态，首期支持 `ASSOCIATION_VIEW` 和 `QUERY_TEMPLATE` 两类后端可验证判定，查询模板可通过 `externalRecordIdKey` 显式注入当前记录 ID，`MANUAL` 任务只作为前端引导返回 `UNKNOWN`，不制造隐式办理状态。
 
 M9 不做完整 BPMN 设计器，也不把弹窗 handler、信息编辑或模块任务变成业务硬编码入口；所有动作必须能回到平台动作上下文、权限判定和配置化运行态。
 

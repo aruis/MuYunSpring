@@ -54,7 +54,7 @@ class DynamicPageBootstrapWebControllerTest {
                 new PlatformResolvedPageConfig(List.of(), List.of(), List.of(), List.of(), List.of(
                         new PlatformActionBlock("ui-1", "action", null, "query", null, "toolbar"),
                         new PlatformActionBlock("ui-1", "action", null, "delete", null, "toolbar")
-                ))
+                ), List.of())
         );
         PlatformPageBootstrap webBootstrap = new PlatformPageBootstrap(
                 new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
