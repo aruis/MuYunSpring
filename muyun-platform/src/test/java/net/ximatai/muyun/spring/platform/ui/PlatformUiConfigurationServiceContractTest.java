@@ -283,6 +283,32 @@ class PlatformUiConfigurationServiceContractTest {
         config.setLayoutJson("""
                 {
                   "blocks": [
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo", "width":0}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].width must be positive integer");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo", "refresh":{"list":"no"}}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].refresh.list must be boolean");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
                     {"type":"dialog", "key":"submitDialog"}
                   ]
                 }
@@ -300,8 +326,8 @@ class PlatformUiConfigurationServiceContractTest {
                   ],
                   "blocks": [
                     {"type":"associationView", "key":"contracts", "viewCode":"contracts"},
-                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo"},
-                    {"type":"dialog", "key":"submitDialog", "actionCode":"submitDialog", "position":"recordToolbar"},
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo", "width":720, "height":520, "refresh":{"list":false, "detail":true}},
+                    {"type":"dialog", "key":"submitDialog", "actionCode":"submitDialog", "position":"recordToolbar", "width":640},
                     {"type":"taskPanel", "key":"completion"}
                   ]
                 }
@@ -473,6 +499,56 @@ class PlatformUiConfigurationServiceContractTest {
                 """.formatted(templateId));
         uiConfigService.update(config);
         assertThatCode(() -> verifyingPublishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldValidateLocalEditTargetConfigBeforePublishingSourceConfig() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String sourceSetId = uiSetService.insert(uiSet("crm.customer", "detail", PlatformUiSetType.DETAIL, true));
+        String sourceConfigId = uiConfigService.insert(uiConfig(sourceSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(sourceConfigId, customerNameField, "text"));
+        String targetSetId = uiSetService.insert(uiSet("crm.customer", "localedit", PlatformUiSetType.FORM, false));
+        String targetConfigId = uiConfigService.insert(uiConfig(targetSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(targetConfigId, customerNameField, "text"));
+
+        PlatformUiConfig targetConfig = uiConfigService.select(targetConfigId);
+        targetConfig.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo"}
+                  ]
+                }
+                """);
+        uiConfigService.update(targetConfig);
+        PlatformUiConfig sourceConfig = uiConfigService.select(sourceConfigId);
+        sourceConfig.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo", "targetUiConfigId":"%s"}
+                  ]
+                }
+                """.formatted(targetConfigId));
+        uiConfigService.update(sourceConfig);
+
+        assertThatThrownBy(() -> publishService.publishUiConfig(sourceConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("targetUiConfigId must be published and enabled");
+
+        publishService.publishUiConfig(targetConfigId);
+
+        PlatformUiSet targetSet = uiSetService.select(targetSetId);
+        targetSet.setEnabled(false);
+        uiSetService.update(targetSet);
+        assertThatThrownBy(() -> publishService.publishUiConfig(sourceConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("targetUiConfigId must use enabled UI set");
+        targetSet = uiSetService.select(targetSetId);
+        targetSet.setEnabled(true);
+        uiSetService.update(targetSet);
+
+        assertThatCode(() -> publishService.publishUiConfig(sourceConfigId)).doesNotThrowAnyException();
     }
 
     @Test

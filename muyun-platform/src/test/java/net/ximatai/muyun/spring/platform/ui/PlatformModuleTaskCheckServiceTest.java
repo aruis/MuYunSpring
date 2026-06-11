@@ -296,6 +296,91 @@ class PlatformModuleTaskCheckServiceTest {
                 .hasMessageContaining("Module task definition does not belong");
     }
 
+    @Test
+    void shouldSyncManagedSourceWithoutOverwritingManualTasks() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+        registry.register(task("crm.customer", "manual-ready", PlatformModuleTaskOriginType.MANUAL,
+                null, false, "手工任务"));
+
+        registry.replaceManagedSource("crm.customer", PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "profile-ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", true, "资料齐备")));
+
+        assertThat(registry.listEnabled("crm.customer"))
+                .extracting(PlatformModuleTaskDefinition::taskCode)
+                .containsExactly("manual-ready", "profile-ready");
+    }
+
+    @Test
+    void shouldReplaceOldManagedTasksFromSameSource() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+        registry.replaceManagedSource("crm.customer", PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "old-ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", true, "旧任务")));
+
+        registry.replaceManagedSource("crm.customer", PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "new-ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", true, "新任务")));
+
+        assertThat(registry.listEnabled("crm.customer"))
+                .extracting(PlatformModuleTaskDefinition::taskCode)
+                .containsExactly("new-ready");
+    }
+
+    @Test
+    void shouldRejectInvalidManagedSourceSyncDefinitions() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+
+        assertThatThrownBy(() -> registry.replaceManagedSource("crm.customer",
+                PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.contract", "ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", true, "跨模块"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong");
+        assertThatThrownBy(() -> registry.replaceManagedSource("crm.customer",
+                PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", false, "非托管"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only accepts managed");
+        assertThatThrownBy(() -> registry.replaceManagedSource("crm.customer",
+                PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "ready", PlatformModuleTaskOriginType.GENERATION_RULE,
+                        "rule-1", true, "错误来源"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("matching origin");
+    }
+
+    @Test
+    void shouldRejectManagedSourceSyncWhenTaskCodeIsOwnedByManualTask() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+        registry.register(task("crm.customer", "ready", PlatformModuleTaskOriginType.MANUAL,
+                null, false, "手工任务"));
+
+        assertThatThrownBy(() -> registry.replaceManagedSource("crm.customer",
+                PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(task("crm.customer", "ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                        "local-edit-basic", true, "托管任务"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("already owned by another source");
+    }
+
+    @Test
+    void shouldRejectDuplicateTaskCodeWithinManagedSourceSync() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+
+        assertThatThrownBy(() -> registry.replaceManagedSource("crm.customer",
+                PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic",
+                List.of(
+                        task("crm.customer", "ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                                "local-edit-basic", true, "任务一"),
+                        task("crm.customer", "ready", PlatformModuleTaskOriginType.LOCAL_EDIT,
+                                "local-edit-basic", true, "任务二")
+                )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate taskCode");
+    }
+
     private PlatformPageConfigSnapshot snapshot(String layoutJson, List<PlatformQueryTemplate> templates) {
         PlatformUiConfig config = new PlatformUiConfig();
         config.setId("ui-detail");
@@ -318,5 +403,16 @@ class PlatformModuleTaskCheckServiceTest {
         RecordImpactRelation relation = new RecordImpactRelation();
         relation.setTargetRecordId(targetRecordId);
         return relation;
+    }
+
+    private PlatformModuleTaskDefinition task(String moduleAlias,
+                                              String taskCode,
+                                              PlatformModuleTaskOriginType originType,
+                                              String originId,
+                                              boolean managed,
+                                              String title) {
+        return new PlatformModuleTaskDefinition(moduleAlias, taskCode, title,
+                PlatformModuleTaskType.BUSINESS_COMPLETION, originType, originId, managed,
+                false, true, 1, null, List.of(), List.of());
     }
 }

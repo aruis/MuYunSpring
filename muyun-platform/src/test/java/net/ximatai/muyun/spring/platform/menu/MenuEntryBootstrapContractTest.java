@@ -338,6 +338,17 @@ class MenuEntryBootstrapContractTest {
                       "position": "recordToolbar"
                     },
                     {
+                      "type": "localEdit",
+                      "key": "baseInfo",
+                      "actionCode": "editBaseInfo",
+                      "title": "编辑资料",
+                      "position": "recordToolbar",
+                      "uiConfigId": "ui-detail-web",
+                      "width": 720,
+                      "height": 520,
+                      "refresh": {"list": false, "detail": true}
+                    },
+                    {
                       "type": "taskPanel",
                       "key": "contractReady",
                       "title": "合同齐备",
@@ -378,10 +389,18 @@ class MenuEntryBootstrapContractTest {
         assertThat(block.queryPath()).isEqualTo("/crm.customer/view/{id}/associations/contracts/query");
         assertThat(bootstrap.resolvedConfig().actionBlocks())
                 .extracting(PlatformActionBlock::actionCode)
-                .containsExactly("submitDialog");
+                .containsExactly("submitDialog", "editBaseInfo");
         PlatformActionBlock actionBlock = bootstrap.resolvedConfig().actionBlocks().getFirst();
         assertThat(actionBlock.type()).isEqualTo("dialog");
         assertThat(actionBlock.position()).isEqualTo("recordToolbar");
+        PlatformActionBlock localEditBlock = bootstrap.resolvedConfig().actionBlocks().get(1);
+        assertThat(localEditBlock.type()).isEqualTo("localEdit");
+        assertThat(localEditBlock.targetUiConfigId()).isEqualTo("ui-detail-web");
+        assertThat(localEditBlock.submitPath()).isEqualTo("/crm.customer/editBaseInfo/{recordId}");
+        assertThat(localEditBlock.refreshStrategy().list()).isFalse();
+        assertThat(localEditBlock.refreshStrategy().detail()).isTrue();
+        assertThat(localEditBlock.width()).isEqualTo(720);
+        assertThat(localEditBlock.height()).isEqualTo(520);
         assertThat(bootstrap.resolvedConfig().taskBlocks())
                 .extracting(PlatformTaskBlock::key)
                 .containsExactly("contractReady");

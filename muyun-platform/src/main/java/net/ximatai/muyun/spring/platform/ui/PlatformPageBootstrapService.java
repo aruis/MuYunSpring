@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionRefreshStrategy;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
@@ -258,11 +259,11 @@ public class PlatformPageBootstrapService {
         return snapshot.uiConfigs().stream()
                 .filter(config -> config.getClientType() == clientType)
                 .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
-                .flatMap(config -> actionBlocks(config).stream())
+                .flatMap(config -> actionBlocks(snapshot.moduleAlias(), config).stream())
                 .toList();
     }
 
-    private List<PlatformActionBlock> actionBlocks(PlatformUiConfig config) {
+    private List<PlatformActionBlock> actionBlocks(String moduleAlias, PlatformUiConfig config) {
         String layoutJson = config.getLayoutJson();
         if (layoutJson == null || layoutJson.isBlank()) {
             return List.of();
@@ -296,10 +297,54 @@ public class PlatformPageBootstrapService {
                     text(block, "key"),
                     actionCode,
                     text(block, "title"),
-                    text(block, "position")
+                    text(block, "position"),
+                    localEditTargetUiConfigId(config, block, type),
+                    localEditSubmitPath(moduleAlias, actionCode, type),
+                    localEditRefreshStrategy(block, type),
+                    positiveInteger(block, "width"),
+                    positiveInteger(block, "height")
             ));
         }
         return resolved;
+    }
+
+    private String localEditTargetUiConfigId(PlatformUiConfig config, JsonNode block, String type) {
+        if (!"localEdit".equals(type)) {
+            return null;
+        }
+        String targetUiConfigId = text(block, "targetUiConfigId");
+        if (targetUiConfigId != null) {
+            return targetUiConfigId;
+        }
+        targetUiConfigId = text(block, "uiConfigId");
+        return targetUiConfigId == null ? config.getId() : targetUiConfigId;
+    }
+
+    private String localEditSubmitPath(String moduleAlias, String actionCode, String type) {
+        if (!"localEdit".equals(type)) {
+            return null;
+        }
+        return "/" + moduleAlias + "/" + actionCode + "/{recordId}";
+    }
+
+    private DynamicActionRefreshStrategy localEditRefreshStrategy(JsonNode block, String type) {
+        if (!"localEdit".equals(type)) {
+            return DynamicActionRefreshStrategy.none();
+        }
+        JsonNode refresh = block.get("refresh");
+        if (refresh == null || refresh.isNull()) {
+            return DynamicActionRefreshStrategy.listAndDetail();
+        }
+        if (!refresh.isObject()) {
+            throw new PlatformException("localEdit.refresh must be object");
+        }
+        return new DynamicActionRefreshStrategy(
+                booleanValue(refresh, "list", true),
+                booleanValue(refresh, "detail", true),
+                false,
+                null,
+                null
+        );
     }
 
     private List<PlatformTaskBlock> taskBlocks(PlatformPageConfigSnapshot snapshot,
@@ -321,6 +366,28 @@ public class PlatformPageBootstrapService {
             return null;
         }
         return value.asText().trim();
+    }
+
+    private boolean booleanValue(JsonNode node, String field, boolean defaultValue) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return defaultValue;
+        }
+        if (!value.isBoolean()) {
+            throw new PlatformException("localEdit.refresh." + field + " must be boolean");
+        }
+        return value.asBoolean();
+    }
+
+    private Integer positiveInteger(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.canConvertToInt() || value.asInt() <= 0) {
+            throw new PlatformException("action block " + field + " must be positive integer");
+        }
+        return value.asInt();
     }
 
     private PlatformResolvedUiField resolvedUiField(PlatformUiConfigField field) {

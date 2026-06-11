@@ -267,6 +267,12 @@ public class PlatformPageConfigPublishService {
         }
         validateOptionalText(block, "title", path, uiConfigId);
         validateOptionalText(block, "position", path, uiConfigId);
+        validateOptionalText(block, "uiConfigId", path, uiConfigId);
+        validateOptionalText(block, "targetUiConfigId", path, uiConfigId);
+        validateOptionalPositiveInt(block, "width", path, uiConfigId);
+        validateOptionalPositiveInt(block, "height", path, uiConfigId);
+        validateOptionalRefreshObject(block, path, uiConfigId);
+        validateLocalEditTargetConfig(moduleAlias, actionCode, block, path, uiConfigId);
     }
 
     private void validateActionBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
@@ -282,6 +288,8 @@ public class PlatformPageConfigPublishService {
         }
         validateOptionalText(block, "title", path, uiConfigId);
         validateOptionalText(block, "position", path, uiConfigId);
+        validateOptionalPositiveInt(block, "width", path, uiConfigId);
+        validateOptionalPositiveInt(block, "height", path, uiConfigId);
     }
 
     private void validateTaskBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
@@ -375,6 +383,99 @@ public class PlatformPageConfigPublishService {
         if (!value.isInt() || value.asInt() <= 0) {
             throw layoutException(uiConfigId, path + "." + field + " must be positive integer");
         }
+    }
+
+    private void validateOptionalRefreshObject(JsonNode block, String path, String uiConfigId) {
+        JsonNode refresh = block.get("refresh");
+        if (refresh == null || refresh.isNull()) {
+            return;
+        }
+        if (!refresh.isObject()) {
+            throw layoutException(uiConfigId, path + ".refresh must be object");
+        }
+        validateOptionalBoolean(refresh, "list", path + ".refresh", uiConfigId);
+        validateOptionalBoolean(refresh, "detail", path + ".refresh", uiConfigId);
+    }
+
+    private void validateOptionalBoolean(JsonNode block, String field, String path, String uiConfigId) {
+        JsonNode value = block.get(field);
+        if (value == null || value.isNull()) {
+            return;
+        }
+        if (!value.isBoolean()) {
+            throw layoutException(uiConfigId, path + "." + field + " must be boolean");
+        }
+    }
+
+    private void validateLocalEditTargetConfig(String moduleAlias,
+                                               String actionCode,
+                                               JsonNode block,
+                                               String path,
+                                               String uiConfigId) {
+        String targetUiConfigId = firstText(text(block, "targetUiConfigId"), text(block, "uiConfigId"));
+        if (targetUiConfigId == null || targetUiConfigId.equals(uiConfigId)) {
+            return;
+        }
+        PlatformUiConfig sourceConfig = uiConfigService.requireUiConfig(uiConfigId);
+        PlatformUiConfig targetConfig = uiConfigService.requireUiConfig(targetUiConfigId);
+        PlatformUiSet targetSet = uiSetService.requireUiSet(targetConfig.getUiSetId());
+        if (!moduleAlias.equals(targetSet.getModuleAlias())) {
+            throw layoutException(uiConfigId, path + ".targetUiConfigId must belong to module");
+        }
+        if (sourceConfig.getClientType() != targetConfig.getClientType()) {
+            throw layoutException(uiConfigId, path + ".targetUiConfigId must use same client type");
+        }
+        if (!Boolean.TRUE.equals(targetSet.getEnabled())) {
+            throw layoutException(uiConfigId, path + ".targetUiConfigId must use enabled UI set");
+        }
+        if (!Boolean.TRUE.equals(targetConfig.getEnabled()) || !Boolean.TRUE.equals(targetConfig.getPublished())) {
+            throw layoutException(uiConfigId, path + ".targetUiConfigId must be published and enabled");
+        }
+        if (!hasLocalEditBinding(targetConfig, actionCode)) {
+            throw layoutException(uiConfigId, path + ".targetUiConfigId must bind local edit action");
+        }
+    }
+
+    private boolean hasLocalEditBinding(PlatformUiConfig uiConfig, String actionCode) {
+        String layoutJson = uiConfig.getLayoutJson();
+        if (layoutJson == null || layoutJson.isBlank()) {
+            return false;
+        }
+        JsonNode root;
+        try {
+            root = OBJECT_MAPPER.readTree(layoutJson);
+        } catch (JsonProcessingException exception) {
+            throw new PlatformException("UI config layout JSON cannot be decoded: " + uiConfig.getId());
+        }
+        JsonNode blocks = root.get("blocks");
+        if (blocks == null || !blocks.isArray()) {
+            return false;
+        }
+        for (JsonNode item : blocks) {
+            if (item != null && item.isObject()
+                    && "localEdit".equals(text(item, "type"))
+                    && actionCode.equals(text(item, "actionCode"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String text(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull() || !value.isTextual() || value.asText().isBlank()) {
+            return null;
+        }
+        return value.asText().trim();
     }
 
     private void validateQueryTemplate(String moduleAlias, String queryTemplateId, String path, String uiConfigId) {
