@@ -8,6 +8,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackageWithPageBundle;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.pageOnlyPackage;
 
 class LowCodeModuleTemplateServiceTest {
     private final LowCodeModuleConfigVersionService versionService =
@@ -114,49 +117,4 @@ class LowCodeModuleTemplateServiceTest {
                 .hasMessageContaining("template source package must be MODULE_FULL with METADATA bundle");
     }
 
-    private LowCodeModulePackage fullPackage(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.MODULE_FULL,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", moduleAlias, "title", "Contract"))),
-                null,
-                null
-        );
-    }
-
-    private LowCodeModulePackage fullPackageWithPageBundle(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.MODULE_FULL,
-                applicationAlias,
-                moduleAlias,
-                List.of(
-                        LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                                Map.of("module", moduleAlias, "title", "Contract")),
-                        LowCodeConfigBundle.included(LowCodePackageBundleType.PAGE,
-                                Map.of("moduleAlias", moduleAlias, "uiConfigs", List.of("list")))
-                ),
-                null,
-                null
-        );
-    }
-
-    private LowCodeModulePackage pageOnlyPackage(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.PAGE_ONLY,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.PAGE,
-                        Map.of("moduleAlias", moduleAlias, "uiConfigs", List.of("list")))),
-                null,
-                null
-        );
-    }
 }

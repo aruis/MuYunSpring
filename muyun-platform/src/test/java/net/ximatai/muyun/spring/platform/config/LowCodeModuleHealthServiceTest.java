@@ -8,6 +8,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
 
 class LowCodeModuleHealthServiceTest {
     @Test
@@ -115,7 +116,7 @@ class LowCodeModuleHealthServiceTest {
 
     @Test
     void packageCheckerShouldReportContextModuleMismatch() {
-        LowCodeModulePackage modulePackage = validPackage();
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract");
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
                 List.of(new LowCodeModulePackageHealthChecker()));
 
@@ -130,7 +131,7 @@ class LowCodeModuleHealthServiceTest {
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
                 List.of(new LowCodeModulePackageHealthChecker()));
 
-        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(validPackage()));
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(fullPackage("crm.contract")));
 
         assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
         assertThat(report.items()).isEmpty();
@@ -143,7 +144,7 @@ class LowCodeModuleHealthServiceTest {
             context.refresh();
             LowCodeModuleHealthService service = context.getBean(LowCodeModuleHealthService.class);
 
-            LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(validPackage()));
+            LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(fullPackage("crm.contract")));
 
             assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
         }
@@ -156,18 +157,5 @@ class LowCodeModuleHealthServiceTest {
         assertThatThrownBy(() -> service.check(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("health context must not be null");
-    }
-
-    private LowCodeModulePackage validPackage() {
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.MODULE_FULL,
-                "crm",
-                "crm.contract",
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", "crm.contract"))),
-                null,
-                null
-        );
     }
 }

@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
 
 class LowCodeModuleConfigPublishFacadeTest {
     private final LowCodeModuleConfigVersionService versionService =
@@ -20,7 +21,7 @@ class LowCodeModuleConfigPublishFacadeTest {
 
     @Test
     void shouldPublishModulePackageAsCurrentVersion() {
-        LowCodeModuleConfigPublishResult result = facade.publish(validPackage("crm.contract"), "tester", "baseline");
+        LowCodeModuleConfigPublishResult result = facade.publish(fullPackage("crm.contract"), "tester", "baseline");
 
         LowCodeModuleConfigVersion version = result.version();
         assertThat(version.getVersionNo()).isEqualTo(1);
@@ -35,8 +36,8 @@ class LowCodeModuleConfigPublishFacadeTest {
 
     @Test
     void shouldPublishNextVersionAndRollbackToHistoricalPublishedVersion() {
-        LowCodeModuleConfigVersion first = facade.publish(validPackage("crm.contract"), "tester", "v1").version();
-        LowCodeModuleConfigVersion second = facade.publish(validPackage("crm.contract"), "tester", "v2").version();
+        LowCodeModuleConfigVersion first = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
+        LowCodeModuleConfigVersion second = facade.publish(fullPackage("crm.contract"), "tester", "v2").version();
 
         assertThat(second.getVersionNo()).isEqualTo(2);
         assertThat(versionService.select(first.getId()).getCurrentVersion()).isFalse();
@@ -71,7 +72,7 @@ class LowCodeModuleConfigPublishFacadeTest {
 
     @Test
     void shouldRejectRollbackToVersionInAnotherModule() {
-        LowCodeModuleConfigVersion version = facade.publish(validPackage("crm.contract"), "tester", "v1").version();
+        LowCodeModuleConfigVersion version = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
 
         assertThatThrownBy(() -> facade.rollback("crm.customer", version.getId()))
                 .isInstanceOf(PlatformException.class)
@@ -90,27 +91,13 @@ class LowCodeModuleConfigPublishFacadeTest {
 
     @Test
     void serviceShouldRejectPublishedSnapshotMutation() {
-        LowCodeModuleConfigVersion published = facade.publish(validPackage("crm.contract"), "tester", "v1").version();
+        LowCodeModuleConfigVersion published = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
         LowCodeModuleConfigVersion mutated = copyVersion(published);
         mutated.setPackageHash("changed");
 
         assertThatThrownBy(() -> versionService.update(mutated))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("packageHash cannot be changed");
-    }
-
-    private LowCodeModulePackage validPackage(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.MODULE_FULL,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", moduleAlias))),
-                null,
-                null
-        );
     }
 
     private LowCodeModuleConfigVersion rawVersion(String moduleAlias, int versionNo) {

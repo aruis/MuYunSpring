@@ -9,6 +9,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.pageOnlyPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.templatePackage;
 
 class LowCodeModulePackageExchangeServiceTest {
     private final LowCodeModuleConfigVersionService versionService =
@@ -147,52 +150,6 @@ class LowCodeModulePackageExchangeServiceTest {
         assertThatThrownBy(() -> exchangeService.parsePackage(" "))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("low code module package json must not be blank");
-    }
-
-    private LowCodeModulePackage fullPackage(String moduleAlias) {
-        return fullPackage(moduleAlias, List.of());
-    }
-
-    private LowCodeModulePackage fullPackage(String moduleAlias, List<LowCodePackageDependency> dependencies) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.MODULE_FULL,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", moduleAlias))),
-                new LowCodePackageDependencyManifest(dependencies),
-                null
-        );
-    }
-
-    private LowCodeModulePackage pageOnlyPackage(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.PAGE_ONLY,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.PAGE,
-                        Map.of("uiConfigs", List.of("list")))),
-                null,
-                null
-        );
-    }
-
-    private LowCodeModulePackage templatePackage(String moduleAlias) {
-        String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
-        return new LowCodeModulePackage(
-                "m10.v1",
-                LowCodePackageMode.TEMPLATE,
-                applicationAlias,
-                moduleAlias,
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", moduleAlias))),
-                null,
-                null
-        );
     }
 
     private LowCodePackageDependencyResolver missingResolver(LowCodePackageDependencyType type) {
