@@ -200,6 +200,26 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return 1;
     }
 
+    public int grantActions(String roleId, List<ActionGrantCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        int changed = 0;
+        for (ActionGrantCommand command : commands.stream().filter(Objects::nonNull).toList()) {
+            changed += grantAction(
+                    roleId,
+                    command.moduleAlias(),
+                    command.actionCode(),
+                    command.dataScopePolicy(),
+                    command.tenantScopePolicy(),
+                    command.scopeCondition(),
+                    command.referenceFieldId(),
+                    command.referenceActionCode()
+            );
+        }
+        return changed;
+    }
+
     public int grantWildcardDataScopeAction(String roleId,
                                             String actionCode,
                                             DataScopePolicy dataScopePolicy,
@@ -248,6 +268,17 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         roleAction.setEnabled(false);
         prepareChildUpdate(roleAction);
         return roleActionDao.updateById(roleAction);
+    }
+
+    public int revokeActions(String roleId, List<ActionRevokeCommand> commands) {
+        if (commands == null || commands.isEmpty()) {
+            return 0;
+        }
+        int changed = 0;
+        for (ActionRevokeCommand command : commands.stream().filter(Objects::nonNull).toList()) {
+            changed += revokeAction(roleId, command.moduleAlias(), command.actionCode());
+        }
+        return changed;
     }
 
     public boolean hasActionPermission(String userId, String moduleAlias, String actionCode) {
@@ -586,5 +617,22 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
         TenantContext.currentTenantId().ifPresent(tenantId -> scoped.eq("tenantId", tenantId));
         return scoped;
+    }
+
+    public record ActionGrantCommand(
+            String moduleAlias,
+            String actionCode,
+            DataScopePolicy dataScopePolicy,
+            TenantScopePolicy tenantScopePolicy,
+            String scopeCondition,
+            String referenceFieldId,
+            String referenceActionCode
+    ) {
+    }
+
+    public record ActionRevokeCommand(
+            String moduleAlias,
+            String actionCode
+    ) {
     }
 }

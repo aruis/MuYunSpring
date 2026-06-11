@@ -94,6 +94,7 @@
 | `POST` | `/iam.user/disable/{id}` | 停用用户。 |
 | `POST` | `/iam.user/sort/{id}` | 调整用户排序。 |
 | `POST` | `/iam.user/changePassword/{id}` | 修改用户密码；成功后撤销该用户现有 session。 |
+| `POST` | `/iam.user/selector/query` | 用户选择器查询；支持按角色、组织、关键字和启用状态过滤，返回轻量用户项。 |
 
 ## 角色、角色绑定与授权
 
@@ -113,9 +114,12 @@
 | `POST` | `/iam.role/users/{roleId}/unbind` | 为角色批量解绑用户。 |
 | `GET` | `/iam.role/users/{roleId}` | 查询角色已绑定用户 ID。 |
 | `POST` | `/iam.role/grant/{roleId}` | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
+| `POST` | `/iam.role/grant/{roleId}/batch` | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。 |
 | `POST` | `/iam.role/wildcard-data-scope/{roleId}/grant` | 为数据权限通配角色授予通配数据范围动作。 |
 | `POST` | `/iam.role/revoke/{roleId}` | 撤销角色某个模块动作授权。 |
+| `POST` | `/iam.role/revoke/{roleId}/batch` | 批量撤销角色多个模块动作授权。 |
 | `POST` | `/iam.role/permissionMatrix/{roleId}` | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。 |
+| `GET` | `/iam.role/menuMatrix/{roleId}/{schemeId}` | 按菜单方案返回菜单树和角色对模块菜单的授权状态。 |
 
 授权请求中常见字段：
 
@@ -138,6 +142,8 @@
 | `GET` | `/platform.menu/mine` | 返回当前用户可见菜单树。后端按当前用户推理菜单方案，并按模块 `menu` 动作做剪枝。 |
 
 该接口不接收前端传入的菜单方案参数；剪枝只影响返回结果，不修改菜单配置。
+
+角色菜单授权视图使用 `/iam.role/menuMatrix/{roleId}/{schemeId}`。它不引入单独的角色-菜单权限模型：模块菜单是否可见仍由角色对目标模块的 `menu` 动作授权决定。保存菜单授权时，可使用 `/iam.role/grant/{roleId}`、`/iam.role/grant/{roleId}/batch`、`/iam.role/revoke/{roleId}` 或 `/iam.role/revoke/{roleId}/batch` 维护 `menu` 动作。
 
 ## 动态与静态动作接入线索
 

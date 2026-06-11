@@ -80,8 +80,15 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.moduleAlias()).isEqualTo("iam.user");
                 assertThat(definition.title()).isEqualTo("用户管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactly("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "changePassword");
+                        .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
+                                "sort", "enable", "disable", "userSelector", "changePassword");
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("userSelector"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.title()).isEqualTo("用户选择器");
+                            assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.LIST);
+                            assertThat(action.dataAuth()).isTrue();
+                        });
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("changePassword"))
                         .singleElement()
                         .satisfies(action -> {

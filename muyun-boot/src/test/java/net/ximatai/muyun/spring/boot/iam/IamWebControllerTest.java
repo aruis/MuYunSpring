@@ -10,6 +10,9 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
+import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationDao;
@@ -26,9 +29,13 @@ import net.ximatai.muyun.spring.iam.user.PasswordHashingService;
 import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -378,6 +385,41 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldExposeRoleBatchGrantAndRevokeEndpoints() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(roleService.grantActions(any(), any())).thenReturn(2);
+        when(roleService.revokeActions(any(), any())).thenReturn(1);
+
+        mvc.perform(post("/iam.role/grant/{roleId}/batch", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "actions":[
+                                    {"moduleAlias":"sales.contract","actionCode":"query"},
+                                    {"moduleAlias":"sales.order","actionCode":"menu"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2));
+
+        mvc.perform(post("/iam.role/revoke/{roleId}/batch", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "actions":[
+                                    {"moduleAlias":"sales.contract","actionCode":"query"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(roleService).grantActions(any(), any());
+        verify(roleService).revokeActions(any(), any());
+    }
+
+    @Test
     void shouldExposeRolePermissionMatrixFromModuleAliases() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         List<GrantableAction> grantableActions = List.of(
@@ -407,6 +449,77 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.modules[0].actions[0].granted").value(true));
     }
 
+    @Test
+    void shouldExposeRoleMenuMatrixFromMenuTree() throws Exception {
+        MenuService menuService = mock(MenuService.class);
+        RoleWebController controller = new RoleWebController(grantableActionResolver, provider(menuService));
+        ReflectionTestUtils.setField(controller, "service", roleService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+
+        Menu group = menu("group-1", "scheme-1", MenuType.GROUP, null);
+        Menu contract = menu("menu-1", "scheme-1", MenuType.MODULE, "sales.contract");
+        when(menuService.rootMenus("scheme-1")).thenReturn(List.of(group));
+        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract));
+        when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
+        when(roleService.permissionMatrix(any(), any())).thenReturn(new RolePermissionMatrix(
+                "role-1",
+                List.of(new RolePermissionMatrix.Module(
+                        "sales.contract",
+                        List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
+                                "sales.contract", "menu", "menu", "Menu",
+                                true, false, true, DataScopePolicy.NONE,
+                                TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                ))
+        ));
+
+        mvc.perform(get("/iam.role/menuMatrix/{roleId}/{schemeId}", "role-1", "scheme-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].menu.id").value("group-1"))
+                .andExpect(jsonPath("$.records[0].children[0].menu.id").value("menu-1"))
+                .andExpect(jsonPath("$.records[0].children[0].granted").value(true));
+    }
+
+    @Test
+    void shouldExposeUserSelectorQuery() throws Exception {
+        RoleService roleService = mock(RoleService.class);
+        RecordingUserAccountService userAccountService = new RecordingUserAccountService();
+        UserAccountWebController controller = new UserAccountWebController(null, provider(roleService));
+        ReflectionTestUtils.setField(controller, "service", userAccountService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .addFilters(new CurrentUserWebFilter(() ->
+                        java.util.Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        UserAccount alice = user("user-2", "alice", "Alice");
+        alice.setOrganizationId("org-1");
+        when(roleService.userIds("role-1")).thenReturn(List.of("user-2"));
+        userAccountService.result = PageResult.of(List.of(alice), 1, PageRequest.of(1, 20));
+
+        mvc.perform(post("/iam.user/selector/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "roleId":"role-1",
+                                  "organizationId":"org-1",
+                                  "keyword":"ali"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("user-2"))
+                .andExpect(jsonPath("$.records[0].username").value("alice"))
+                .andExpect(jsonPath("$.records[0].organizationId").value("org-1"));
+
+        verify(roleService).userIds("role-1");
+        assertThat(userAccountService.scopedPolicies)
+                .extracting(ActionExecutionPolicy::actionCode)
+                .containsExactly("userSelector");
+        assertThat(userAccountService.scopedPolicies.getFirst().requiresDataScope()).isTrue();
+        assertThat(userAccountService.queriedCriteria).isSameAs(userAccountService.scopedCriteria);
+        assertThat(containsCondition(userAccountService.baseCriteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
     private Tenant tenant(String alias, String title) {
         Tenant tenant = new Tenant();
         tenant.setAlias(alias);
@@ -434,6 +547,57 @@ class IamWebControllerTest {
         user.setEnabled(Boolean.TRUE);
         user.setSortOrder(1);
         return user;
+    }
+
+    private Menu menu(String id, String schemeId, MenuType menuType, String moduleAlias) {
+        Menu menu = new Menu();
+        menu.setId(id);
+        menu.setSchemeId(schemeId);
+        menu.setMenuType(menuType);
+        menu.setModuleAlias(moduleAlias);
+        menu.setTitle(id);
+        menu.setEnabled(Boolean.TRUE);
+        return menu;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ObjectProvider<T> provider(T value) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(value);
+        return provider;
+    }
+
+    private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
+        return criteria.getClauses().stream()
+                .anyMatch(clause -> fieldName.equals(clause.getField())
+                        && clause.getValues().contains(value));
+    }
+
+    private static final class RecordingUserAccountService extends UserAccountService {
+        private final List<ActionExecutionPolicy> scopedPolicies = new java.util.ArrayList<>();
+        private Criteria baseCriteria;
+        private Criteria scopedCriteria;
+        private Criteria queriedCriteria;
+        private PageResult<UserAccount> result = PageResult.of(List.of(), 0, PageRequest.of(1, 20));
+
+        private RecordingUserAccountService() {
+            super(mock(UserAccountDao.class), mock(ActiveTenantVerifier.class), new PasswordHashingService());
+        }
+
+        @Override
+        public DataScopeCriteriaResult readScopeByPolicy(ActionExecutionPolicy policy, Criteria criteria) {
+            scopedPolicies.add(policy);
+            baseCriteria = criteria;
+            scopedCriteria = Criteria.of().eq("authUserId", "user-1");
+            scopedCriteria.andGroup(criteria.getRoot());
+            return DataScopeCriteriaResult.restricted(scopedCriteria);
+        }
+
+        @Override
+        public PageResult<UserAccount> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
+            queriedCriteria = criteria;
+            return result;
+        }
     }
 
     private String json(Object value) throws Exception {
