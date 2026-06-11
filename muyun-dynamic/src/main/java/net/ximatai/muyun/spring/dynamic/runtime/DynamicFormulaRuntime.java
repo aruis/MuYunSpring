@@ -29,13 +29,14 @@ final class DynamicFormulaRuntime {
     }
 
     FormulaRuntimeReport beforeInsert(DynamicRecord record) {
-        return execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true);
+        return execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true)
+                .report();
     }
 
     FormulaRuntimeReport beforeUpdate(DynamicRecord record,
                                       DynamicRecord existing,
                                       Map<String, List<DynamicRecord>> existingChildren) {
-        return execute(record, existing, existingChildren, List.of(FormulaRulePhase.BEFORE_SAVE));
+        return execute(record, existing, existingChildren, List.of(FormulaRulePhase.BEFORE_SAVE)).report();
     }
 
     boolean hasBeforeUpdateRules(DynamicRecord record) {
@@ -47,7 +48,15 @@ final class DynamicFormulaRuntime {
     }
 
     FormulaRuntimeReport beforeActionExecute(DynamicRecord record, DynamicRecord existing) {
-        return execute(record, existing, List.of(FormulaRulePhase.ACTION_BEFORE_EXECUTE), true);
+        return execute(record, existing, List.of(FormulaRulePhase.ACTION_BEFORE_EXECUTE), true).report();
+    }
+
+    DynamicFormulaPreviewResult preview(DynamicRecord record, DynamicRecord existing) {
+        FormulaExecutionResult result = record.getId() == null || record.getId().isBlank()
+                ? execute(record, null, List.of(FormulaRulePhase.DEFAULT_VALUE, FormulaRulePhase.BEFORE_SAVE), true, false)
+                : execute(record, existing, List.of(FormulaRulePhase.BEFORE_SAVE), true, false);
+        List<String> changedFields = result.report().hasErrors() ? List.of() : result.changedFields();
+        return new DynamicFormulaPreviewResult(record, result.report(), changedFields);
     }
 
     private boolean hasRules(List<FormulaRulePhase> phases) {
@@ -56,32 +65,42 @@ final class DynamicFormulaRuntime {
                         && phases.contains(rule.phase()));
     }
 
-    private FormulaRuntimeReport execute(DynamicRecord record,
-                                         DynamicRecord existing,
-                                         List<FormulaRulePhase> phases,
-                                         boolean includeChildDependentRules) {
+    private FormulaExecutionResult execute(DynamicRecord record,
+                                           DynamicRecord existing,
+                                           List<FormulaRulePhase> phases,
+                                           boolean includeChildDependentRules) {
+        return execute(record, existing, phases, includeChildDependentRules, true);
+    }
+
+    private FormulaExecutionResult execute(DynamicRecord record,
+                                           DynamicRecord existing,
+                                           List<FormulaRulePhase> phases,
+                                           boolean includeChildDependentRules,
+                                           boolean failOnErrors) {
         List<FormulaRule> rules = runtimeRules(phases, includeChildDependentRules);
         if (rules.isEmpty()) {
-            return new FormulaRuntimeReport();
+            return new FormulaExecutionResult();
         }
         Map<String, Object> main = DynamicFormulaDataSupport.mainValues(record, existing);
         Map<String, List<Map<String, Object>>> tables = DynamicFormulaDataSupport.childValues(record);
         FormulaExecutionResult result = engine.execute(rules, FormulaRuntimeData.typed(
                 main, tables, DynamicFormulaDataSupport.fieldDefinitions(entity, module)));
-        if (result.report().hasErrors()) {
+        if (failOnErrors && result.report().hasErrors()) {
             throw new DynamicFormulaException(moduleAlias, entity.alias(), result.report());
         }
-        applyChangedFields(record, main, tables, result.changedFields());
-        return result.report();
+        if (!result.report().hasErrors()) {
+            applyChangedFields(record, main, tables, result.changedFields());
+        }
+        return result;
     }
 
-    private FormulaRuntimeReport execute(DynamicRecord record,
-                                         DynamicRecord existing,
-                                         Map<String, List<DynamicRecord>> existingChildren,
-                                         List<FormulaRulePhase> phases) {
+    private FormulaExecutionResult execute(DynamicRecord record,
+                                           DynamicRecord existing,
+                                           Map<String, List<DynamicRecord>> existingChildren,
+                                           List<FormulaRulePhase> phases) {
         List<FormulaRule> rules = runtimeRulesForUpdate(record, phases);
         if (rules.isEmpty()) {
-            return new FormulaRuntimeReport();
+            return new FormulaExecutionResult();
         }
         Map<String, Object> main = DynamicFormulaDataSupport.mainValues(record, existing);
         Map<String, List<Map<String, Object>>> tables = DynamicFormulaDataSupport.childValues(record, existingChildren);
@@ -91,7 +110,7 @@ final class DynamicFormulaRuntime {
             throw new DynamicFormulaException(moduleAlias, entity.alias(), result.report());
         }
         applyChangedFields(record, main, tables, result.changedFields());
-        return result.report();
+        return result;
     }
 
     private List<FormulaRule> runtimeRules(List<FormulaRulePhase> phases, boolean includeChildDependentRules) {

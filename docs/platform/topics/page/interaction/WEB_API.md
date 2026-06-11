@@ -43,6 +43,16 @@
 
 payload 中应包含 `record.version`、`record.values` 和 `uiConfigId`。实际可编辑字段以后端发布配置和动作授权为准。
 
+## 公式即时试算
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/{moduleAlias}/formula/preview` | 按页面当前记录 payload 执行已发布公式规则试算，返回试算后的记录、变更字段和结构化诊断。 |
+
+该入口服务 onchange、表单预览等页面交互场景，只做运行态计算，不保存数据，也不生成业务流水。请求体使用 `record` 包裹当前页面记录状态，支持 `values` 和 `children`；响应中的 `changedFields` 用于前端判断需要回填的字段。
+
+公式校验失败时接口返回 `report` 诊断，不按保存链路抛出业务异常。字段可见和可编辑范围仍由页面 bootstrap、动作配置和保存接口兜底；试算入口不替代最终保存校验。
+
 ## 模块任务
 
 | 方法 | URL | 功能 |

@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
@@ -45,6 +46,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosis;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosisStatus;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaPreviewResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -221,6 +223,47 @@ class DynamicRecordWebControllerTest {
                 eq(null), eq(null));
         assertThat(contextCaptor.getValue()).containsEntry("code", "draft");
         verify(mainEntity, times(1)).newRecord();
+    }
+
+    @Test
+    void shouldPreviewFormulaWithoutPersistingRecord() throws Exception {
+        DynamicRecord calculated = new DynamicRecord(entity())
+                .setValue("amount", BigDecimal.valueOf(30));
+        when(service.previewFormula(eq(MODULE), eq(ENTITY), any(DynamicRecord.class)))
+                .thenReturn(new DynamicFormulaPreviewResult(calculated, null, List.of("amount")));
+
+        mvc.perform(post("/{moduleAlias}/formula/preview", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "record": {
+                                    "values": {
+                                      "code": "draft",
+                                      "amount": 15
+                                    }
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.record.values.amount").value(30))
+                .andExpect(jsonPath("$.changedFields[0]").value("amount"))
+                .andExpect(jsonPath("$.report.errors").isArray());
+
+        ArgumentCaptor<DynamicRecord> recordCaptor = ArgumentCaptor.forClass(DynamicRecord.class);
+        verify(service).previewFormula(eq(MODULE), eq(ENTITY), recordCaptor.capture());
+        assertThat(recordCaptor.getValue().getValue("code")).isEqualTo("draft");
+        assertThat(recordCaptor.getValue().getValue("amount")).isEqualTo(15);
+    }
+
+    @Test
+    void shouldExposeFormulaPreviewAsCreateActionEndpoint() throws Exception {
+        Method method = DynamicRecordWebController.class.getDeclaredMethod("previewFormula",
+                String.class, DynamicFormulaPreviewRequest.class);
+
+        ActionEndpoint endpoint = method.getAnnotation(ActionEndpoint.class);
+
+        assertThat(endpoint).isNotNull();
+        assertThat(endpoint.value()).isEqualTo(PlatformAction.CREATE);
     }
 
     @Test

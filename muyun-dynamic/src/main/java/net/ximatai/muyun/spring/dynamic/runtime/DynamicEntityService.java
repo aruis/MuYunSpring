@@ -257,6 +257,11 @@ public class DynamicEntityService implements
         lifecycle.beforeDelete(id);
     }
 
+    public DynamicFormulaPreviewResult previewFormula(DynamicRecord record) {
+        DynamicRecord working = record == null ? new DynamicRecord(dao.getEntity()) : record.copy();
+        return formulaRuntime().preview(working, null);
+    }
+
     @Override
     public void afterSelect(DynamicRecord record) {
         lifecycle.afterSelect(record);

@@ -6,12 +6,14 @@ import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryCriteria;
 import net.ximatai.muyun.spring.boot.web.WebSort;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaPreviewResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceMatchMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveMode;
@@ -138,6 +140,29 @@ record DynamicWebGenerationConfirmRequest(String targetModuleAlias,
 }
 
 record DynamicModuleTaskCheckRequest(String uiConfigId) {
+}
+
+record DynamicFormulaPreviewRequest(DynamicRecordPayload record) {
+}
+
+record DynamicFormulaReportResponse(List<FormulaRuntimeReport.Issue> warnings,
+                                    List<FormulaRuntimeReport.Issue> errors) {
+    static DynamicFormulaReportResponse from(FormulaRuntimeReport report) {
+        FormulaRuntimeReport normalized = report == null ? new FormulaRuntimeReport() : report;
+        return new DynamicFormulaReportResponse(normalized.warnings(), normalized.errors());
+    }
+}
+
+record DynamicFormulaPreviewResponse(DynamicRecordResponse record,
+                                     DynamicFormulaReportResponse report,
+                                     List<String> changedFields) {
+    static DynamicFormulaPreviewResponse from(DynamicFormulaPreviewResult result) {
+        return new DynamicFormulaPreviewResponse(
+                DynamicRecordResponse.from(result.record()),
+                DynamicFormulaReportResponse.from(result.report()),
+                result.changedFields()
+        );
+    }
 }
 
 record DynamicRecordResponse(String id,

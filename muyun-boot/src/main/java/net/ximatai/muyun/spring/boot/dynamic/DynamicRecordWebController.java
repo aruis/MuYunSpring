@@ -1166,6 +1166,18 @@ public class DynamicRecordWebController implements
         });
     }
 
+    @PostMapping("/formula/preview")
+    @ActionEndpoint(PlatformAction.CREATE)
+    public DynamicFormulaPreviewResponse previewFormula(@PathVariable String moduleAlias,
+                                                        @RequestBody(required = false) DynamicFormulaPreviewRequest request) {
+        return tenantScope(moduleAlias, () -> {
+            String entityAlias = mainEntityAlias(moduleAlias);
+            DynamicFormulaPreviewRequest normalized = request == null ? new DynamicFormulaPreviewRequest(null) : request;
+            DynamicRecord record = record(moduleAlias, entityAlias, normalized.record());
+            return DynamicFormulaPreviewResponse.from(recordService.previewFormula(moduleAlias, entityAlias, record));
+        });
+    }
+
     @Override
     public List<DynamicActionDescriptor> listActions() {
         String moduleAlias = DynamicWebRequest.moduleAlias();

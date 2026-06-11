@@ -145,6 +145,10 @@ public class DynamicRecordService {
         return findEntity(describe(moduleAlias), entityAlias);
     }
 
+    public DynamicFormulaPreviewResult previewFormula(String moduleAlias, String entityAlias, DynamicRecord record) {
+        return entityService(moduleAlias, entityAlias).previewFormula(record);
+    }
+
     public List<DynamicActionDescriptor> actions(String moduleAlias) {
         return describe(moduleAlias).actions();
     }

@@ -43,6 +43,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class DynamicRecordDaoTest {
@@ -196,6 +197,24 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldPreviewDynamicFormulaRulesWithoutPersistingOrMutatingSourceRecord() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = formulaEntity();
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(15));
+
+        DynamicFormulaPreviewResult result = new DynamicEntityService(new DynamicRecordDao(operations, entity),
+                "sales.contract").previewFormula(record);
+
+        assertThat((BigDecimal) result.record().getValue("amount")).isEqualByComparingTo("30");
+        assertThat(result.changedFields()).containsExactly("amount");
+        assertThat(result.report().hasErrors()).isFalse();
+        assertThat(record.getValue("amount")).isNull();
+        verifyNoInteractions(operations);
+    }
+
+    @Test
     void shouldApplyDynamicFormulaRulesAfterLifecycleHooks() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = formulaEntity();
@@ -289,6 +308,36 @@ class DynamicRecordDaoTest {
                     assertThat(exception.warnings()).isEmpty();
                 });
         verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void shouldReturnFormulaValidationDiagnosisWhenPreviewFails() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
+                        FieldDefinition.decimal("price", "Price").precision(18, 2),
+                        FieldDefinition.decimal("amount", "Amount").precision(18, 2)
+                )
+        ).withFormulaRules(
+                EntityFormulaRuleDefinition.calculation("amountCalc", "amount", "{quantity} * {price}"),
+                EntityFormulaRuleDefinition.validation("amountPositive", "amount", "{amount} > 0",
+                        "amount must be positive")
+        );
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("quantity", BigDecimal.valueOf(2))
+                .setValue("price", BigDecimal.valueOf(-15));
+
+        DynamicFormulaPreviewResult result = new DynamicFormulaRuntime("sales.contract", entity, null)
+                .preview(record, null);
+
+        assertThat(result.report().hasErrors()).isTrue();
+        assertThat(result.report().errors()).anySatisfy(issue ->
+                assertThat(issue.message()).isEqualTo("amount must be positive"));
+        assertThat(result.changedFields()).isEmpty();
+        assertThat(result.record().getValue("amount")).isNull();
     }
 
     @Test
