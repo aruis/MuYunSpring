@@ -54,6 +54,7 @@
 - `/platform/code/sequence-state`
 - `POST /query`：查询序列状态。
 - `GET /view/{id}`：查看序列状态。
+- `POST /adjust/{id}`：按序列状态行调整当前基线值，复用编码运维日志和下一值预览。
 
 编码日志：
 

@@ -75,6 +75,27 @@ class CodeOpsServiceTest {
     }
 
     @Test
+    void shouldAdjustSequenceStateByStateRowThroughBaselineGovernance() {
+        CodeRule rule = rule("orderNo", true);
+        ruleService.saveRuleTree(rule);
+        CodeSequenceState state = stateService.setCurrentValue(rule.getId(), "customer-a", "202606", 12L);
+
+        CodeSequenceBaselineResult adjusted = actionService.adjustSequenceState(state.getId(), 120L, "repair");
+
+        assertThat(adjusted.beforeValue()).isEqualTo(12L);
+        assertThat(adjusted.afterValue()).isEqualTo(120L);
+        assertThat(adjusted.nextValue()).isEqualTo(121L);
+        assertThat(stateService.select(state.getId()).getCurrentValue()).isEqualTo(120L);
+        assertThat(issueLogService.selectByRuleId(rule.getId(), 10))
+                .singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getBasisKey()).isEqualTo("customer-a");
+                    assertThat(log.getPeriodKey()).isEqualTo("202606");
+                    assertThat(log.getMessage()).contains("Set sequence baseline").contains("repair");
+                });
+    }
+
+    @Test
     void shouldInspectAndReleaseStaleLedgerEntryWithoutBindingNewValue() {
         CodeRule rule = rule("orderNo", true);
         ruleService.saveRuleTree(rule);

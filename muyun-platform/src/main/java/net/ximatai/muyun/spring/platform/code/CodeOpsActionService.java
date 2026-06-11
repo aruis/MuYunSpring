@@ -72,6 +72,15 @@ public class CodeOpsActionService {
         );
     }
 
+    @Transactional
+    public CodeSequenceBaselineResult adjustSequenceState(String stateId, Long currentValue, String reason) {
+        CodeSequenceState state = sequenceStateService.select(stateId);
+        if (state == null) {
+            throw new PlatformException("Code sequence state does not exist: " + stateId);
+        }
+        return setSequenceBaseline(state.getRuleId(), state.getBasisKey(), state.getPeriodKey(), currentValue, reason);
+    }
+
     public CodeLedgerInspection inspectLedgerEntry(String entryId) {
         CodeLedgerEntry entry = requireActiveLedger(entryId);
         CodeRule rule = requireRule(entry.getRuleId());

@@ -84,7 +84,7 @@ class CodeRuleWebControllerTest {
         opsActionService = mock(CodeOpsActionService.class);
 
         CodeRuleWebController ruleController = new CodeRuleWebController(previewService, opsQueryService, opsActionService);
-        CodeSequenceStateWebController stateController = new CodeSequenceStateWebController();
+        CodeSequenceStateWebController stateController = new CodeSequenceStateWebController(opsActionService);
         CodeLedgerEntryWebController ledgerController = new CodeLedgerEntryWebController();
         CodeRecycleEntryWebController recycleController = new CodeRecycleEntryWebController();
         CodeIssueLogWebController issueLogController = new CodeIssueLogWebController();
@@ -208,6 +208,8 @@ class CodeRuleWebControllerTest {
         when(stateService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(state), 1, PageRequest.of(1, 20)));
         when(stateService.select("state-1")).thenReturn(state);
+        when(opsActionService.adjustSequenceState("state-1", 120L, "repair")).thenReturn(
+                new CodeSequenceBaselineResult(state, 12L, 120L, 121L, "updated"));
 
         CodeLedgerEntry ledger = new CodeLedgerEntry();
         ledger.setId("ledger-1");
@@ -253,6 +255,15 @@ class CodeRuleWebControllerTest {
         mvc.perform(get("/platform.code_sequence_state/view/state-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ruleId").value("rule-1"));
+        mvc.perform(post("/platform.code_sequence_state/adjust/state-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentValue":120,"reason":"repair"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.beforeValue").value(12))
+                .andExpect(jsonPath("$.afterValue").value(120))
+                .andExpect(jsonPath("$.nextValue").value(121));
 
         mvc.perform(post("/platform.code_ledger_entry/query"))
                 .andExpect(status().isOk())
@@ -289,6 +300,8 @@ class CodeRuleWebControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isNotFound());
+
+        verify(opsActionService).adjustSequenceState("state-1", 120L, "repair");
     }
 
     @Test

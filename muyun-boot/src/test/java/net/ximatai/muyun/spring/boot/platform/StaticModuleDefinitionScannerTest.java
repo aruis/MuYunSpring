@@ -18,6 +18,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.code.CodePreviewService;
+import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
@@ -109,7 +110,8 @@ class StaticModuleDefinitionScannerTest {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(CodeRuleWebController.class,
                     () -> new CodeRuleWebController(org.mockito.Mockito.mock(CodePreviewService.class)));
-            context.registerBean(CodeSequenceStateWebController.class);
+            context.registerBean(CodeSequenceStateWebController.class,
+                    () -> new CodeSequenceStateWebController(org.mockito.Mockito.mock(CodeOpsActionService.class)));
             context.registerBean(CodeLedgerEntryWebController.class);
             context.registerBean(CodeRecycleEntryWebController.class);
             context.registerBean(CodeIssueLogWebController.class);
@@ -129,7 +131,16 @@ class StaticModuleDefinitionScannerTest {
                     .containsExactlyInAnyOrder("menu", "view", "query",
                             "sort", "enable", "disable", "viewTree", "saveTree", "preview", "opsQuery", "opsManage");
             assertThat(byAlias.get("platform.code_sequence_state").actions()).extracting(StaticModuleActionDefinition::actionCode)
-                    .containsExactly("menu", "view", "query");
+                    .containsExactlyInAnyOrder("menu", "view", "query", "adjustBaseline");
+            assertThat(byAlias.get("platform.code_sequence_state").actions())
+                    .filteredOn(action -> action.actionCode().equals("adjustBaseline"))
+                    .singleElement()
+                    .satisfies(action -> {
+                        assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+                        assertThat(action.actionAuth()).isTrue();
+                        assertThat(action.dataAuth()).isTrue();
+                        assertThat(action.defaultGrantPolicy()).isEqualTo(ActionDefaultGrantPolicy.NONE);
+                    });
             assertThat(byAlias.get("platform.code_ledger_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactly("menu", "view", "query");
             assertThat(byAlias.get("platform.code_recycle_entry").actions()).extracting(StaticModuleActionDefinition::actionCode)
