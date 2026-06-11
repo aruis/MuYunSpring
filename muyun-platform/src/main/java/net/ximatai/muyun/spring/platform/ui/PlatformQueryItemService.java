@@ -34,7 +34,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         SoftDeleteAbility<PlatformQueryItem>,
         EnableAbility<PlatformQueryItem>,
         SortAbility<PlatformQueryItem> {
-    public static final String MODULE_ALIAS = "platform.queryItem";
+    public static final String MODULE_ALIAS = "platform.query_item";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final PlatformQueryTemplateService queryTemplateService;

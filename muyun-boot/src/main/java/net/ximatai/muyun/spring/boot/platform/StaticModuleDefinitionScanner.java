@@ -70,10 +70,17 @@ public class StaticModuleDefinitionScanner {
             return;
         }
         String scopeName = path.replaceFirst("^/", "");
-        if (!module.alias().equals(scopeName)) {
+        if (scopeName.contains("/")) {
+            return;
+        }
+        if (!module.alias().equals(scopeName) && !normalizeScope(module.alias()).equals(normalizeScope(scopeName))) {
             throw new IllegalStateException("@PlatformStaticModule alias must match web scope: "
                     + module.alias() + " != " + scopeName);
         }
+    }
+
+    private String normalizeScope(String value) {
+        return value == null ? "" : value.replace("-", "_").toLowerCase(java.util.Locale.ROOT);
     }
 
     private List<StaticModuleActionDefinition> actions(Class<?> beanClass,

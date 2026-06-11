@@ -19,7 +19,7 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
         SoftDeleteAbility<PlatformUiSet>,
         EnableAbility<PlatformUiSet>,
         SortAbility<PlatformUiSet> {
-    public static final String MODULE_ALIAS = "platform.uiSet";
+    public static final String MODULE_ALIAS = "platform.ui_set";
 
     private final PlatformModuleService moduleService;
 

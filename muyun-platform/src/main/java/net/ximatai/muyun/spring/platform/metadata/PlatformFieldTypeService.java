@@ -22,7 +22,7 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         SoftDeleteAbility<PlatformFieldType>,
         EnableAbility<PlatformFieldType>,
         SortAbility<PlatformFieldType> {
-    public static final String MODULE_ALIAS = "platform.fieldType";
+    public static final String MODULE_ALIAS = "platform.field_type";
     private final BaseDao<PlatformFieldUiType, String> fieldUiTypeDao;
 
     public PlatformFieldTypeService(BaseDao<PlatformFieldType, String> fieldTypeDao) {

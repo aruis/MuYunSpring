@@ -26,7 +26,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         SoftDeleteAbility<MenuScheme>,
         EnableAbility<MenuScheme>,
         SortAbility<MenuScheme> {
-    public static final String MODULE_ALIAS = "platform.menuScheme";
+    public static final String MODULE_ALIAS = "platform.menu_scheme";
     public static final String SYSTEM_SCOPE_ID = "system";
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
 

@@ -23,7 +23,7 @@ import java.util.Set;
 public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMetadataField> implements
         SoftDeleteAbility<ModuleMetadataField>,
         SortAbility<ModuleMetadataField> {
-    public static final String MODULE_ALIAS = "platform.moduleMetadataField";
+    public static final String MODULE_ALIAS = "platform.module_metadata_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final ModuleMetadataRelationService relationService;

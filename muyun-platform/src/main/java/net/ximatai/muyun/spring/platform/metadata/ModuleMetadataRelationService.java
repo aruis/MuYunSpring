@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class ModuleMetadataRelationService extends AbstractAbilityService<ModuleMetadataRelation> implements
         SoftDeleteAbility<ModuleMetadataRelation>,
         SortAbility<ModuleMetadataRelation> {
-    public static final String MODULE_ALIAS = "platform.moduleMetadataRelation";
+    public static final String MODULE_ALIAS = "platform.module_metadata_relation";
 
     private final PlatformModuleService moduleService;
     private final MetadataService metadataService;

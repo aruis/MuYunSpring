@@ -20,7 +20,7 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
         SoftDeleteAbility<PlatformUiConfig>,
         EnableAbility<PlatformUiConfig>,
         SortAbility<PlatformUiConfig> {
-    public static final String MODULE_ALIAS = "platform.uiConfig";
+    public static final String MODULE_ALIAS = "platform.ui_config";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final PlatformUiSetService uiSetService;

@@ -14,7 +14,7 @@ import java.util.Objects;
 public class ModuleMetadataFieldAffectService extends AbstractAbilityService<ModuleMetadataFieldAffect> implements
         SoftDeleteAbility<ModuleMetadataFieldAffect>,
         SortAbility<ModuleMetadataFieldAffect> {
-    public static final String MODULE_ALIAS = "platform.moduleMetadataFieldAffect";
+    public static final String MODULE_ALIAS = "platform.module_metadata_field_affect";
 
     private final ModuleMetadataFieldService moduleFieldService;
 

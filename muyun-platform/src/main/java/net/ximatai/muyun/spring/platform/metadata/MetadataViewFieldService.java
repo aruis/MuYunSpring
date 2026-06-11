@@ -22,7 +22,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         SoftDeleteAbility<MetadataViewField>,
         EnableAbility<MetadataViewField>,
         SortAbility<MetadataViewField> {
-    public static final String MODULE_ALIAS = "platform.metadataViewField";
+    public static final String MODULE_ALIAS = "platform.metadata_view_field";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

@@ -23,7 +23,7 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
         SoftDeleteAbility<PlatformQueryTemplate>,
         EnableAbility<PlatformQueryTemplate>,
         SortAbility<PlatformQueryTemplate> {
-    public static final String MODULE_ALIAS = "platform.queryTemplate";
+    public static final String MODULE_ALIAS = "platform.query_template";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final PlatformModuleService moduleService;

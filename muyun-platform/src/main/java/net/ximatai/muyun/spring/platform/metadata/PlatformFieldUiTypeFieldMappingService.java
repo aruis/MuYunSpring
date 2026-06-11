@@ -16,7 +16,7 @@ import java.util.Objects;
 public class PlatformFieldUiTypeFieldMappingService extends AbstractAbilityService<PlatformFieldUiTypeFieldMapping> implements
         SoftDeleteAbility<PlatformFieldUiTypeFieldMapping>,
         SortAbility<PlatformFieldUiTypeFieldMapping> {
-    public static final String MODULE_ALIAS = "platform.fieldUiTypeFieldMapping";
+    public static final String MODULE_ALIAS = "platform.field_ui_type_field_mapping";
 
     private final PlatformFieldUiTypeService fieldUiTypeService;
 

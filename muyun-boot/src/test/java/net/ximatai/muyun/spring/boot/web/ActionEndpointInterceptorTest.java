@@ -178,6 +178,25 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
+    void shouldPreferStaticModuleAnnotationOverPathModuleAlias() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/platform.module/sales.contract/actions/query");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of(
+                "moduleAlias", "sales.contract"
+        ));
+        StaticModuleActionController controller = new StaticModuleActionController();
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, StaticModuleActionController.class.getMethod("standardQuery", WebQueryRequest.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("platform.workflow_admin");
+            assertThat(context.actionCode()).isEqualTo("query");
+            assertThat(context.permissionCode()).isEqualTo("platform.workflow_admin:view");
+        });
+    }
+
+    @Test
     void shouldUseRegisteredCustomActionPolicyWhenResolvingWebEndpoint() throws Exception {
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         PlatformModuleAction action = new PlatformModuleAction();
@@ -295,6 +314,10 @@ class ActionEndpointInterceptorTest {
     private static final class StaticModuleActionController {
         @net.ximatai.muyun.spring.common.platform.CustomActionEndpoint("workflowAdminQuery")
         public void query() {
+        }
+
+        @ActionEndpoint(PlatformAction.QUERY)
+        public void standardQuery(WebQueryRequest request) {
         }
     }
 }

@@ -82,6 +82,10 @@ public class ActionEndpointContextResolver {
     }
 
     private String moduleAlias(HttpServletRequest request, HandlerMethod handlerMethod) {
+        PlatformStaticModule staticModule = handlerMethod.getBeanType().getAnnotation(PlatformStaticModule.class);
+        if (staticModule != null && !staticModule.alias().isBlank()) {
+            return staticModule.alias();
+        }
         String pathModuleAlias = pathVariable(request, MODULE_ALIAS_PATH_KEY);
         if (pathModuleAlias != null && !pathModuleAlias.isBlank()) {
             return pathModuleAlias;
@@ -89,10 +93,6 @@ public class ActionEndpointContextResolver {
         Object bean = handlerMethod.getBean();
         if (bean instanceof ScopedWeb<?> scopedWeb) {
             return scopedWeb.webScopeName();
-        }
-        PlatformStaticModule staticModule = handlerMethod.getBeanType().getAnnotation(PlatformStaticModule.class);
-        if (staticModule != null && !staticModule.alias().isBlank()) {
-            return staticModule.alias();
         }
         return null;
     }

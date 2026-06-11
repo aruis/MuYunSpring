@@ -19,7 +19,7 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
         SoftDeleteAbility<MetadataView>,
         EnableAbility<MetadataView>,
         SortAbility<MetadataView> {
-    public static final String MODULE_ALIAS = "platform.metadataView";
+    public static final String MODULE_ALIAS = "platform.metadata_view";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

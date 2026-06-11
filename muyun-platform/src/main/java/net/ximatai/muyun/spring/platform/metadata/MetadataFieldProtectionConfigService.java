@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class MetadataFieldProtectionConfigService extends AbstractAbilityService<MetadataFieldProtectionConfig> implements
         SoftDeleteAbility<MetadataFieldProtectionConfig> {
-    public static final String MODULE_ALIAS = "platform.metadataFieldProtectionConfig";
+    public static final String MODULE_ALIAS = "platform.metadata_field_protection_config";
 
     private final MetadataFieldService fieldService;
     private final PlatformFieldTypeService fieldTypeService;

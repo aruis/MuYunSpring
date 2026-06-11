@@ -177,6 +177,66 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
+    @Test
+    void shouldScanSnakeCaseWebScopeForCamelCaseStaticAlias() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(PlatformFieldTypeWebController.class);
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("platform.field_type");
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactly("menu", "create", "view", "update", "delete", "query",
+                            "sort", "enable", "disable");
+        }
+    }
+
+    @Test
+    void shouldScanNestedResourceControllerActionsFromInheritedEndpoints() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(PlatformUiSetWebController.class);
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("platform.ui_set");
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("query", "view", "create", "update", "delete",
+                            "enable", "disable", "sort");
+        }
+    }
+
+    @Test
+    void shouldRejectStaticModuleScopeWhenSeparatorsAreMissing() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(MissingSeparatorAliasWeb.class);
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            assertThatThrownBy(scanner::scan)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("alias must match web scope");
+        }
+    }
+
+    @Test
+    void shouldRegisterPageConfigPublishActionsAsRecordActions() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(PlatformPageConfigPublishWebController.class);
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("platform.page_config_publish");
+            assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("publishUiConfig", "unpublishUiConfig",
+                            "publishQueryTemplate", "unpublishQueryTemplate");
+            assertThat(definition.actions()).allSatisfy(action ->
+                    assertThat(action.actionLevel()).isEqualTo(EntityActionLevel.RECORD));
+        }
+    }
+
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
         assertThat(action.actionCode()).isEqualTo(actionCode);
         assertThat(action.permissionActionCode()).isEqualTo(actionCode);
@@ -205,6 +265,12 @@ class StaticModuleDefinitionScannerTest {
     @PlatformStaticModule(application = "iam", alias = "iam.bad", title = "Bad")
     @RequestMapping("/iam.good")
     static class BadAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "platform", alias = "platform.field_type", title = "Bad")
+    @RequestMapping("/platform.fieldtype")
+    static class MissingSeparatorAliasWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<Object> {
     }
 
     @RestController

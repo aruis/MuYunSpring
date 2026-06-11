@@ -17,7 +17,7 @@ public class PlatformFieldUiTypeService extends AbstractAbilityService<PlatformF
         SoftDeleteAbility<PlatformFieldUiType>,
         EnableAbility<PlatformFieldUiType>,
         SortAbility<PlatformFieldUiType> {
-    public static final String MODULE_ALIAS = "platform.fieldUiType";
+    public static final String MODULE_ALIAS = "platform.field_ui_type";
 
     private final PlatformFieldTypeService fieldTypeService;
 

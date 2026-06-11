@@ -17,7 +17,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         SoftDeleteAbility<MetadataField>,
         EnableAbility<MetadataField>,
         SortAbility<MetadataField> {
-    public static final String MODULE_ALIAS = "platform.metadataField";
+    public static final String MODULE_ALIAS = "platform.metadata_field";
 
     private final MetadataService metadataService;
     private final PlatformFieldTypeService fieldTypeService;

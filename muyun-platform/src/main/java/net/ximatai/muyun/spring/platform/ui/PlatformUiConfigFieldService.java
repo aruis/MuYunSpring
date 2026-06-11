@@ -29,7 +29,7 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         SoftDeleteAbility<PlatformUiConfigField>,
         EnableAbility<PlatformUiConfigField>,
         SortAbility<PlatformUiConfigField> {
-    public static final String MODULE_ALIAS = "platform.uiConfigField";
+    public static final String MODULE_ALIAS = "platform.ui_config_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final PlatformUiConfigService uiConfigService;

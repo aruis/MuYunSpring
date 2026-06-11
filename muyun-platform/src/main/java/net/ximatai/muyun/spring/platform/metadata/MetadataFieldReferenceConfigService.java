@@ -19,7 +19,7 @@ import java.util.Set;
 @Service
 public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
         SoftDeleteAbility<MetadataFieldReferenceConfig> {
-    public static final String MODULE_ALIAS = "platform.metadataFieldReferenceConfig";
+    public static final String MODULE_ALIAS = "platform.metadata_field_reference_config";
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
     private final MetadataFieldService fieldService;
