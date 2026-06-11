@@ -1,5 +1,8 @@
 package net.ximatai.muyun.spring.platform.ui;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.menu.Menu;
@@ -25,6 +28,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class PlatformPageBootstrapService {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final MenuService menuService;
     private final PlatformPageConfigSnapshotService snapshotService;
     private final ModuleMetadataFieldService moduleFieldService;
@@ -78,7 +83,8 @@ public class PlatformPageBootstrapService {
                         resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
                         resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
                 requestedClientType,
-                resolveConfig(snapshot, requestedClientType)
+                resolveConfig(snapshot, requestedClientType,
+                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType))
         );
     }
 
@@ -100,7 +106,8 @@ public class PlatformPageBootstrapService {
                         resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType),
                         resolveDefaultQueryTemplateId(snapshot, menu.getDefaultQueryTemplateId())),
                 requestedClientType,
-                resolveConfig(snapshot, requestedClientType)
+                resolveConfig(snapshot, requestedClientType,
+                        resolveDefaultUiConfigId(snapshot, menu.getDefaultUiConfigId(), pageMode, requestedClientType))
         );
     }
 
@@ -170,7 +177,8 @@ public class PlatformPageBootstrapService {
     }
 
     private PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot,
-                                                     PlatformUiClientType clientType) {
+                                                     PlatformUiClientType clientType,
+                                                     String defaultUiConfigId) {
         if (moduleFieldService == null) {
             return PlatformResolvedPageConfig.empty();
         }
@@ -185,7 +193,66 @@ public class PlatformPageBootstrapService {
         List<PlatformResolvedQueryItem> queryItems = snapshot.queryItems().stream()
                 .map(this::resolvedQueryItem)
                 .toList();
-        return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiTypes(uiFields));
+        return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiTypes(uiFields),
+                associationBlocks(snapshot, clientType, defaultUiConfigId));
+    }
+
+    private List<PlatformAssociationBlock> associationBlocks(PlatformPageConfigSnapshot snapshot,
+                                                             PlatformUiClientType clientType,
+                                                             String defaultUiConfigId) {
+        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
+            return List.of();
+        }
+        return snapshot.uiConfigs().stream()
+                .filter(config -> config.getClientType() == clientType)
+                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
+                .flatMap(config -> associationBlocks(snapshot.moduleAlias(), config).stream())
+                .toList();
+    }
+
+    private List<PlatformAssociationBlock> associationBlocks(String moduleAlias, PlatformUiConfig config) {
+        String layoutJson = config.getLayoutJson();
+        if (layoutJson == null || layoutJson.isBlank()) {
+            return List.of();
+        }
+        JsonNode root;
+        try {
+            root = OBJECT_MAPPER.readTree(layoutJson);
+        } catch (JsonProcessingException exception) {
+            throw new PlatformException("UI config layout JSON cannot be decoded: " + config.getId());
+        }
+        JsonNode blocks = root.get("blocks");
+        if (blocks == null || !blocks.isArray()) {
+            return List.of();
+        }
+        java.util.ArrayList<PlatformAssociationBlock> resolved = new java.util.ArrayList<>();
+        for (JsonNode block : blocks) {
+            if (block == null || !block.isObject() || !"associationView".equals(text(block, "type"))) {
+                continue;
+            }
+            String viewCode = text(block, "viewCode");
+            if (viewCode == null) {
+                continue;
+            }
+            resolved.add(new PlatformAssociationBlock(
+                    config.getId(),
+                    text(block, "key"),
+                    viewCode,
+                    text(block, "title"),
+                    text(block, "uiConfigId"),
+                    text(block, "queryTemplateId"),
+                    "/" + moduleAlias + "/view/{id}/associations/" + viewCode + "/query"
+            ));
+        }
+        return resolved;
+    }
+
+    private String text(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull() || !value.isTextual() || value.asText().isBlank()) {
+            return null;
+        }
+        return value.asText().trim();
     }
 
     private PlatformResolvedUiField resolvedUiField(PlatformUiConfigField field) {

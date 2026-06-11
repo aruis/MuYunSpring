@@ -7,8 +7,13 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
@@ -246,11 +251,38 @@ class PlatformUiConfigurationServiceContractTest {
         config = uiConfigService.select(uiConfigId);
         config.setLayoutJson("""
                 {
+                  "blocks": [
+                    {"type":"associationView", "key":"contracts"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].viewCode is required");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"localEdit", "key":"baseInfo"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].actionCode is required");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
                   "referenceCandidates": [
                     {"sourceUiConfigId":"ui-form", "uiConfigId":"ui-ref", "queryTemplateId":"q-ref"}
                   ],
                   "blocks": [
-                    {"type":"associationView", "key":"contracts"},
+                    {"type":"associationView", "key":"contracts", "viewCode":"contracts"},
+                    {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo"},
                     {"type":"dialog", "key":"submitDialog"},
                     {"type":"taskPanel", "key":"completion"}
                   ]
@@ -258,6 +290,56 @@ class PlatformUiConfigurationServiceContractTest {
                 """);
         uiConfigService.update(config);
         assertThatCode(() -> publishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldValidateAssociationViewCodeAgainstDynamicDescriptorWhenAvailable() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "detail", PlatformUiSetType.DETAIL, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        DynamicRecordService recordService = org.mockito.Mockito.mock(DynamicRecordService.class);
+        org.mockito.Mockito.when(recordService.describe("crm.customer")).thenReturn(new DynamicModuleDescriptor(
+                "crm.customer",
+                "Customer",
+                "customer",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new DynamicAssociationViewDescriptor("contracts", "customer", "crm.contract", "contract",
+                        AssociationViewDisplayMode.INLINE_LIST, "contracts", null, EntityViewType.LIST, true))
+        ));
+        PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
+                uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
+                recordService);
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"associationView", "viewCode":"missing"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("viewCode is unknown");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"associationView", "viewCode":"contracts"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatCode(() -> verifyingPublishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
     }
 
     @Test

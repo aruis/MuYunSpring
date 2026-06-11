@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,17 +22,29 @@ public class PlatformPageConfigPublishService {
     private final PlatformUiConfigFieldService uiConfigFieldService;
     private final PlatformQueryTemplateService queryTemplateService;
     private final PlatformQueryItemService queryItemService;
+    private final DynamicRecordService recordService;
 
     public PlatformPageConfigPublishService(PlatformUiSetService uiSetService,
                                             PlatformUiConfigService uiConfigService,
                                             PlatformUiConfigFieldService uiConfigFieldService,
                                             PlatformQueryTemplateService queryTemplateService,
                                             PlatformQueryItemService queryItemService) {
+        this(uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService, null);
+    }
+
+    @Autowired
+    public PlatformPageConfigPublishService(PlatformUiSetService uiSetService,
+                                            PlatformUiConfigService uiConfigService,
+                                            PlatformUiConfigFieldService uiConfigFieldService,
+                                            PlatformQueryTemplateService queryTemplateService,
+                                            PlatformQueryItemService queryItemService,
+                                            DynamicRecordService recordService) {
         this.uiSetService = uiSetService;
         this.uiConfigService = uiConfigService;
         this.uiConfigFieldService = uiConfigFieldService;
         this.queryTemplateService = queryTemplateService;
         this.queryItemService = queryItemService;
+        this.recordService = recordService;
     }
 
     public void publishUiConfig(String uiConfigId) {
@@ -58,7 +73,7 @@ public class PlatformPageConfigPublishService {
         if (!hasVisibleField) {
             throw new PlatformException("UI config publish requires at least one visible field: " + uiConfigId);
         }
-        validateLayoutJson(uiConfig);
+        validateLayoutJson(uiSet.getModuleAlias(), uiConfig);
         return uiConfig;
     }
 
@@ -85,20 +100,20 @@ public class PlatformPageConfigPublishService {
         return template;
     }
 
-    private void validateLayoutJson(PlatformUiConfig uiConfig) {
+    private void validateLayoutJson(String moduleAlias, PlatformUiConfig uiConfig) {
         String layoutJson = uiConfig.getLayoutJson();
         if (layoutJson == null || layoutJson.isBlank()) {
             return;
         }
         try {
             JsonNode root = OBJECT_MAPPER.readTree(layoutJson);
-            validateLayoutRoot(root, uiConfig.getId());
+            validateLayoutRoot(moduleAlias, root, uiConfig.getId());
         } catch (JsonProcessingException exception) {
             throw new PlatformException("UI config layout JSON cannot be decoded: " + uiConfig.getId());
         }
     }
 
-    private void validateLayoutRoot(JsonNode root, String uiConfigId) {
+    private void validateLayoutRoot(String moduleAlias, JsonNode root, String uiConfigId) {
         if (root == null || !root.isObject()) {
             throw new PlatformException("UI config layout JSON root must be object: " + uiConfigId);
         }
@@ -107,7 +122,7 @@ public class PlatformPageConfigPublishService {
         validateReferenceCandidateArray(root.get("referenceCandidates"), "referenceCandidates", uiConfigId);
         validateChildSections(root.get("children"), "children", uiConfigId);
         validateChildSections(root.get("childSections"), "childSections", uiConfigId);
-        validateKnownBlocks(root.get("blocks"), uiConfigId);
+        validateKnownBlocks(moduleAlias, root.get("blocks"), uiConfigId);
     }
 
     private void validateSummaryPanel(JsonNode summaryPanel, String uiConfigId) {
@@ -188,7 +203,7 @@ public class PlatformPageConfigPublishService {
         }
     }
 
-    private void validateKnownBlocks(JsonNode blocks, String uiConfigId) {
+    private void validateKnownBlocks(String moduleAlias, JsonNode blocks, String uiConfigId) {
         if (blocks == null || blocks.isNull()) {
             return;
         }
@@ -203,7 +218,49 @@ public class PlatformPageConfigPublishService {
             }
             validateOptionalText(block, "type", path, uiConfigId);
             validateOptionalText(block, "key", path, uiConfigId);
+            validateAssociationBlock(moduleAlias, block, path, uiConfigId);
+            validateLocalEditBlock(block, path, uiConfigId);
         }
+    }
+
+    private void validateAssociationBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
+        JsonNode type = block.get("type");
+        if (type == null || type.isNull() || !"associationView".equals(type.asText())) {
+            return;
+        }
+        JsonNode viewCode = block.get("viewCode");
+        if (viewCode == null || !viewCode.isTextual() || viewCode.asText().isBlank()) {
+            throw layoutException(uiConfigId, path + ".viewCode is required");
+        }
+        validateAssociationViewCode(moduleAlias, viewCode.asText(), path, uiConfigId);
+        validateOptionalText(block, "title", path, uiConfigId);
+        validateOptionalText(block, "uiConfigId", path, uiConfigId);
+        validateOptionalText(block, "queryTemplateId", path, uiConfigId);
+    }
+
+    private void validateAssociationViewCode(String moduleAlias, String viewCode, String path, String uiConfigId) {
+        if (recordService == null) {
+            return;
+        }
+        DynamicAssociationViewDescriptor view = recordService.describe(moduleAlias).associationViews().stream()
+                .filter(item -> item.code().equals(viewCode))
+                .findFirst()
+                .orElseThrow(() -> layoutException(uiConfigId, path + ".viewCode is unknown"));
+        if (!view.queryable()) {
+            throw layoutException(uiConfigId, path + ".viewCode is not queryable");
+        }
+    }
+
+    private void validateLocalEditBlock(JsonNode block, String path, String uiConfigId) {
+        JsonNode type = block.get("type");
+        if (type == null || type.isNull() || !"localEdit".equals(type.asText())) {
+            return;
+        }
+        JsonNode actionCode = block.get("actionCode");
+        if (actionCode == null || !actionCode.isTextual() || actionCode.asText().isBlank()) {
+            throw layoutException(uiConfigId, path + ".actionCode is required");
+        }
+        validateOptionalText(block, "title", path, uiConfigId);
     }
 
     private void validateOptionalText(JsonNode node, String field, String path, String uiConfigId) {

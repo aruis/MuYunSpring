@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
+import net.ximatai.muyun.spring.platform.ui.PlatformAssociationBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
@@ -299,6 +300,64 @@ class MenuEntryBootstrapContractTest {
         assertThat(appBootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
                 .extracting("sourceKey")
                 .containsExactly("label");
+    }
+
+    @Test
+    void shouldResolveAssociationBlocksFromClientLayout() {
+        MenuService mockedMenuService = mock(MenuService.class);
+        PlatformPageConfigSnapshotService mockedSnapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService mockedModuleFieldService = mock(ModuleMetadataFieldService.class);
+        PlatformPageBootstrapService service = new PlatformPageBootstrapService(
+                mockedMenuService, mockedSnapshotService, mockedModuleFieldService);
+        Menu menu = moduleMenu("scheme-1", "客户", "crm.customer");
+        menu.setId("menu-1");
+        menu.setPageMode(MenuPageMode.DETAIL);
+        when(mockedMenuService.currentUserVisibleMenu("menu-1")).thenReturn(menu);
+        PlatformUiSet detailSet = uiSetRecord("set-1", "crm.customer", PlatformUiSetType.DETAIL);
+        detailSet.setDefaultSet(true);
+        PlatformUiConfig webConfig = uiConfigRecord("ui-detail-web", "set-1", PlatformUiClientType.WEB);
+        webConfig.setLayoutJson("""
+                {
+                  "blocks": [
+                    {
+                      "type": "associationView",
+                      "key": "contracts",
+                      "viewCode": "contracts",
+                      "title": "合同",
+                      "uiConfigId": "contract-list",
+                      "queryTemplateId": "contract-default"
+                    }
+                  ]
+                }
+                """);
+        PlatformUiConfig appConfig = uiConfigRecord("ui-detail-app", "set-1", PlatformUiClientType.APP);
+        appConfig.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type": "associationView", "viewCode": "appContracts"}
+                  ]
+                }
+                """);
+        when(mockedSnapshotService.snapshot("crm.customer")).thenReturn(new PlatformPageConfigSnapshot(
+                "crm.customer",
+                java.util.List.of(detailSet),
+                java.util.List.of(webConfig, appConfig),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of()
+        ));
+
+        PlatformPageBootstrap bootstrap = service.bootstrapByMenu("menu-1", PlatformUiClientType.WEB);
+
+        assertThat(bootstrap.resolvedConfig().associationBlocks())
+                .extracting(PlatformAssociationBlock::viewCode)
+                .containsExactly("contracts");
+        PlatformAssociationBlock block = bootstrap.resolvedConfig().associationBlocks().getFirst();
+        assertThat(block.uiConfigId()).isEqualTo("ui-detail-web");
+        assertThat(block.key()).isEqualTo("contracts");
+        assertThat(block.targetUiConfigId()).isEqualTo("contract-list");
+        assertThat(block.queryTemplateId()).isEqualTo("contract-default");
+        assertThat(block.queryPath()).isEqualTo("/crm.customer/view/{id}/associations/contracts/query");
     }
 
     @Test
