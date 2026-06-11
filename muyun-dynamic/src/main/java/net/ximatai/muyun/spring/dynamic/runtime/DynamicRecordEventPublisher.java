@@ -71,6 +71,7 @@ final class DynamicRecordEventPublisher {
     }
 
     void actionExecuted(DynamicActionExecutionContext context, DynamicActionResultBody body) {
+        DynamicActionRefreshStrategy refreshStrategy = effectiveRefreshStrategy(body);
         publisher.publishAfterCommit(new RuntimeEvent(
                 null,
                 context.traceId(),
@@ -93,14 +94,21 @@ final class DynamicRecordEventPublisher {
                         context.action().actionLevel().name(),
                         body.type().name(),
                         body.message(),
-                        body.refresh(),
+                        body.refresh() || refreshStrategy.active(),
                         body.redirectTo(),
-                        body.refreshStrategy(),
+                        refreshStrategy,
                         context.action().executorType() == EntityActionExecutorType.DIALOG,
                         isSimpleEventValue(body.value()) ? body.value() : null
                 )),
                 null
         ));
+    }
+
+    private DynamicActionRefreshStrategy effectiveRefreshStrategy(DynamicActionResultBody body) {
+        if (body.value() instanceof DynamicActionDialog dialog) {
+            return dialog.refreshStrategy();
+        }
+        return body.refreshStrategy();
     }
 
     void actionFailed(DynamicActionExecutionContext context,

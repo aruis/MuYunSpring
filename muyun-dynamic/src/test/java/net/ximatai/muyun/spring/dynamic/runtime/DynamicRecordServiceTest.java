@@ -1132,7 +1132,8 @@ class DynamicRecordServiceTest {
 
     @Test
     void shouldExposeDialogSubmitProtocolWhenExecutorKeyBindsSubmitAction() {
-        DynamicRecordService service = actionServiceWithActions(operations(),
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = actionServiceWithActions(operations(), events,
                 submitActionWithExecutorKey("contractSubmit"),
                 new EntityActionDefinition("contract", "submitDialog", "提交合同", true, EntityActionLevel.RECORD,
                         EntityActionCategory.DIALOG, null, null, null, null,
@@ -1153,6 +1154,12 @@ class DynamicRecordServiceTest {
                 .extracting(DynamicActionRefreshStrategy::list, DynamicActionRefreshStrategy::detail,
                         DynamicActionRefreshStrategy::redirectToDetail)
                 .containsExactly(true, true, false);
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.payload()).containsEntry("refresh", true);
+                    assertThat(event.payload().get("refreshStrategy"))
+                            .isEqualTo(((DynamicActionDialog) result.value()).refreshStrategy());
+                });
     }
 
     @Test
@@ -2879,6 +2886,12 @@ class DynamicRecordServiceTest {
 
     private DynamicRecordService actionServiceWithActions(IDatabaseOperations<Object> operations,
                                                           EntityActionDefinition... actions) {
+        return actionServiceWithActions(operations, RuntimeEventPublisher.noop(), actions);
+    }
+
+    private DynamicRecordService actionServiceWithActions(IDatabaseOperations<Object> operations,
+                                                          RuntimeEventPublisher eventPublisher,
+                                                          EntityActionDefinition... actions) {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Contract",
@@ -2888,7 +2901,12 @@ class DynamicRecordServiceTest {
                 List.of(),
                 List.of(actions)
         );
-        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
+        return new DynamicRecordService(new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                eventPublisher
+        ).register(module));
     }
 
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,
