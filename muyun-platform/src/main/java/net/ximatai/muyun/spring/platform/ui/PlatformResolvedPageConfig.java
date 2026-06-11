@@ -6,17 +6,18 @@ public record PlatformResolvedPageConfig(
         List<PlatformResolvedUiField> uiFields,
         List<PlatformResolvedQueryItem> queryItems,
         List<PlatformResolvedFieldUiType> fieldUiTypes,
-        List<PlatformAssociationBlock> associationBlocks
+        List<PlatformAssociationBlock> associationBlocks,
+        List<PlatformActionBlock> actionBlocks
 ) {
     public PlatformResolvedPageConfig(List<PlatformResolvedUiField> uiFields,
                                       List<PlatformResolvedQueryItem> queryItems) {
-        this(uiFields, queryItems, List.of(), List.of());
+        this(uiFields, queryItems, List.of(), List.of(), List.of());
     }
 
     public PlatformResolvedPageConfig(List<PlatformResolvedUiField> uiFields,
                                       List<PlatformResolvedQueryItem> queryItems,
                                       List<PlatformResolvedFieldUiType> fieldUiTypes) {
-        this(uiFields, queryItems, fieldUiTypes, List.of());
+        this(uiFields, queryItems, fieldUiTypes, List.of(), List.of());
     }
 
     public PlatformResolvedPageConfig {
@@ -24,9 +25,10 @@ public record PlatformResolvedPageConfig(
         queryItems = queryItems == null ? List.of() : List.copyOf(queryItems);
         fieldUiTypes = fieldUiTypes == null ? List.of() : List.copyOf(fieldUiTypes);
         associationBlocks = associationBlocks == null ? List.of() : List.copyOf(associationBlocks);
+        actionBlocks = actionBlocks == null ? List.of() : List.copyOf(actionBlocks);
     }
 
     public static PlatformResolvedPageConfig empty() {
-        return new PlatformResolvedPageConfig(List.of(), List.of(), List.of(), List.of());
+        return new PlatformResolvedPageConfig(List.of(), List.of(), List.of(), List.of(), List.of());
     }
 }

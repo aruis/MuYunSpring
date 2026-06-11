@@ -1110,6 +1110,10 @@ class DynamicRecordServiceTest {
         assertThat((DynamicActionDialog) result.value())
                 .extracting(DynamicActionDialog::dialogKey, DynamicActionDialog::title)
                 .containsExactly("contractSubmitDialog", "提交合同");
+        assertThat((DynamicActionDialog) result.value())
+                .extracting(DynamicActionDialog::actionCode, DynamicActionDialog::submitActionCode,
+                        DynamicActionDialog::submitPath)
+                .containsExactly("submitDialog", null, null);
         assertThat(result.body().refresh()).isFalse();
         assertThat(result.context().action().executorType()).isEqualTo(EntityActionExecutorType.DIALOG);
         assertThat(events.events()).singleElement()
@@ -1123,6 +1127,41 @@ class DynamicRecordServiceTest {
                             .containsEntry("interactionOnly", true);
                     assertThat(event.payload()).doesNotContainKey("result");
                 });
+    }
+
+    @Test
+    void shouldExposeDialogSubmitProtocolWhenExecutorKeyBindsSubmitAction() {
+        DynamicRecordService service = actionServiceWithActions(operations(),
+                submitActionWithExecutorKey("contractSubmit"),
+                new EntityActionDefinition("contract", "submitDialog", "提交合同", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.DIALOG, null, null, null, null,
+                        null, null, null, "contractSubmitDialog#submit"
+                ));
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("submitDialog", DynamicActionExecutionRequest.id("contract-1"));
+
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.DIALOG);
+        assertThat((DynamicActionDialog) result.value())
+                .extracting(DynamicActionDialog::dialogKey, DynamicActionDialog::actionCode,
+                        DynamicActionDialog::submitActionCode, DynamicActionDialog::submitPath,
+                        DynamicActionDialog::recordId, DynamicActionDialog::refreshOnSuccess)
+                .containsExactly("contractSubmitDialog", "submitDialog", "submit",
+                        "/" + MODULE + "/submit/contract-1", "contract-1", true);
+    }
+
+    @Test
+    void shouldRejectDialogSubmitActionWhenTargetActionIsMissing() {
+        DynamicRecordService service = actionService(operations(), RuntimeEventPublisher.noop(), null,
+                new EntityActionDefinition("contract", "submitDialog", "提交合同", true, EntityActionLevel.RECORD,
+                        EntityActionCategory.DIALOG, null, null, null, null,
+                        null, null, null, "contractSubmitDialog#missing"
+                ));
+
+        assertThatThrownBy(() -> service.entity(MODULE, "contract")
+                .executeAction("submitDialog", DynamicActionExecutionRequest.id("contract-1")))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("unknown dynamic action");
     }
 
     @Test
@@ -1304,6 +1343,7 @@ class DynamicRecordServiceTest {
         assertThat((DynamicActionDialog) dialog.value())
                 .extracting(DynamicActionDialog::dialogKey, DynamicActionDialog::title)
                 .containsExactly("contractSubmitDialog", "提交合同");
+        assertThat(((DynamicActionDialog) dialog.value()).refreshOnSuccess()).isFalse();
         assertThat(dialog.refresh()).isFalse();
     }
 
@@ -2816,6 +2856,20 @@ class DynamicRecordServiceTest {
                 ? new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService()
                 : actionExecutionPolicyService,
                 dataScopeCriteriaService);
+    }
+
+    private DynamicRecordService actionServiceWithActions(IDatabaseOperations<Object> operations,
+                                                          EntityActionDefinition... actions) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(actionEntity()),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(actions)
+        );
+        return new DynamicRecordService(new DynamicRecordRuntime(operations).register(module));
     }
 
     private DynamicRecordService actionRuleService(IDatabaseOperations<Object> operations,

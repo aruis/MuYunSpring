@@ -7,8 +7,10 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.platform.ui.PlatformActionBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
+import net.ximatai.muyun.spring.platform.ui.PlatformResolvedPageConfig;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,13 +47,35 @@ public class DynamicPageBootstrapWebController {
     private DynamicPageBootstrapResponse response(PlatformPageBootstrap bootstrap) {
         String moduleAlias = bootstrap.entry().moduleAlias();
         DynamicModuleDescriptor descriptor = permissionScopedDescriptor(moduleAlias);
+        PlatformResolvedPageConfig resolvedConfig = permissionScopedResolvedConfig(bootstrap.resolvedConfig(), descriptor);
         return new DynamicPageBootstrapResponse(
                 bootstrap.entry(),
                 bootstrap.clientType(),
                 descriptor,
                 descriptor.mainEntityAlias(),
-                bootstrap.resolvedConfig(),
+                resolvedConfig,
                 "/" + moduleAlias + "/openapi"
+        );
+    }
+
+    private PlatformResolvedPageConfig permissionScopedResolvedConfig(PlatformResolvedPageConfig config,
+                                                                     DynamicModuleDescriptor descriptor) {
+        Set<String> visibleActionCodes = descriptor.entities().stream()
+                .flatMap(entity -> entity.actions().stream())
+                .map(DynamicActionDescriptor::code)
+                .collect(java.util.stream.Collectors.toSet());
+        visibleActionCodes.addAll(descriptor.actions().stream()
+                .map(DynamicActionDescriptor::code)
+                .collect(java.util.stream.Collectors.toSet()));
+        List<PlatformActionBlock> actionBlocks = config.actionBlocks().stream()
+                .filter(block -> visibleActionCodes.contains(block.actionCode()))
+                .toList();
+        return new PlatformResolvedPageConfig(
+                config.uiFields(),
+                config.queryItems(),
+                config.fieldUiTypes(),
+                config.associationBlocks(),
+                actionBlocks
         );
     }
 

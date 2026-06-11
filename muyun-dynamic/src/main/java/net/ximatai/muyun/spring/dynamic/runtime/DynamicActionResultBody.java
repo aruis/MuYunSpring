@@ -63,8 +63,11 @@ public record DynamicActionResultBody(
     }
 
     public static DynamicActionResultBody dialog(String dialogKey, String title) {
-        return new DynamicActionResultBody(DynamicActionResultType.DIALOG,
-                new DynamicActionDialog(dialogKey, title), null, false, null);
+        return dialog(new DynamicActionDialog(dialogKey, title));
+    }
+
+    public static DynamicActionResultBody dialog(DynamicActionDialog dialog) {
+        return new DynamicActionResultBody(DynamicActionResultType.DIALOG, dialog, null, false, null);
     }
 
     public DynamicActionResultBody message(String value) {

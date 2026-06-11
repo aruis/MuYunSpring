@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformAssociationBlock;
+import net.ximatai.muyun.spring.platform.ui.PlatformActionBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItem;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
@@ -326,6 +327,13 @@ class MenuEntryBootstrapContractTest {
                       "title": "合同",
                       "uiConfigId": "contract-list",
                       "queryTemplateId": "contract-default"
+                    },
+                    {
+                      "type": "dialog",
+                      "key": "submitDialog",
+                      "actionCode": "submitDialog",
+                      "title": "提交",
+                      "position": "recordToolbar"
                     }
                   ]
                 }
@@ -358,6 +366,12 @@ class MenuEntryBootstrapContractTest {
         assertThat(block.targetUiConfigId()).isEqualTo("contract-list");
         assertThat(block.queryTemplateId()).isEqualTo("contract-default");
         assertThat(block.queryPath()).isEqualTo("/crm.customer/view/{id}/associations/contracts/query");
+        assertThat(bootstrap.resolvedConfig().actionBlocks())
+                .extracting(PlatformActionBlock::actionCode)
+                .containsExactly("submitDialog");
+        PlatformActionBlock actionBlock = bootstrap.resolvedConfig().actionBlocks().getFirst();
+        assertThat(actionBlock.type()).isEqualTo("dialog");
+        assertThat(actionBlock.position()).isEqualTo("recordToolbar");
     }
 
     @Test

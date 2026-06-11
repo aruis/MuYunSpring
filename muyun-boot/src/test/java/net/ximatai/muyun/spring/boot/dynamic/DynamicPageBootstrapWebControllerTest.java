@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
+import net.ximatai.muyun.spring.platform.ui.PlatformActionBlock;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrap;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageBootstrapService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageEntryContext;
@@ -50,7 +51,10 @@ class DynamicPageBootstrapWebControllerTest {
                 new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
                         "ui-1", "query-1", "{\"source\":\"menu\"}"),
                 PlatformUiClientType.APP,
-                PlatformResolvedPageConfig.empty()
+                new PlatformResolvedPageConfig(List.of(), List.of(), List.of(), List.of(), List.of(
+                        new PlatformActionBlock("ui-1", "action", null, "query", null, "toolbar"),
+                        new PlatformActionBlock("ui-1", "action", null, "delete", null, "toolbar")
+                ))
         );
         PlatformPageBootstrap webBootstrap = new PlatformPageBootstrap(
                 new PlatformPageEntryContext("menu-1", "crm.customer", MenuPageMode.LIST,
@@ -82,7 +86,9 @@ class DynamicPageBootstrapWebControllerTest {
                     .andExpect(jsonPath("$.mainEntityAlias").value("customer"))
                     .andExpect(jsonPath("$.openApiPath").value("/crm.customer/openapi"))
                     .andExpect(jsonPath("$.pageConfig").doesNotExist())
-                    .andExpect(jsonPath("$.resolvedConfig.uiFields.length()").value(0));
+                    .andExpect(jsonPath("$.resolvedConfig.uiFields.length()").value(0))
+                    .andExpect(jsonPath("$.resolvedConfig.actionBlocks.length()").value(1))
+                    .andExpect(jsonPath("$.resolvedConfig.actionBlocks[0].actionCode").value("query"));
             mvc.perform(get("/platform.menu/menu-1/entry"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.clientType").value("WEB"))

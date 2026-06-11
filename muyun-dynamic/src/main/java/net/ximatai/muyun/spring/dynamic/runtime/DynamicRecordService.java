@@ -1664,7 +1664,7 @@ public class DynamicRecordService {
             return executeRegisteredAction(moduleAlias, entityAlias, action, request, context, traceId, policy);
         }
         if (action.executorType() == EntityActionExecutorType.DIALOG) {
-            return DynamicActionResultBody.dialog(dialogKey(action), action.title());
+            return DynamicActionResultBody.dialog(dialog(moduleAlias, action, request));
         }
         throw new DynamicActionExecutionException(
                 "dynamic action executor is not supported: " + action.executorType(),
@@ -1696,7 +1696,66 @@ public class DynamicRecordService {
     }
 
     private String dialogKey(DynamicActionDescriptor action) {
-        return requireText(action.executorKey(), "dialog executorKey");
+        String executorKey = requireText(action.executorKey(), "dialog executorKey");
+        int separator = executorKey.indexOf('#');
+        return separator < 0 ? executorKey : requireText(executorKey.substring(0, separator), "dialog key");
+    }
+
+    private DynamicActionDialog dialog(String moduleAlias,
+                                       DynamicActionDescriptor action,
+                                       DynamicActionExecutionRequest request) {
+        String submitActionCode = dialogSubmitActionCode(action);
+        DynamicActionDescriptor submitAction = submitActionCode == null ? null : action(moduleAlias, submitActionCode);
+        if (submitAction != null && submitAction.executorType() == EntityActionExecutorType.DIALOG) {
+            throw new PlatformException("dialog submit action must not be DIALOG: " + submitActionCode);
+        }
+        String recordId = request == null ? null : firstText(request.recordId(),
+                request.record() == null ? null : request.record().getId());
+        return new DynamicActionDialog(
+                dialogKey(action),
+                action.title(),
+                action.code(),
+                submitActionCode,
+                submitActionPath(moduleAlias, submitAction, recordId),
+                recordId,
+                submitActionCode != null,
+                null
+        );
+    }
+
+    private String dialogSubmitActionCode(DynamicActionDescriptor action) {
+        String executorKey = requireText(action.executorKey(), "dialog executorKey");
+        int separator = executorKey.indexOf('#');
+        if (separator < 0 || separator == executorKey.length() - 1) {
+            return null;
+        }
+        return requireText(executorKey.substring(separator + 1), "dialog submit actionCode");
+    }
+
+    private String submitActionPath(String moduleAlias,
+                                    DynamicActionDescriptor submitAction,
+                                    String recordId) {
+        if (submitAction == null) {
+            return null;
+        }
+        if (submitAction.actionLevel() == net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.RECORD) {
+            return recordId == null
+                    ? "/" + moduleAlias + "/" + submitAction.code() + "/{recordId}"
+                    : "/" + moduleAlias + "/" + submitAction.code() + "/" + recordId;
+        }
+        if (submitAction.actionLevel() == net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel.BATCH) {
+            return "/" + moduleAlias + "/" + submitAction.code() + "/batch";
+        }
+        return "/" + moduleAlias + "/" + submitAction.code();
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private boolean isInteractionOnlyAction(DynamicActionDescriptor action) {

@@ -2014,7 +2014,8 @@ class DynamicRecordWebControllerTest {
     @Test
     void shouldExposeDialogActionResultThroughStableWebResponse() throws Exception {
         DynamicActionDescriptor submitDialog = dialogAction("submitDialog", EntityActionLevel.RECORD);
-        DynamicActionDialog dialog = new DynamicActionDialog("contractSubmitDialog", "提交合同");
+        DynamicActionDialog dialog = new DynamicActionDialog("contractSubmitDialog", "提交合同",
+                "submitDialog", "submit", "/" + MODULE + "/submit/contract-1", "contract-1", true, null);
         when(service.action(MODULE, "submitDialog")).thenReturn(submitDialog);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.executeAction(eq(MODULE), eq("submitDialog"), any(DynamicActionExecutionRequest.class)))
@@ -2023,7 +2024,7 @@ class DynamicRecordWebControllerTest {
                                 "contract-1", "trace-1", "tenant-1", false,
                                 DynamicActionAvailability.available("submitDialog")),
                         dialog,
-                        DynamicActionResultBody.dialog("contractSubmitDialog", "提交合同")));
+                        DynamicActionResultBody.dialog(dialog)));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submitDialog", "contract-1")
                         .contentType("application/json")
@@ -2037,6 +2038,11 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.body.type").value("DIALOG"))
                 .andExpect(jsonPath("$.body.value.dialogKey").value("contractSubmitDialog"))
                 .andExpect(jsonPath("$.body.value.title").value("提交合同"))
+                .andExpect(jsonPath("$.body.value.actionCode").value("submitDialog"))
+                .andExpect(jsonPath("$.body.value.submitActionCode").value("submit"))
+                .andExpect(jsonPath("$.body.value.submitPath").value("/" + MODULE + "/submit/contract-1"))
+                .andExpect(jsonPath("$.body.value.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.body.value.refreshOnSuccess").value(true))
                 .andExpect(jsonPath("$.body.refresh").value(false));
     }
 

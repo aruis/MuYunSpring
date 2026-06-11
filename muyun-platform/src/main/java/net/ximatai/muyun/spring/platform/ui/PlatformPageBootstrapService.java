@@ -194,7 +194,8 @@ public class PlatformPageBootstrapService {
                 .map(this::resolvedQueryItem)
                 .toList();
         return new PlatformResolvedPageConfig(uiFields, queryItems, resolvedFieldUiTypes(uiFields),
-                associationBlocks(snapshot, clientType, defaultUiConfigId));
+                associationBlocks(snapshot, clientType, defaultUiConfigId),
+                actionBlocks(snapshot, clientType, defaultUiConfigId));
     }
 
     private List<PlatformAssociationBlock> associationBlocks(PlatformPageConfigSnapshot snapshot,
@@ -242,6 +243,59 @@ public class PlatformPageBootstrapService {
                     text(block, "uiConfigId"),
                     text(block, "queryTemplateId"),
                     "/" + moduleAlias + "/view/{id}/associations/" + viewCode + "/query"
+            ));
+        }
+        return resolved;
+    }
+
+    private List<PlatformActionBlock> actionBlocks(PlatformPageConfigSnapshot snapshot,
+                                                   PlatformUiClientType clientType,
+                                                   String defaultUiConfigId) {
+        if (defaultUiConfigId == null || defaultUiConfigId.isBlank()) {
+            return List.of();
+        }
+        return snapshot.uiConfigs().stream()
+                .filter(config -> config.getClientType() == clientType)
+                .filter(config -> Objects.equals(config.getId(), defaultUiConfigId))
+                .flatMap(config -> actionBlocks(config).stream())
+                .toList();
+    }
+
+    private List<PlatformActionBlock> actionBlocks(PlatformUiConfig config) {
+        String layoutJson = config.getLayoutJson();
+        if (layoutJson == null || layoutJson.isBlank()) {
+            return List.of();
+        }
+        JsonNode root;
+        try {
+            root = OBJECT_MAPPER.readTree(layoutJson);
+        } catch (JsonProcessingException exception) {
+            throw new PlatformException("UI config layout JSON cannot be decoded: " + config.getId());
+        }
+        JsonNode blocks = root.get("blocks");
+        if (blocks == null || !blocks.isArray()) {
+            return List.of();
+        }
+        java.util.ArrayList<PlatformActionBlock> resolved = new java.util.ArrayList<>();
+        for (JsonNode block : blocks) {
+            if (block == null || !block.isObject()) {
+                continue;
+            }
+            String type = text(block, "type");
+            if (!"dialog".equals(type) && !"localEdit".equals(type) && !"action".equals(type)) {
+                continue;
+            }
+            String actionCode = text(block, "actionCode");
+            if (actionCode == null) {
+                continue;
+            }
+            resolved.add(new PlatformActionBlock(
+                    config.getId(),
+                    type,
+                    text(block, "key"),
+                    actionCode,
+                    text(block, "title"),
+                    text(block, "position")
             ));
         }
         return resolved;

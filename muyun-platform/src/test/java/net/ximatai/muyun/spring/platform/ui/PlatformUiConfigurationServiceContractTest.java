@@ -7,10 +7,15 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -277,13 +282,26 @@ class PlatformUiConfigurationServiceContractTest {
         config = uiConfigService.select(uiConfigId);
         config.setLayoutJson("""
                 {
+                  "blocks": [
+                    {"type":"dialog", "key":"submitDialog"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> publishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("blocks[0].actionCode is required");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
                   "referenceCandidates": [
                     {"sourceUiConfigId":"ui-form", "uiConfigId":"ui-ref", "queryTemplateId":"q-ref"}
                   ],
                   "blocks": [
                     {"type":"associationView", "key":"contracts", "viewCode":"contracts"},
                     {"type":"localEdit", "key":"baseInfo", "actionCode":"editBaseInfo"},
-                    {"type":"dialog", "key":"submitDialog"},
+                    {"type":"dialog", "key":"submitDialog", "actionCode":"submitDialog", "position":"recordToolbar"},
                     {"type":"taskPanel", "key":"completion"}
                   ]
                 }
@@ -340,6 +358,72 @@ class PlatformUiConfigurationServiceContractTest {
                 """);
         uiConfigService.update(config);
         assertThatCode(() -> verifyingPublishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldValidateActionBlocksAgainstDynamicDescriptorWhenAvailable() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "detail", PlatformUiSetType.DETAIL, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, customerNameField, "text"));
+        DynamicRecordService recordService = org.mockito.Mockito.mock(DynamicRecordService.class);
+        org.mockito.Mockito.when(recordService.action("crm.customer", "submitDialog")).thenReturn(action(
+                "submitDialog", EntityActionExecutorType.DIALOG, "submitDialog#submit"));
+        org.mockito.Mockito.when(recordService.action("crm.customer", "submit")).thenReturn(action(
+                "submit", EntityActionExecutorType.SERVICE, "contractSubmit"));
+        org.mockito.Mockito.when(recordService.action("crm.customer", "editBaseInfo")).thenReturn(action(
+                "editBaseInfo", EntityActionExecutorType.SERVICE, DynamicLocalEditActionExecutor.EXECUTOR_KEY));
+        PlatformPageConfigPublishService verifyingPublishService = new PlatformPageConfigPublishService(
+                uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService,
+                recordService);
+
+        PlatformUiConfig config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"dialog", "actionCode":"submit"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must be DIALOG action");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"localEdit", "actionCode":"submit"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatThrownBy(() -> verifyingPublishService.publishUiConfig(uiConfigId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must use local edit executor");
+
+        config = uiConfigService.select(uiConfigId);
+        config.setLayoutJson("""
+                {
+                  "blocks": [
+                    {"type":"dialog", "actionCode":"submitDialog"},
+                    {"type":"localEdit", "actionCode":"editBaseInfo"}
+                  ]
+                }
+                """);
+        uiConfigService.update(config);
+        assertThatCode(() -> verifyingPublishService.publishUiConfig(uiConfigId)).doesNotThrowAnyException();
+    }
+
+    private DynamicActionDescriptor action(String code,
+                                           EntityActionExecutorType executorType,
+                                           String executorKey) {
+        return new DynamicActionDescriptor(code, code, true, EntityActionLevel.RECORD,
+                EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED, true, true,
+                null, false, null, executorType, executorKey);
     }
 
     @Test

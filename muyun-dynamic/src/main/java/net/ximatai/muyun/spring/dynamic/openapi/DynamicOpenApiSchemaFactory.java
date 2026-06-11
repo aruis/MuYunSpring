@@ -782,6 +782,13 @@ final class DynamicOpenApiSchemaFactory {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("dialogKey", stringProperty(false));
         properties.put("title", stringProperty(true));
+        properties.put("actionCode", stringProperty(true));
+        properties.put("submitActionCode", stringProperty(true));
+        properties.put("submitPath", stringProperty(true));
+        properties.put("recordId", stringProperty(true));
+        properties.put("refreshOnSuccess", new DynamicOpenApiDocument.Property("boolean", null, false, false,
+                false, null, null, null, null, null, List.of()));
+        properties.put("redirectTo", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicActionDialog", "object", null,
                 List.of("dialogKey"), properties, null);
     }

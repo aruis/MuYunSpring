@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -219,7 +221,8 @@ public class PlatformPageConfigPublishService {
             validateOptionalText(block, "type", path, uiConfigId);
             validateOptionalText(block, "key", path, uiConfigId);
             validateAssociationBlock(moduleAlias, block, path, uiConfigId);
-            validateLocalEditBlock(block, path, uiConfigId);
+            validateActionBlock(moduleAlias, block, path, uiConfigId);
+            validateLocalEditBlock(moduleAlias, block, path, uiConfigId);
         }
     }
 
@@ -251,16 +254,52 @@ public class PlatformPageConfigPublishService {
         }
     }
 
-    private void validateLocalEditBlock(JsonNode block, String path, String uiConfigId) {
+    private void validateLocalEditBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
         JsonNode type = block.get("type");
         if (type == null || type.isNull() || !"localEdit".equals(type.asText())) {
             return;
         }
+        String actionCode = validateRequiredActionCode(block, path, uiConfigId);
+        DynamicActionDescriptor action = validateActionCode(moduleAlias, actionCode, path, uiConfigId);
+        if (action != null && !DynamicLocalEditActionExecutor.EXECUTOR_KEY.equals(action.executorKey())) {
+            throw layoutException(uiConfigId, path + ".actionCode must use local edit executor");
+        }
+        validateOptionalText(block, "title", path, uiConfigId);
+        validateOptionalText(block, "position", path, uiConfigId);
+    }
+
+    private void validateActionBlock(String moduleAlias, JsonNode block, String path, String uiConfigId) {
+        JsonNode type = block.get("type");
+        if (type == null || type.isNull()
+                || (!"dialog".equals(type.asText()) && !"action".equals(type.asText()))) {
+            return;
+        }
+        String actionCode = validateRequiredActionCode(block, path, uiConfigId);
+        DynamicActionDescriptor action = validateActionCode(moduleAlias, actionCode, path, uiConfigId);
+        if (action != null && "dialog".equals(type.asText()) && action.executorType() != EntityActionExecutorType.DIALOG) {
+            throw layoutException(uiConfigId, path + ".actionCode must be DIALOG action");
+        }
+        validateOptionalText(block, "title", path, uiConfigId);
+        validateOptionalText(block, "position", path, uiConfigId);
+    }
+
+    private String validateRequiredActionCode(JsonNode block, String path, String uiConfigId) {
         JsonNode actionCode = block.get("actionCode");
         if (actionCode == null || !actionCode.isTextual() || actionCode.asText().isBlank()) {
             throw layoutException(uiConfigId, path + ".actionCode is required");
         }
-        validateOptionalText(block, "title", path, uiConfigId);
+        return actionCode.asText().trim();
+    }
+
+    private DynamicActionDescriptor validateActionCode(String moduleAlias, String actionCode, String path, String uiConfigId) {
+        if (recordService == null) {
+            return null;
+        }
+        try {
+            return recordService.action(moduleAlias, actionCode);
+        } catch (RuntimeException exception) {
+            throw layoutException(uiConfigId, path + ".actionCode is unknown");
+        }
     }
 
     private void validateOptionalText(JsonNode node, String field, String path, String uiConfigId) {
