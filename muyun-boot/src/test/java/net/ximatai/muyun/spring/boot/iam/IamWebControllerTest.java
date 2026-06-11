@@ -137,6 +137,25 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldRejectUnsupportedStaticQueryCriteriaInsteadOfIgnoringThem() throws Exception {
+        mvc.perform(post("/iam.tenant/query")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "criteria", Map.of(
+                                        "operator", "OR",
+                                        "conditions", List.of(Map.of(
+                                                "fieldName", "title",
+                                                "operator", "EQ",
+                                                "values", List.of("Tenant A")
+                                        ))
+                                )
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("query criteria are not supported by iam.tenant"));
+    }
+
+    @Test
     void shouldExposeOrganizationTreeUnderTenantScope() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));

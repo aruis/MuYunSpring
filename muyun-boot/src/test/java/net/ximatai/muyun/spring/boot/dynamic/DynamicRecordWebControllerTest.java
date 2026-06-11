@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.dynamic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
@@ -892,6 +893,61 @@ class DynamicRecordWebControllerTest {
         assertThat(page.getValue().getOffset()).isEqualTo(30);
         assertThat(page.getValue().getLimit()).isEqualTo(30);
         assertThat(sorts.getValue()[0].getField()).isEqualTo("amount");
+    }
+
+    @Test
+    void shouldBuildNestedMainEntityQueryCriteriaTree() throws Exception {
+        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
+        record.setId("contract-1");
+        when(mainEntity.queryCriteria(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<DynamicQueryCondition> conditions = invocation.getArgument(0, List.class);
+            DynamicQueryCondition condition = conditions.getFirst();
+            return Criteria.of().eq(condition.fieldName(), condition.values().getFirst());
+        });
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "criteria": {
+                                    "operator": "OR",
+                                    "conditions": [
+                                      {"fieldName": "code", "operator": "EQ", "values": ["C-001"]}
+                                    ],
+                                    "groups": [
+                                      {
+                                        "operator": "AND",
+                                        "conditions": [
+                                          {"fieldName": "status", "operator": "EQ", "values": ["ACTIVE"]}
+                                        ],
+                                        "groups": [
+                                          {
+                                            "operator": "OR",
+                                            "conditions": [
+                                              {"fieldName": "ownerId", "operator": "EQ", "values": ["u-1"]},
+                                              {"fieldName": "ownerId", "operator": "EQ", "values": ["u-2"]}
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(mainEntity).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort[].class));
+        List<CriteriaGroup.Entry> rootEntries = criteria.getValue().getRoot().getEntries();
+        assertThat(rootEntries).hasSize(2);
+        assertThat(criteriaJoin(rootEntries.get(1))).isEqualTo("OR");
+        CriteriaGroup nestedAnd = (CriteriaGroup) criteriaNode(rootEntries.get(1));
+        assertThat(nestedAnd.getEntries()).hasSize(2);
+        CriteriaGroup nestedOr = (CriteriaGroup) criteriaNode(nestedAnd.getEntries().get(1));
+        assertThat(criteriaJoin(nestedOr.getEntries().get(1))).isEqualTo("OR");
     }
 
     @Test
@@ -2607,6 +2663,24 @@ class DynamicRecordWebControllerTest {
         attachment.setFileId(fileId);
         attachment.setDisplayName(displayName);
         return attachment;
+    }
+
+    private Object criteriaNode(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
+    }
+
+    private String criteriaJoin(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getJoin");
+            return String.valueOf(method.invoke(entry));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria join", e);
+        }
     }
 
     private EntityDefinition lineEntity() {

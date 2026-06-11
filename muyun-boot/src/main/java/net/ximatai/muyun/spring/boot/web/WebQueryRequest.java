@@ -7,6 +7,7 @@ import java.util.Map;
 
 public record WebQueryRequest(WebPageRequest page,
                               List<WebQueryCondition> conditions,
+                              WebQueryCriteria criteria,
                               List<WebSort> sorts,
                               String uiConfigId,
                               String queryTemplateId,
@@ -27,7 +28,7 @@ public record WebQueryRequest(WebPageRequest page,
     public WebQueryRequest(WebPageRequest page,
                            List<WebQueryCondition> conditions,
                            List<WebSort> sorts) {
-        this(page, conditions, sorts, null, null, Map.of(), null, null, List.of(), null);
+        this(page, conditions, null, sorts, null, null, Map.of(), null, null, List.of(), null);
     }
 
     public WebPageRequest pageOrDefault() {

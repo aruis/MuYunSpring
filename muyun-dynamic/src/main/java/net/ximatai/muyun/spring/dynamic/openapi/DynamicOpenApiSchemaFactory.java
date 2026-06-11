@@ -23,6 +23,7 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicRecordResponse", recordResponseSchema(entity));
         schemas.put("WebQueryRequest", queryRequestSchema("WebQueryRequest", "WebQueryCondition", "WebPageRequest", "WebSort"));
         schemas.put("WebQueryCondition", queryConditionSchema("WebQueryCondition"));
+        schemas.put("WebQueryCriteria", queryCriteriaSchema());
         schemas.put("WebPageRequest", pageRequestSchema("WebPageRequest"));
         schemas.put("WebSort", sortSchema("WebSort"));
         schemas.put("DynamicSummaryItem", summaryItemSchema());
@@ -445,6 +446,7 @@ final class DynamicOpenApiSchemaFactory {
                                                              String sortSchema) {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("conditions", arrayProperty(conditionSchema));
+        properties.put("criteria", objectProperty("WebQueryCriteria"));
         properties.put("page", objectProperty(pageSchema));
         properties.put("sorts", arrayProperty(sortSchema));
         properties.put("uiConfigId", stringProperty(true));
@@ -463,6 +465,14 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("operator", stringProperty(true));
         properties.put("values", arrayProperty("object"));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema queryCriteriaSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("operator", stringProperty(true));
+        properties.put("conditions", arrayProperty("WebQueryCondition"));
+        properties.put("groups", arrayProperty("WebQueryCriteria"));
+        return new DynamicOpenApiDocument.Schema("WebQueryCriteria", "object", null, List.of(), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema pageRequestSchema(String name) {
@@ -618,6 +628,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("fuzzy", stringProperty(true));
         properties.put("values", arrayProperty("object"));
         properties.put("conditions", arrayProperty("WebQueryCondition"));
+        properties.put("criteria", objectProperty("WebQueryCriteria"));
         properties.put("page", objectProperty("WebPageRequest"));
         properties.put("includeProjections", new DynamicOpenApiDocument.Property("boolean", null, false, true,
                 false, null, null, null, null, null, List.of()));

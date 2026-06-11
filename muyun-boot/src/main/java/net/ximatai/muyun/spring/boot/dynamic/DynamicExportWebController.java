@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import jakarta.servlet.http.HttpServletResponse;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
@@ -17,10 +18,17 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -33,8 +41,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 @RestController
@@ -45,11 +56,12 @@ public class DynamicExportWebController {
     private final DynamicExportFacade exportFacade;
     private final PlatformPageConfigSnapshotService pageConfigSnapshotService;
     private final PlatformQueryItemService queryItemService;
+    private final ModuleMetadataFieldService moduleMetadataFieldService;
 
     public DynamicExportWebController(DynamicRecordService recordService,
                                       ActiveTenantVerifier activeTenantVerifier,
                                       DynamicExportFacade exportFacade) {
-        this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null, null);
+        this(recordService, activeTenantVerifier, exportFacade, (PlatformPageConfigSnapshotService) null, null, null);
     }
 
     @Autowired
@@ -57,10 +69,12 @@ public class DynamicExportWebController {
                                       ActiveTenantVerifier activeTenantVerifier,
                                       DynamicExportFacade exportFacade,
                                       ObjectProvider<PlatformPageConfigSnapshotService> pageConfigSnapshotServiceProvider,
-                                      ObjectProvider<PlatformQueryItemService> queryItemServiceProvider) {
+                                      ObjectProvider<PlatformQueryItemService> queryItemServiceProvider,
+                                      ObjectProvider<ModuleMetadataFieldService> moduleMetadataFieldServiceProvider) {
         this(recordService, activeTenantVerifier, exportFacade,
                 pageConfigSnapshotServiceProvider == null ? null : pageConfigSnapshotServiceProvider.getIfAvailable(),
-                queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable());
+                queryItemServiceProvider == null ? null : queryItemServiceProvider.getIfAvailable(),
+                moduleMetadataFieldServiceProvider == null ? null : moduleMetadataFieldServiceProvider.getIfAvailable());
     }
 
     public DynamicExportWebController(DynamicRecordService recordService,
@@ -68,11 +82,21 @@ public class DynamicExportWebController {
                                       DynamicExportFacade exportFacade,
                                       PlatformPageConfigSnapshotService pageConfigSnapshotService,
                                       PlatformQueryItemService queryItemService) {
+        this(recordService, activeTenantVerifier, exportFacade, pageConfigSnapshotService, queryItemService, null);
+    }
+
+    public DynamicExportWebController(DynamicRecordService recordService,
+                                      ActiveTenantVerifier activeTenantVerifier,
+                                      DynamicExportFacade exportFacade,
+                                      PlatformPageConfigSnapshotService pageConfigSnapshotService,
+                                      PlatformQueryItemService queryItemService,
+                                      ModuleMetadataFieldService moduleMetadataFieldService) {
         this.recordService = recordService;
         this.activeTenantVerifier = activeTenantVerifier;
         this.exportFacade = exportFacade;
         this.pageConfigSnapshotService = pageConfigSnapshotService;
         this.queryItemService = queryItemService;
+        this.moduleMetadataFieldService = moduleMetadataFieldService;
     }
 
     @PostMapping("/data")
@@ -109,17 +133,94 @@ public class DynamicExportWebController {
             validateQueryTemplateBelongsToModule(moduleAlias, request.queryTemplateId());
             templateCriteria = queryItemService.compile(request.queryTemplateId(), request.externalQueryValues());
         }
-        if (request == null || request.conditions().isEmpty()) {
-            return templateCriteria;
+        Criteria manualCriteria = request == null || request.conditions().isEmpty()
+                ? Criteria.of()
+                : operations.queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        Criteria treeCriteria = request == null || request.criteria() == null
+                ? Criteria.of()
+                : DynamicWebQueryMapper.queryCriteria(request.criteria(), operations::queryCriteria);
+        Criteria quickCriteria = quickSearchCriteria(moduleAlias, request);
+        return andCriteria(templateCriteria, manualCriteria, treeCriteria, quickCriteria);
+    }
+
+    private Criteria quickSearchCriteria(String moduleAlias, WebQueryRequest request) {
+        if (request == null || !hasText(request.quickSearch())) {
+            return Criteria.of();
         }
-        Criteria manualCriteria = operations.queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
-        if (templateCriteria.isEmpty()) {
-            return manualCriteria;
+        if (!hasText(request.uiConfigId())) {
+            throw new PlatformException("Quick search requires published LIST uiConfigId");
+        }
+        String keyword = request.quickSearch().trim();
+        List<String> fields = quickSearchFields(moduleAlias, request);
+        if (fields.isEmpty()) {
+            throw new PlatformException("Quick search requires at least one searchable field");
         }
         Criteria criteria = Criteria.of();
-        criteria.andGroup(templateCriteria.getRoot());
-        if (!manualCriteria.isEmpty()) {
-            criteria.andGroup(manualCriteria.getRoot());
+        criteria.andGroup(group -> {
+            for (String field : fields) {
+                group.or(field, CriteriaOperator.LIKE, keyword);
+            }
+        });
+        return criteria;
+    }
+
+    private List<String> quickSearchFields(String moduleAlias, WebQueryRequest request) {
+        requireLowCodeQuickSearchServices();
+        PlatformPageConfigSnapshot snapshot = pageConfigSnapshotService.snapshot(moduleAlias);
+        PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
+        requireListUiConfig(snapshot, uiConfig);
+        Set<String> visibleFields = new LinkedHashSet<>();
+        for (PlatformUiConfigField field : snapshot.uiFields()) {
+            if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
+                    || !Boolean.TRUE.equals(field.getVisible())) {
+                continue;
+            }
+            ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
+            if (resolved.relationRole() == RelationRole.MAIN && searchableTextField(resolved)) {
+                visibleFields.add(resolved.fieldName());
+            }
+        }
+        if (request.quickSearchFields().isEmpty()) {
+            return List.copyOf(visibleFields);
+        }
+        List<String> requestedFields = request.quickSearchFields().stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        for (String field : requestedFields) {
+            if (!visibleFields.contains(field)) {
+                throw new PlatformException("Quick search field is not searchable in UI config: " + field);
+            }
+        }
+        return requestedFields;
+    }
+
+    private boolean searchableTextField(ResolvedModuleMetadataField field) {
+        String alias = field.fieldTypeAlias();
+        return alias != null && Set.of("string", "text").contains(alias.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private Criteria andCriteria(Criteria... criteriaList) {
+        Criteria single = null;
+        int size = 0;
+        for (Criteria item : criteriaList) {
+            if (item != null && !item.isEmpty()) {
+                single = item;
+                size++;
+            }
+        }
+        if (size == 0) {
+            return Criteria.of();
+        }
+        if (size == 1) {
+            return single;
+        }
+        Criteria criteria = Criteria.of();
+        for (Criteria item : criteriaList) {
+            if (item != null && !item.isEmpty()) {
+                criteria.andGroup(item.getRoot());
+            }
         }
         return criteria;
     }
@@ -139,6 +240,31 @@ public class DynamicExportWebController {
     private void requireLowCodeQueryServices() {
         if (pageConfigSnapshotService == null || queryItemService == null) {
             throw new PlatformException("dynamic low-code query services are not configured");
+        }
+    }
+
+    private void requireLowCodeQuickSearchServices() {
+        if (pageConfigSnapshotService == null || moduleMetadataFieldService == null) {
+            throw new PlatformException("dynamic low-code quick search services are not configured");
+        }
+    }
+
+    private PlatformUiConfig publishedUiConfig(PlatformPageConfigSnapshot snapshot, String uiConfigId) {
+        return snapshot.uiConfigs().stream()
+                .filter(config -> Objects.equals(config.getId(), uiConfigId))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config is not published in module snapshot: "
+                        + uiConfigId));
+    }
+
+    private void requireListUiConfig(PlatformPageConfigSnapshot snapshot, PlatformUiConfig uiConfig) {
+        PlatformUiSet uiSet = snapshot.uiSets().stream()
+                .filter(set -> Objects.equals(set.getId(), uiConfig.getUiSetId()))
+                .findFirst()
+                .orElseThrow(() -> new PlatformException("UI config set is not published in module snapshot: "
+                        + uiConfig.getUiSetId()));
+        if (uiSet.getSetType() != PlatformUiSetType.LIST) {
+            throw new PlatformException("Quick search requires LIST UI config: " + uiConfig.getId());
         }
     }
 

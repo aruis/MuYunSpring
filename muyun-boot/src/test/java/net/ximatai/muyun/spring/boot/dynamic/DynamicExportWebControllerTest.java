@@ -2,6 +2,9 @@ package net.ximatai.muyun.spring.boot.dynamic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaClause;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
@@ -17,10 +20,18 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.RelationRole;
+import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryItemService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiClientType;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigField;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
+import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -28,11 +39,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.eq;
@@ -148,6 +162,70 @@ class DynamicExportWebControllerTest {
     }
 
     @Test
+    void shouldExportDataWithNestedCriteriaAndQuickSearch() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc exportMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicExportWebController(
+                        recordService, activeTenantVerifier, exportFacade,
+                        snapshotService, queryItemService, moduleFieldService))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        PlatformUiSet uiSet = uiSet("set-list");
+        PlatformUiConfig uiConfig = uiConfig("ui-list", uiSet.getId());
+        PlatformUiConfigField codeField = uiField(uiConfig.getId(), "field-code");
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE, List.of(uiSet), List.of(uiConfig), List.of(codeField), List.of(), List.of()));
+        when(moduleFieldService.resolve("field-code")).thenReturn(resolvedField("field-code", "code", "string"));
+        when(operations.queryCriteria(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            List<net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition> conditions =
+                    invocation.getArgument(0, List.class);
+            var condition = conditions.getFirst();
+            return Criteria.of().eq(condition.fieldName(), condition.values().getFirst());
+        });
+        when(exportFacade.exportWorkbook(any(DynamicExportCommand.class))).thenReturn(new byte[]{4, 5, 6});
+
+        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["code"],
+                                  "criteria": {
+                                    "operator": "OR",
+                                    "conditions": [
+                                      {"fieldName": "status", "operator": "EQ", "values": ["ACTIVE"]},
+                                      {"fieldName": "status", "operator": "EQ", "values": ["PENDING"]}
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<DynamicExportCommand> captor = ArgumentCaptor.forClass(DynamicExportCommand.class);
+        verify(exportFacade).exportWorkbook(captor.capture());
+        List<CriteriaClause> clauses = clauses(captor.getValue().criteria());
+        assertThat(clauses).anySatisfy(clause -> {
+            assertThat(clause.getField()).isEqualTo("status");
+            assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.EQ);
+            assertThat(clause.getValues()).contains("ACTIVE");
+        });
+        assertThat(clauses).anySatisfy(clause -> {
+            assertThat(clause.getField()).isEqualTo("code");
+            assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.LIKE);
+            assertThat(clause.getValues()).contains("C-001");
+        });
+    }
+
+    @Test
     void shouldRejectDataExportWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
@@ -173,6 +251,76 @@ class DynamicExportWebControllerTest {
                         FieldDefinition.string("orderNo", "Order No")
                 )))
         ));
+    }
+
+    private PlatformUiSet uiSet(String id) {
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId(id);
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        return uiSet;
+    }
+
+    private PlatformUiConfig uiConfig(String id, String uiSetId) {
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId(id);
+        uiConfig.setUiSetId(uiSetId);
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        return uiConfig;
+    }
+
+    private PlatformUiConfigField uiField(String uiConfigId, String moduleFieldId) {
+        PlatformUiConfigField field = new PlatformUiConfigField();
+        field.setUiConfigId(uiConfigId);
+        field.setModuleMetadataFieldId(moduleFieldId);
+        field.setVisible(true);
+        return field;
+    }
+
+    private ResolvedModuleMetadataField resolvedField(String id, String fieldName, String fieldTypeAlias) {
+        return new ResolvedModuleMetadataField(
+                id,
+                MODULE,
+                "rel-main",
+                "main",
+                RelationRole.MAIN,
+                "metadata-order",
+                "order",
+                "Order",
+                "metadata-" + fieldName,
+                fieldName,
+                fieldName,
+                fieldName,
+                fieldTypeAlias
+        );
+    }
+
+    private List<CriteriaClause> clauses(Criteria criteria) {
+        List<CriteriaClause> result = new ArrayList<>();
+        collect(criteria.getRoot(), result);
+        return result;
+    }
+
+    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = node(entry);
+            if (node instanceof CriteriaClause clause) {
+                result.add(clause);
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collect(childGroup, result);
+            }
+        }
+    }
+
+    private Object node(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
     }
 
 }

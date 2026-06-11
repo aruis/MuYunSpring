@@ -281,8 +281,11 @@ public class DynamicRecordWebController implements
         Criteria manualCriteria = request == null || request.conditions().isEmpty()
                 ? Criteria.of()
                 : service().queryCriteria(DynamicWebQueryMapper.queryConditions(request.conditions()));
+        Criteria treeCriteria = request == null || request.criteria() == null
+                ? Criteria.of()
+                : DynamicWebQueryMapper.queryCriteria(request.criteria(), service()::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(DynamicWebRequest.moduleAlias(), request);
-        return andCriteria(templateCriteria, manualCriteria, quickCriteria);
+        return andCriteria(templateCriteria, manualCriteria, treeCriteria, quickCriteria);
     }
 
     private Criteria andCriteria(Criteria... criteriaList) {
@@ -1268,7 +1271,9 @@ public class DynamicRecordWebController implements
         }
         Criteria manualCriteria = criteria(reference.targetModuleAlias(), reference.targetEntityAlias(),
                 request.conditions());
-        return andCriteria(templateCriteria, manualCriteria);
+        Criteria treeCriteria = criteria(reference.targetModuleAlias(), reference.targetEntityAlias(),
+                request.criteria());
+        return andCriteria(templateCriteria, manualCriteria, treeCriteria);
     }
 
     private ReferenceRecordGenerationFacade referenceGenerationFacade() {
@@ -1484,6 +1489,15 @@ public class DynamicRecordWebController implements
             return Criteria.of();
         }
         return recordService.queryCriteria(moduleAlias, entityAlias, queryConditions);
+    }
+
+    private Criteria criteria(String moduleAlias, String entityAlias,
+                              net.ximatai.muyun.spring.boot.web.WebQueryCriteria criteria) {
+        if (criteria == null || criteria.isEmpty()) {
+            return Criteria.of();
+        }
+        return DynamicWebQueryMapper.queryCriteria(criteria,
+                conditions -> recordService.queryCriteria(moduleAlias, entityAlias, conditions));
     }
 
     private DynamicActionExecutionRequest actionRequest(String moduleAlias,

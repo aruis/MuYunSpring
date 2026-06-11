@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebQueryCriteria;
 import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
@@ -79,6 +80,7 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
                                   String fuzzy,
                                   List<Object> values,
                                   List<WebQueryCondition> conditions,
+                                  WebQueryCriteria criteria,
                                   WebPageRequest page,
                                   Boolean includeProjections,
                                   Map<String, Object> formValues,
@@ -95,7 +97,7 @@ record DynamicWebReferenceRequest(DynamicReferenceResolveMode mode,
     }
 
     static DynamicWebReferenceRequest empty() {
-        return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(),
+        return new DynamicWebReferenceRequest(null, null, null, List.of(), List.of(), null,
                 WebPageRequest.DEFAULT, true, Map.of(), null, null, null, Map.of());
     }
 }

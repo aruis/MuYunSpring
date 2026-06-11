@@ -40,6 +40,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
         if (request != null && !request.conditions().isEmpty()) {
             throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
         }
+        if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
+            throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
+        }
         return Criteria.of();
     }
 

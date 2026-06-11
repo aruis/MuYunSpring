@@ -194,6 +194,13 @@ class DynamicOpenApiGeneratorTest {
                 .singleElement()
                 .extracting(DynamicOpenApiDocument.Operation::method)
                 .isEqualTo("GET");
+        assertThat(document.schemas()).containsKey("WebQueryCriteria");
+        assertThat(document.schemas().get("WebQueryRequest").properties())
+                .containsKey("criteria");
+        assertThat(document.schemas().get("DynamicWebReferenceRequest").properties())
+                .containsKey("criteria");
+        assertThat(document.schemas().get("WebQueryCriteria").properties().get("groups").itemType())
+                .isEqualTo("WebQueryCriteria");
     }
 
     @Test
