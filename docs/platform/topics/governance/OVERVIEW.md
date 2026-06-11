@@ -80,9 +80,9 @@
 
 ## Web 暴露面
 
-配置治理通过 `platform.low_code_governance` 静态模块入口开放。当前 Web 层只承接已有治理门面，覆盖配置包健康检查、发布、回滚、当前/历史版本导出、导入 dry-run、导入草稿和草稿发布；具体 URL 见 `WEB_API.md`。
+配置治理通过 `platform.low_code_governance` 静态模块入口开放。当前 Web 层只承接已有治理门面，覆盖配置包健康检查、发布、回滚、当前/历史版本导出、导入 dry-run、导入草稿、草稿发布，以及无状态模板派生和实例化；具体 URL 见 `WEB_API.md`。
 
-模板服务当前还没有稳定模板仓库和管理模型，暂不开放独立 Web API。模板实例化结果仍可作为 `LowCodeModulePackage` 进入 dry-run 和发布链路。
+模板服务当前还没有稳定模板仓库和管理模型。Web 入口只提供从版本派生模板、按客户端提交的模板实例化模块包，不提供模板列表、保存、发布、版本、市场或权限分配。模板实例化结果仍可作为 `LowCodeModulePackage` 进入 dry-run 和发布链路。
 
 ## 模板复用
 

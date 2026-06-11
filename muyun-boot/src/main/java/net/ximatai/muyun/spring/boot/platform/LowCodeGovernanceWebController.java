@@ -14,6 +14,9 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModulePackage;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportDraft;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplate;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateInstantiationRequest;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,15 +33,18 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
     private final LowCodeModuleHealthService healthService;
     private final LowCodeModulePackageExchangeService exchangeService;
     private final LowCodeModulePackageImportService importService;
+    private final LowCodeModuleTemplateService templateService;
 
     public LowCodeGovernanceWebController(LowCodeModuleConfigPublishFacade publishFacade,
                                           LowCodeModuleHealthService healthService,
                                           LowCodeModulePackageExchangeService exchangeService,
-                                          LowCodeModulePackageImportService importService) {
+                                          LowCodeModulePackageImportService importService,
+                                          LowCodeModuleTemplateService templateService) {
         this.service = publishFacade;
         this.healthService = healthService;
         this.exchangeService = exchangeService;
         this.importService = importService;
+        this.templateService = templateService;
     }
 
     @PostMapping("/packages/health")
@@ -95,6 +101,21 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
         return webScope(() -> importService.publishDraft(request.draft(), request.operatorId(), request.remark()));
     }
 
+    @PostMapping("/templates/from-version")
+    @CustomActionEndpoint(value = "createTemplateFromVersion", title = "从版本创建模板",
+            level = PlatformActionLevel.LIST)
+    public LowCodeModuleTemplate createTemplateFromVersion(@RequestBody CreateTemplateFromVersionRequest request) {
+        return webScope(() -> templateService.createTemplateFromVersion(
+                request.templateAlias(), request.title(), request.versionId()));
+    }
+
+    @PostMapping("/templates/instantiate")
+    @CustomActionEndpoint(value = "instantiateTemplate", title = "实例化模板",
+            level = PlatformActionLevel.LIST)
+    public LowCodeModulePackage instantiateTemplate(@RequestBody InstantiateTemplateRequest request) {
+        return webScope(() -> templateService.instantiate(request.template(), request.request()));
+    }
+
     public record PublishPackageRequest(
             LowCodeModulePackage modulePackage,
             String operatorId,
@@ -106,6 +127,19 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
             LowCodeModulePackageImportDraft draft,
             String operatorId,
             String remark
+    ) {
+    }
+
+    public record CreateTemplateFromVersionRequest(
+            String templateAlias,
+            String title,
+            String versionId
+    ) {
+    }
+
+    public record InstantiateTemplateRequest(
+            LowCodeModuleTemplate template,
+            LowCodeModuleTemplateInstantiationRequest request
     ) {
     }
 }

@@ -11,6 +11,9 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModulePackage;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportDraft;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplate;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateInstantiationRequest;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageBundleType;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageDryRunResult;
 import net.ximatai.muyun.spring.platform.config.LowCodePackageMode;
@@ -183,12 +186,78 @@ class LowCodeGovernanceWebControllerTest {
                 org.mockito.ArgumentMatchers.eq("u-1"), org.mockito.ArgumentMatchers.eq("导入"));
     }
 
+    @Test
+    void shouldCreateAndInstantiateTemplateThroughGovernanceEndpoint() throws Exception {
+        LowCodeModuleTemplateService templateService = mock(LowCodeModuleTemplateService.class);
+        LowCodeModuleTemplate template = template();
+        LowCodeModulePackage instantiated = new LowCodeModulePackage(
+                "1.0",
+                LowCodePackageMode.MODULE_FULL,
+                "sales",
+                "sales.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of("moduleAlias", "sales.contract"))),
+                null,
+                LowCodePackagePublishManifest.draft("1.0"));
+        when(templateService.createTemplateFromVersion("contract_template", "Contract Template", "version-1"))
+                .thenReturn(template);
+        when(templateService.instantiate(any(LowCodeModuleTemplate.class),
+                any(LowCodeModuleTemplateInstantiationRequest.class))).thenReturn(instantiated);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(templateService)).build();
+        mvc.perform(post("/platform.low_code_governance/templates/from-version")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "templateAlias": "contract_template",
+                                  "title": "Contract Template",
+                                  "versionId": "version-1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.templateAlias").value("contract_template"))
+                .andExpect(jsonPath("$.basePackage.mode").value("TEMPLATE"));
+        mvc.perform(post("/platform.low_code_governance/templates/instantiate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "template": {
+                                    "templateAlias": "contract_template",
+                                    "title": "Contract Template",
+                                    "basePackage": %s
+                                  },
+                                  "request": {
+                                    "applicationAlias": "sales",
+                                    "moduleAlias": "sales.contract",
+                                    "title": "Sales Contract",
+                                    "parameters": {"tableName": "sales_contract"}
+                                  }
+                                }
+                                """.formatted(templatePackageJson())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("MODULE_FULL"))
+                .andExpect(jsonPath("$.moduleAlias").value("sales.contract"));
+
+        verify(templateService).createTemplateFromVersion("contract_template", "Contract Template", "version-1");
+        ArgumentCaptor<LowCodeModuleTemplate> templateCaptor =
+                ArgumentCaptor.forClass(LowCodeModuleTemplate.class);
+        ArgumentCaptor<LowCodeModuleTemplateInstantiationRequest> requestCaptor =
+                ArgumentCaptor.forClass(LowCodeModuleTemplateInstantiationRequest.class);
+        verify(templateService).instantiate(templateCaptor.capture(), requestCaptor.capture());
+        assertThat(templateCaptor.getValue().templateAlias()).isEqualTo("contract_template");
+        assertThat(templateCaptor.getValue().basePackage().mode()).isEqualTo(LowCodePackageMode.TEMPLATE);
+        assertThat(templateCaptor.getValue().basePackage().moduleAlias()).isEqualTo("crm.contract");
+        assertThat(requestCaptor.getValue().moduleAlias()).isEqualTo("sales.contract");
+        assertThat(requestCaptor.getValue().parameters()).containsEntry("tableName", "sales_contract");
+    }
+
     private LowCodeGovernanceWebController controller(LowCodeModuleHealthService healthService) {
         return new LowCodeGovernanceWebController(
                 mock(LowCodeModuleConfigPublishFacade.class),
                 healthService,
                 mock(LowCodeModulePackageExchangeService.class),
-                mock(LowCodeModulePackageImportService.class));
+                mock(LowCodeModulePackageImportService.class),
+                mock(LowCodeModuleTemplateService.class));
     }
 
     private LowCodeGovernanceWebController controller(LowCodeModuleConfigPublishFacade publishFacade) {
@@ -196,7 +265,8 @@ class LowCodeGovernanceWebControllerTest {
                 publishFacade,
                 mock(LowCodeModuleHealthService.class),
                 mock(LowCodeModulePackageExchangeService.class),
-                mock(LowCodeModulePackageImportService.class));
+                mock(LowCodeModulePackageImportService.class),
+                mock(LowCodeModuleTemplateService.class));
     }
 
     private LowCodeGovernanceWebController controller(LowCodeModulePackageExchangeService exchangeService) {
@@ -209,13 +279,39 @@ class LowCodeGovernanceWebControllerTest {
                 mock(LowCodeModuleConfigPublishFacade.class),
                 mock(LowCodeModuleHealthService.class),
                 exchangeService,
-                importService);
+                importService,
+                mock(LowCodeModuleTemplateService.class));
+    }
+
+    private LowCodeGovernanceWebController controller(LowCodeModuleTemplateService templateService) {
+        return new LowCodeGovernanceWebController(
+                mock(LowCodeModuleConfigPublishFacade.class),
+                mock(LowCodeModuleHealthService.class),
+                mock(LowCodeModulePackageExchangeService.class),
+                mock(LowCodeModulePackageImportService.class),
+                templateService);
     }
 
     private LowCodeModulePackage modulePackage() {
         return new LowCodeModulePackage(
                 "1.0",
                 LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of("moduleAlias", "crm.contract"))),
+                null,
+                LowCodePackagePublishManifest.draft("1.0"));
+    }
+
+    private LowCodeModuleTemplate template() {
+        return new LowCodeModuleTemplate("contract_template", "Contract Template", templatePackage());
+    }
+
+    private LowCodeModulePackage templatePackage() {
+        return new LowCodeModulePackage(
+                "1.0",
+                LowCodePackageMode.TEMPLATE,
                 "crm",
                 "crm.contract",
                 List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
@@ -240,6 +336,24 @@ class LowCodeGovernanceWebControllerTest {
                 {
                   "protocolVersion": "1.0",
                   "mode": "MODULE_FULL",
+                  "applicationAlias": "crm",
+                  "moduleAlias": "crm.contract",
+                  "bundles": [
+                    {
+                      "type": "METADATA",
+                      "included": true,
+                      "content": {"moduleAlias": "crm.contract"}
+                    }
+                  ]
+                }
+                """;
+    }
+
+    private String templatePackageJson() {
+        return """
+                {
+                  "protocolVersion": "1.0",
+                  "mode": "TEMPLATE",
                   "applicationAlias": "crm",
                   "moduleAlias": "crm.contract",
                   "bundles": [

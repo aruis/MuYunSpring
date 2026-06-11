@@ -28,6 +28,7 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -370,6 +371,8 @@ class StaticModuleDefinitionScannerTest {
                     () -> mock(LowCodeModulePackageExchangeService.class));
             context.registerBean(LowCodeModulePackageImportService.class,
                     () -> mock(LowCodeModulePackageImportService.class));
+            context.registerBean(LowCodeModuleTemplateService.class,
+                    () -> mock(LowCodeModuleTemplateService.class));
             context.registerBean(LowCodeGovernanceWebController.class);
             context.refresh();
 
@@ -379,7 +382,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("checkPackageHealth", "publishPackage", "rollbackPackageVersion",
                             "exportCurrentPackage", "exportVersionPackage", "dryRunImportPackage",
-                            "prepareImportDraft", "publishImportDraft");
+                            "prepareImportDraft", "publishImportDraft",
+                            "createTemplateFromVersion", "instantiateTemplate");
             Map<String, StaticModuleActionDefinition> actions = definition.actions().stream()
                     .collect(Collectors.toMap(StaticModuleActionDefinition::actionCode, Function.identity()));
             assertThat(actions.get("checkPackageHealth").actionLevel()).isEqualTo(EntityActionLevel.LIST);
@@ -387,6 +391,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(actions.get("dryRunImportPackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("prepareImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("publishImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("createTemplateFromVersion").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("instantiateTemplate").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("rollbackPackageVersion").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportCurrentPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportVersionPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
