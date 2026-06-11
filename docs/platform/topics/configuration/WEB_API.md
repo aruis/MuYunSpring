@@ -19,11 +19,14 @@
 | 查询模板 | `PlatformQueryTemplateService` | `/platform.module/{moduleAlias}/query-templates` |
 | 查询项 | `PlatformQueryItemService` | `/platform.query-template/{queryTemplateId}/items` |
 | 页面配置发布 | `PlatformPageConfigPublishService` | `/platform.page_config_publish` |
-| 字段引用配置 | `MetadataFieldReferenceConfigService` | 当前未暴露独立 Web Controller |
-| 字段保护配置 | `MetadataFieldProtectionConfigService` | 当前未暴露独立 Web Controller |
+| 字段引用配置 | `MetadataFieldReferenceConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs` |
+| 字段保护配置 | `MetadataFieldProtectionConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs` |
 | 元数据视图 | `MetadataViewService`、`MetadataViewFieldService` | 当前未暴露独立 Web Controller |
 | 模块-元数据关系 | `ModuleMetadataRelationService` | `/platform.module/{moduleAlias}/metadata-relations` |
 | 模块字段配置 | `ModuleMetadataFieldService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields` |
+| 模块字段引用过滤 | `ModuleMetadataFieldFilterService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters` |
+| 模块字段引用回填 | `ModuleMetadataFieldAffectService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects` |
+| 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
 | 数据字典类目 | `DictionaryCategoryService` | 当前未暴露独立 Web Controller |
 | 数据字典项目 | `DictionaryItemService` | 当前未暴露独立 Web Controller |
 | 菜单方案 | `MenuSchemeService` | 当前未暴露独立 Web Controller |
@@ -85,6 +88,21 @@
 | `POST` | `/platform.metadata/{metadataId}/fields/enable/{id}`、`/disable/{id}` | 启用或停用字段 |
 | `POST` | `/platform.metadata/{metadataId}/fields/sort/{id}` | 在同一元数据下调整字段顺序 |
 
+字段行为配置挂在具体字段下。URL 中的 `metadataId` 和 `fieldId` 是归属边界，新增或更新时以后端路径为准。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 字段引用配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs/query` | 查询字段引用配置 |
+| 字段引用配置 | `GET` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs/view/{id}` | 查看字段引用配置 |
+| 字段引用配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs/insert` | 新增字段引用配置；后端以 URL 中的 `fieldId` 为准 |
+| 字段引用配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs/update/{id}` | 更新字段引用配置 |
+| 字段引用配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs/delete/{id}` | 删除字段引用配置 |
+| 字段保护配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs/query` | 查询字段保护配置 |
+| 字段保护配置 | `GET` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs/view/{id}` | 查看字段保护配置 |
+| 字段保护配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs/insert` | 新增字段保护配置；后端以 URL 中的 `fieldId` 为准 |
+| 字段保护配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs/update/{id}` | 更新字段保护配置 |
+| 字段保护配置 | `POST` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs/delete/{id}` | 删除字段保护配置 |
+
 ## 模块聚合配置
 
 模块聚合接口只处理天然归属模块的配置。请求体里即使传入 `moduleAlias` 或 `relationId`，后端也以 URL 路径为准，并校验存量记录不能跨模块操作。
@@ -111,6 +129,25 @@
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/update/{id}` | 更新模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/delete/{id}` | 删除模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/sort/{id}` | 在关系内调整字段配置顺序 |
+| 字段引用过滤 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/query` | 查询模块字段引用过滤配置 |
+| 字段引用过滤 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/view/{id}` | 查看模块字段引用过滤配置 |
+| 字段引用过滤 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/insert` | 新增模块字段引用过滤配置；后端以 URL 中的 `fieldId` 为准 |
+| 字段引用过滤 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/update/{id}` | 更新模块字段引用过滤配置 |
+| 字段引用过滤 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/delete/{id}` | 删除模块字段引用过滤配置 |
+| 字段引用过滤 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters/sort/{id}` | 在字段内调整引用过滤顺序 |
+| 字段引用回填 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/query` | 查询模块字段引用回填配置 |
+| 字段引用回填 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/view/{id}` | 查看模块字段引用回填配置 |
+| 字段引用回填 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/insert` | 新增模块字段引用回填配置；后端以 URL 中的 `fieldId` 为准 |
+| 字段引用回填 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/update/{id}` | 更新模块字段引用回填配置 |
+| 字段引用回填 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/delete/{id}` | 删除模块字段引用回填配置 |
+| 字段引用回填 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects/sort/{id}` | 在字段内调整引用回填顺序 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/query` | 查询关系下的公式规则 |
+| 模块公式规则 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/view/{id}` | 查看公式规则 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/insert` | 新增公式规则；后端以 URL 中的 `relationId` 为准 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/update/{id}` | 更新公式规则 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/delete/{id}` | 删除公式规则 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/enable/{id}`、`/disable/{id}` | 启用或停用公式规则 |
+| 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/sort/{id}` | 在关系内调整公式规则顺序 |
 
 ## 页面配置与查询模板
 

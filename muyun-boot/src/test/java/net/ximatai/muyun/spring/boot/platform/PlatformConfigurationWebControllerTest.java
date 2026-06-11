@@ -9,6 +9,19 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffect;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldAffectService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -151,6 +164,182 @@ class PlatformConfigurationWebControllerTest {
         assertThatThrownBy(() -> controller.ensure(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong to module");
+    }
+
+    @Test
+    void shouldForceReferenceConfigFieldFromPathOnInsert() throws Exception {
+        MetadataFieldService fieldService = mock(MetadataFieldService.class);
+        MetadataFieldReferenceConfigService service = mock(MetadataFieldReferenceConfigService.class);
+        MetadataFieldReferenceConfigWebController controller =
+                new MetadataFieldReferenceConfigWebController(fieldService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(fieldService.select("field-1")).thenReturn(metadataField("field-1", "metadata-1"));
+        MetadataFieldReferenceConfig inserted = new MetadataFieldReferenceConfig();
+        inserted.setId("ref-1");
+        inserted.setMetadataFieldId("field-1");
+        inserted.setTargetMetadataId("target-metadata");
+        when(service.insert(any(MetadataFieldReferenceConfig.class))).thenReturn("ref-1");
+        when(service.select("ref-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.metadata/metadata-1/fields/field-1/reference-configs/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"metadataFieldId":"other-field","targetMetadataId":"target-metadata"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.metadataFieldId").value("field-1"));
+
+        ArgumentCaptor<MetadataFieldReferenceConfig> captor =
+                ArgumentCaptor.forClass(MetadataFieldReferenceConfig.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getMetadataFieldId()).isEqualTo("field-1");
+    }
+
+    @Test
+    void shouldRejectProtectionConfigWhenFieldBelongsToOtherMetadata() {
+        MetadataFieldService fieldService = mock(MetadataFieldService.class);
+        MetadataFieldProtectionConfigService service = mock(MetadataFieldProtectionConfigService.class);
+        MetadataFieldProtectionConfigWebController controller =
+                new MetadataFieldProtectionConfigWebController(fieldService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(fieldService.select("field-1")).thenReturn(metadataField("field-1", "other-metadata"));
+        MockHttpServletRequest request = requestVars(Map.of(
+                "metadataId", "metadata-1",
+                "fieldId", "field-1"));
+
+        assertThatThrownBy(() -> controller.insert(request, new MetadataFieldProtectionConfig()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to metadata");
+    }
+
+    @Test
+    void shouldRejectCrossFieldProtectionConfigView() {
+        MetadataFieldService fieldService = mock(MetadataFieldService.class);
+        MetadataFieldProtectionConfigService service = mock(MetadataFieldProtectionConfigService.class);
+        MetadataFieldProtectionConfigWebController controller =
+                new MetadataFieldProtectionConfigWebController(fieldService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(fieldService.select("field-1")).thenReturn(metadataField("field-1", "metadata-1"));
+        MetadataFieldProtectionConfig config = new MetadataFieldProtectionConfig();
+        config.setId("protect-1");
+        config.setMetadataFieldId("other-field");
+        when(service.select("protect-1")).thenReturn(config);
+        MockHttpServletRequest request = requestVars(Map.of(
+                "metadataId", "metadata-1",
+                "fieldId", "field-1"));
+
+        assertThatThrownBy(() -> controller.view(request, "protect-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to field");
+    }
+
+    @Test
+    void shouldQueryModuleFieldFiltersWithinPathField() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
+        ModuleMetadataFieldFilterService service = mock(ModuleMetadataFieldFilterService.class);
+        PlatformModuleMetadataFieldFilterWebController controller =
+                new PlatformModuleMetadataFieldFilterWebController(relationService, fieldService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(fieldService.select("field-1")).thenReturn(moduleField("field-1", "rel-1"));
+        ModuleMetadataFieldFilter filter = new ModuleMetadataFieldFilter();
+        filter.setId("filter-1");
+        filter.setModuleMetadataFieldId("field-1");
+        filter.setFormFieldId("field-form");
+        filter.setReferenceFieldId("field-ref");
+        when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(filter), 1, PageRequest.of(1, 20)));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/fields/field-1/filters/query"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].moduleMetadataFieldId").value("field-1"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class));
+        assertClause(criteria.getValue(), "moduleMetadataFieldId", "field-1");
+    }
+
+    @Test
+    void shouldForceModuleFieldAffectOwnerFromPathOnInsert() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
+        ModuleMetadataFieldAffectService service = mock(ModuleMetadataFieldAffectService.class);
+        PlatformModuleMetadataFieldAffectWebController controller =
+                new PlatformModuleMetadataFieldAffectWebController(relationService, fieldService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(fieldService.select("field-1")).thenReturn(moduleField("field-1", "rel-1"));
+        ModuleMetadataFieldAffect inserted = new ModuleMetadataFieldAffect();
+        inserted.setId("affect-1");
+        inserted.setModuleMetadataFieldId("field-1");
+        when(service.insert(any(ModuleMetadataFieldAffect.class))).thenReturn("affect-1");
+        when(service.select("affect-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/fields/field-1/affects/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"moduleMetadataFieldId":"other-field","referenceFieldId":"ref","targetFieldId":"target"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.moduleMetadataFieldId").value("field-1"));
+
+        ArgumentCaptor<ModuleMetadataFieldAffect> captor = ArgumentCaptor.forClass(ModuleMetadataFieldAffect.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getModuleMetadataFieldId()).isEqualTo("field-1");
+    }
+
+    @Test
+    void shouldForceFormulaRuleRelationFromPathOnInsert() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataFormulaRuleService service = mock(ModuleMetadataFormulaRuleService.class);
+        PlatformModuleMetadataFormulaRuleWebController controller =
+                new PlatformModuleMetadataFormulaRuleWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        ModuleMetadataFormulaRule inserted = new ModuleMetadataFormulaRule();
+        inserted.setId("rule-1");
+        inserted.setRelationId("rel-1");
+        inserted.setAlias("checkAmount");
+        when(service.insert(any(ModuleMetadataFormulaRule.class))).thenReturn("rule-1");
+        when(service.select("rule-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/formula-rules/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"relationId":"other-rel","alias":"checkAmount","expression":"amount > 0"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.relationId").value("rel-1"));
+
+        ArgumentCaptor<ModuleMetadataFormulaRule> captor = ArgumentCaptor.forClass(ModuleMetadataFormulaRule.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getRelationId()).isEqualTo("rel-1");
+    }
+
+    @Test
+    void shouldRejectCrossRelationFormulaRuleSort() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        ModuleMetadataFormulaRuleService service = mock(ModuleMetadataFormulaRuleService.class);
+        PlatformModuleMetadataFormulaRuleWebController controller =
+                new PlatformModuleMetadataFormulaRuleWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        ModuleMetadataFormulaRule rule = new ModuleMetadataFormulaRule();
+        rule.setId("rule-1");
+        rule.setRelationId("other-rel");
+        when(service.select("rule-1")).thenReturn(rule);
+        MockHttpServletRequest request = requestVars(Map.of(
+                "moduleAlias", "platform.sales.order",
+                "relationId", "rel-1"));
+
+        assertThatThrownBy(() -> controller.sort(request, "rule-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to relation");
     }
 
     @Test
@@ -306,6 +495,27 @@ class PlatformConfigurationWebControllerTest {
         template.setAlias(alias);
         template.setTitle(alias);
         return template;
+    }
+
+    private MetadataField metadataField(String id, String metadataId) {
+        MetadataField field = new MetadataField();
+        field.setId(id);
+        field.setMetadataId(metadataId);
+        return field;
+    }
+
+    private ModuleMetadataRelation relation(String id, String moduleAlias) {
+        ModuleMetadataRelation relation = new ModuleMetadataRelation();
+        relation.setId(id);
+        relation.setModuleAlias(moduleAlias);
+        return relation;
+    }
+
+    private ModuleMetadataField moduleField(String id, String relationId) {
+        ModuleMetadataField field = new ModuleMetadataField();
+        field.setId(id);
+        field.setRelationId(relationId);
+        return field;
     }
 
     private void assertClause(Criteria criteria, String field, Object value) {
