@@ -504,6 +504,8 @@ dry-run 状态使用 `READY/WARN/BLOCKED`：
 
 真正“导入为草稿”的执行链路需要等草稿存放、覆盖策略和版本发布衔接明确后再补，不在首期 dry-run 中假装完成。
 
+夯实阶段先提供 `LowCodeModulePackageImportService` 作为最小导入门面：`prepareDraft` 在 dry-run 不阻断时生成内存 draft，记录目标包、健康/冲突结果和当前基线版本；`publishDraft` 校验基线版本未变化后，只允许 `MODULE_FULL` draft 交给既有发布门面生成配置版本。`PAGE_ONLY/TEMPLATE` 当前只到 prepare/dry-run 层，不直接发布。当前不持久化草稿、不批量写真实配置表、不做字段级 diff、审批流或合并策略。
+
 ### M10 模板复用
 
 模板复用首期建立在配置包和版本快照之上，不另起模板表结构、继承系统或模板市场。
