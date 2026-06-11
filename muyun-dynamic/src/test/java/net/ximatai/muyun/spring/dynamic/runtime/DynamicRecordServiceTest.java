@@ -26,7 +26,10 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewQueryMappingGroupOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewRootQueryMapping;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -2150,6 +2153,155 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeAssociationRelationOverviewForDesigner() {
+        DynamicRecordService service = associationService(operations());
+
+        DynamicAssociationRelationOverview overview = service.associationRelationOverview(MODULE);
+
+        assertThat(overview.downstream())
+                .extracting(item -> item.type() + ":" + item.code() + ":" + item.associationViewCode())
+                .contains("RELATION:lines:lines", "REFERENCE:contractId:contractId");
+        assertThat(overview.upstream())
+                .extracting(item -> item.type() + ":" + item.code() + ":" + item.associationViewCode())
+                .contains("RELATION:lines:lines", "REFERENCE:contractId:contractId");
+    }
+
+    @Test
+    void shouldKeepAssociationDesignFieldsInDescriptor() {
+        EntityRelationDefinition relation = EntityRelationDefinition.child("lines", "contract", "line", "contractId");
+        EntityAssociationViewDefinition view = new EntityAssociationViewDefinition(
+                "lines",
+                "contract",
+                MODULE,
+                "line",
+                AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                EntityViewType.LIST,
+                true,
+                null,
+                AssociationViewRootQueryMapping.sourceField("summary", DynamicQueryOperator.EQ, "code"),
+                "ui-list",
+                "query-open"
+        );
+        DynamicRecordService service = associationService(operations(), List.of(relation), List.of(), List.of(view),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+
+        var descriptor = service.associationViewDesignDescriptors(MODULE).getFirst();
+
+        assertThat(descriptor.path()).hasSize(1);
+        assertThat(descriptor.rootQueryMapping().targetField()).isEqualTo("summary");
+        assertThat(descriptor.targetUiConfigId()).isEqualTo("ui-list");
+        assertThat(descriptor.targetQueryTemplateId()).isEqualTo("query-open");
+    }
+
+    @Test
+    void shouldApplyRootQueryMappingWhenDiagnosingAssociationView() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(lineRow("line-1", "contract-1", "C-001")));
+        EntityReferenceDefinition reference = EntityReferenceDefinition.to("line", "contractId",
+                ReferenceTarget.of(MODULE, "contract"));
+        EntityAssociationViewDefinition view = new EntityAssociationViewDefinition(
+                "contractId",
+                "line",
+                MODULE,
+                "contract",
+                AssociationViewDisplayMode.LINKED_RECORD,
+                null,
+                "contractId",
+                EntityViewType.FORM,
+                true,
+                null,
+                AssociationViewRootQueryMapping.group(AssociationViewQueryMappingGroupOperator.AND,
+                        List.of(AssociationViewRootQueryMapping.sourceField("code", DynamicQueryOperator.EQ, "summary"))),
+                null,
+                null
+        );
+        DynamicRecordService service = associationService(operations, List.of(), List.of(reference), List.of(view),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+
+        DynamicAssociationViewDiagnosis diagnosis = service.diagnoseAssociationView(
+                MODULE, "line", "line-1", "contractId", Criteria.of());
+
+        assertThat(diagnosis.status()).isEqualTo(DynamicAssociationViewDiagnosisStatus.OK);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, atLeastOnce()).row(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"id\" =")
+                .contains("\"code\" ="));
+    }
+
+    @Test
+    void shouldApplyRootQueryMappingWhenQueryingAssociationView() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"app_contract_line\"")) {
+                return List.of(lineRow("line-1", "contract-1", "C-001"));
+            }
+            return List.of(row("contract-1", "C-001", 0, false));
+        });
+        EntityRelationDefinition relation = EntityRelationDefinition.child("lines", "contract", "line", "contractId");
+        EntityAssociationViewDefinition view = new EntityAssociationViewDefinition(
+                "lines",
+                "contract",
+                MODULE,
+                "line",
+                AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                EntityViewType.LIST,
+                true,
+                null,
+                AssociationViewRootQueryMapping.sourceField("summary", DynamicQueryOperator.EQ, "code"),
+                null,
+                null
+        );
+        DynamicRecordService service = associationService(operations, List.of(relation), List.of(), List.of(view),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+
+        PageResult<DynamicRecord> page = service.associationViewPage(
+                MODULE, "contract", "contract-1", "lines", Criteria.of(), PageRequest.of(1, 20));
+
+        assertThat(page.getRecords()).hasSize(1);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"app_contract_line\"")
+                .contains("\"contract_id\" =")
+                .contains("\"summary\" ="));
+    }
+
+    @Test
+    void shouldReportFormAssociationWhenTargetIsNotUnique() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 2));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        EntityRelationDefinition relation = EntityRelationDefinition.child("lines", "contract", "line", "contractId");
+        EntityAssociationViewDefinition formView = new EntityAssociationViewDefinition(
+                "lineForm",
+                "contract",
+                MODULE,
+                "line",
+                AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                EntityViewType.FORM,
+                true
+        );
+        DynamicRecordService service = associationService(operations, List.of(relation), List.of(), List.of(formView),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+
+        DynamicAssociationViewDiagnosis diagnosis = service.diagnoseAssociationView(
+                MODULE, "contract", "contract-1", "lineForm", Criteria.of());
+
+        assertThat(diagnosis.status()).isEqualTo(DynamicAssociationViewDiagnosisStatus.FORM_NOT_UNIQUE);
+        assertThat(diagnosis.message()).contains("must be unique");
+    }
+
+    @Test
     void shouldExcludeSoftDeletedTargetWhenResolvingReference() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
@@ -3086,7 +3238,7 @@ class DynamicRecordServiceTest {
                 "app_contract",
                 "Contract",
                 List.of(
-                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("code", "Code").length(64).required().queryable(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2)
                 )
         );
@@ -3266,7 +3418,7 @@ class DynamicRecordServiceTest {
                 "Contract Line",
                 List.of(
                         FieldDefinition.string("contractId", "Contract").column("contract_id").length(32),
-                        FieldDefinition.string("summary", "Summary").length(128)
+                        FieldDefinition.string("summary", "Summary").length(128).queryable()
                 )
         );
     }

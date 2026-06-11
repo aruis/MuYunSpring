@@ -266,6 +266,21 @@ class DynamicOpenApiGeneratorTest {
     }
 
     @Test
+    void shouldHideAssociationDesignOpenApiWhenViewActionIsNotVisible() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()),
+                action -> action == PlatformAction.QUERY);
+
+        assertThat(document.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .contains("/sales.contract/query",
+                        "/sales.contract/view/{id}/associations/{viewCode}/query",
+                        "/sales.contract/view/{id}/associations/{viewCode}/diagnose")
+                .doesNotContain("/sales.contract/associations/relation-overview",
+                        "/sales.contract/associations/design",
+                        "/sales.contract/view/{id}");
+    }
+
+    @Test
     void shouldExposeSortWebOperationOnlyWhenMainEntitySupportsSort() {
         DynamicOpenApiDocument plain = generator.generate(DynamicModuleDescriptor.from(
                 new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity()))));

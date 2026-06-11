@@ -65,6 +65,13 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicReferenceDescriptor", referenceDescriptorSchema());
         schemas.put("DynamicReferenceProjectionDescriptor", referenceProjectionDescriptorSchema());
         schemas.put("DynamicAssociationViewDescriptor", associationViewDescriptorSchema());
+        schemas.put("AssociationViewPathStep", associationViewPathStepSchema());
+        schemas.put("AssociationViewRootQueryMapping", associationViewRootQueryMappingSchema());
+        schemas.put("DynamicAssociationViewDescriptorList", arraySchema("DynamicAssociationViewDescriptorList",
+                "DynamicAssociationViewDescriptor"));
+        schemas.put("DynamicAssociationRelationOverview", associationRelationOverviewSchema());
+        schemas.put("DynamicAssociationRelationItem", associationRelationItemSchema());
+        schemas.put("DynamicAssociationViewDiagnosis", associationViewDiagnosisSchema());
         schemas.put("DynamicViewDescriptor", viewDescriptorSchema());
         schemas.put("DynamicViewFieldDescriptor", viewFieldDescriptorSchema());
         schemas.put("DynamicOpenApiDocument", openApiDocumentSchema());
@@ -345,8 +352,74 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("referenceField", stringProperty(true));
         properties.put("viewType", stringProperty(true));
         properties.put("queryable", booleanProperty(false));
+        properties.put("path", arrayProperty("AssociationViewPathStep"));
+        properties.put("rootQueryMapping", objectProperty("AssociationViewRootQueryMapping"));
+        properties.put("targetUiConfigId", stringProperty(true));
+        properties.put("targetQueryTemplateId", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicAssociationViewDescriptor", "object", null,
                 List.of("code", "sourceEntityAlias", "targetModuleAlias", "targetEntityAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationViewPathStepSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("type", stringProperty(false));
+        properties.put("code", stringProperty(false));
+        properties.put("sourceEntityAlias", stringProperty(false));
+        properties.put("targetModuleAlias", stringProperty(false));
+        properties.put("targetEntityAlias", stringProperty(false));
+        return new DynamicOpenApiDocument.Schema("AssociationViewPathStep", "object", null,
+                List.of("type", "code", "sourceEntityAlias", "targetModuleAlias", "targetEntityAlias"),
+                properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationViewRootQueryMappingSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("groupOperator", stringProperty(true));
+        properties.put("children", arrayProperty("AssociationViewRootQueryMapping"));
+        properties.put("targetField", stringProperty(true));
+        properties.put("operator", stringProperty(true));
+        properties.put("sourceType", stringProperty(true));
+        properties.put("sourceField", stringProperty(true));
+        properties.put("systemVariable", stringProperty(true));
+        properties.put("constantValue", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("AssociationViewRootQueryMapping", "object", null,
+                List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationRelationOverviewSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("moduleAlias", stringProperty(false));
+        properties.put("upstream", arrayProperty("DynamicAssociationRelationItem"));
+        properties.put("downstream", arrayProperty("DynamicAssociationRelationItem"));
+        return new DynamicOpenApiDocument.Schema("DynamicAssociationRelationOverview", "object", null,
+                List.of("moduleAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationRelationItemSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("type", stringProperty(false));
+        properties.put("code", stringProperty(false));
+        properties.put("sourceModuleAlias", stringProperty(false));
+        properties.put("sourceEntityAlias", stringProperty(false));
+        properties.put("targetModuleAlias", stringProperty(false));
+        properties.put("targetEntityAlias", stringProperty(false));
+        properties.put("associationViewCode", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicAssociationRelationItem", "object", null,
+                List.of("type", "code", "sourceModuleAlias", "sourceEntityAlias", "targetModuleAlias",
+                        "targetEntityAlias"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema associationViewDiagnosisSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("view", objectProperty("DynamicAssociationViewDescriptor"));
+        properties.put("associationCriteria", objectProperty("WebQueryCriteria"));
+        properties.put("requestCriteria", objectProperty("WebQueryCriteria"));
+        properties.put("targetCriteria", objectProperty("WebQueryCriteria"));
+        properties.put("targetCount", integerProperty(false));
+        properties.put("status", stringProperty(false));
+        properties.put("message", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("DynamicAssociationViewDiagnosis", "object", null,
+                List.of("view", "targetCount", "status"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema viewDescriptorSchema() {

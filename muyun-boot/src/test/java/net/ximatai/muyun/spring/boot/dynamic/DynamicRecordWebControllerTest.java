@@ -8,6 +8,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationItem;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -40,6 +42,8 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionDialog;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosis;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosisStatus;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
@@ -1384,6 +1388,86 @@ class DynamicRecordWebControllerTest {
         verify(service).associationViewPage(eq(MODULE), eq(ENTITY), eq("contract-1"), eq("lines"),
                 criteria.capture(), any(PageRequest.class), any(Sort[].class));
         assertThat(criteria.getValue()).isSameAs(targetCriteria);
+    }
+
+    @Test
+    void shouldExposeAssociationDesignEndpoints() throws Exception {
+        DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
+                "lines",
+                ENTITY,
+                MODULE,
+                "line",
+                net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                net.ximatai.muyun.spring.dynamic.metadata.EntityViewType.LIST,
+                true,
+                List.of(net.ximatai.muyun.spring.dynamic.metadata.AssociationViewPathStep.relation(
+                        "lines", ENTITY, MODULE, "line")),
+                null,
+                "ui-list",
+                "query-default"
+        );
+        when(service.associationViewDesignDescriptors(MODULE)).thenReturn(List.of(association));
+        when(service.associationRelationOverview(MODULE)).thenReturn(new DynamicAssociationRelationOverview(
+                MODULE,
+                List.of(new DynamicAssociationRelationItem("RELATION", "lines", MODULE, "line", MODULE, ENTITY, "lines")),
+                List.of(new DynamicAssociationRelationItem("RELATION", "lines", MODULE, ENTITY, MODULE, "line", "lines"))
+        ));
+
+        mvc.perform(get("/{moduleAlias}/associations/design", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("lines"))
+                .andExpect(jsonPath("$[0].targetUiConfigId").value("ui-list"))
+                .andExpect(jsonPath("$[0].targetQueryTemplateId").value("query-default"))
+                .andExpect(jsonPath("$[0].path[0].code").value("lines"));
+        mvc.perform(get("/{moduleAlias}/associations/relation-overview", MODULE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.downstream[0].associationViewCode").value("lines"));
+    }
+
+    @Test
+    void shouldDiagnoseAssociationView() throws Exception {
+        DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
+                "lines",
+                ENTITY,
+                MODULE,
+                "line",
+                net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                net.ximatai.muyun.spring.dynamic.metadata.EntityViewType.LIST,
+                true
+        );
+        Criteria targetCriteria = Criteria.of().like("summary", "Line");
+        DynamicAssociationViewDiagnosis diagnosis = new DynamicAssociationViewDiagnosis(
+                association,
+                Criteria.of().eq("contractId", "contract-1"),
+                targetCriteria,
+                Criteria.of().eq("contractId", "contract-1").andGroup(targetCriteria.getRoot()),
+                1,
+                DynamicAssociationViewDiagnosisStatus.OK,
+                "association view target matched"
+        );
+        when(service.associationView(MODULE, ENTITY, "lines")).thenReturn(association);
+        when(service.queryCriteria(eq(MODULE), eq("line"), any())).thenReturn(targetCriteria);
+        when(service.diagnoseAssociationView(eq(MODULE), eq(ENTITY), eq("contract-1"), eq("lines"),
+                any(Criteria.class))).thenReturn(diagnosis);
+
+        mvc.perform(post("/{moduleAlias}/view/{id}/associations/{viewCode}/diagnose", MODULE, "contract-1", "lines")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "conditions": [
+                                    {"fieldName": "summary", "operator": "LIKE", "values": ["Line"]}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.view.code").value("lines"))
+                .andExpect(jsonPath("$.targetCount").value(1))
+                .andExpect(jsonPath("$.status").value("OK"));
     }
 
     @Test

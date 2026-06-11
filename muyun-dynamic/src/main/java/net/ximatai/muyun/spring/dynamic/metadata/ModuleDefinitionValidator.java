@@ -580,8 +580,9 @@ public class ModuleDefinitionValidator {
         if (view.viewType() == null) {
             throw new ModuleDefinitionException("association view type must not be null: " + view.code());
         }
+        EntityDefinition target = null;
         if (moduleAlias != null && moduleAlias.equals(view.targetModuleAlias())) {
-            requireEntity(entities, view.targetEntityAlias(), "association view target entity");
+            target = requireEntity(entities, view.targetEntityAlias(), "association view target entity");
         }
         boolean hasRelation = view.relationCode() != null && !view.relationCode().isBlank();
         boolean hasReference = view.referenceField() != null && !view.referenceField().isBlank();
@@ -603,6 +604,8 @@ public class ModuleDefinitionValidator {
             EntityReferenceDefinition reference = requireMatchingReference(view, references);
             requireMatchingReferenceDisplay(view, reference);
         }
+        validateAssociationPath(view);
+        validateAssociationRootQueryMapping(view.rootQueryMapping(), source, target);
     }
 
     public void validateReference(EntityReferenceDefinition reference, Map<String, EntityDefinition> entities, String moduleAlias) {
@@ -746,6 +749,73 @@ public class ModuleDefinitionValidator {
         if (view.displayMode() != AssociationViewDisplayMode.LINKED_RECORD || view.viewType() != EntityViewType.FORM) {
             throw new ModuleDefinitionException("single reference association view requires LINKED_RECORD FORM: "
                     + view.sourceEntityAlias() + "." + view.code());
+        }
+    }
+
+    private void validateAssociationPath(EntityAssociationViewDefinition view) {
+        if (view.path().isEmpty()) {
+            throw new ModuleDefinitionException("association view path must not be empty: " + view.code());
+        }
+        if (view.path().size() != 1) {
+            throw new ModuleDefinitionException("association view path currently supports direct step only: "
+                    + view.code());
+        }
+        for (AssociationViewPathStep step : view.path()) {
+            if (step.type() == AssociationViewPathStepType.REFERENCE) {
+                requireFieldName(step.code(), "association view path reference field");
+            } else {
+                requireIdentifier(step.code(), "association view path relation code");
+            }
+            requireIdentifier(step.sourceEntityAlias(), "association view path source entity");
+            requireModuleAlias(step.targetModuleAlias(), "association view path target module alias");
+            requireIdentifier(step.targetEntityAlias(), "association view path target entity");
+        }
+        AssociationViewPathStep step = view.path().getFirst();
+        if (!view.sourceEntityAlias().equals(step.sourceEntityAlias())
+                || !view.targetModuleAlias().equals(step.targetModuleAlias())
+                || !view.targetEntityAlias().equals(step.targetEntityAlias())) {
+            throw new ModuleDefinitionException("association view path does not match view endpoints: " + view.code());
+        }
+        if (view.relationCode() != null && !view.relationCode().isBlank()) {
+            if (step.type() != AssociationViewPathStepType.RELATION || !view.relationCode().equals(step.code())) {
+                throw new ModuleDefinitionException("association view path relation does not match relationCode: "
+                        + view.code());
+            }
+            return;
+        }
+        if (step.type() != AssociationViewPathStepType.REFERENCE || !view.referenceField().equals(step.code())) {
+            throw new ModuleDefinitionException("association view path reference does not match referenceField: "
+                    + view.code());
+        }
+    }
+
+    private void validateAssociationRootQueryMapping(AssociationViewRootQueryMapping mapping,
+                                                     EntityDefinition source,
+                                                     EntityDefinition target) {
+        if (mapping == null) {
+            return;
+        }
+        if (!mapping.leaf()) {
+            for (AssociationViewRootQueryMapping child : mapping.children()) {
+                validateAssociationRootQueryMapping(child, source, target);
+            }
+            return;
+        }
+        requireFieldName(mapping.targetField(), "association view rootQueryMapping target field");
+        if (target != null) {
+            requireField(target, mapping.targetField(), "association view rootQueryMapping target field");
+        }
+        if (mapping.sourceType() == null) {
+            throw new ModuleDefinitionException("association view rootQueryMapping source type must not be null");
+        }
+        switch (mapping.sourceType()) {
+            case SOURCE_FIELD -> {
+                requireFieldName(mapping.sourceField(), "association view rootQueryMapping source field");
+                requireField(source, mapping.sourceField(), "association view rootQueryMapping source field");
+            }
+            case SYSTEM_VARIABLE -> requireText(mapping.systemVariable(), "association view rootQueryMapping system variable");
+            case CONSTANT -> {
+            }
         }
     }
 

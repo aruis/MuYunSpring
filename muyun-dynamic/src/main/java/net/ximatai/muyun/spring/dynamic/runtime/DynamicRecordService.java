@@ -27,6 +27,8 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationItem;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -34,6 +36,9 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceFilterDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewQueryMappingGroupOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewQueryMappingSourceType;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewRootQueryMapping;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
@@ -258,8 +263,66 @@ public class DynamicRecordService {
             throw new PlatformException("dynamic association source record does not exist: " + sourceRecordId);
         }
         Criteria associationCriteria = associationCriteria(moduleAlias, entityAlias, source, view);
-        Criteria merged = andCriteria(associationCriteria, criteria);
-        return page(view.targetModuleAlias(), view.targetEntityAlias(), merged, pageRequest, sorts);
+        Criteria targetCriteria = associationTargetCriteria(source, view, associationCriteria, criteria);
+        return page(view.targetModuleAlias(), view.targetEntityAlias(), targetCriteria, pageRequest, sorts);
+    }
+
+    public DynamicAssociationRelationOverview associationRelationOverview(String moduleAlias) {
+        DynamicModuleDescriptor descriptor = describe(moduleAlias);
+        Map<String, String> viewByRelation = new LinkedHashMap<>();
+        Map<String, String> viewByReference = new LinkedHashMap<>();
+        for (DynamicAssociationViewDescriptor view : descriptor.associationViews()) {
+            if (view.relationCode() != null && !view.relationCode().isBlank()) {
+                viewByRelation.put(view.sourceEntityAlias() + "." + view.relationCode(), view.code());
+            }
+            if (view.referenceField() != null && !view.referenceField().isBlank()) {
+                viewByReference.put(view.sourceEntityAlias() + "." + view.referenceField(), view.code());
+            }
+        }
+        List<DynamicAssociationRelationItem> downstream = new ArrayList<>();
+        List<DynamicAssociationRelationItem> upstream = new ArrayList<>();
+        for (DynamicRelationDescriptor relation : descriptor.relations()) {
+            String viewCode = viewByRelation.get(relation.parentEntityAlias() + "." + relation.code());
+            downstream.add(new DynamicAssociationRelationItem("RELATION", relation.code(), moduleAlias,
+                    relation.parentEntityAlias(), moduleAlias, relation.childEntityAlias(), viewCode));
+            upstream.add(new DynamicAssociationRelationItem("RELATION", relation.code(), moduleAlias,
+                    relation.childEntityAlias(), moduleAlias, relation.parentEntityAlias(), viewCode));
+        }
+        for (DynamicReferenceDescriptor reference : descriptor.references()) {
+            String viewCode = viewByReference.get(reference.sourceEntityAlias() + "." + reference.sourceField());
+            downstream.add(new DynamicAssociationRelationItem("REFERENCE", reference.sourceField(), moduleAlias,
+                    reference.sourceEntityAlias(), reference.targetModuleAlias(), reference.targetEntityAlias(), viewCode));
+            if (moduleAlias.equals(reference.targetModuleAlias())) {
+                upstream.add(new DynamicAssociationRelationItem("REFERENCE", reference.sourceField(), moduleAlias,
+                        reference.targetEntityAlias(), moduleAlias, reference.sourceEntityAlias(), viewCode));
+            }
+        }
+        return new DynamicAssociationRelationOverview(moduleAlias, upstream, downstream);
+    }
+
+    public List<DynamicAssociationViewDescriptor> associationViewDesignDescriptors(String moduleAlias) {
+        return associationViews(moduleAlias);
+    }
+
+    public DynamicAssociationViewDiagnosis diagnoseAssociationView(String moduleAlias,
+                                                                   String entityAlias,
+                                                                   String sourceRecordId,
+                                                                   String viewCode,
+                                                                   Criteria criteria) {
+        DynamicAssociationViewDescriptor view = associationView(moduleAlias, entityAlias, viewCode);
+        if (!view.queryable()) {
+            throw new PlatformException("dynamic association view is not queryable: " + moduleAlias + "." + viewCode);
+        }
+        DynamicRecord source = select(moduleAlias, entityAlias, sourceRecordId);
+        if (source == null) {
+            throw new PlatformException("dynamic association source record does not exist: " + sourceRecordId);
+        }
+        Criteria associationCriteria = associationCriteria(moduleAlias, entityAlias, source, view);
+        Criteria targetCriteria = associationTargetCriteria(source, view, associationCriteria, criteria);
+        long targetCount = count(view.targetModuleAlias(), view.targetEntityAlias(), targetCriteria);
+        DynamicAssociationViewDiagnosisStatus status = diagnosisStatus(view, targetCount);
+        return new DynamicAssociationViewDiagnosis(view, associationCriteria, criteria == null ? Criteria.of() : criteria,
+                targetCriteria, targetCount, status, diagnosisMessage(view, status, targetCount));
     }
 
     public List<DynamicRelationDescriptor> relations(String moduleAlias) {
@@ -302,6 +365,109 @@ public class DynamicRecordService {
             return falseCriteria();
         }
         return Criteria.of().eq(keyField, value);
+    }
+
+    private Criteria rootQueryMappingCriteria(DynamicRecord source, DynamicAssociationViewDescriptor view) {
+        AssociationViewRootQueryMapping mapping = view.rootQueryMapping();
+        if (mapping == null) {
+            return Criteria.of();
+        }
+        return mappingCriteria(source, view.targetModuleAlias(), view.targetEntityAlias(), mapping);
+    }
+
+    private Criteria associationTargetCriteria(DynamicRecord source,
+                                               DynamicAssociationViewDescriptor view,
+                                               Criteria associationCriteria,
+                                               Criteria requestCriteria) {
+        Criteria targetCriteria = andCriteria(associationCriteria, rootQueryMappingCriteria(source, view));
+        return andCriteria(targetCriteria, requestCriteria);
+    }
+
+    private Criteria mappingCriteria(DynamicRecord source,
+                                     String targetModuleAlias,
+                                     String targetEntityAlias,
+                                     AssociationViewRootQueryMapping mapping) {
+        if (mapping == null) {
+            return Criteria.of();
+        }
+        if (mapping.leaf()) {
+            Object value = mappingValue(source, mapping);
+            if (value == null && mapping.operator() != DynamicQueryOperator.NULL
+                    && mapping.operator() != DynamicQueryOperator.NOT_NULL) {
+                return falseCriteria();
+            }
+            return queryCriteria(targetModuleAlias, targetEntityAlias, List.of(
+                    new DynamicQueryCondition(mapping.targetField(), mapping.operator(), mappingValues(mapping, value))));
+        }
+        Criteria criteria = Criteria.of();
+        for (AssociationViewRootQueryMapping child : mapping.children()) {
+            Criteria childCriteria = mappingCriteria(source, targetModuleAlias, targetEntityAlias, child);
+            if (childCriteria.isEmpty()) {
+                continue;
+            }
+            if (mapping.groupOperator() == AssociationViewQueryMappingGroupOperator.OR) {
+                criteria.orGroup(childCriteria.getRoot());
+            } else {
+                criteria.andGroup(childCriteria.getRoot());
+            }
+        }
+        return criteria;
+    }
+
+    private List<?> mappingValues(AssociationViewRootQueryMapping mapping, Object value) {
+        return switch (mapping.operator()) {
+            case NULL, NOT_NULL -> List.of();
+            case IN, NOT_IN -> value instanceof Collection<?> collection ? List.copyOf(collection) : List.of(value);
+            case BETWEEN -> value instanceof Collection<?> collection ? List.copyOf(collection) : List.of(value);
+            default -> List.of(value);
+        };
+    }
+
+    private Object mappingValue(DynamicRecord source, AssociationViewRootQueryMapping mapping) {
+        AssociationViewQueryMappingSourceType sourceType = mapping.sourceType();
+        if (sourceType == null) {
+            throw new ModuleDefinitionException("association rootQueryMapping source type is required");
+        }
+        return switch (sourceType) {
+            case SOURCE_FIELD -> source.getValue(mapping.sourceField());
+            case SYSTEM_VARIABLE -> systemVariableValue(source, mapping.systemVariable());
+            case CONSTANT -> mapping.constantValue();
+        };
+    }
+
+    private Object systemVariableValue(DynamicRecord source, String systemVariable) {
+        if (systemVariable == null || systemVariable.isBlank()) {
+            throw new ModuleDefinitionException("association rootQueryMapping system variable is required");
+        }
+        return switch (systemVariable.trim()) {
+            case "source.id", "sourceId" -> source.getId();
+            default -> throw new ModuleDefinitionException("unsupported association rootQueryMapping system variable: "
+                    + systemVariable);
+        };
+    }
+
+    private DynamicAssociationViewDiagnosisStatus diagnosisStatus(DynamicAssociationViewDescriptor view, long targetCount) {
+        if (view.viewType() == EntityViewType.FORM) {
+            if (targetCount == 0) {
+                return DynamicAssociationViewDiagnosisStatus.FORM_NOT_FOUND;
+            }
+            if (targetCount > 1) {
+                return DynamicAssociationViewDiagnosisStatus.FORM_NOT_UNIQUE;
+            }
+            return DynamicAssociationViewDiagnosisStatus.OK;
+        }
+        return targetCount == 0 ? DynamicAssociationViewDiagnosisStatus.EMPTY : DynamicAssociationViewDiagnosisStatus.OK;
+    }
+
+    private String diagnosisMessage(DynamicAssociationViewDescriptor view,
+                                    DynamicAssociationViewDiagnosisStatus status,
+                                    long targetCount) {
+        return switch (status) {
+            case OK -> "association view target matched";
+            case EMPTY -> "association view target is empty";
+            case FORM_NOT_FOUND -> "association view FORM target not found";
+            case FORM_NOT_UNIQUE -> "association view FORM target must be unique, but matched " + targetCount;
+        };
     }
 
     private Criteria andCriteria(Criteria left, Criteria right) {

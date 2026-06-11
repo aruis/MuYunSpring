@@ -77,8 +77,20 @@ public class DynamicOpenApiGenerator {
                     operationId(descriptor, "queryAssociation"),
                     "Query association " + mainEntity.title(), "WebQueryRequest", "WebPageResponse",
                     PlatformAction.QUERY.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/associations/{viewCode}/diagnose",
+                    operationId(descriptor, "diagnoseAssociation"),
+                    "Diagnose association " + mainEntity.title(), "WebQueryRequest", "DynamicAssociationViewDiagnosis",
+                    PlatformAction.QUERY.code()));
         }
         if (standardActionVisible.test(PlatformAction.VIEW)) {
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/associations/relation-overview",
+                    operationId(descriptor, "associationRelationOverview"),
+                    "Association relation overview " + descriptor.title(), null, "DynamicAssociationRelationOverview",
+                    PlatformAction.VIEW.code()));
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/associations/design",
+                    operationId(descriptor, "associationDesign"),
+                    "Association design " + descriptor.title(), null, "DynamicAssociationViewDescriptorList",
+                    PlatformAction.VIEW.code()));
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
                     "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/query",

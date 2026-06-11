@@ -64,8 +64,10 @@ import net.ximatai.muyun.spring.dynamic.openapi.DynamicOpenApiGenerator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosis;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -368,6 +370,32 @@ public class DynamicRecordWebController implements
             return items.stream()
                     .map(item -> summaryItem(DynamicWebRequest.moduleAlias(), records, fields, item))
                     .toList();
+        });
+    }
+
+    @GetMapping("/associations/relation-overview")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public DynamicAssociationRelationOverview associationRelationOverview() {
+        return webScope(() -> recordService.associationRelationOverview(DynamicWebRequest.moduleAlias()));
+    }
+
+    @GetMapping("/associations/design")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public List<DynamicAssociationViewDescriptor> associationDesignDescriptors() {
+        return webScope(() -> recordService.associationViewDesignDescriptors(DynamicWebRequest.moduleAlias()));
+    }
+
+    @PostMapping("/view/{id}/associations/{viewCode}/diagnose")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public DynamicAssociationViewDiagnosis diagnoseAssociation(@PathVariable String id,
+                                                               @PathVariable String viewCode,
+                                                               @RequestBody(required = false) WebQueryRequest request) {
+        return webScope(() -> {
+            String moduleAlias = DynamicWebRequest.moduleAlias();
+            String entityAlias = mainEntityAlias(moduleAlias);
+            DynamicAssociationViewDescriptor view = recordService.associationView(moduleAlias, entityAlias, viewCode);
+            Criteria criteria = targetQueryCriteria(view.targetModuleAlias(), view.targetEntityAlias(), request);
+            return recordService.diagnoseAssociationView(moduleAlias, entityAlias, id, viewCode, criteria);
         });
     }
 

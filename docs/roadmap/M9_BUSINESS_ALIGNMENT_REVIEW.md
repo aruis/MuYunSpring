@@ -104,7 +104,7 @@ MuYun M7 已有生成来源影响关系，M9 任务 check 还没有用上。`GEN
 如果继续推进业务颗粒对齐，建议拆成四场，不要混在 M10 大治理里一次性铺开：
 
 1. **M10 前置补强战役**：结构化刷新策略、任务评估结果汇总、expectedCount、完整越权 Web/IT 回归。目标是在不重开 M9 基础契约的前提下，把第一批交互能力补到“前端可稳定联调”。
-2. **关联视图设计态战役**：模块上下游关系总览、关联视图定义、path、rootQueryMapping、目标 UI 配置和 FORM/LIST 模式。
+2. **关联视图设计态战役**：模块上下游关系总览、关联视图定义、path、rootQueryMapping、目标 UI 配置和 FORM/LIST 模式已进入 M10 前置补强；后续只在需要完整配置器 UI 或持久化治理时继续扩展。
 3. **模块任务定义战役**：任务/guide/check 独立模型，生成关系 check、公式 check、托管来源同步和托管保护。
 4. **弹窗与信息编辑体验战役**：弹窗多按钮、FORM/DETAIL view schema、规则节点、ModuleInfoEdit 独立配置和 byAction 运行态反查。只在真实业务动作需要时推进。
 
