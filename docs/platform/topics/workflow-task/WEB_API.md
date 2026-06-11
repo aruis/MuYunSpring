@@ -6,10 +6,44 @@
 
 | Controller | 根路径 |
 | --- | --- |
+| `WorkflowDefinitionWebController` | `/platform.module/{moduleAlias}/workflow-definitions` |
+| `WorkflowVersionWebController` | `/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions` |
 | `WorkflowRuntimeWebController` | `/workflow/runtime` |
 | `WorkflowRuntimeAdminWebController` | `/workflow/runtime/admin` |
 | `WorkflowHistoryWebController` | `/workflow/history` |
 | `WorkflowDelegationWebController` | `/workflow/delegation`、`/platform.workflow_delegation` |
+
+## 工作流定义配置
+
+根路径：`/platform.module/{moduleAlias}/workflow-definitions`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/query` | 按模块查询工作流定义。 |
+| `GET` | `/platform.module/{moduleAlias}/workflow-definitions/view/{id}` | 查看某个工作流定义。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/insert` | 新增工作流定义；路径模块必须是已存在平台模块，并写入 `moduleAlias` 与 `applicationAlias`。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/update/{id}` | 更新草稿工作流定义；已发布、停用和归档定义不能通过普通更新改写。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/delete/{id}` | 删除草稿工作流定义。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/sort/{id}` | 在同一模块内调整定义顺序。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions/{versionId}/publish` | 发布指定版本，并同步定义当前版本和模块动作贡献。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/disable` | 停用工作流定义，并禁用已贡献动作。 |
+| `POST` | `/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/archive` | 归档工作流定义，并禁用已贡献动作。 |
+
+普通定义维护只面向草稿；发布、停用和归档必须走发布门面，避免绕过动作贡献和状态同步。
+
+## 工作流版本配置
+
+根路径：`/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/query` | 查询某个定义下的版本列表。 |
+| `GET` | `/view/{id}` | 查看版本，包含设计器语义图、布局图和发布快照字段。 |
+| `POST` | `/insert` | 新增草稿版本；路径定义会写入 `definitionId`，请求体不能跨定义写入。 |
+| `POST` | `/update/{id}` | 更新草稿版本。已发布版本不可改写。 |
+| `POST` | `/delete/{id}` | 删除草稿版本。 |
+
+版本配置用于承载设计器语义图和布局图 JSON。版本发布仍通过定义配置下的 `publish` 入口完成。
 
 ## 运行实例读取
 

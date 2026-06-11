@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
+import net.ximatai.muyun.spring.boot.workflow.WorkflowDefinitionWebController;
+import net.ximatai.muyun.spring.boot.workflow.WorkflowVersionWebController;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -17,6 +19,9 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionService;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
+import net.ximatai.muyun.spring.platform.workflow.WorkflowVersionService;
 import net.ximatai.muyun.spring.platform.code.CodePreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
@@ -244,6 +249,32 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(action.actionAuth()).isTrue();
                 assertThat(action.dataAuth()).isFalse();
             });
+        }
+    }
+
+    @Test
+    void shouldScanWorkflowConfigurationModules() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(WorkflowDefinitionWebController.class,
+                    () -> new WorkflowDefinitionWebController(mock(net.ximatai.muyun.spring.platform.module.PlatformModuleService.class),
+                            mock(WorkflowPublishFacade.class)));
+            context.registerBean(WorkflowVersionWebController.class,
+                    () -> new WorkflowVersionWebController(mock(WorkflowDefinitionService.class)));
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
+
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    WorkflowDefinitionService.MODULE_ALIAS, WorkflowVersionService.MODULE_ALIAS);
+            assertThat(byAlias.get(WorkflowDefinitionService.MODULE_ALIAS).actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("create", "view", "update", "delete", "query", "sort",
+                            "publishWorkflowDefinition", "disableWorkflowDefinition", "archiveWorkflowDefinition");
+            assertThat(byAlias.get(WorkflowVersionService.MODULE_ALIAS).actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("create", "view", "update", "delete", "query");
         }
     }
 
