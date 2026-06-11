@@ -65,6 +65,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutionRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionAvailability;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -367,6 +368,25 @@ public class DynamicRecordWebController implements
             return items.stream()
                     .map(item -> summaryItem(DynamicWebRequest.moduleAlias(), records, fields, item))
                     .toList();
+        });
+    }
+
+    @PostMapping("/view/{id}/associations/{viewCode}/query")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public WebPageResponse<DynamicRecord> queryAssociation(@PathVariable String id,
+                                                           @PathVariable String viewCode,
+                                                           @RequestBody(required = false) WebQueryRequest request) {
+        return webScope(() -> {
+            String moduleAlias = DynamicWebRequest.moduleAlias();
+            String entityAlias = mainEntityAlias(moduleAlias);
+            DynamicAssociationViewDescriptor view = recordService.associationView(moduleAlias, entityAlias, viewCode);
+            Criteria criteria = targetQueryCriteria(view.targetModuleAlias(), view.targetEntityAlias(), request);
+            WebQueryRequest normalized = request == null ? new WebQueryRequest(null, List.of(), List.of()) : request;
+            PageResult<DynamicRecord> page = recordService.associationViewPage(moduleAlias, entityAlias, id,
+                    viewCode, criteria, DynamicWebQueryMapper.page(normalized.pageOrDefault()),
+                    DynamicWebQueryMapper.sorts(normalized.sorts()));
+            DynamicEntityOperations targetOperations = recordService.entity(view.targetModuleAlias(), view.targetEntityAlias());
+            return WebPageResponse.from(WebOutputSupport.page(targetOperations, page, FieldOutputContext.LIST));
         });
     }
 
@@ -823,6 +843,26 @@ public class DynamicRecordWebController implements
             fields.add(resolved.fieldName());
         }
         return fields;
+    }
+
+    private Criteria targetQueryCriteria(String moduleAlias, String entityAlias, WebQueryRequest request) {
+        Criteria templateCriteria = Criteria.of();
+        if (request != null && hasText(request.queryTemplateId())) {
+            requireLowCodeQueryServices();
+            validateQueryTemplateBelongsToModule(moduleAlias, request.queryTemplateId());
+            templateCriteria = queryItemService.compile(request.queryTemplateId(), request.externalQueryValues());
+        }
+        Criteria manualCriteria = request == null || request.conditions().isEmpty()
+                ? Criteria.of()
+                : criteria(moduleAlias, entityAlias, request.conditions());
+        Criteria treeCriteria = request == null || request.criteria() == null
+                ? Criteria.of()
+                : criteria(moduleAlias, entityAlias, request.criteria());
+        Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(moduleAlias,
+                request, pageConfigSnapshotService, moduleMetadataFieldService,
+                conditions -> recordService.queryCriteria(moduleAlias, entityAlias, conditions));
+        Criteria quickCriteria = quickSearchCriteria(moduleAlias, request);
+        return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
     }
 
     private void validateUiSave(String moduleAlias, DynamicRecord record) {

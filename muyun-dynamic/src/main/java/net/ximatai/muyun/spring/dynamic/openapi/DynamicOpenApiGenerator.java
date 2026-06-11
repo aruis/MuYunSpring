@@ -73,6 +73,10 @@ public class DynamicOpenApiGenerator {
                     operationId(descriptor, "querySummary"),
                     "Summary " + mainEntity.title(), "WebQueryRequest", "DynamicSummaryItemList",
                     PlatformAction.QUERY.code()));
+            operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/associations/{viewCode}/query",
+                    operationId(descriptor, "queryAssociation"),
+                    "Query association " + mainEntity.title(), "WebQueryRequest", "WebPageResponse",
+                    PlatformAction.QUERY.code()));
         }
         if (standardActionVisible.test(PlatformAction.VIEW)) {
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),

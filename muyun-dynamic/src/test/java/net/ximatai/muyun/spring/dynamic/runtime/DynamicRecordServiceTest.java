@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
@@ -24,18 +25,22 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityAssociationViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceAffectDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceFilterDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDictionaryBinding;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -1929,6 +1934,156 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldQueryChildAssociationViewWithTargetCriteria() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"app_contract_line\"")) {
+                return List.of(lineRow("line-1", "contract-1", "Line A"));
+            }
+            return List.of(row("contract-1", "C-001", 0, false));
+        });
+        DynamicRecordService service = associationService(operations);
+
+        PageResult<DynamicRecord> page = service.associationViewPage(
+                MODULE,
+                "contract",
+                "contract-1",
+                "lines",
+                Criteria.of().like("summary", "Line"),
+                PageRequest.of(1, 20)
+        );
+
+        assertThat(page.getRecords()).hasSize(1);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"app_contract_line\"")
+                .contains("\"contract_id\" =")
+                .contains("\"summary\" LIKE"));
+    }
+
+    @Test
+    void shouldQueryReferenceAssociationViewBySourceReferenceValue() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"app_contract_line\"")) {
+                return List.of(lineRow("line-1", "contract-1", "Line A"));
+            }
+            return List.of(row("contract-1", "C-001", 0, false));
+        });
+        DynamicRecordService service = associationService(operations);
+
+        assertThat(service.associationView(MODULE, "line", "contractId").queryable()).isTrue();
+
+        PageResult<DynamicRecord> page = service.associationViewPage(
+                MODULE,
+                "line",
+                "line-1",
+                "contractId",
+                Criteria.of().like("code", "C-"),
+                PageRequest.of(1, 20)
+        );
+
+        assertThat(page.getRecords()).hasSize(1);
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement)
+                .contains("\"app_contract\"")
+                .contains("\"id\" =")
+                .contains("\"code\" LIKE"));
+    }
+
+    @Test
+    void shouldRejectNonQueryableAssociationView() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityRelationDefinition relation = EntityRelationDefinition.child("lines", "contract", "line", "contractId");
+        EntityAssociationViewDefinition hiddenView = new EntityAssociationViewDefinition(
+                "hiddenLines",
+                "contract",
+                MODULE,
+                "line",
+                AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                EntityViewType.LIST,
+                false
+        );
+        DynamicRecordService service = associationService(operations, List.of(relation), List.of(), List.of(hiddenView),
+                new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+
+        assertThatThrownBy(() -> service.associationViewPage(MODULE, "contract", "contract-1",
+                "hiddenLines", Criteria.of(), PageRequest.of(1, 20)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("dynamic association view is not queryable");
+    }
+
+    @Test
+    void shouldReturnEmptyPageWhenReferenceAssociationValueIsBlank() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"app_contract_line\"")) {
+                return List.of(lineRow("line-1", "", "Line A"));
+            }
+            return List.of();
+        });
+        DynamicRecordService service = associationService(operations);
+
+        PageResult<DynamicRecord> page = service.associationViewPage(
+                MODULE,
+                "line",
+                "line-1",
+                "contractId",
+                Criteria.of(),
+                PageRequest.of(1, 20)
+        );
+
+        assertThat(page.getRecords()).isEmpty();
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(operations, org.mockito.Mockito.atLeastOnce()).row(sql.capture(), anyMap());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> assertThat(statement).contains("1 = 0"));
+    }
+
+    @Test
+    void shouldApplyViewScopeToSourceAndQueryScopeToAssociationTarget() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"app_contract_line\"")) {
+                return List.of(lineRow("line-1", "contract-1", "Line A"));
+            }
+            return List.of(row("contract-1", "C-001", 0, false));
+        });
+        DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
+        when(dataScope.resolveReadScope(eq(MODULE), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
+                .thenAnswer(invocation -> DataScopeCriteriaResult.restricted(invocation.getArgument(2)));
+        DynamicRecordService service = associationService(operations, dataScope);
+
+        PageResult<DynamicRecord> page = service.associationViewPage(
+                MODULE,
+                "contract",
+                "contract-1",
+                "lines",
+                Criteria.of().like("summary", "Line"),
+                PageRequest.of(1, 20)
+        );
+
+        assertThat(page.getRecords()).hasSize(1);
+        ArgumentCaptor<ActionExecutionPolicy> policy = ArgumentCaptor.forClass(ActionExecutionPolicy.class);
+        verify(dataScope, org.mockito.Mockito.atLeastOnce())
+                .resolveReadScope(eq(MODULE), policy.capture(), any(Criteria.class), any());
+        assertThat(policy.getAllValues())
+                .extracting(ActionExecutionPolicy::actionCode)
+                .contains(PlatformAction.VIEW.code(), PlatformAction.QUERY.code());
+    }
+
+    @Test
     void shouldExcludeSoftDeletedTargetWhenResolvingReference() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0));
@@ -2546,6 +2701,48 @@ class DynamicRecordServiceTest {
         );
     }
 
+    private DynamicRecordService associationService(IDatabaseOperations<Object> operations) {
+        return associationService(operations, new net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService());
+    }
+
+    private DynamicRecordService associationService(IDatabaseOperations<Object> operations,
+                                                    DataScopeCriteriaService dataScopeCriteriaService) {
+        EntityRelationDefinition relation = EntityRelationDefinition.child("lines", "contract", "line", "contractId");
+        EntityReferenceDefinition reference = EntityReferenceDefinition.to("line", "contractId",
+                ReferenceTarget.of(MODULE, "contract"));
+        return associationService(operations,
+                List.of(relation),
+                List.of(reference),
+                List.of(
+                        EntityAssociationViewDefinition.childRelation("lines", "contract", MODULE, "line", "lines"),
+                        EntityAssociationViewDefinition.reference("contractId", "line", MODULE, "contract",
+                                "contractId")
+                ),
+                dataScopeCriteriaService);
+    }
+
+    private DynamicRecordService associationService(IDatabaseOperations<Object> operations,
+                                                    List<EntityRelationDefinition> relations,
+                                                    List<EntityReferenceDefinition> references,
+                                                    List<EntityAssociationViewDefinition> associationViews,
+                                                    DataScopeCriteriaService dataScopeCriteriaService) {
+        ModuleDefinition module = new ModuleDefinition(
+                MODULE,
+                "Contract",
+                List.of(contractEntity(), lineEntity()),
+                relations,
+                references,
+                List.of(),
+                associationViews,
+                List.of()
+        );
+        return new DynamicRecordService(
+                new DynamicRecordRuntime(operations).register(module),
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                dataScopeCriteriaService
+        );
+    }
+
     private DynamicRecordService actionService(IDatabaseOperations<Object> operations) {
         return actionService(operations, RuntimeEventPublisher.noop());
     }
@@ -3087,6 +3284,16 @@ class DynamicRecordServiceTest {
                 "code", id.toUpperCase(),
                 "title", name,
                 "region", region,
+                "deleted", Boolean.FALSE,
+                "version", 0
+        );
+    }
+
+    private Map<String, Object> lineRow(String id, String contractId, String summary) {
+        return Map.of(
+                "id", id,
+                "contract_id", contractId,
+                "summary", summary,
                 "deleted", Boolean.FALSE,
                 "version", 0
         );

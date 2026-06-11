@@ -343,7 +343,7 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(referenceView.displayMode()).isEqualTo(AssociationViewDisplayMode.LINKED_RECORD);
         assertThat(referenceView.referenceField()).isEqualTo("invoiceId");
         assertThat(referenceView.targetEntityAlias()).isEqualTo("invoice");
-        assertThat(referenceView.queryable()).isFalse();
+        assertThat(referenceView.queryable()).isTrue();
     }
 
     @Test

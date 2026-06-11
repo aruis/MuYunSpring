@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
@@ -1339,6 +1340,50 @@ class DynamicRecordWebControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Query form field is not available in UI config: hidden"));
+    }
+
+    @Test
+    void shouldQueryAssociationViewWithTargetQueryContext() throws Exception {
+        DynamicEntityOperations lineOperations = mock(DynamicEntityOperations.class);
+        DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
+                "lines",
+                ENTITY,
+                MODULE,
+                "line",
+                net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                net.ximatai.muyun.spring.dynamic.metadata.EntityViewType.LIST,
+                true
+        );
+        DynamicRecord line = new DynamicRecord(associationLineEntity()).setValue("contractId", "contract-1")
+                .setValue("summary", "Line A");
+        line.setId("line-1");
+        Criteria targetCriteria = Criteria.of().like("summary", "Line");
+        when(service.associationView(MODULE, ENTITY, "lines")).thenReturn(association);
+        when(service.queryCriteria(eq(MODULE), eq("line"), any())).thenReturn(targetCriteria);
+        when(service.associationViewPage(eq(MODULE), eq(ENTITY), eq("contract-1"), eq("lines"),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(line), 1, PageRequest.of(1, 20)));
+        when(service.entity(MODULE, "line")).thenReturn(lineOperations);
+
+        mvc.perform(post("/{moduleAlias}/view/{id}/associations/{viewCode}/query", MODULE, "contract-1", "lines")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "conditions": [
+                                    {"fieldName": "summary", "operator": "LIKE", "values": ["Line"]}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("line-1"))
+                .andExpect(jsonPath("$.records[0].values.summary").value("Line A"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).associationViewPage(eq(MODULE), eq(ENTITY), eq("contract-1"), eq("lines"),
+                criteria.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(criteria.getValue()).isSameAs(targetCriteria);
     }
 
     @Test
@@ -2725,6 +2770,13 @@ class DynamicRecordWebControllerTest {
                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
+        ));
+    }
+
+    private EntityDefinition associationLineEntity() {
+        return new EntityDefinition("line", "sales_contract_line", "Contract Line", List.of(
+                FieldDefinition.string("contractId", "Contract").column("contract_id").length(32),
+                FieldDefinition.string("summary", "Summary").length(128)
         ));
     }
 

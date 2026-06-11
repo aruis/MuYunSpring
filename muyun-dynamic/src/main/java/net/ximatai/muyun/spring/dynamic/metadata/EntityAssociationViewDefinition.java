@@ -47,6 +47,6 @@ public record EntityAssociationViewDefinition(
                 null,
                 referenceField,
                 many ? EntityViewType.LIST : EntityViewType.FORM,
-                many);
+                true);
     }
 }

@@ -179,7 +179,7 @@ class DynamicModuleDescriptorTest {
                     assertThat(view.targetEntityAlias()).isEqualTo("customer");
                     assertThat(view.referenceField()).isEqualTo("customerId");
                     assertThat(view.viewType()).isEqualTo(EntityViewType.FORM);
-                    assertThat(view.queryable()).isFalse();
+                    assertThat(view.queryable()).isTrue();
                 });
         DynamicReferenceDescriptor reference = descriptor.references().getFirst();
         assertThat(reference.sourceEntityAlias()).isEqualTo("contact");

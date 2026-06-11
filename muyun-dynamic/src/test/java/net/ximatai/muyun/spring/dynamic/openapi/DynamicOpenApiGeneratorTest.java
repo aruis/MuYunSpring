@@ -254,6 +254,15 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.method()).isEqualTo("GET");
                     assertThat(operation.actionCode()).isNull();
                 });
+        assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/view/{id}/associations/{viewCode}/query")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.method()).isEqualTo("POST");
+                    assertThat(operation.requestSchema()).isEqualTo("WebQueryRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("WebPageResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.QUERY.code());
+                });
     }
 
     @Test

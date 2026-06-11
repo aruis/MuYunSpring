@@ -242,12 +242,83 @@ public class DynamicRecordService {
         return findAssociationView(moduleAlias, entityDescriptor(moduleAlias, entityAlias), viewCode);
     }
 
+    public PageResult<DynamicRecord> associationViewPage(String moduleAlias,
+                                                         String entityAlias,
+                                                         String sourceRecordId,
+                                                         String viewCode,
+                                                         Criteria criteria,
+                                                         PageRequest pageRequest,
+                                                         Sort... sorts) {
+        DynamicAssociationViewDescriptor view = associationView(moduleAlias, entityAlias, viewCode);
+        if (!view.queryable()) {
+            throw new PlatformException("dynamic association view is not queryable: " + moduleAlias + "." + viewCode);
+        }
+        DynamicRecord source = select(moduleAlias, entityAlias, sourceRecordId);
+        if (source == null) {
+            throw new PlatformException("dynamic association source record does not exist: " + sourceRecordId);
+        }
+        Criteria associationCriteria = associationCriteria(moduleAlias, entityAlias, source, view);
+        Criteria merged = andCriteria(associationCriteria, criteria);
+        return page(view.targetModuleAlias(), view.targetEntityAlias(), merged, pageRequest, sorts);
+    }
+
     public List<DynamicRelationDescriptor> relations(String moduleAlias) {
         return describe(moduleAlias).relations();
     }
 
     public List<DynamicReferenceDescriptor> references(String moduleAlias) {
         return describe(moduleAlias).references();
+    }
+
+    private Criteria associationCriteria(String moduleAlias,
+                                         String entityAlias,
+                                         DynamicRecord source,
+                                         DynamicAssociationViewDescriptor view) {
+        if (view.relationCode() != null && !view.relationCode().isBlank()) {
+            DynamicRelationDescriptor relation = relations(moduleAlias).stream()
+                    .filter(item -> item.code().equals(view.relationCode())
+                            && item.parentEntityAlias().equals(entityAlias)
+                            && item.childEntityAlias().equals(view.targetEntityAlias()))
+                    .findFirst()
+                    .orElseThrow(() -> new ModuleDefinitionException("unknown dynamic association relation: "
+                            + moduleAlias + "." + view.code()));
+            return Criteria.of().eq(relation.childForeignKeyField(), source.getId());
+        }
+        DynamicReferenceDescriptor reference = reference(moduleAlias, entityAlias, view.referenceField());
+        String keyField = reference.keyField() == null || reference.keyField().isBlank()
+                ? "id"
+                : reference.keyField();
+        Object value = source.getValue(reference.sourceField());
+        if (value == null) {
+            return falseCriteria();
+        }
+        if (value instanceof Collection<?> collection) {
+            List<?> values = collection.stream()
+                    .filter(item -> item != null && !String.valueOf(item).isBlank())
+                    .toList();
+            return values.isEmpty() ? falseCriteria() : Criteria.of().in(keyField, values);
+        }
+        if (String.valueOf(value).isBlank()) {
+            return falseCriteria();
+        }
+        return Criteria.of().eq(keyField, value);
+    }
+
+    private Criteria andCriteria(Criteria left, Criteria right) {
+        if (left == null || left.isEmpty()) {
+            return right == null ? Criteria.of() : right;
+        }
+        if (right == null || right.isEmpty()) {
+            return left;
+        }
+        Criteria criteria = Criteria.of();
+        criteria.andGroup(left.getRoot());
+        criteria.andGroup(right.getRoot());
+        return criteria;
+    }
+
+    private Criteria falseCriteria() {
+        return Criteria.of().raw(net.ximatai.muyun.database.core.orm.SqlRawCondition.of("1 = 0", Map.of()));
     }
 
     public List<DynamicReferenceDescriptor> references(String moduleAlias, String entityAlias) {
