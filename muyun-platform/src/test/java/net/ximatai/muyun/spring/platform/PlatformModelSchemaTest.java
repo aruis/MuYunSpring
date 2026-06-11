@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.platform.code.CodeLedgerEntry;
 import net.ximatai.muyun.spring.platform.code.CodeRecycleEntry;
 import net.ximatai.muyun.spring.platform.code.CodeRule;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigVersion;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationFieldMapping;
@@ -188,6 +189,12 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(ModuleMetadataFormulaRule.class)))
                 .contains("id", "relation_id", "alias", "rule_kind", "rule_phase", "target_field",
                         "expression", "severity", "message_template", "stop_on_error", "enabled", "sort_order");
+        assertThat(columnNames(mapper.toTable(LowCodeModuleConfigVersion.class)))
+                .contains("id", "tenant_id", "module_alias", "version_no", "version_status", "current_version",
+                        "package_snapshot_text", "package_hash", "summary_json", "source_version_id",
+                        "published_by", "published_at", "remark");
+        assertThat(uniqueIndexes(mapper.toTable(LowCodeModuleConfigVersion.class)))
+                .contains(List.of("tenant_id", "module_alias", "version_no"));
     }
 
     @Test
