@@ -40,6 +40,7 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/query",
                         "/sales.contract/query/summary",
                         "/sales.contract/view/{id}",
+                        "/sales.contract/tasks/definitions",
                         "/sales.contract/view/{id}/attachments/query",
                         "/sales.contract/view/{id}/attachments/add",
                         "/sales.contract/view/{id}/attachments/upload-ticket",
@@ -277,6 +278,7 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/view/{id}/associations/{viewCode}/diagnose")
                 .doesNotContain("/sales.contract/associations/relation-overview",
                         "/sales.contract/associations/design",
+                        "/sales.contract/tasks/definitions",
                         "/sales.contract/view/{id}");
     }
 

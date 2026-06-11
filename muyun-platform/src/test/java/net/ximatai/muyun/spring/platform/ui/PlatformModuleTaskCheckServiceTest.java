@@ -197,6 +197,83 @@ class PlatformModuleTaskCheckServiceTest {
     }
 
     @Test
+    void shouldEvaluatePlatformTaskDefinitionWithGuides() {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        DynamicRecordService recordService = mock(DynamicRecordService.class);
+        PlatformQueryTemplate template = queryTemplate("q-ready", "crm.customer");
+        when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot("{}", List.of(template)));
+        Criteria compiled = Criteria.of().eq("customerId", "customer-1");
+        when(queryItemService.compile(eq("q-ready"), any(Map.class))).thenReturn(compiled);
+        when(recordService.mainEntityAlias("crm.customer")).thenReturn("customer");
+        when(recordService.count("crm.customer", "customer", compiled)).thenReturn(1L);
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+        registry.register(new PlatformModuleTaskDefinition("crm.customer", "profile-ready", "资料齐备",
+                PlatformModuleTaskType.BUSINESS_COMPLETION, PlatformModuleTaskOriginType.LOCAL_EDIT,
+                "local-edit-basic", true, false, true, 10, "/crm.customer/view/{id}",
+                List.of(new PlatformModuleTaskGuideDefinition("profile-ready",
+                        PlatformModuleTaskGuideType.OPEN_FORM, "muyun.localEdit",
+                        "/crm.customer/view/{id}", "crm.customer", "detail", "name", "补充资料")),
+                List.of(new PlatformModuleTaskCheckDefinition("profile-ready", PlatformTaskCheckType.QUERY_TEMPLATE,
+                        null, "q-ready", "recordId", null, null, 1, "/crm.customer/query"))));
+        PlatformModuleTaskCheckService service = new PlatformModuleTaskCheckService(
+                snapshotService, queryItemService, recordService, Optional.empty(), registry);
+
+        PlatformModuleTaskCheckResult result = service.check("crm.customer", "customer-1", "ui-detail");
+
+        assertThat(result.passed()).isTrue();
+        PlatformModuleTaskStatus task = result.tasks().getFirst();
+        assertThat(task.key()).isEqualTo("profile-ready");
+        assertThat(task.guides()).hasSize(1);
+        assertThat(task.guides().getFirst().guideType()).isEqualTo(PlatformModuleTaskGuideType.OPEN_FORM);
+        ArgumentCaptor<Map<String, Object>> values = ArgumentCaptor.forClass(Map.class);
+        verify(queryItemService).compile(eq("q-ready"), values.capture());
+        assertThat(values.getValue()).containsEntry("recordId", "customer-1");
+    }
+
+    @Test
+    void shouldPreferPlatformTaskDefinitionWhenUiBlockHasSameKey() {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);
+        DynamicRecordService recordService = mock(DynamicRecordService.class);
+        PlatformQueryTemplate template = queryTemplate("q-ready", "crm.customer");
+        when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot("""
+                {
+                  "blocks": [
+                    {
+                      "type":"taskPanel",
+                      "key":"ready",
+                      "title":"页面任务",
+                      "checkType":"ASSOCIATION_VIEW",
+                      "associationViewCode":"contracts"
+                    }
+                  ]
+                }
+                """, List.of(template)));
+        Criteria compiled = Criteria.of().eq("customerId", "customer-1");
+        when(queryItemService.compile(eq("q-ready"), any(Map.class))).thenReturn(compiled);
+        when(recordService.mainEntityAlias("crm.customer")).thenReturn("customer");
+        when(recordService.count("crm.customer", "customer", compiled)).thenReturn(1L);
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+        registry.register(new PlatformModuleTaskDefinition("crm.customer", "ready", "定义任务",
+                PlatformModuleTaskType.BUSINESS_COMPLETION, PlatformModuleTaskOriginType.MANUAL,
+                null, false, false, true, 1, null, List.of(),
+                List.of(new PlatformModuleTaskCheckDefinition("ready", PlatformTaskCheckType.QUERY_TEMPLATE,
+                        null, "q-ready", "recordId", null, null, 1, null))));
+        PlatformModuleTaskCheckService service = new PlatformModuleTaskCheckService(
+                snapshotService, queryItemService, recordService, Optional.empty(), registry);
+
+        PlatformModuleTaskCheckResult result = service.check("crm.customer", "customer-1", "ui-detail");
+
+        assertThat(result.tasks()).singleElement()
+                .satisfies(task -> {
+                    assertThat(task.key()).isEqualTo("ready");
+                    assertThat(task.title()).isEqualTo("定义任务");
+                    assertThat(task.checkType()).isEqualTo(PlatformTaskCheckType.QUERY_TEMPLATE);
+                });
+    }
+
+    @Test
     void shouldRejectUnknownUiConfig() {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         when(snapshotService.snapshot("crm.customer")).thenReturn(snapshot("{}", List.of()));
@@ -206,6 +283,17 @@ class PlatformModuleTaskCheckServiceTest {
         assertThatThrownBy(() -> service.check("crm.customer", "customer-1", "missing"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("UI config is not published");
+    }
+
+    @Test
+    void shouldRejectCrossModuleDefinitionsWhenReplacingRegistryModule() {
+        PlatformModuleTaskDefinitionRegistry registry = new PlatformModuleTaskDefinitionRegistry();
+
+        assertThatThrownBy(() -> registry.replace("crm.customer", List.of(new PlatformModuleTaskDefinition(
+                "crm.contract", "ready", "合同任务", PlatformModuleTaskType.BUSINESS_COMPLETION,
+                PlatformModuleTaskOriginType.MANUAL, null, false, false, true, 1, null, List.of(), List.of()))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Module task definition does not belong");
     }
 
     private PlatformPageConfigSnapshot snapshot(String layoutJson, List<PlatformQueryTemplate> templates) {

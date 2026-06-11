@@ -12,7 +12,9 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckResult;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckService;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskDefinition;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,6 +43,14 @@ public class DynamicModuleTaskWebController {
     public List<PlatformModuleTaskStatus> checkTasks(@PathVariable String id,
                                                      @RequestBody(required = false) DynamicModuleTaskCheckRequest request) {
         return evaluateTasks(id, request).tasks();
+    }
+
+    @GetMapping("/tasks/definitions")
+    @ActionEndpoint(PlatformAction.VIEW)
+    public List<PlatformModuleTaskDefinition> taskDefinitions() {
+        String moduleAlias = DynamicWebRequest.moduleAlias();
+        requireTenantContext(moduleAlias);
+        return taskCheckService.definitions(moduleAlias);
     }
 
     @PostMapping("/view/{id}/tasks/evaluate")

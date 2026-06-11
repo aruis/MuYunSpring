@@ -91,6 +91,10 @@ public class DynamicOpenApiGenerator {
                     operationId(descriptor, "associationDesign"),
                     "Association design " + descriptor.title(), null, "DynamicAssociationViewDescriptorList",
                     PlatformAction.VIEW.code()));
+            operations.add(getOperation(descriptor.moduleAlias(), basePath + "/tasks/definitions",
+                    operationId(descriptor, "taskDefinitions"),
+                    "Module task definitions " + descriptor.title(), null, "PlatformModuleTaskDefinitionList",
+                    PlatformAction.VIEW.code()));
             operations.add(getOperation(descriptor.moduleAlias(), basePath + "/view/{id}", operationId(descriptor, "view"),
                     "View " + mainEntity.title(), null, "DynamicRecordResponse", PlatformAction.VIEW.code()));
             operations.add(operation(descriptor.moduleAlias(), basePath + "/view/{id}/attachments/query",

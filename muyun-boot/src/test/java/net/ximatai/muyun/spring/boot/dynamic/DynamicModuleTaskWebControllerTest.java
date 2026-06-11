@@ -7,7 +7,12 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckDetail;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckResult;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskCheckService;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskDefinition;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskGuideDefinition;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskGuideType;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskOriginType;
 import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskStatus;
+import net.ximatai.muyun.spring.platform.ui.PlatformModuleTaskType;
 import net.ximatai.muyun.spring.platform.ui.PlatformTaskCheckType;
 import net.ximatai.muyun.spring.platform.ui.PlatformTaskCompletionStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,6 +58,7 @@ class DynamicModuleTaskWebControllerTest {
                         List.of(new PlatformModuleTaskCheckDetail(
                                 PlatformTaskCheckType.ASSOCIATION_VIEW, true, 2L, 2,
                                 "/crm.customer/view/{id}/associations/contracts/query", null)),
+                        List.of(),
                         "/crm.customer/view/{id}/associations/contracts/query",
                         null
                 ))));
@@ -96,6 +103,7 @@ class DynamicModuleTaskWebControllerTest {
                         List.of(new PlatformModuleTaskCheckDetail(
                                 PlatformTaskCheckType.ASSOCIATION_VIEW, true, 2L, 2,
                                 "/crm.customer/view/{id}/associations/contracts/query", null)),
+                        List.of(),
                         "/crm.customer/view/{id}/associations/contracts/query",
                         null
                 ))));
@@ -112,5 +120,35 @@ class DynamicModuleTaskWebControllerTest {
                     .andExpect(jsonPath("$.tasks[0].key").value("contracts"))
                     .andExpect(jsonPath("$.tasks[0].checks[0].expectedCount").value(2));
         }
+    }
+
+    @Test
+    void shouldExposeModuleTaskDefinitions() throws Exception {
+        PlatformModuleTaskCheckService taskCheckService = mock(PlatformModuleTaskCheckService.class);
+        DynamicRecordService recordService = mock(DynamicRecordService.class);
+        ActiveTenantVerifier activeTenantVerifier = mock(ActiveTenantVerifier.class);
+        when(taskCheckService.definitions("crm.customer"))
+                .thenReturn(List.of(new PlatformModuleTaskDefinition("crm.customer", "profile-ready",
+                        "资料齐备", PlatformModuleTaskType.BUSINESS_COMPLETION,
+                        PlatformModuleTaskOriginType.LOCAL_EDIT, "local-edit-basic", true, false,
+                        true, 10, "/crm.customer/view/{id}",
+                        List.of(new PlatformModuleTaskGuideDefinition("profile-ready",
+                                PlatformModuleTaskGuideType.OPEN_FORM, "muyun.localEdit",
+                                "/crm.customer/view/{id}", "crm.customer", "detail", "name", "补充资料")),
+                        List.of())));
+        MockMvc mvc = MockMvcBuilders
+                .standaloneSetup(new DynamicModuleTaskWebController(taskCheckService, recordService, activeTenantVerifier))
+                .build();
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(get("/crm.customer/tasks/definitions"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].taskCode").value("profile-ready"))
+                    .andExpect(jsonPath("$[0].managed").value(true))
+                    .andExpect(jsonPath("$[0].guides[0].guideType").value("OPEN_FORM"));
+        }
+
+        verify(activeTenantVerifier).verifyActiveTenant("tenant-a");
+        verify(taskCheckService).definitions("crm.customer");
     }
 }

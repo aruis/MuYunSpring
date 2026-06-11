@@ -72,6 +72,11 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicAssociationRelationOverview", associationRelationOverviewSchema());
         schemas.put("DynamicAssociationRelationItem", associationRelationItemSchema());
         schemas.put("DynamicAssociationViewDiagnosis", associationViewDiagnosisSchema());
+        schemas.put("PlatformModuleTaskDefinitionList", arraySchema("PlatformModuleTaskDefinitionList",
+                "PlatformModuleTaskDefinition"));
+        schemas.put("PlatformModuleTaskDefinition", moduleTaskDefinitionSchema());
+        schemas.put("PlatformModuleTaskGuideDefinition", moduleTaskGuideDefinitionSchema());
+        schemas.put("PlatformModuleTaskCheckDefinition", moduleTaskCheckDefinitionSchema());
         schemas.put("DynamicViewDescriptor", viewDescriptorSchema());
         schemas.put("DynamicViewFieldDescriptor", viewFieldDescriptorSchema());
         schemas.put("DynamicOpenApiDocument", openApiDocumentSchema());
@@ -420,6 +425,55 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("message", stringProperty(true));
         return new DynamicOpenApiDocument.Schema("DynamicAssociationViewDiagnosis", "object", null,
                 List.of("view", "targetCount", "status"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema moduleTaskDefinitionSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("moduleAlias", stringProperty(false));
+        properties.put("taskCode", stringProperty(false));
+        properties.put("title", stringProperty(true));
+        properties.put("taskType", stringProperty(false));
+        properties.put("originType", stringProperty(false));
+        properties.put("originId", stringProperty(true));
+        properties.put("managed", booleanProperty(false));
+        properties.put("system", booleanProperty(false));
+        properties.put("enabled", booleanProperty(false));
+        properties.put("sortOrder", integerProperty(false));
+        properties.put("diagnosticPath", stringProperty(true));
+        properties.put("guides", arrayProperty("PlatformModuleTaskGuideDefinition"));
+        properties.put("checks", arrayProperty("PlatformModuleTaskCheckDefinition"));
+        return new DynamicOpenApiDocument.Schema("PlatformModuleTaskDefinition", "object", null,
+                List.of("moduleAlias", "taskCode", "taskType", "originType", "managed", "system", "enabled"),
+                properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema moduleTaskGuideDefinitionSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("taskCode", stringProperty(true));
+        properties.put("guideType", stringProperty(false));
+        properties.put("actionCode", stringProperty(true));
+        properties.put("path", stringProperty(true));
+        properties.put("moduleAlias", stringProperty(true));
+        properties.put("viewCode", stringProperty(true));
+        properties.put("fieldName", stringProperty(true));
+        properties.put("title", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("PlatformModuleTaskGuideDefinition", "object", null,
+                List.of("guideType"), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema moduleTaskCheckDefinitionSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("taskCode", stringProperty(true));
+        properties.put("checkType", stringProperty(false));
+        properties.put("associationViewCode", stringProperty(true));
+        properties.put("queryTemplateId", stringProperty(true));
+        properties.put("externalRecordIdKey", stringProperty(true));
+        properties.put("targetModuleAlias", stringProperty(true));
+        properties.put("generationRuleId", stringProperty(true));
+        properties.put("expectedCount", integerProperty(false));
+        properties.put("diagnosticPath", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("PlatformModuleTaskCheckDefinition", "object", null,
+                List.of("checkType", "expectedCount"), properties, null);
     }
 
     private DynamicOpenApiDocument.Schema viewDescriptorSchema() {

@@ -27,21 +27,35 @@ public class PlatformModuleTaskCheckService {
     private final PlatformQueryItemService queryItemService;
     private final DynamicRecordService recordService;
     private final Optional<RecordImpactRelationService> impactRelationService;
+    private final PlatformModuleTaskDefinitionRegistry taskDefinitionRegistry;
 
     public PlatformModuleTaskCheckService(PlatformPageConfigSnapshotService snapshotService,
                                           PlatformQueryItemService queryItemService,
                                           DynamicRecordService recordService,
-                                          Optional<RecordImpactRelationService> impactRelationService) {
+                                          Optional<RecordImpactRelationService> impactRelationService,
+                                          PlatformModuleTaskDefinitionRegistry taskDefinitionRegistry) {
         this.snapshotService = snapshotService;
         this.queryItemService = queryItemService;
         this.recordService = recordService;
         this.impactRelationService = impactRelationService == null ? Optional.empty() : impactRelationService;
+        this.taskDefinitionRegistry = taskDefinitionRegistry == null
+                ? new PlatformModuleTaskDefinitionRegistry()
+                : taskDefinitionRegistry;
+    }
+
+    PlatformModuleTaskCheckService(PlatformPageConfigSnapshotService snapshotService,
+                                   PlatformQueryItemService queryItemService,
+                                   DynamicRecordService recordService,
+                                   Optional<RecordImpactRelationService> impactRelationService) {
+        this(snapshotService, queryItemService, recordService, impactRelationService,
+                new PlatformModuleTaskDefinitionRegistry());
     }
 
     PlatformModuleTaskCheckService(PlatformPageConfigSnapshotService snapshotService,
                                    PlatformQueryItemService queryItemService,
                                    DynamicRecordService recordService) {
-        this(snapshotService, queryItemService, recordService, Optional.empty());
+        this(snapshotService, queryItemService, recordService, Optional.empty(),
+                new PlatformModuleTaskDefinitionRegistry());
     }
 
     public PlatformModuleTaskCheckResult check(String moduleAlias, String recordId, String uiConfigId) {
@@ -49,40 +63,57 @@ public class PlatformModuleTaskCheckService {
             throw new PlatformException("Module task check requires record id");
         }
         PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(moduleAlias);
-        List<PlatformTaskBlock> blocks = snapshot.uiConfigs().stream()
+        List<PlatformModuleTaskDefinition> definitions = taskDefinitionRegistry.listEnabled(moduleAlias);
+        List<PlatformTaskSource> definitionSources = definitions.stream()
+                .map(definition -> new PlatformTaskSource(definition.toBlock(), definition.guides()))
+                .toList();
+        Set<String> definitionKeys = definitions.stream()
+                .map(PlatformModuleTaskDefinition::taskCode)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        List<PlatformTaskSource> uiSources = snapshot.uiConfigs().stream()
                 .filter(config -> uiConfigId == null || uiConfigId.isBlank()
                         || Objects.equals(config.getId(), uiConfigId))
                 .flatMap(config -> PlatformTaskBlockLayoutResolver.resolve(config).stream())
+                .filter(block -> !definitionKeys.contains(block.key()))
+                .map(block -> new PlatformTaskSource(block, List.of()))
                 .toList();
-        if (hasText(uiConfigId) && blocks.isEmpty()) {
+        if (hasText(uiConfigId)) {
             boolean configExists = snapshot.uiConfigs().stream()
                     .anyMatch(config -> Objects.equals(config.getId(), uiConfigId));
             if (!configExists) {
                 throw new PlatformException("UI config is not published in module snapshot: " + uiConfigId);
             }
         }
-        return PlatformModuleTaskCheckResult.of(blocks.stream()
-                .map(block -> checkBlock(snapshot, recordId, block))
+        List<PlatformTaskSource> sources = new java.util.ArrayList<>();
+        sources.addAll(definitionSources);
+        sources.addAll(uiSources);
+        return PlatformModuleTaskCheckResult.of(sources.stream()
+                .map(source -> checkBlock(snapshot, recordId, source))
                 .toList());
+    }
+
+    public List<PlatformModuleTaskDefinition> definitions(String moduleAlias) {
+        return taskDefinitionRegistry.listEnabled(moduleAlias);
     }
 
     private PlatformModuleTaskStatus checkBlock(PlatformPageConfigSnapshot snapshot,
                                                 String recordId,
-                                                PlatformTaskBlock block) {
+                                                PlatformTaskSource source) {
+        PlatformTaskBlock block = source.block();
         List<PlatformModuleTaskCheckDetail> checks = block.checks().stream()
                 .map(check -> checkOne(snapshot, recordId, check))
                 .toList();
         if (checks.isEmpty() || checks.stream().allMatch(check -> check.passed() == null)) {
-            return status(block, PlatformTaskCompletionStatus.UNKNOWN, null, null, null, checks,
+            return status(source, PlatformTaskCompletionStatus.UNKNOWN, null, null, null, checks,
                     "manual task has no backend check");
         }
         boolean hasFailed = checks.stream().anyMatch(check -> Boolean.FALSE.equals(check.passed()));
         if (hasFailed) {
-            return status(block, PlatformTaskCompletionStatus.PENDING, false, matchedCount(checks),
+            return status(source, PlatformTaskCompletionStatus.PENDING, false, matchedCount(checks),
                     expectedCount(checks), checks, null);
         }
         boolean hasUnknown = checks.stream().anyMatch(check -> check.passed() == null);
-        return status(block, hasUnknown ? PlatformTaskCompletionStatus.UNKNOWN : PlatformTaskCompletionStatus.COMPLETE,
+        return status(source, hasUnknown ? PlatformTaskCompletionStatus.UNKNOWN : PlatformTaskCompletionStatus.COMPLETE,
                 hasUnknown ? null : true, matchedCount(checks), expectedCount(checks), checks, null);
     }
 
@@ -176,15 +207,16 @@ public class PlatformModuleTaskCheckService {
                 check.expectedCount(), check.diagnosticPath(), null);
     }
 
-    private PlatformModuleTaskStatus status(PlatformTaskBlock block,
+    private PlatformModuleTaskStatus status(PlatformTaskSource source,
                                             PlatformTaskCompletionStatus status,
                                             Boolean passed,
                                             Long matchedCount,
                                             Integer expectedCount,
                                             List<PlatformModuleTaskCheckDetail> checks,
                                             String message) {
+        PlatformTaskBlock block = source.block();
         return new PlatformModuleTaskStatus(block.key(), block.title(), block.checkType(), status, passed,
-                matchedCount, expectedCount, checks, block.diagnosticPath(), message);
+                matchedCount, expectedCount, checks, source.guides(), block.diagnosticPath(), message);
     }
 
     private Long matchedCount(List<PlatformModuleTaskCheckDetail> checks) {
@@ -203,5 +235,12 @@ public class PlatformModuleTaskCheckService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record PlatformTaskSource(PlatformTaskBlock block,
+                                      List<PlatformModuleTaskGuideDefinition> guides) {
+        private PlatformTaskSource {
+            guides = guides == null ? List.of() : List.copyOf(guides);
+        }
     }
 }
