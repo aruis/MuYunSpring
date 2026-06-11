@@ -23,8 +23,9 @@
 | 页面配置发布 | `PlatformPageConfigPublishService` | `/platform.page_config_publish` |
 | 字段引用配置 | `MetadataFieldReferenceConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs` |
 | 字段保护配置 | `MetadataFieldProtectionConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs` |
-| 元数据视图 | `MetadataViewService`、`MetadataViewFieldService` | 当前未暴露独立 Web Controller |
 | 模块-元数据关系 | `ModuleMetadataRelationService` | `/platform.module/{moduleAlias}/metadata-relations` |
+| 元数据视图 | `MetadataViewService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views` |
+| 元数据视图字段 | `MetadataViewFieldService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields` |
 | 模块字段配置 | `ModuleMetadataFieldService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields` |
 | 模块字段引用过滤 | `ModuleMetadataFieldFilterService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters` |
 | 模块字段引用回填 | `ModuleMetadataFieldAffectService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects` |
@@ -166,6 +167,20 @@
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/update/{id}` | 更新模块元数据关系 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/delete/{id}` | 删除模块元数据关系 |
 | 元数据关系 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/sort/{id}` | 在模块内调整关系顺序 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/query` | 查询关系下的元数据视图 |
+| 元数据视图 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/view/{id}` | 查看元数据视图 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/insert` | 新增元数据视图；后端以 URL 中的 `relationId` 为准 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/update/{id}` | 更新元数据视图，并保持视图不跨关系；关系本身不跨模块 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/delete/{id}` | 删除元数据视图 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/enable/{id}`、`/disable/{id}` | 启用或停用元数据视图 |
+| 元数据视图 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/sort/{id}` | 在关系内调整视图顺序 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/query` | 查询视图字段 |
+| 元数据视图字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/view/{id}` | 查看视图字段 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/insert` | 新增视图字段；后端以 URL 中的 `viewId` 为准 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/update/{id}` | 更新视图字段，并保持视图归属不跨关系 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/delete/{id}` | 删除视图字段 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/enable/{id}`、`/disable/{id}` | 启用或停用视图字段 |
+| 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/sort/{id}` | 在视图内调整字段顺序 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/query` | 查询关系下的模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/ensure` | 按元数据字段同步生成模块字段配置 |
 | 模块字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/view/{id}` | 查看模块字段配置 |

@@ -9,6 +9,10 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataView;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataViewService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfigService;
@@ -28,6 +32,7 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMapping;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -347,6 +352,137 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
+    void shouldQueryMetadataViewsWithinPathRelation() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService service = mock(MetadataViewService.class);
+        PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(metadataView("view-1", "rel-1", EntityViewType.LIST)),
+                        1, PageRequest.of(1, 20)));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/views/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"conditions":[{"fieldName":"viewType","values":["LIST"]}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].relationId").value("rel-1"))
+                .andExpect(jsonPath("$.records[0].viewType").value("LIST"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class));
+        assertClause(criteria.getValue(), "relationId", "rel-1");
+        assertClause(criteria.getValue(), "viewType", "LIST");
+    }
+
+    @Test
+    void shouldForceMetadataViewRelationFromPathOnInsert() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService service = mock(MetadataViewService.class);
+        PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(service.insert(any(MetadataView.class))).thenReturn("view-1");
+        when(service.select("view-1")).thenReturn(metadataView("view-1", "rel-1", EntityViewType.FORM));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/views/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"relationId":"other-rel","viewType":"FORM","title":"Form"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.relationId").value("rel-1"));
+
+        ArgumentCaptor<MetadataView> captor = ArgumentCaptor.forClass(MetadataView.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getRelationId()).isEqualTo("rel-1");
+    }
+
+    @Test
+    void shouldRejectCrossRelationMetadataViewSort() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService service = mock(MetadataViewService.class);
+        PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(service.select("view-1")).thenReturn(metadataView("view-1", "other-rel", EntityViewType.LIST));
+        MockHttpServletRequest request = requestVars(Map.of(
+                "moduleAlias", "platform.sales.order",
+                "relationId", "rel-1"));
+
+        assertThatThrownBy(() -> controller.sort(request, "view-1", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to relation");
+    }
+
+    @Test
+    void shouldRejectMetadataViewWhenRelationBelongsToOtherModule() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService service = mock(MetadataViewService.class);
+        PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "other.module"));
+        MockHttpServletRequest request = requestVars(Map.of(
+                "moduleAlias", "platform.sales.order",
+                "relationId", "rel-1"));
+
+        assertThatThrownBy(() -> controller.query(request, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to module");
+    }
+
+    @Test
+    void shouldForceMetadataViewFieldOwnerFromPathOnInsert() throws Exception {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService viewService = mock(MetadataViewService.class);
+        MetadataViewFieldService service = mock(MetadataViewFieldService.class);
+        PlatformMetadataViewFieldWebController controller =
+                new PlatformMetadataViewFieldWebController(relationService, viewService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(viewService.select("view-1")).thenReturn(metadataView("view-1", "rel-1", EntityViewType.LIST));
+        when(service.insert(any(MetadataViewField.class))).thenReturn("view-field-1");
+        when(service.select("view-field-1")).thenReturn(metadataViewField("view-field-1", "view-1", "field-1"));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/views/view-1/fields/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"viewId":"other-view","metadataFieldId":"field-1","title":"Code"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.viewId").value("view-1"));
+
+        ArgumentCaptor<MetadataViewField> captor = ArgumentCaptor.forClass(MetadataViewField.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getViewId()).isEqualTo("view-1");
+    }
+
+    @Test
+    void shouldRejectCrossRelationMetadataViewFieldQuery() {
+        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
+        MetadataViewService viewService = mock(MetadataViewService.class);
+        MetadataViewFieldService service = mock(MetadataViewFieldService.class);
+        PlatformMetadataViewFieldWebController controller =
+                new PlatformMetadataViewFieldWebController(relationService, viewService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(viewService.select("view-1")).thenReturn(metadataView("view-1", "other-rel", EntityViewType.LIST));
+        MockHttpServletRequest request = requestVars(Map.of(
+                "moduleAlias", "platform.sales.order",
+                "relationId", "rel-1",
+                "viewId", "view-1"));
+
+        assertThatThrownBy(() -> controller.query(request, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not belong to relation");
+    }
+
+    @Test
     void shouldExposeFieldTypeDirectory() throws Exception {
         PlatformFieldTypeService service = mock(PlatformFieldTypeService.class);
         PlatformFieldTypeWebController controller = new PlatformFieldTypeWebController();
@@ -643,6 +779,24 @@ class PlatformConfigurationWebControllerTest {
         ModuleMetadataField field = new ModuleMetadataField();
         field.setId(id);
         field.setRelationId(relationId);
+        return field;
+    }
+
+    private MetadataView metadataView(String id, String relationId, EntityViewType viewType) {
+        MetadataView view = new MetadataView();
+        view.setId(id);
+        view.setRelationId(relationId);
+        view.setViewType(viewType);
+        view.setTitle(viewType.name());
+        return view;
+    }
+
+    private MetadataViewField metadataViewField(String id, String viewId, String metadataFieldId) {
+        MetadataViewField field = new MetadataViewField();
+        field.setId(id);
+        field.setViewId(viewId);
+        field.setMetadataFieldId(metadataFieldId);
+        field.setTitle(metadataFieldId);
         return field;
     }
 
