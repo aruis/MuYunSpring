@@ -59,7 +59,37 @@
 
 回写没有单独的用户动作入口。它由动态记录写事件同步执行，失败时按规则阻断来源事务，并通过诊断台账和字段影响记录支撑排查。
 
+## 生单规则配置
+
+基础路径：
+
+- `/platform.module/{moduleAlias}/generation-rules`
+
+接口：
+
+- `POST /query`：按来源模块查询生单规则。
+- `GET /viewTree/{id}`：查看生单规则树，包含对象映射、字段映射和拆分策略。
+- `POST /saveTree`：保存生单规则树。路径模块会作为规则 `sourceModuleAlias`，不能借当前路径修改其他来源模块的规则。
+- `POST /enable/{id}`、`POST /disable/{id}`：启停生单规则。规则启用后可贡献记录级托管动作。
+- `POST /sort/{id}`：在同一来源模块内调整规则顺序。
+- `POST /delete/{id}`：删除生单规则，并回收对应托管动作。
+
+## 回写规则配置
+
+基础路径：
+
+- `/platform.module/{moduleAlias}/write-back-rules`
+
+接口：
+
+- `POST /query`：按触发模块查询回写规则。
+- `GET /viewTree/{id}`：查看回写规则树，包含目标定位、匹配规则和字段写入规则。
+- `POST /saveTree`：保存回写规则树。路径模块会作为规则 `triggerModuleAlias`，不能借当前路径修改其他触发模块的规则。
+- `POST /enable/{id}`、`POST /disable/{id}`：启停回写规则。
+- `POST /sort/{id}`：在同一触发模块内调整规则顺序。
+- `POST /delete/{id}`：删除回写规则。
+
 ## 明确不归属本专题
 
 - `POST /references/{fieldName}/resolve`：引用候选解析属于动态页面/引用基础能力，不作为记录联动专属接口。
-- 页面查询、附件、模块任务和配置治理 URL 不在业务自动化记录联动专题内列出。
+- 页面查询、附件、模块任务和通用配置治理 URL 不在业务自动化记录联动专题内列出。

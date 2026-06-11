@@ -174,6 +174,30 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @Test
+    void shouldScanRecordLinkageRuleConfigurationModules() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(RecordGenerationRuleWebController.class);
+            context.registerBean(RecordWriteBackRuleWebController.class);
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
+
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "platform.record_generation_rule", "platform.record_write_back_rule");
+            assertThat(byAlias.get("platform.record_generation_rule").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("query", "delete", "enable", "disable",
+                            "sort", "viewTree", "saveTree");
+            assertThat(byAlias.get("platform.record_write_back_rule").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("query", "delete", "enable", "disable",
+                            "sort", "viewTree", "saveTree");
+        }
+    }
+
+    @Test
     void shouldAssembleWorkflowActionsFromStaticModuleCapabilities() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(WorkflowEnabledWeb.class);
