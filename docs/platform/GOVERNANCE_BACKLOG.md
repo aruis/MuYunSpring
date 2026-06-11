@@ -29,7 +29,7 @@
 | P1 | 业务自动化 | 通用用户偏好 | 已确认通过页面偏好接口承载当前用户页面与导出个人化配置。 | 已完成 |
 | P1 | 治理 | 配置发布、包、导入导出 Web 暴露面 | 已补齐配置包健康检查、发布、回滚、导出、导入预检和导入草稿发布入口。 | 已完成 |
 | P1 | 配置与元数据 | 菜单方案、菜单维护 Web 暴露面 | 已补齐菜单方案和方案内菜单树维护入口。 | 已完成 |
-| P1 | 配置与元数据 | 字段 UI 类型属性和字段映射配置入口 | 字段 UI 类型目录已暴露，属性和映射配置服务已有但缺 Web 入口。 | 待治理 |
+| P1 | 配置与元数据 | 字段 UI 类型属性和字段映射配置入口 | 已补齐字段 UI 类型下的属性和字段映射维护入口。 | 已完成 |
 | P1 | 记录联动 | 生单、回写配置 Web 暴露面 | 运行态已覆盖，配置态规则维护入口仍需补齐。 | 待治理 |
 | P1 | 工作流任务 | 工作流定义与发布配置 Web 暴露面 | 运行态已覆盖，定义、版本和发布配置入口仍需补齐。 | 待治理 |
 | P2 | 业务自动化 | 序列状态行级调整 | 已补齐序列状态行级基线调整入口，并复用编码运维服务。 | 已完成 |
@@ -50,6 +50,7 @@
 | 配置与元数据 | 字段行为配置 Web 暴露面 | 已补齐字段引用、字段保护、模块字段引用过滤、引用回填和公式规则配置入口。 | `configuration/WEB_API.md` |
 | 配置与元数据 | 嵌套资源标准 Web 支撑 | 已抽出嵌套 CRUD、排序、启停支撑，避免配置接口退化成各自手写业务代码。 | `configuration/OVERVIEW.md` |
 | 配置与元数据 | 菜单方案、菜单维护 Web 暴露面 | 已补齐 `/platform.menu_scheme` 和 `/platform.menu-scheme/{schemeId}/menus`，菜单消费入口继续保持 `/platform.menu/mine` 和 `/platform.menu/{menuId}/entry`。 | `configuration/WEB_API.md`、`page/delivery/WEB_API.md` |
+| 配置与元数据 | 字段 UI 类型属性和字段映射配置入口 | 已补齐 `/platform.field_ui_type/{fieldUiTypeAlias}/attributes` 和 `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings`，页面 bootstrap 继续消费 resolved 字段 UI 类型配置。 | `configuration/WEB_API.md`、`page/delivery/WEB_API.md` |
 | 运行态与权限 | 静态模块注解优先解析 | 已修正动作端点上下文解析，保证平台配置接口优先使用自身静态模块语义。 | `runtime/OVERVIEW.md`、`identity-permission/OVERVIEW.md` |
 | 身份权限 | 当前用户上下文接口 | 已补齐 `GET /iam.auth/context`，用于前端和接手方识别当前用户身份。 | `identity-permission/WEB_API.md` |
 | 身份权限 | 权限配置与授权工作台 | 已补齐角色批量授权/撤销、角色菜单矩阵和用户选择器入口；菜单授权继续复用模块 `menu` 动作。 | `identity-permission/WEB_API.md` |
@@ -106,9 +107,9 @@
 #### 字段 UI 类型属性和字段映射配置入口
 
 - 优先级：P1
-- 状态：待治理
+- 状态：已完成
 - 当前判断：字段类型和字段 UI 类型目录已开放；`PlatformFieldUiTypeAttributeService`、`PlatformFieldUiTypeFieldMappingService` 已存在但缺少 Web 暴露面。
-- 治理方向：按字段 UI 类型聚合属性和字段映射配置入口，支撑页面 bootstrap 和字段渲染配置交接。
+- 治理结果：按字段 UI 类型 alias 聚合属性和字段映射配置入口，新增和更新时以后端 URL 中的 `fieldUiTypeAlias` 为准，支撑页面 bootstrap 和字段渲染配置交接。
 - 回流目标：`configuration/WEB_API.md`、`page/delivery/WEB_API.md`
 
 #### 元数据视图、视图字段配置入口

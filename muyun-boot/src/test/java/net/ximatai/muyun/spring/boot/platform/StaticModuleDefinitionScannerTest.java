@@ -254,6 +254,28 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @Test
+    void shouldScanFieldUiTypeNestedConfigurationActions() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(PlatformFieldUiTypeAttributeWebController.class);
+            context.registerBean(PlatformFieldUiTypeFieldMappingWebController.class);
+            context.refresh();
+
+            Map<String, StaticModuleDefinition> byAlias = new StaticModuleDefinitionScanner(context).scan().stream()
+                    .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
+
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "platform.field_ui_type_attribute",
+                    "platform.field_ui_type_field_mapping");
+            assertThat(byAlias.get("platform.field_ui_type_attribute").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("query", "view", "create", "update", "delete", "sort");
+            assertThat(byAlias.get("platform.field_ui_type_field_mapping").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("query", "view", "create", "update", "delete", "sort");
+        }
+    }
+
+    @Test
     void shouldRejectStaticModuleScopeWhenSeparatorsAreMissing() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(MissingSeparatorAliasWeb.class);
