@@ -113,7 +113,11 @@ public class LowCodeModulePackageExchangeService {
             if (resolver == null) {
                 conflicts.add(dependencyConflict(modulePackage, dependency,
                         LowCodePackageConflictType.DEPENDENCY_RESOLVER_MISSING,
-                        "No dependency resolver is available for " + dependency.type()));
+                        dependency.type().platformResolvedByDefault()
+                                ? dependency.required()
+                                : false,
+                        "No dependency resolver is available for "
+                                + requiredLabel(dependency) + " " + dependency.type() + " dependency"));
                 continue;
             }
             if (!resolver.exists(dependency)) {
@@ -121,6 +125,7 @@ public class LowCodeModulePackageExchangeService {
                         dependency.required()
                                 ? LowCodePackageConflictType.REQUIRED_DEPENDENCY_MISSING
                                 : LowCodePackageConflictType.OPTIONAL_DEPENDENCY_MISSING,
+                        dependency.required(),
                         "Package dependency is missing: " + dependency.type()));
             }
         }
@@ -137,13 +142,18 @@ public class LowCodeModulePackageExchangeService {
     private LowCodePackageImportConflict dependencyConflict(LowCodeModulePackage modulePackage,
                                                            LowCodePackageDependency dependency,
                                                            LowCodePackageConflictType conflictType,
+                                                           boolean blocking,
                                                            String message) {
         return new LowCodePackageImportConflict(
                 conflictType,
-                dependency.required() ? LowCodePackageConflictSeverity.ERROR : LowCodePackageConflictSeverity.WARN,
+                blocking ? LowCodePackageConflictSeverity.ERROR : LowCodePackageConflictSeverity.WARN,
                 modulePackage.moduleAlias(),
                 dependency.moduleAlias() == null ? dependency.alias() : dependency.moduleAlias(),
                 message
         );
+    }
+
+    private String requiredLabel(LowCodePackageDependency dependency) {
+        return dependency.required() ? "required" : "optional";
     }
 }

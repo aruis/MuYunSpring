@@ -490,13 +490,15 @@ LowCodeConfigHealthReport
 4. 对导入包执行 dry-run，复用健康检查，并输出冲突列表。
 5. 通过 `LowCodePackageDependencyResolver` 聚合模块、动作、字典等依赖解析器，检查 `dependencyManifest` 中声明的依赖是否可满足。
 
+依赖解析按两类处理：`MODULE/ACTION/DICTIONARY` 是平台默认可解析依赖，缺少 resolver 或 required 依赖不存在都应阻断 dry-run；`WORKFLOW/FILE_SERVICE/EXTERNAL` 当前先作为 manifest-only 依赖，缺少 resolver 时只返回 WARN，表示迁移包携带了声明但平台尚未验证目标环境事实。后续若为 manifest-only 类型补充显式 resolver，则 required 依赖解析失败仍会阻断。
+
 dry-run 状态使用 `READY/WARN/BLOCKED`：
 
 1. 健康检查 `FAIL` 或 ERROR 级冲突会阻断导入。
 2. `PAGE_ONLY` 包要求目标模块已有当前配置版本，否则阻断。
 3. `MODULE_FULL` 包遇到目标模块已有当前版本时先返回 WARN，表示后续应导入草稿并显式发布，不直接覆盖线上。
 4. `TEMPLATE` 包直接指向已存在模块时阻断；模板参数化创建新模块进入模板复用战役。
-5. required 依赖缺失或缺少 resolver 会阻断；optional 依赖缺失降级为 WARN。
+5. 平台默认可解析的 required 依赖缺失或缺少 resolver 会阻断；optional 依赖缺失降级为 WARN；manifest-only 依赖缺少 resolver 只返回 WARN。
 
 真正“导入为草稿”的执行链路需要等草稿存放、覆盖策略和版本发布衔接明确后再补，不在首期 dry-run 中假装完成。
 

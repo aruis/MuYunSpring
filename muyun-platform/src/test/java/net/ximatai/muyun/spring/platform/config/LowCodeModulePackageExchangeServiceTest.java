@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.platform.config;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
 import java.util.Map;
@@ -115,6 +117,51 @@ class LowCodeModulePackageExchangeServiceTest {
                 .containsExactly(LowCodePackageConflictType.DEPENDENCY_RESOLVER_MISSING);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = LowCodePackageDependencyType.class, names = {"MODULE", "ACTION", "DICTIONARY"})
+    void shouldBlockPlatformResolvedDependencyWhenNoResolverIsAvailable(LowCodePackageDependencyType type) {
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract", List.of(dependency(type)));
+
+        LowCodePackageDryRunResult result = exchangeService.dryRunImport(modulePackage);
+
+        assertThat(result.status()).isEqualTo(LowCodePackageDryRunStatus.BLOCKED);
+        assertThat(result.conflicts()).extracting(LowCodePackageImportConflict::conflictType)
+                .containsExactly(LowCodePackageConflictType.DEPENDENCY_RESOLVER_MISSING);
+        assertThat(result.conflicts().getFirst().severity()).isEqualTo(LowCodePackageConflictSeverity.ERROR);
+        assertThat(result.conflicts().getFirst().message()).contains("required");
+    }
+
+    @Test
+    void shouldWarnWhenManifestOnlyDependencyHasNoResolver() {
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract",
+                List.of(new LowCodePackageDependency(LowCodePackageDependencyType.WORKFLOW,
+                        null, null, "contract_approval", true)));
+
+        LowCodePackageDryRunResult result = exchangeService.dryRunImport(modulePackage);
+
+        assertThat(result.status()).isEqualTo(LowCodePackageDryRunStatus.WARN);
+        assertThat(result.blocked()).isFalse();
+        assertThat(result.conflicts()).extracting(LowCodePackageImportConflict::conflictType)
+                .containsExactly(LowCodePackageConflictType.DEPENDENCY_RESOLVER_MISSING);
+        assertThat(result.conflicts().getFirst().severity()).isEqualTo(LowCodePackageConflictSeverity.WARN);
+        assertThat(result.conflicts().getFirst().message()).contains("required WORKFLOW dependency");
+    }
+
+    @Test
+    void shouldBlockRequiredManifestDependencyWhenExplicitResolverReportsMissing() {
+        LowCodeModulePackageExchangeService service = new LowCodeModulePackageExchangeService(
+                versionService, healthService, List.of(missingResolver(LowCodePackageDependencyType.WORKFLOW)));
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract",
+                List.of(new LowCodePackageDependency(LowCodePackageDependencyType.WORKFLOW,
+                        null, null, "contract_approval", true)));
+
+        LowCodePackageDryRunResult result = service.dryRunImport(modulePackage);
+
+        assertThat(result.status()).isEqualTo(LowCodePackageDryRunStatus.BLOCKED);
+        assertThat(result.conflicts()).extracting(LowCodePackageImportConflict::conflictType)
+                .containsExactly(LowCodePackageConflictType.REQUIRED_DEPENDENCY_MISSING);
+    }
+
     @Test
     void shouldBlockTemplatePackageWhenTargetModuleAlreadyExists() {
         publishFacade.publish(fullPackage("crm.contract"), "tester", null);
@@ -163,6 +210,17 @@ class LowCodeModulePackageExchangeServiceTest {
             public boolean exists(LowCodePackageDependency dependency) {
                 return false;
             }
+        };
+    }
+
+    private LowCodePackageDependency dependency(LowCodePackageDependencyType type) {
+        return switch (type) {
+            case MODULE -> LowCodePackageDependency.module("crm.customer");
+            case ACTION -> LowCodePackageDependency.action("crm.contract", "submit");
+            case DICTIONARY -> LowCodePackageDependency.dictionary("crm", "contract_status");
+            case WORKFLOW -> new LowCodePackageDependency(type, null, null, "contract_approval", true);
+            case FILE_SERVICE -> new LowCodePackageDependency(type, null, null, "record_attachment", true);
+            case EXTERNAL -> new LowCodePackageDependency(type, null, null, "erp_credit_check", true);
         };
     }
 }

@@ -6,5 +6,12 @@ public enum LowCodePackageDependencyType {
     ACTION,
     WORKFLOW,
     FILE_SERVICE,
-    EXTERNAL
+    EXTERNAL;
+
+    public boolean platformResolvedByDefault() {
+        return switch (this) {
+            case MODULE, DICTIONARY, ACTION -> true;
+            case WORKFLOW, FILE_SERVICE, EXTERNAL -> false;
+        };
+    }
 }
