@@ -5,10 +5,13 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackageWithPageBundle;
 
 class LowCodeModuleHealthServiceTest {
     @Test
@@ -138,13 +141,94 @@ class LowCodeModuleHealthServiceTest {
     }
 
     @Test
+    void bundleIdentityCheckerShouldReportTopLevelModuleMismatch() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(
+                        LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                                Map.of("module", "crm.contract")),
+                        LowCodeConfigBundle.included(LowCodePackageBundleType.PAGE,
+                                Map.of("moduleAlias", "crm.customer", "uiConfigs", List.of("list")))
+                ),
+                null,
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeModulePackageHealthChecker(), new LowCodeModuleBundleIdentityHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::scope, LowCodeConfigHealthItem::code,
+                        LowCodeConfigHealthItem::targetId)
+                .containsExactly(tuple(LowCodeConfigHealthScope.PAGE, "BUNDLE_MODULE_IDENTITY_MISMATCH", "PAGE"));
+    }
+
+    @Test
+    void dependencyCheckerShouldFailDefaultResolvedDependencyWithoutResolver() {
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract",
+                List.of(LowCodePackageDependency.action("crm.contract", "submit")));
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeModulePackageHealthChecker(), new LowCodeModuleDependencyHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::scope, LowCodeConfigHealthItem::code,
+                        LowCodeConfigHealthItem::targetType, LowCodeConfigHealthItem::targetId)
+                .containsExactly(tuple(LowCodeConfigHealthScope.DEPENDENCY, "DEPENDENCY_RESOLVER_MISSING",
+                        "ACTION", "crm.contract:submit"));
+    }
+
+    @Test
+    void dependencyCheckerShouldWarnManifestOnlyDependencyWithoutResolver() {
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract",
+                List.of(new LowCodePackageDependency(LowCodePackageDependencyType.WORKFLOW,
+                        null, null, "contract_approval", true)));
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeModulePackageHealthChecker(), new LowCodeModuleDependencyHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.WARN);
+        assertThat(report.items().getFirst())
+                .extracting(LowCodeConfigHealthItem::scope, LowCodeConfigHealthItem::code,
+                        LowCodeConfigHealthItem::severity, LowCodeConfigHealthItem::targetType)
+                .containsExactly(LowCodeConfigHealthScope.DEPENDENCY, "DEPENDENCY_RESOLVER_MISSING",
+                        LowCodeConfigHealthSeverity.WARN, "WORKFLOW");
+    }
+
+    @Test
+    void dependencyCheckerShouldUseExplicitResolverResult() {
+        LowCodeModulePackage modulePackage = fullPackage("crm.contract",
+                List.of(LowCodePackageDependency.dictionary("crm", "contract_status")));
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeModuleDependencyHealthChecker(List.of(new LowCodeConfigTestFixtures.RecordingDependencyResolver(
+                        Set.of(LowCodePackageDependencyType.DICTIONARY), Set.of()
+                )))));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items().getFirst().code()).isEqualTo("REQUIRED_DEPENDENCY_MISSING");
+        assertThat(report.items().getFirst().targetId()).isEqualTo("crm:contract_status");
+    }
+
+    @Test
     void shouldWireHealthServiceWithPackageCheckerInSpringContext() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            context.register(LowCodeModuleHealthService.class, LowCodeModulePackageHealthChecker.class);
+            context.register(LowCodeModuleHealthService.class,
+                    LowCodeModulePackageHealthChecker.class,
+                    LowCodeModuleBundleIdentityHealthChecker.class,
+                    LowCodeModuleDependencyHealthChecker.class);
             context.refresh();
             LowCodeModuleHealthService service = context.getBean(LowCodeModuleHealthService.class);
 
-            LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(fullPackage("crm.contract")));
+            LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(
+                    fullPackageWithPageBundle("crm.contract")));
 
             assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
         }

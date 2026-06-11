@@ -464,6 +464,8 @@ LowCodeConfigHealthReport
 
 首期实现 `LowCodeModuleHealthChecker` 扩展点和 `LowCodeModuleHealthService` 聚合门面，并接入模块包结构检查器。后续每补一个治理对象，只增加对应 checker，不把健康检查退化成单体 if/else：元数据 checker、页面 checker、查询 checker、入口 checker、动作 checker、关联视图 checker、任务 checker、自动化 checker 和依赖 checker 可按战役逐步接入。
 
+夯实阶段已补两个低成本门禁：`LowCodeModuleBundleIdentityHealthChecker` 检查各 bundle 顶层 `module/moduleAlias` 是否与包身份一致；`LowCodeModuleDependencyHealthChecker` 将依赖 resolver 结果进入统一 health report。当前仍只检查包级身份和依赖事实，不展开 UI、工作流或自动化配置的深层语义解析。
+
 ### M10 版本发布与回滚
 
 版本治理首期只承诺模块级配置快照，不做 Git 式分支、字段级回滚或完整发布审批流。

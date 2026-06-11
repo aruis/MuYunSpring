@@ -18,7 +18,7 @@ public class LowCodeModulePackageExchangeService {
 
     private final LowCodeModuleConfigVersionService versionService;
     private final LowCodeModuleHealthService healthService;
-    private final List<LowCodePackageDependencyResolver> dependencyResolvers;
+    private final LowCodePackageDependencyDiagnostics dependencyDiagnostics;
 
     public LowCodeModulePackageExchangeService(LowCodeModuleConfigVersionService versionService,
                                                LowCodeModuleHealthService healthService) {
@@ -31,7 +31,7 @@ public class LowCodeModulePackageExchangeService {
                                                List<LowCodePackageDependencyResolver> dependencyResolvers) {
         this.versionService = versionService;
         this.healthService = healthService;
-        this.dependencyResolvers = dependencyResolvers == null ? List.of() : List.copyOf(dependencyResolvers);
+        this.dependencyDiagnostics = new LowCodePackageDependencyDiagnostics(dependencyResolvers);
     }
 
     public String exportCurrentPackage(String moduleAlias) {
@@ -108,52 +108,20 @@ public class LowCodeModulePackageExchangeService {
 
     private List<LowCodePackageImportConflict> dependencyConflicts(LowCodeModulePackage modulePackage) {
         List<LowCodePackageImportConflict> conflicts = new ArrayList<>();
-        for (LowCodePackageDependency dependency : modulePackage.dependencyManifest().dependencies()) {
-            LowCodePackageDependencyResolver resolver = resolver(dependency.type());
-            if (resolver == null) {
-                conflicts.add(dependencyConflict(modulePackage, dependency,
-                        LowCodePackageConflictType.DEPENDENCY_RESOLVER_MISSING,
-                        dependency.type().platformResolvedByDefault()
-                                ? dependency.required()
-                                : false,
-                        "No dependency resolver is available for "
-                                + requiredLabel(dependency) + " " + dependency.type() + " dependency"));
-                continue;
-            }
-            if (!resolver.exists(dependency)) {
-                conflicts.add(dependencyConflict(modulePackage, dependency,
-                        dependency.required()
-                                ? LowCodePackageConflictType.REQUIRED_DEPENDENCY_MISSING
-                                : LowCodePackageConflictType.OPTIONAL_DEPENDENCY_MISSING,
-                        dependency.required(),
-                        "Package dependency is missing: " + dependency.type()));
-            }
+        for (LowCodePackageDependencyDiagnostic diagnostic : dependencyDiagnostics.diagnose(modulePackage)) {
+            conflicts.add(dependencyConflict(modulePackage, diagnostic));
         }
         return conflicts;
     }
 
-    private LowCodePackageDependencyResolver resolver(LowCodePackageDependencyType type) {
-        return dependencyResolvers.stream()
-                .filter(resolver -> resolver.supports(type))
-                .findFirst()
-                .orElse(null);
-    }
-
     private LowCodePackageImportConflict dependencyConflict(LowCodeModulePackage modulePackage,
-                                                           LowCodePackageDependency dependency,
-                                                           LowCodePackageConflictType conflictType,
-                                                           boolean blocking,
-                                                           String message) {
+                                                           LowCodePackageDependencyDiagnostic diagnostic) {
         return new LowCodePackageImportConflict(
-                conflictType,
-                blocking ? LowCodePackageConflictSeverity.ERROR : LowCodePackageConflictSeverity.WARN,
+                diagnostic.conflictType(),
+                diagnostic.blocking() ? LowCodePackageConflictSeverity.ERROR : LowCodePackageConflictSeverity.WARN,
                 modulePackage.moduleAlias(),
-                dependency.moduleAlias() == null ? dependency.alias() : dependency.moduleAlias(),
-                message
+                diagnostic.targetId(),
+                diagnostic.message()
         );
-    }
-
-    private String requiredLabel(LowCodePackageDependency dependency) {
-        return dependency.required() ? "required" : "optional";
     }
 }
