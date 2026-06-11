@@ -284,8 +284,10 @@ public class DynamicRecordWebController implements
         Criteria treeCriteria = request == null || request.criteria() == null
                 ? Criteria.of()
                 : DynamicWebQueryMapper.queryCriteria(request.criteria(), service()::queryCriteria);
+        Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(DynamicWebRequest.moduleAlias(),
+                request, pageConfigSnapshotService, moduleMetadataFieldService, service()::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(DynamicWebRequest.moduleAlias(), request);
-        return andCriteria(templateCriteria, manualCriteria, treeCriteria, quickCriteria);
+        return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
     }
 
     private Criteria andCriteria(Criteria... criteriaList) {

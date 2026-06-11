@@ -1202,6 +1202,146 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldApplyQueryFormWithinPublishedListUiConfig() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField codeField = uiField("ui-list", "module-field-code");
+        PlatformUiConfigField amountField = uiField("ui-list", "module-field-amount");
+        PlatformUiConfigField hiddenField = uiField("ui-list", "module-field-hidden");
+        hiddenField.setVisible(false);
+        PlatformUiConfigField lineField = uiField("ui-list", "module-field-line-code");
+        PlatformPageConfigSnapshot normalSnapshot = new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(codeField, amountField),
+                List.of(),
+                List.of()
+        );
+        PlatformPageConfigSnapshot restrictedSnapshot = new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(codeField, amountField, hiddenField, lineField),
+                List.of(),
+                List.of()
+        );
+        when(snapshotService.snapshot(MODULE)).thenReturn(
+                normalSnapshot,
+                normalSnapshot,
+                normalSnapshot,
+                restrictedSnapshot,
+                restrictedSnapshot
+        );
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
+                "module-field-amount", "amount", RelationRole.MAIN, "decimal"));
+        when(moduleFieldService.resolve("module-field-line-code")).thenReturn(resolvedModuleField(
+                "module-field-line-code", "lineCode", RelationRole.CHILD));
+        when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().like("code", "C-001"));
+        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
+        record.setId("contract-1");
+        when(mainEntity.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "code": "C-001",
+                                    "amount": 1200
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
+        verify(mainEntity).queryCriteria(conditions.capture());
+        assertThat(conditions.getValue()).extracting(DynamicQueryCondition::fieldName)
+                .containsExactly("code", "amount");
+        assertThat(conditions.getValue().getFirst().operator()).isNull();
+        assertThat(conditions.getValue().getFirst().values()).isEqualTo(List.of("C-001"));
+
+        org.mockito.Mockito.clearInvocations(mainEntity);
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "code": "",
+                                    "amount": []
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"));
+        verify(mainEntity, org.mockito.Mockito.never()).queryCriteria(any());
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "missing": "x"
+                                  }
+                                }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Query form field is not available in UI config: missing"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "lineCode": "L-001"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Query form field is not available in UI config: lineCode"));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "hidden": "x"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Query form field is not available in UI config: hidden"));
+    }
+
+    @Test
     void shouldSummarizePublishedListConfigWithSameQueryContext() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         PlatformQueryItemService queryItemService = mock(PlatformQueryItemService.class);

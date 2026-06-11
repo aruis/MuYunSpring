@@ -48,13 +48,17 @@ public final class DynamicQueryCriteriaBuilder {
         List<?> values = condition.values();
         switch (operator) {
             case EQ -> criteria.eq(field.fieldName(), singleValue(field, condition, values));
+            case NOT_EQUAL -> criteria.ne(field.fieldName(), singleValue(field, condition, values));
             case LIKE -> criteria.like(field.fieldName(), String.valueOf(singleValue(field, condition, values)));
             case IN -> criteria.in(field.fieldName(), listValues(field, condition, values));
+            case NOT_IN -> criteria.notIn(field.fieldName(), listValues(field, condition, values));
             case BETWEEN -> criteria.between(field.fieldName(), rangeValue(field, condition, values, 0), rangeValue(field, condition, values, 1));
             case GT -> criteria.gt(field.fieldName(), singleValue(field, condition, values));
             case GTE -> criteria.gte(field.fieldName(), singleValue(field, condition, values));
             case LT -> criteria.lt(field.fieldName(), singleValue(field, condition, values));
             case LTE -> criteria.lte(field.fieldName(), singleValue(field, condition, values));
+            case NULL -> criteria.isNull(field.fieldName());
+            case NOT_NULL -> criteria.isNotNull(field.fieldName());
         }
     }
 

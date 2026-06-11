@@ -8,6 +8,7 @@ import java.util.Map;
 public record WebQueryRequest(WebPageRequest page,
                               List<WebQueryCondition> conditions,
                               WebQueryCriteria criteria,
+                              Map<String, Object> queryForm,
                               List<WebSort> sorts,
                               String uiConfigId,
                               String queryTemplateId,
@@ -18,6 +19,9 @@ public record WebQueryRequest(WebPageRequest page,
                               String navigationQueryKey) {
     public WebQueryRequest {
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
+        queryForm = queryForm == null
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(queryForm));
         sorts = sorts == null ? List.of() : List.copyOf(sorts);
         externalQueryValues = externalQueryValues == null
                 ? Map.of()
@@ -28,7 +32,7 @@ public record WebQueryRequest(WebPageRequest page,
     public WebQueryRequest(WebPageRequest page,
                            List<WebQueryCondition> conditions,
                            List<WebSort> sorts) {
-        this(page, conditions, null, sorts, null, null, Map.of(), null, null, List.of(), null);
+        this(page, conditions, null, Map.of(), sorts, null, null, Map.of(), null, null, List.of(), null);
     }
 
     public WebPageRequest pageOrDefault() {

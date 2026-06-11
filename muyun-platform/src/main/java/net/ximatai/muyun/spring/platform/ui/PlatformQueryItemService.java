@@ -242,7 +242,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         }
         ResolvedModuleMetadataField moduleField = moduleFieldService.resolve(item.getModuleMetadataFieldId());
         Object value = resolveQueryValue(item, externalValues);
-        if (isEmptyValue(value)) {
+        if (isEmptyValue(value) && !isNullOperator(item.getOperator())) {
             visiting.remove(item.getId());
             return criteria;
         }
@@ -287,8 +287,10 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     private void appendLeaf(Criteria criteria, String fieldName, DynamicQueryOperator operator, Object value) {
         switch (operator) {
             case EQ -> criteria.eq(fieldName, singleValue(operator, value));
+            case NOT_EQUAL -> criteria.ne(fieldName, singleValue(operator, value));
             case LIKE -> criteria.like(fieldName, String.valueOf(singleValue(operator, value)));
             case IN -> criteria.in(fieldName, listValues(operator, value));
+            case NOT_IN -> criteria.notIn(fieldName, listValues(operator, value));
             case BETWEEN -> {
                 List<?> values = listValues(operator, value);
                 if (values.size() != 2) {
@@ -300,6 +302,8 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             case GTE -> criteria.gte(fieldName, singleValue(operator, value));
             case LT -> criteria.lt(fieldName, singleValue(operator, value));
             case LTE -> criteria.lte(fieldName, singleValue(operator, value));
+            case NULL -> criteria.isNull(fieldName);
+            case NOT_NULL -> criteria.isNotNull(fieldName);
         }
     }
 
@@ -334,7 +338,9 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             }
             return values;
         }
-        if (value instanceof String text && (operator == DynamicQueryOperator.IN || operator == DynamicQueryOperator.BETWEEN)) {
+        if (value instanceof String text && (operator == DynamicQueryOperator.IN
+                || operator == DynamicQueryOperator.NOT_IN
+                || operator == DynamicQueryOperator.BETWEEN)) {
             return List.of(text.split(",")).stream()
                     .map(String::trim)
                     .filter(v -> !v.isBlank())
@@ -366,6 +372,10 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             return collection.isEmpty();
         }
         return false;
+    }
+
+    private boolean isNullOperator(DynamicQueryOperator operator) {
+        return operator == DynamicQueryOperator.NULL || operator == DynamicQueryOperator.NOT_NULL;
     }
 
     private void requireDraftQueryTemplate(String queryTemplateId) {

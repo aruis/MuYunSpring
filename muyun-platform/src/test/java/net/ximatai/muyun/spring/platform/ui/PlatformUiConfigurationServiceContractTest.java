@@ -506,7 +506,8 @@ class PlatformUiConfigurationServiceContractTest {
 
     @Test
     void shouldCompileGroupedQueryOperatorsAndSkipDisabledItems() {
-        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE, DynamicQueryOperator.IN);
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE, DynamicQueryOperator.IN,
+                DynamicQueryOperator.NOT_IN, DynamicQueryOperator.NULL);
         seedFieldType("integer", FieldType.INTEGER, DynamicQueryOperator.EQ, DynamicQueryOperator.BETWEEN);
         seedUiType("text", "string");
         seedUiType("number", "integer");
@@ -517,6 +518,11 @@ class PlatformUiConfigurationServiceContractTest {
         PlatformQueryItem nameItem = queryLeaf(templateId, groupId, nameField, DynamicQueryOperator.IN);
         nameItem.setDefaultValue("alice,bob");
         queryItemService.insert(nameItem);
+        PlatformQueryItem excludedNameItem = queryLeaf(templateId, groupId, nameField, DynamicQueryOperator.NOT_IN);
+        excludedNameItem.setDefaultValue("mallory,eve");
+        queryItemService.insert(excludedNameItem);
+        PlatformQueryItem emptyNameItem = queryLeaf(templateId, groupId, nameField, DynamicQueryOperator.NULL);
+        queryItemService.insert(emptyNameItem);
         PlatformQueryItem levelItem = queryLeaf(templateId, groupId, levelField, DynamicQueryOperator.BETWEEN);
         levelItem.setDefaultValue("1,10");
         queryItemService.insert(levelItem);
@@ -527,7 +533,8 @@ class PlatformUiConfigurationServiceContractTest {
 
         List<CriteriaClause> clauses = clauses(criteria);
         assertThat(clauses).extracting(CriteriaClause::getOperator)
-                .containsExactlyInAnyOrder(CriteriaOperator.IN, CriteriaOperator.BETWEEN);
+                .containsExactlyInAnyOrder(CriteriaOperator.IN, CriteriaOperator.NOT_IN,
+                        CriteriaOperator.IS_NULL, CriteriaOperator.BETWEEN);
     }
 
     @Test

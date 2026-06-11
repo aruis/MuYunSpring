@@ -418,7 +418,7 @@ class DynamicOpenApiGeneratorTest {
                 });
         assertThat(document.schemas().get("WebQueryRequest").properties())
                 .containsKeys("uiConfigId", "queryTemplateId", "externalQueryValues", "navigationSession",
-                        "quickSearch", "quickSearchFields", "navigationQueryKey");
+                        "queryForm", "quickSearch", "quickSearchFields", "navigationQueryKey");
         assertThat(document.schemas().get("DynamicRecordSaveRequest").properties())
                 .containsKeys("uiConfigId", "record")
                 .doesNotContainKey("attachments");

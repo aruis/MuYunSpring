@@ -80,6 +80,24 @@ class DynamicQueryCriteriaBuilderTest {
     }
 
     @Test
+    void shouldBuildNegativeAndNullCriteriaOperators() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(entity());
+
+        Criteria criteria = builder.build(List.of(
+                DynamicQueryCondition.of("title", DynamicQueryOperator.NOT_EQUAL, "Acme"),
+                DynamicQueryCondition.of("status", DynamicQueryOperator.NOT_IN, "inactive", "frozen"),
+                new DynamicQueryCondition("title", DynamicQueryOperator.NULL, List.of()),
+                new DynamicQueryCondition("amount", DynamicQueryOperator.NOT_NULL, List.of())
+        ));
+
+        assertThat(criteria.getClauses()).extracting(clause -> clause.getOperator())
+                .containsExactly(CriteriaOperator.NE, CriteriaOperator.NOT_IN,
+                        CriteriaOperator.IS_NULL, CriteriaOperator.IS_NOT_NULL);
+        assertThat(criteria.getClauses().get(2).getValues()).isEmpty();
+        assertThat(criteria.getClauses().get(3).getValues()).isEmpty();
+    }
+
+    @Test
     void shouldRejectInvalidDateAndTimestampQueryValues() {
         DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(timeEntity());
 
@@ -99,7 +117,8 @@ class DynamicQueryCriteriaBuilderTest {
                 FieldDefinition.titleField().queryable(),
                 FieldDefinition.decimal("amount", "Amount").queryable(),
                 FieldDefinition.string("status", "Status")
-                        .queryable(DynamicQueryOperator.EQ, Set.of(DynamicQueryOperator.EQ, DynamicQueryOperator.IN)),
+                        .queryable(DynamicQueryOperator.EQ, Set.of(DynamicQueryOperator.EQ,
+                                DynamicQueryOperator.IN, DynamicQueryOperator.NOT_IN)),
                 FieldDefinition.text("remark", "Remark")
         ));
     }

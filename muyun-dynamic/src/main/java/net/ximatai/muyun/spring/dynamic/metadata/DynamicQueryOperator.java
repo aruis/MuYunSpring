@@ -8,20 +8,25 @@ import java.util.Set;
 
 public enum DynamicQueryOperator {
     EQ,
+    NOT_EQUAL,
     LIKE,
     IN,
+    NOT_IN,
     BETWEEN,
     GT,
     GTE,
     LT,
-    LTE;
+    LTE,
+    NULL,
+    NOT_NULL;
 
     public static Set<DynamicQueryOperator> defaultOperators(FieldType fieldType) {
         return switch (fieldType) {
-            case STRING, TEXT -> EnumSet.of(EQ, LIKE, IN);
-            case BOOLEAN -> EnumSet.of(EQ);
-            case INTEGER, LONG, DECIMAL, TIMESTAMP, ZONED_TIMESTAMP, DATE -> EnumSet.of(EQ, BETWEEN, GT, GTE, LT, LTE, IN);
-            case JSON -> EnumSet.of(EQ);
+            case STRING, TEXT -> EnumSet.of(EQ, NOT_EQUAL, LIKE, IN, NOT_IN, NULL, NOT_NULL);
+            case BOOLEAN -> EnumSet.of(EQ, NOT_EQUAL, NULL, NOT_NULL);
+            case INTEGER, LONG, DECIMAL, TIMESTAMP, ZONED_TIMESTAMP, DATE ->
+                    EnumSet.of(EQ, NOT_EQUAL, IN, NOT_IN, BETWEEN, GT, GTE, LT, LTE, NULL, NOT_NULL);
+            case JSON -> EnumSet.of(EQ, NOT_EQUAL, NULL, NOT_NULL);
         };
     }
 

@@ -160,7 +160,7 @@ class DynamicModuleDescriptorTest {
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().defaultOperator())
                 .isEqualTo(DynamicQueryOperator.LIKE.name());
         assertThat(descriptor.entities().getFirst().fields().getFirst().query().operators())
-                .containsExactly("EQ", "LIKE", "IN");
+                .containsExactly("EQ", "NOT_EQUAL", "LIKE", "IN", "NOT_IN", "NULL", "NOT_NULL");
         assertThat(descriptor.relations().getFirst().code()).isEqualTo("contacts");
         assertThat(descriptor.relations().getFirst().autoPopulate()).isTrue();
         assertThat(descriptor.associationViews())

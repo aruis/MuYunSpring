@@ -447,6 +447,7 @@ final class DynamicOpenApiSchemaFactory {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("conditions", arrayProperty(conditionSchema));
         properties.put("criteria", objectProperty("WebQueryCriteria"));
+        properties.put("queryForm", objectProperty("object"));
         properties.put("page", objectProperty(pageSchema));
         properties.put("sorts", arrayProperty(sortSchema));
         properties.put("uiConfigId", stringProperty(true));

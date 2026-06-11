@@ -139,8 +139,10 @@ public class DynamicExportWebController {
         Criteria treeCriteria = request == null || request.criteria() == null
                 ? Criteria.of()
                 : DynamicWebQueryMapper.queryCriteria(request.criteria(), operations::queryCriteria);
+        Criteria queryFormCriteria = DynamicWebQueryFormSupport.queryFormCriteria(moduleAlias,
+                request, pageConfigSnapshotService, moduleMetadataFieldService, operations::queryCriteria);
         Criteria quickCriteria = quickSearchCriteria(moduleAlias, request);
-        return andCriteria(templateCriteria, manualCriteria, treeCriteria, quickCriteria);
+        return andCriteria(templateCriteria, queryFormCriteria, manualCriteria, treeCriteria, quickCriteria);
     }
 
     private Criteria quickSearchCriteria(String moduleAlias, WebQueryRequest request) {

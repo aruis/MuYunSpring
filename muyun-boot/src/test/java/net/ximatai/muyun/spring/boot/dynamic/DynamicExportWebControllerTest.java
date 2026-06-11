@@ -197,6 +197,9 @@ class DynamicExportWebControllerTest {
                         .content("""
                                 {
                                   "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "code": "C-001"
+                                  },
                                   "quickSearch": "C-001",
                                   "quickSearchFields": ["code"],
                                   "criteria": {
@@ -223,6 +226,7 @@ class DynamicExportWebControllerTest {
             assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.LIKE);
             assertThat(clause.getValues()).contains("C-001");
         });
+        verify(operations, org.mockito.Mockito.atLeastOnce()).queryCriteria(any());
     }
 
     @Test
