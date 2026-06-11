@@ -30,6 +30,7 @@ final class DynamicStandardActionExecutor {
             case VIEW -> DynamicActionResultBody.of(operations.select(requireRecordId(request, actionCode)));
             case UPDATE -> countResult(service.updateFromAction(moduleAlias, entityAlias, requireRecord(request, actionCode), traceId));
             case DELETE -> countResult(service.deleteFromAction(moduleAlias, entityAlias, requireRecordId(request, actionCode), traceId));
+            case BATCH_DELETE -> countResult(service.deleteBatchFromAction(moduleAlias, entityAlias, requireIds(request, actionCode), traceId));
             case QUERY -> DynamicActionResultBody.of(operations.page(criteria(request), requirePageRequest(request, actionCode), sorts(request)));
             case SORT -> {
                 SortIntent intent = sortIntent(request, actionCode);
@@ -93,6 +94,13 @@ final class DynamicStandardActionExecutor {
             return request.record().getId();
         }
         throw new IllegalArgumentException("dynamic action requires recordId: " + actionCode);
+    }
+
+    private java.util.Collection<String> requireIds(DynamicActionExecutionRequest request, String actionCode) {
+        if (!request.ids().isEmpty()) {
+            return request.ids();
+        }
+        throw new IllegalArgumentException("dynamic action requires ids: " + actionCode);
     }
 
     private Criteria criteria(DynamicActionExecutionRequest request) {

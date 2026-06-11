@@ -441,6 +441,36 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExecuteStandardBatchDeleteActionThroughBatchPath() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                row("contract-1", "C-001", 0, false),
+                row("contract-2", "C-002", 0, false)
+        ));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+
+        DynamicActionExecutionResult result = service.entity(MODULE, "contract")
+                .executeAction("batchDelete", DynamicActionExecutionRequest.empty()
+                        .withIds(List.of("contract-1", "contract-2")));
+
+        assertThat(result.value()).isEqualTo(2);
+        assertThat(result.body().type()).isEqualTo(DynamicActionResultType.COUNT);
+        assertThat(result.context().actionCode()).isEqualTo("batchDelete");
+        assertThat(result.context().action().actionLevel()).isEqualTo(EntityActionLevel.BATCH);
+        assertThat(result.context().authorizationPermissionActionCode()).isEqualTo("delete");
+        verify(operations, org.mockito.Mockito.times(2))
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        assertThat(events.events()).extracting(RuntimeEvent::eventType)
+                .contains(RuntimeEventType.AFTER_DELETE, RuntimeEventType.ACTION_EXECUTED);
+        RuntimeEvent action = events.events().getLast();
+        assertThat(action.actionCode()).isEqualTo("batchDelete");
+        assertThat(action.payload()).containsEntry("resultType", "COUNT")
+                .containsEntry("actionLevel", "BATCH")
+                .containsEntry("result", 2);
+    }
+
+    @Test
     void shouldLinkSortMutationAndActionEventsWithSameTrace() {
         IDatabaseOperations<Object> operations = operations();
         stubSortableRows(operations);

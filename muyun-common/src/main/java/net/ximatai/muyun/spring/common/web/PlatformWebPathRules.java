@@ -20,6 +20,10 @@ public final class PlatformWebPathRules {
         return RESERVED_WEB_ACTION_CODES.contains(actionCode);
     }
 
+    public static boolean isStandardActionPathCode(String actionCode) {
+        return PlatformAction.BATCH_DELETE.matches(actionCode);
+    }
+
     public static Set<String> reservedWebActionCodes() {
         return RESERVED_WEB_ACTION_CODES;
     }

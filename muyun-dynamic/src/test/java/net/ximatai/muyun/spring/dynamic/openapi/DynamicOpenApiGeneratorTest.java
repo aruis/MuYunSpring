@@ -59,6 +59,7 @@ class DynamicOpenApiGeneratorTest {
                         "/sales.contract/export/selected",
                         "/sales.contract/actions",
                         "/sales.contract/actions/{recordId}",
+                        "/sales.contract/batchDelete/batch",
                         "/sales.contract/publish",
                         "/sales.contract/submit/{recordId}",
                         "/sales.contract/submit/duplicate/check",
@@ -188,6 +189,15 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.actionCode()).isEqualTo(PlatformAction.VIEW.code());
                 });
         assertThat(document.operations().stream()
+                .filter(operation -> operation.path().equals("/sales.contract/batchDelete/batch")))
+                .singleElement()
+                .satisfies(operation -> {
+                    assertThat(operation.requestSchema()).isEqualTo("DynamicWebActionRequest");
+                    assertThat(operation.responseSchema()).isEqualTo("DynamicWebActionExecutionResponse");
+                    assertThat(operation.actionCode()).isEqualTo(PlatformAction.BATCH_DELETE.code());
+                    assertThat(operation.permissionCode()).isEqualTo("sales.contract:delete");
+                });
+        assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/query")))
                 .singleElement()
                 .satisfies(operation -> {
@@ -220,9 +230,20 @@ class DynamicOpenApiGeneratorTest {
 
         assertThat(document.operations())
                 .extracting(DynamicOpenApiDocument.Operation::path)
-                .contains("/sales.contract/query", "/sales.contract/insert")
+                .contains("/sales.contract/query", "/sales.contract/insert", "/sales.contract/batchDelete/batch")
                 .doesNotContain("/sales.contract/create", "/sales.contract/select/{recordId}",
                         "/sales.contract/queryCriteria", "/sales.contract/count");
+    }
+
+    @Test
+    void shouldHideStandardBatchDeleteActionPathWhenBatchDeleteActionIsNotVisible() {
+        DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()),
+                action -> action != PlatformAction.BATCH_DELETE);
+
+        assertThat(document.operations())
+                .extracting(DynamicOpenApiDocument.Operation::path)
+                .contains("/sales.contract/delete/{id}")
+                .doesNotContain("/sales.contract/batchDelete/batch");
     }
 
     @Test

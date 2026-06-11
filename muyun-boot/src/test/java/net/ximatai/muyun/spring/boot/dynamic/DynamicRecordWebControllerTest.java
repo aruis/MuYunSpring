@@ -117,6 +117,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -2309,9 +2310,11 @@ class DynamicRecordWebControllerTest {
     void shouldExecuteListAndBatchActionsThroughStaticLikePaths() throws Exception {
         DynamicActionDescriptor publish = action("publish", EntityActionLevel.LIST);
         DynamicActionDescriptor archive = action("archive", EntityActionLevel.BATCH);
+        DynamicActionDescriptor batchDelete = standardBatchDeleteAction();
         DynamicActionDescriptor refreshSelected = action("refreshSelected", EntityActionLevel.ANY);
         when(service.action(MODULE, "publish")).thenReturn(publish);
         when(service.action(MODULE, "archive")).thenReturn(archive);
+        when(service.action(MODULE, "batchDelete")).thenReturn(batchDelete);
         when(service.action(MODULE, "refreshSelected")).thenReturn(refreshSelected);
         when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
         when(service.executeAction(eq(MODULE), eq("publish"), any(DynamicActionExecutionRequest.class)))
@@ -2328,6 +2331,13 @@ class DynamicRecordWebControllerTest {
                                 DynamicActionAvailability.available("archive")),
                         2,
                         DynamicActionResultBody.changedCount(2, "已归档 2 条")));
+        when(service.executeAction(eq(MODULE), eq("batchDelete"), any(DynamicActionExecutionRequest.class)))
+                .thenReturn(new DynamicActionExecutionResult(
+                        new DynamicActionExecutionContext(MODULE, ENTITY, "batchDelete", batchDelete,
+                                null, "trace-batch-delete", "tenant-1", false,
+                                DynamicActionAvailability.available("batchDelete")),
+                        2,
+                        DynamicActionResultBody.changedCount(2)));
         when(service.executeAction(eq(MODULE), eq("refreshSelected"), any(DynamicActionExecutionRequest.class)))
                 .thenReturn(new DynamicActionExecutionResult(null, "ok",
                         DynamicActionResultBody.refreshed("ok")));
@@ -2357,6 +2367,14 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.body.refreshStrategy.list").value(true))
                 .andExpect(jsonPath("$.body.refreshStrategy.detail").value(true));
 
+        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "batchDelete")
+                        .contentType("application/json")
+                        .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.actionLevel").value("BATCH"))
+                .andExpect(jsonPath("$.body.type").value("COUNT"))
+                .andExpect(jsonPath("$.body.value").value(2));
+
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "refreshSelected")
                         .contentType("application/json")
                 .content(json(Map.of("ids", List.of("contract-1")))))
@@ -2370,6 +2388,22 @@ class DynamicRecordWebControllerTest {
         ArgumentCaptor<DynamicActionExecutionRequest> batchRequest = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
         verify(service).executeAction(eq(MODULE), eq("archive"), batchRequest.capture());
         assertThat(batchRequest.getValue().ids()).containsExactly("contract-1", "contract-2");
+        ArgumentCaptor<DynamicActionExecutionRequest> batchDeleteRequest = ArgumentCaptor.forClass(DynamicActionExecutionRequest.class);
+        verify(service).executeAction(eq(MODULE), eq("batchDelete"), batchDeleteRequest.capture());
+        assertThat(batchDeleteRequest.getValue().ids()).containsExactly("contract-1", "contract-2");
+    }
+
+    @Test
+    void shouldRejectCustomBatchDeleteActionPathEvenWhenCodeMatchesStandardPath() throws Exception {
+        when(service.action(MODULE, "batchDelete")).thenReturn(action("batchDelete", EntityActionLevel.BATCH, "delete"));
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "batchDelete")
+                        .contentType("application/json")
+                        .content(json(Map.of("ids", List.of("contract-1")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dynamic action path is reserved: batchDelete"));
+
+        verify(service, never()).executeAction(eq(MODULE), eq("batchDelete"), any(DynamicActionExecutionRequest.class));
     }
 
     @Test
@@ -2888,6 +2922,14 @@ class DynamicRecordWebControllerTest {
         return new DynamicActionDescriptor(code, "Submit", true, level, EntityActionCategory.CUSTOM,
                 EntityActionAccessMode.AUTH_REQUIRED, true, false, authInheritActionCode, false, null,
                 EntityActionExecutorType.SERVICE, "submitExecutor").withPermission(MODULE);
+    }
+
+    private DynamicActionDescriptor standardBatchDeleteAction() {
+        return new DynamicActionDescriptor(PlatformAction.BATCH_DELETE.code(), "Batch Delete", true,
+                EntityActionLevel.BATCH, EntityActionCategory.STANDARD,
+                EntityActionAccessMode.AUTH_REQUIRED, true, true,
+                PlatformAction.BATCH_DELETE.inheritActionCode(), false, null,
+                EntityActionExecutorType.STANDARD, PlatformAction.BATCH_DELETE.code()).withPermission(MODULE);
     }
 
     private DynamicActionDescriptor workflowAction(String code) {

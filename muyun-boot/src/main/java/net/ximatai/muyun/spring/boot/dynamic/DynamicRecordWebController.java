@@ -53,6 +53,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicEntityDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -1617,15 +1618,19 @@ public class DynamicRecordWebController implements
                                     String actionCode,
                                     Set<EntityActionLevel> allowed,
         String messagePrefix) {
-        rejectReservedActionPath(actionCode);
-        EntityActionLevel level = recordService.action(moduleAlias, actionCode).actionLevel();
+        DynamicActionDescriptor action = recordService.action(moduleAlias, actionCode);
+        rejectReservedActionPath(action);
+        EntityActionLevel level = action.actionLevel();
         if (!allowed.contains(level)) {
             throw new IllegalArgumentException(messagePrefix + actionCode);
         }
     }
 
-    private void rejectReservedActionPath(String actionCode) {
-        if (PlatformWebPathRules.isReservedWebActionCode(actionCode)) {
+    private void rejectReservedActionPath(DynamicActionDescriptor action) {
+        if (PlatformWebPathRules.isReservedWebActionCode(action.code())
+                && (action.category() != EntityActionCategory.STANDARD
+                || !PlatformWebPathRules.isStandardActionPathCode(action.code()))) {
+            String actionCode = action.code();
             throw new IllegalArgumentException("dynamic action path is reserved: " + actionCode);
         }
     }

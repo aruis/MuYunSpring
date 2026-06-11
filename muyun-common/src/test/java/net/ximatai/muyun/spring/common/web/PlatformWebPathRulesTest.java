@@ -21,4 +21,11 @@ class PlatformWebPathRulesTest {
         assertThat(PlatformWebPathRules.reservedWebActionCodes())
                 .contains("actions", "describe", "entities", "exchange", "openapi", "references");
     }
+
+    @Test
+    void shouldAllowOnlyStandardBatchDeleteThroughActionPath() {
+        assertThat(PlatformWebPathRules.isStandardActionPathCode("batchDelete")).isTrue();
+        assertThat(PlatformWebPathRules.isStandardActionPathCode("delete")).isFalse();
+        assertThat(PlatformWebPathRules.isStandardActionPathCode("customSubmit")).isFalse();
+    }
 }

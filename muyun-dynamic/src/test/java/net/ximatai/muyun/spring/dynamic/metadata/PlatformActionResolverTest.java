@@ -68,6 +68,9 @@ class PlatformActionResolverTest {
         assertThat(action(dataScopedActions, PlatformAction.CREATE).dataAuth()).isFalse();
         assertThat(action(dataScopedActions, PlatformAction.UPDATE).dataAuth()).isTrue();
         assertThat(action(dataScopedActions, PlatformAction.DELETE).dataAuth()).isTrue();
+        assertThat(action(dataScopedActions, PlatformAction.BATCH_DELETE).dataAuth()).isTrue();
+        assertThat(action(dataScopedActions, PlatformAction.BATCH_DELETE).level()).isEqualTo(EntityActionLevel.BATCH);
+        assertThat(action(dataScopedActions, PlatformAction.BATCH_DELETE).authInheritActionCode()).isEqualTo("delete");
         assertThat(action(dataScopedActions, PlatformAction.QUERY).dataAuth()).isTrue();
         assertThat(action(dataScopedActions, PlatformAction.QUERY).authInheritActionCode()).isEqualTo("view");
         assertThat(action(EntityStandardActionCatalog.from(entityWith(EntityCapability.EXCHANGE)),

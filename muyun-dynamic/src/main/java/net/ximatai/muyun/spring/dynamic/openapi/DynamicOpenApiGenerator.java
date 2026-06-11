@@ -194,8 +194,7 @@ public class DynamicOpenApiGenerator {
                 "List record actions", null, "DynamicWebActionAvailabilityList", null));
         descriptor.actions().stream()
                 .filter(DynamicActionDescriptor::enabled)
-                .filter(action -> action.category() != EntityActionCategory.STANDARD)
-                .filter(action -> !PlatformWebPathRules.isReservedWebActionCode(action.code()))
+                .filter(action -> hasActionPath(action, standardActionVisible))
                 .filter(action -> action.actionLevel() != null)
                 .forEach(action -> operations.addAll(actionOperations(descriptor, action, basePath)));
         descriptor.actions().stream()
@@ -223,6 +222,17 @@ public class DynamicOpenApiGenerator {
                             PlatformAction.REFERENCE.code())));
         }
         return List.copyOf(operations);
+    }
+
+    private boolean hasActionPath(DynamicActionDescriptor action,
+                                  Predicate<PlatformAction> standardActionVisible) {
+        if (action.category() != EntityActionCategory.STANDARD) {
+            return !PlatformWebPathRules.isReservedWebActionCode(action.code());
+        }
+        return PlatformWebPathRules.isStandardActionPathCode(action.code())
+                && PlatformAction.fromCode(action.code())
+                .filter(standardActionVisible::test)
+                .isPresent();
     }
 
     private List<DynamicOpenApiDocument.Operation> actionOperations(DynamicModuleDescriptor descriptor,

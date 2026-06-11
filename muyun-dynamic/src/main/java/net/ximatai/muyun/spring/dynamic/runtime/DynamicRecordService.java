@@ -778,6 +778,10 @@ public class DynamicRecordService {
         return delete(moduleAlias, entityAlias, id, RuntimeMutationSource.ACTION, traceId);
     }
 
+    int deleteBatchFromAction(String moduleAlias, String entityAlias, Collection<String> ids, String traceId) {
+        return deleteBatch(moduleAlias, entityAlias, ids, RuntimeMutationSource.ACTION, traceId);
+    }
+
     private int delete(String moduleAlias, String entityAlias, String id, RuntimeMutationSource mutationSource, String traceId) {
         try (DynamicMutationContext mutationContext = DynamicMutationContext.open(mutationClock, mutationSource,
                 traceId, Map.of())) {

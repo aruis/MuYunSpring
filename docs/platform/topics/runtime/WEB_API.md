@@ -70,6 +70,8 @@
 
 `actions` 命名空间只用于动作查询。动作执行直接使用 `{actionCode}` 路径，因此动作编码必须避开平台保留路径。动作命中范围由动作定义声明为列表、记录、批量或任意范围。
 
+动态 CRUD 模块会贡献标准批量删除动作 `batchDelete`，通过 `POST /{moduleAlias}/batchDelete/batch` 执行，请求体提供 `ids`。该动作复用软删、动作授权、数据范围和运行事件链路；权限码继承 `delete`。不提供 `/deleteBatch` 之类平行 URL，记录级删除仍使用 `POST /{moduleAlias}/delete/{id}`。
+
 ## 关联视图
 
 关联视图 URL 由动态运行态 Controller 承载，但页面交互专题负责其页面语义和交接说明。
