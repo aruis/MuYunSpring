@@ -177,7 +177,7 @@
 | `POST` | `/iam.role/{roleId}/grants/{grantId}/delete` | 删除角色授权实例。 |
 | `POST` | `/iam.role/grant/{roleId}` | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
 | `POST` | `/iam.role/grant/{roleId}/batch` | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。 |
-| `POST` | `/iam.role/wildcard-data-scope/{roleId}/grant` | 为数据权限通配角色授予通配数据范围动作。 |
+| `POST` | `/iam.role/wildcard-data-scope/{roleId}/grant` | 为数据权限通配角色授予账号级通配数据范围动作；不承载部门相对策略。 |
 | `POST` | `/iam.role/revoke/{roleId}` | 撤销角色某个模块动作授权。 |
 | `POST` | `/iam.role/revoke/{roleId}/batch` | 批量撤销角色多个模块动作授权。 |
 | `POST` | `/iam.role/permissionMatrix/{roleId}` | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。 |

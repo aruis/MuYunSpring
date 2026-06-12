@@ -344,6 +344,9 @@ class IamWebControllerIT {
         when(roleService.grantAction("role-1", "sales.contract", "query",
                 DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
                 null, null, null)).thenReturn(1);
+        when(roleService.grantAction("role-1", "sales.contract", "query",
+                DataScopePolicy.DEPARTMENT_AND_CHILDREN, TenantScopePolicy.CURRENT_TENANT,
+                null, null, null)).thenReturn(1);
         when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
 
         mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
@@ -371,6 +374,19 @@ class IamWebControllerIT {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
                                   "dataScopePolicy":"OWNER",
+                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "moduleAlias":"sales.contract",
+                                  "actionCode":"query",
+                                  "dataScopePolicy":"DEPARTMENT_AND_CHILDREN",
                                   "tenantScopePolicy":"CURRENT_TENANT"
                                 }
                                 """))
