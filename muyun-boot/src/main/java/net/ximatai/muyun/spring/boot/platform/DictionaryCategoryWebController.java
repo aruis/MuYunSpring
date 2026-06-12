@@ -3,7 +3,7 @@ package net.ximatai.muyun.spring.boot.platform;
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
+import net.ximatai.muyun.spring.boot.web.NestedEnabledTreeCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
@@ -28,7 +28,7 @@ import java.util.Set;
 @PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
 @RequestMapping("/platform.application/{applicationAlias}/dictionary-categories")
 public class DictionaryCategoryWebController
-        extends NestedEnabledSortableCrudWebSupport<DictionaryCategory, DictionaryCategoryService> {
+        extends NestedEnabledTreeCrudWebSupport<DictionaryCategory, DictionaryCategoryService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "applicationAlias", "alias", "categoryKind", "parentId", "title",
             "enabled", "sortOrder", "createdAt", "updatedAt");
@@ -41,6 +41,11 @@ public class DictionaryCategoryWebController
     @Override
     protected Sort[] querySorts(WebQueryRequest request) {
         return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"), Sort.asc("title"));
+    }
+
+    @Override
+    protected Criteria treeScopeCriteria(HttpServletRequest request) {
+        return Criteria.of().eq("applicationAlias", applicationAlias(request));
     }
 
     @Override

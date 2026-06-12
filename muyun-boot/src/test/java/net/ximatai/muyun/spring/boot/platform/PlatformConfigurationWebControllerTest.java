@@ -63,6 +63,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -576,6 +577,27 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
+    void shouldMoveDictionaryCategoryWithTreeSortRequest() throws Exception {
+        DictionaryCategoryService service = mock(DictionaryCategoryService.class);
+        DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.select("category-1")).thenReturn(dictionaryCategory("category-1", "platform", "common", null));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.application/platform/dictionary-categories/sort/category-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"parentId":"root"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).moveInTree(criteria.capture(), eq("category-1"), eq(null), eq(null), eq("root"));
+        assertClause(criteria.getValue(), "applicationAlias", "platform");
+    }
+
+    @Test
     void shouldManageDictionaryItemsWithinPathCategory() throws Exception {
         DictionaryItemService service = mock(DictionaryItemService.class);
         DictionaryItemWebController controller = new DictionaryItemWebController();
@@ -639,6 +661,30 @@ class PlatformConfigurationWebControllerTest {
         assertThatThrownBy(() -> controller.update(request, "item-1", new DictionaryItem()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dictionary item does not belong to category");
+    }
+
+    @Test
+    void shouldMoveDictionaryItemWithTreeSortRequest() throws Exception {
+        DictionaryItemService service = mock(DictionaryItemService.class);
+        DictionaryItemWebController controller = new DictionaryItemWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "platform", "status", "enabled", null));
+        when(service.select("item-0")).thenReturn(dictionaryItem("item-0", "platform", "status", "disabled", "parent-1"));
+        when(service.select("parent-1")).thenReturn(dictionaryItem("parent-1", "platform", "status", "group", null));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/sort/item-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"previousId":"item-0","parentId":"parent-1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).moveInTree(criteria.capture(), eq("item-1"), eq("item-0"), eq(null), eq("parent-1"));
+        assertClause(criteria.getValue(), "applicationAlias", "platform");
+        assertClause(criteria.getValue(), "categoryAlias", "status");
     }
 
     @Test
