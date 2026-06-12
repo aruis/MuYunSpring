@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.code.CodeSequenceStateWebController;
 import net.ximatai.muyun.spring.boot.iam.DepartmentWebController;
 import net.ximatai.muyun.spring.boot.iam.EmployeeWebController;
 import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
+import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.TenantWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
@@ -53,6 +54,7 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(OrganizationWebController.class);
             context.registerBean(DepartmentWebController.class);
             context.registerBean(EmployeeWebController.class);
+            context.registerBean(PositionWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
             context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
             context.refresh();
@@ -63,7 +65,8 @@ class StaticModuleDefinitionScannerTest {
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
-                    "iam.tenant", "iam.organization", "iam.department", "iam.employee", "iam.role", "iam.user");
+                    "iam.tenant", "iam.organization", "iam.department", "iam.employee",
+                    "iam.position", "iam.role", "iam.user");
             assertThat(byAlias.get("iam.tenant")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("租户管理");
@@ -88,6 +91,13 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("iam.employee")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("职员管理");
+                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
+                        .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
+                                "sort", "enable", "disable");
+            });
+            assertThat(byAlias.get("iam.position")).satisfies(definition -> {
+                assertThat(definition.applicationAlias()).isEqualTo("iam");
+                assertThat(definition.title()).isEqualTo("岗位管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "sort", "enable", "disable");

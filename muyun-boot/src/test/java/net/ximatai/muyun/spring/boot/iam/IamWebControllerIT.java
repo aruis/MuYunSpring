@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.position.Position;
+import net.ximatai.muyun.spring.iam.position.PositionService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         OrganizationWebController.class,
         DepartmentWebController.class,
         EmployeeWebController.class,
+        PositionWebController.class,
         RoleWebController.class
 })
 @Import({
@@ -61,6 +64,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private EmployeeService employeeService;
+
+    @MockitoBean
+    private PositionService positionService;
 
     @MockitoBean
     private RoleService roleService;
@@ -189,6 +195,22 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("employee-1"))
                 .andExpect(jsonPath("$.departmentId").value("dept-1"));
+    }
+
+    @Test
+    void shouldBindPositionEndpointInRealMvcContext() throws Exception {
+        Position position = new Position();
+        position.setId("position-1");
+        position.setCode("SALES_MANAGER");
+        position.setTitle("Sales Manager");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(positionService.select("position-1")).thenReturn(position);
+
+        mvc.perform(get("/iam.position/view/position-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("position-1"))
+                .andExpect(jsonPath("$.code").value("SALES_MANAGER"));
     }
 
     @Test

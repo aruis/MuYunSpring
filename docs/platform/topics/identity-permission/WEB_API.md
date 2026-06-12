@@ -24,6 +24,7 @@
 | 组织机构 | `/iam.organization` | CRUD、启停、树、树内排序 |
 | 部门 | `/iam.department` | CRUD、启停、树、树内排序 |
 | 职员 | `/iam.employee` | CRUD、启停、排序 |
+| 岗位 | `/iam.position` | CRUD、启停、排序 |
 | 用户 | `/iam.user` | CRUD、启停、排序 |
 | 角色 | `/iam.role` | CRUD、启停、排序 |
 
@@ -112,6 +113,21 @@
 | `POST` | `/iam.employee/enable/{id}` | 启用职员。 |
 | `POST` | `/iam.employee/disable/{id}` | 停用职员。 |
 | `POST` | `/iam.employee/sort/{id}` | 调整职员在部门内的排序。 |
+
+## 岗位
+
+根路径：`/iam.position`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/iam.position/query` | 查询岗位标准项。 |
+| `GET` | `/iam.position/view/{id}` | 查看岗位标准项。 |
+| `POST` | `/iam.position/insert` | 新增岗位标准项。 |
+| `POST` | `/iam.position/update/{id}` | 更新岗位标准项。 |
+| `POST` | `/iam.position/delete/{id}` | 删除岗位标准项。 |
+| `POST` | `/iam.position/enable/{id}` | 启用岗位标准项。 |
+| `POST` | `/iam.position/disable/{id}` | 停用岗位标准项。 |
+| `POST` | `/iam.position/sort/{id}` | 调整岗位标准项排序。 |
 
 ## 用户
 
