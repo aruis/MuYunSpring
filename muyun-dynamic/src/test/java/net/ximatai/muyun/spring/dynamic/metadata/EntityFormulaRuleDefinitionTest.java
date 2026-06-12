@@ -46,6 +46,17 @@ class EntityFormulaRuleDefinitionTest {
     }
 
     @Test
+    void shouldRejectImportValidationCalculationRule() {
+        EntityDefinition entity = invoiceEntity()
+                .withFormulaRules(EntityFormulaRuleDefinition.calculation("normalizeAmount",
+                        "amount", "{quantity} * {price}").phase(FormulaRulePhase.IMPORT_VALIDATE));
+
+        assertThatThrownBy(() -> validator.validateEntity(entity))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("import validation formula must not calculate fields: normalizeAmount");
+    }
+
+    @Test
     void shouldValidateChildFormulaTargetAgainstModuleRelation() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.invoice",
@@ -298,6 +309,30 @@ class EntityFormulaRuleDefinitionTest {
                 .hasMessageContaining("unknown formula target relation: invoice.details");
     }
 
+    @Test
+    void shouldRejectChildTargetFormulaDirectlyReadingAnotherChildRelation() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.invoice",
+                "Invoice",
+                List.of(
+                        invoiceEntity().withFormulaRules(
+                                EntityFormulaRuleDefinition.calculation("lineAmountCalc",
+                                        "items.lineAmount", "{discounts.rate} * {items.price}")
+                        ),
+                        invoiceLineEntity(),
+                        invoiceDiscountEntity()
+                ),
+                List.of(
+                        EntityRelationDefinition.child("items", "invoice", "invoice_line", "invoiceId"),
+                        EntityRelationDefinition.child("discounts", "invoice", "invoice_discount", "invoiceId")
+                )
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("child target formula cannot directly read another child table: discounts.rate");
+    }
+
     private EntityDefinition invoiceEntity() {
         return new EntityDefinition("invoice", "sales_invoice", "Invoice", List.of(
                 FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
@@ -312,6 +347,13 @@ class EntityFormulaRuleDefinitionTest {
                 FieldDefinition.decimal("quantity", "Quantity").precision(18, 2),
                 FieldDefinition.decimal("price", "Price").precision(18, 2),
                 FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+        ));
+    }
+
+    private EntityDefinition invoiceDiscountEntity() {
+        return new EntityDefinition("invoice_discount", "sales_invoice_discount", "Invoice Discount", List.of(
+                FieldDefinition.string("invoiceId", "Invoice").column("invoice_id"),
+                FieldDefinition.decimal("rate", "Rate").precision(18, 2)
         ));
     }
 }

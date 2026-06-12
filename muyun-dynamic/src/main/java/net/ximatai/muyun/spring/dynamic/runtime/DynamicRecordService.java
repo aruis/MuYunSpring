@@ -677,6 +677,14 @@ public class DynamicRecordService {
         return update(moduleAlias, entityAlias, record, RuntimeMutationSource.ACTION, traceId, Map.of());
     }
 
+    void validateImportFromAction(String moduleAlias, String entityAlias, DynamicRecord record, DynamicRecord existing) {
+        DynamicFormulaRuntime formulaRuntime = new DynamicFormulaRuntime(
+                moduleAlias, record.getEntity(), runtime.registry().requireModule(moduleAlias));
+        if (formulaRuntime.hasImportValidateRules()) {
+            formulaRuntime.importValidate(record, existing);
+        }
+    }
+
     private int update(String moduleAlias,
                        String entityAlias,
                        DynamicRecord record,

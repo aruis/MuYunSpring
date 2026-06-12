@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -116,6 +117,9 @@ public class DynamicImportExecutor {
                     DynamicRecord record = buildRecord(records, sheet, row, parent);
                     record.setId(existingRecord.getId());
                     record.setVersion(existingRecord.getVersion());
+                    if (!validateImport(records, sheet, record, existingRecord, row, errorRows, groupIdentity, summaries)) {
+                        yield WriteDecision.failed();
+                    }
                     records.update(sheet.entityAlias(), record);
                     addUpdated(sheet.entityAlias(), summaries);
                     yield WriteDecision.success(existingRecord.getId());
@@ -124,9 +128,37 @@ public class DynamicImportExecutor {
         }
 
         DynamicRecord record = buildRecord(records, sheet, row, parent);
+        if (!validateImport(records, sheet, record, null, row, errorRows, groupIdentity, summaries)) {
+            return WriteDecision.failed();
+        }
         String id = records.create(sheet.entityAlias(), record);
         addCreated(sheet.entityAlias(), summaries);
         return WriteDecision.success(id);
+    }
+
+    private boolean validateImport(DynamicRecordActionGateway records,
+                                   DynamicImportPlan.SheetPlan sheet,
+                                   DynamicRecord record,
+                                   DynamicRecord existing,
+                                   ParsedImportRow row,
+                                   List<ImportErrorRow> errorRows,
+                                   String groupIdentity,
+                                   Map<String, ImportEntityExecutionSummary> summaries) {
+        try {
+            records.validateImport(sheet.entityAlias(), record, existing);
+            return true;
+        } catch (DynamicFormulaException exception) {
+            addError(sheet.entityAlias(), summaries, errorRows,
+                    ImportErrorRow.of(row, importValidationMessage(exception), groupIdentity));
+            return false;
+        }
+    }
+
+    private String importValidationMessage(DynamicFormulaException exception) {
+        if (exception == null || exception.firstError() == null || exception.firstError().message() == null) {
+            return "导入公式校验未通过";
+        }
+        return exception.firstError().message();
     }
 
     private boolean resolveReferenceValues(String moduleAlias,

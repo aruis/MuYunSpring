@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.exchange.importer;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
+import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
@@ -16,6 +17,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveRequest;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResponse;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveResult;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceResolveStatus;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -140,6 +142,22 @@ class DynamicImportExecutorTest {
         assertThat(captor.getValue().getId()).isEqualTo("order-existing");
         assertThat(captor.getValue().getVersion()).isEqualTo(3);
         assertThat(captor.getValue().getValue("orderNo")).isEqualTo("SO-1");
+    }
+
+    @Test
+    void shouldReportImportFormulaValidationFailureBeforeCreate() {
+        when(records.list(eq("order"), any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of());
+        org.mockito.Mockito.doThrow(formulaException("订单号不能为空"))
+                .when(records).validateImport(eq("order"), any(DynamicRecord.class), eq(null));
+
+        DynamicImportExecutionResult result = executor.execute(command(plan(ImportDuplicateStrategy.OVERWRITE,
+                ImportDuplicateStrategy.ERROR), workbook(group("R-1", mainRow("R-1", "SO-1"), List.of()))));
+
+        assertThat(result.errorRows()).extracting(ImportErrorRow::message)
+                .containsExactly("订单号不能为空");
+        assertThat(result.summaries().get("order").errors()).isEqualTo(1);
+        verify(records, never()).create(eq("order"), any(DynamicRecord.class));
     }
 
     @Test
@@ -449,6 +467,12 @@ class DynamicImportExecutorTest {
         record.setId(id);
         record.setValue("orderNo", orderNo);
         return record;
+    }
+
+    private DynamicFormulaException formulaException(String message) {
+        FormulaRuntimeReport report = new FormulaRuntimeReport();
+        report.error("importCheck", "{orderNo} != ''", message);
+        return new DynamicFormulaException(MODULE, "order", report);
     }
 
     private DynamicRecord lineRecord(String id, String orderId, String sku) {

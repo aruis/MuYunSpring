@@ -6,6 +6,8 @@ import net.ximatai.muyun.spring.ability.reference.ReferenceProjection;
 import net.ximatai.muyun.spring.ability.reference.ReferenceTarget;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaEvaluationException;
+import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
+import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
@@ -170,6 +172,9 @@ public class ModuleDefinitionValidator {
         if (rule.phase() == null) {
             throw new ModuleDefinitionException("formula rule phase must not be null: " + rule.code());
         }
+        if (rule.phase() == FormulaRulePhase.IMPORT_VALIDATE && rule.kind() == FormulaRuleKind.CALCULATION) {
+            throw new ModuleDefinitionException("import validation formula must not calculate fields: " + rule.code());
+        }
         if (rule.severity() == null) {
             throw new ModuleDefinitionException("formula rule severity must not be null: " + rule.code());
         }
@@ -205,6 +210,11 @@ public class ModuleDefinitionValidator {
                                 + entity.alias() + "." + parts[0]));
                 EntityDefinition childEntity = requireEntity(entities, relation.childEntityAlias(), "formula target child entity");
                 requireField(childEntity, parts[1], "formula target field");
+                try {
+                    formulaEngine.validateTargetFieldExpressionScope(rule.targetField(), rule.expression());
+                } catch (FormulaEvaluationException e) {
+                    throw new ModuleDefinitionException("invalid formula expression: " + rule.code() + ", " + e.getMessage());
+                }
             }
         }
     }

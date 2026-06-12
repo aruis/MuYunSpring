@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FormulaEngineTest {
     private final FormulaEngine engine = new FormulaEngine(
@@ -325,6 +326,101 @@ class FormulaEngineTest {
         assertThat(first).containsEntry("lineAmount", new BigDecimal("20.0"));
         assertThat(second).containsEntry("lineAmount", new BigDecimal("60.0"));
         assertThat(main).containsEntry("total", new BigDecimal("80.0"));
+    }
+
+    @Test
+    void shouldApplyTargetFieldCalculationToEachChildRow() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        Map<String, Object> first = new LinkedHashMap<>(Map.of("qty", 2, "price", 10));
+        Map<String, Object> second = new LinkedHashMap<>(Map.of("qty", 3, "price", 20));
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(first, second)), List.of(
+                FormulaFieldDefinition.of("items.qty", FormulaValueType.INTEGER),
+                FormulaFieldDefinition.of("items.price", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.lineAmount", FormulaValueType.DECIMAL)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("lineAmount", "{items.qty} * {items.price}",
+                        FormulaRuleKind.CALCULATION, FormulaRulePhase.BEFORE_SAVE, "items.lineAmount")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(first).containsEntry("lineAmount", new BigDecimal("20.0"));
+        assertThat(second).containsEntry("lineAmount", new BigDecimal("60.0"));
+    }
+
+    @Test
+    void shouldSupportFilteredAggregateAndFirstDefaultValue() {
+        Map<String, Object> main = new LinkedHashMap<>();
+        FormulaRuntimeData data = FormulaRuntimeData.typed(main, Map.of("items", List.of(
+                new LinkedHashMap<>(Map.of("amount", 10, "enabled", true, "name", "A")),
+                new LinkedHashMap<>(Map.of("amount", 20, "enabled", false, "name", "B")),
+                new LinkedHashMap<>(Map.of("amount", 30, "enabled", true, "name", "C"))
+        )), List.of(
+                FormulaFieldDefinition.of("enabledTotal", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("firstEnabledName", FormulaValueType.STRING),
+                FormulaFieldDefinition.of("items.amount", FormulaValueType.DECIMAL),
+                FormulaFieldDefinition.of("items.enabled", FormulaValueType.BOOLEAN),
+                FormulaFieldDefinition.of("items.name", FormulaValueType.STRING)
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("enabledTotal", "{enabledTotal} = SUM({items.amount}, WHERE({items.enabled} == true))"),
+                new FormulaRule("firstName", "{firstEnabledName} = GETFIRSTORDEFAULTVALUE({items.name}, FILTER({items.enabled} == true))")
+        ), data);
+
+        assertThat(report.errors()).isEmpty();
+        assertThat(main)
+                .containsEntry("enabledTotal", new BigDecimal("40.0"))
+                .containsEntry("firstEnabledName", "A");
+    }
+
+    @Test
+    void shouldRejectWhereOutsideAggregate() {
+        FormulaRuntimeData data = FormulaRuntimeData.of(new LinkedHashMap<>(Map.of("amount", 10)));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("badWhere", "{matched} = WHERE({amount} > 0)")
+        ), data);
+
+        assertThat(report.errors()).singleElement()
+                .extracting(FormulaRuntimeReport.Issue::code)
+                .isEqualTo("FORMULA_AGGREGATE_CONDITION_ONLY");
+    }
+
+    @Test
+    void shouldRejectInvalidAggregateConditionShape() {
+        FormulaRuntimeData data = FormulaRuntimeData.of(new LinkedHashMap<>(), Map.of(
+                "items", List.of(new LinkedHashMap<>(Map.of("amount", 10, "enabled", true)))
+        ));
+
+        FormulaRuntimeReport report = engine.apply(List.of(
+                new FormulaRule("blankWhere", "{total} = SUM({items.amount}, WHERE())"),
+                new FormulaRule("multiWhere", "{count} = COUNT({items.amount}, WHERE({items.enabled}, true))"),
+                new FormulaRule("duplicateWhere", "{max} = MAX({items.amount}, WHERE({items.enabled}), FILTER(true))")
+        ), data);
+
+        assertThat(report.errors()).extracting(FormulaRuntimeReport.Issue::code)
+                .containsExactly(
+                        "FORMULA_AGGREGATE_CONDITION_INVALID",
+                        "FORMULA_AGGREGATE_CONDITION_INVALID",
+                        "FORMULA_AGGREGATE_CONDITION_INVALID"
+                );
+    }
+
+    @Test
+    void shouldRejectChildTargetFormulaDirectlyReadingOtherChildTable() {
+        assertThatThrownBy(() -> engine.validateTargetFieldExpressionScope(
+                "items.lineAmount",
+                "{discounts.rate} * {items.price}"
+        ))
+                .isInstanceOf(FormulaEvaluationException.class)
+                .hasMessageContaining("cannot directly read another child table");
+
+        engine.validateTargetFieldExpressionScope(
+                "items.lineAmount",
+                "{items.qty} * {items.price} + SUM({discounts.amount})"
+        );
     }
 
     @Test

@@ -113,6 +113,27 @@ public class FormulaEngine {
         return parsed != null && FormulaExpressionSupport.containsAssignment(parsed.ast());
     }
 
+    public void validateTargetFieldExpressionScope(String targetField, String expression) {
+        FormulaFieldPath target = FormulaFieldPath.parse(targetField);
+        if (target.tableKey() == null) {
+            return;
+        }
+        FormulaExpressionSupport.ParsedExpression parsed = parse("expression", expression);
+        if (parsed == null) {
+            return;
+        }
+        for (String fieldPath : directChildFieldReferences(parsed.ast(), false)) {
+            FormulaFieldPath reference = FormulaFieldPath.parse(fieldPath);
+            if (reference.tableKey() != null && !Objects.equals(reference.tableKey(), target.tableKey())) {
+                throw new FormulaEvaluationException(
+                        "FORMULA_TARGET_SCOPE_ERROR",
+                        reference.dataIndex(),
+                        "child target formula cannot directly read another child table: " + reference.dataIndex()
+                );
+            }
+        }
+    }
+
     private void applyRule(
             FormulaRule rule,
             FormulaExpressionSupport.ParsedExpression parsed,
@@ -144,12 +165,21 @@ public class FormulaEngine {
     ) {
         FormulaEvaluationSession session = data.beginSession();
         if (rule.targetField() != null && !FormulaExpressionSupport.containsAssignment(parsed.ast())) {
-            EvalResult evalResult = eval(parsed.ast(), session, FormulaEvaluationScope.main());
-            session.set(
-                    FormulaFieldPath.parse(rule.targetField()),
-                    normalizeCalculatedValue(evalResult.value()),
-                    FormulaEvaluationScope.main()
-            );
+            FormulaFieldPath targetField = FormulaFieldPath.parse(rule.targetField());
+            if (targetField.tableKey() == null) {
+                EvalResult evalResult = eval(parsed.ast(), session, FormulaEvaluationScope.main());
+                session.set(
+                        targetField,
+                        normalizeCalculatedValue(evalResult.value()),
+                        FormulaEvaluationScope.main()
+                );
+            } else {
+                for (Object row : session.rows(targetField.tableKey())) {
+                    FormulaEvaluationScope rowScope = FormulaEvaluationScope.row(targetField.tableKey(), row);
+                    EvalResult evalResult = eval(parsed.ast(), session, rowScope);
+                    session.set(targetField, normalizeCalculatedValue(evalResult.value()), rowScope);
+                }
+            }
             commitSession(session, result);
             return;
         }
@@ -279,10 +309,12 @@ public class FormulaEngine {
     }
 
     private EvalResult evalAggregate(FuncNode node, FormulaEvaluationContext data, FormulaEvaluationScope context, String functionName) {
+        AggregateArgs aggregateArgs = parseAggregateArgs(node.args);
         List<String> fieldRefs = new ArrayList<>();
-        for (AstNode arg : node.args) {
+        for (AstNode arg : aggregateArgs.valueArgs()) {
             collectFieldRefs(arg, fieldRefs);
         }
+        collectFieldRefs(aggregateArgs.condition(), fieldRefs);
         Set<String> tableKeys = fieldRefs.stream()
                 .map(FormulaFieldPath::parse)
                 .filter(ref -> ref.tableKey() != null)
@@ -301,8 +333,21 @@ public class FormulaEngine {
         List<Object> bucket = new ArrayList<>();
         boolean changed = false;
         for (Object row : rows) {
+            if (aggregateArgs.excludeCurrentRow()
+                    && context.row() != null
+                    && Objects.equals(context.tableKey(), tableKey)
+                    && row == context.row()) {
+                continue;
+            }
             FormulaEvaluationScope rowContext = tableKey == null ? context : FormulaEvaluationScope.row(tableKey, row);
-            for (AstNode arg : node.args) {
+            if (aggregateArgs.condition() != null) {
+                EvalResult condition = eval(aggregateArgs.condition(), data, rowContext);
+                changed = changed || condition.changed();
+                if (!toBoolean(condition.value())) {
+                    continue;
+                }
+            }
+            for (AstNode arg : aggregateArgs.valueArgs()) {
                 EvalResult value = eval(arg, data, rowContext);
                 bucket.add(value.value());
                 changed = changed || value.changed();
@@ -314,9 +359,99 @@ public class FormulaEngine {
             case "COUNT" -> bucket.stream().filter(v -> v != null && !"".equals(v)).count();
             case "MAX" -> bucket.isEmpty() ? 0d : bucket.stream().mapToDouble(this::toNumber).max().orElse(0d);
             case "MIN" -> bucket.isEmpty() ? 0d : bucket.stream().mapToDouble(this::toNumber).min().orElse(0d);
+            case "GET_FIRST_OR_DEFAULT_VALUE" -> bucket.isEmpty() || bucket.getFirst() == null ? "" : bucket.getFirst();
             default -> null;
         };
         return EvalResult.of(value, changed);
+    }
+
+    private AggregateArgs parseAggregateArgs(List<AstNode> args) {
+        List<AstNode> valueArgs = new ArrayList<>();
+        AstNode condition = null;
+        boolean excludeCurrentRow = false;
+        if (args == null) {
+            return new AggregateArgs(valueArgs, condition, excludeCurrentRow);
+        }
+        for (AstNode arg : args) {
+            String option = aggregateOption(arg);
+            if ("EXCLUDE_CURRENT_ROW".equals(option)) {
+                excludeCurrentRow = true;
+                continue;
+            }
+            if ("INCLUDE_CURRENT_ROW".equals(option)) {
+                continue;
+            }
+            if (arg instanceof FuncNode funcNode && isAggregateConditionFunction(funcNode.name)) {
+                if (condition != null || funcNode.args.size() != 1) {
+                    throw new FormulaEvaluationException(
+                            "FORMULA_AGGREGATE_CONDITION_INVALID",
+                            "aggregate condition requires exactly one WHERE/FILTER argument"
+                    );
+                }
+                condition = funcNode.args.getFirst();
+                continue;
+            }
+            if (arg != null && arg.type != FormulaAst.NodeType.EMPTY) {
+                valueArgs.add(arg);
+            }
+        }
+        return new AggregateArgs(valueArgs, condition, excludeCurrentRow);
+    }
+
+    private String aggregateOption(AstNode arg) {
+        if (!(arg instanceof ValueNode valueNode) || valueNode.value == null) {
+            return null;
+        }
+        String value = String.valueOf(valueNode.value).trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "INCLUDE_CURRENT_ROW", "EXCLUDE_CURRENT_ROW" -> value;
+            default -> null;
+        };
+    }
+
+    private boolean isAggregateConditionFunction(String name) {
+        String normalized = FormulaFunctions.normalize(name);
+        return "WHERE".equals(normalized) || "FILTER".equals(normalized);
+    }
+
+    private record AggregateArgs(List<AstNode> valueArgs, AstNode condition, boolean excludeCurrentRow) {
+    }
+
+    private Set<String> directChildFieldReferences(AstNode node, boolean inAggregate) {
+        Set<String> fields = new LinkedHashSet<>();
+        collectDirectChildFieldReferences(node, inAggregate, fields);
+        return fields;
+    }
+
+    private void collectDirectChildFieldReferences(AstNode node, boolean inAggregate, Set<String> fields) {
+        if (node == null) {
+            return;
+        }
+        if (node instanceof FieldNode fieldNode) {
+            FormulaFieldPath fieldPath = FormulaFieldPath.parse(fieldNode.dataIndex);
+            if (!inAggregate && fieldPath.tableKey() != null) {
+                fields.add(fieldPath.dataIndex());
+            }
+            return;
+        }
+        if (node instanceof AssignNode assignNode) {
+            collectDirectChildFieldReferences(assignNode.left, inAggregate, fields);
+            collectDirectChildFieldReferences(assignNode.right, inAggregate, fields);
+            return;
+        }
+        if (node instanceof UnaryNode unaryNode) {
+            collectDirectChildFieldReferences(unaryNode.arg, inAggregate, fields);
+            return;
+        }
+        if (node instanceof BinaryNode binaryNode) {
+            collectDirectChildFieldReferences(binaryNode.left, inAggregate, fields);
+            collectDirectChildFieldReferences(binaryNode.right, inAggregate, fields);
+            return;
+        }
+        if (node instanceof FuncNode funcNode) {
+            boolean childInAggregate = inAggregate || FormulaFunctions.isAggregate(funcNode.name);
+            funcNode.args.forEach(arg -> collectDirectChildFieldReferences(arg, childInAggregate, fields));
+        }
     }
 
     private Object evalScalar(String name, List<Object> args) {
@@ -352,6 +487,10 @@ public class FormulaEngine {
                 Object value = argNullable(args, 0);
                 yield value == null || "".equals(value);
             }
+            case "WHERE", "FILTER" -> throw new FormulaEvaluationException(
+                    "FORMULA_AGGREGATE_CONDITION_ONLY",
+                    name + " only supports aggregate condition"
+            );
             default -> throw new FormulaEvaluationException(
                     "FORMULA_UNKNOWN_FUNCTION",
                     "unknown formula function: " + name

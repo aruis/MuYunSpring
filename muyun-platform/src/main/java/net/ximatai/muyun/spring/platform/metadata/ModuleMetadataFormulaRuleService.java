@@ -134,11 +134,12 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
                     && formulaEngine.containsAssignment(rule.getExpression())) {
                 throw new PlatformException("Metadata formula expression must not assign fields: " + rule.getAlias());
             }
-            if (rule.getRuleKind() == FormulaRuleKind.CALCULATION
-                    && rule.getTargetField() != null
-                    && rule.getTargetField().contains(".")) {
-                throw new PlatformException("Metadata formula targetField cannot be child field: " + rule.getAlias());
+            if (rule.getRulePhase() == FormulaRulePhase.IMPORT_VALIDATE
+                    && rule.getRuleKind() == FormulaRuleKind.CALCULATION) {
+                throw new PlatformException("Metadata import validation formula must not calculate fields: "
+                        + rule.getAlias());
             }
+            formulaEngine.validateTargetFieldExpressionScope(rule.getTargetField(), rule.getExpression());
             fieldValidator.validateTargetField(rule.getTargetField(), relation, "Metadata formula");
             fieldValidator.validateExpressionFields(formulaEngine.referencedFields(rule.getExpression()), relation,
                     "Metadata formula");

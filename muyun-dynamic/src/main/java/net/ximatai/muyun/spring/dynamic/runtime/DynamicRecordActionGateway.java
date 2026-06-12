@@ -58,6 +58,11 @@ public class DynamicRecordActionGateway {
         return recordService.updateFromAction(moduleAlias, entityAlias, record, traceId);
     }
 
+    public void validateImport(String entityAlias, DynamicRecord record, DynamicRecord existing) {
+        requireMutationAction();
+        recordService.validateImportFromAction(moduleAlias, entityAlias, record, existing);
+    }
+
     private void requireMutationAction() {
         if (action != PlatformAction.IMPORT) {
             throw new IllegalStateException("dynamic record action gateway does not allow mutation for action: "

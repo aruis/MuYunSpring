@@ -4,7 +4,14 @@ import java.util.Locale;
 import java.util.Set;
 
 final class FormulaFunctions {
-    private static final Set<String> AGGREGATE_FUNCTIONS = Set.of("SUM", "AVG", "COUNT", "MAX", "MIN");
+    private static final Set<String> AGGREGATE_FUNCTIONS = Set.of(
+            "SUM",
+            "AVG",
+            "COUNT",
+            "MAX",
+            "MIN",
+            "GET_FIRST_OR_DEFAULT_VALUE"
+    );
 
     private FormulaFunctions() {
     }
@@ -14,6 +21,10 @@ final class FormulaFunctions {
     }
 
     static String normalize(String name) {
-        return name == null ? "" : name.toUpperCase(Locale.ROOT);
+        String normalized = name == null ? "" : name.toUpperCase(Locale.ROOT);
+        if ("GETFIRSTORDEFAULTVALUE".equals(normalized)) {
+            return "GET_FIRST_OR_DEFAULT_VALUE";
+        }
+        return normalized;
     }
 }

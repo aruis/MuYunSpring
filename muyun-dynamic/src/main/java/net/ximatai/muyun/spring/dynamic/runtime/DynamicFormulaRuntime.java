@@ -59,6 +59,14 @@ final class DynamicFormulaRuntime {
         return new DynamicFormulaPreviewResult(record, result.report(), changedFields);
     }
 
+    boolean hasImportValidateRules() {
+        return hasRules(List.of(FormulaRulePhase.IMPORT_VALIDATE));
+    }
+
+    FormulaRuntimeReport importValidate(DynamicRecord record, DynamicRecord existing) {
+        return execute(record, existing, List.of(FormulaRulePhase.IMPORT_VALIDATE), false, true, false).report();
+    }
+
     private boolean hasRules(List<FormulaRulePhase> phases) {
         return entity.orderedFormulaRules().stream()
                 .anyMatch(rule -> rule.enabled()
@@ -77,6 +85,15 @@ final class DynamicFormulaRuntime {
                                            List<FormulaRulePhase> phases,
                                            boolean includeChildDependentRules,
                                            boolean failOnErrors) {
+        return execute(record, existing, phases, includeChildDependentRules, failOnErrors, true);
+    }
+
+    private FormulaExecutionResult execute(DynamicRecord record,
+                                           DynamicRecord existing,
+                                           List<FormulaRulePhase> phases,
+                                           boolean includeChildDependentRules,
+                                           boolean failOnErrors,
+                                           boolean applyChanges) {
         List<FormulaRule> rules = runtimeRules(phases, includeChildDependentRules);
         if (rules.isEmpty()) {
             return new FormulaExecutionResult();
@@ -88,7 +105,7 @@ final class DynamicFormulaRuntime {
         if (failOnErrors && result.report().hasErrors()) {
             throw new DynamicFormulaException(moduleAlias, entity.alias(), result.report());
         }
-        if (!result.report().hasErrors()) {
+        if (applyChanges && !result.report().hasErrors()) {
             applyChangedFields(record, main, tables, result.changedFields());
         }
         return result;
