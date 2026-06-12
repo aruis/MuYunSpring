@@ -15,6 +15,10 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformAliasRules;
 import net.ximatai.muyun.spring.common.util.Preconditions;
+import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -37,27 +41,58 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
-    private final RoleUserDao roleUserDao;
+    private final RoleGrantDao roleGrantDao;
     private final RoleActionDao roleActionDao;
     private final RoleActionGrantVerifier grantVerifier;
+    private final UserAccountService userAccountService;
+    private final EmployeeService employeeService;
+    private final EmployeePositionService employeePositionService;
 
     public RoleService(RoleDao roleDao,
-                       RoleUserDao roleUserDao,
+                       RoleGrantDao roleGrantDao,
                        RoleActionDao roleActionDao,
                        ActiveTenantVerifier activeTenantVerifier) {
-        this(roleDao, roleUserDao, roleActionDao, activeTenantVerifier,
-                RoleActionGrantVerifier.platformActionsOnly());
+        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, null);
     }
 
     public RoleService(RoleDao roleDao,
-                       RoleUserDao roleUserDao,
+                       RoleGrantDao roleGrantDao,
                        RoleActionDao roleActionDao,
                        ActiveTenantVerifier activeTenantVerifier,
                        RoleActionGrantVerifier grantVerifier) {
+        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
+                grantVerifier, null, null, null);
+    }
+
+    @Autowired
+    public RoleService(RoleDao roleDao,
+                       RoleGrantDao roleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService) {
+        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
+                RoleActionGrantVerifier.platformActionsOnly(),
+                userAccountService, employeeService, employeePositionService);
+    }
+
+    public RoleService(RoleDao roleDao,
+                       RoleGrantDao roleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService) {
         super(MODULE_ALIAS, Role.class, roleDao, activeTenantVerifier);
-        this.roleUserDao = Objects.requireNonNull(roleUserDao, "roleUserDao must not be null");
+        this.roleGrantDao = Objects.requireNonNull(roleGrantDao, "roleGrantDao must not be null");
         this.roleActionDao = Objects.requireNonNull(roleActionDao, "roleActionDao must not be null");
         this.grantVerifier = Objects.requireNonNull(grantVerifier, "grantVerifier must not be null");
+        this.userAccountService = userAccountService;
+        this.employeeService = employeeService;
+        this.employeePositionService = employeePositionService;
     }
 
     @Override
@@ -84,76 +119,85 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public String bindUser(String roleId, String userId) {
-        Role role = requireEnabledRole(roleId);
-        ensureRoleCanGrantTo(role, RoleGrantSubjectType.USER_ACCOUNT);
-        String validUserId = Preconditions.requireText(userId, "userId");
-        ensureDataScopeRoleBindingValid(role.getId(), validUserId);
-        RoleUser existing = findRoleUser(role.getId(), validUserId);
-        if (existing != null) {
-            return existing.getId();
-        }
-
-        RoleUser binding = new RoleUser();
-        binding.setRoleId(role.getId());
-        binding.setUserId(validUserId);
-        prepareChildInsert(binding);
-        return roleUserDao.insert(binding);
+        return grantRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
     }
 
     public int bindUsers(String roleId, List<String> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return 0;
         }
-        Role role = requireEnabledRole(roleId);
-        ensureRoleCanGrantTo(role, RoleGrantSubjectType.USER_ACCOUNT);
         int changed = 0;
         for (String userId : userIds.stream().filter(Objects::nonNull).distinct().toList()) {
-            String validUserId = Preconditions.requireText(userId, "userId");
-            ensureDataScopeRoleBindingValid(role.getId(), validUserId);
-            if (findRoleUser(role.getId(), validUserId) != null) {
-                continue;
+            if (grantRoleIfAbsent(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId).created()) {
+                changed++;
             }
-            RoleUser binding = new RoleUser();
-            binding.setRoleId(role.getId());
-            binding.setUserId(validUserId);
-            prepareChildInsert(binding);
-            roleUserDao.insert(binding);
-            changed++;
         }
         return changed;
     }
 
     public int unbindUser(String roleId, String userId) {
-        Role role = requireEnabledRole(roleId);
-        RoleUser binding = findRoleUser(role.getId(), userId);
-        if (binding == null) {
-            return 0;
-        }
-        return roleUserDao.deleteById(binding.getId());
+        return revokeRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
     }
 
     public int unbindUsers(String roleId, List<String> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return 0;
         }
-        Role role = requireEnabledRole(roleId);
         int changed = 0;
         for (String userId : userIds.stream().filter(Objects::nonNull).distinct().toList()) {
-            RoleUser binding = findRoleUser(role.getId(), userId);
-            if (binding != null) {
-                changed += roleUserDao.deleteById(binding.getId());
-            }
+            changed += revokeRole(roleId, RoleGrantSubjectType.USER_ACCOUNT, userId);
         }
         return changed;
     }
 
     public List<String> userIds(String roleId) {
         Role role = requireEnabledRole(roleId);
-        return roleUserDao.query(scopedChildCriteria(Criteria.of().eq("roleId", role.getId())), ALL)
+        return roleGrantDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("roleId", role.getId())
+                        .eq("subjectType", RoleGrantSubjectType.USER_ACCOUNT)
+                        .eq("enabled", Boolean.TRUE)), ALL)
                 .stream()
-                .map(RoleUser::getUserId)
+                .map(RoleGrant::getSubjectId)
                 .distinct()
                 .toList();
+    }
+
+    public String grantRole(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        return grantRoleIfAbsent(roleId, subjectType, subjectId).grantId();
+    }
+
+    public int revokeRole(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        Role role = requireEnabledRole(roleId);
+        RoleGrant grant = findRoleGrant(role.getId(), requireSubjectType(subjectType), requireSubjectId(subjectId));
+        if (grant == null) {
+            return 0;
+        }
+        return roleGrantDao.deleteById(grant.getId());
+    }
+
+    public int deleteGrant(String roleId, String grantId) {
+        Role role = requireEnabledRole(roleId);
+        RoleGrant grant = roleGrantDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("id", Preconditions.requireText(grantId, "grantId"))),
+                new PageRequest(0, 1)).stream().findFirst().orElse(null);
+        if (grant == null || !SortAbility.sameValue(role.getId(), grant.getRoleId())) {
+            throw new PlatformException("role grant does not belong to role: " + grantId);
+        }
+        return roleGrantDao.deleteById(grant.getId());
+    }
+
+    public List<RoleGrant> roleGrants(String roleId) {
+        Role role = requireEnabledRole(roleId);
+        return roleGrantDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("roleId", role.getId())
+                        .eq("enabled", Boolean.TRUE)), ALL);
+    }
+
+    public List<RoleGrant> subjectRoleGrants(RoleGrantSubjectType subjectType, String subjectId) {
+        return roleGrantDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("subjectType", requireSubjectType(subjectType))
+                        .eq("subjectId", requireSubjectId(subjectId))
+                        .eq("enabled", Boolean.TRUE)), ALL);
     }
 
     public int grantAction(String roleId, String moduleAlias, String actionCode) {
@@ -336,9 +380,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     public Set<String> effectiveRoleIds(String userId) {
         String validUserId = Preconditions.requireText(userId, "userId");
-        List<RoleUser> bindings = roleUserDao.query(scopedChildCriteria(Criteria.of().eq("userId", validUserId)), ALL);
+        List<RoleGrant> bindings = roleGrantDao.query(scopedChildCriteria(Criteria.of()
+                        .eq("subjectType", RoleGrantSubjectType.USER_ACCOUNT)
+                        .eq("subjectId", validUserId)
+                        .eq("enabled", Boolean.TRUE)), ALL);
         LinkedHashSet<String> effective = new LinkedHashSet<>();
-        for (RoleUser binding : bindings) {
+        for (RoleGrant binding : bindings) {
             Role role = select(binding.getRoleId());
             if (role == null || !Boolean.TRUE.equals(role.getEnabled())) {
                 continue;
@@ -424,8 +471,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     @Override
     public void afterDelete(String id, Role role, int deleted) {
-        roleUserDao.query(scopedChildCriteria(Criteria.of().eq("roleId", id)), ALL)
-                .forEach(binding -> roleUserDao.deleteById(binding.getId()));
+        roleGrantDao.query(scopedChildCriteria(Criteria.of().eq("roleId", id)), ALL)
+                .forEach(binding -> roleGrantDao.deleteById(binding.getId()));
         roleActionDao.query(scopedChildCriteria(Criteria.of().eq("roleId", id)), ALL)
                 .forEach(action -> roleActionDao.deleteById(action.getId()));
         removeRoleFromGroups(id);
@@ -491,8 +538,42 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return expanded;
     }
 
-    private void ensureDataScopeRoleBindingValid(String roleId, String userId) {
-        LinkedHashSet<String> roleIds = new LinkedHashSet<>(effectiveRoleIds(userId));
+    private GrantResult grantRoleIfAbsent(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        Role role = requireEnabledRole(roleId);
+        RoleGrantSubjectType validSubjectType = requireSubjectType(subjectType);
+        String validSubjectId = requireSubjectId(subjectId);
+        ensureRoleCanGrantTo(role, validSubjectType);
+        validateGrantSubject(validSubjectType, validSubjectId);
+        ensureDataScopeRoleBindingValid(role.getId(), validSubjectType, validSubjectId);
+        RoleGrant existing = findRoleGrant(role.getId(), validSubjectType, validSubjectId);
+        if (existing != null) {
+            return new GrantResult(existing.getId(), false);
+        }
+
+        RoleGrant grant = new RoleGrant();
+        grant.setRoleId(role.getId());
+        grant.setSubjectType(validSubjectType);
+        grant.setSubjectId(validSubjectId);
+        grant.setEnabled(true);
+        prepareChildInsert(grant);
+        return new GrantResult(roleGrantDao.insert(grant), true);
+    }
+
+    private void validateGrantSubject(RoleGrantSubjectType subjectType, String subjectId) {
+        if (subjectType == RoleGrantSubjectType.USER_ACCOUNT && userAccountService != null) {
+            userAccountService.requireEnabled(subjectId, "user account is not active: " + subjectId);
+        } else if (subjectType == RoleGrantSubjectType.EMPLOYEE && employeeService != null) {
+            employeeService.requireEnabled(subjectId, "employee is not active: " + subjectId);
+        } else if (subjectType == RoleGrantSubjectType.EMPLOYEE_POSITION && employeePositionService != null) {
+            employeePositionService.requireEnabled(subjectId, "employee position is not active: " + subjectId);
+        }
+    }
+
+    private void ensureDataScopeRoleBindingValid(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        if (subjectType != RoleGrantSubjectType.USER_ACCOUNT) {
+            return;
+        }
+        LinkedHashSet<String> roleIds = new LinkedHashSet<>(effectiveRoleIds(subjectId));
         roleIds.add(roleId);
         long wildcardDataScopeRoleCount = roleIds.stream()
                 .map(this::select)
@@ -510,10 +591,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         }
     }
 
-    private RoleUser findRoleUser(String roleId, String userId) {
-        return roleUserDao.query(scopedChildCriteria(Criteria.of()
+    private RoleGrant findRoleGrant(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        return roleGrantDao.query(scopedChildCriteria(Criteria.of()
                         .eq("roleId", Preconditions.requireText(roleId, "roleId"))
-                        .eq("userId", Preconditions.requireText(userId, "userId"))),
+                        .eq("subjectType", requireSubjectType(subjectType))
+                        .eq("subjectId", requireSubjectId(subjectId))),
                 new PageRequest(0, 1)).stream().findFirst().orElse(null);
     }
 
@@ -648,6 +730,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return Preconditions.requireText(actionCode, "actionCode");
     }
 
+    private RoleGrantSubjectType requireSubjectType(RoleGrantSubjectType subjectType) {
+        return Objects.requireNonNull(subjectType, "subjectType must not be null");
+    }
+
+    private String requireSubjectId(String subjectId) {
+        return Preconditions.requireText(subjectId, "subjectId");
+    }
+
     private String permissionActionCode(String actionCode) {
         return PlatformAction.permissionActionCodeOf(requireActionCode(actionCode));
     }
@@ -693,5 +783,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             String moduleAlias,
             String actionCode
     ) {
+    }
+
+    private record GrantResult(String grantId, boolean created) {
     }
 }

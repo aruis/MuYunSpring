@@ -11,7 +11,7 @@ import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
-import net.ximatai.muyun.spring.iam.role.RoleUserDao;
+import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleActionDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
@@ -122,13 +122,13 @@ class RoleGrantableActionResolverTest {
         when(roleActionDao.query(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(List.of(rolePermissionsGrant));
         RoleService roleService = new RoleService(
-                roleDao, mock(RoleUserDao.class), roleActionDao, tenantId -> {
+                roleDao, mock(RoleGrantDao.class), roleActionDao, tenantId -> {
         });
 
         RolePermissionMatrix matrix = roleService.permissionMatrix("role-1", grantableActions);
 
         assertThat(grantableActions).extracting(GrantableAction::actionCode)
-                .contains("menu", "roleUsers", "rolePermissions");
+                .contains("menu", "roleGrants", "rolePermissions");
         assertThat(matrix.modules()).singleElement()
                 .satisfies(module -> {
                     assertThat(module.moduleAlias()).isEqualTo("iam.role");
@@ -145,12 +145,12 @@ class RoleGrantableActionResolverTest {
                                     RolePermissionAction::dataScopePolicy,
                                     RolePermissionAction::dataAuth)
                             .containsExactly("rolePermissions", true, DataScopePolicy.ORGANIZATION, true);
-                    assertThat(module.actions()).filteredOn(action -> "roleUsers".equals(action.actionCode()))
+                    assertThat(module.actions()).filteredOn(action -> "roleGrants".equals(action.actionCode()))
                             .singleElement()
                             .extracting(RolePermissionAction::permissionActionCode,
                                     RolePermissionAction::granted,
                                     RolePermissionAction::dataAuth)
-                            .containsExactly("roleUsers", false, true);
+                            .containsExactly("roleGrants", false, true);
                 });
     }
 

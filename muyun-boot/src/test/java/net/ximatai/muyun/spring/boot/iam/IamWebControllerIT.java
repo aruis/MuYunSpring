@@ -17,6 +17,8 @@ import net.ximatai.muyun.spring.iam.position.Position;
 import net.ximatai.muyun.spring.iam.position.PositionService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.RoleGrant;
+import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -290,25 +292,32 @@ class IamWebControllerIT {
     void shouldBindRoleManagementEndpointsInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
-        when(roleService.bindUsers("role-1", List.of("user-2", "user-3"))).thenReturn(2);
-        when(roleService.userIds("role-1")).thenReturn(List.of("user-2", "user-3"));
+        RoleGrant grant = roleGrant("grant-1", "role-1", RoleGrantSubjectType.USER_ACCOUNT, "user-2");
+        when(roleService.grantRole("role-1", RoleGrantSubjectType.USER_ACCOUNT, "user-2")).thenReturn("grant-1");
+        when(roleService.roleGrants("role-1")).thenReturn(List.of(grant));
+        when(roleService.deleteGrant("role-1", "grant-1")).thenReturn(1);
         when(roleService.grantAction("role-1", "sales.contract", "query",
                 DataScopePolicy.OWNER, TenantScopePolicy.CURRENT_TENANT,
                 null, null, null)).thenReturn(1);
         when(roleService.revokeAction("role-1", "sales.contract", "query")).thenReturn(1);
 
-        mvc.perform(post("/iam.role/users/{roleId}/bind", "role-1")
+        mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
                         .contentType("application/json")
                         .content("""
-                                {"userIds":["user-2","user-3"]}
+                                {"subjectType":"USER_ACCOUNT","subjectId":"user-2"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(2));
+                .andExpect(jsonPath("$").value("grant-1"));
 
-        mvc.perform(get("/iam.role/users/{roleId}", "role-1"))
+        mvc.perform(get("/iam.role/{roleId}/grants", "role-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("user-2"))
-                .andExpect(jsonPath("$[1]").value("user-3"));
+                .andExpect(jsonPath("$[0].id").value("grant-1"))
+                .andExpect(jsonPath("$[0].subjectType").value("USER_ACCOUNT"))
+                .andExpect(jsonPath("$[0].subjectId").value("user-2"));
+
+        mvc.perform(post("/iam.role/{roleId}/grants/{grantId}/delete", "role-1", "grant-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
 
         mvc.perform(post("/iam.role/grant/{roleId}", "role-1")
                         .contentType("application/json")
@@ -386,5 +395,15 @@ class IamWebControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("custom data scope policy is not supported yet"));
+    }
+
+    private RoleGrant roleGrant(String id, String roleId, RoleGrantSubjectType subjectType, String subjectId) {
+        RoleGrant grant = new RoleGrant();
+        grant.setId(id);
+        grant.setRoleId(roleId);
+        grant.setSubjectType(subjectType);
+        grant.setSubjectId(subjectId);
+        grant.setEnabled(Boolean.TRUE);
+        return grant;
     }
 }

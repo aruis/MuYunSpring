@@ -123,20 +123,20 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
-    void shouldResolveRoleUsersCustomEndpointActionContext() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.role/users/role-1/bind");
+    void shouldResolveRoleGrantsCustomEndpointActionContext() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.role/role-1/grants");
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("roleId", "role-1"));
         RoleWebController controller = new RoleWebController(null);
 
         interceptor.preHandle(request, new MockHttpServletResponse(),
                 handler(controller, RoleWebController.class.getMethod(
-                        "bindUsers", String.class, RoleWebController.UserIdsRequest.class)));
+                        "grantRole", String.class, RoleWebController.RoleGrantRequest.class)));
 
         assertThat(policyService.context).satisfies(context -> {
             assertThat(context.moduleAlias()).isEqualTo("iam.role");
             assertThat(context.platformAction()).isNull();
-            assertThat(context.actionCode()).isEqualTo("roleUsers");
-            assertThat(context.permissionCode()).isEqualTo("iam.role:roleUsers");
+            assertThat(context.actionCode()).isEqualTo("roleGrants");
+            assertThat(context.permissionCode()).isEqualTo("iam.role:roleGrants");
             assertThat(context.actionPolicy().requiresDataScope()).isTrue();
             assertThat(context.recordIds()).containsExactly("role-1");
         });

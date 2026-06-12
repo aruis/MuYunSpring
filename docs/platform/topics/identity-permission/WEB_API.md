@@ -167,9 +167,9 @@
 | `POST` | `/iam.role/enable/{id}` | 启用角色。 |
 | `POST` | `/iam.role/disable/{id}` | 停用角色。 |
 | `POST` | `/iam.role/sort/{id}` | 调整角色排序。 |
-| `POST` | `/iam.role/users/{roleId}/bind` | 为角色批量绑定用户。 |
-| `POST` | `/iam.role/users/{roleId}/unbind` | 为角色批量解绑用户。 |
-| `GET` | `/iam.role/users/{roleId}` | 查询角色已绑定用户 ID。 |
+| `GET` | `/iam.role/{roleId}/grants` | 查询角色授权实例，包含授权主体类型和主体 ID。 |
+| `POST` | `/iam.role/{roleId}/grants` | 新增角色授权实例，可授给账号、职员或具体任岗。 |
+| `POST` | `/iam.role/{roleId}/grants/{grantId}/delete` | 删除角色授权实例。 |
 | `POST` | `/iam.role/grant/{roleId}` | 授予角色某个 `moduleAlias + actionCode`，可携带数据权限策略、租户范围策略和引用依赖参数。 |
 | `POST` | `/iam.role/grant/{roleId}/batch` | 批量授予角色多个模块动作；每项请求体复用单动作授权字段。 |
 | `POST` | `/iam.role/wildcard-data-scope/{roleId}/grant` | 为数据权限通配角色授予通配数据范围动作。 |
@@ -177,6 +177,13 @@
 | `POST` | `/iam.role/revoke/{roleId}/batch` | 批量撤销角色多个模块动作授权。 |
 | `POST` | `/iam.role/permissionMatrix/{roleId}` | 按模块列表返回角色授权矩阵，用于回显可授权动作和已授权状态。 |
 | `GET` | `/iam.role/menuMatrix/{roleId}/{schemeId}` | 按菜单方案返回菜单树和角色对模块菜单的授权状态。 |
+
+授权实例请求中常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `subjectType` | 授权主体类型，当前 JSON 使用 enum 名称：`USER_ACCOUNT`、`EMPLOYEE`、`EMPLOYEE_POSITION`。 |
+| `subjectId` | 授权主体 ID。账号、职员、任岗授权分别指向对应记录。 |
 
 授权请求中常见字段：
 

@@ -4,5 +4,5 @@ import net.ximatai.muyun.database.spring.boot.sql.annotation.MuYunRepository;
 import net.ximatai.muyun.spring.ability.BaseDao;
 
 @MuYunRepository
-public interface RoleUserDao extends BaseDao<RoleUser, String> {
+public interface RoleGrantDao extends BaseDao<RoleGrant, String> {
 }

@@ -13,6 +13,8 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.Role;
+import net.ximatai.muyun.spring.iam.role.RoleGrant;
+import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
 import net.ximatai.muyun.spring.iam.role.RolePermissionAction;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
@@ -61,27 +63,27 @@ public class RoleWebController extends WebSupport<RoleService> implements
         this.menuService = menuService;
     }
 
-    @PostMapping("/users/{roleId}/bind")
-    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+    @GetMapping("/{roleId}/grants")
+    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public WebCountResponse bindUsers(@PathVariable String roleId,
-                                      @RequestBody UserIdsRequest request) {
-        return webScope(() -> new WebCountResponse(service().bindUsers(roleId, request.userIds())));
+    public List<RoleGrant> roleGrants(@PathVariable String roleId) {
+        return webScope(() -> service().roleGrants(roleId));
     }
 
-    @PostMapping("/users/{roleId}/unbind")
-    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+    @PostMapping("/{roleId}/grants")
+    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public WebCountResponse unbindUsers(@PathVariable String roleId,
-                                        @RequestBody UserIdsRequest request) {
-        return webScope(() -> new WebCountResponse(service().unbindUsers(roleId, request.userIds())));
+    public String grantRole(@PathVariable String roleId,
+                            @RequestBody RoleGrantRequest request) {
+        return webScope(() -> service().grantRole(roleId, request.subjectType(), request.subjectId()));
     }
 
-    @GetMapping("/users/{roleId}")
-    @CustomActionEndpoint(value = "roleUsers", title = "角色用户",
+    @PostMapping("/{roleId}/grants/{grantId}/delete")
+    @CustomActionEndpoint(value = "roleGrants", title = "角色授权实例",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "roleId")
-    public List<String> userIds(@PathVariable String roleId) {
-        return webScope(() -> service().userIds(roleId));
+    public WebCountResponse deleteGrant(@PathVariable String roleId,
+                                        @PathVariable String grantId) {
+        return webScope(() -> new WebCountResponse(service().deleteGrant(roleId, grantId)));
     }
 
     @PostMapping("/grant/{roleId}")
@@ -177,7 +179,10 @@ public class RoleWebController extends WebSupport<RoleService> implements
         });
     }
 
-    public record UserIdsRequest(List<String> userIds) {
+    public record RoleGrantRequest(
+            RoleGrantSubjectType subjectType,
+            String subjectId
+    ) {
     }
 
     public record GrantActionRequest(
