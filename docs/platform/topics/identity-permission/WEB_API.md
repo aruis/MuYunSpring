@@ -142,6 +142,8 @@
 | `X-MuYun-Acting-Principal-Employee-Id` | 被代办职员 ID。出现该头时，入口会校验当前登录账号是否为有效受托职员，并校验代办关系、有效期和 scope。 |
 | `X-MuYun-Acting-Principal-Position-Id` | 可选，被代办任岗关系 ID；用于让被代办业务主体落到具体任岗上下文。 |
 
+声明代办并命中当前模块动作后，动作权限和数据权限按被代办业务主体解释；当前登录账号仍作为实际操作者用于租户上下文和审计。
+
 ## 岗位
 
 根路径：`/iam.position`

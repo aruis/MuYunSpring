@@ -5,6 +5,9 @@ import net.ximatai.muyun.database.core.orm.CompiledCriteria;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -28,6 +31,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleDataScopeCriteriaServiceTest {
@@ -364,6 +369,210 @@ class RoleDataScopeCriteriaServiceTest {
         assertThat(compiled.getParams())
                 .containsEntry("p1", "dept-main")
                 .containsEntry("p2", "dept-branch");
+    }
+
+    @Test
+    void shouldResolveActingDataScopeFromBusinessPrincipalGrantContext() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employeePosition(
+                "employee-principal", "org-principal", "dept-principal", "position-principal");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(
+                        grant(DataScopePolicy.DEPARTMENT, "position-role"),
+                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                                "position-principal", "org-grant", "dept-grant", "position-principal"))));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "query"))) {
+            scoped = service.applyReadScope(
+                    "sales.contract",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authDepartmentId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "dept-grant");
+        verify(roleService, never()).effectiveActionGrantsWithContext("assistant-user", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldDenyActingDataScopeWhenPrincipalHasNoGrantEvenIfOperatorHasGrant() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
+                .thenReturn(List.of());
+        whenActionGrants(roleService, "assistant-user", "sales.contract", "view", grant(DataScopePolicy.ALL));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "query"))) {
+            scoped = service.applyReadScope(
+                    "sales.contract",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        assertThat(compile(scoped).getSql()).contains("\"status\" = :p0").contains("1 = 0");
+        verify(roleService, never()).effectiveActionGrantsWithContext("assistant-user", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldNotUseOperatorUserIdForOwnerScopeWhenEmployeePrincipalHasNoUserId() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(
+                        grant(DataScopePolicy.OWNER, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-principal", "org-principal", "dept-principal", null))));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "query"))) {
+            scoped = service.applyReadScope(
+                    "sales.contract",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql()).contains("\"status\" = :p0").contains("1 = 0");
+        assertThat(compiled.getParams().values()).doesNotContain("assistant-user");
+    }
+
+    @Test
+    void shouldUseOperatorDataScopeWhenActingContextDoesNotMatchAction() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        whenActionGrants(roleService, "assistant-user", "sales.contract", "view",
+                grant(DataScopePolicy.ORGANIZATION));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "create"))) {
+            scoped = service.applyReadScope(
+                    "sales.contract",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql()).contains("\"authOrganizationId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "org-assistant");
+        verify(roleService, never()).effectiveActionGrantsWithContext(principal, "sales.contract", "view");
+    }
+
+    @Test
+    void shouldSkipDefaultGrantPolicyWhenActingDataScopeUsesEmployeePrincipal() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "follow"))
+                .thenReturn(List.of());
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "follow"))) {
+            scoped = service.resolveReadScope(
+                    "sales.contract",
+                    policy("follow", ActionDefaultGrantPolicy.MEMBER),
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            ).criteria();
+        }
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql()).contains("\"status\" = :p0").contains("1 = 0");
+        assertThat(compiled.getParams().values()).doesNotContain("assistant-user");
+        verify(roleService, never()).effectiveActionGrantsWithContext("assistant-user", "sales.contract", "follow");
+    }
+
+    @Test
+    void shouldNotResolveWildcardDataScopeFromOperatorWhenActing() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
+        wildcard.setActionCode("view");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.contract", "view"))
+                .thenReturn(List.of(effectiveActionGrant(wildcard,
+                        effectiveRoleGrant("role-1", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-principal", "org-principal", "dept-principal", null))));
+        when(roleService.effectiveWildcardDataScopeGrant("assistant-user", "view"))
+                .thenReturn(grant(DataScopePolicy.ALL));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "query"))) {
+            scoped = service.applyReadScope(
+                    "sales.contract",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        assertThat(compile(scoped).getSql()).contains("\"status\" = :p0").contains("1 = 0");
+        verify(roleService, never()).effectiveWildcardDataScopeGrant("assistant-user", "view");
+    }
+
+    @Test
+    void shouldNotResolveReferenceDependencyScopeFromOperatorWhenActing() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        when(roleService.effectiveActionGrantsWithContext(principal, "sales.score", "view"))
+                .thenReturn(List.of(effectiveActionGrant(referenceGrant("studentId", "view"),
+                        effectiveRoleGrant("role-1", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-principal", "org-principal", "dept-principal", null))));
+        whenActionGrants(roleService, "assistant-user", "school.student", "view", grant(DataScopePolicy.ALL));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
+                roleService,
+                Optional.empty(),
+                Optional.of(referenceResolver("studentId", "school.student", "student"))
+        );
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+
+        Criteria scoped;
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.score", "query"))) {
+            scoped = service.applyReadScope(
+                    "sales.score",
+                    "query",
+                    Criteria.of().eq("status", "OPEN"),
+                    Optional.of(operator)
+            );
+        }
+
+        assertThat(compile(scoped).getSql()).contains("\"status\" = :p0").contains("1 = 0");
+        verify(roleService, never()).effectiveActionGrantsWithContext("assistant-user", "school.student", "view");
     }
 
     @Test

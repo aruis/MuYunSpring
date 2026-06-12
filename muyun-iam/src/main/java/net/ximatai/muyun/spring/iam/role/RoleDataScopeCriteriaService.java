@@ -8,6 +8,9 @@ import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.database.core.orm.SqlSubQuery;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
@@ -100,10 +103,13 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         if (!visiting.add(visitKey)) {
             return DataScopeCriteriaResult.restricted(combine(base, denied()));
         }
-        List<EffectiveRoleActionGrant> grants = roleService.effectiveActionGrantsWithContext(
-                user.userId(), moduleAlias, policy.permissionActionCode());
+        ActingContext actingContext = actingContext(moduleAlias, policy, user);
+        BusinessPrincipal principal = actingContext == null ? null : actingContext.principal();
+        List<EffectiveRoleActionGrant> grants = principal == null
+                ? roleService.effectiveActionGrantsWithContext(user.userId(), moduleAlias, policy.permissionActionCode())
+                : roleService.effectiveActionGrantsWithContext(principal, moduleAlias, policy.permissionActionCode());
         try {
-            List<GrantScope> scopes = grantScopes(moduleAlias, policy, user, grants, visiting);
+            List<GrantScope> scopes = grantScopes(moduleAlias, policy, user, principal, grants, visiting);
             if (scopes.isEmpty()) {
                 return DataScopeCriteriaResult.restricted(combine(base, denied()));
             }
@@ -113,6 +119,19 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         } finally {
             visiting.remove(visitKey);
         }
+    }
+
+    private ActingContext actingContext(String moduleAlias, ActionExecutionPolicy policy, CurrentUser user) {
+        ActingContext actingContext = ActingContextHolder.current()
+                .filter(acting -> acting.matches(moduleAlias, policy.actionCode()))
+                .orElse(null);
+        if (actingContext == null) {
+            return null;
+        }
+        if (!user.userId().equals(actingContext.operator().userId())) {
+            throw new PlatformException("acting context operator does not match current user");
+        }
+        return actingContext;
     }
 
     private ActionExecutionPolicy policyOf(String actionCode) {
@@ -134,16 +153,19 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     private List<GrantScope> grantScopes(String moduleAlias,
                                          ActionExecutionPolicy policy,
                                          CurrentUser user,
+                                         BusinessPrincipal principal,
                                          List<EffectiveRoleActionGrant> grants,
                                          Set<String> visiting) {
         java.util.ArrayList<GrantScope> scopes = new java.util.ArrayList<>();
-        GrantScope defaultScope = resolveDefaultScope(policy.defaultGrantPolicy(), user);
+        GrantScope defaultScope = principal == null
+                ? resolveDefaultScope(policy.defaultGrantPolicy(), user)
+                : GrantScope.none();
         if (defaultScope.contributes()) {
             scopes.add(defaultScope);
         }
         if (grants != null) {
             grants.stream()
-                    .map(grant -> resolveGrantScope(moduleAlias, grant, user, visiting))
+                    .map(grant -> resolveGrantScope(moduleAlias, grant, user, principal, visiting))
                     .filter(GrantScope::contributes)
                     .forEach(scopes::add);
         }
@@ -214,6 +236,7 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     private GrantScope resolveGrantScope(String moduleAlias,
                                          EffectiveRoleActionGrant effectiveGrant,
                                          CurrentUser user,
+                                         BusinessPrincipal principal,
                                          Set<String> visiting) {
         RoleAction grant = effectiveGrant.actionGrant();
         DataScopePolicy policy = normalizePolicy(grant);
@@ -221,12 +244,18 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
             return GrantScope.all(allowsCrossTenant(grant));
         }
         if (policy == DataScopePolicy.WILDCARD) {
+            if (principal != null) {
+                return GrantScope.none();
+            }
             return resolveWildcardScope(moduleAlias, grant, user, visiting);
         }
         if (policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
+            if (principal != null) {
+                return GrantScope.none();
+            }
             return resolveReferenceDependencyScope(moduleAlias, grant, user, visiting);
         }
-        Criteria criteria = criteriaForPolicy(policy, user, effectiveGrant.roleGrant());
+        Criteria criteria = criteriaForPolicy(policy, user, principal, effectiveGrant.roleGrant());
         return GrantScope.restricted(criteria, allowsCrossTenant(grant));
     }
 
@@ -244,7 +273,8 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                 || wildcardPolicy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             return GrantScope.none();
         }
-        GrantScope resolved = resolveGrantScope(moduleAlias, new EffectiveRoleActionGrant(wildcardGrant, null), user, visiting);
+        GrantScope resolved = resolveGrantScope(moduleAlias, new EffectiveRoleActionGrant(wildcardGrant, null),
+                user, null, visiting);
         if (!resolved.contributes()) {
             return GrantScope.none();
         }
@@ -302,46 +332,71 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     }
 
     private Criteria criteriaForPolicy(DataScopePolicy policy, CurrentUser user) {
-        return criteriaForPolicy(policy, user, null);
+        return criteriaForPolicy(policy, user, null, null);
     }
 
-    private Criteria criteriaForPolicy(DataScopePolicy policy, CurrentUser user, EffectiveRoleGrant roleGrant) {
-        return criteriaForPolicies(user, roleGrant, policy);
+    private Criteria criteriaForPolicy(DataScopePolicy policy,
+                                       CurrentUser user,
+                                       BusinessPrincipal principal,
+                                       EffectiveRoleGrant roleGrant) {
+        return criteriaForPolicies(user, principal, roleGrant, policy);
     }
 
     private Criteria criteriaForPolicies(CurrentUser user, DataScopePolicy... policies) {
-        return criteriaForPolicies(user, null, policies);
+        return criteriaForPolicies(user, null, null, policies);
     }
 
-    private Criteria criteriaForPolicies(CurrentUser user, EffectiveRoleGrant roleGrant, DataScopePolicy... policies) {
+    private Criteria criteriaForPolicies(CurrentUser user,
+                                         BusinessPrincipal principal,
+                                         EffectiveRoleGrant roleGrant,
+                                         DataScopePolicy... policies) {
         Criteria scope = Criteria.of();
         if (policies != null) {
             for (DataScopePolicy policy : policies) {
-                appendScope(scope, policy, user, roleGrant);
+                appendScope(scope, policy, user, principal, roleGrant);
             }
         }
         return scope;
     }
 
-    private void appendScope(Criteria scope, DataScopePolicy policy, CurrentUser user, EffectiveRoleGrant roleGrant) {
+    private void appendScope(Criteria scope,
+                             DataScopePolicy policy,
+                             CurrentUser user,
+                             BusinessPrincipal principal,
+                             EffectiveRoleGrant roleGrant) {
         switch (normalizePolicy(policy)) {
-            case OWNER -> scope.orEq(PlatformAbilityFields.AUTH_USER_FIELD, user.userId());
-            case ASSIGNEE -> scope.orRaw(csvContains(PlatformAbilityFields.AUTH_ASSIGNEE_COLUMN, "userId", user.userId()));
-            case MEMBER -> scope.orRaw(csvContains(PlatformAbilityFields.AUTH_MEMBER_COLUMN, "userId", user.userId()));
+            case OWNER -> {
+                String userId = scopeUserId(user, principal);
+                if (userId != null) {
+                    scope.orEq(PlatformAbilityFields.AUTH_USER_FIELD, userId);
+                }
+            }
+            case ASSIGNEE -> {
+                String userId = scopeUserId(user, principal);
+                if (userId != null) {
+                    scope.orRaw(csvContains(PlatformAbilityFields.AUTH_ASSIGNEE_COLUMN, "userId", userId));
+                }
+            }
+            case MEMBER -> {
+                String userId = scopeUserId(user, principal);
+                if (userId != null) {
+                    scope.orRaw(csvContains(PlatformAbilityFields.AUTH_MEMBER_COLUMN, "userId", userId));
+                }
+            }
             case ORGANIZATION -> {
-                String organizationId = scopeOrganizationId(user, roleGrant);
+                String organizationId = scopeOrganizationId(user, principal, roleGrant);
                 if (organizationId != null) {
                     scope.orEq(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, organizationId);
                 }
             }
-            case ORGANIZATION_AND_CHILDREN -> appendOrganizationAndChildrenScope(scope, user, roleGrant);
+            case ORGANIZATION_AND_CHILDREN -> appendOrganizationAndChildrenScope(scope, user, principal, roleGrant);
             case DEPARTMENT -> {
-                String departmentId = scopeDepartmentId(roleGrant);
+                String departmentId = scopeDepartmentId(principal, roleGrant);
                 if (departmentId != null) {
                     scope.orEq(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, departmentId);
                 }
             }
-            case DEPARTMENT_AND_CHILDREN -> appendDepartmentAndChildrenScope(scope, roleGrant);
+            case DEPARTMENT_AND_CHILDREN -> appendDepartmentAndChildrenScope(scope, principal, roleGrant);
             case CUSTOM ->
                     throw new PlatformException("custom data scope condition is not supported yet");
             case WILDCARD -> throw new PlatformException("wildcard data scope must be resolved before append scope");
@@ -369,8 +424,11 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                 .andGroup(grantScope.getRoot());
     }
 
-    private void appendOrganizationAndChildrenScope(Criteria scope, CurrentUser user, EffectiveRoleGrant roleGrant) {
-        String organizationId = scopeOrganizationId(user, roleGrant);
+    private void appendOrganizationAndChildrenScope(Criteria scope,
+                                                    CurrentUser user,
+                                                    BusinessPrincipal principal,
+                                                    EffectiveRoleGrant roleGrant) {
+        String organizationId = scopeOrganizationId(user, principal, roleGrant);
         if (organizationId == null) {
             return;
         }
@@ -382,9 +440,11 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         }
     }
 
-    private void appendDepartmentAndChildrenScope(Criteria scope, EffectiveRoleGrant roleGrant) {
-        String organizationId = scopeOrganizationId(null, roleGrant);
-        String departmentId = scopeDepartmentId(roleGrant);
+    private void appendDepartmentAndChildrenScope(Criteria scope,
+                                                  BusinessPrincipal principal,
+                                                  EffectiveRoleGrant roleGrant) {
+        String organizationId = scopeOrganizationId(null, principal, roleGrant);
+        String departmentId = scopeDepartmentId(principal, roleGrant);
         if (organizationId == null || departmentId == null) {
             return;
         }
@@ -396,17 +456,30 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         }
     }
 
-    private String scopeOrganizationId(CurrentUser user, EffectiveRoleGrant roleGrant) {
+    private String scopeUserId(CurrentUser user, BusinessPrincipal principal) {
+        if (principal != null) {
+            return principal.userId();
+        }
+        return user.userId();
+    }
+
+    private String scopeOrganizationId(CurrentUser user, BusinessPrincipal principal, EffectiveRoleGrant roleGrant) {
         String contextOrganizationId = roleGrant == null ? null : roleGrant.organizationId();
         if (contextOrganizationId != null && !contextOrganizationId.isBlank()) {
             return contextOrganizationId;
         }
+        if (principal != null) {
+            return principal.organizationId();
+        }
         return user == null ? null : user.organizationId();
     }
 
-    private String scopeDepartmentId(EffectiveRoleGrant roleGrant) {
+    private String scopeDepartmentId(BusinessPrincipal principal, EffectiveRoleGrant roleGrant) {
         String contextDepartmentId = roleGrant == null ? null : roleGrant.departmentId();
-        return contextDepartmentId == null || contextDepartmentId.isBlank() ? null : contextDepartmentId;
+        if (contextDepartmentId != null && !contextDepartmentId.isBlank()) {
+            return contextDepartmentId;
+        }
+        return principal == null ? null : principal.departmentId();
     }
 
     private DataScopePolicy normalizePolicy(RoleAction grant) {
