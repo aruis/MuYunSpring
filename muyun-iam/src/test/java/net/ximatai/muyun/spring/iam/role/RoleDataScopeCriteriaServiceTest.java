@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +36,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDenyWhenUserHasNoActionGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of());
+        whenActionGrants(roleService, "user-1", "sales.contract", "view");
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -52,10 +53,10 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldUnionOwnerAndOrganizationScopes() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.OWNER),
                 grant(DataScopePolicy.ORGANIZATION)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -76,10 +77,10 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldLeaveCriteriaUnrestrictedWhenAnyGrantAllowsAllData() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.OWNER),
                 grant(DataScopePolicy.ALL)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -96,9 +97,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldMarkAllDataScopeAsCrossTenantWhenRoleAllowsAllTenants() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ALL, "role-cross", TenantScopePolicy.ALL_TENANTS)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -116,9 +117,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldNotMarkCrossTenantWhenAllTenantRoleDoesNotContributeActionGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ALL, "role-current")
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -136,10 +137,10 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldKeepCurrentTenantAllScopedWhenMixedWithCrossTenantRestrictedGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ALL, "role-current"),
                 grant(DataScopePolicy.OWNER, "role-cross", TenantScopePolicy.ALL_TENANTS)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -162,10 +163,10 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldNotMarkCrossTenantWhenAllTenantGrantContributesNoScope() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ALL, "role-current"),
                 grant(DataScopePolicy.NONE, "role-cross", TenantScopePolicy.ALL_TENANTS)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -185,9 +186,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldKeepBusinessScopeWhenRoleAllowsAllTenants() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.OWNER, "role-cross", TenantScopePolicy.ALL_TENANTS)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -208,9 +209,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDenyWhenOnlyGrantHasNoDataScope() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.NONE)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -228,9 +229,9 @@ class RoleDataScopeCriteriaServiceTest {
     void shouldApplyOrganizationAndChildrenScope() {
         RoleService roleService = mock(RoleService.class);
         OrganizationService organizationService = mock(OrganizationService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
-        ));
+        );
         when(organizationService.selfAndDescendantIds("org-1")).thenReturn(List.of("org-1", "org-1-1"));
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService, Optional.of(organizationService));
 
@@ -442,9 +443,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldFailFastWhenOrganizationAndChildrenScopeHasNoOrganizationService() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService, Optional.empty());
 
         assertThatThrownBy(() -> service.applyReadScope(
@@ -459,10 +460,10 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldMatchCsvAssigneeAndMemberFieldsInsideServiceOnly() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ASSIGNEE),
                 grant(DataScopePolicy.MEMBER)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -482,9 +483,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldCompileCsvScopeForMysqlAsCurrentSupportedRawShape() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.contract", "view",
                 grant(DataScopePolicy.ASSIGNEE)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -502,7 +503,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldApplyDefaultOwnerScopeWithoutRoleGrant() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "follow")).thenReturn(List.of());
+        whenActionGrants(roleService, "user-1", "sales.contract", "follow");
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         DataScopeCriteriaResult result = service.resolveReadScope(
@@ -523,7 +524,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldExpandDefaultMemberScopeToOwnerAssigneeAndMember() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "follow")).thenReturn(List.of());
+        whenActionGrants(roleService, "user-1", "sales.contract", "follow");
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.resolveReadScope(
@@ -543,7 +544,7 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldNotTreatAnyLoginUserDefaultGrantAsDataScope() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "query")).thenReturn(List.of());
+        whenActionGrants(roleService, "user-1", "sales.contract", "query");
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.resolveReadScope(
@@ -563,7 +564,7 @@ class RoleDataScopeCriteriaServiceTest {
         RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
         wildcard.setActionCode("view");
         RoleAction actual = grant(DataScopePolicy.OWNER);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
         when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
@@ -587,7 +588,7 @@ class RoleDataScopeCriteriaServiceTest {
         RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
         wildcard.setActionCode("view");
         RoleAction actual = grant(DataScopePolicy.ALL, "scope-role", TenantScopePolicy.ALL_TENANTS);
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
         when(roleService.effectiveWildcardDataScopeGrant("user-1", "view")).thenReturn(actual);
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
@@ -608,7 +609,7 @@ class RoleDataScopeCriteriaServiceTest {
         RoleService roleService = mock(RoleService.class);
         RoleAction wildcard = grant(DataScopePolicy.WILDCARD);
         wildcard.setActionCode("view");
-        when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(wildcard));
+        whenActionGrants(roleService, "user-1", "sales.contract", "view", wildcard);
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -624,12 +625,12 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldApplyReferenceDependencyScopeAsTargetPermissionSubquery() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.score", "view",
                 referenceGrant("studentId", "view")
-        ));
-        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+        );
+        whenActionGrants(roleService, "user-1", "school.student", "view",
                 grant(DataScopePolicy.OWNER)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
                 roleService,
                 Optional.empty(),
@@ -656,12 +657,12 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDefaultReferenceDependencyActionToReference() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.score", "view",
                 referenceGrant("studentId", null)
-        ));
-        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+        );
+        whenActionGrants(roleService, "user-1", "school.student", "view",
                 grant(DataScopePolicy.OWNER)
-        ));
+        );
         AtomicReference<String> requestedAction = new AtomicReference<>();
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
                 roleService,
@@ -685,10 +686,10 @@ class RoleDataScopeCriteriaServiceTest {
         RoleService roleService = mock(RoleService.class);
         RoleAction sourceGrant = referenceGrant("studentId", "view");
         sourceGrant.setTenantScopePolicy(TenantScopePolicy.ALL_TENANTS);
-        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(sourceGrant));
-        when(roleService.effectiveActionGrants("user-1", "school.student", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.score", "view", sourceGrant);
+        whenActionGrants(roleService, "user-1", "school.student", "view",
                 grant(DataScopePolicy.OWNER)
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
                 roleService,
                 Optional.empty(),
@@ -713,9 +714,9 @@ class RoleDataScopeCriteriaServiceTest {
     @Test
     void shouldDenyReferenceDependencyWhenResolverCannotResolve() {
         RoleService roleService = mock(RoleService.class);
-        when(roleService.effectiveActionGrants("user-1", "sales.score", "view")).thenReturn(List.of(
+        whenActionGrants(roleService, "user-1", "sales.score", "view",
                 referenceGrant("missingField", "view")
-        ));
+        );
         RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
 
         Criteria scoped = service.applyReadScope(
@@ -726,6 +727,17 @@ class RoleDataScopeCriteriaServiceTest {
         );
 
         assertThat(compile(scoped).getSql()).contains("1 = 0");
+    }
+
+    private void whenActionGrants(RoleService roleService,
+                                  String userId,
+                                  String moduleAlias,
+                                  String actionCode,
+                                  RoleAction... grants) {
+        when(roleService.effectiveActionGrantsWithContext(userId, moduleAlias, actionCode))
+                .thenReturn(Arrays.stream(grants)
+                        .map(grant -> effectiveActionGrant(grant, null))
+                        .toList());
     }
 
     private RoleAction grant(DataScopePolicy policy) {

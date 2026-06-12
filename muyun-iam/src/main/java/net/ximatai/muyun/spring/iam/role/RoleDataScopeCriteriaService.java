@@ -102,9 +102,6 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         }
         List<EffectiveRoleActionGrant> grants = roleService.effectiveActionGrantsWithContext(
                 user.userId(), moduleAlias, policy.permissionActionCode());
-        if (grants.isEmpty()) {
-            grants = fallbackEffectiveActionGrants(user, moduleAlias, policy.permissionActionCode());
-        }
         try {
             List<GrantScope> scopes = grantScopes(moduleAlias, policy, user, grants, visiting);
             if (scopes.isEmpty()) {
@@ -151,19 +148,6 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                     .forEach(scopes::add);
         }
         return List.copyOf(scopes);
-    }
-
-    private List<EffectiveRoleActionGrant> fallbackEffectiveActionGrants(CurrentUser user,
-                                                                         String moduleAlias,
-                                                                         String actionCode) {
-        List<RoleAction> grants = roleService.effectiveActionGrants(user.userId(), moduleAlias, actionCode);
-        if (grants == null || grants.isEmpty()) {
-            return List.of();
-        }
-        return grants.stream()
-                .filter(Objects::nonNull)
-                .map(grant -> new EffectiveRoleActionGrant(grant, null))
-                .toList();
     }
 
     private DataScopeCriteriaResult combineGrantedScopes(Criteria base,
