@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.common.model;
 
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.id.Ids;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -18,6 +19,13 @@ public final class EntityLifecycle {
         model.setVersion(model.getVersion() == null ? 0 : model.getVersion());
         model.setDeleted(Boolean.FALSE);
         model.setDeletedAt(null);
+        String operatorId = currentOperatorId();
+        if (operatorId != null && (model.getCreatedBy() == null || model.getCreatedBy().isBlank())) {
+            model.setCreatedBy(operatorId);
+        }
+        if (operatorId != null) {
+            model.setUpdatedBy(operatorId);
+        }
         model.setCreatedAt(model.getCreatedAt() == null ? now : model.getCreatedAt());
         model.setUpdatedAt(now);
     }
@@ -28,6 +36,10 @@ public final class EntityLifecycle {
 
     public static void prepareUpdate(EntityContract model, Instant now, Integer nextVersion) {
         model.setUpdatedAt(now);
+        String operatorId = currentOperatorId();
+        if (operatorId != null) {
+            model.setUpdatedBy(operatorId);
+        }
         model.setVersion(nextVersion);
     }
 
@@ -39,5 +51,11 @@ public final class EntityLifecycle {
 
     public static Integer nextVersion(Integer currentVersion) {
         return currentVersion == null ? 1 : currentVersion + 1;
+    }
+
+    private static String currentOperatorId() {
+        return CurrentUserContext.currentUser()
+                .map(user -> user.userId())
+                .orElse(null);
     }
 }

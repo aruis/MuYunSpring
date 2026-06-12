@@ -5,8 +5,14 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -25,6 +31,12 @@ import static org.mockito.Mockito.when;
 class DynamicStaticCrudConsistencyTest {
     private static final String SCHEMA = "public";
     private static final String TABLE = "app_contract";
+
+    @AfterEach
+    void tearDown() {
+        CurrentUserContext.clear();
+        ActingContextHolder.clear();
+    }
 
     @Test
     void shouldMatchStaticCrudDefaultsForInsertUpdateSoftDeleteAndActiveQuery() {
@@ -48,13 +60,17 @@ class DynamicStaticCrudConsistencyTest {
         record.setId("contract-1");
         record.setTenantId("tenant-a");
 
-        String id = entityService.insert(record);
-        DynamicRecord selected = entityService.select(id);
-        selected.setValue("amount", BigDecimal.ONE);
-        entityService.update(selected);
-        entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount"));
-        entityService.count(Criteria.of().eq("code", "C-001"));
-        entityService.delete(id);
+        String id;
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("operator-1", "Operator", "tenant-a"))) {
+            id = entityService.insert(record);
+            DynamicRecord selected = entityService.select(id);
+            selected.setValue("amount", BigDecimal.ONE);
+            entityService.update(selected);
+            entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10), Sort.desc("amount"));
+            entityService.count(Criteria.of().eq("code", "C-001"));
+            entityService.delete(id);
+        }
 
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
         verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
@@ -64,6 +80,8 @@ class DynamicStaticCrudConsistencyTest {
                 .containsEntry("version", 0)
                 .containsEntry("deleted", Boolean.FALSE)
                 .containsEntry("deleted_at", null)
+                .containsEntry("created_by", "operator-1")
+                .containsEntry("updated_by", "operator-1")
                 .containsKeys("created_at", "updated_at");
 
         ArgumentCaptor<Map<String, Object>> patchBody = mapCaptor();
@@ -71,11 +89,13 @@ class DynamicStaticCrudConsistencyTest {
                 .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), patchBody.capture(), anyMap());
         assertThat(patchBody.getAllValues().get(0))
                 .containsEntry("version", 1)
+                .containsEntry("updated_by", "operator-1")
                 .containsKey("updated_at")
                 .doesNotContainKeys("created_at", "created_by");
         assertThat(patchBody.getAllValues().get(1))
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 1)
+                .containsEntry("updated_by", "operator-1")
                 .containsKeys("deleted_at", "updated_at");
 
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
@@ -84,6 +104,33 @@ class DynamicStaticCrudConsistencyTest {
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL")
                 .contains("OR"));
+    }
+
+    @Test
+    void shouldKeepDynamicAuditOperatorAsActualUserWhenActing() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, contractEntity()),
+                "sales.contract");
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+
+        try (CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "sales.contract", "create"))) {
+            entityService.insert(record);
+        }
+
+        ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
+        assertThat(insertBody.getValue())
+                .containsEntry("created_by", "assistant-user")
+                .containsEntry("updated_by", "assistant-user");
     }
 
     @SuppressWarnings("unchecked")
