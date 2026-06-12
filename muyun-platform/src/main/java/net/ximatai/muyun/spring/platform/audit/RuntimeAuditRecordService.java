@@ -7,8 +7,14 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
+import net.ximatai.muyun.spring.ability.event.RuntimeEventAuditContext;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -53,6 +59,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         record.setAuthorizationDecision(event.authorizationDecision());
         record.setAuthorizationPermissionCode(event.authorizationPermissionCode());
         record.setAuthorizationPermissionActionCode(event.authorizationPermissionActionCode());
+        fillActingContext(record, event);
         record.setMutationSource(event.mutationSource());
         Map<String, Object> sanitizedPayload = payloadSanitizer.sanitize(event.payload());
         record.setPayloadText(payloadText(sanitizedPayload));
@@ -63,6 +70,54 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
             }
         }
         return insert(record);
+    }
+
+    private void fillActingContext(RuntimeAuditRecord record, RuntimeEvent event) {
+        if (fillActingContext(record, event.auditContext())) {
+            return;
+        }
+        ActingContext actingContext = ActingContextHolder.current()
+                .filter(acting -> acting.matches(event.moduleAlias(), auditActionCode(event)))
+                .orElse(null);
+        if (actingContext == null) {
+            return;
+        }
+        BusinessPrincipal principal = actingContext.principal();
+        record.setActingDelegationId(actingContext.delegationId());
+        record.setActingPrincipalUserId(principal.userId());
+        record.setActingPrincipalEmployeeId(principal.employeeId());
+        record.setActingPrincipalOrganizationId(principal.organizationId());
+        record.setActingPrincipalDepartmentId(principal.departmentId());
+        record.setActingPrincipalEmployeePositionId(principal.employeePositionId());
+    }
+
+    private boolean fillActingContext(RuntimeAuditRecord record, Map<String, Object> auditContext) {
+        String delegationId = RuntimeEventAuditContext.text(auditContext, RuntimeEventAuditContext.ACTING_DELEGATION_ID);
+        if (delegationId == null) {
+            return false;
+        }
+        record.setActingDelegationId(delegationId);
+        record.setActingPrincipalUserId(RuntimeEventAuditContext.text(
+                auditContext, RuntimeEventAuditContext.ACTING_PRINCIPAL_USER_ID));
+        record.setActingPrincipalEmployeeId(RuntimeEventAuditContext.text(
+                auditContext, RuntimeEventAuditContext.ACTING_PRINCIPAL_EMPLOYEE_ID));
+        record.setActingPrincipalOrganizationId(RuntimeEventAuditContext.text(
+                auditContext, RuntimeEventAuditContext.ACTING_PRINCIPAL_ORGANIZATION_ID));
+        record.setActingPrincipalDepartmentId(RuntimeEventAuditContext.text(
+                auditContext, RuntimeEventAuditContext.ACTING_PRINCIPAL_DEPARTMENT_ID));
+        record.setActingPrincipalEmployeePositionId(RuntimeEventAuditContext.text(
+                auditContext, RuntimeEventAuditContext.ACTING_PRINCIPAL_EMPLOYEE_POSITION_ID));
+        return true;
+    }
+
+    private String auditActionCode(RuntimeEvent event) {
+        if (event.actionCode() != null && !event.actionCode().isBlank()) {
+            return event.actionCode();
+        }
+        return ActionExecutionContextHolder.current()
+                .filter(context -> context.moduleAlias().equals(event.moduleAlias()))
+                .map(ActionExecutionContext::actionCode)
+                .orElse(null);
     }
 
     private void fillActionPayload(RuntimeAuditRecord record, RuntimeEvent event) {

@@ -7,8 +7,16 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -20,6 +28,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RuntimeAuditRecordServiceContractTest {
     private final TestMemoryDao<RuntimeAuditRecord> dao = new TestMemoryDao<>();
     private final RuntimeAuditRecordService service = new RuntimeAuditRecordService(dao);
+
+    @AfterEach
+    void tearDown() {
+        ActingContextHolder.clear();
+        ActionExecutionContextHolder.clear();
+    }
 
     @Test
     void shouldPersistRuntimeEventAsAuditRecord() {
@@ -42,6 +56,7 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getAuthorizationDecision()).isEqualTo("ROLE_GRANTED");
         assertThat(record.getAuthorizationPermissionCode()).isEqualTo("sales.contract:view");
         assertThat(record.getAuthorizationPermissionActionCode()).isEqualTo("view");
+        assertThat(record.getActingDelegationId()).isNull();
         assertThat(record.getExecutorType()).isEqualTo("SERVICE");
         assertThat(record.getActionLevel()).isEqualTo("RECORD");
         assertThat(record.getResultType()).isEqualTo("VALUE");
@@ -54,6 +69,106 @@ class RuntimeAuditRecordServiceContractTest {
         assertThat(record.getMutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
         assertThat(record.getPayloadText()).contains("resultType=VALUE");
         assertThat(record.getOccurredAt()).isEqualTo(Instant.parse("2026-06-02T04:00:00Z"));
+    }
+
+    @Test
+    void shouldPersistActingContextAsLightweightAuditColumns() {
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-1");
+        BusinessPrincipal principal = BusinessPrincipal.employeePosition(
+                "employee-principal", "org-principal", "dept-principal", "position-principal");
+
+        String id;
+        try (ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, "sales.contract", "approve"))) {
+            id = service.record(event());
+        }
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getOperatorId()).isEqualTo("user-1");
+        assertThat(record.getActingDelegationId()).isEqualTo("delegation-1");
+        assertThat(record.getActingPrincipalUserId()).isNull();
+        assertThat(record.getActingPrincipalEmployeeId()).isEqualTo("employee-principal");
+        assertThat(record.getActingPrincipalOrganizationId()).isEqualTo("org-principal");
+        assertThat(record.getActingPrincipalDepartmentId()).isEqualTo("dept-principal");
+        assertThat(record.getActingPrincipalEmployeePositionId()).isEqualTo("position-principal");
+        assertThat(record.getPayloadText()).doesNotContain("employee-principal", "dept-principal");
+    }
+
+    @Test
+    void shouldMatchActingContextForRecordEventsThroughCurrentActionContext() {
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-1");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        RuntimeEvent event = new RuntimeEvent(
+                "record-create-event",
+                "record-create-trace",
+                RuntimeEventType.AFTER_CREATE,
+                "sales.contract",
+                "contract",
+                "contract-1",
+                null,
+                "tenant-1",
+                false,
+                RuntimeMutationSource.BUSINESS,
+                Map.of(),
+                Instant.parse("2026-06-02T04:25:00Z")
+        );
+
+        String id;
+        try (ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "sales.contract", "create"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction("sales.contract", PlatformAction.CREATE,
+                             java.util.Set.of(), java.util.Optional.of(operator)))) {
+            id = service.record(event);
+        }
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getActionCode()).isNull();
+        assertThat(record.getActingDelegationId()).isEqualTo("delegation-1");
+        assertThat(record.getActingPrincipalEmployeeId()).isEqualTo("employee-principal");
+        assertThat(record.getActingPrincipalOrganizationId()).isEqualTo("org-principal");
+        assertThat(record.getActingPrincipalDepartmentId()).isEqualTo("dept-principal");
+    }
+
+    @Test
+    void shouldPersistCapturedActingContextAfterThreadLocalCleared() {
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-1");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+        RuntimeEvent event;
+
+        try (ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "sales.contract", "create"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction("sales.contract", PlatformAction.CREATE,
+                             java.util.Set.of(), java.util.Optional.of(operator)))) {
+            event = new RuntimeEvent(
+                    "after-commit-event",
+                    "after-commit-trace",
+                    RuntimeEventType.AFTER_CREATE,
+                    "sales.contract",
+                    "contract",
+                    "contract-1",
+                    null,
+                    "tenant-1",
+                    false,
+                    RuntimeMutationSource.BUSINESS,
+                    Map.of(),
+                    Instant.parse("2026-06-02T04:25:00Z")
+            );
+        }
+
+        assertThat(ActingContextHolder.current()).isEmpty();
+        assertThat(ActionExecutionContextHolder.current()).isEmpty();
+
+        String id = service.record(event);
+
+        RuntimeAuditRecord record = service.select(id);
+        assertThat(record.getActingDelegationId()).isEqualTo("delegation-1");
+        assertThat(record.getActingPrincipalEmployeeId()).isEqualTo("employee-principal");
+        assertThat(record.getActingPrincipalOrganizationId()).isEqualTo("org-principal");
+        assertThat(record.getActingPrincipalDepartmentId()).isEqualTo("dept-principal");
     }
 
     @Test

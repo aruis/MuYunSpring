@@ -5,6 +5,10 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
@@ -30,6 +34,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -50,6 +55,11 @@ class RuntimeActionExecutionClosureTest {
     private final IDatabaseOperations<Object> operations = operations();
     private final RuntimeAuditRecordService auditService = new RuntimeAuditRecordService(new TestMemoryDao<>());
     private final DynamicRecordService recordService = recordService(new RuntimeAuditEventListener(auditService));
+
+    @AfterEach
+    void tearDown() {
+        ActingContextHolder.clear();
+    }
 
     @Test
     void shouldAuditSuccessfulContractSubmitActionAsCompleteRuntimeClosure() {
@@ -92,6 +102,30 @@ class RuntimeActionExecutionClosureTest {
             assertThat(record.getRefreshRequested()).isTrue();
             assertThat(record.getResultText()).isEqualTo("1");
         });
+    }
+
+    @Test
+    void shouldAuditActingContextForActionAndMutationEvents() {
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(contractRow("contract-1", "draft", BigDecimal.TEN)));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        DynamicRecord draft = contract("contract-1", "draft", BigDecimal.TEN);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a");
+        BusinessPrincipal principal = BusinessPrincipal.employeePosition(
+                "employee-principal", "org-principal", "dept-principal", "position-principal");
+
+        DynamicActionExecutionResult result;
+        try (ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                "delegation-1", operator, principal, MODULE, "submit"))) {
+            result = recordService.entity(MODULE, "contract")
+                    .executeAction("submit", DynamicActionExecutionRequest.record(draft));
+        }
+
+        List<RuntimeAuditRecord> trace = auditService.traceEvents(result.context().traceId(), PageRequest.of(1, 10));
+        assertThat(trace).hasSize(2);
+        assertThat(onlyEvent(trace, RuntimeEventType.ACTION_EXECUTED))
+                .satisfies(this::assertActingAudit);
+        assertThat(onlyEvent(trace, RuntimeEventType.AFTER_UPDATE))
+                .satisfies(this::assertActingAudit);
     }
 
     @Test
@@ -164,6 +198,18 @@ class RuntimeActionExecutionClosureTest {
                 .toList();
         assertThat(matched).hasSize(1);
         return matched.getFirst();
+    }
+
+    private void assertActingAudit(RuntimeAuditRecord record) {
+        assertThat(record.getActingDelegationId()).isEqualTo("delegation-1");
+        assertThat(record.getActingPrincipalUserId()).isNull();
+        assertThat(record.getActingPrincipalEmployeeId()).isEqualTo("employee-principal");
+        assertThat(record.getActingPrincipalOrganizationId()).isEqualTo("org-principal");
+        assertThat(record.getActingPrincipalDepartmentId()).isEqualTo("dept-principal");
+        assertThat(record.getActingPrincipalEmployeePositionId()).isEqualTo("position-principal");
+        if (record.getPayloadText() != null) {
+            assertThat(record.getPayloadText()).doesNotContain("employee-principal", "dept-principal");
+        }
     }
 
     private DynamicRecordService recordService(RuntimeAuditEventListener listener) {

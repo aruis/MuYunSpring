@@ -234,13 +234,17 @@ class PlatformModelSchemaTest {
                         "result_type", "result_message", "refresh_requested", "redirect_to", "result_text",
                         "failure_stage", "error_message", "error_type", "system_context", "system_reason",
                         "operator_id", "operator_type", "authorization_decision", "authorization_permission_code",
-                        "authorization_permission_action_code", "mutation_source",
+                        "authorization_permission_action_code", "acting_delegation_id",
+                        "acting_principal_user_id", "acting_principal_employee_id",
+                        "acting_principal_organization_id", "acting_principal_department_id",
+                        "acting_principal_employee_position_id", "mutation_source",
                         "payload_text", "occurred_at");
         assertThat(uniqueIndexes(table)).contains(List.of("tenant_id", "event_id"));
         assertThat(indexes(table)).contains(
                 List.of("trace_id"),
                 List.of("tenant_id", "action_code", "occurred_at"),
-                List.of("tenant_id", "result_type", "occurred_at")
+                List.of("tenant_id", "result_type", "occurred_at"),
+                List.of("tenant_id", "acting_delegation_id", "occurred_at")
         );
         assertThat(columnType(table, "payload_text")).isEqualTo(ColumnType.TEXT);
         assertThat(columnType(table, "result_message")).isEqualTo(ColumnType.TEXT);

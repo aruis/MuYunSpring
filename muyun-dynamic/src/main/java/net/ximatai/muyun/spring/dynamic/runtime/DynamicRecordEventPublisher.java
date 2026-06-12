@@ -100,6 +100,7 @@ final class DynamicRecordEventPublisher {
                         context.action().executorType() == EntityActionExecutorType.DIALOG,
                         isSimpleEventValue(body.value()) ? body.value() : null
                 )),
+                null,
                 null
         ));
     }
@@ -141,6 +142,7 @@ final class DynamicRecordEventPublisher {
                             errorMessage,
                             cause == null ? null : cause.getClass().getName()
                     )),
+                    null,
                     null
             ));
         } catch (RuntimeException ignored) {

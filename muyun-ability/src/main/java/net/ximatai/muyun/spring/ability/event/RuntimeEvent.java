@@ -24,6 +24,7 @@ public record RuntimeEvent(
         String authorizationPermissionActionCode,
         RuntimeMutationSource mutationSource,
         Map<String, Object> payload,
+        Map<String, Object> auditContext,
         Instant occurredAt
 ) {
     public RuntimeEvent(String eventId,
@@ -40,7 +41,7 @@ public record RuntimeEvent(
                         Map<String, Object> payload,
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
-                systemReason, null, null, null, null, null, mutationSource, payload, occurredAt);
+                systemReason, null, null, null, null, null, mutationSource, payload, null, occurredAt);
     }
 
     public RuntimeEvent(String eventId,
@@ -59,7 +60,7 @@ public record RuntimeEvent(
                         Map<String, Object> payload,
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
-                null, operatorId, operatorType, authorizationDecision, null, null, mutationSource, payload, occurredAt);
+                null, operatorId, operatorType, authorizationDecision, null, null, mutationSource, payload, null, occurredAt);
     }
 
     public RuntimeEvent(String eventId,
@@ -81,7 +82,7 @@ public record RuntimeEvent(
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
                 null, operatorId, operatorType, authorizationDecision, authorizationPermissionCode,
-                authorizationPermissionActionCode, mutationSource, payload, occurredAt);
+                authorizationPermissionActionCode, mutationSource, payload, null, occurredAt);
     }
 
     public RuntimeEvent(String eventId,
@@ -101,7 +102,7 @@ public record RuntimeEvent(
                         Map<String, Object> payload,
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
-                systemReason, operatorId, operatorType, authorizationDecision, null, null, mutationSource, payload, occurredAt);
+                systemReason, operatorId, operatorType, authorizationDecision, null, null, mutationSource, payload, null, occurredAt);
     }
 
     public RuntimeEvent(String eventId,
@@ -117,7 +118,7 @@ public record RuntimeEvent(
                         Map<String, Object> payload,
                         Instant occurredAt) {
         this(eventId, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode, tenantId, systemContext,
-                null, null, null, null, null, null, mutationSource, payload, occurredAt);
+                null, null, null, null, null, null, mutationSource, payload, null, occurredAt);
     }
 
     public RuntimeEvent {
@@ -134,6 +135,9 @@ public record RuntimeEvent(
         traceId = traceId == null || traceId.isBlank() ? eventId : traceId;
         systemReason = systemReason == null || systemReason.isBlank() ? null : systemReason.trim();
         payload = payload == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(payload));
+        auditContext = auditContext == null
+                ? RuntimeEventAuditContext.capture(moduleAlias, actionCode)
+                : Map.copyOf(new LinkedHashMap<>(auditContext));
         occurredAt = occurredAt == null ? Instant.now() : occurredAt;
     }
 
@@ -148,7 +152,7 @@ public record RuntimeEvent(
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
         return new RuntimeEvent(null, null, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, systemReason, null, null, null, null, null, mutationSource, payload, null);
+                tenantId, systemContext, systemReason, null, null, null, null, null, mutationSource, payload, null, null);
     }
 
     public static RuntimeEvent of(String traceId,
@@ -163,7 +167,7 @@ public record RuntimeEvent(
                                   RuntimeMutationSource mutationSource,
                                   Map<String, Object> payload) {
         return new RuntimeEvent(null, traceId, eventType, moduleAlias, entityAlias, recordId, actionCode,
-                tenantId, systemContext, systemReason, null, null, null, null, null, mutationSource, payload, null);
+                tenantId, systemContext, systemReason, null, null, null, null, null, mutationSource, payload, null, null);
     }
 
     public static RuntimeEvent of(RuntimeEventType eventType,

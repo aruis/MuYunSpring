@@ -23,6 +23,7 @@ import java.time.Instant;
 @CompositeIndex(columns = {"event_type", "occurred_at"})
 @CompositeIndex(columns = {"tenant_id", "action_code", "occurred_at"})
 @CompositeIndex(columns = {"tenant_id", "result_type", "occurred_at"})
+@CompositeIndex(columns = {"tenant_id", "acting_delegation_id", "occurred_at"})
 public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "event_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Runtime event id")
     private String eventId;
@@ -98,6 +99,29 @@ public class RuntimeAuditRecord extends StandardEntity {
     @Column(name = "authorization_permission_action_code", type = ColumnType.VARCHAR, length = 64,
             comment = "Authorization permission action code")
     private String authorizationPermissionActionCode;
+
+    @Column(name = "acting_delegation_id", type = ColumnType.VARCHAR, length = 64, comment = "Acting delegation id")
+    private String actingDelegationId;
+
+    @Column(name = "acting_principal_user_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Acting principal user id")
+    private String actingPrincipalUserId;
+
+    @Column(name = "acting_principal_employee_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Acting principal employee id")
+    private String actingPrincipalEmployeeId;
+
+    @Column(name = "acting_principal_organization_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Acting principal organization id")
+    private String actingPrincipalOrganizationId;
+
+    @Column(name = "acting_principal_department_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Acting principal department id")
+    private String actingPrincipalDepartmentId;
+
+    @Column(name = "acting_principal_employee_position_id", type = ColumnType.VARCHAR, length = 64,
+            comment = "Acting principal employee position id")
+    private String actingPrincipalEmployeePositionId;
 
     @Column(name = "mutation_source", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Mutation source")
     private RuntimeMutationSource mutationSource;
