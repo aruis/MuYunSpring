@@ -34,7 +34,7 @@
 ## 稳定边界
 
 1. 在线页面只消费已发布且启用的 UI 配置和查询模板；未发布配置属于配置工作区。
-2. UI 配置是页面交付真相源；旧 view descriptor 保持结构兼容，不反写页面配置。
+2. UI 配置是页面交付真相源；基础 view descriptor 保持结构兼容，不反写页面配置。
 3. 页面保存使用 `uiConfigId + record` wrapper；`uiConfigId` 只作为保存校验的 mutation metadata，不改变动态记录模型身份。
 4. `record.attachments` 和附件维护接口只管理业务记录到 `fileId` 的关系；文件事实、二进制、预览和下载策略归属文件服务。
 5. 交互区块只识别已收口类型，不把 `layoutJson.blocks` 扩展成任意前端组件注册表。
