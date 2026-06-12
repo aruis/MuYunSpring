@@ -23,6 +23,7 @@
 | 租户 | `/iam.tenant` | CRUD、启停、排序、系统态访问 |
 | 组织机构 | `/iam.organization` | CRUD、启停、树、树内排序 |
 | 部门 | `/iam.department` | CRUD、启停、树、树内排序 |
+| 职员 | `/iam.employee` | CRUD、启停、排序 |
 | 用户 | `/iam.user` | CRUD、启停、排序 |
 | 角色 | `/iam.role` | CRUD、启停、排序 |
 
@@ -96,6 +97,21 @@
 | `GET` | `/iam.department/tree` | 读取部门树；查询条件可按机构过滤。 |
 | `GET` | `/iam.department/tree/{id}` | 读取指定部门子树。 |
 | `POST` | `/iam.department/sort/{id}` | 调整部门树位置或同级顺序。 |
+
+## 职员
+
+根路径：`/iam.employee`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/iam.employee/query` | 查询职员。 |
+| `GET` | `/iam.employee/view/{id}` | 查看职员。 |
+| `POST` | `/iam.employee/insert` | 新增职员；必须指定所属机构和部门。 |
+| `POST` | `/iam.employee/update/{id}` | 更新职员基础信息。 |
+| `POST` | `/iam.employee/delete/{id}` | 删除职员。 |
+| `POST` | `/iam.employee/enable/{id}` | 启用职员。 |
+| `POST` | `/iam.employee/disable/{id}` | 停用职员。 |
+| `POST` | `/iam.employee/sort/{id}` | 调整职员在部门内的排序。 |
 
 ## 用户
 

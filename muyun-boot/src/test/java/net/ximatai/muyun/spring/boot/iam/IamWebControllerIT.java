@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
+import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
@@ -37,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         TenantWebController.class,
         OrganizationWebController.class,
         DepartmentWebController.class,
+        EmployeeWebController.class,
         RoleWebController.class
 })
 @Import({
@@ -55,6 +58,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private DepartmentService departmentService;
+
+    @MockitoBean
+    private EmployeeService employeeService;
 
     @MockitoBean
     private RoleService roleService;
@@ -149,6 +155,40 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.count").value(1));
 
         verify(tenantService).moveAfter("tenant-1", "tenant-0");
+    }
+
+    @Test
+    void shouldBindEmployeeSortEndpointInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(post("/iam.employee/sort/employee-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"previousId":"employee-0"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(employeeService).moveAfter("employee-1", "employee-0");
+    }
+
+    @Test
+    void shouldBindEmployeeViewEndpointInRealMvcContext() throws Exception {
+        Employee employee = new Employee();
+        employee.setId("employee-1");
+        employee.setOrganizationId("org-1");
+        employee.setDepartmentId("dept-1");
+        employee.setEmployeeNo("E001");
+        employee.setTitle("Alice");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(employeeService.select("employee-1")).thenReturn(employee);
+
+        mvc.perform(get("/iam.employee/view/employee-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("employee-1"))
+                .andExpect(jsonPath("$.departmentId").value("dept-1"));
     }
 
     @Test
