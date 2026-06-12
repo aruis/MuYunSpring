@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
+import net.ximatai.muyun.spring.iam.department.Department;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
@@ -34,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {
         TenantWebController.class,
         OrganizationWebController.class,
+        DepartmentWebController.class,
         RoleWebController.class
 })
 @Import({
@@ -49,6 +52,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private OrganizationService organizationService;
+
+    @MockitoBean
+    private DepartmentService departmentService;
 
     @MockitoBean
     private RoleService roleService;
@@ -91,6 +97,42 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.count").value(1));
 
         verify(organizationService).moveInTree("org-1", "org-0", null, TreeAbility.ROOT_ID);
+    }
+
+    @Test
+    void shouldBindDepartmentTreeEndpointWithOrganizationScopeInRealMvcContext() throws Exception {
+        Department department = new Department();
+        department.setId("dept-1");
+        department.setOrganizationId("org-1");
+        department.setCode("FIN");
+        department.setTitle("Finance");
+        department.setParentId(TreeAbility.ROOT_ID);
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(departmentService.rootDepartments("org-1")).thenReturn(List.of(department));
+        when(departmentService.departmentChildren("org-1", "dept-1")).thenReturn(List.of());
+
+        mvc.perform(get("/iam.department/tree").param("organizationId", "org-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("dept-1"))
+                .andExpect(jsonPath("$.records[0].record.organizationId").value("org-1"))
+                .andExpect(jsonPath("$.records[0].children").isArray());
+    }
+
+    @Test
+    void shouldBindDepartmentTreeSortEndpointInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(post("/iam.department/sort/dept-1")
+                        .contentType("application/json")
+                        .content("""
+                                {"previousId":"dept-0","parentId":"root"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(departmentService).moveInDepartmentTree("dept-1", "dept-0", null, TreeAbility.ROOT_ID);
     }
 
     @Test
