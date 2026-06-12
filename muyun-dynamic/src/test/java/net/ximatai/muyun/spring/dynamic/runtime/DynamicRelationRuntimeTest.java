@@ -885,7 +885,7 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
-    void shouldRejectDynamicReferenceAutoTitleAcrossModules() {
+    void shouldAllowDynamicReferenceAutoTitleAcrossModules() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Invoice",
@@ -895,9 +895,7 @@ class DynamicRelationRuntimeTest {
                         .withAutoTitle("invoiceTitle"))
         );
 
-        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
-                .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("same module target");
+        new ModuleDefinitionValidator().validate(module);
     }
 
     @Test
@@ -954,7 +952,7 @@ class DynamicRelationRuntimeTest {
     }
 
     @Test
-    void shouldRejectDynamicReferenceProjectionAcrossModules() {
+    void shouldAllowDynamicReferenceProjectionAcrossModules() {
         ModuleDefinition module = new ModuleDefinition(
                 MODULE,
                 "Invoice",
@@ -964,9 +962,7 @@ class DynamicRelationRuntimeTest {
                         .withProjection("title", "invoiceDisplayTitle"))
         );
 
-        assertThatThrownBy(() -> new ModuleDefinitionValidator().validate(module))
-                .isInstanceOf(ModuleDefinitionException.class)
-                .hasMessageContaining("projection requires same module target");
+        new ModuleDefinitionValidator().validate(module);
     }
 
     @Test

@@ -2874,6 +2874,51 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldResolveCrossModuleReferenceThroughTargetModuleScope() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(
+                referenceRow("customer-1", "Acme")
+        ));
+        DataScopeCriteriaService dataScope = mock(DataScopeCriteriaService.class);
+        when(dataScope.resolveReadScope(eq("crm.customer"), any(ActionExecutionPolicy.class), any(Criteria.class), any()))
+                .thenAnswer(invocation -> DataScopeCriteriaResult.unrestricted(invocation.getArgument(2)));
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
+                .register(new ModuleDefinition(
+                        MODULE,
+                        "Contract",
+                        List.of(lineEntity()),
+                        List.of(),
+                        List.of(EntityReferenceDefinition
+                                .to("line", "contractId", ReferenceTarget.of("crm.customer", "customer"))
+                                .withAutoTitle("customerTitle")
+                                .withProjection("code", "customerCode"))
+                ))
+                .register(new ModuleDefinition(
+                        "crm.customer",
+                        "Customer",
+                        List.of(customerReferenceEntity())
+                ));
+        DynamicRecordService service = new DynamicRecordService(
+                runtime,
+                new net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService(),
+                dataScope
+        );
+
+        DynamicReferenceResolveResponse response = service.resolveReference(
+                MODULE,
+                "line",
+                "contractId",
+                DynamicReferenceResolveRequest.query("Acme")
+        );
+
+        assertThat(response.status()).isEqualTo(DynamicReferenceResolveStatus.OK);
+        assertThat(response.options().getFirst().id()).isEqualTo("customer-1");
+        assertThat(response.options().getFirst().projections()).containsEntry("customerCode", "CUSTOMER-1");
+        verify(dataScope).resolveReadScope(eq("crm.customer"), any(ActionExecutionPolicy.class), any(Criteria.class), any());
+    }
+
+    @Test
     void shouldApplyDataScopeToTreeChildrenRead() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
@@ -3421,6 +3466,18 @@ class DynamicRecordServiceTest {
                 "contract",
                 "app_contract",
                 "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.titleField().required()
+                )
+        ).withCapabilities(EntityCapability.CRUD, EntityCapability.REFERENCE);
+    }
+
+    private EntityDefinition customerReferenceEntity() {
+        return new EntityDefinition(
+                "customer",
+                "app_customer",
+                "Customer",
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.titleField().required()

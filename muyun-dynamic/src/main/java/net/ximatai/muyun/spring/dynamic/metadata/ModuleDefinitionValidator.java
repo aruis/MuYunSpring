@@ -628,25 +628,27 @@ public class ModuleDefinitionValidator {
         }
         Set<String> outputFields = new HashSet<>();
         ReferencePlan plan = referencePlan(reference);
+        EntityDefinition targetEntity = moduleAlias != null && moduleAlias.equals(target.moduleAlias())
+                ? requireEntity(entities, target.entityAlias(), "reference target entity")
+                : null;
         if (!reference.projections().isEmpty()) {
-            if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
-                throw new ModuleDefinitionException("reference projection requires same module target: " + target.qualifiedName());
+            if (targetEntity != null) {
+                requireReferenceTargetCapability(targetEntity, target);
             }
-            EntityDefinition targetEntity = requireEntity(entities, target.entityAlias(), "reference target entity");
-            requireReferenceTargetCapability(targetEntity, target);
             for (ReferenceProjection projection : reference.projections()) {
-                requireField(targetEntity, projection.targetField(), "reference projection target field");
+                requireFieldName(projection.targetField(), "reference projection target field");
+                if (targetEntity != null) {
+                    requireField(targetEntity, projection.targetField(), "reference projection target field");
+                }
                 requireFieldName(projection.outputField(), "reference projection output field");
                 requireReferenceOutputField(source, projection.outputField(), "reference projection output field");
                 requireUnique(outputFields, projection.outputField(), "reference output field");
             }
         }
         if (reference.autoTitle()) {
-            if (moduleAlias != null && !moduleAlias.equals(target.moduleAlias())) {
-                throw new ModuleDefinitionException("reference auto title requires same module target: " + target.qualifiedName());
+            if (targetEntity != null) {
+                requireReferenceTargetCapability(targetEntity, target);
             }
-            EntityDefinition targetEntity = requireEntity(entities, target.entityAlias(), "reference target entity");
-            requireReferenceTargetCapability(targetEntity, target);
             String outputField = plan.titleOutputField();
             requireFieldName(outputField, "reference title output field");
             requireReferenceOutputField(source, outputField, "reference title output field");
