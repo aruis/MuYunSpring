@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -357,8 +358,19 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return !effectiveActionGrants(userId, moduleAlias, actionCode).isEmpty();
     }
 
+    public boolean hasActionPermission(BusinessPrincipal principal, String moduleAlias, String actionCode) {
+        return !effectiveActionGrants(principal, moduleAlias, actionCode).isEmpty();
+    }
+
     public List<RoleAction> effectiveActionGrants(String userId, String moduleAlias, String actionCode) {
         return effectiveActionGrantsWithContext(userId, moduleAlias, actionCode).stream()
+                .map(EffectiveRoleActionGrant::actionGrant)
+                .distinct()
+                .toList();
+    }
+
+    public List<RoleAction> effectiveActionGrants(BusinessPrincipal principal, String moduleAlias, String actionCode) {
+        return effectiveActionGrantsWithContext(principal, moduleAlias, actionCode).stream()
                 .map(EffectiveRoleActionGrant::actionGrant)
                 .distinct()
                 .toList();
@@ -368,6 +380,19 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                                                                            String moduleAlias,
                                                                            String actionCode) {
         List<EffectiveRoleGrant> roleGrants = effectiveRoleGrants(userId);
+        return effectiveActionGrantsWithContext(roleGrants, moduleAlias, actionCode);
+    }
+
+    public List<EffectiveRoleActionGrant> effectiveActionGrantsWithContext(BusinessPrincipal principal,
+                                                                           String moduleAlias,
+                                                                           String actionCode) {
+        List<EffectiveRoleGrant> roleGrants = effectiveRoleGrants(principal);
+        return effectiveActionGrantsWithContext(roleGrants, moduleAlias, actionCode);
+    }
+
+    private List<EffectiveRoleActionGrant> effectiveActionGrantsWithContext(List<EffectiveRoleGrant> roleGrants,
+                                                                            String moduleAlias,
+                                                                            String actionCode) {
         if (roleGrants.isEmpty()) {
             return List.of();
         }
@@ -431,6 +456,14 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         return effective;
     }
 
+    public Set<String> effectiveRoleIds(BusinessPrincipal principal) {
+        LinkedHashSet<String> effective = new LinkedHashSet<>();
+        effectiveRoleGrants(principal).stream()
+                .map(EffectiveRoleGrant::roleId)
+                .forEach(effective::add);
+        return effective;
+    }
+
     public List<EffectiveRoleGrant> effectiveRoleGrants(String userId) {
         String validUserId = Preconditions.requireText(userId, "userId");
         java.util.ArrayList<EffectiveRoleGrant> effective = new java.util.ArrayList<>();
@@ -458,6 +491,39 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 appendEffectiveRoleGrants(effective,
                         subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, position.getId()),
                         position.getOrganizationId(), position.getDepartmentId(), position.getId());
+            }
+        }
+        return List.copyOf(effective);
+    }
+
+    public List<EffectiveRoleGrant> effectiveRoleGrants(BusinessPrincipal principal) {
+        Objects.requireNonNull(principal, "principal must not be null");
+        java.util.ArrayList<EffectiveRoleGrant> effective = new java.util.ArrayList<>();
+        if (principal.userId() != null) {
+            appendEffectiveRoleGrants(effective,
+                    subjectRoleGrants(RoleGrantSubjectType.USER_ACCOUNT, principal.userId()),
+                    null, null, null);
+        }
+        if (principal.employeeId() != null) {
+            Employee employee = employeeService == null ? null : employeeService.select(principal.employeeId());
+            if (employee != null && Boolean.TRUE.equals(employee.getEnabled())) {
+                appendEffectiveRoleGrants(effective,
+                        subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE, principal.employeeId()),
+                        employee.getOrganizationId(),
+                        employee.getDepartmentId(),
+                        null);
+            }
+        }
+        if (principal.employeePositionId() != null) {
+            EmployeePosition position = employeePositionService == null
+                    ? null
+                    : employeePositionService.select(principal.employeePositionId());
+            if (isActivePrincipalPosition(principal, position)) {
+                appendEffectiveRoleGrants(effective,
+                        subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, principal.employeePositionId()),
+                        position.getOrganizationId(),
+                        position.getDepartmentId(),
+                        principal.employeePositionId());
             }
         }
         return List.copyOf(effective);
@@ -657,6 +723,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         .computeIfAbsent(grant.roleId(), ignored -> new java.util.ArrayList<>())
                         .add(grant));
         return byRoleId;
+    }
+
+    private boolean isActivePrincipalPosition(BusinessPrincipal principal, EmployeePosition position) {
+        return position != null
+                && Boolean.TRUE.equals(position.getEnabled())
+                && (principal.employeeId() == null || Objects.equals(principal.employeeId(), position.getEmployeeId()));
     }
 
     private GrantResult grantRoleIfAbsent(String roleId, RoleGrantSubjectType subjectType, String subjectId) {

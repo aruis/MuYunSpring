@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -606,6 +607,99 @@ class RoleServiceContractTest {
                         "org-branch", "dept-branch", "position-rel-1");
         assertThat(service.effectiveRoleIds("user-1"))
                 .containsExactly("account-role", "employee-role", "position-role");
+    }
+
+    @Test
+    void shouldAggregateEffectiveRoleGrantsFromExplicitBusinessPrincipalOnly() {
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        when(employeeService.select("employee-1")).thenReturn(employee("employee-1", "org-main", "dept-main", true));
+        when(employeePositionService.select("position-rel-1"))
+                .thenReturn(employeePosition("position-rel-1", "employee-1", "org-branch", "dept-branch", true));
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, employeeService, employeePositionService,
+                null));
+        doReturn(List.of(roleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE, "employee-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE, "employee-1");
+        doReturn(List.of(roleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1");
+        doReturn(standardRole("employee-role")).when(service).select("employee-role");
+        doReturn(standardRole("position-role")).when(service).select("position-role");
+
+        List<EffectiveRoleGrant> grants = service.effectiveRoleGrants(
+                BusinessPrincipal.employeePosition("employee-1", "org-forged", "dept-forged", "position-rel-1"));
+
+        assertThat(grants).extracting(EffectiveRoleGrant::roleId)
+                .containsExactly("employee-role", "position-role");
+        assertThat(grants.get(0))
+                .extracting(EffectiveRoleGrant::sourceType, EffectiveRoleGrant::sourceId,
+                        EffectiveRoleGrant::organizationId, EffectiveRoleGrant::departmentId,
+                        EffectiveRoleGrant::employeePositionId)
+                .containsExactly(RoleGrantSubjectType.EMPLOYEE, "employee-1", "org-main", "dept-main", null);
+        assertThat(grants.get(1))
+                .extracting(EffectiveRoleGrant::sourceType, EffectiveRoleGrant::sourceId,
+                        EffectiveRoleGrant::organizationId, EffectiveRoleGrant::departmentId,
+                        EffectiveRoleGrant::employeePositionId)
+                .containsExactly(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1",
+                        "org-branch", "dept-branch", "position-rel-1");
+    }
+
+    @Test
+    void shouldResolveActionGrantsFromBusinessPrincipalContext() {
+        RoleActionDao roleActionDao = mock(RoleActionDao.class);
+        RoleAction action = enabledAction("action-1", "position-role", "sales.contract", "view");
+        when(roleActionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(action));
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        when(employeePositionService.select("position-rel-1"))
+                .thenReturn(employeePosition("position-rel-1", "employee-1", "org-branch", "dept-branch", true));
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), roleActionDao, activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, employeePositionService,
+                null));
+        doReturn(List.of(roleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1");
+        doReturn(standardRole("position-role")).when(service).select("position-role");
+
+        List<EffectiveRoleActionGrant> grants = service.effectiveActionGrantsWithContext(
+                BusinessPrincipal.employeePosition("employee-1", null, null, "position-rel-1"),
+                "sales.contract",
+                "query");
+
+        assertThat(grants).singleElement().satisfies(grant -> {
+            assertThat(grant.actionGrant()).isSameAs(action);
+            assertThat(grant.roleGrant().sourceType()).isEqualTo(RoleGrantSubjectType.EMPLOYEE_POSITION);
+            assertThat(grant.roleGrant().organizationId()).isEqualTo("org-branch");
+            assertThat(grant.roleGrant().departmentId()).isEqualTo("dept-branch");
+        });
+    }
+
+    @Test
+    void shouldIgnoreExplicitEmployeePrincipalWhenServerSideEmployeeFactIsMissing() {
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null));
+        doReturn(List.of(roleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE, "employee-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE, "employee-1");
+
+        List<EffectiveRoleGrant> grants = service.effectiveRoleGrants(
+                BusinessPrincipal.employee("employee-1", "org-forged", "dept-forged"));
+
+        assertThat(grants).isEmpty();
+    }
+
+    @Test
+    void shouldIgnoreExplicitPositionPrincipalWhenServerSidePositionFactIsMissing() {
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null));
+        doReturn(List.of(roleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1");
+
+        List<EffectiveRoleGrant> grants = service.effectiveRoleGrants(
+                BusinessPrincipal.employeePosition("employee-1", "org-forged", "dept-forged", "position-rel-1"));
+
+        assertThat(grants).isEmpty();
     }
 
     @Test
