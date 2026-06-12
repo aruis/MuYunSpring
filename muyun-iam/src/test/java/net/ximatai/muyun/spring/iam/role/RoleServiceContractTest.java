@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
@@ -21,8 +22,10 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -429,6 +432,27 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldRejectWildcardDataScopeRoleGrantedToEmployeeSubject() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleGrantDao roleGrantDao = mock(RoleGrantDao.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        Role role = role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE);
+        role.setGrantSubjectTypes(RoleGrantSubjectType.EMPLOYEE.getCode());
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(role));
+        RoleService service = new RoleService(roleDao, roleGrantDao, mock(RoleActionDao.class),
+                activeTenantVerifier(), RoleActionGrantVerifier.platformActionsOnly(),
+                null, employeeService, null);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantRole("scope-1", RoleGrantSubjectType.EMPLOYEE, "employee-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("wildcard data scope role can only be granted to user account");
+        }
+
+        verify(roleGrantDao, org.mockito.Mockito.never()).insert(any());
+    }
+
+    @Test
     void shouldGrantPositionTemplateRoleToEmployeePosition() {
         RoleDao roleDao = mock(RoleDao.class);
         RoleGrantDao roleGrantDao = mock(RoleGrantDao.class);
@@ -519,6 +543,113 @@ class RoleServiceContractTest {
         }
 
         verify(roleGrantDao, org.mockito.Mockito.never()).insert(any());
+    }
+
+    @Test
+    void shouldAggregateEffectiveRoleGrantsFromAccountEmployeeAndPositionSources() {
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        when(employeeAccountService.employeeIdOfUser("user-1")).thenReturn("employee-1");
+        when(employeeService.select("employee-1")).thenReturn(employee("employee-1", "org-main", "dept-main", true));
+        when(employeePositionService.positions("employee-1"))
+                .thenReturn(List.of(employeePosition("position-rel-1", "employee-1", "org-branch", "dept-branch", true)));
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, employeeService, employeePositionService,
+                employeeAccountService));
+        doReturn(List.of(roleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT, "user-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.USER_ACCOUNT, "user-1");
+        doReturn(List.of(roleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE, "employee-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE, "employee-1");
+        doReturn(List.of(roleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1");
+        doReturn(standardRole("account-role")).when(service).select("account-role");
+        doReturn(standardRole("employee-role")).when(service).select("employee-role");
+        doReturn(standardRole("position-role")).when(service).select("position-role");
+
+        List<EffectiveRoleGrant> grants = service.effectiveRoleGrants("user-1");
+
+        assertThat(grants)
+                .extracting(EffectiveRoleGrant::roleId)
+                .containsExactly("account-role", "employee-role", "position-role");
+        assertThat(grants.get(0))
+                .extracting(EffectiveRoleGrant::sourceType, EffectiveRoleGrant::sourceId,
+                        EffectiveRoleGrant::organizationId, EffectiveRoleGrant::departmentId,
+                        EffectiveRoleGrant::employeePositionId)
+                .containsExactly(RoleGrantSubjectType.USER_ACCOUNT, "user-1", null, null, null);
+        assertThat(grants.get(1))
+                .extracting(EffectiveRoleGrant::sourceType, EffectiveRoleGrant::sourceId,
+                        EffectiveRoleGrant::organizationId, EffectiveRoleGrant::departmentId,
+                        EffectiveRoleGrant::employeePositionId)
+                .containsExactly(RoleGrantSubjectType.EMPLOYEE, "employee-1", "org-main", "dept-main", null);
+        assertThat(grants.get(2))
+                .extracting(EffectiveRoleGrant::sourceType, EffectiveRoleGrant::sourceId,
+                        EffectiveRoleGrant::organizationId, EffectiveRoleGrant::departmentId,
+                        EffectiveRoleGrant::employeePositionId)
+                .containsExactly(RoleGrantSubjectType.EMPLOYEE_POSITION, "position-rel-1",
+                        "org-branch", "dept-branch", "position-rel-1");
+        assertThat(service.effectiveRoleIds("user-1"))
+                .containsExactly("account-role", "employee-role", "position-role");
+    }
+
+    @Test
+    void shouldExpandGroupRoleMembersWithSameEffectiveGrantContext() {
+        RoleService service = spy(service(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class)));
+        Role group = role("group-1", "Group", RoleKind.GROUP);
+        group.setMemberRoleIds("member-1");
+        doReturn(List.of(roleGrant("group-1", RoleGrantSubjectType.USER_ACCOUNT, "user-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.USER_ACCOUNT, "user-1");
+        doReturn(group).when(service).select("group-1");
+        doReturn(standardRole("member-1")).when(service).select("member-1");
+
+        List<EffectiveRoleGrant> grants = service.effectiveRoleGrants("user-1");
+
+        assertThat(grants).extracting(EffectiveRoleGrant::roleId)
+                .containsExactly("group-1", "member-1");
+        assertThat(grants).allSatisfy(grant -> {
+            assertThat(grant.sourceType()).isEqualTo(RoleGrantSubjectType.USER_ACCOUNT);
+            assertThat(grant.sourceId()).isEqualTo("user-1");
+        });
+    }
+
+    @Test
+    void shouldIgnoreDisabledEmployeeAndPositionWhenAggregatingEffectiveRoleGrants() {
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        when(employeeAccountService.employeeIdOfUser("user-1")).thenReturn("employee-1");
+        when(employeeService.select("employee-1")).thenReturn(employee("employee-1", "org-main", "dept-main", false));
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, employeeService, employeePositionService,
+                employeeAccountService));
+        doReturn(List.of(roleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT, "user-1")))
+                .when(service).subjectRoleGrants(RoleGrantSubjectType.USER_ACCOUNT, "user-1");
+        doReturn(standardRole("account-role")).when(service).select("account-role");
+
+        assertThat(service.effectiveRoleGrants("user-1"))
+                .extracting(EffectiveRoleGrant::roleId)
+                .containsExactly("account-role");
+    }
+
+    @Test
+    void shouldIgnoreDisabledEmployeePositionWhenAggregatingEffectiveRoleGrants() {
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
+        EmployeeService employeeService = mock(EmployeeService.class);
+        EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        when(employeeAccountService.employeeIdOfUser("user-1")).thenReturn("employee-1");
+        when(employeeService.select("employee-1")).thenReturn(employee("employee-1", "org-main", "dept-main", true));
+        when(employeePositionService.positions("employee-1"))
+                .thenReturn(List.of(employeePosition("position-rel-1", "employee-1", "org-branch", "dept-branch", false)));
+        RoleService service = spy(new RoleService(
+                mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class), activeTenantVerifier(),
+                RoleActionGrantVerifier.platformActionsOnly(), null, employeeService, employeePositionService,
+                employeeAccountService));
+        doReturn(List.of()).when(service).subjectRoleGrants(RoleGrantSubjectType.USER_ACCOUNT, "user-1");
+        doReturn(List.of()).when(service).subjectRoleGrants(RoleGrantSubjectType.EMPLOYEE, "employee-1");
+
+        assertThat(service.effectiveRoleGrants("user-1")).isEmpty();
     }
 
     @Test
@@ -691,6 +822,26 @@ class RoleServiceContractTest {
         binding.setSubjectId(subjectId);
         binding.setEnabled(Boolean.TRUE);
         return binding;
+    }
+
+    private Employee employee(String id, String organizationId, String departmentId, boolean enabled) {
+        Employee employee = new Employee();
+        employee.setId(id);
+        employee.setOrganizationId(organizationId);
+        employee.setDepartmentId(departmentId);
+        employee.setEnabled(enabled);
+        return employee;
+    }
+
+    private EmployeePosition employeePosition(String id, String employeeId, String organizationId,
+                                              String departmentId, boolean enabled) {
+        EmployeePosition position = new EmployeePosition();
+        position.setId(id);
+        position.setEmployeeId(employeeId);
+        position.setOrganizationId(organizationId);
+        position.setDepartmentId(departmentId);
+        position.setEnabled(enabled);
+        return position;
     }
 
     private RoleAction enabledAction(String id, String roleId, String moduleAlias, String actionCode) {
