@@ -13,6 +13,8 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegation;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
@@ -33,12 +35,15 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         SortWeb<Employee, EmployeeService> {
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
+    private final EmployeeDelegationService employeeDelegationService;
 
     @Autowired
     public EmployeeWebController(EmployeePositionService employeePositionService,
-                                 EmployeeAccountService employeeAccountService) {
+                                 EmployeeAccountService employeeAccountService,
+                                 EmployeeDelegationService employeeDelegationService) {
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+        this.employeeDelegationService = employeeDelegationService;
     }
 
     @GetMapping("/{employeeId}/accounts")
@@ -159,5 +164,67 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                     normalized.previousId(), normalized.nextId());
             return new WebCountResponse(1);
         });
+    }
+
+    @GetMapping("/{employeeId}/delegations")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebListResponse<EmployeeDelegation> delegations(@PathVariable String employeeId) {
+        return webScope(() -> new WebListResponse<>(employeeDelegationService.delegationsByPrincipal(employeeId)));
+    }
+
+    @GetMapping("/{employeeId}/delegated-to-me")
+    @CustomActionEndpoint(value = "employeeDelegatedToMe", title = "职员受托代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebListResponse<EmployeeDelegation> delegatedToMe(@PathVariable String employeeId) {
+        return webScope(() -> new WebListResponse<>(employeeDelegationService.delegationsByDelegate(employeeId)));
+    }
+
+    @PostMapping("/{employeeId}/delegations")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public EmployeeDelegation addDelegation(@PathVariable String employeeId,
+                                            @RequestBody EmployeeDelegation delegation) {
+        return webScope(() -> employeeDelegationService.select(
+                employeeDelegationService.addDelegation(employeeId, delegation)));
+    }
+
+    @PostMapping("/{employeeId}/delegations/{delegationId}/update")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public EmployeeDelegation updateDelegation(@PathVariable String employeeId,
+                                               @PathVariable String delegationId,
+                                               @RequestBody EmployeeDelegation delegation) {
+        return webScope(() -> {
+            employeeDelegationService.updateDelegation(employeeId, delegationId, delegation);
+            return employeeDelegationService.select(delegationId);
+        });
+    }
+
+    @PostMapping("/{employeeId}/delegations/{delegationId}/delete")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse deleteDelegation(@PathVariable String employeeId,
+                                             @PathVariable String delegationId) {
+        return webScope(() -> new WebCountResponse(
+                employeeDelegationService.deleteDelegation(employeeId, delegationId)));
+    }
+
+    @PostMapping("/{employeeId}/delegations/{delegationId}/enable")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse enableDelegation(@PathVariable String employeeId,
+                                             @PathVariable String delegationId) {
+        return webScope(() -> new WebCountResponse(
+                employeeDelegationService.enableDelegation(employeeId, delegationId)));
+    }
+
+    @PostMapping("/{employeeId}/delegations/{delegationId}/disable")
+    @CustomActionEndpoint(value = "employeeDelegations", title = "职员业务代办",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse disableDelegation(@PathVariable String employeeId,
+                                              @PathVariable String delegationId) {
+        return webScope(() -> new WebCountResponse(
+                employeeDelegationService.disableDelegation(employeeId, delegationId)));
     }
 }

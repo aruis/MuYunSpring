@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegation;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
@@ -78,6 +80,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private EmployeeAccountService employeeAccountService;
+
+    @MockitoBean
+    private EmployeeDelegationService employeeDelegationService;
 
     @MockitoBean
     private PositionService positionService;
@@ -311,6 +316,62 @@ class IamWebControllerIT {
     }
 
     @Test
+    void shouldBindEmployeeDelegationEndpointsInRealMvcContext() throws Exception {
+        EmployeeDelegation delegation = employeeDelegation("delegation-1", "employee-1", "employee-2");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(employeeDelegationService.delegationsByPrincipal("employee-1")).thenReturn(List.of(delegation));
+        when(employeeDelegationService.delegationsByDelegate("employee-2")).thenReturn(List.of(delegation));
+        when(employeeDelegationService.addDelegation(eq("employee-1"), any(EmployeeDelegation.class)))
+                .thenReturn("delegation-1");
+        when(employeeDelegationService.select("delegation-1")).thenReturn(delegation);
+        when(employeeDelegationService.updateDelegation(eq("employee-1"), eq("delegation-1"),
+                any(EmployeeDelegation.class))).thenReturn(1);
+        when(employeeDelegationService.deleteDelegation("employee-1", "delegation-1")).thenReturn(1);
+        when(employeeDelegationService.enableDelegation("employee-1", "delegation-1")).thenReturn(1);
+        when(employeeDelegationService.disableDelegation("employee-1", "delegation-1")).thenReturn(1);
+
+        mvc.perform(get("/iam.employee/employee-1/delegations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("delegation-1"))
+                .andExpect(jsonPath("$.records[0].delegateEmployeeId").value("employee-2"));
+
+        mvc.perform(get("/iam.employee/employee-2/delegated-to-me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].principalEmployeeId").value("employee-1"));
+
+        mvc.perform(post("/iam.employee/employee-1/delegations")
+                        .contentType("application/json")
+                        .content("""
+                                {"delegateEmployeeId":"employee-2"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("delegation-1"));
+
+        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/update")
+                        .contentType("application/json")
+                        .content("""
+                                {"delegateEmployeeId":"employee-2","memo":"changed"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("delegation-1"));
+
+        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/enable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.employee/employee-1/delegations/delegation-1/disable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(employeeDelegationService).delegationsByPrincipal("employee-1");
+        verify(employeeDelegationService).delegationsByDelegate("employee-2");
+        verify(employeeDelegationService).addDelegation(eq("employee-1"), any(EmployeeDelegation.class));
+    }
+
+    @Test
     void shouldBindPositionEndpointInRealMvcContext() throws Exception {
         Position position = new Position();
         position.setId("position-1");
@@ -485,5 +546,14 @@ class IamWebControllerIT {
         binding.setPrimaryAccount(primaryAccount);
         binding.setEnabled(Boolean.TRUE);
         return binding;
+    }
+
+    private EmployeeDelegation employeeDelegation(String id, String principalEmployeeId, String delegateEmployeeId) {
+        EmployeeDelegation delegation = new EmployeeDelegation();
+        delegation.setId(id);
+        delegation.setPrincipalEmployeeId(principalEmployeeId);
+        delegation.setDelegateEmployeeId(delegateEmployeeId);
+        delegation.setEnabled(Boolean.TRUE);
+        return delegation;
     }
 }

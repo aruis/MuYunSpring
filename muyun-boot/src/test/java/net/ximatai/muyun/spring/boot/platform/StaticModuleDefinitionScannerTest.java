@@ -23,6 +23,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowActionPolicyService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowDefinitionService;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
@@ -56,7 +57,8 @@ class StaticModuleDefinitionScannerTest {
             context.registerBean(OrganizationWebController.class);
             context.registerBean(DepartmentWebController.class);
             context.registerBean(EmployeeWebController.class,
-                    () -> new EmployeeWebController(mock(EmployeePositionService.class), mock(EmployeeAccountService.class)));
+                    () -> new EmployeeWebController(mock(EmployeePositionService.class),
+                            mock(EmployeeAccountService.class), mock(EmployeeDelegationService.class)));
             context.registerBean(PositionWebController.class);
             context.registerBean(RoleWebController.class, () -> new RoleWebController(null));
             context.registerBean(UserAccountWebController.class, () -> new UserAccountWebController(null));
@@ -96,13 +98,20 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.title()).isEqualTo("职员管理");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable", "employeePositions", "employeeAccounts");
+                                "sort", "enable", "disable", "employeePositions", "employeeAccounts",
+                                "employeeDelegations", "employeeDelegatedToMe");
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeAccounts"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeAccounts", "职员账号"));
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeePositions"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeePositions", "职员任岗"));
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeDelegations"))
+                        .singleElement()
+                        .satisfies(action -> assertCustomRecordAction(action, "employeeDelegations", "职员业务代办"));
+                assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeDelegatedToMe"))
+                        .singleElement()
+                        .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
             });
             assertThat(byAlias.get("iam.position")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");

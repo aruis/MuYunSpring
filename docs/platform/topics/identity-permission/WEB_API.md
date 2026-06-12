@@ -127,6 +127,13 @@
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/disable` | 停用职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/primary` | 将指定任岗设为职员主岗，并降级同职员其他启用主岗。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/sort` | 调整职员任岗关系排序。 |
+| `GET` | `/iam.employee/{employeeId}/delegations` | 查询职员作为委托人的业务代办关系。 |
+| `GET` | `/iam.employee/{employeeId}/delegated-to-me` | 查询职员作为受托人的业务代办关系。 |
+| `POST` | `/iam.employee/{employeeId}/delegations` | 为职员新增业务代办关系；委托人由路径职员确定。 |
+| `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/update` | 更新职员业务代办关系。 |
+| `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/delete` | 删除职员业务代办关系。 |
+| `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/enable` | 启用职员业务代办关系。 |
+| `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/disable` | 停用职员业务代办关系。 |
 
 ## 岗位
 
