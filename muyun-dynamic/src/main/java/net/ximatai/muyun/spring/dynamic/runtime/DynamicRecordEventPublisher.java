@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -176,9 +177,17 @@ final class DynamicRecordEventPublisher {
     }
 
     private Map<String, Object> recordPayload(DynamicRecordEventContext context, Map<String, Object> payload) {
+        Map<String, Object> enriched = payload == null || payload.isEmpty()
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(payload);
+        if (context.mutationSource() == RuntimeMutationSource.WRITE_BACK) {
+            enriched.put("writeBackDepth", context.writeBackDepth());
+            putIfPresent(enriched, "writeBackParentExecutionId", context.writeBackParentExecutionId());
+            enriched.put("writeBackCascadeAllowed", context.writeBackCascadeAllowed());
+        }
         return context.systemContext()
-                ? ActionEventPayload.withSystemReason(payload, context.systemReason())
-                : payload;
+                ? ActionEventPayload.withSystemReason(enriched, context.systemReason())
+                : Map.copyOf(enriched);
     }
 
     private void putIfPresent(Map<String, Object> payload, String key, String value) {
@@ -198,7 +207,10 @@ final class DynamicRecordEventPublisher {
             String tenantId,
             boolean systemContext,
             String systemReason,
-            RuntimeMutationSource mutationSource
+            RuntimeMutationSource mutationSource,
+            int writeBackDepth,
+            String writeBackParentExecutionId,
+            boolean writeBackCascadeAllowed
     ) {
     }
 }

@@ -205,6 +205,56 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldExposeWriteBackContextOnRuntimeRecordEventPayload() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-002");
+        record.setId("contract-1");
+
+        service.updateWriteBack(MODULE, "contract", record,
+                new DynamicWriteBackContext("trace-wb", 2, "exec-1", false));
+
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
+                    assertThat(event.traceId()).isEqualTo("trace-wb");
+                    assertThat(event.systemContext()).isFalse();
+                    assertThat(event.systemReason()).isNull();
+                    assertThat(event.payload())
+                            .containsEntry("writeBackDepth", 2)
+                            .containsEntry("writeBackParentExecutionId", "exec-1")
+                            .containsEntry("writeBackCascadeAllowed", false);
+                });
+    }
+
+    @Test
+    void shouldExposeWriteBackContextOnCreateRuntimeRecordEventPayload() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-002");
+        record.setId("contract-1");
+
+        service.createWriteBack(MODULE, "contract", record,
+                new DynamicWriteBackContext("trace-wb-create", 1, "exec-create", true));
+
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.AFTER_CREATE);
+                    assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
+                    assertThat(event.traceId()).isEqualTo("trace-wb-create");
+                    assertThat(event.payload())
+                            .containsEntry("writeBackDepth", 1)
+                            .containsEntry("writeBackParentExecutionId", "exec-create")
+                            .containsEntry("writeBackCascadeAllowed", true);
+                });
+    }
+
+    @Test
     void shouldRestoreOuterMutationContextAfterNestedWriteBackContext() {
         try (DynamicMutationContext outer = DynamicMutationContext.open(null,
                 RuntimeMutationSource.BUSINESS, "trace-root", Map.of("originContext", "ctx-1"))) {

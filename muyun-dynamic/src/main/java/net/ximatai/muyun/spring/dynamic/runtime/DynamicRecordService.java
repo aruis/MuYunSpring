@@ -2077,14 +2077,19 @@ public class DynamicRecordService {
                                                                                String entityAlias,
                                                                                RuntimeMutationSource mutationSource,
                                                                                String traceId) {
+        DynamicMutationContext mutationContext = DynamicMutationContext.current().orElse(null);
+        boolean writeBack = mutationSource == RuntimeMutationSource.WRITE_BACK && mutationContext != null;
         return new DynamicRecordEventPublisher.DynamicRecordEventContext(
                 moduleAlias,
                 entityAlias,
-                traceId,
+                writeBack ? mutationContext.traceId() : traceId,
                 TenantContext.currentTenantId().orElse(null),
                 TenantContext.isSystem(),
                 TenantContext.systemReason().orElse(null),
-                mutationSource
+                mutationSource,
+                writeBack ? mutationContext.depth() : 0,
+                writeBack ? mutationContext.parentExecutionId() : null,
+                !writeBack || mutationContext.cascadeAllowed()
         );
     }
 
