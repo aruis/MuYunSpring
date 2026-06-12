@@ -113,6 +113,13 @@
 | `POST` | `/iam.employee/enable/{id}` | 启用职员。 |
 | `POST` | `/iam.employee/disable/{id}` | 停用职员。 |
 | `POST` | `/iam.employee/sort/{id}` | 调整职员在部门内的排序。 |
+| `GET` | `/iam.employee/{employeeId}/positions` | 查询职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions` | 为职员新增任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/update` | 更新职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/delete` | 删除职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/enable` | 启用职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/disable` | 停用职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/sort` | 调整职员任岗关系排序。 |
 
 ## 岗位
 

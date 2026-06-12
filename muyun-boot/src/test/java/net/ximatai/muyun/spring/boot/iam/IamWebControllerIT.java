@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
+import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
@@ -30,6 +32,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -64,6 +68,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private EmployeeService employeeService;
+
+    @MockitoBean
+    private EmployeePositionService employeePositionService;
 
     @MockitoBean
     private PositionService positionService;
@@ -195,6 +202,56 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("employee-1"))
                 .andExpect(jsonPath("$.departmentId").value("dept-1"));
+    }
+
+    @Test
+    void shouldBindEmployeePositionEndpointsInRealMvcContext() throws Exception {
+        EmployeePosition relation = new EmployeePosition();
+        relation.setId("relation-1");
+        relation.setEmployeeId("employee-1");
+        relation.setOrganizationId("org-1");
+        relation.setDepartmentId("dept-1");
+        relation.setPositionId("position-1");
+        relation.setPrimaryPosition(Boolean.TRUE);
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(employeePositionService.positions("employee-1")).thenReturn(List.of(relation));
+        when(employeePositionService.addPosition(eq("employee-1"), any())).thenReturn("relation-1");
+        when(employeePositionService.select("relation-1")).thenReturn(relation);
+        when(employeePositionService.deletePosition("employee-1", "relation-1")).thenReturn(1);
+
+        mvc.perform(get("/iam.employee/employee-1/positions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("relation-1"))
+                .andExpect(jsonPath("$.records[0].primaryPosition").value(true));
+
+        mvc.perform(post("/iam.employee/employee-1/positions")
+                        .contentType("application/json")
+                        .content("""
+                                {"organizationId":"org-1","departmentId":"dept-1","positionId":"position-1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("relation-1"));
+
+        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void shouldBindEmployeePositionSortEndpointInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/sort")
+                        .contentType("application/json")
+                        .content("""
+                                {"previousId":"relation-0"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(employeePositionService).moveEmployeePosition("employee-1", "relation-1", "relation-0", null);
     }
 
     @Test
