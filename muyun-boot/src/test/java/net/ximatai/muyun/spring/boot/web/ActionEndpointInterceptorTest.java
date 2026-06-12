@@ -1,7 +1,11 @@
 package net.ximatai.muyun.spring.boot.web;
 
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
@@ -15,6 +19,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
+import net.ximatai.muyun.spring.iam.employee.EmployeeDelegationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -40,6 +45,7 @@ class ActionEndpointInterceptorTest {
     @AfterEach
     void tearDown() {
         CurrentUserContext.clear();
+        ActingContextHolder.clear();
         ActionExecutionContextHolder.clear();
     }
 
@@ -100,6 +106,116 @@ class ActionEndpointInterceptorTest {
         interceptor.afterConcurrentHandlingStarted(request, new MockHttpServletResponse(), handler);
 
         assertThat(ActionExecutionContextHolder.current()).isEmpty();
+    }
+
+    @Test
+    void shouldResolveActingContextFromRequestHeadersBeforeAuthorization() throws Exception {
+        EmployeeDelegationService delegationService = mock(EmployeeDelegationService.class);
+        ActingContext actingContext = new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                BusinessPrincipal.employee("principal-employee", "org-1", "dept-1"),
+                "iam.organization",
+                "query");
+        when(delegationService.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "principal-employee",
+                "principal-position",
+                "iam.organization",
+                "query")).thenReturn(actingContext);
+        RecordingPolicyService policyService = new RecordingPolicyService();
+        ActionEndpointInterceptor interceptor = new ActionEndpointInterceptor(
+                policyService,
+                new ActionEndpointContextResolver(),
+                new ActingRequestResolver(delegationService)
+        );
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/query");
+            request.addHeader(ActingRequestResolver.PRINCIPAL_EMPLOYEE_ID_HEADER, "principal-employee");
+            request.addHeader(ActingRequestResolver.PRINCIPAL_POSITION_ID_HEADER, "principal-position");
+            HandlerMethod handler = handler(new StaticScopedWeb(),
+                    CrudWeb.class.getMethod("query", WebQueryRequest.class));
+
+            interceptor.preHandle(request, new MockHttpServletResponse(), handler);
+
+            assertThat(policyService.actingContext).isSameAs(actingContext);
+            assertThat(ActingContextHolder.current()).contains(actingContext);
+            interceptor.afterCompletion(request, new MockHttpServletResponse(), handler, null);
+            assertThat(ActingContextHolder.current()).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldRejectActingHeadersWhenResolverIsNotConfigured() throws Exception {
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/query");
+            request.addHeader(ActingRequestResolver.PRINCIPAL_EMPLOYEE_ID_HEADER, "principal-employee");
+
+            assertThatThrownBy(() -> interceptor.preHandle(request, new MockHttpServletResponse(),
+                    handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class))))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("employee delegation service is not available");
+        }
+    }
+
+    @Test
+    void shouldClearActingContextWhenAuthorizationFails() throws Exception {
+        EmployeeDelegationService delegationService = mock(EmployeeDelegationService.class);
+        ActingContext actingContext = actingContext();
+        when(delegationService.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "principal-employee",
+                null,
+                "iam.organization",
+                "query")).thenReturn(actingContext);
+        ActionEndpointInterceptor interceptor = new ActionEndpointInterceptor(
+                new ThrowingPolicyService(),
+                new ActionEndpointContextResolver(),
+                new ActingRequestResolver(delegationService)
+        );
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/query");
+            request.addHeader(ActingRequestResolver.PRINCIPAL_EMPLOYEE_ID_HEADER, "principal-employee");
+
+            assertThatThrownBy(() -> interceptor.preHandle(request, new MockHttpServletResponse(),
+                    handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class))))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("denied");
+            assertThat(ActingContextHolder.current()).isEmpty();
+        }
+    }
+
+    @Test
+    void shouldKeepActingContextEmptyWhenActingResolutionFails() throws Exception {
+        EmployeeDelegationService delegationService = mock(EmployeeDelegationService.class);
+        when(delegationService.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "principal-employee",
+                null,
+                "iam.organization",
+                "query")).thenThrow(new PlatformException("delegation denied"));
+        ActionEndpointInterceptor interceptor = new ActionEndpointInterceptor(
+                policyService,
+                new ActionEndpointContextResolver(),
+                new ActingRequestResolver(delegationService)
+        );
+
+        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/iam.organization/query");
+            request.addHeader(ActingRequestResolver.PRINCIPAL_EMPLOYEE_ID_HEADER, "principal-employee");
+
+            assertThatThrownBy(() -> interceptor.preHandle(request, new MockHttpServletResponse(),
+                    handler(new StaticScopedWeb(), CrudWeb.class.getMethod("query", WebQueryRequest.class))))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("delegation denied");
+            assertThat(ActingContextHolder.current()).isEmpty();
+        }
     }
 
     @Test
@@ -265,8 +381,18 @@ class ActionEndpointInterceptorTest {
         return new HandlerMethod(bean, method);
     }
 
+    private ActingContext actingContext() {
+        return new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                BusinessPrincipal.employee("principal-employee", "org-1", "dept-1"),
+                "iam.organization",
+                "query");
+    }
+
     private static final class RecordingPolicyService implements ActionExecutionPolicyService {
         private ActionExecutionContext context;
+        private ActingContext actingContext;
 
         @Override
         public void requireAuthorized(ActionExecutionContext context) {
@@ -277,7 +403,20 @@ class ActionEndpointInterceptorTest {
         public ActionAuthorizationResult authorize(ActionExecutionContext context) {
             ActionAuthorizationResult result = ActionAuthorizationResult.allowed(context, "TEST_ALLOWED");
             this.context = context.withAuthorizationResult(result);
+            this.actingContext = ActingContextHolder.current().orElse(null);
             return result;
+        }
+    }
+
+    private static final class ThrowingPolicyService implements ActionExecutionPolicyService {
+        @Override
+        public void requireAuthorized(ActionExecutionContext context) {
+            throw new PlatformException("denied");
+        }
+
+        @Override
+        public ActionAuthorizationResult authorize(ActionExecutionContext context) {
+            throw new PlatformException("denied");
         }
     }
 

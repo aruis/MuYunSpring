@@ -135,6 +135,13 @@
 | `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/enable` | 启用职员业务代办关系。 |
 | `POST` | `/iam.employee/{employeeId}/delegations/{delegationId}/disable` | 停用职员业务代办关系。 |
 
+静态 Web 动作入口可通过请求头声明业务代办：
+
+| 请求头 | 说明 |
+| --- | --- |
+| `X-MuYun-Acting-Principal-Employee-Id` | 被代办职员 ID。出现该头时，入口会校验当前登录账号是否为有效受托职员，并校验代办关系、有效期和 scope。 |
+| `X-MuYun-Acting-Principal-Position-Id` | 可选，被代办任岗关系 ID；用于让被代办业务主体落到具体任岗上下文。 |
+
 ## 岗位
 
 根路径：`/iam.position`

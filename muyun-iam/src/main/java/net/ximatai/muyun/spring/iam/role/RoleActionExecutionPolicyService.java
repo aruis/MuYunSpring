@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
@@ -52,6 +54,18 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
             return ActionAuthorizationResult.allowed(context, DECISION_ACTION_DEFAULT_GRANT);
         }
         String permissionActionCode = context.actionPolicy().permissionActionCode();
+        ActingContext actingContext = ActingContextHolder.current()
+                .filter(acting -> acting.matches(context.moduleAlias(), context.actionCode()))
+                .orElse(null);
+        if (actingContext != null) {
+            if (!currentUser.userId().equals(actingContext.operator().userId())) {
+                throw new PlatformException("acting context operator does not match current user");
+            }
+            if (roleService.hasActionPermission(actingContext.principal(), context.moduleAlias(), permissionActionCode)) {
+                return ActionAuthorizationResult.allowed(context, DECISION_ROLE_GRANTED);
+            }
+            throw new PlatformException("action permission denied: " + context.permissionCode());
+        }
         if (roleService.hasActionPermission(currentUser.userId(), context.moduleAlias(), permissionActionCode)) {
             return ActionAuthorizationResult.allowed(context, DECISION_ROLE_GRANTED);
         }

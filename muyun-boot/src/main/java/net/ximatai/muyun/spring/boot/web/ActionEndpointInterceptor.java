@@ -2,6 +2,9 @@ package net.ximatai.muyun.spring.boot.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -18,14 +21,24 @@ import java.util.Optional;
 public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
     private static final String ACTION_CONTEXT_SCOPE_ATTRIBUTE =
             ActionEndpointInterceptor.class.getName() + ".ACTION_CONTEXT_SCOPE";
+    private static final String ACTING_CONTEXT_SCOPE_ATTRIBUTE =
+            ActionEndpointInterceptor.class.getName() + ".ACTING_CONTEXT_SCOPE";
 
     private final ActionExecutionPolicyService policyService;
     private final ActionEndpointContextResolver contextResolver;
+    private final ActingRequestResolver actingRequestResolver;
 
     public ActionEndpointInterceptor(ActionExecutionPolicyService policyService,
                                      ActionEndpointContextResolver contextResolver) {
+        this(policyService, contextResolver, null);
+    }
+
+    public ActionEndpointInterceptor(ActionExecutionPolicyService policyService,
+                                     ActionEndpointContextResolver contextResolver,
+                                     ActingRequestResolver actingRequestResolver) {
         this.policyService = policyService;
         this.contextResolver = contextResolver;
+        this.actingRequestResolver = actingRequestResolver;
     }
 
     @Override
@@ -53,10 +66,28 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                     + handlerMethod.getBeanType().getName() + "#" + handlerMethod.getMethod().getName());
         }
         ActionExecutionContext resolved = context.get();
-        ActionAuthorizationResult authorization = policyService.authorize(resolved);
-        request.setAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE,
-                ActionExecutionContextHolder.use(resolved.withAuthorizationResult(authorization)));
-        return true;
+        ActingContextHolder.Scope actingScope = null;
+        try {
+            if (actingRequestResolver != null) {
+                Optional<ActingContext> actingContext = actingRequestResolver.resolve(request, resolved);
+                if (actingContext.isPresent()) {
+                    actingScope = ActingContextHolder.use(actingContext.get());
+                    request.setAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE, actingScope);
+                }
+            } else if (ActingRequestResolver.hasActingRequest(request)) {
+                throw new PlatformException("employee delegation service is not available");
+            }
+            ActionAuthorizationResult authorization = policyService.authorize(resolved);
+            request.setAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE,
+                    ActionExecutionContextHolder.use(resolved.withAuthorizationResult(authorization)));
+            return true;
+        } catch (RuntimeException ex) {
+            if (actingScope != null) {
+                request.removeAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
+                actingScope.close();
+            }
+            throw ex;
+        }
     }
 
     @Override
@@ -65,6 +96,7 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                                 @NonNull Object handler,
                                 Exception ex) {
         closeActionContext(request);
+        closeActingContext(request);
     }
 
     @Override
@@ -72,6 +104,7 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
                                                @NonNull HttpServletResponse response,
                                                @NonNull Object handler) {
         closeActionContext(request);
+        closeActingContext(request);
     }
 
     private void closeActionContext(HttpServletRequest request) {
@@ -79,6 +112,14 @@ public class ActionEndpointInterceptor implements AsyncHandlerInterceptor {
         request.removeAttribute(ACTION_CONTEXT_SCOPE_ATTRIBUTE);
         if (scope instanceof ActionExecutionContextHolder.Scope contextScope) {
             contextScope.close();
+        }
+    }
+
+    private void closeActingContext(HttpServletRequest request) {
+        Object scope = request.getAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
+        request.removeAttribute(ACTING_CONTEXT_SCOPE_ATTRIBUTE);
+        if (scope instanceof ActingContextHolder.Scope actingScope) {
+            actingScope.close();
         }
     }
 }

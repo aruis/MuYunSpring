@@ -121,6 +121,17 @@ public class EmployeeDelegationService extends TenantStandardBusinessService<Emp
     }
 
     public ActingContext resolveActingContext(CurrentUser operator,
+                                              String principalEmployeeId,
+                                              String principalPositionId,
+                                              String moduleAlias,
+                                              String actionCode) {
+        String delegateEmployeeId = java.util.Objects.requireNonNull(employeeAccountService, "employeeAccountService")
+                .employeeIdOfUser(java.util.Objects.requireNonNull(operator, "operator must not be null").userId());
+        return resolveActingContext(operator, delegateEmployeeId, null,
+                principalEmployeeId, principalPositionId, moduleAlias, actionCode, Instant.now());
+    }
+
+    public ActingContext resolveActingContext(CurrentUser operator,
                                               String delegateEmployeeId,
                                               String delegatePositionId,
                                               String principalEmployeeId,

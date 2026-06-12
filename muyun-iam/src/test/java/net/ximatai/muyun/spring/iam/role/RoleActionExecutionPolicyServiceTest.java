@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.iam.role;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionAuthorizationResult;
@@ -47,6 +50,95 @@ class RoleActionExecutionPolicyServiceTest {
         assertThat(result.operatorId()).isEqualTo("user-1");
         assertThat(result.operatorType()).isEqualTo(ActionAuthorizationResult.OPERATOR_USER);
         verify(roleService).hasActionPermission("user-1", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldUseActingPrincipalForRoleLookupWhenActingContextMatchesAction() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee("employee-1", "org-1", "dept-1");
+        when(roleService.hasActionPermission(principal, "sales.contract", "view")).thenReturn(true);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                principal,
+                "sales.contract",
+                "query"))) {
+            ActionAuthorizationResult result = policy.authorize(context(
+                    CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a")));
+
+            assertThat(result.decision()).isEqualTo(RoleActionExecutionPolicyService.DECISION_ROLE_GRANTED);
+        }
+
+        verify(roleService).hasActionPermission(principal, "sales.contract", "view");
+        verify(roleService, never()).hasActionPermission("assistant-user", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldIgnoreActingPrincipalWhenActingContextDoesNotMatchAction() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee("employee-1", "org-1", "dept-1");
+        when(roleService.hasActionPermission("assistant-user", "sales.contract", "view")).thenReturn(true);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                principal,
+                "sales.contract",
+                "create"))) {
+            ActionAuthorizationResult result = policy.authorize(context(
+                    CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a")));
+
+            assertThat(result.decision()).isEqualTo(RoleActionExecutionPolicyService.DECISION_ROLE_GRANTED);
+        }
+
+        verify(roleService, never()).hasActionPermission(principal, "sales.contract", "view");
+        verify(roleService).hasActionPermission("assistant-user", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldDenyWhenMatchingActingPrincipalIsNotGrantedEvenIfOperatorIsGranted() {
+        RoleService roleService = mock(RoleService.class);
+        BusinessPrincipal principal = BusinessPrincipal.employee("employee-1", "org-1", "dept-1");
+        when(roleService.hasActionPermission("assistant-user", "sales.contract", "view")).thenReturn(true);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                principal,
+                "sales.contract",
+                "query"))) {
+            assertThatThrownBy(() -> policy.authorize(context(
+                    CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("sales.contract:view");
+        }
+
+        verify(roleService).hasActionPermission(principal, "sales.contract", "view");
+        verify(roleService, never()).hasActionPermission("assistant-user", "sales.contract", "view");
+    }
+
+    @Test
+    void shouldRejectWhenActingOperatorDoesNotMatchCurrentUser() {
+        RoleService roleService = mock(RoleService.class);
+        RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
+
+        try (ActingContextHolder.Scope ignored = ActingContextHolder.use(new ActingContext(
+                "delegation-1",
+                CurrentUser.tenantUser("other-user", "Other", "tenant_a"),
+                BusinessPrincipal.employee("employee-1", "org-1", "dept-1"),
+                "sales.contract",
+                "query"))) {
+            assertThatThrownBy(() -> policy.authorize(context(
+                    CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("operator does not match");
+        }
+
+        verify(roleService, never()).hasActionPermission("assistant-user", "sales.contract", "view");
     }
 
     @Test
