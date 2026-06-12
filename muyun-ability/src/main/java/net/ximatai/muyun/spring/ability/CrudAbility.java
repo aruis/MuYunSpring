@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
+import net.ximatai.muyun.spring.common.model.capability.DataScopeCapable;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -310,6 +311,9 @@ public interface CrudAbility<T extends EntityContract> {
                 && shouldPrepareEnabledDefault(entity)
                 && enabled.getEnabled() == null) {
             enabled.setEnabled(Boolean.TRUE);
+        }
+        if (entity instanceof DataScopeCapable dataScopeCapable) {
+            DataScopeOwnershipDefaults.prepareInsert(getModuleAlias(), dataScopeCapable);
         }
     }
 

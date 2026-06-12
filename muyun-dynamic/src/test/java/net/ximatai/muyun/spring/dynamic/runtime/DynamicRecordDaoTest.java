@@ -11,6 +11,11 @@ import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceOption;
@@ -18,7 +23,10 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TitledCapable;
 import net.ximatai.muyun.spring.common.model.capability.TreeCapable;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
+import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
@@ -146,6 +154,72 @@ class DynamicRecordDaoTest {
         assertThat(selected.getAuthOrganizationId()).isEqualTo("org-1");
         assertThat(selected.getAuthDepartmentId()).isEqualTo("dept-1");
         assertThat(selected.getAuthModuleAlias()).isEqualTo("sales.contract");
+    }
+
+    @Test
+    void shouldPrepareDynamicDataScopeOwnershipFromCurrentUserOnInsert() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+
+        try (CurrentUserContext.Scope user = CurrentUserContext.use(CurrentUser.tenantUser(
+                "user-1", "User", "tenant-a", "org-1"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction(
+                             "sales.contract",
+                             PlatformAction.CREATE,
+                             java.util.Set.of(),
+                             CurrentUserContext.currentUser()))) {
+            service.insert(record);
+        }
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue())
+                .containsEntry("auth_user_id", "user-1")
+                .containsEntry("auth_organization_id", "org-1")
+                .containsEntry("auth_module_alias", "sales.contract");
+        assertThat(body.getValue()).doesNotContainKey("auth_department_id");
+    }
+
+    @Test
+    void shouldPrepareDynamicDataScopeOwnershipFromActingPrincipalOnInsert() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C-001")
+                .setValue("amount", BigDecimal.TEN);
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+        BusinessPrincipal principal = BusinessPrincipal.employeePosition(
+                "employee-principal", "org-principal", "dept-principal", "position-principal");
+
+        try (CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "sales.contract", "create"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction(
+                             "sales.contract",
+                             PlatformAction.CREATE,
+                             java.util.Set.of(),
+                             CurrentUserContext.currentUser()))) {
+            service.insert(record);
+        }
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        assertThat(body.getValue())
+                .containsEntry("auth_organization_id", "org-principal")
+                .containsEntry("auth_department_id", "dept-principal")
+                .containsEntry("auth_module_alias", "sales.contract");
+        assertThat(body.getValue()).doesNotContainEntry("auth_user_id", "assistant-user");
     }
 
     @Test

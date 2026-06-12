@@ -4,6 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
+import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEntity;
@@ -28,6 +31,7 @@ class DataScopeAbilityTest {
     @AfterEach
     void tearDown() {
         CurrentUserContext.clear();
+        ActingContextHolder.clear();
         ActionExecutionContextHolder.clear();
         TenantContext.clear();
     }
@@ -166,6 +170,154 @@ class DataScopeAbilityTest {
             update.setId(othersId);
             assertThat(service.update(update)).isEqualTo(1);
             assertThat(service.select(othersId).getTitle()).isEqualTo("Others normalized");
+        }
+    }
+
+    @Test
+    void shouldPrepareDataScopeOwnershipFromCurrentUserOnInsert() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new AllDataScopeCriteriaService());
+
+        String id;
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(CurrentUser.tenantUser(
+                     "user-1", "User", "tenant-a", "org-1"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction(
+                             "demo.dataScoped",
+                             PlatformAction.CREATE,
+                             java.util.Set.of(),
+                             CurrentUserContext.currentUser()))) {
+            DemoDataScopedRecord incoming = new DemoDataScopedRecord();
+            incoming.setTitle("Created");
+            id = service.insert(incoming);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoDataScopedRecord saved = service.select(id);
+            assertThat(saved.getAuthUserId()).isEqualTo("user-1");
+            assertThat(saved.getAuthOrganizationId()).isEqualTo("org-1");
+            assertThat(saved.getAuthDepartmentId()).isNull();
+            assertThat(saved.getAuthModuleAlias()).isEqualTo("demo.dataScoped");
+        }
+    }
+
+    @Test
+    void shouldPrepareDataScopeOwnershipFromActingPrincipalOnInsert() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new AllDataScopeCriteriaService());
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+        BusinessPrincipal principal = BusinessPrincipal.employeePosition(
+                "employee-principal", "org-principal", "dept-principal", "position-principal");
+
+        String id;
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "demo.dataScoped", "create"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction(
+                             "demo.dataScoped",
+                             PlatformAction.CREATE,
+                             java.util.Set.of(),
+                             CurrentUserContext.currentUser()))) {
+            DemoDataScopedRecord incoming = new DemoDataScopedRecord();
+            incoming.setTitle("Acting created");
+            id = service.insert(incoming);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoDataScopedRecord saved = service.select(id);
+            assertThat(saved.getAuthUserId()).isNull();
+            assertThat(saved.getAuthOrganizationId()).isEqualTo("org-principal");
+            assertThat(saved.getAuthDepartmentId()).isEqualTo("dept-principal");
+            assertThat(saved.getAuthModuleAlias()).isEqualTo("demo.dataScoped");
+        }
+    }
+
+    @Test
+    void shouldUseCurrentUserOwnershipWhenActingContextDoesNotMatchAction() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new AllDataScopeCriteriaService());
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+
+        String id;
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "demo.dataScoped", "update"));
+             ActionExecutionContextHolder.Scope action = ActionExecutionContextHolder.use(
+                     ActionExecutionContext.ofPlatformAction(
+                             "demo.dataScoped",
+                             PlatformAction.CREATE,
+                             java.util.Set.of(),
+                             CurrentUserContext.currentUser()))) {
+            DemoDataScopedRecord incoming = new DemoDataScopedRecord();
+            incoming.setTitle("Current user created");
+            id = service.insert(incoming);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoDataScopedRecord saved = service.select(id);
+            assertThat(saved.getAuthUserId()).isEqualTo("assistant-user");
+            assertThat(saved.getAuthOrganizationId()).isEqualTo("org-assistant");
+            assertThat(saved.getAuthDepartmentId()).isNull();
+            assertThat(saved.getAuthModuleAlias()).isEqualTo("demo.dataScoped");
+        }
+    }
+
+    @Test
+    void shouldUseCurrentUserOwnershipWhenActingContextHasNoActionContext() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new AllDataScopeCriteriaService());
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+
+        String id;
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "demo.dataScoped", "create"))) {
+            DemoDataScopedRecord incoming = new DemoDataScopedRecord();
+            incoming.setTitle("No action context");
+            id = service.insert(incoming);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoDataScopedRecord saved = service.select(id);
+            assertThat(saved.getAuthUserId()).isEqualTo("assistant-user");
+            assertThat(saved.getAuthOrganizationId()).isEqualTo("org-assistant");
+            assertThat(saved.getAuthDepartmentId()).isNull();
+            assertThat(saved.getAuthModuleAlias()).isEqualTo("demo.dataScoped");
+        }
+    }
+
+    @Test
+    void shouldKeepExplicitDataScopeOwnershipWhenPreparingInsertDefaults() {
+        DemoDataScopedRecordService service = new DemoDataScopedRecordService(new AllDataScopeCriteriaService());
+        CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a", "org-assistant");
+        BusinessPrincipal principal = BusinessPrincipal.employee(
+                "employee-principal", "org-principal", "dept-principal");
+
+        String id;
+        try (TenantContext.Scope tenant = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope user = CurrentUserContext.use(operator);
+             ActingContextHolder.Scope acting = ActingContextHolder.use(new ActingContext(
+                     "delegation-1", operator, principal, "demo.dataScoped", "create"))) {
+            DemoDataScopedRecord incoming = new DemoDataScopedRecord();
+            incoming.setTitle("Explicit");
+            incoming.setAuthUserId("explicit-user");
+            incoming.setAuthOrganizationId("explicit-org");
+            incoming.setAuthDepartmentId("explicit-dept");
+            incoming.setAuthModuleAlias("explicit.module");
+            id = service.insert(incoming);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            DemoDataScopedRecord saved = service.select(id);
+            assertThat(saved.getAuthUserId()).isEqualTo("explicit-user");
+            assertThat(saved.getAuthOrganizationId()).isEqualTo("explicit-org");
+            assertThat(saved.getAuthDepartmentId()).isEqualTo("explicit-dept");
+            assertThat(saved.getAuthModuleAlias()).isEqualTo("explicit.module");
         }
     }
 
