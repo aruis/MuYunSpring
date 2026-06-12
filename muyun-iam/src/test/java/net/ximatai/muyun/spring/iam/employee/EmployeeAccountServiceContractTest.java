@@ -177,6 +177,30 @@ class EmployeeAccountServiceContractTest {
                 .hasMessageContaining("does not belong to employee");
     }
 
+    @Test
+    void shouldSwitchPrimaryAccountWithinSameEmployee() {
+        EmployeeAccountService service = spy(service(mock(EmployeeAccountDao.class)));
+        EmployeeAccount existingPrimary = binding("employee-1", "user-1", true);
+        existingPrimary.setId("binding-old");
+        existingPrimary.setEnabled(Boolean.TRUE);
+        EmployeeAccount target = binding("employee-1", "user-2", false);
+        target.setId("binding-new");
+        target.setEnabled(Boolean.FALSE);
+        doReturn(target).when(service).select("binding-new");
+        doReturn(List.of(existingPrimary)).when(service).list(any(Criteria.class), any(PageRequest.class));
+        doReturn(1).when(service).update(any(EmployeeAccount.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.makePrimaryAccount("employee-1", "binding-new")).isEqualTo(2);
+        }
+
+        assertThat(existingPrimary.getPrimaryAccount()).isFalse();
+        assertThat(target.getPrimaryAccount()).isTrue();
+        assertThat(target.getEnabled()).isTrue();
+        verify(service).update(existingPrimary);
+        verify(service).update(target);
+    }
+
     private EmployeeAccountService service(EmployeeAccountDao dao) {
         return service(dao, activeTenantVerifier());
     }
@@ -186,6 +210,7 @@ class EmployeeAccountServiceContractTest {
         UserAccountService userAccountService = mock(UserAccountService.class);
         when(employeeService.requireEnabled(eq("employee-1"), any())).thenReturn(employee("employee-1"));
         when(userAccountService.requireEnabled(eq("user-1"), any())).thenReturn(user("user-1"));
+        when(userAccountService.requireEnabled(eq("user-2"), any())).thenReturn(user("user-2"));
         return new EmployeeAccountService(dao, tenantVerifier, employeeService, userAccountService);
     }
 

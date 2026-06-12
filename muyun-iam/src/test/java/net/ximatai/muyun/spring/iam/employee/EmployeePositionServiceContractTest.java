@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.iam.employee;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -131,6 +133,30 @@ class EmployeePositionServiceContractTest {
                 .hasMessageContaining("same employee");
     }
 
+    @Test
+    void shouldSwitchPrimaryPositionWithinSameEmployee() {
+        EmployeePositionService service = spy(service(mock(EmployeePositionDao.class)));
+        EmployeePosition existingPrimary = relation("employee-1", "org-1", "dept-1", "position-1", true);
+        existingPrimary.setId("relation-old");
+        existingPrimary.setEnabled(Boolean.TRUE);
+        EmployeePosition target = relation("employee-1", "org-1", "dept-1", "position-2", false);
+        target.setId("relation-new");
+        target.setEnabled(Boolean.FALSE);
+        doReturn(target).when(service).select("relation-new");
+        doReturn(List.of(existingPrimary)).when(service).list(any(Criteria.class), any(PageRequest.class));
+        doReturn(1).when(service).update(any(EmployeePosition.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.makePrimaryPosition("employee-1", "relation-new")).isEqualTo(2);
+        }
+
+        assertThat(existingPrimary.getPrimaryPosition()).isFalse();
+        assertThat(target.getPrimaryPosition()).isTrue();
+        assertThat(target.getEnabled()).isTrue();
+        verify(service).update(existingPrimary);
+        verify(service).update(target);
+    }
+
     private EmployeePositionService service(EmployeePositionDao dao) {
         return service(dao, activeTenantVerifier());
     }
@@ -146,6 +172,7 @@ class EmployeePositionServiceContractTest {
         when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("dept-1", "org-1"));
         when(departmentService.requireEnabled(eq("dept-2"), any())).thenReturn(department("dept-2", "org-1"));
         when(positionService.requireEnabled(eq("position-1"), any())).thenReturn(position("position-1"));
+        when(positionService.requireEnabled(eq("position-2"), any())).thenReturn(position("position-2"));
         return new EmployeePositionService(dao, tenantVerifier, employeeService, organizationService,
                 departmentService, positionService);
     }

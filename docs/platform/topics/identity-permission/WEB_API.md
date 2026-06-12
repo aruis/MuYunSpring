@@ -118,12 +118,14 @@
 | `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/delete` | 删除职员账号绑定。 |
 | `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/enable` | 启用职员账号绑定。 |
 | `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/disable` | 停用职员账号绑定。 |
+| `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/primary` | 将指定账号绑定设为职员主账号，并降级同职员其他启用主账号。 |
 | `GET` | `/iam.employee/{employeeId}/positions` | 查询职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions` | 为职员新增任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/update` | 更新职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/delete` | 删除职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/enable` | 启用职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/disable` | 停用职员任岗关系。 |
+| `POST` | `/iam.employee/{employeeId}/positions/{relationId}/primary` | 将指定任岗设为职员主岗，并降级同职员其他启用主岗。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/sort` | 调整职员任岗关系排序。 |
 
 ## 岗位

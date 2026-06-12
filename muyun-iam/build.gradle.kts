@@ -2,6 +2,7 @@ dependencies {
     api(project(":muyun-ability"))
     compileOnly(libs.muyun.database.spring.boot.starter)
     compileOnly(libs.spring.context)
+    compileOnly(libs.spring.tx)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

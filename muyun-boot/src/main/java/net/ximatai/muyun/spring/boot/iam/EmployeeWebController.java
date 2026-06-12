@@ -80,6 +80,14 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         return webScope(() -> new WebCountResponse(employeeAccountService.disableAccount(employeeId, bindingId)));
     }
 
+    @PostMapping("/{employeeId}/accounts/{bindingId}/primary")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse makePrimaryAccount(@PathVariable String employeeId,
+                                               @PathVariable String bindingId) {
+        return webScope(() -> new WebCountResponse(employeeAccountService.makePrimaryAccount(employeeId, bindingId)));
+    }
+
     @GetMapping("/{employeeId}/positions")
     @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
             level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
@@ -129,6 +137,14 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     public WebCountResponse disablePosition(@PathVariable String employeeId,
                                             @PathVariable String relationId) {
         return webScope(() -> new WebCountResponse(employeePositionService.disablePosition(employeeId, relationId)));
+    }
+
+    @PostMapping("/{employeeId}/positions/{relationId}/primary")
+    @CustomActionEndpoint(value = "employeePositions", title = "职员任岗",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse makePrimaryPosition(@PathVariable String employeeId,
+                                                @PathVariable String relationId) {
+        return webScope(() -> new WebCountResponse(employeePositionService.makePrimaryPosition(employeeId, relationId)));
     }
 
     @PostMapping("/{employeeId}/positions/{relationId}/sort")

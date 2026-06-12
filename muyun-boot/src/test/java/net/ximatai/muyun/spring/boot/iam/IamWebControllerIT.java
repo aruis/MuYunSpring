@@ -226,6 +226,7 @@ class IamWebControllerIT {
         when(employeePositionService.addPosition(eq("employee-1"), any())).thenReturn("relation-1");
         when(employeePositionService.select("relation-1")).thenReturn(relation);
         when(employeePositionService.deletePosition("employee-1", "relation-1")).thenReturn(1);
+        when(employeePositionService.makePrimaryPosition("employee-1", "relation-1")).thenReturn(1);
 
         mvc.perform(get("/iam.employee/employee-1/positions"))
                 .andExpect(status().isOk())
@@ -241,6 +242,10 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.id").value("relation-1"));
 
         mvc.perform(post("/iam.employee/employee-1/positions/relation-1/delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        mvc.perform(post("/iam.employee/employee-1/positions/relation-1/primary"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
     }
@@ -272,6 +277,7 @@ class IamWebControllerIT {
         when(employeeAccountService.deleteAccount("employee-1", "binding-1")).thenReturn(1);
         when(employeeAccountService.enableAccount("employee-1", "binding-1")).thenReturn(1);
         when(employeeAccountService.disableAccount("employee-1", "binding-1")).thenReturn(1);
+        when(employeeAccountService.makePrimaryAccount("employee-1", "binding-1")).thenReturn(1);
 
         mvc.perform(get("/iam.employee/employee-1/accounts"))
                 .andExpect(status().isOk())
@@ -294,6 +300,9 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
         mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/disable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/primary"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
 

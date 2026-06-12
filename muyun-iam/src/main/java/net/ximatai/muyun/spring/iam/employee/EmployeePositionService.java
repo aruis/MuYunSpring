@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import net.ximatai.muyun.spring.iam.position.PositionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -57,19 +58,14 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
 
     @Override
     protected void validateBeforeSave(EmployeePosition relation) {
-        Employee employee = employeeService.requireEnabled(relation.getEmployeeId(),
-                "employee is not active: " + relation.getEmployeeId());
-        organizationService.requireEnabled(relation.getOrganizationId(),
-                "organization is not active: " + relation.getOrganizationId());
-        Department department = departmentService.requireEnabled(relation.getDepartmentId(),
-                "department is not active: " + relation.getDepartmentId());
-        positionService.requireEnabled(relation.getPositionId(),
-                "position is not active: " + relation.getPositionId());
-        if (!SortAbility.sameValue(relation.getOrganizationId(), department.getOrganizationId())) {
-            throw new PlatformException("Employee position department must belong to the same organization");
-        }
+        Employee employee = validatePositionReferences(relation);
         if (Boolean.TRUE.equals(relation.getPrimaryPosition())) {
-            validatePrimaryPosition(relation, employee);
+            validatePrimaryPositionOwner(relation, employee);
+            rejectDuplicate(relation, Criteria.of()
+                            .eq("employeeId", relation.getEmployeeId())
+                            .eq("primaryPosition", Boolean.TRUE)
+                            .eq("enabled", Boolean.TRUE),
+                    "employee can only have one primary position");
         }
         rejectDuplicate(relation, Criteria.of()
                         .eq("employeeId", relation.getEmployeeId())
@@ -123,6 +119,28 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         return disable(relationId);
     }
 
+    @Transactional
+    public int makePrimaryPosition(String employeeId, String relationId) {
+        requireActiveTenantMutationContext();
+        String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");
+        EmployeePosition target = requireEmployeePosition(validEmployeeId, relationId);
+        validatePrimaryPositionOwner(target, validatePositionReferences(target));
+        int changed = 0;
+        for (EmployeePosition current : activePrimaryPositions(validEmployeeId)) {
+            if (SortAbility.sameValue(current.getId(), target.getId())) {
+                continue;
+            }
+            current.setPrimaryPosition(Boolean.FALSE);
+            changed += update(current);
+        }
+        if (!Boolean.TRUE.equals(target.getEnabled()) || !Boolean.TRUE.equals(target.getPrimaryPosition())) {
+            target.setEnabled(Boolean.TRUE);
+            target.setPrimaryPosition(Boolean.TRUE);
+            changed += update(target);
+        }
+        return changed;
+    }
+
     public void moveEmployeePosition(String employeeId, String relationId, String previousId, String nextId) {
         requireEmployeePosition(employeeId, relationId);
         if (previousId != null && !previousId.isBlank()) {
@@ -152,15 +170,31 @@ public class EmployeePositionService extends TenantStandardBusinessService<Emplo
         return Criteria.of().eq("employeeId", employeeId);
     }
 
-    private void validatePrimaryPosition(EmployeePosition relation, Employee employee) {
+    private List<EmployeePosition> activePrimaryPositions(String employeeId) {
+        return list(employeeCriteria(employeeId)
+                .eq("primaryPosition", Boolean.TRUE)
+                .eq("enabled", Boolean.TRUE), new PageRequest(0, Integer.MAX_VALUE));
+    }
+
+    private Employee validatePositionReferences(EmployeePosition relation) {
+        Employee employee = employeeService.requireEnabled(relation.getEmployeeId(),
+                "employee is not active: " + relation.getEmployeeId());
+        organizationService.requireEnabled(relation.getOrganizationId(),
+                "organization is not active: " + relation.getOrganizationId());
+        Department department = departmentService.requireEnabled(relation.getDepartmentId(),
+                "department is not active: " + relation.getDepartmentId());
+        positionService.requireEnabled(relation.getPositionId(),
+                "position is not active: " + relation.getPositionId());
+        if (!SortAbility.sameValue(relation.getOrganizationId(), department.getOrganizationId())) {
+            throw new PlatformException("Employee position department must belong to the same organization");
+        }
+        return employee;
+    }
+
+    private void validatePrimaryPositionOwner(EmployeePosition relation, Employee employee) {
         if (!SortAbility.sameValue(relation.getOrganizationId(), employee.getOrganizationId())
                 || !SortAbility.sameValue(relation.getDepartmentId(), employee.getDepartmentId())) {
             throw new PlatformException("Primary employee position must match employee main organization and department");
         }
-        rejectDuplicate(relation, Criteria.of()
-                        .eq("employeeId", relation.getEmployeeId())
-                        .eq("primaryPosition", Boolean.TRUE)
-                        .eq("enabled", Boolean.TRUE),
-                "employee can only have one primary position");
     }
 }

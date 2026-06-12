@@ -10,8 +10,10 @@ import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class EmployeeAccountService extends TenantStandardBusinessService<EmployeeAccount> implements
@@ -45,10 +47,7 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
 
     @Override
     protected void validateBeforeSave(EmployeeAccount binding) {
-        employeeService.requireEnabled(binding.getEmployeeId(),
-                "employee is not active: " + binding.getEmployeeId());
-        userAccountService.requireEnabled(binding.getUserId(),
-                "user account is not active: " + binding.getUserId());
+        validateAccountReferences(binding);
         rejectDuplicate(binding, Criteria.of()
                         .eq("employeeId", binding.getEmployeeId())
                         .eq("userId", binding.getUserId()),
@@ -88,6 +87,28 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
         return disable(bindingId);
     }
 
+    @Transactional
+    public int makePrimaryAccount(String employeeId, String bindingId) {
+        requireActiveTenantMutationContext();
+        String validEmployeeId = Preconditions.requireText(employeeId, "employeeId");
+        EmployeeAccount target = requireEmployeeAccount(validEmployeeId, bindingId);
+        validateAccountReferences(target);
+        int changed = 0;
+        for (EmployeeAccount current : activePrimaryAccounts(validEmployeeId)) {
+            if (Objects.equals(current.getId(), target.getId())) {
+                continue;
+            }
+            current.setPrimaryAccount(Boolean.FALSE);
+            changed += update(current);
+        }
+        if (!Boolean.TRUE.equals(target.getEnabled()) || !Boolean.TRUE.equals(target.getPrimaryAccount())) {
+            target.setEnabled(Boolean.TRUE);
+            target.setPrimaryAccount(Boolean.TRUE);
+            changed += update(target);
+        }
+        return changed;
+    }
+
     public String employeeIdOfUser(String userId) {
         String validUserId = Preconditions.requireText(userId, "userId");
         return list(Criteria.of()
@@ -112,5 +133,18 @@ public class EmployeeAccountService extends TenantStandardBusinessService<Employ
 
     private Criteria employeeCriteria(String employeeId) {
         return Criteria.of().eq("employeeId", employeeId);
+    }
+
+    private List<EmployeeAccount> activePrimaryAccounts(String employeeId) {
+        return list(employeeCriteria(employeeId)
+                .eq("primaryAccount", Boolean.TRUE)
+                .eq("enabled", Boolean.TRUE), ALL);
+    }
+
+    private void validateAccountReferences(EmployeeAccount binding) {
+        employeeService.requireEnabled(binding.getEmployeeId(),
+                "employee is not active: " + binding.getEmployeeId());
+        userAccountService.requireEnabled(binding.getUserId(),
+                "user account is not active: " + binding.getUserId());
     }
 }
