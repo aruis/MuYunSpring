@@ -63,6 +63,7 @@
 | `CacheAbility` | 统一按 ID 和全量列表缓存、写后失效、事务内绕过、对象副本隔离 | `CrudAbility`、`CacheRegistry`、`TenantContext` | 缓存命名空间包含服务、模块和 DAO；跨模型引用失效依赖 `ReferencerAbility`。 |
 | `PlatformAbilityDispatcher` | 调度平台内部 after 链，避免业务 hook 覆盖破坏平台能力 | CRUD 生命周期 | 新能力如果需要挂入 CRUD 内部链，应优先考虑这里，而不是要求业务手动调用 `super`。 |
 | `RuntimeEventPublisher` 等事件组件 | 提供 after-commit 运行事件发布和监听边界 | `TransactionScopeSupport`、事件 listener | 平台审计只记录必要上下文；工作流等专题应保留自己的流水。 |
+| `@ModuleExtension` / `@RuntimeEventHandler` | 给模块运行事件提供声明式扩展处理器 | `RuntimeEvent`、`RuntimeEventHandlerRegistry` | 这是 Ability 事件链路上的扩展点，不是绕过权限、租户、生命周期和审计的插件内核；默认 after 类事件提交后执行且失败告警，非 after 类事件事务内执行且失败阻断。类级 `entityAlias` 可作为方法级默认值，方法级声明优先。handler phase 只约束处理器执行时机，不改变事件源发布时间；已由事件源 after-commit 发布的事件不会回到事务内执行。 |
 
 ## 选型提示
 
