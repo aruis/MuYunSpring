@@ -20,6 +20,9 @@ public final class DynamicAbilityFields {
                 FieldDefinition.string(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, "Auth Organization")
                         .column(PlatformAbilityFields.AUTH_ORGANIZATION_COLUMN)
                         .length(PlatformAbilityFields.AUTH_ORGANIZATION_LENGTH),
+                FieldDefinition.string(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, "Auth Department")
+                        .column(PlatformAbilityFields.AUTH_DEPARTMENT_COLUMN)
+                        .length(PlatformAbilityFields.AUTH_DEPARTMENT_LENGTH),
                 FieldDefinition.string(PlatformAbilityFields.AUTH_MODULE_FIELD, "Auth Module")
                         .column(PlatformAbilityFields.AUTH_MODULE_COLUMN)
                         .length(PlatformAbilityFields.AUTH_MODULE_LENGTH)

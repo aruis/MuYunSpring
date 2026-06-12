@@ -39,6 +39,11 @@ public final class PlatformAbilityFields {
     public static final ColumnType AUTH_ORGANIZATION_COLUMN_TYPE = ColumnType.VARCHAR;
     public static final int AUTH_ORGANIZATION_LENGTH = 64;
 
+    public static final String AUTH_DEPARTMENT_FIELD = "authDepartmentId";
+    public static final String AUTH_DEPARTMENT_COLUMN = "auth_department_id";
+    public static final ColumnType AUTH_DEPARTMENT_COLUMN_TYPE = ColumnType.VARCHAR;
+    public static final int AUTH_DEPARTMENT_LENGTH = 64;
+
     public static final String AUTH_MODULE_FIELD = "authModuleAlias";
     public static final String AUTH_MODULE_COLUMN = "auth_module_alias";
     public static final ColumnType AUTH_MODULE_COLUMN_TYPE = ColumnType.VARCHAR;

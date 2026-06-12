@@ -11,6 +11,8 @@ public enum DataScopePolicy implements CodeTitleEnum {
     MEMBER("member", "相关人"),
     ORGANIZATION("organization", "本机构"),
     ORGANIZATION_AND_CHILDREN("organizationAndChildren", "本机构及下级"),
+    DEPARTMENT("department", "本部门"),
+    DEPARTMENT_AND_CHILDREN("departmentAndChildren", "本部门及下级"),
     CUSTOM("custom", "自定义条件"),
     REFERENCE_DEPENDENCY("referenceDependency", "引用依赖");
 

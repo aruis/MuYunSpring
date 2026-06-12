@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,22 +36,31 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
     private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
     private final RoleService roleService;
     private final Optional<OrganizationService> organizationService;
+    private final Optional<DepartmentService> departmentService;
     private final Optional<ReferenceDependencyScopeResolver> referenceDependencyScopeResolver;
 
     public RoleDataScopeCriteriaService(RoleService roleService) {
-        this(roleService, Optional.empty(), Optional.empty());
+        this(roleService, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public RoleDataScopeCriteriaService(RoleService roleService, Optional<OrganizationService> organizationService) {
-        this(roleService, organizationService, Optional.empty());
+        this(roleService, organizationService, Optional.empty(), Optional.empty());
+    }
+
+    public RoleDataScopeCriteriaService(RoleService roleService,
+                                        Optional<OrganizationService> organizationService,
+                                        Optional<ReferenceDependencyScopeResolver> referenceDependencyScopeResolver) {
+        this(roleService, organizationService, Optional.empty(), referenceDependencyScopeResolver);
     }
 
     @Autowired
     public RoleDataScopeCriteriaService(RoleService roleService,
                                         Optional<OrganizationService> organizationService,
+                                        Optional<DepartmentService> departmentService,
                                         Optional<ReferenceDependencyScopeResolver> referenceDependencyScopeResolver) {
         this.roleService = Objects.requireNonNull(roleService, "roleService must not be null");
         this.organizationService = organizationService == null ? Optional.empty() : organizationService;
+        this.departmentService = departmentService == null ? Optional.empty() : departmentService;
         this.referenceDependencyScopeResolver = referenceDependencyScopeResolver == null
                 ? Optional.empty()
                 : referenceDependencyScopeResolver;
@@ -341,6 +351,13 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
                 }
             }
             case ORGANIZATION_AND_CHILDREN -> appendOrganizationAndChildrenScope(scope, user, roleGrant);
+            case DEPARTMENT -> {
+                String departmentId = scopeDepartmentId(roleGrant);
+                if (departmentId != null) {
+                    scope.orEq(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, departmentId);
+                }
+            }
+            case DEPARTMENT_AND_CHILDREN -> appendDepartmentAndChildrenScope(scope, roleGrant);
             case CUSTOM ->
                     throw new PlatformException("custom data scope condition is not supported yet");
             case WILDCARD -> throw new PlatformException("wildcard data scope must be resolved before append scope");
@@ -381,11 +398,31 @@ public class RoleDataScopeCriteriaService implements DataScopeCriteriaService {
         }
     }
 
+    private void appendDepartmentAndChildrenScope(Criteria scope, EffectiveRoleGrant roleGrant) {
+        String organizationId = scopeOrganizationId(null, roleGrant);
+        String departmentId = scopeDepartmentId(roleGrant);
+        if (organizationId == null || departmentId == null) {
+            return;
+        }
+        DepartmentService service = departmentService.orElseThrow(() ->
+                new PlatformException("department children data scope requires department hierarchy support"));
+        List<String> departmentIds = service.selfAndDescendantIds(organizationId, departmentId);
+        if (!departmentIds.isEmpty()) {
+            scope.orIn(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, departmentIds);
+        }
+    }
+
     private String scopeOrganizationId(CurrentUser user, EffectiveRoleGrant roleGrant) {
         String contextOrganizationId = roleGrant == null ? null : roleGrant.organizationId();
-        return contextOrganizationId == null || contextOrganizationId.isBlank()
-                ? user.organizationId()
-                : contextOrganizationId;
+        if (contextOrganizationId != null && !contextOrganizationId.isBlank()) {
+            return contextOrganizationId;
+        }
+        return user == null ? null : user.organizationId();
+    }
+
+    private String scopeDepartmentId(EffectiveRoleGrant roleGrant) {
+        String contextDepartmentId = roleGrant == null ? null : roleGrant.departmentId();
+        return contextDepartmentId == null || contextDepartmentId.isBlank() ? null : contextDepartmentId;
     }
 
     private DataScopePolicy normalizePolicy(RoleAction grant) {

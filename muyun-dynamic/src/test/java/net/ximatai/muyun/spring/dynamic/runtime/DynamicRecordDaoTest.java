@@ -111,6 +111,7 @@ class DynamicRecordDaoTest {
                 Map.entry("auth_assignee_ids", "user-2,user-3"),
                 Map.entry("auth_member_ids", "user-4"),
                 Map.entry("auth_organization_id", "org-1"),
+                Map.entry("auth_department_id", "dept-1"),
                 Map.entry("auth_module_alias", "sales.contract"),
                 Map.entry("code", "C-001"),
                 Map.entry("amount", BigDecimal.TEN)
@@ -124,6 +125,7 @@ class DynamicRecordDaoTest {
         record.setAuthAssigneeIds("user-2,user-3");
         record.setAuthMemberIds("user-4");
         record.setAuthOrganizationId("org-1");
+        record.setAuthDepartmentId("dept-1");
         record.setAuthModuleAlias("sales.contract");
 
         service.insert(record);
@@ -136,11 +138,13 @@ class DynamicRecordDaoTest {
                 .containsEntry("auth_assignee_ids", "user-2,user-3")
                 .containsEntry("auth_member_ids", "user-4")
                 .containsEntry("auth_organization_id", "org-1")
+                .containsEntry("auth_department_id", "dept-1")
                 .containsEntry("auth_module_alias", "sales.contract");
         assertThat(selected.getAuthUserId()).isEqualTo("user-1");
         assertThat(selected.getAuthAssigneeIds()).isEqualTo("user-2,user-3");
         assertThat(selected.getAuthMemberIds()).isEqualTo("user-4");
         assertThat(selected.getAuthOrganizationId()).isEqualTo("org-1");
+        assertThat(selected.getAuthDepartmentId()).isEqualTo("dept-1");
         assertThat(selected.getAuthModuleAlias()).isEqualTo("sales.contract");
     }
 

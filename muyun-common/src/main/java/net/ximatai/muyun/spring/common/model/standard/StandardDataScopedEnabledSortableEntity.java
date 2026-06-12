@@ -32,6 +32,12 @@ public abstract class StandardDataScopedEnabledSortableEntity extends StandardEn
             comment = "Data scope organization id")
     private String authOrganizationId;
 
+    @Column(name = PlatformAbilityFields.AUTH_DEPARTMENT_COLUMN,
+            type = ColumnType.VARCHAR,
+            length = PlatformAbilityFields.AUTH_DEPARTMENT_LENGTH,
+            comment = "Data scope department id")
+    private String authDepartmentId;
+
     @Column(name = PlatformAbilityFields.AUTH_MODULE_COLUMN,
             type = ColumnType.VARCHAR,
             length = PlatformAbilityFields.AUTH_MODULE_LENGTH,

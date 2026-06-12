@@ -17,6 +17,10 @@ public interface DataScopeCapable {
 
     void setAuthOrganizationId(String authOrganizationId);
 
+    String getAuthDepartmentId();
+
+    void setAuthDepartmentId(String authDepartmentId);
+
     String getAuthModuleAlias();
 
     void setAuthModuleAlias(String authModuleAlias);

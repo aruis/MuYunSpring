@@ -184,6 +184,24 @@ class DepartmentServiceContractTest {
         assertThat(service.rootDepartments("org-1")).containsExactly(root);
     }
 
+    @Test
+    void shouldResolveSelfAndDescendantsInsideOrganizationScope() {
+        DepartmentService service = spy(new DepartmentService(mock(DepartmentDao.class), activeTenantVerifier(),
+                organizationService()));
+        Department root = department("org-1", "FIN", "Finance");
+        root.setId("dept-main");
+        Department child = department("org-1", "AR", "Accounts Receivable");
+        child.setId("dept-child");
+        doReturn(root).when(service).selectInScope(any(), eq("dept-main"));
+        doReturn(List.of(child)).when(service).children(any(), eq("dept-main"));
+        doReturn(List.of()).when(service).children(any(), eq("dept-child"));
+
+        assertThat(service.selfAndDescendantIds("org-1", "dept-main"))
+                .containsExactly("dept-main", "dept-child");
+        verify(service).children(any(), eq("dept-main"));
+        verify(service).children(any(), eq("dept-child"));
+    }
+
     private Department department(String organizationId, String code, String title) {
         Department department = new Department();
         department.setOrganizationId(organizationId);

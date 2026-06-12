@@ -13,7 +13,10 @@ import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class DepartmentService extends TenantStandardBusinessService<Department> implements
@@ -71,12 +74,41 @@ public class DepartmentService extends TenantStandardBusinessService<Department>
         return children(organizationScope(validOrganizationId), parentId);
     }
 
+    public List<String> selfAndDescendantIds(String organizationId, String departmentId) {
+        String validOrganizationId = Preconditions.requireText(organizationId, "organizationId");
+        String validDepartmentId = Preconditions.requireText(departmentId, "departmentId");
+        if (selectInScope(organizationScope(validOrganizationId), validDepartmentId) == null) {
+            return List.of();
+        }
+        ArrayList<String> ids = new ArrayList<>();
+        ids.add(validDepartmentId);
+        collectDepartmentDescendantIds(validOrganizationId, validDepartmentId, ids, new LinkedHashSet<>());
+        return List.copyOf(ids);
+    }
+
     public void moveInDepartmentTree(String id, String previousId, String nextId, String parentId) {
         Department moving = select(id);
         if (moving == null) {
             throw new PlatformException("Cannot move missing department: " + id);
         }
         moveInTree(organizationScope(moving.getOrganizationId()), id, previousId, nextId, parentId);
+    }
+
+    private void collectDepartmentDescendantIds(String organizationId,
+                                                String parentId,
+                                                List<String> result,
+                                                Set<String> visited) {
+        if (!visited.add(parentId)) {
+            throw new PlatformException("Department tree cycle detected while resolving descendants: " + parentId);
+        }
+        for (Department child : departmentChildren(organizationId, parentId)) {
+            if (visited.contains(child.getId())) {
+                throw new PlatformException("Department tree cycle detected while resolving descendants: " + parentId);
+            }
+            result.add(child.getId());
+            collectDepartmentDescendantIds(organizationId, child.getId(), result, visited);
+        }
+        visited.remove(parentId);
     }
 
     private Criteria organizationScope(String organizationId) {

@@ -358,6 +358,16 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     }
 
     @Override
+    public String getAuthDepartmentId() {
+        return dataScopeValue(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD);
+    }
+
+    @Override
+    public void setAuthDepartmentId(String authDepartmentId) {
+        setDataScopeValue(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, authDepartmentId);
+    }
+
+    @Override
     public String getAuthModuleAlias() {
         return dataScopeValue(PlatformAbilityFields.AUTH_MODULE_FIELD);
     }

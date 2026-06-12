@@ -196,7 +196,7 @@
 | --- | --- |
 | `moduleAlias` | 平台模块别名，如 `iam.user`。 |
 | `actionCode` | 动作编码。标准动作和配置动作最终都归到权限动作。 |
-| `dataScopePolicy` | 数据范围策略，当前 JSON 使用 enum 名称，如 `ALL`、`OWNER`、`ORGANIZATION_AND_CHILDREN`。 |
+| `dataScopePolicy` | 数据范围策略，当前 JSON 使用 enum 名称，如 `ALL`、`OWNER`、`ORGANIZATION_AND_CHILDREN`、`DEPARTMENT_AND_CHILDREN`。 |
 | `tenantScopePolicy` | 租户范围策略，当前 JSON 使用 enum 名称，如 `CURRENT_TENANT`、`ALL_TENANTS`。 |
 | `scopeCondition` | 自定义条件保留字段；当前不开放可执行自定义条件授权。 |
 | `referenceFieldId` | 引用依赖数据权限使用的引用字段。 |

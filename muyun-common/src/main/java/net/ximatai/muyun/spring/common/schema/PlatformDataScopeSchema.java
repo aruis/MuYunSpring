@@ -26,6 +26,10 @@ public final class PlatformDataScopeSchema {
                         .setType(PlatformAbilityFields.AUTH_ORGANIZATION_COLUMN_TYPE)
                         .setLength(PlatformAbilityFields.AUTH_ORGANIZATION_LENGTH)
                         .setComment("Data scope organization id"),
+                Column.of(PlatformAbilityFields.AUTH_DEPARTMENT_COLUMN)
+                        .setType(PlatformAbilityFields.AUTH_DEPARTMENT_COLUMN_TYPE)
+                        .setLength(PlatformAbilityFields.AUTH_DEPARTMENT_LENGTH)
+                        .setComment("Data scope department id"),
                 Column.of(PlatformAbilityFields.AUTH_MODULE_COLUMN)
                         .setType(PlatformAbilityFields.AUTH_MODULE_COLUMN_TYPE)
                         .setLength(PlatformAbilityFields.AUTH_MODULE_LENGTH)
@@ -39,6 +43,7 @@ public final class PlatformDataScopeSchema {
                 PlatformAbilityFields.AUTH_ASSIGNEE_FIELD,
                 PlatformAbilityFields.AUTH_MEMBER_FIELD,
                 PlatformAbilityFields.AUTH_ORGANIZATION_FIELD,
+                PlatformAbilityFields.AUTH_DEPARTMENT_FIELD,
                 PlatformAbilityFields.AUTH_MODULE_FIELD
         );
     }
@@ -53,6 +58,7 @@ public final class PlatformDataScopeSchema {
         values.put(PlatformAbilityFields.AUTH_ASSIGNEE_FIELD, PlatformAbilityFields.AUTH_ASSIGNEE_COLUMN);
         values.put(PlatformAbilityFields.AUTH_MEMBER_FIELD, PlatformAbilityFields.AUTH_MEMBER_COLUMN);
         values.put(PlatformAbilityFields.AUTH_ORGANIZATION_FIELD, PlatformAbilityFields.AUTH_ORGANIZATION_COLUMN);
+        values.put(PlatformAbilityFields.AUTH_DEPARTMENT_FIELD, PlatformAbilityFields.AUTH_DEPARTMENT_COLUMN);
         values.put(PlatformAbilityFields.AUTH_MODULE_FIELD, PlatformAbilityFields.AUTH_MODULE_COLUMN);
         return Map.copyOf(values);
     }

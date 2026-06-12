@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopePlan;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeRequest;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
 import org.junit.jupiter.api.Test;
 
@@ -332,6 +333,110 @@ class RoleDataScopeCriteriaServiceTest {
         assertThat(compiled.getParams().values())
                 .contains("org-main", "org-main-child", "org-branch")
                 .doesNotContain("org-account");
+    }
+
+    @Test
+    void shouldResolveDepartmentScopeFromEffectiveRoleGrantContext() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-1", "org-main", "dept-main", null)),
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "position-role"),
+                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                                "position-1", "org-branch", "dept-branch", "position-1"))
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authDepartmentId\" = :p1")
+                .contains("\"authDepartmentId\" = :p2");
+        assertThat(compiled.getParams())
+                .containsEntry("p1", "dept-main")
+                .containsEntry("p2", "dept-branch");
+    }
+
+    @Test
+    void shouldDenyAccountRoleDepartmentScopeWhenContextHasNoDepartment() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT, "account-role"),
+                        effectiveRoleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT,
+                                "user-1", null, null, null))
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        assertThat(compile(scoped).getSql()).contains("\"status\" = :p0").contains("1 = 0");
+    }
+
+    @Test
+    void shouldApplyDepartmentChildrenScopePerEffectiveRoleGrantContext() {
+        RoleService roleService = mock(RoleService.class);
+        DepartmentService departmentService = mock(DepartmentService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-1", "org-main", "dept-main", null)),
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "position-role"),
+                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                                "position-1", "org-branch", "dept-branch", "position-1"))
+        ));
+        when(departmentService.selfAndDescendantIds("org-main", "dept-main"))
+                .thenReturn(List.of("dept-main", "dept-main-child"));
+        when(departmentService.selfAndDescendantIds("org-branch", "dept-branch"))
+                .thenReturn(List.of("dept-branch"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(
+                roleService, Optional.empty(), Optional.of(departmentService), Optional.empty());
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authDepartmentId\" IN (:p1_0, :p1_1)")
+                .contains("\"authDepartmentId\" IN (:p2_0)");
+        assertThat(compiled.getParams().values())
+                .contains("dept-main", "dept-main-child", "dept-branch");
+    }
+
+    @Test
+    void shouldFailFastWhenDepartmentAndChildrenScopeHasNoDepartmentService() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.DEPARTMENT_AND_CHILDREN, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-1", "org-main", "dept-main", null))
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        assertThatThrownBy(() -> service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of(),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        )).isInstanceOf(PlatformException.class)
+                .hasMessageContaining("department hierarchy support");
     }
 
     @Test

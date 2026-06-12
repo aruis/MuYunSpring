@@ -303,7 +303,8 @@ class DynamicTableMapperTest {
 
         assertThat(entity.supports(EntityCapability.DATA_SCOPE)).isTrue();
         assertThat(columnNames(table))
-                .contains("auth_user_id", "auth_assignee_ids", "auth_member_ids", "auth_organization_id", "auth_module_alias")
+                .contains("auth_user_id", "auth_assignee_ids", "auth_member_ids",
+                        "auth_organization_id", "auth_department_id", "auth_module_alias")
                 .contains("code", "name");
     }
 

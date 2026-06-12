@@ -297,6 +297,21 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldRejectDepartmentPolicyOnWildcardDataScopeRole() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        RoleService service = service(roleDao, mock(RoleGrantDao.class), mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.grantWildcardDataScopeAction(
+                    "scope-1", "query", DataScopePolicy.DEPARTMENT, TenantScopePolicy.CURRENT_TENANT))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("standard data scope");
+        }
+    }
+
+    @Test
     void shouldRejectBusinessActionGrantOnWildcardDataScopeRole() {
         RoleDao roleDao = mock(RoleDao.class);
         when(roleDao.query(any(Criteria.class), any(PageRequest.class)))

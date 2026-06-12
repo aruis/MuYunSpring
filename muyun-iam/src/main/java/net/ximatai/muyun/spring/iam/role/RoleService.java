@@ -779,6 +779,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         DataScopePolicy policy = dataScopePolicy == null ? DataScopePolicy.NONE : dataScopePolicy;
         if (policy == DataScopePolicy.WILDCARD
                 || policy == DataScopePolicy.CUSTOM
+                || policy == DataScopePolicy.DEPARTMENT
+                || policy == DataScopePolicy.DEPARTMENT_AND_CHILDREN
                 || policy == DataScopePolicy.REFERENCE_DEPENDENCY) {
             throw new PlatformException("wildcard data scope role only supports standard data scope policy");
         }
@@ -789,6 +791,8 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getRoleKind() == RoleKind.WILDCARD_DATA_SCOPE
                 && (policy == DataScopePolicy.WILDCARD
                 || policy == DataScopePolicy.CUSTOM
+                || policy == DataScopePolicy.DEPARTMENT
+                || policy == DataScopePolicy.DEPARTMENT_AND_CHILDREN
                 || policy == DataScopePolicy.REFERENCE_DEPENDENCY)) {
             throw new PlatformException("wildcard data scope role only supports standard data scope policy");
         }
