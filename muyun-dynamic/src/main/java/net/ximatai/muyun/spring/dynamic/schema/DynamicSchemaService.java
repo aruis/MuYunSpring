@@ -65,7 +65,11 @@ public class DynamicSchemaService {
                 : previousModule.entities().stream().collect(Collectors.toMap(EntityDefinition::alias, Function.identity()));
         Map<String, MigrationResult> results = new LinkedHashMap<>();
         for (EntityDefinition entity : module.entities()) {
-            results.put(entity.alias(), ensureTable(entity, previousEntities.get(entity.alias()), options));
+            try {
+                results.put(entity.alias(), ensureTable(entity, previousEntities.get(entity.alias()), options));
+            } catch (RuntimeException e) {
+                throw new DynamicSchemaMigrationException(module.moduleAlias(), entity.alias(), results, e);
+            }
         }
         return results;
     }

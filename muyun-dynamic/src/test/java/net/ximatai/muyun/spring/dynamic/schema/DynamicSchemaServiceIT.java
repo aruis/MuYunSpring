@@ -606,9 +606,12 @@ class DynamicSchemaServiceIT {
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "name", "amount");
         assertThatThrownBy(() -> publisher.publish(removedFieldModule, MigrationOptions.strict()))
-                .isInstanceOf(OrmException.class)
-                .extracting("code")
-                .isEqualTo(OrmException.Code.STRICT_MIGRATION_REJECTED);
+                .isInstanceOfSatisfying(DynamicSchemaMigrationException.class, exception -> {
+                    assertThat(exception.failedEntityAlias()).isEqualTo("contract");
+                    assertThat(exception.completedMigrations()).isEmpty();
+                    assertThat(exception.getCause()).isInstanceOfSatisfying(OrmException.class,
+                            cause -> assertThat(cause.getCode()).isEqualTo(OrmException.Code.STRICT_MIGRATION_REJECTED));
+                });
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "name", "amount");

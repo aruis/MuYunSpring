@@ -54,6 +54,29 @@ class DynamicSchemaServiceTest {
         assertThat(service.ensuredEntities).isEmpty();
     }
 
+    @Test
+    void shouldExposeCompletedMigrationsWhenModuleSchemaFailsMidBatch() {
+        FailingSecondEntitySchemaService service = new FailingSecondEntitySchemaService();
+        ModuleDefinition module = new ModuleDefinition(
+                "contract.app",
+                "Contract App",
+                List.of(
+                        entity("contract", "app_contract"),
+                        entity("invoice", "app_invoice")
+                )
+        );
+
+        assertThatThrownBy(() -> service.ensureModule(module, MigrationOptions.execute()))
+                .isInstanceOfSatisfying(DynamicSchemaMigrationException.class, exception -> {
+                    assertThat(exception.moduleAlias()).isEqualTo("contract.app");
+                    assertThat(exception.failedEntityAlias()).isEqualTo("invoice");
+                    assertThat(exception.completedMigrations()).containsOnlyKeys("contract");
+                    assertThat(exception.completedMigrations().get("contract").isChanged()).isTrue();
+                    assertThat(exception).hasCauseInstanceOf(IllegalStateException.class);
+                });
+        assertThat(service.ensuredEntities).containsExactly("contract", "invoice");
+    }
+
     private EntityDefinition entity(String code, String tableName) {
         return new EntityDefinition(
                 code,
@@ -79,6 +102,23 @@ class DynamicSchemaServiceTest {
                 results.put(entity.alias(), new MigrationResult(ensuredEntities.size() == 1, false, false, List.of()));
             }
             return results;
+        }
+    }
+
+    private static class FailingSecondEntitySchemaService extends DynamicSchemaService {
+        private final List<String> ensuredEntities = new ArrayList<>();
+
+        FailingSecondEntitySchemaService() {
+            super(null);
+        }
+
+        @Override
+        public MigrationResult ensureTable(EntityDefinition entity, EntityDefinition previousEntity, MigrationOptions options) {
+            ensuredEntities.add(entity.alias());
+            if (ensuredEntities.size() == 2) {
+                throw new IllegalStateException("schema failed");
+            }
+            return new MigrationResult(true, false, false, List.of());
         }
     }
 }
