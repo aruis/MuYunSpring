@@ -614,6 +614,47 @@ class RoleServiceContractTest {
     }
 
     @Test
+    void shouldReturnEffectiveActionGrantsWithRoleGrantContext() {
+        RoleActionDao roleActionDao = mock(RoleActionDao.class);
+        RoleAction action = enabledAction("action-1", "position-role", "sales.contract", "view");
+        when(roleActionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(action));
+        RoleService service = spy(service(mock(RoleDao.class), mock(RoleGrantDao.class), roleActionDao));
+        doReturn(List.of(
+                new EffectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        "position-1", "org-branch", "dept-branch", "position-1"),
+                new EffectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        "position-2", "org-other", "dept-other", "position-2")
+        )).when(service).effectiveRoleGrants("user-1");
+
+        List<EffectiveRoleActionGrant> grants = service.effectiveActionGrantsWithContext(
+                "user-1", "sales.contract", "query");
+
+        assertThat(grants).hasSize(2);
+        assertThat(grants).allSatisfy(grant -> assertThat(grant.actionGrant()).isSameAs(action));
+        assertThat(grants)
+                .extracting(grant -> grant.roleGrant().employeePositionId())
+                .containsExactly("position-1", "position-2");
+    }
+
+    @Test
+    void shouldKeepLegacyEffectiveActionGrantsDistinctWhenRoleHasMultipleContexts() {
+        RoleActionDao roleActionDao = mock(RoleActionDao.class);
+        RoleAction action = enabledAction("action-1", "position-role", "sales.contract", "view");
+        when(roleActionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(action));
+        RoleService service = spy(service(mock(RoleDao.class), mock(RoleGrantDao.class), roleActionDao));
+        doReturn(List.of(
+                new EffectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        "position-1", "org-branch", "dept-branch", "position-1"),
+                new EffectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                        "position-2", "org-other", "dept-other", "position-2")
+        )).when(service).effectiveRoleGrants("user-1");
+
+        List<RoleAction> grants = service.effectiveActionGrants("user-1", "sales.contract", "query");
+
+        assertThat(grants).containsExactly(action);
+    }
+
+    @Test
     void shouldIgnoreDisabledEmployeeAndPositionWhenAggregatingEffectiveRoleGrants() {
         EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
         EmployeeService employeeService = mock(EmployeeService.class);

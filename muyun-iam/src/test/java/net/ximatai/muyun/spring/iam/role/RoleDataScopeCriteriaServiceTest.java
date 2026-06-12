@@ -248,6 +248,93 @@ class RoleDataScopeCriteriaServiceTest {
     }
 
     @Test
+    void shouldResolveOrganizationScopeFromEffectiveRoleGrantContext() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-1", "org-main", "dept-main", null)),
+                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "position-role"),
+                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                                "position-1", "org-branch", "dept-branch", "position-1"))
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authOrganizationId\" = :p1")
+                .contains("\"authOrganizationId\" = :p2");
+        assertThat(compiled.getParams())
+                .containsEntry("p1", "org-main")
+                .containsEntry("p2", "org-branch");
+    }
+
+    @Test
+    void shouldResolveAccountRoleOrganizationScopeFromCurrentUserWhenContextHasNoOrganization() {
+        RoleService roleService = mock(RoleService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION, "account-role"),
+                        effectiveRoleGrant("account-role", RoleGrantSubjectType.USER_ACCOUNT,
+                                "user-1", null, null, null))
+        ));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService);
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authOrganizationId\" = :p1");
+        assertThat(compiled.getParams()).containsEntry("p1", "org-account");
+    }
+
+    @Test
+    void shouldApplyOrganizationChildrenScopePerEffectiveRoleGrantContext() {
+        RoleService roleService = mock(RoleService.class);
+        OrganizationService organizationService = mock(OrganizationService.class);
+        when(roleService.effectiveActionGrantsWithContext("user-1", "sales.contract", "view")).thenReturn(List.of(
+                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN, "employee-role"),
+                        effectiveRoleGrant("employee-role", RoleGrantSubjectType.EMPLOYEE,
+                                "employee-1", "org-main", "dept-main", null)),
+                effectiveActionGrant(grant(DataScopePolicy.ORGANIZATION_AND_CHILDREN, "position-role"),
+                        effectiveRoleGrant("position-role", RoleGrantSubjectType.EMPLOYEE_POSITION,
+                                "position-1", "org-branch", "dept-branch", "position-1"))
+        ));
+        when(organizationService.selfAndDescendantIds("org-main")).thenReturn(List.of("org-main", "org-main-child"));
+        when(organizationService.selfAndDescendantIds("org-branch")).thenReturn(List.of("org-branch"));
+        RoleDataScopeCriteriaService service = new RoleDataScopeCriteriaService(roleService, Optional.of(organizationService));
+
+        Criteria scoped = service.applyReadScope(
+                "sales.contract",
+                "query",
+                Criteria.of().eq("status", "OPEN"),
+                Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant-a", "org-account"))
+        );
+
+        CompiledCriteria compiled = compile(scoped);
+        assertThat(compiled.getSql())
+                .contains("\"status\" = :p0")
+                .contains("\"authOrganizationId\" IN (:p1_0, :p1_1)")
+                .contains("\"authOrganizationId\" IN (:p2_0)");
+        assertThat(compiled.getParams().values())
+                .contains("org-main", "org-main-child", "org-branch")
+                .doesNotContain("org-account");
+    }
+
+    @Test
     void shouldFailFastWhenOrganizationAndChildrenScopeHasNoOrganizationService() {
         RoleService roleService = mock(RoleService.class);
         when(roleService.effectiveActionGrants("user-1", "sales.contract", "view")).thenReturn(List.of(
@@ -558,6 +645,19 @@ class RoleDataScopeCriteriaServiceTest {
         action.setReferenceFieldId(referenceFieldId);
         action.setReferenceActionCode(referenceActionCode);
         return action;
+    }
+
+    private EffectiveRoleGrant effectiveRoleGrant(String roleId,
+                                                  RoleGrantSubjectType sourceType,
+                                                  String sourceId,
+                                                  String organizationId,
+                                                  String departmentId,
+                                                  String employeePositionId) {
+        return new EffectiveRoleGrant(roleId, sourceType, sourceId, organizationId, departmentId, employeePositionId);
+    }
+
+    private EffectiveRoleActionGrant effectiveActionGrant(RoleAction actionGrant, EffectiveRoleGrant roleGrant) {
+        return new EffectiveRoleActionGrant(actionGrant, roleGrant);
     }
 
     private ReferenceDependencyScopeResolver referenceResolver(String sourceField,

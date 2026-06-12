@@ -358,17 +358,43 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     }
 
     public List<RoleAction> effectiveActionGrants(String userId, String moduleAlias, String actionCode) {
-        Set<String> roleIds = effectiveRoleIds(userId);
-        if (roleIds.isEmpty()) {
+        return effectiveActionGrantsWithContext(userId, moduleAlias, actionCode).stream()
+                .map(EffectiveRoleActionGrant::actionGrant)
+                .distinct()
+                .toList();
+    }
+
+    public List<EffectiveRoleActionGrant> effectiveActionGrantsWithContext(String userId,
+                                                                           String moduleAlias,
+                                                                           String actionCode) {
+        List<EffectiveRoleGrant> roleGrants = effectiveRoleGrants(userId);
+        if (roleGrants.isEmpty()) {
             return List.of();
         }
+        LinkedHashSet<String> roleIds = new LinkedHashSet<>();
+        roleGrants.stream()
+                .map(EffectiveRoleGrant::roleId)
+                .forEach(roleIds::add);
         String permissionActionCode = permissionActionCode(actionCode);
-        return roleActionDao.query(Criteria.of()
+        List<RoleAction> actionGrants = roleActionDao.query(Criteria.of()
                         .in("roleId", List.copyOf(roleIds))
                         .eq("moduleAlias", requireModuleAlias(moduleAlias))
                         .eq("actionCode", permissionActionCode)
                         .eq("enabled", Boolean.TRUE),
                 ALL);
+        if (actionGrants.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<EffectiveRoleGrant>> grantsByRoleId = roleGrantsByRoleId(roleGrants);
+        java.util.ArrayList<EffectiveRoleActionGrant> effective = new java.util.ArrayList<>();
+        for (RoleAction actionGrant : actionGrants) {
+            List<EffectiveRoleGrant> matchedRoleGrants = grantsByRoleId.get(actionGrant.getRoleId());
+            if (matchedRoleGrants == null || matchedRoleGrants.isEmpty()) {
+                continue;
+            }
+            matchedRoleGrants.forEach(roleGrant -> effective.add(new EffectiveRoleActionGrant(actionGrant, roleGrant)));
+        }
+        return List.copyOf(effective);
     }
 
     public RoleAction effectiveWildcardDataScopeGrant(String userId, String actionCode) {
@@ -620,6 +646,17 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                         employeePositionId));
             }
         }
+    }
+
+    private Map<String, List<EffectiveRoleGrant>> roleGrantsByRoleId(List<EffectiveRoleGrant> roleGrants) {
+        LinkedHashMap<String, List<EffectiveRoleGrant>> byRoleId = new LinkedHashMap<>();
+        roleGrants.stream()
+                .filter(Objects::nonNull)
+                .filter(grant -> grant.roleId() != null)
+                .forEach(grant -> byRoleId
+                        .computeIfAbsent(grant.roleId(), ignored -> new java.util.ArrayList<>())
+                        .add(grant));
+        return byRoleId;
     }
 
     private GrantResult grantRoleIfAbsent(String roleId, RoleGrantSubjectType subjectType, String subjectId) {
