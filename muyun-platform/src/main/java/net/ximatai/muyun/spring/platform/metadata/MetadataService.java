@@ -34,14 +34,13 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
 
     @Override
     public Criteria sortScope(Metadata metadata) {
-        return Criteria.of().eq("applicationAlias", metadata.getApplicationAlias());
+        return sortScopeByFields(metadata, "applicationAlias");
     }
 
     @Override
     public void validateSortScope(Metadata left, Metadata right) {
-        if (!java.util.Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
-            throw new PlatformException("Metadata sort can only move records within the same application");
-        }
+        validateSortScopeByFields(left, right,
+                "Metadata sort can only move records within the same application", "applicationAlias");
     }
 
     private void normalizeAndValidate(Metadata metadata) {

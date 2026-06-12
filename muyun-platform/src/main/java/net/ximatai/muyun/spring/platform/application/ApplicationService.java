@@ -1,15 +1,15 @@
 package net.ximatai.muyun.spring.platform.application;
 
-import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.StandardBusinessService;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ApplicationService extends AbstractAbilityService<Application> implements
+public class ApplicationService extends StandardBusinessService<Application> implements
         SoftDeleteAbility<Application>,
         EnableAbility<Application>,
         SortAbility<Application> {
@@ -21,17 +21,7 @@ public class ApplicationService extends AbstractAbilityService<Application> impl
     }
 
     @Override
-    public void beforePrepareInsert(Application application) {
-        requireAlias(application.getAlias());
-    }
-
-    @Override
-    public void beforeInsert(Application application) {
-        requireAlias(application.getAlias());
-    }
-
-    @Override
-    public void beforeUpdate(Application application) {
+    public void normalizeBeforeMutation(Application application) {
         requireAlias(application.getAlias());
     }
 

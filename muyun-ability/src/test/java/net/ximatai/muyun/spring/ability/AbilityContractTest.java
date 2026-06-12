@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -1234,6 +1235,71 @@ class AbilityContractTest {
     }
 
     @Test
+    void scopeHelpersShouldBuildCriteriaAndValidateSortScopeByFields() {
+        ScopedDemoOrganizationService service = new ScopedDemoOrganizationService();
+        DemoOrganization left = new DemoOrganization("Left", TreeAbility.ROOT_ID);
+        left.setScopeKey("scope-a");
+        DemoOrganization right = new DemoOrganization("Right", TreeAbility.ROOT_ID);
+        right.setScopeKey("scope-a");
+        DemoOrganization other = new DemoOrganization("Other", TreeAbility.ROOT_ID);
+        other.setScopeKey("scope-b");
+
+        assertThat(service.sortScope(left).getClauses())
+                .extracting(clause -> clause.getField())
+                .contains("scopeKey", "parentId");
+        service.validateSortScope(left, right);
+        assertThatThrownBy(() -> service.validateSortScope(left, other))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("same scope");
+    }
+
+    @Test
+    void treeAbilityShouldMoveRecordsInsideScopedTree() {
+        ScopedDemoOrganizationService service = new ScopedDemoOrganizationService();
+        DemoOrganization firstParent = scopedOrganization("First Parent", TreeAbility.ROOT_ID, "scope-a");
+        DemoOrganization secondParent = scopedOrganization("Second Parent", TreeAbility.ROOT_ID, "scope-a");
+        DemoOrganization otherParent = scopedOrganization("Other Parent", TreeAbility.ROOT_ID, "scope-b");
+        String firstParentId = service.insert(firstParent);
+        String secondParentId = service.insert(secondParent);
+        String otherParentId = service.insert(otherParent);
+        String firstChildId = service.insert(scopedOrganization("First Child", firstParentId, "scope-a"));
+        String secondChildId = service.insert(scopedOrganization("Second Child", secondParentId, "scope-a"));
+        String otherChildId = service.insert(scopedOrganization("Other Child", otherParentId, "scope-b"));
+
+        service.moveInTree(Criteria.of().eq("scopeKey", "scope-a"), firstChildId, secondChildId, null, secondParentId);
+
+        assertThat(service.select(firstChildId).getParentId()).isEqualTo(secondParentId);
+        assertThat(service.children(Criteria.of().eq("scopeKey", "scope-a"), secondParentId)
+                        .stream()
+                        .map(DemoOrganization::getId))
+                .containsExactly(secondChildId, firstChildId);
+        assertThatThrownBy(() -> service.moveInTree(Criteria.of().eq("scopeKey", "scope-a"),
+                firstChildId, otherChildId, null, secondParentId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("neighbor must belong to target parent");
+    }
+
+    @Test
+    void standardBusinessServiceShouldRouteSharedMutationHooks() {
+        StandardDemoBusinessService service = new StandardDemoBusinessService();
+        DemoPlainRecord record = new DemoPlainRecord("  alpha  ");
+
+        String id = service.insert(record);
+
+        assertThat(record.getTitle()).isEqualTo("alpha");
+        assertThat(service.hooks).containsExactly("normalize", "save", "insert");
+
+        service.hooks.clear();
+        DemoPlainRecord update = new DemoPlainRecord("  beta  ");
+        update.setId(id);
+        update.setVersion(record.getVersion());
+        service.update(update);
+
+        assertThat(update.getTitle()).isEqualTo("beta");
+        assertThat(service.hooks).containsExactly("normalize", "save", "update");
+    }
+
+    @Test
     void treeAbilityShouldHideSoftDeletedChildrenAndDescendants() {
         DemoOrganizationService service = new DemoOrganizationService();
         String parentId = service.insert(new DemoOrganization("Parent", TreeAbility.ROOT_ID));
@@ -1777,5 +1843,62 @@ class AbilityContractTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
         TransactionSynchronizationManager.setActualTransactionActive(false);
+    }
+
+    private static DemoOrganization scopedOrganization(String title, String parentId, String scopeKey) {
+        DemoOrganization organization = new DemoOrganization(title, parentId);
+        organization.setScopeKey(scopeKey);
+        return organization;
+    }
+
+    private static final class ScopedDemoOrganizationService extends AbstractAbilityService<DemoOrganization> implements
+            SoftDeleteAbility<DemoOrganization>,
+            TreeAbility<DemoOrganization> {
+        private ScopedDemoOrganizationService() {
+            super("demo.scopedOrganization", DemoOrganization.class, new InMemoryBaseDao<>());
+        }
+
+        @Override
+        public Criteria sortScope(DemoOrganization organization) {
+            return scopedTreeCriteria(organization, "scopeKey");
+        }
+
+        @Override
+        public void validateSortScope(DemoOrganization left, DemoOrganization right) {
+            validateTreeSortScopeByFields(left, right,
+                    "Scoped organization sort can only move records within the same scope", "scopeKey");
+        }
+    }
+
+    private static final class StandardDemoBusinessService extends StandardBusinessService<DemoPlainRecord> {
+        private final List<String> hooks = new ArrayList<>();
+
+        private StandardDemoBusinessService() {
+            super("demo.standardBusiness", DemoPlainRecord.class, new InMemoryBaseDao<>());
+        }
+
+        @Override
+        public void normalizeBeforeMutation(DemoPlainRecord record) {
+            hooks.add("normalize");
+            record.setTitle(record.getTitle().trim());
+        }
+
+        @Override
+        protected void validateBeforeSave(DemoPlainRecord record) {
+            hooks.add("save");
+            if (record.getTitle().isBlank()) {
+                throw new PlatformException("title must not be blank");
+            }
+        }
+
+        @Override
+        protected void validateBeforeInsert(DemoPlainRecord record) {
+            hooks.add("insert");
+        }
+
+        @Override
+        protected void validateBeforeUpdate(DemoPlainRecord record) {
+            hooks.add("update");
+        }
     }
 }

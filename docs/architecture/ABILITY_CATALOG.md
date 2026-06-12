@@ -17,6 +17,8 @@
 | --- | --- | --- | --- |
 | `CrudAbility` | 统一插入、查询、分页、更新、删除、乐观锁、生命周期 hook 和平台内部链 | `EntityContract`、`BaseDao<T, String>` | 所有业务能力的主入口。平台内部链先于业务扩展 hook 执行，业务覆盖 `after*` 不应破坏平台能力。 |
 | `AbstractAbilityService` | 给静态 Service 提供 `moduleAlias`、`modelClass`、`dao` 和常用校验辅助 | `CrudAbility`、`BaseDao` | 标准静态 Service 通常继承它；不要把普通非业务工具继续塞进这里。 |
+| `StandardBusinessService` | 给普通静态业务收口保存前规范化、通用保存校验、插入校验和更新校验 hook | `AbstractAbilityService` | 适合不需要系统态或租户态写入门禁的普通业务，业务优先覆盖 `normalizeBeforeMutation`、`validateBeforeSave`、`validateBeforeInsert`、`validateBeforeUpdate`，避免重复覆盖多个 CRUD hook。 |
+| `SystemStandardBusinessService` | 在系统态写入校验基础上收口系统配置保存 hook 模板 | `SystemManagedAbility` | 适合租户等明确要求系统态维护的配置；系统态业务不要直接用 `StandardBusinessService` 绕过系统上下文。 |
 | `BaseDao` | 屏蔽静态 DAO、动态 DAO 和底层数据访问差异 | MuYunDatabase 默认实现 | 生命周期、权限、软删等不应下沉到 DAO；DAO 只负责数据访问。 |
 
 ## 数据状态与作用域
@@ -28,14 +30,15 @@
 | `SystemManagedAbility` | 限制系统级配置只能在系统态维护 | `TenantContext.system(reason)` | 适合租户、应用、平台模块等系统态配置；写入前可做 `normalizeBeforeMutation`。 |
 | `TenantActiveScopedAbility` | 限制租户内业务写入必须处于有效租户上下文 | `TenantContext.currentTenantId()`、`ActiveTenantVerifier` | 写入前会要求租户上下文并校验租户有效；适合组织、部门等租户内业务。 |
 | `TenantActiveScopedService` | 收口租户内业务 Service 对 `ActiveTenantVerifier` 的样板依赖 | `AbstractAbilityService`、`TenantActiveScopedAbility` | 后续租户内静态 Service 优先继承它，而不是重复声明 verifier 字段和转发方法。 |
+| `TenantStandardBusinessService` | 在租户有效性校验基础上收口租户内业务保存 hook 模板 | `TenantActiveScopedService` | 适合部门、职员等租户内标准业务，业务只补规范化和业务校验，不重复写租户校验链路。 |
 | `GlobalScopedAbility` | 表达不受当前租户过滤影响的全局配置读取 | `SoftDeleteAbility` | 适合租户自身、平台全局配置等；不要用于普通租户业务绕过隔离。 |
 
 ## 结构能力
 
 | 能力 | 核心解决问题 | 主要依赖 | 注意点 |
 | --- | --- | --- | --- |
-| `SortAbility` | 统一排序字段、完整 scope 重排、相邻移动 | `SortCapable.sortOrder` | `reorder` 要覆盖完整排序 scope，避免局部重排造成数据不一致。 |
-| `TreeAbility` | 统一树形父子关系、根节点、子节点、祖先后代、环保护 | `TreeCapable.parentId`，天然包含排序能力 | 树天然支持同父级排序；有业务 scope 的树应使用显式 scope 查询方法。 |
+| `SortAbility` | 统一排序字段、完整 scope 重排、相邻移动 | `SortCapable.sortOrder` | `reorder` 要覆盖完整排序 scope，避免局部重排造成数据不一致；非树业务可用 `sortScopeByFields` / `validateSortScopeByFields` 声明排序 scope。 |
+| `TreeAbility` | 统一树形父子关系、根节点、子节点、祖先后代、环保护 | `TreeCapable.parentId`，天然包含排序能力 | 树天然支持同父级排序；有业务 scope 的树应使用显式 scope 查询、`scopedTreeCriteria`、`validateTreeSortScopeByFields` 和 scoped `moveInTree`。 |
 
 ## 引用与聚合
 
@@ -66,7 +69,7 @@
 | 业务场景 | 推荐能力组合 |
 | --- | --- |
 | 系统态维护的全局配置，如租户、应用 | `SystemManagedAbility + GlobalScopedAbility + EnableAbility + SortAbility` |
-| 租户内树形业务，如组织机构 | `TenantActiveScopedService + SoftDeleteAbility + EnableAbility + TreeAbility + ReferenceAbility` |
+| 租户内树形业务，如组织机构、部门 | `TenantStandardBusinessService + SoftDeleteAbility + EnableAbility + TreeAbility + ReferenceAbility` |
 | 可被其他模型选择的基础资料 | `ReferenceAbility`，必要时叠加 `EnableAbility`、`SortAbility` |
 | 引用了其他模型且需要标题/投影展示的业务 | `ReferencerAbility` + 静态引用注解或动态引用配置 |
 | 主子表聚合保存和读取 | 父 Service 实现 `ChildrenAbility`，子 Service 实现 `ChildAbility` |

@@ -11,8 +11,6 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
-
 @Service
 public class DictionaryCategoryService extends AbstractAbilityService<DictionaryCategory> implements
         SoftDeleteAbility<DictionaryCategory>,
@@ -37,15 +35,13 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
 
     @Override
     public Criteria sortScope(DictionaryCategory category) {
-        return scopedTreeCriteria(applicationScope(category.getApplicationAlias()), category.getParentId());
+        return scopedTreeCriteria(category, "applicationAlias");
     }
 
     @Override
     public void validateSortScope(DictionaryCategory left, DictionaryCategory right) {
-        if (!Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
-            throw new PlatformException("Dictionary category sort can only move records within the same application");
-        }
-        TreeAbility.super.validateSortScope(left, right);
+        validateTreeSortScopeByFields(left, right,
+                "Dictionary category sort can only move records within the same application", "applicationAlias");
     }
 
     @Override

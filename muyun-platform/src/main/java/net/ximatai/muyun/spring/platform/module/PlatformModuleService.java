@@ -13,8 +13,6 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
-
 @Service
 public class PlatformModuleService extends AbstractAbilityService<PlatformModule> implements
         SoftDeleteAbility<PlatformModule>,
@@ -44,15 +42,13 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
 
     @Override
     public Criteria sortScope(PlatformModule module) {
-        return scopedTreeCriteria(applicationScope(module.getApplicationAlias()), module.getParentId());
+        return scopedTreeCriteria(module, "applicationAlias");
     }
 
     @Override
     public void validateSortScope(PlatformModule left, PlatformModule right) {
-        if (!Objects.equals(left.getApplicationAlias(), right.getApplicationAlias())) {
-            throw new PlatformException("Module sort can only move records within the same application");
-        }
-        TreeAbility.super.validateSortScope(left, right);
+        validateTreeSortScopeByFields(left, right,
+                "Module sort can only move records within the same application", "applicationAlias");
     }
 
     @Override

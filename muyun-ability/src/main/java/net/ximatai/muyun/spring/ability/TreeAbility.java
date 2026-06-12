@@ -54,6 +54,20 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         return criteria;
     }
 
+    default Criteria scopedTreeCriteria(T entity, String... fieldNames) {
+        Criteria criteria = sortScopeByFields(entity, fieldNames);
+        criteria.eq(PlatformAbilityFields.TREE_PARENT_FIELD, entity.getParentId());
+        return criteria;
+    }
+
+    default List<T> rootChildrenInScope(Object scopeSource, String... fieldNames) {
+        return children(BusinessScope.criteria(scopeSource, fieldNames), ROOT_ID);
+    }
+
+    default List<T> childrenInScope(Object scopeSource, String parentId, String... fieldNames) {
+        return children(BusinessScope.criteria(scopeSource, fieldNames), parentId);
+    }
+
     /**
      * Use from services that require a business scope to resolve root nodes.
      */
@@ -68,6 +82,13 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
 
     @Override
     default void validateSortScope(T left, T right) {
+        if (!SortAbility.sameValue(left.getParentId(), right.getParentId())) {
+            throw new PlatformException("Tree sort can only move records within the same parent");
+        }
+    }
+
+    default void validateTreeSortScopeByFields(T left, T right, String message, String... fieldNames) {
+        validateSortScopeByFields(left, right, message, fieldNames);
         if (!SortAbility.sameValue(left.getParentId(), right.getParentId())) {
             throw new PlatformException("Tree sort can only move records within the same parent");
         }
@@ -96,6 +117,37 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         }
         T previous = previousId == null || previousId.isBlank() ? lastSibling(orderedIds) : select(previousId);
         T next = nextId == null || nextId.isBlank() ? null : select(nextId);
+        if (moveBetween(moving, previous, next)) {
+            return;
+        }
+        int insertIndex = resolveInsertIndex(orderedIds, previousId, nextId);
+        orderedIds.add(insertIndex, id);
+        reorder(orderedIds);
+    }
+
+    default void moveInTree(Criteria scopeCriteria, String id, String previousId, String nextId, String parentId) {
+        T moving = selectInScope(scopeCriteria, id);
+        if (moving == null) {
+            throw new PlatformException("Cannot move missing tree record: " + id);
+        }
+        rejectSelfNeighbor(id, previousId);
+        rejectSelfNeighbor(id, nextId);
+        String oldParentId = moving.getParentId();
+        String targetParentId = resolveMoveParentId(scopeCriteria, moving, previousId, nextId, parentId);
+        if (!SortAbility.sameValue(oldParentId, targetParentId)) {
+            moving.setParentId(targetParentId);
+            validateTreePlacementInScope(moving, scopeCriteria, "Tree parent must belong to the same scope");
+            update(moving);
+        }
+        List<T> siblings = children(scopeCriteria, targetParentId);
+        List<String> orderedIds = new ArrayList<>();
+        for (T sibling : siblings) {
+            if (!sibling.getId().equals(id)) {
+                orderedIds.add(sibling.getId());
+            }
+        }
+        T previous = previousId == null || previousId.isBlank() ? lastSibling(orderedIds) : selectInScope(scopeCriteria, previousId);
+        T next = nextId == null || nextId.isBlank() ? null : selectInScope(scopeCriteria, nextId);
         if (moveBetween(moving, previous, next)) {
             return;
         }
@@ -133,6 +185,25 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         return targetParentId;
     }
 
+    private String resolveMoveParentId(Criteria scopeCriteria, T moving, String previousId, String nextId, String parentId) {
+        String targetParentId = normalizeParentId(parentId);
+        if (targetParentId == null) {
+            targetParentId = neighborParentId(scopeCriteria, previousId);
+        }
+        if (targetParentId == null) {
+            targetParentId = neighborParentId(scopeCriteria, nextId);
+        }
+        if (targetParentId == null) {
+            targetParentId = normalizeParentId(moving.getParentId());
+        }
+        if (targetParentId == null) {
+            targetParentId = ROOT_ID;
+        }
+        requireNeighborInParent(scopeCriteria, previousId, targetParentId);
+        requireNeighborInParent(scopeCriteria, nextId, targetParentId);
+        return targetParentId;
+    }
+
     private String normalizeParentId(String parentId) {
         return parentId == null || parentId.isBlank() ? null : parentId;
     }
@@ -148,11 +219,32 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         return normalizeParentId(neighbor.getParentId());
     }
 
+    private String neighborParentId(Criteria scopeCriteria, String neighborId) {
+        if (neighborId == null || neighborId.isBlank()) {
+            return null;
+        }
+        T neighbor = selectInScope(scopeCriteria, neighborId);
+        if (neighbor == null) {
+            throw new PlatformException("Cannot move relative to missing tree record in scope: " + neighborId);
+        }
+        return normalizeParentId(neighbor.getParentId());
+    }
+
     private void requireNeighborInParent(String neighborId, String parentId) {
         if (neighborId == null || neighborId.isBlank()) {
             return;
         }
         T neighbor = select(neighborId);
+        if (neighbor == null || !SortAbility.sameValue(normalizeParentId(neighbor.getParentId()), parentId)) {
+            throw new PlatformException("Tree move neighbor must belong to target parent: " + neighborId);
+        }
+    }
+
+    private void requireNeighborInParent(Criteria scopeCriteria, String neighborId, String parentId) {
+        if (neighborId == null || neighborId.isBlank()) {
+            return;
+        }
+        T neighbor = selectInScope(scopeCriteria, neighborId);
         if (neighbor == null || !SortAbility.sameValue(normalizeParentId(neighbor.getParentId()), parentId)) {
             throw new PlatformException("Tree move neighbor must belong to target parent: " + neighborId);
         }
@@ -225,6 +317,10 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
     }
 
     default void validateTreePlacement(T entity) {
+        validateTreePlacementBase(entity);
+    }
+
+    default void validateTreePlacementBase(T entity) {
         String id = entity.getId();
         String parentId = entity.getParentId();
         if (parentId == null || parentId.isBlank() || ROOT_ID.equals(parentId)) {
@@ -250,13 +346,13 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
         if (parentId == null || parentId.isBlank() || ROOT_ID.equals(parentId)) {
             return;
         }
-        validateTreePlacement(entity);
+        validateTreePlacementBase(entity);
         if (selectInScope(scopeCriteria, parentId) == null) {
             throw new PlatformException(message);
         }
     }
 
-    private T selectInScope(Criteria scopeCriteria, String id) {
+    default T selectInScope(Criteria scopeCriteria, String id) {
         if (id == null || id.isBlank()) {
             return null;
         }

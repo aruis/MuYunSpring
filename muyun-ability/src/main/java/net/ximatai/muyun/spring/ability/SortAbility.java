@@ -76,6 +76,14 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
     default void validateSortScope(T left, T right) {
     }
 
+    default Criteria sortScopeByFields(T entity, String... fieldNames) {
+        return BusinessScope.criteria(entity, fieldNames);
+    }
+
+    default void validateSortScopeByFields(T left, T right, String message, String... fieldNames) {
+        BusinessScope.requireSame(left, right, message, fieldNames);
+    }
+
     default boolean moveBetween(T moving, T previous, T next) {
         Integer order = sortOrderBetween(previous, next);
         if (order == null) {

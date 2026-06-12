@@ -47,6 +47,39 @@ class ScopedMutationAbilityTest {
     }
 
     @Test
+    void systemStandardBusinessServiceShouldKeepSystemContextAndSharedHooks() {
+        SystemStandardDemoService service = new SystemStandardDemoService();
+
+        assertThatThrownBy(() -> service.insert(new DemoEnabledRecord("Tenant")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+
+        String id;
+        try (TenantContext.Scope ignored = TenantContext.system("test system standard context")) {
+            DemoEnabledRecord record = new DemoEnabledRecord("  System  ");
+            id = service.insert(record);
+            assertThat(record.getTitle()).isEqualTo("System");
+            assertThat(service.saveChecks).isEqualTo(1);
+        }
+
+        DemoEnabledRecord update = new DemoEnabledRecord("  Updated  ");
+        update.setId(id);
+        update.setVersion(0);
+        assertThatThrownBy(() -> service.update(update))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+
+        try (TenantContext.Scope ignored = TenantContext.system("test system standard context")) {
+            DemoEnabledRecord systemUpdate = new DemoEnabledRecord("  Updated  ");
+            systemUpdate.setId(id);
+            systemUpdate.setVersion(0);
+            service.update(systemUpdate);
+            assertThat(systemUpdate.getTitle()).isEqualTo("Updated");
+            assertThat(service.saveChecks).isEqualTo(2);
+        }
+    }
+
+    @Test
     void tenantActiveScopedAbilityShouldRequireTenantContextAndVerifyActiveTenant() {
         TenantScopedDemoService service = new TenantScopedDemoService();
 
@@ -121,6 +154,26 @@ class ScopedMutationAbilityTest {
 
         private SystemManagedDemoService() {
             super("demo.systemManaged", DemoEnabledRecord.class, new InMemoryBaseDao<>());
+        }
+    }
+
+    private static final class SystemStandardDemoService extends SystemStandardBusinessService<DemoEnabledRecord> implements
+            GlobalScopedAbility<DemoEnabledRecord>,
+            EnableAbility<DemoEnabledRecord> {
+        private int saveChecks;
+
+        private SystemStandardDemoService() {
+            super("demo.systemStandard", DemoEnabledRecord.class, new InMemoryBaseDao<>());
+        }
+
+        @Override
+        public void normalizeBeforeMutation(DemoEnabledRecord record) {
+            record.setTitle(record.getTitle().trim());
+        }
+
+        @Override
+        protected void validateBeforeSave(DemoEnabledRecord entity) {
+            saveChecks++;
         }
     }
 
