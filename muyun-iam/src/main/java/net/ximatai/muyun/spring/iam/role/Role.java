@@ -22,7 +22,22 @@ public class Role extends StandardEnabledSortableEntity {
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;
 
+    @Column(name = "grant_subject_types", type = ColumnType.VARCHAR, length = 128, nullable = false,
+            comment = "Allowed grant subject types", defaultVal = @Default(varchar = "userAccount"))
+    private String grantSubjectTypes = RoleGrantSubjectType.USER_ACCOUNT.getCode();
+
     @Column(name = "public_role", type = ColumnType.BOOLEAN, comment = "Visible to child management scopes",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean publicRole = Boolean.FALSE;
+
+    @Column(name = "built_in", type = ColumnType.BOOLEAN, comment = "Built-in role flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean builtIn = Boolean.FALSE;
+
+    @Column(name = "system_managed", type = ColumnType.BOOLEAN, comment = "System managed role flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean systemManaged = Boolean.FALSE;
+
+    @Column(name = "description", type = ColumnType.TEXT, comment = "Role description")
+    private String description;
 }

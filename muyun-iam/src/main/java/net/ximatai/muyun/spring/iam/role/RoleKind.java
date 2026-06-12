@@ -4,6 +4,8 @@ import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
 public enum RoleKind implements CodeTitleEnum {
     STANDARD("standard", "标准角色"),
+    POSITION_TEMPLATE("positionTemplate", "岗位模板角色"),
+    SYSTEM("system", "系统角色"),
     GROUP("group", "角色组"),
     WILDCARD_DATA_SCOPE("wildcardDataScope", "数据权限通配角色");
 

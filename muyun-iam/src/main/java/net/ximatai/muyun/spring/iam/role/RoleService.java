@@ -68,6 +68,13 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getPublicRole() == null) {
             role.setPublicRole(false);
         }
+        if (role.getBuiltIn() == null) {
+            role.setBuiltIn(false);
+        }
+        if (role.getSystemManaged() == null) {
+            role.setSystemManaged(false);
+        }
+        role.setGrantSubjectTypes(normalizeGrantSubjectTypes(role.getGrantSubjectTypes(), role.getRoleKind()));
         if (role.getRoleKind() != RoleKind.GROUP) {
             role.setMemberRoleIds(null);
         } else {
@@ -78,6 +85,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
 
     public String bindUser(String roleId, String userId) {
         Role role = requireEnabledRole(roleId);
+        ensureRoleCanGrantTo(role, RoleGrantSubjectType.USER_ACCOUNT);
         String validUserId = Preconditions.requireText(userId, "userId");
         ensureDataScopeRoleBindingValid(role.getId(), validUserId);
         RoleUser existing = findRoleUser(role.getId(), validUserId);
@@ -97,6 +105,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
             return 0;
         }
         Role role = requireEnabledRole(roleId);
+        ensureRoleCanGrantTo(role, RoleGrantSubjectType.USER_ACCOUNT);
         int changed = 0;
         for (String userId : userIds.stream().filter(Objects::nonNull).distinct().toList()) {
             String validUserId = Preconditions.requireText(userId, "userId");
@@ -427,7 +436,15 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         if (role.getRoleKind() == null) {
             role.setRoleKind(RoleKind.STANDARD);
         }
+        role.setGrantSubjectTypes(normalizeGrantSubjectTypes(role.getGrantSubjectTypes(), role.getRoleKind()));
         return role;
+    }
+
+    public boolean canGrantTo(Role role, RoleGrantSubjectType subjectType) {
+        Objects.requireNonNull(role, "role must not be null");
+        Objects.requireNonNull(subjectType, "subjectType must not be null");
+        return parseGrantSubjectTypes(normalizeGrantSubjectTypes(role.getGrantSubjectTypes(), role.getRoleKind()))
+                .contains(subjectType);
     }
 
     private Role requireConfigurableRole(String roleId) {
@@ -484,6 +501,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 .count();
         if (wildcardDataScopeRoleCount > 1) {
             throw new PlatformException("user can bind at most one wildcard data scope role");
+        }
+    }
+
+    private void ensureRoleCanGrantTo(Role role, RoleGrantSubjectType subjectType) {
+        if (!canGrantTo(role, subjectType)) {
+            throw new PlatformException("role cannot be granted to " + subjectType.getCode() + ": " + role.getId());
         }
     }
 
@@ -567,6 +590,42 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private String normalizeRoleIdCsv(String value) {
         Set<String> ids = parseRoleIds(value);
         return ids.isEmpty() ? null : String.join(",", ids);
+    }
+
+    private String normalizeGrantSubjectTypes(String value, RoleKind roleKind) {
+        Set<RoleGrantSubjectType> types = parseGrantSubjectTypes(value);
+        if (types.isEmpty() || shouldUseKindDefaultGrantSubjectTypes(types, roleKind)) {
+            types.clear();
+            types.add(defaultGrantSubjectType(roleKind));
+        }
+        return types.stream()
+                .map(RoleGrantSubjectType::getCode)
+                .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private boolean shouldUseKindDefaultGrantSubjectTypes(Set<RoleGrantSubjectType> types, RoleKind roleKind) {
+        return roleKind == RoleKind.POSITION_TEMPLATE
+                && types.size() == 1
+                && types.contains(RoleGrantSubjectType.USER_ACCOUNT);
+    }
+
+    private RoleGrantSubjectType defaultGrantSubjectType(RoleKind roleKind) {
+        return roleKind == RoleKind.POSITION_TEMPLATE
+                ? RoleGrantSubjectType.EMPLOYEE_POSITION
+                : RoleGrantSubjectType.USER_ACCOUNT;
+    }
+
+    private Set<RoleGrantSubjectType> parseGrantSubjectTypes(String value) {
+        LinkedHashSet<RoleGrantSubjectType> types = new LinkedHashSet<>();
+        if (value == null || value.isBlank()) {
+            return types;
+        }
+        Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .map(RoleGrantSubjectType::fromCode)
+                .forEach(types::add);
+        return types;
     }
 
     private Set<String> parseRoleIds(String value) {

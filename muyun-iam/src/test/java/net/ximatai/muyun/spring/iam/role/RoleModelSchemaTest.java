@@ -12,7 +12,10 @@ class RoleModelSchemaTest {
     @Test
     void shouldMapStableRoleDefaults() {
         assertThat(columnDefault(mapper.toTable(Role.class), "role_kind")).isEqualTo("'standard'");
+        assertThat(columnDefault(mapper.toTable(Role.class), "grant_subject_types")).isEqualTo("'userAccount'");
         assertThat(columnDefault(mapper.toTable(Role.class), "public_role")).isEqualTo("FALSE");
+        assertThat(columnDefault(mapper.toTable(Role.class), "built_in")).isEqualTo("FALSE");
+        assertThat(columnDefault(mapper.toTable(Role.class), "system_managed")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(RoleAction.class), "tenant_scope_policy")).isEqualTo("'currentTenant'");
         assertThat(columnDefault(mapper.toTable(RoleAction.class), "enabled")).isEqualTo("TRUE");
     }

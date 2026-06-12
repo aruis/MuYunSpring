@@ -39,7 +39,62 @@ class RoleServiceContractTest {
 
         assertThat(group.getRoleKind()).isEqualTo(RoleKind.GROUP);
         assertThat(group.getMemberRoleIds()).isEqualTo("r1,r2");
+        assertThat(group.getGrantSubjectTypes()).isEqualTo(RoleGrantSubjectType.USER_ACCOUNT.getCode());
         assertThat(group.getEnabled()).isTrue();
+        assertThat(group.getBuiltIn()).isFalse();
+        assertThat(group.getSystemManaged()).isFalse();
+    }
+
+    @Test
+    void shouldNormalizeGrantSubjectTypesAndDefaultPositionTemplateToEmployeePosition() {
+        RoleDao roleDao = mock(RoleDao.class);
+        when(roleDao.insert(any())).thenReturn("r1");
+        RoleService service = service(roleDao, mock(RoleUserDao.class), mock(RoleActionDao.class));
+
+        Role role = role("r1", "Sales Manager", RoleKind.STANDARD);
+        role.setGrantSubjectTypes(" employee, userAccount, employee ");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.insert(role);
+        }
+
+        assertThat(role.getGrantSubjectTypes()).isEqualTo("employee,userAccount");
+
+        Role positionTemplate = role("r2", "Position Template", RoleKind.POSITION_TEMPLATE);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.insert(positionTemplate);
+        }
+
+        assertThat(positionTemplate.getGrantSubjectTypes()).isEqualTo("employeePosition");
+    }
+
+    @Test
+    void shouldRejectUserBindingWhenRoleDoesNotAllowUserAccountGrant() {
+        RoleDao roleDao = mock(RoleDao.class);
+        Role positionTemplate = role("template-1", "Position Template", RoleKind.POSITION_TEMPLATE);
+        positionTemplate.setGrantSubjectTypes(RoleGrantSubjectType.EMPLOYEE_POSITION.getCode());
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(positionTemplate));
+        RoleService service = service(roleDao, mock(RoleUserDao.class), mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.bindUser("template-1", "user-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("cannot be granted to userAccount");
+        }
+    }
+
+    @Test
+    void shouldRejectUnsupportedGrantSubjectTypeAsPlatformException() {
+        RoleService service = service(mock(RoleDao.class), mock(RoleUserDao.class), mock(RoleActionDao.class));
+        Role role = role("r1", "Role", RoleKind.STANDARD);
+        role.setGrantSubjectTypes("unknownSubject");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.insert(role))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("unsupported role grant subject type");
+        }
     }
 
     @Test
@@ -347,6 +402,23 @@ class RoleServiceContractTest {
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThat(service.bindUsers("r1", List.of("user-1", "user-2", "user-2"))).isEqualTo(1);
             assertThat(service.userIds("r1")).containsExactly("user-1", "user-2");
+        }
+    }
+
+    @Test
+    void shouldKeepGroupAndWildcardRolesGrantableToUserAccount() {
+        RoleDao roleDao = mock(RoleDao.class);
+        RoleUserDao roleUserDao = mock(RoleUserDao.class);
+        when(roleDao.query(any(Criteria.class), any(PageRequest.class)))
+                .thenReturn(List.of(role("group-1", "Group", RoleKind.GROUP)))
+                .thenReturn(List.of(role("scope-1", "Wildcard Scope", RoleKind.WILDCARD_DATA_SCOPE)));
+        when(roleUserDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of());
+        when(roleUserDao.insert(any())).thenReturn("binding-1", "binding-2");
+        RoleService service = service(roleDao, roleUserDao, mock(RoleActionDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThat(service.bindUser("group-1", "user-1")).isEqualTo("binding-1");
+            assertThat(service.bindUser("scope-1", "user-1")).isEqualTo("binding-2");
         }
     }
 
