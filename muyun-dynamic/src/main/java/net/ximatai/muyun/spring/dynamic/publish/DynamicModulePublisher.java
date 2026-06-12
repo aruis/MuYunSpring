@@ -43,6 +43,7 @@ public class DynamicModulePublisher {
 
     private void publishModuleEvent(ModuleDefinition module, Map<String, MigrationResult> migrations) {
         DynamicModulePublishResult result = new DynamicModulePublishResult(module, migrations, false);
+        String systemReason = TenantContext.systemReason().orElse("dynamic module publication");
         runtime.eventPublisher().publishAfterCommit(RuntimeEvent.of(
                 RuntimeEventType.MODULE_PUBLISHED,
                 module.moduleAlias(),
@@ -50,7 +51,8 @@ public class DynamicModulePublisher {
                 null,
                 null,
                 TenantContext.currentTenantId().orElse(null),
-                TenantContext.isSystem(),
+                true,
+                systemReason,
                 RuntimeMutationSource.SYSTEM,
                 Map.of(
                         "changed", result.changed(),

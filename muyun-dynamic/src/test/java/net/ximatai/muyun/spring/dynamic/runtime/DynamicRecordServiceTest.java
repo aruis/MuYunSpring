@@ -2507,6 +2507,28 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldPublishSystemUpdateEventWithSystemReasonThroughStableServiceApi() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, contractEntity(), events);
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002");
+        record.setId("contract-1");
+
+        service.updateSystem(MODULE, "contract", record, "workflow submit");
+
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(RuntimeEventType.AFTER_UPDATE);
+                    assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
+                    assertThat(event.systemContext()).isTrue();
+                    assertThat(event.systemReason()).isEqualTo("workflow submit");
+                    assertThat(event.payload()).containsEntry("systemReason", "workflow submit");
+                });
+    }
+
+    @Test
     void shouldPublishBatchDeleteAndSortMutationEvents() {
         IDatabaseOperations<Object> operations = operations();
         stubSortableRows(operations);
@@ -2598,6 +2620,14 @@ class DynamicRecordServiceTest {
                 null, null, false, RuntimeMutationSource.ACTION, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("actionCode");
+        assertThatThrownBy(() -> RuntimeEvent.of(RuntimeEventType.AFTER_CREATE, MODULE, "contract", "contract-1",
+                null, null, true, RuntimeMutationSource.SYSTEM, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("systemReason");
+        assertThatThrownBy(() -> RuntimeEvent.of(RuntimeEventType.AFTER_CREATE, MODULE, "contract", "contract-1",
+                null, null, false, RuntimeMutationSource.SYSTEM, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("systemReason");
     }
 
     @Test

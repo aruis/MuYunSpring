@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.ability.event.ActionEventPayload;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventAuditContext;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
+import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
@@ -222,6 +223,15 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
         }
         if (record.getMutationSource() == null) {
             throw new PlatformException("Runtime audit mutationSource must not be null");
+        }
+        if (record.getMutationSource() == RuntimeMutationSource.SYSTEM) {
+            record.setSystemContext(Boolean.TRUE);
+        }
+        if (record.getSystemReason() != null && record.getSystemReason().isBlank()) {
+            record.setSystemReason(null);
+        }
+        if (Boolean.TRUE.equals(record.getSystemContext()) && record.getSystemReason() == null) {
+            throw new PlatformException("Runtime audit systemReason must not be blank for system context");
         }
         if (record.getOccurredAt() == null) {
             throw new PlatformException("Runtime audit occurredAt must not be null");

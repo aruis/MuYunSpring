@@ -134,6 +134,12 @@ public record RuntimeEvent(
         eventId = eventId == null || eventId.isBlank() ? UUID.randomUUID().toString() : eventId;
         traceId = traceId == null || traceId.isBlank() ? eventId : traceId;
         systemReason = systemReason == null || systemReason.isBlank() ? null : systemReason.trim();
+        if (mutationSource == RuntimeMutationSource.SYSTEM) {
+            systemContext = true;
+        }
+        if (systemContext && systemReason == null) {
+            throw new IllegalArgumentException("system runtime event requires systemReason");
+        }
         payload = payload == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(payload));
         auditContext = auditContext == null
                 ? RuntimeEventAuditContext.capture(moduleAlias, actionCode)

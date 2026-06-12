@@ -193,6 +193,24 @@ class RuntimeAuditRecordServiceContractTest {
     }
 
     @Test
+    void shouldRejectSystemAuditRecordWithoutSystemReason() {
+        RuntimeAuditRecord record = new RuntimeAuditRecord();
+        record.setEventId("system-event-without-reason");
+        record.setTraceId("system-trace-without-reason");
+        record.setEventType(RuntimeEventType.AFTER_UPDATE);
+        record.setModuleAlias("sales.contract");
+        record.setEntityAlias("contract");
+        record.setRecordId("contract-1");
+        record.setSystemContext(Boolean.FALSE);
+        record.setMutationSource(RuntimeMutationSource.SYSTEM);
+        record.setOccurredAt(Instant.parse("2026-06-02T04:30:00Z"));
+
+        assertThatThrownBy(() -> service.insert(record))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("systemReason");
+    }
+
+    @Test
     void shouldBuildRuntimeAuditQueryCriteriaForActionDimensions() {
         service.record(event());
         service.record(otherActionEvent());
@@ -379,6 +397,7 @@ class RuntimeAuditRecordServiceContractTest {
                 null,
                 "tenant-1",
                 true,
+                "module publication",
                 RuntimeMutationSource.SYSTEM,
                 Map.of("resultType", "VALUE", "message", "发布完成", "result", "ok"),
                 Instant.parse("2026-06-02T04:10:00Z")

@@ -623,8 +623,10 @@ public class DynamicRecordService {
     }
 
     @Transactional
-    public int updateSystem(String moduleAlias, String entityAlias, DynamicRecord record, String traceId) {
-        return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, traceId, Map.of());
+    public int updateSystem(String moduleAlias, String entityAlias, DynamicRecord record, String systemReason) {
+        try (TenantContext.Scope ignored = TenantContext.system(systemReason)) {
+            return update(moduleAlias, entityAlias, record, RuntimeMutationSource.SYSTEM, null, Map.of());
+        }
     }
 
     @Transactional

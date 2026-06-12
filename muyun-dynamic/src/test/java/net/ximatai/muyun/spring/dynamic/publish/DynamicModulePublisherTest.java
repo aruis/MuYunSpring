@@ -59,6 +59,8 @@ class DynamicModulePublisherTest {
         assertThat(event.eventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
         assertThat(event.moduleAlias()).isEqualTo("sales.contract");
         assertThat(event.entityAlias()).isNull();
+        assertThat(event.systemContext()).isTrue();
+        assertThat(event.systemReason()).isEqualTo("dynamic module publication");
         assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
         assertThat(event.payload()).containsEntry("changed", Boolean.TRUE)
                 .containsEntry("nonAdditiveChanges", Boolean.FALSE);
@@ -93,7 +95,10 @@ class DynamicModulePublisherTest {
         }
 
         assertThat(events.events()).singleElement()
-                .satisfies(event -> assertThat(event.systemContext()).isTrue());
+                .satisfies(event -> {
+                    assertThat(event.systemContext()).isTrue();
+                    assertThat(event.systemReason()).isEqualTo("test system context");
+                });
     }
 
     @Test
