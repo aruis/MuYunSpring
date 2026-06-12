@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
@@ -30,10 +32,52 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         EnableWeb<Employee, EmployeeService>,
         SortWeb<Employee, EmployeeService> {
     private final EmployeePositionService employeePositionService;
+    private final EmployeeAccountService employeeAccountService;
 
     @Autowired
-    public EmployeeWebController(EmployeePositionService employeePositionService) {
+    public EmployeeWebController(EmployeePositionService employeePositionService,
+                                 EmployeeAccountService employeeAccountService) {
         this.employeePositionService = employeePositionService;
+        this.employeeAccountService = employeeAccountService;
+    }
+
+    @GetMapping("/{employeeId}/accounts")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebListResponse<EmployeeAccount> accounts(@PathVariable String employeeId) {
+        return webScope(() -> new WebListResponse<>(employeeAccountService.accounts(employeeId)));
+    }
+
+    @PostMapping("/{employeeId}/accounts")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public EmployeeAccount bindAccount(@PathVariable String employeeId,
+                                       @RequestBody EmployeeAccount binding) {
+        return webScope(() -> employeeAccountService.select(employeeAccountService.bindAccount(employeeId, binding)));
+    }
+
+    @PostMapping("/{employeeId}/accounts/{bindingId}/delete")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse deleteAccount(@PathVariable String employeeId,
+                                          @PathVariable String bindingId) {
+        return webScope(() -> new WebCountResponse(employeeAccountService.deleteAccount(employeeId, bindingId)));
+    }
+
+    @PostMapping("/{employeeId}/accounts/{bindingId}/enable")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse enableAccount(@PathVariable String employeeId,
+                                          @PathVariable String bindingId) {
+        return webScope(() -> new WebCountResponse(employeeAccountService.enableAccount(employeeId, bindingId)));
+    }
+
+    @PostMapping("/{employeeId}/accounts/{bindingId}/disable")
+    @CustomActionEndpoint(value = "employeeAccounts", title = "职员账号",
+            level = PlatformActionLevel.RECORD, dataAuth = true, recordIdPathVariable = "employeeId")
+    public WebCountResponse disableAccount(@PathVariable String employeeId,
+                                           @PathVariable String bindingId) {
+        return webScope(() -> new WebCountResponse(employeeAccountService.disableAccount(employeeId, bindingId)));
     }
 
     @GetMapping("/{employeeId}/positions")

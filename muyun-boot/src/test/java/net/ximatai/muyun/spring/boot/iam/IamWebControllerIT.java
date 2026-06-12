@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
+import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
@@ -73,6 +75,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private EmployeePositionService employeePositionService;
+
+    @MockitoBean
+    private EmployeeAccountService employeeAccountService;
 
     @MockitoBean
     private PositionService positionService;
@@ -257,6 +262,46 @@ class IamWebControllerIT {
     }
 
     @Test
+    void shouldBindEmployeeAccountEndpointsInRealMvcContext() throws Exception {
+        EmployeeAccount binding = employeeAccount("binding-1", "employee-1", "user-2", true);
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(employeeAccountService.accounts("employee-1")).thenReturn(List.of(binding));
+        when(employeeAccountService.bindAccount(eq("employee-1"), any(EmployeeAccount.class))).thenReturn("binding-1");
+        when(employeeAccountService.select("binding-1")).thenReturn(binding);
+        when(employeeAccountService.deleteAccount("employee-1", "binding-1")).thenReturn(1);
+        when(employeeAccountService.enableAccount("employee-1", "binding-1")).thenReturn(1);
+        when(employeeAccountService.disableAccount("employee-1", "binding-1")).thenReturn(1);
+
+        mvc.perform(get("/iam.employee/employee-1/accounts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("binding-1"))
+                .andExpect(jsonPath("$.records[0].primaryAccount").value(true));
+
+        mvc.perform(post("/iam.employee/employee-1/accounts")
+                        .contentType("application/json")
+                        .content("""
+                                {"userId":"user-2","primaryAccount":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("binding-1"))
+                .andExpect(jsonPath("$.userId").value("user-2"));
+
+        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/enable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+        mvc.perform(post("/iam.employee/employee-1/accounts/binding-1/disable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        verify(employeeAccountService).accounts("employee-1");
+        verify(employeeAccountService).bindAccount(eq("employee-1"), any(EmployeeAccount.class));
+    }
+
+    @Test
     void shouldBindPositionEndpointInRealMvcContext() throws Exception {
         Position position = new Position();
         position.setId("position-1");
@@ -405,5 +450,15 @@ class IamWebControllerIT {
         grant.setSubjectId(subjectId);
         grant.setEnabled(Boolean.TRUE);
         return grant;
+    }
+
+    private EmployeeAccount employeeAccount(String id, String employeeId, String userId, boolean primaryAccount) {
+        EmployeeAccount binding = new EmployeeAccount();
+        binding.setId(id);
+        binding.setEmployeeId(employeeId);
+        binding.setUserId(userId);
+        binding.setPrimaryAccount(primaryAccount);
+        binding.setEnabled(Boolean.TRUE);
+        return binding;
     }
 }

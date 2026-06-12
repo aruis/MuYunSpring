@@ -113,6 +113,11 @@
 | `POST` | `/iam.employee/enable/{id}` | 启用职员。 |
 | `POST` | `/iam.employee/disable/{id}` | 停用职员。 |
 | `POST` | `/iam.employee/sort/{id}` | 调整职员在部门内的排序。 |
+| `GET` | `/iam.employee/{employeeId}/accounts` | 查询职员绑定的登录账号，包含启停状态。 |
+| `POST` | `/iam.employee/{employeeId}/accounts` | 为职员绑定登录账号；当前一个账号只绑定一个职员。 |
+| `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/delete` | 删除职员账号绑定。 |
+| `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/enable` | 启用职员账号绑定。 |
+| `POST` | `/iam.employee/{employeeId}/accounts/{bindingId}/disable` | 停用职员账号绑定。 |
 | `GET` | `/iam.employee/{employeeId}/positions` | 查询职员任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions` | 为职员新增任岗关系。 |
 | `POST` | `/iam.employee/{employeeId}/positions/{relationId}/update` | 更新职员任岗关系。 |
