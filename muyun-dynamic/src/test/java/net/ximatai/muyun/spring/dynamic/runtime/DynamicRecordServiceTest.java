@@ -230,6 +230,28 @@ class DynamicRecordServiceTest {
     }
 
     @Test
+    void shouldBypassBusinessDataScopeForWriteBackUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("hidden", "C-001", 0, false)));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, dataScopedActionEntity(), events,
+                new FailingDataScopeCriteriaService());
+        DynamicRecord record = service.newRecord(MODULE, "contract").setValue("code", "C-002");
+        record.setId("hidden");
+
+        assertThat(service.updateWriteBack(MODULE, "contract", record,
+                new DynamicWriteBackContext("trace-wb", 1, "exec-1", false))).isEqualTo(1);
+
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
+                    assertThat(event.systemContext()).isFalse();
+                });
+    }
+
+    @Test
     void shouldExposeWriteBackContextOnCreateRuntimeRecordEventPayload() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
@@ -2575,6 +2597,29 @@ class DynamicRecordServiceTest {
                     assertThat(event.systemContext()).isTrue();
                     assertThat(event.systemReason()).isEqualTo("workflow submit");
                     assertThat(event.payload()).containsEntry("systemReason", "workflow submit");
+                });
+    }
+
+    @Test
+    void shouldBypassBusinessDataScopeForSystemUpdate() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("hidden", "C-001", 0, false)));
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
+        DynamicRecordService service = service(operations, dataScopedActionEntity(), events,
+                new FailingDataScopeCriteriaService());
+        DynamicRecord record = service.newRecord(MODULE, "contract")
+                .setValue("code", "C-002");
+        record.setId("hidden");
+
+        assertThat(service.updateSystem(MODULE, "contract", record, "workflow submit")).isEqualTo(1);
+
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        assertThat(events.events()).singleElement()
+                .satisfies(event -> {
+                    assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
+                    assertThat(event.systemContext()).isTrue();
+                    assertThat(event.systemReason()).isEqualTo("workflow submit");
                 });
     }
 
