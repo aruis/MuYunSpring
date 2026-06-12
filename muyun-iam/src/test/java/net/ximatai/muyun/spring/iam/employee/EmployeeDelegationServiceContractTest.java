@@ -5,12 +5,15 @@ import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.identity.ActingContext;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,9 +48,28 @@ class EmployeeDelegationServiceContractTest {
         }
 
         assertThat(delegation.getDelegationType()).isEqualTo(EmployeeDelegationType.BUSINESS);
+        assertThat(delegation.getModuleScopeType()).isEqualTo(EmployeeDelegationScopeType.ALL);
+        assertThat(delegation.getModuleAliases()).isEmpty();
+        assertThat(delegation.getActionScopeType()).isEqualTo(EmployeeDelegationScopeType.ALL);
+        assertThat(delegation.getActionKeys()).isEmpty();
         assertThat(delegation.getEnabled()).isTrue();
         assertThat(delegation.getTenantId()).isEqualTo("tenant_a");
         verify(tenantVerifier).verifyActiveTenant("tenant_a");
+    }
+
+    @Test
+    void shouldClearScopeValuesWhenScopeTypeIsAll() {
+        EmployeeDelegationService service = service(mock(EmployeeDelegationDao.class));
+        EmployeeDelegation delegation = delegation("principal-1", "delegate-1");
+        delegation.setModuleScopeType(EmployeeDelegationScopeType.ALL);
+        delegation.setModuleAliases(Set.of("sales.contract"));
+        delegation.setActionScopeType(EmployeeDelegationScopeType.ALL);
+        delegation.setActionKeys(Set.of("sales.contract#create"));
+
+        service.normalizeBeforeMutation(delegation);
+
+        assertThat(delegation.getModuleAliases()).isEmpty();
+        assertThat(delegation.getActionKeys()).isEmpty();
     }
 
     @Test
@@ -103,6 +125,24 @@ class EmployeeDelegationServiceContractTest {
     }
 
     @Test
+    void shouldRequireValuesForIncludeScopes() {
+        EmployeeDelegationService service = service(mock(EmployeeDelegationDao.class));
+        EmployeeDelegation moduleScoped = delegation("principal-1", "delegate-1");
+        moduleScoped.setModuleScopeType(EmployeeDelegationScopeType.INCLUDE);
+        EmployeeDelegation actionScoped = delegation("principal-1", "delegate-1");
+        actionScoped.setActionScopeType(EmployeeDelegationScopeType.INCLUDE);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeInsert(moduleScoped))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("moduleAliases are required");
+            assertThatThrownBy(() -> service.beforeInsert(actionScoped))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("actionKeys are required");
+        }
+    }
+
+    @Test
     void shouldUseIsNullCriteriaForNullableDuplicateFields() {
         EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
         org.mockito.ArgumentCaptor<Criteria> criteriaCaptor = org.mockito.ArgumentCaptor.forClass(Criteria.class);
@@ -146,6 +186,31 @@ class EmployeeDelegationServiceContractTest {
         service.updateDelegation("principal-1", "delegation-1", incoming);
 
         assertThat(incoming.getEnabled()).isFalse();
+    }
+
+    @Test
+    void shouldKeepExistingScopeWhenUpdatingDelegationWithoutScopePayload() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
+        EmployeeDelegation existing = delegation("principal-1", "delegate-1");
+        existing.setId("delegation-1");
+        existing.setModuleScopeType(EmployeeDelegationScopeType.INCLUDE);
+        existing.setModuleAliases(Set.of("sales.contract"));
+        existing.setActionScopeType(EmployeeDelegationScopeType.INCLUDE);
+        existing.setActionKeys(Set.of("sales.contract#create"));
+        EmployeeDelegation incoming = delegation("principal-1", "delegate-1");
+        incoming.setModuleScopeType(null);
+        incoming.setModuleAliases(null);
+        incoming.setActionScopeType(null);
+        incoming.setActionKeys(null);
+        doReturn(existing).when(service).select("delegation-1");
+        doReturn(1).when(service).update(any(EmployeeDelegation.class));
+
+        service.updateDelegation("principal-1", "delegation-1", incoming);
+
+        assertThat(incoming.getModuleScopeType()).isEqualTo(EmployeeDelegationScopeType.INCLUDE);
+        assertThat(incoming.getModuleAliases()).containsExactly("sales.contract");
+        assertThat(incoming.getActionScopeType()).isEqualTo(EmployeeDelegationScopeType.INCLUDE);
+        assertThat(incoming.getActionKeys()).containsExactly("sales.contract#create");
     }
 
     @Test
@@ -210,13 +275,129 @@ class EmployeeDelegationServiceContractTest {
         assertThat(command.getPrincipalEmployeeId()).isEqualTo("principal-1");
     }
 
+    @Test
+    void shouldResolveActingContextFromGlobalDelegation() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
+        EmployeeDelegation delegation = delegation("principal-1", "delegate-1");
+        delegation.setId("delegation-1");
+        doReturn(List.of(delegation)).when(service).list(any(Criteria.class), any(PageRequest.class), any());
+
+        ActingContext context = service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z"));
+
+        assertThat(context.delegationId()).isEqualTo("delegation-1");
+        assertThat(context.operator().userId()).isEqualTo("assistant-user");
+        assertThat(context.principal().employeeId()).isEqualTo("principal-1");
+        assertThat(context.principal().organizationId()).isEqualTo("org-principal");
+        assertThat(context.principal().departmentId()).isEqualTo("dept-principal");
+        assertThat(context.principal().employeePositionId()).isNull();
+        assertThat(context.matches("sales.contract", "create")).isTrue();
+    }
+
+    @Test
+    void shouldRejectActingContextWhenOperatorIsNotDelegateEmployeeAccount() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class), activeTenantVerifier(),
+                "other-employee"));
+
+        assertThatThrownBy(() -> service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("operator is not bound to delegate employee");
+    }
+
+    @Test
+    void shouldResolveActingContextFromPrincipalPositionWithServerFacts() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
+        EmployeeDelegation delegation = delegation("principal-1", "delegate-1");
+        delegation.setId("delegation-1");
+        delegation.setPrincipalPositionId("principal-position");
+        doReturn(List.of(delegation)).when(service).list(any(Criteria.class), any(PageRequest.class), any());
+
+        ActingContext context = service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", "principal-position",
+                "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z"));
+
+        assertThat(context.principal().employeeId()).isEqualTo("principal-1");
+        assertThat(context.principal().employeePositionId()).isEqualTo("principal-position");
+        assertThat(context.principal().organizationId()).isEqualTo("org-position");
+        assertThat(context.principal().departmentId()).isEqualTo("dept-position");
+    }
+
+    @Test
+    void shouldMatchModuleAndActionScopes() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
+        EmployeeDelegation moduleScoped = delegation("principal-1", "delegate-1");
+        moduleScoped.setId("module-delegation");
+        moduleScoped.setModuleScopeType(EmployeeDelegationScopeType.INCLUDE);
+        moduleScoped.setModuleAliases(Set.of("sales.contract"));
+        EmployeeDelegation actionScoped = delegation("principal-1", "delegate-1");
+        actionScoped.setId("action-delegation");
+        actionScoped.setActionScopeType(EmployeeDelegationScopeType.INCLUDE);
+        actionScoped.setActionKeys(Set.of("sales.contract#create"));
+        doReturn(List.of(moduleScoped, actionScoped)).when(service)
+                .list(any(Criteria.class), any(PageRequest.class), any());
+
+        ActingContext moduleContext = service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.contract", "update", Instant.parse("2026-01-01T00:00:00Z"));
+        ActingContext actionContext = service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z"));
+
+        assertThat(moduleContext.delegationId()).isEqualTo("module-delegation");
+        assertThat(actionContext.delegationId()).isEqualTo("action-delegation");
+        assertThatThrownBy(() -> service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.order", "create", Instant.parse("2026-01-01T00:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("employee delegation is not allowed");
+    }
+
+    @Test
+    void shouldRejectDisabledExpiredOrPositionMismatchedDelegation() {
+        EmployeeDelegationService service = spy(service(mock(EmployeeDelegationDao.class)));
+        EmployeeDelegation disabled = delegation("principal-1", "delegate-1");
+        disabled.setId("disabled");
+        disabled.setEnabled(Boolean.FALSE);
+        EmployeeDelegation expired = delegation("principal-1", "delegate-1");
+        expired.setId("expired");
+        expired.setEffectiveTo(Instant.parse("2025-01-01T00:00:00Z"));
+        EmployeeDelegation positionBound = delegation("principal-1", "delegate-1");
+        positionBound.setId("position-bound");
+        positionBound.setPrincipalPositionId("principal-position");
+        doReturn(List.of(disabled, expired, positionBound)).when(service)
+                .list(any(Criteria.class), any(PageRequest.class), any());
+
+        assertThatThrownBy(() -> service.resolveActingContext(
+                CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"),
+                "delegate-1", null, "principal-1", null,
+                "sales.contract", "create", Instant.parse("2026-01-01T00:00:00Z")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("employee delegation is not allowed");
+    }
+
     private EmployeeDelegationService service(EmployeeDelegationDao dao) {
         return service(dao, activeTenantVerifier());
     }
 
     private EmployeeDelegationService service(EmployeeDelegationDao dao, ActiveTenantVerifier tenantVerifier) {
+        return service(dao, tenantVerifier, "delegate-1");
+    }
+
+    private EmployeeDelegationService service(EmployeeDelegationDao dao,
+                                             ActiveTenantVerifier tenantVerifier,
+                                             String operatorEmployeeId) {
         EmployeeService employeeService = mock(EmployeeService.class);
         EmployeePositionService employeePositionService = mock(EmployeePositionService.class);
+        EmployeeAccountService employeeAccountService = mock(EmployeeAccountService.class);
         when(employeeService.requireEnabled(eq("principal-1"), any()))
                 .thenReturn(employee("principal-1"));
         when(employeeService.requireEnabled(eq("principal-2"), any()))
@@ -229,7 +410,9 @@ class EmployeeDelegationServiceContractTest {
                 .thenReturn(position("delegate-position", "delegate-1", true));
         when(employeePositionService.select("disabled-position"))
                 .thenReturn(position("disabled-position", "principal-1", false));
-        return new EmployeeDelegationService(dao, tenantVerifier, employeeService, employeePositionService);
+        when(employeeAccountService.employeeIdOfUser("assistant-user")).thenReturn(operatorEmployeeId);
+        return new EmployeeDelegationService(dao, tenantVerifier, employeeService, employeePositionService,
+                employeeAccountService);
     }
 
     private EmployeeDelegation delegation(String principalEmployeeId, String delegateEmployeeId) {
@@ -242,6 +425,8 @@ class EmployeeDelegationServiceContractTest {
     private Employee employee(String id) {
         Employee employee = new Employee();
         employee.setId(id);
+        employee.setOrganizationId("org-" + id.replace("principal-1", "principal").replace("delegate-1", "delegate"));
+        employee.setDepartmentId("dept-" + id.replace("principal-1", "principal").replace("delegate-1", "delegate"));
         employee.setEnabled(Boolean.TRUE);
         return employee;
     }
@@ -250,6 +435,8 @@ class EmployeeDelegationServiceContractTest {
         EmployeePosition position = new EmployeePosition();
         position.setId(id);
         position.setEmployeeId(employeeId);
+        position.setOrganizationId("org-position");
+        position.setDepartmentId("dept-position");
         position.setEnabled(enabled);
         return position;
     }

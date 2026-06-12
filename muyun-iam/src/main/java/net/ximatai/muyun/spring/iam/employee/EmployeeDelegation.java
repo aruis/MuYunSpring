@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -44,6 +45,20 @@ public class EmployeeDelegation extends StandardEntity implements EnabledCapable
 
     @Column(name = "effective_to", type = ColumnType.TIMESTAMP, comment = "Effective to")
     private Instant effectiveTo;
+
+    @Column(name = "module_scope_type", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Module scope type", defaultVal = @Default(varchar = "all"))
+    private EmployeeDelegationScopeType moduleScopeType = EmployeeDelegationScopeType.ALL;
+
+    @Column(name = "module_aliases", type = ColumnType.JSON_SET, comment = "Included module aliases")
+    private Set<String> moduleAliases;
+
+    @Column(name = "action_scope_type", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Action scope type", defaultVal = @Default(varchar = "all"))
+    private EmployeeDelegationScopeType actionScopeType = EmployeeDelegationScopeType.ALL;
+
+    @Column(name = "action_keys", type = ColumnType.JSON_SET, comment = "Included action keys")
+    private Set<String> actionKeys;
 
     @Column(name = "memo", type = ColumnType.TEXT, comment = "Delegation memo")
     private String memo;

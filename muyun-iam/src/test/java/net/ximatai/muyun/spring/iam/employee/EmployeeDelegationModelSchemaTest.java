@@ -20,7 +20,8 @@ class EmployeeDelegationModelSchemaTest {
         assertThat(columnNames(table))
                 .contains("id", "tenant_id", "delegation_type", "principal_employee_id",
                         "principal_position_id", "delegate_employee_id", "delegate_position_id",
-                        "effective_from", "effective_to", "memo", "enabled", "deleted", "version");
+                        "effective_from", "effective_to", "module_scope_type", "module_aliases",
+                        "action_scope_type", "action_keys", "memo", "enabled", "deleted", "version");
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isFalse();
