@@ -30,8 +30,8 @@
 | 模块字段引用过滤 | `ModuleMetadataFieldFilterService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/filters` |
 | 模块字段引用回填 | `ModuleMetadataFieldAffectService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{fieldId}/affects` |
 | 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
-| 数据字典类目 | `DictionaryCategoryService` | 当前未暴露独立 Web Controller |
-| 数据字典项目 | `DictionaryItemService` | 当前未暴露独立 Web Controller |
+| 数据字典类目 | `DictionaryCategoryService` | `/platform.application/{applicationAlias}/dictionary-categories` |
+| 数据字典项目 | `DictionaryItemService` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -97,6 +97,31 @@
 | UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/update/{id}` | 更新 UI 类型字段映射，并保持归属不跨 UI 类型 |
 | UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/delete/{id}` | 删除 UI 类型字段映射 |
 | UI 类型字段映射 | `POST` | `/platform.field_ui_type/{fieldUiTypeAlias}/field-mappings/sort/{id}` | 在同一 UI 类型内调整字段映射顺序 |
+
+## 数据字典
+
+数据字典类目挂在应用下，字典项目挂在类目下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准，避免跨应用或跨类目维护。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/query` | 查询应用下的字典类目 |
+| 字典类目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/tree` | 获取应用下的字典类目树，可用 `flat=true` 返回扁平列表 |
+| 字典类目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/tree/{id}` | 获取指定类目下的子树 |
+| 字典类目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/view/{id}` | 查看字典类目，并校验类目属于该应用 |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/insert` | 新增字典类目；后端以 URL 中的 `applicationAlias` 为准 |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/update/{id}` | 更新字典类目，并保持应用归属不跨应用 |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/delete/{id}` | 删除字典类目 |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/enable/{id}`、`/disable/{id}` | 启用或停用字典类目 |
+| 字典类目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/sort/{id}` | 在同一应用和父类目范围内调整类目顺序 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/query` | 查询类目下的字典项目 |
+| 字典项目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/tree` | 获取类目下的项目树，可用 `flat=true` 返回扁平列表 |
+| 字典项目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/tree/{id}` | 获取指定项目下的子树 |
+| 字典项目 | `GET` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/view/{id}` | 查看字典项目，并校验项目属于该类目 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/insert` | 新增字典项目；后端以 URL 中的应用和类目为准 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/update/{id}` | 更新字典项目，并保持类目归属不跨类目 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/delete/{id}` | 删除字典项目 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/enable/{id}`、`/disable/{id}` | 启用或停用字典项目 |
+| 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/sort/{id}` | 在同一类目和父项目范围内调整项目顺序 |
 
 ## 菜单配置
 

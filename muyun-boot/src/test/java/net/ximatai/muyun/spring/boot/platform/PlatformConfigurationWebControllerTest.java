@@ -34,6 +34,10 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappin
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeFieldMappingService;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -512,6 +516,132 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
+    void shouldManageDictionaryCategoriesWithinPathApplication() throws Exception {
+        DictionaryCategoryService service = mock(DictionaryCategoryService.class);
+        DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+
+        DictionaryCategory root = dictionaryCategory("category-1", "platform", "common", null);
+        DictionaryCategory child = dictionaryCategory("category-2", "platform", "status", "category-1");
+        when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(root), 1, PageRequest.of(1, 20)));
+        when(service.rootCategories("platform")).thenReturn(List.of(root));
+        when(service.children("platform", "category-1")).thenReturn(List.of(child));
+        when(service.children("platform", "category-2")).thenReturn(List.of());
+        when(service.insert(any(DictionaryCategory.class))).thenReturn("category-1");
+        when(service.select("category-1")).thenReturn(root);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.application/platform/dictionary-categories/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"conditions":[{"fieldName":"alias","values":["common"]}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.records[0].alias").value("common"));
+        mvc.perform(get("/platform.application/platform/dictionary-categories/tree"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("category-1"))
+                .andExpect(jsonPath("$.records[0].children[0].record.id").value("category-2"));
+        mvc.perform(post("/platform.application/platform/dictionary-categories/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"applicationAlias":"other","alias":"common","title":"Common"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.applicationAlias").value("platform"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
+        assertClause(criteria.getValue(), "applicationAlias", "platform");
+        assertClause(criteria.getValue(), "alias", "common");
+        ArgumentCaptor<DictionaryCategory> captor = ArgumentCaptor.forClass(DictionaryCategory.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+    }
+
+    @Test
+    void shouldRejectCrossApplicationDictionaryCategoryUpdate() {
+        DictionaryCategoryService service = mock(DictionaryCategoryService.class);
+        DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.select("category-1")).thenReturn(dictionaryCategory("category-1", "crm", "common", null));
+
+        MockHttpServletRequest request = requestVars(Map.of("applicationAlias", "platform"));
+
+        assertThatThrownBy(() -> controller.update(request, "category-1", new DictionaryCategory()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionary category does not belong to application");
+    }
+
+    @Test
+    void shouldManageDictionaryItemsWithinPathCategory() throws Exception {
+        DictionaryItemService service = mock(DictionaryItemService.class);
+        DictionaryItemWebController controller = new DictionaryItemWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+
+        DictionaryItem root = dictionaryItem("item-1", "platform", "status", "enabled", null);
+        DictionaryItem child = dictionaryItem("item-2", "platform", "status", "active", "item-1");
+        when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(root), 1, PageRequest.of(1, 20)));
+        when(service.rootItems("platform", "status")).thenReturn(List.of(root));
+        when(service.children("platform", "status", "item-1")).thenReturn(List.of(child));
+        when(service.children("platform", "status", "item-2")).thenReturn(List.of());
+        when(service.insert(any(DictionaryItem.class))).thenReturn("item-1");
+        when(service.select("item-1")).thenReturn(root);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/query")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"conditions":[{"fieldName":"code","values":["enabled"]}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.records[0].categoryAlias").value("status"))
+                .andExpect(jsonPath("$.records[0].code").value("enabled"));
+        mvc.perform(get("/platform.application/platform/dictionary-categories/status/items/tree"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("item-1"))
+                .andExpect(jsonPath("$.records[0].children[0].record.id").value("item-2"));
+        mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"applicationAlias":"other","categoryAlias":"other","code":"enabled","title":"Enabled"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.categoryAlias").value("status"));
+
+        ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
+        verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
+        assertClause(criteria.getValue(), "applicationAlias", "platform");
+        assertClause(criteria.getValue(), "categoryAlias", "status");
+        assertClause(criteria.getValue(), "code", "enabled");
+        ArgumentCaptor<DictionaryItem> captor = ArgumentCaptor.forClass(DictionaryItem.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+        assertThat(captor.getValue().getCategoryAlias()).isEqualTo("status");
+    }
+
+    @Test
+    void shouldRejectCrossCategoryDictionaryItemUpdate() {
+        DictionaryItemService service = mock(DictionaryItemService.class);
+        DictionaryItemWebController controller = new DictionaryItemWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "platform", "priority", "enabled", null));
+
+        MockHttpServletRequest request = requestVars(Map.of(
+                "applicationAlias", "platform",
+                "categoryAlias", "status"));
+
+        assertThatThrownBy(() -> controller.update(request, "item-1", new DictionaryItem()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionary item does not belong to category");
+    }
+
+    @Test
     void shouldQueryUiSetsWithinPathModule() throws Exception {
         PlatformUiSetService service = mock(PlatformUiSetService.class);
         PlatformUiSetWebController controller = new PlatformUiSetWebController();
@@ -759,6 +889,28 @@ class PlatformConfigurationWebControllerTest {
         mapping.setSourceKey(sourceKey);
         mapping.setTitle(sourceKey);
         return mapping;
+    }
+
+    private DictionaryCategory dictionaryCategory(String id, String applicationAlias, String alias, String parentId) {
+        DictionaryCategory category = new DictionaryCategory();
+        category.setId(id);
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setParentId(parentId);
+        category.setTitle(alias);
+        return category;
+    }
+
+    private DictionaryItem dictionaryItem(String id, String applicationAlias, String categoryAlias,
+                                          String code, String parentId) {
+        DictionaryItem item = new DictionaryItem();
+        item.setId(id);
+        item.setApplicationAlias(applicationAlias);
+        item.setCategoryAlias(categoryAlias);
+        item.setCode(code);
+        item.setParentId(parentId);
+        item.setTitle(code);
+        return item;
     }
 
     private MetadataField metadataField(String id, String metadataId) {
