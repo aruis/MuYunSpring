@@ -39,6 +39,7 @@
 | TD-016 | 职员主账号唯一仍缺少强并发保护 | 已提供事务性主账号切换能力，常规请求会先降级同职员其他启用主账号再设置目标主账号；但没有条件唯一索引或显式锁时，强并发写入仍可能绕过应用层预查 | 进入账号开通批处理、多端账号治理或平台级条件唯一约束建设时，补条件唯一索引或显式锁 |
 | TD-017 | 外部写入、后台任务和异步批次尚未建设专题流水 | 平台运行审计只记录动作入口和必要身份上下文，不能解释幂等、重试、回执、批次进度和失败恢复 | 进入外部系统接入、统一后台任务调度或异步导入执行时，按 [审计与专题流水边界](platform/AUDIT_AND_PROCESS_LOG_BOUNDARY.md)、[外部写入接入边界](platform/EXTERNAL_WRITE_BOUNDARY.md) 和 [后台任务与异步批次边界](platform/BACKGROUND_JOB_AND_BATCH_BOUNDARY.md) 建设对应专题流水 |
 | TD-018 | 数据迁移当前仅支持全局版本序列，尚未支持按租户独立迁移 | 已预留 `(tenant_id, alias)` 复合唯一索引和 `MigrationVersionStore` 接缝；当前 `tenant_id` 恒为 null，alias 全局唯一；详见 [数据迁移](architecture/DATA_MIGRATION.md) | 进入多租户 SaaS、租户数据独立演化场景时，提供按租户作用域的 `MigrationVersionStore` 实现并按 `TenantContext` 解析租户维度 |
+| TD-019 | 全局表（`GlobalScopedAbility`）的单列 unique 不被 SQL 强制 | 平台 `PlatformUniqueIndexes` 把单列 `unique=true` 改写成 `(tenant_id, column)` 复合唯一索引；当 entity 是全局表（`tenant_id` 恒为 null）时，因 SQL 的 `NULL != NULL` 语义，该索引不强制全局唯一。`migration_record` 通过 `MigrationBootstrap` 显式建 partial unique index `WHERE tenant_id IS NULL` 兜底；其他全局表若需要单列唯一（例如未来引入 `code`、`symbol` 等业务键），同样需要兜底，否则重复值不会被数据库拒绝 | 进入其他全局表需要单列唯一约束时，扩 `PlatformUniqueIndexes`（或 `muyun-database` 的 `Index` 模型支持 partial）让全局表自动生成 partial unique index；同时复核既有全局表是否已暴露此风险 |
 
 ## 运维治理触发回收
 

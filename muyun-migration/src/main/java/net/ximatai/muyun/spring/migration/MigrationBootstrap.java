@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.migration;
 
+import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.slf4j.Logger;
@@ -23,16 +24,23 @@ import java.util.List;
 @Order(100)
 public class MigrationBootstrap implements ApplicationRunner {
 
+    static final String ALIAS_GLOBAL_PARTIAL_INDEX =
+            "CREATE UNIQUE INDEX IF NOT EXISTS migration_record_alias_global_unique "
+                    + "ON migration_record (alias) WHERE tenant_id IS NULL";
+
     private static final Logger logger = LoggerFactory.getLogger(MigrationBootstrap.class);
 
     private final StaticSchemaService schemaService;
+    private final IDatabaseOperations<?> operations;
     private final MigrationExecutor executor;
     private final List<AbstractMigration> migrations;
 
     public MigrationBootstrap(StaticSchemaService schemaService,
+                              IDatabaseOperations<?> operations,
                               MigrationExecutor executor,
                               List<AbstractMigration> migrations) {
         this.schemaService = schemaService;
+        this.operations = operations;
         this.executor = executor;
         this.migrations = migrations == null ? List.of() : migrations;
     }
@@ -45,9 +53,20 @@ public class MigrationBootstrap implements ApplicationRunner {
         try (TenantContext.Scope ignored = TenantContext.system("data migration on startup")) {
             logger.info("Ensuring migration version table");
             schemaService.ensureTable(MigrationRecord.class);
+            ensureAliasGlobalUnique();
             for (AbstractMigration migration : migrations) {
                 executor.run(migration);
             }
         }
     }
+
+    // PlatformUniqueIndexes rewrites @Column(unique=true) on alias into a (tenant_id, alias)
+    // composite unique index. SQL treats NULL != NULL, so while tenant_id is always null that
+    // composite index does NOT enforce alias global uniqueness. This partial index closes the
+    // gap. When per-tenant migration lands, a sibling partial index "WHERE tenant_id IS NOT
+    // NULL" can be added without conflict.
+    private void ensureAliasGlobalUnique() {
+        operations.execute(ALIAS_GLOBAL_PARTIAL_INDEX);
+    }
 }
+

@@ -178,6 +178,123 @@ class MigrationIT {
         assertThat(migrationRecordService.findByAlias("failure-retry-test").getAppliedVersion()).isEqualTo(3);
     }
 
+    @Test
+    void shouldRejectNullAction() {
+        assertThatThrownBy(() -> new MigrateStep(1, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("action must not be null");
+    }
+
+    @Test
+    void shouldHandleMigrationWithNoSteps() {
+        AbstractMigration empty = new AbstractMigration() {
+            @Override
+            public String getAlias() {
+                return "empty-steps-test";
+            }
+
+            @Override
+            public List<MigrateStep> getMigrateSteps() {
+                return List.of();
+            }
+        };
+
+        migrationExecutor.run(empty);
+
+        assertThat(migrationRecordService.findByAlias("empty-steps-test")).isNull();
+    }
+
+    @Test
+    void shouldTrackIndependentMigrationsSeparately() {
+        List<String> executedA = new ArrayList<>();
+        List<String> executedB = new ArrayList<>();
+
+        AbstractMigration migrationA = new AbstractMigration() {
+            @Override
+            public String getAlias() {
+                return "independent-a";
+            }
+
+            @Override
+            public List<MigrateStep> getMigrateSteps() {
+                return List.of(new MigrateStep(1, () -> executedA.add("a1")));
+            }
+        };
+        AbstractMigration migrationB = new AbstractMigration() {
+            @Override
+            public String getAlias() {
+                return "independent-b";
+            }
+
+            @Override
+            public List<MigrateStep> getMigrateSteps() {
+                return List.of(
+                        new MigrateStep(1, () -> executedB.add("b1")),
+                        new MigrateStep(2, () -> executedB.add("b2"))
+                );
+            }
+        };
+
+        migrationExecutor.run(migrationA);
+        migrationExecutor.run(migrationB);
+
+        assertThat(executedA).containsExactly("a1");
+        assertThat(executedB).containsExactly("b1", "b2");
+        assertThat(migrationRecordService.findByAlias("independent-a").getAppliedVersion()).isEqualTo(1);
+        assertThat(migrationRecordService.findByAlias("independent-b").getAppliedVersion()).isEqualTo(2);
+
+        executedA.clear();
+        executedB.clear();
+        migrationExecutor.run(migrationA);
+        migrationExecutor.run(migrationB);
+
+        assertThat(executedA).isEmpty();
+        assertThat(executedB).isEmpty();
+    }
+
+    @Test
+    void shouldRejectBlankAlias() {
+        MigrationRecord record = new MigrationRecord();
+        record.setAlias("   ");
+        record.setAppliedVersion(1);
+
+        assertThatThrownBy(() -> {
+            try (net.ximatai.muyun.spring.common.tenant.TenantContext.Scope ignored =
+                         net.ximatai.muyun.spring.common.tenant.TenantContext.system("blank alias test")) {
+                migrationRecordService.insert(record);
+            }
+        })
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("alias must not be blank");
+    }
+
+    @Test
+    void shouldEnforceAliasUniquenessAtDatabaseLevel() {
+        MigrationRecord first = new MigrationRecord();
+        first.setAlias("unique-alias-test");
+        first.setAppliedVersion(1);
+        try (net.ximatai.muyun.spring.common.tenant.TenantContext.Scope ignored =
+                     net.ximatai.muyun.spring.common.tenant.TenantContext.system("seed first alias")) {
+            migrationRecordService.insert(first);
+        }
+
+        MigrationRecord duplicate = new MigrationRecord();
+        duplicate.setAlias("unique-alias-test");
+        duplicate.setAppliedVersion(2);
+
+        assertThatThrownBy(() -> {
+            try (net.ximatai.muyun.spring.common.tenant.TenantContext.Scope ignored =
+                         net.ximatai.muyun.spring.common.tenant.TenantContext.system("duplicate alias")) {
+                migrationRecordService.insert(duplicate);
+            }
+        })
+                .hasMessageContaining("migration_record_alias_global_unique")
+                .hasMessageContaining("duplicate key");
+
+        MigrationRecord saved = migrationRecordService.findByAlias("unique-alias-test");
+        assertThat(saved.getAppliedVersion()).isEqualTo(1);
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @EnableTransactionManagement

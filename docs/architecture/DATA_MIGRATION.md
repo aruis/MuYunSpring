@@ -22,14 +22,39 @@
 
 ## 全局版本与多租户预留
 
-第一版是**全局/平台级**迁移：每个 alias 一套版本序列，系统态执行，不按租户划分。版本追踪表 `migration_record` 的 `alias` 字段声明唯一，平台归一化为 `(tenant_id, alias)` 复合唯一索引；当前 `tenant_id` 恒为 null，等价于 alias 全局唯一。
+第一版是**全局/平台级**迁移：每个 alias 一套版本序列，系统态执行，不按租户划分。
 
-升级到按租户独立迁移时，只需：
+### 表结构
 
-1. 提供一个新的 `MigrationVersionStore` 实现（按 `TenantContext` 解析租户维度），替换默认的 `GlobalMigrationVersionStore`。
-2. 版本追踪 Service 从全局作用域改为按租户作用域。
+版本追踪表 `migration_record`：
+- `alias` 列声明 `unique = true`，平台 `PlatformUniqueIndexes` 把它归一化为 `(tenant_id, alias)` 复合唯一索引——这是按租户唯一的标准模式。
+- 当前 `tenant_id` 恒为 null（`MigrationRecordService.normalizeBeforeMutation` 强制），所以"按租户唯一"在全局阶段退化为"按 null 维度唯一"。
 
-**表结构、索引、`AbstractMigration` / `MigrateStep` 签名、迁移类代码都不需要改动。** 这是刻意预留的接缝，不是当前能力。
+### NULL 语义陷阱与 partial unique index
+
+SQL 标准下 `NULL != NULL`，所以 `(tenant_id, alias)` 复合索引在 `tenant_id IS NULL` 时**不强制 alias 全局唯一**——两条 `(NULL, 'foo')` 数据库不会拒绝。
+
+为兜底全局阶段的 alias 唯一性，`MigrationBootstrap` 在 `ensureTable` 之后显式执行：
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS migration_record_alias_global_unique
+ON migration_record (alias) WHERE tenant_id IS NULL
+```
+
+这个 partial unique index 只约束 `tenant_id IS NULL` 的行，与复合索引并存不冲突。`MigrationRecord.alias` 上声明的 `unique = true` 仍然保留——它是未来多租户阶段的契约表达，partial index 是当前阶段的运行时兜底，两者意图互补。
+
+### 升级到按租户迁移
+
+未来按租户独立迁移时，追加一个 sibling partial index：
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS migration_record_tenant_alias_unique
+ON migration_record (tenant_id, alias) WHERE tenant_id IS NOT NULL
+```
+
+配合一个按 `TenantContext` 解析租户维度的 `MigrationVersionStore` 实现替换默认的 `GlobalMigrationVersionStore`。
+
+**表结构、`AbstractMigration` / `MigrateStep` 签名、迁移类代码都不需要改动。** 这是刻意预留的接缝，不是当前能力。
 
 ## 用法
 
