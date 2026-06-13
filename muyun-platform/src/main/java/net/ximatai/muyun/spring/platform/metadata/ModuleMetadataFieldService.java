@@ -252,6 +252,12 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         requireNumericField(field, "measure unit value field");
         moduleField.setUnitCategoryAlias(PlatformNameRules.requireIdentifier(
                 moduleField.getUnitCategoryAlias(), "unitCategoryAlias"));
+        if (hasText(moduleField.getBaseUnitCategoryAlias())) {
+            moduleField.setBaseUnitCategoryAlias(PlatformNameRules.requireIdentifier(
+                    moduleField.getBaseUnitCategoryAlias(), "baseUnitCategoryAlias"));
+        } else {
+            moduleField.setBaseUnitCategoryAlias(moduleField.getUnitCategoryAlias());
+        }
         moduleField.setBaseUnitCode(PlatformNameRules.requireIdentifier(moduleField.getBaseUnitCode(), "baseUnitCode"));
         if (moduleField.getUnitConversionMode() == null) {
             moduleField.setUnitConversionMode(FieldMeasureUnitConversionMode.LINEAR);
@@ -302,6 +308,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         moduleField.setDefaultUnitCode(null);
         moduleField.setUnitFieldId(null);
         moduleField.setBaseValueFieldId(null);
+        moduleField.setBaseUnitCategoryAlias(null);
         moduleField.setBaseUnitCode(null);
         moduleField.setUnitConversionMode(null);
         moduleField.setConversionScopeFieldId(null);

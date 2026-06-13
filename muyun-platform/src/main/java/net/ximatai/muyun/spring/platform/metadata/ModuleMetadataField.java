@@ -79,6 +79,9 @@ public class ModuleMetadataField extends StandardSortableEntity {
     @Column(name = "base_value_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Shadow base value metadata field id")
     private String baseValueFieldId;
 
+    @Column(name = "base_unit_category_alias", type = ColumnType.VARCHAR, length = 64, comment = "Base measure unit category alias")
+    private String baseUnitCategoryAlias;
+
     @Column(name = "base_unit_code", type = ColumnType.VARCHAR, length = 64, comment = "Base measure unit code")
     private String baseUnitCode;
 

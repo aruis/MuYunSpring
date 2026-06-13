@@ -60,7 +60,9 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 
 计量单位被元数据消费时，配置入口在模块字段配置上。主业务字段必须是数值字段，并声明 `unitCategoryAlias`、`baseUnitCode`、单位输入模式、默认单位、换算模式等契约。可选单位字段使用伴生字段表达，字段角色为 `MEASURE_UNIT`，归属于主业务字段；标准值字段使用影子字段表达，字段角色为 `MEASURE_BASE_VALUE`，由平台管理，归属于主业务字段。
 
-典型字段形态是 `quantity`、`quantityUnit`、`quantityBase`：`quantity` 是业务输入值，`quantityUnit` 保存业务单位 code，`quantityBase` 保存按基准单位归一后的数值。发布后，动态 `FieldDefinition.measureUnit` 会暴露单位分类、固定/可选单位模式、伴生字段名、影子字段名、基准单位、换算模式和单位必填约束，供动态运行态、页面配置和后续静态字段契约统一消费。
+典型字段形态是 `quantity`、`quantityUnit`、`quantityBase`：`quantity` 是业务输入值，`quantityUnit` 保存业务单位 code，`quantityBase` 保存按基准单位归一后的数值。发布后，动态 `FieldDefinition.measureUnit` 会暴露单位分类、固定/可选单位模式、伴生字段名、影子字段名、基准单位分类、基准单位、换算模式和单位必填约束，供动态运行态、页面配置和后续静态字段契约统一消费。
+
+动态记录保存和更新时，平台按 `FieldDefinition.measureUnit` 自动计算影子标准值字段。线性换算使用单位目录；业务硬换算使用计量单位换算规则，并可按模块和记录上下文字段选择规则。更新主数值或单位任一字段时都会重新计算标准值；只更新主数值时沿用记录已有单位。旧记录缺少单位且配置了默认单位时，保存链路会补写默认单位；显式清空单位但仍有数量时会被拒绝。记录上下文字段在换算规则中使用 code 风格命名，例如字段 `skuId` 对应 `contextObjectType=sku_id`。
 
 ## 关联专题
 

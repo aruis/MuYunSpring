@@ -184,6 +184,7 @@ public class MetadataFieldDefinitionCompiler {
                 moduleField.getDefaultUnitCode(),
                 fieldName(moduleField.getUnitFieldId()),
                 fieldName(moduleField.getBaseValueFieldId()),
+                moduleField.getBaseUnitCategoryAlias(),
                 moduleField.getBaseUnitCode(),
                 moduleField.getUnitConversionMode(),
                 fieldName(moduleField.getConversionScopeFieldId()),

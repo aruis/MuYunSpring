@@ -224,6 +224,7 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(compiled.measureUnit().defaultUnitCode()).isEqualTo("box");
         assertThat(compiled.measureUnit().unitFieldName()).isEqualTo("quantityUnit");
         assertThat(compiled.measureUnit().baseValueFieldName()).isEqualTo("quantityBase");
+        assertThat(compiled.measureUnit().baseUnitCategoryAlias()).isEqualTo("package");
         assertThat(compiled.measureUnit().baseUnitCode()).isEqualTo("bottle");
         assertThat(compiled.measureUnit().unitRequired()).isTrue();
     }

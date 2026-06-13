@@ -141,7 +141,8 @@ class PlatformModelSchemaTest {
                         "reference_generate_rule_id", "reference_query_template_id",
                         "reference_module_plus_fields", "unit_category_alias", "unit_mode",
                         "fixed_unit_code", "default_unit_code", "unit_field_id", "base_value_field_id",
-                        "base_unit_code", "unit_conversion_mode", "conversion_scope_field_id", "unit_required",
+                        "base_unit_category_alias", "base_unit_code", "unit_conversion_mode",
+                        "conversion_scope_field_id", "unit_required",
                         "title", "sort_order");
         assertThat(columnType(mapper.toTable(ModuleMetadataField.class), "reference_module_plus_fields"))
                 .isEqualTo(ColumnType.JSON_SET);

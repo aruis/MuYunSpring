@@ -7,12 +7,14 @@ public record FieldMeasureUnitDefinition(
         String defaultUnitCode,
         String unitFieldName,
         String baseValueFieldName,
+        String baseUnitCategoryAlias,
         String baseUnitCode,
         FieldMeasureUnitConversionMode conversionMode,
         String conversionScopeFieldName,
         boolean unitRequired
 ) {
     public static final FieldMeasureUnitDefinition NONE = new FieldMeasureUnitDefinition(
+            null,
             null,
             null,
             null,
