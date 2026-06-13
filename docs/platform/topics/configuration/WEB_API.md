@@ -34,6 +34,7 @@
 | 数据字典项目 | `DictionaryItemService` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items` |
 | 计量单位分类 | `MeasureUnitCategoryService` | `/platform.application/{applicationAlias}/measure-unit-categories` |
 | 计量单位 | `MeasureUnitService` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units` |
+| 计量单位换算规则 | `MeasureUnitConversionRuleService` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -127,7 +128,7 @@
 
 ## 计量单位
 
-计量单位分类挂在应用下，单位项目挂在分类下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准。当前换算入口只处理同分类线性换算，依赖记录上下文的硬换算规则不属于本入口。
+计量单位分类挂在应用下，单位项目挂在分类下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准。单位目录换算入口只处理同分类线性换算；跨分类或依赖模块、记录上下文的硬换算由计量单位换算规则入口承接。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
@@ -147,6 +148,14 @@
 | 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/enable/{id}`、`/disable/{id}` | 启用或停用计量单位 |
 | 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/sort/{id}` | 在同一分类内调整单位顺序 |
 | 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/convert` | 按同分类线性换算参数执行单位换算 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/query` | 查询应用下的业务硬换算规则 |
+| 换算规则 | `GET` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/view/{id}` | 查看换算规则，并校验规则属于该应用 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/insert` | 新增换算规则；后端以 URL 中的 `applicationAlias` 为准 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/update/{id}` | 更新换算规则，并保持应用归属不跨应用 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/delete/{id}` | 删除换算规则 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/enable/{id}`、`/disable/{id}` | 启用或停用换算规则 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
 
 ## 菜单配置
 
