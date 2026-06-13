@@ -86,6 +86,10 @@ public class LowCodeModulePackageValidator {
                     requireText(dependency.applicationAlias(), "DICTIONARY dependency applicationAlias");
                     requireText(dependency.alias(), "DICTIONARY dependency alias");
                 }
+                case MEASURE_UNIT -> {
+                    requireText(dependency.applicationAlias(), "MEASURE_UNIT dependency applicationAlias");
+                    requireText(dependency.alias(), "MEASURE_UNIT dependency alias");
+                }
                 case WORKFLOW, FILE_SERVICE, EXTERNAL -> requireText(dependency.alias(), dependency.type() + " dependency alias");
                 default -> throw new IllegalArgumentException("unsupported dependency type: " + dependency.type());
             }

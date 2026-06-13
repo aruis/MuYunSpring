@@ -38,6 +38,11 @@ public record LowCodePackageDependency(
                 applicationAlias, null, dictionaryAlias, true);
     }
 
+    public static LowCodePackageDependency measureUnit(String applicationAlias, String categoryAlias) {
+        return new LowCodePackageDependency(LowCodePackageDependencyType.MEASURE_UNIT,
+                applicationAlias, null, categoryAlias, true);
+    }
+
     private static String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

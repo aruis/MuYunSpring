@@ -65,7 +65,7 @@ public class LowCodePackageDependencyDiagnostics {
         return switch (dependency.type()) {
             case MODULE -> dependency.moduleAlias();
             case ACTION -> dependency.moduleAlias() + ":" + dependency.alias();
-            case DICTIONARY -> dependency.applicationAlias() + ":" + dependency.alias();
+            case DICTIONARY, MEASURE_UNIT -> dependency.applicationAlias() + ":" + dependency.alias();
             case WORKFLOW, FILE_SERVICE, EXTERNAL -> dependency.alias();
         };
     }
