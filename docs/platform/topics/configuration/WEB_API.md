@@ -32,6 +32,8 @@
 | 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
 | 数据字典类目 | `DictionaryCategoryService` | `/platform.application/{applicationAlias}/dictionary-categories` |
 | 数据字典项目 | `DictionaryItemService` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items` |
+| 计量单位分类 | `MeasureUnitCategoryService` | `/platform.application/{applicationAlias}/measure-unit-categories` |
+| 计量单位 | `MeasureUnitService` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -122,6 +124,29 @@
 | 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/delete/{id}` | 删除字典项目 |
 | 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/enable/{id}`、`/disable/{id}` | 启用或停用字典项目 |
 | 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/sort/{id}` | 在同一类目和父项目范围内调整项目顺序 |
+
+## 计量单位
+
+计量单位分类挂在应用下，单位项目挂在分类下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准。当前换算入口只处理同分类线性换算，依赖记录上下文的硬换算规则不属于本入口。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/query` | 查询应用下的计量单位分类 |
+| 计量单位分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/view/{id}` | 查看计量单位分类，并校验分类属于该应用 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/insert` | 新增计量单位分类；后端以 URL 中的 `applicationAlias` 为准 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/update/{id}` | 更新计量单位分类，并保持应用归属不跨应用 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/delete/{id}` | 删除计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/enable/{id}`、`/disable/{id}` | 启用或停用计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/sort/{id}` | 在同一应用内调整分类顺序 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/query` | 查询分类下的计量单位 |
+| 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/options` | 获取分类下的单位候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/view/{id}` | 查看计量单位，并校验单位属于该分类 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/insert` | 新增计量单位；后端以 URL 中的应用和分类为准 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/update/{id}` | 更新计量单位，并保持分类归属不跨分类 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/delete/{id}` | 删除计量单位 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/enable/{id}`、`/disable/{id}` | 启用或停用计量单位 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/sort/{id}` | 在同一分类内调整单位顺序 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/convert` | 按同分类线性换算参数执行单位换算 |
 
 ## 菜单配置
 
