@@ -21,15 +21,7 @@ public class GlobalMigrationVersionStore implements MigrationVersionStore {
 
     @Override
     public void recordVersion(String alias, int version) {
-        MigrationRecord record = recordService.findByAlias(alias);
-        if (record == null) {
-            MigrationRecord created = new MigrationRecord();
-            created.setAlias(alias);
-            created.setAppliedVersion(version);
-            recordService.insert(created);
-        } else {
-            record.setAppliedVersion(version);
-            recordService.update(record);
-        }
+        recordService.upsertAliasVersion(alias, version);
     }
 }
+

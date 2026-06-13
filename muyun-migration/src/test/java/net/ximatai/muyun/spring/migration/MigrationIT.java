@@ -1,10 +1,14 @@
 package net.ximatai.muyun.spring.migration;
 
+import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.spring.boot.sql.annotation.EnableMuYunRepositories;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -13,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -49,6 +54,18 @@ class MigrationIT {
 
     @Autowired
     TestMigration testMigration;
+
+    @Autowired
+    StaticSchemaService schemaService;
+
+    @Autowired
+    IDatabaseOperations<?> operations;
+
+    @Autowired
+    MigrationVersionStore versionStore;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     void shouldRunMigrationOnStartupAndTransformData() {
@@ -293,6 +310,64 @@ class MigrationIT {
         MigrationRecord saved = migrationRecordService.findByAlias("unique-alias-test");
         assertThat(saved).isNotNull();
         assertThat(saved.getAppliedVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldUpsertWhenAliasAlreadyExists() {
+        MigrationRecord first = new MigrationRecord();
+        first.setAlias("upsert-test");
+        first.setAppliedVersion(1);
+        try (TenantContext.Scope ignored = TenantContext.system("seed first alias")) {
+            migrationRecordService.insert(first);
+        }
+
+        migrationRecordService.upsertAliasVersion("upsert-test", 5);
+
+        MigrationRecord saved = migrationRecordService.findByAlias("upsert-test");
+        assertThat(saved).isNotNull();
+        assertThat(saved.getAppliedVersion()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldRunBootstrapEndToEndAndStayIdempotent() {
+        List<Integer> executed = new ArrayList<>();
+        AbstractMigration newMigration = new AbstractMigration() {
+            @Override
+            public String getAlias() {
+                return "bootstrap-path-test";
+            }
+
+            @Override
+            public List<MigrateStep> getMigrateSteps() {
+                return List.of(new MigrateStep(1, () -> executed.add(1)));
+            }
+        };
+
+        MigrationExecutor freshExecutor = new MigrationExecutor(versionStore, transactionManager);
+        MigrationBootstrap bootstrap = new MigrationBootstrap(
+                schemaService, operations, freshExecutor, List.of(newMigration)
+        );
+
+        bootstrap.run(new DefaultApplicationArguments());
+
+        assertThat(executed).containsExactly(1);
+        MigrationRecord record = migrationRecordService.findByAlias("bootstrap-path-test");
+        assertThat(record).isNotNull();
+        assertThat(record.getAppliedVersion()).isEqualTo(1);
+
+        executed.clear();
+        bootstrap.run(new DefaultApplicationArguments());
+        assertThat(executed).isEmpty();
+    }
+
+    @Test
+    void shouldShortCircuitWhenMigrationsListIsEmpty() {
+        MigrationExecutor freshExecutor = new MigrationExecutor(versionStore, transactionManager);
+        MigrationBootstrap bootstrap = new MigrationBootstrap(
+                schemaService, operations, freshExecutor, List.of()
+        );
+
+        bootstrap.run(new DefaultApplicationArguments());
     }
 
     @SpringBootConfiguration
