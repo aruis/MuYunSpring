@@ -21,5 +21,6 @@ include(
     "muyun-dynamic",
     "muyun-platform",
     "muyun-iam",
+    "muyun-migration",
     "muyun-boot"
 )
