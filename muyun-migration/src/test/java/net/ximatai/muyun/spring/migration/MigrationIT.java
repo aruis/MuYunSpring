@@ -21,6 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -134,6 +135,47 @@ class MigrationIT {
 
         assertThat(executed).containsExactly(1, 2, 3);
         assertThat(migrationRecordService.findByAlias("order-test").getAppliedVersion()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldStopAtFailedStepAndRetryOnNextRun() {
+        List<Integer> executed = new ArrayList<>();
+        AtomicBoolean shouldFail = new AtomicBoolean(true);
+
+        AbstractMigration migration = new AbstractMigration() {
+            @Override
+            public String getAlias() {
+                return "failure-retry-test";
+            }
+
+            @Override
+            public List<MigrateStep> getMigrateSteps() {
+                return List.of(
+                        new MigrateStep(1, () -> executed.add(1)),
+                        new MigrateStep(2, () -> {
+                            executed.add(2);
+                            if (shouldFail.get()) {
+                                throw new RuntimeException("step 2 boom");
+                            }
+                        }),
+                        new MigrateStep(3, () -> executed.add(3))
+                );
+            }
+        };
+
+        assertThatThrownBy(() -> migrationExecutor.run(migration))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("step 2 boom");
+        assertThat(executed).containsExactly(1, 2);
+        MigrationRecord afterFailure = migrationRecordService.findByAlias("failure-retry-test");
+        assertThat(afterFailure).isNotNull();
+        assertThat(afterFailure.getAppliedVersion()).isEqualTo(1);
+
+        executed.clear();
+        shouldFail.set(false);
+        migrationExecutor.run(migration);
+        assertThat(executed).containsExactly(2, 3);
+        assertThat(migrationRecordService.findByAlias("failure-retry-test").getAppliedVersion()).isEqualTo(3);
     }
 
     @SpringBootConfiguration
