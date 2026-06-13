@@ -213,6 +213,8 @@
 
 模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时必须绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 必须绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
 
+模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
+
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/query` | 查询模块动作 |
@@ -244,6 +246,7 @@
 | 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/sort/{id}` | 在视图内调整字段顺序 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/query` | 查询关系下的模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/ensure` | 按元数据字段同步生成模块字段配置 |
+| 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{id}/measure-unit/prepare` | 为主数值字段准备单位伴生字段、标准值影子字段并回填计量单位配置 |
 | 模块字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/view/{id}` | 查看模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/insert` | 新增模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/update/{id}` | 更新模块字段配置 |

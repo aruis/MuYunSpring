@@ -1141,6 +1141,147 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    void shouldPrepareMeasureUnitCompanionAndShadowFieldsForModuleField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+
+        ModuleMetadataMeasureUnitPrepareResult result = moduleFieldService.prepareMeasureUnitConfig(
+                moduleField.getId(),
+                new ModuleMetadataMeasureUnitPrepareCommand(
+                        "package",
+                        FieldMeasureUnitMode.SELECTABLE,
+                        null,
+                        "box",
+                        null,
+                        null,
+                        null,
+                        "bottle",
+                        FieldMeasureUnitConversionMode.LINEAR,
+                        null,
+                        true,
+                        null,
+                        null
+                ));
+
+        assertThat(result.unitField().getFieldName()).isEqualTo("quantityUnit");
+        assertThat(result.unitField().getColumnName()).isEqualTo("quantity_unit");
+        assertThat(result.unitField().getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
+        assertThat(result.unitField().getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_UNIT);
+        assertThat(result.unitField().getOwnerFieldId()).isEqualTo(quantity.getId());
+        assertThat(result.baseValueField().getFieldName()).isEqualTo("quantityBase");
+        assertThat(result.baseValueField().getColumnName()).isEqualTo("quantity_base");
+        assertThat(result.baseValueField().getFieldForm()).isEqualTo(MetadataFieldForm.SHADOW);
+        assertThat(result.baseValueField().getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_BASE_VALUE);
+        assertThat(result.baseValueField().getSystemManaged()).isTrue();
+        assertThat(result.moduleField().getUnitCategoryAlias()).isEqualTo("package");
+        assertThat(result.moduleField().getUnitFieldId()).isEqualTo(result.unitField().getId());
+        assertThat(result.moduleField().getBaseValueFieldId()).isEqualTo(result.baseValueField().getId());
+        assertThat(result.moduleField().getBaseUnitCategoryAlias()).isEqualTo("package");
+        assertThat(result.moduleField().getBaseUnitCode()).isEqualTo("bottle");
+    }
+
+    @Test
+    void shouldReusePreparedMeasureUnitFieldsWithoutDuplicatingMetadataFields() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        ModuleMetadataMeasureUnitPrepareCommand command = new ModuleMetadataMeasureUnitPrepareCommand(
+                "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
+                null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null);
+
+        ModuleMetadataMeasureUnitPrepareResult first =
+                moduleFieldService.prepareMeasureUnitConfig(moduleField.getId(), command);
+        ModuleMetadataMeasureUnitPrepareResult second =
+                moduleFieldService.prepareMeasureUnitConfig(moduleField.getId(), command);
+
+        assertThat(second.unitField().getId()).isEqualTo(first.unitField().getId());
+        assertThat(second.baseValueField().getId()).isEqualTo(first.baseValueField().getId());
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("quantity", "quantityUnit", "quantityBase");
+    }
+
+    @Test
+    void shouldPrepareFixedMeasureUnitWithoutCompanionUnitField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+
+        ModuleMetadataMeasureUnitPrepareResult result = moduleFieldService.prepareMeasureUnitConfig(
+                moduleField.getId(),
+                new ModuleMetadataMeasureUnitPrepareCommand(
+                        "package", FieldMeasureUnitMode.FIXED, "box", null, null, null,
+                        null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
+                ));
+
+        assertThat(result.unitField()).isNull();
+        assertThat(result.baseValueField().getFieldName()).isEqualTo("quantityBase");
+        assertThat(result.moduleField().getUnitMode()).isEqualTo(FieldMeasureUnitMode.FIXED);
+        assertThat(result.moduleField().getFixedUnitCode()).isEqualTo("box");
+        assertThat(result.moduleField().getUnitFieldId()).isNull();
+    }
+
+    @Test
+    void shouldRejectPrepareMeasureUnitBeforeCreatingFieldsWhenConfigIsInvalid() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.prepareMeasureUnitConfig(
+                moduleField.getId(),
+                new ModuleMetadataMeasureUnitPrepareCommand(
+                        "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
+                        null, null, FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
+                )))
+                .hasMessageContaining("baseUnitCode");
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("quantity");
+    }
+
+    @Test
+    void shouldRejectPrepareMeasureUnitWhenRelatedFieldsAreDuplicated() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField firstUnit = field(metadataId, "quantityUnit", "quantity_unit", FieldType.STRING);
+        firstUnit.setFieldForm(MetadataFieldForm.COMPANION);
+        firstUnit.setFieldRole(MetadataFieldRole.MEASURE_UNIT);
+        firstUnit.setOwnerFieldId(quantity.getId());
+        fieldService.insert(firstUnit);
+        MetadataField secondUnit = field(metadataId, "quantityUnit2", "quantity_unit2", FieldType.STRING);
+        secondUnit.setFieldForm(MetadataFieldForm.COMPANION);
+        secondUnit.setFieldRole(MetadataFieldRole.MEASURE_UNIT);
+        secondUnit.setOwnerFieldId(quantity.getId());
+        fieldService.insert(secondUnit);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.prepareMeasureUnitConfig(
+                moduleField.getId(),
+                new ModuleMetadataMeasureUnitPrepareCommand(
+                        "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
+                        null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
+                )))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("must be unique");
+    }
+
+    @Test
     void shouldRejectMeasureUnitConfigWithoutCompanionUnitField() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
