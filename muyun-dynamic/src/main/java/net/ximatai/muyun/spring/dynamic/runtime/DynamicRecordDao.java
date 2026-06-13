@@ -1,13 +1,10 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
-import net.ximatai.muyun.database.core.builder.sql.SchemaBuildRules;
-import net.ximatai.muyun.database.core.metadata.DBInfo;
-import net.ximatai.muyun.database.core.orm.CompiledCriteria;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.CriteriaSqlCompiler;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.database.core.orm.RuntimeTableGateway;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -23,7 +20,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +30,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     private final EntityDefinition entity;
     private final String schema;
     private final DynamicRecordMapping mapping;
-    private final CriteriaSqlCompiler criteriaSqlCompiler = new CriteriaSqlCompiler();
+    private final RuntimeTableGateway tableGateway;
 
     @SuppressWarnings("unchecked")
     public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity) {
@@ -43,6 +39,8 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         this.entity = entity;
         this.schema = entity.schemaName();
         this.mapping = new DynamicRecordMapping(entity);
+        this.tableGateway = new RuntimeTableGateway(this.operations, this.schema, entity.tableName(),
+                mapping::resolveQueryableColumn);
     }
 
     @Override
@@ -114,16 +112,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     @Override
     public List<DynamicRecord> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         Objects.requireNonNull(pageRequest, "pageRequest must not be null");
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveQueryableColumn, databaseType());
-        StringBuilder sql = selectSql(compiled.getSql());
-        appendOrderBy(sql, sorts);
-        sql.append(" LIMIT :limit OFFSET :offset");
-
-        Map<String, Object> params = new HashMap<>(compiled.getParams());
-        params.put("limit", pageRequest.getLimit());
-        params.put("offset", pageRequest.getOffset());
-
-        return operations.query(sql.toString(), params).stream()
+        return tableGateway.queryColumns(criteria, pageRequest, sorts).stream()
                 .map(this::fromColumnMap)
                 .toList();
     }
@@ -145,14 +134,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public long count(Criteria criteria) {
-        CompiledCriteria compiled = criteriaSqlCompiler.compile(criteria, mapping::resolveQueryableColumn, databaseType());
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS total_count FROM ")
-                .append(qualifiedTable());
-        if (!compiled.getSql().isBlank()) {
-            sql.append(" WHERE ").append(compiled.getSql());
-        }
-        Map<String, Object> row = operations.row(sql.toString(), compiled.getParams());
-        return resolveCount(row);
+        return tableGateway.count(criteria);
     }
 
     @Override
@@ -254,53 +236,6 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         }
         fields.addAll(FieldCompanionRules.recordFields(entity));
         return fields;
-    }
-
-    private StringBuilder selectSql(String whereSql) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(qualifiedTable());
-        if (!whereSql.isBlank()) {
-            sql.append(" WHERE ").append(whereSql);
-        }
-        return sql;
-    }
-
-    private void appendOrderBy(StringBuilder sql, Sort... sorts) {
-        if (sorts == null || sorts.length == 0) {
-            return;
-        }
-        List<String> parts = java.util.Arrays.stream(sorts)
-                .filter(Objects::nonNull)
-                .map(sort -> quote(mapping.resolveQueryableColumn(sort.getField())) + " " + sort.getDirection().name())
-                .toList();
-        if (!parts.isEmpty()) {
-            sql.append(" ORDER BY ").append(String.join(", ", parts));
-        }
-    }
-
-    private String qualifiedTable() {
-        return SchemaBuildRules.qualifiedName(schema, entity.tableName(), databaseType());
-    }
-
-    private String quote(String identifier) {
-        return SchemaBuildRules.quoteIdentifier(identifier, databaseType());
-    }
-
-    private DBInfo.Type databaseType() {
-        return operations.getDBInfo().getDatabaseType();
-    }
-
-    private long resolveCount(Map<String, Object> row) {
-        if (row == null || row.isEmpty()) {
-            return 0L;
-        }
-        Object value = row.get("total_count");
-        if (value == null) {
-            value = row.values().iterator().next();
-        }
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        return Long.parseLong(String.valueOf(value));
     }
 
     private Integer numberValue(Object value) {
