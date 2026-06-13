@@ -143,9 +143,9 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 .run(context -> {
                     @SuppressWarnings("unchecked")
                     IDatabaseOperations<Object> operations = context.getBean(IDatabaseOperations.class);
-                    when(operations.insertItem(eq("public"), eq("app_contract"), anyMap()))
+                    when(operations.insertItem(eq("public"), eq("app_contract"), anyMap(), eq("id")))
                             .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
-                    when(operations.patchUpdateItemWhere(eq("public"), eq("app_contract"), anyMap(), anyMap()))
+                    when(operations.patchUpdateItemWhere(eq("public"), eq("app_contract"), anyMap(), anyMap(), eq("id")))
                             .thenReturn(1);
                     when(operations.query(anyString(), anyMap()))
                             .thenReturn(List.of(contractRow("contract-1")));

@@ -64,7 +64,7 @@ class RuntimeActionExecutionClosureTest {
     @Test
     void shouldAuditSuccessfulContractSubmitActionAsCompleteRuntimeClosure() {
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(contractRow("contract-1", "draft", BigDecimal.TEN)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         DynamicRecord draft = contract("contract-1", "draft", BigDecimal.TEN);
 
         DynamicActionExecutionResult result = recordService.entity(MODULE, "contract")
@@ -77,7 +77,7 @@ class RuntimeActionExecutionClosureTest {
         assertThat(result.body().refresh()).isTrue();
         assertThat(result.context().recordId()).isEqualTo("contract-1");
         ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.captor();
-        verify(operations).patchUpdateItemWhere(eq("public"), eq("app_contract"), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq("public"), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue()).containsEntry("status", "submitted");
 
         List<RuntimeAuditRecord> trace = auditService.traceEvents(result.context().traceId(), PageRequest.of(1, 10));
@@ -107,7 +107,7 @@ class RuntimeActionExecutionClosureTest {
     @Test
     void shouldAuditActingContextForActionAndMutationEvents() {
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(contractRow("contract-1", "draft", BigDecimal.TEN)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         DynamicRecord draft = contract("contract-1", "draft", BigDecimal.TEN);
         CurrentUser operator = CurrentUser.tenantUser("assistant-user", "Assistant", "tenant-a");
         BusinessPrincipal principal = BusinessPrincipal.employeePosition(

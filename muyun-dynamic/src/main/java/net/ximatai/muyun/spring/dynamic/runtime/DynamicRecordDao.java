@@ -53,7 +53,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     @Override
     public String insert(DynamicRecord record) {
         requireSameEntity(record);
-        Object id = operations.insertItem(schema, entity.tableName(), toColumnMap(record, false));
+        Object id = operations.insertItem(schema, entity.tableName(), toColumnMap(record, false), StandardEntitySchema.ID_COLUMN);
         if (id != null) {
             record.setId(String.valueOf(id));
         }
@@ -94,7 +94,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
             where.put(StandardEntitySchema.TENANT_ID_COLUMN, record.getTenantId());
         }
         where.put(StandardEntitySchema.ID_COLUMN, record.getId());
-        return operations.patchUpdateItemWhere(schema, entity.tableName(), body, where);
+        return operations.patchUpdateItemWhere(schema, entity.tableName(), body, where, StandardEntitySchema.ID_COLUMN);
     }
 
     @Override

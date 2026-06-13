@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -62,11 +64,25 @@ public class DynamicModulePublisher {
                                         "changed", entry.getValue().isChanged(),
                                         "dryRun", entry.getValue().isDryRun(),
                                         "nonAdditiveChanges", entry.getValue().hasNonAdditiveChanges(),
-                                        "statements", entry.getValue().getStatements()
+                                        "statements", entry.getValue().getStatements(),
+                                        "changes", migrationChanges(entry.getValue())
                                 ))
                                 .toList(),
                         "nonAdditiveChanges", result.hasNonAdditiveChanges()
                 )
         ));
+    }
+
+    private List<Map<String, Object>> migrationChanges(MigrationResult result) {
+        return result.getChanges().stream()
+                .map(change -> {
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put("type", change.getType().name());
+                    payload.put("target", change.getTarget());
+                    payload.put("sql", change.getSql());
+                    payload.put("nonAdditive", change.isNonAdditive());
+                    return payload;
+                })
+                .toList();
     }
 }

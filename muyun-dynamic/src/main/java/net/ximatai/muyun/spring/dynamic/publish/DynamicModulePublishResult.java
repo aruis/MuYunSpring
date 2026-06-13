@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.publish;
 
+import net.ximatai.muyun.database.core.orm.MigrationChange;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 
@@ -36,6 +37,16 @@ public record DynamicModulePublishResult(
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> entry.getValue().getStatements(),
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+    }
+
+    public Map<String, List<MigrationChange>> changesByEntity() {
+        return migrations.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().getChanges(),
                         (left, right) -> left,
                         LinkedHashMap::new
                 ));

@@ -41,7 +41,7 @@ class DynamicStaticCrudConsistencyTest {
     @Test
     void shouldMatchStaticCrudDefaultsForInsertUpdateSoftDeleteAndActiveQuery() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
@@ -73,7 +73,7 @@ class DynamicStaticCrudConsistencyTest {
         }
 
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture(), eq("id"));
         assertThat(insertBody.getValue())
                 .containsEntry("id", id)
                 .containsEntry("tenant_id", "tenant-a")
@@ -86,7 +86,7 @@ class DynamicStaticCrudConsistencyTest {
 
         ArgumentCaptor<Map<String, Object>> patchBody = mapCaptor();
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), patchBody.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), patchBody.capture(), anyMap(), eq("id"));
         assertThat(patchBody.getAllValues().get(0))
                 .containsEntry("version", 1)
                 .containsEntry("updated_by", "operator-1")
@@ -109,7 +109,7 @@ class DynamicStaticCrudConsistencyTest {
     @Test
     void shouldKeepDynamicAuditOperatorAsActualUserWhenActing() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, contractEntity()),
                 "sales.contract");
@@ -127,7 +127,7 @@ class DynamicStaticCrudConsistencyTest {
         }
 
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture(), eq("id"));
         assertThat(insertBody.getValue())
                 .containsEntry("created_by", "assistant-user")
                 .containsEntry("updated_by", "assistant-user");
@@ -138,7 +138,7 @@ class DynamicStaticCrudConsistencyTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

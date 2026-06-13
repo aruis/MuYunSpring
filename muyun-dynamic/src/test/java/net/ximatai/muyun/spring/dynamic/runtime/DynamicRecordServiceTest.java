@@ -81,7 +81,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldRunCrudThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
@@ -103,9 +103,9 @@ class DynamicRecordServiceTest {
         assertThat(service.selectIgnoreSoftDelete(MODULE, "contract", id)).isNotNull();
         service.deleteBatch(MODULE, "contract", List.of(id));
 
-        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id"));
         verify(operations, org.mockito.Mockito.times(3))
-                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(sql.capture(), anyMap());
         assertThat(sql.getAllValues()).anySatisfy(value -> assertThat(value)
@@ -117,7 +117,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldExposeMutationMetadataToCoordinatorDuringCreate() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         AtomicReference<Object> captured = new AtomicReference<>();
         DynamicRecordMutationCoordinator coordinator = new DynamicRecordMutationCoordinator() {
@@ -149,7 +149,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldPublishMutationSnapshotEventsToCoordinator() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
         List<DynamicRecordMutationEvent> events = new ArrayList<>();
@@ -233,7 +233,7 @@ class DynamicRecordServiceTest {
     void shouldBypassBusinessDataScopeForWriteBackUpdate() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("hidden", "C-001", 0, false)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = service(operations, dataScopedActionEntity(), events,
                 new FailingDataScopeCriteriaService());
@@ -243,7 +243,7 @@ class DynamicRecordServiceTest {
         assertThat(service.updateWriteBack(MODULE, "contract", record,
                 new DynamicWriteBackContext("trace-wb", 1, "exec-1", false))).isEqualTo(1);
 
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
         assertThat(events.events()).singleElement()
                 .satisfies(event -> {
                     assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.WRITE_BACK);
@@ -254,7 +254,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldExposeWriteBackContextOnCreateRuntimeRecordEventPayload() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = service(operations, contractEntity(), events);
@@ -309,7 +309,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldBindEntityOperationsForBusinessScopedCalls() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
         DynamicRecordService service = service(operations, contractEntity());
@@ -323,8 +323,8 @@ class DynamicRecordServiceTest {
         assertThat(contracts.select("contract-1").getValue("code")).isEqualTo("C-001");
         contracts.delete("contract-1");
 
-        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id"));
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
     }
 
     @Test
@@ -413,7 +413,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldExecuteStandardCreateActionThroughStableActionApi() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordService service = actionService(operations);
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -431,13 +431,13 @@ class DynamicRecordServiceTest {
         assertThat(result.context().entityAlias()).isEqualTo("contract");
         assertThat(result.context().actionCode()).isEqualTo("create");
         assertThat(result.context().availability().available()).isTrue();
-        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id"));
     }
 
     @Test
     void shouldExposeGeneratedRecordIdInCreateActionContext() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordService service = actionService(operations);
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -454,7 +454,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldPublishActionExecutionEventAfterStandardAction() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = actionService(operations, events);
@@ -532,7 +532,7 @@ class DynamicRecordServiceTest {
         assertThat(result.context().action().actionLevel()).isEqualTo(EntityActionLevel.BATCH);
         assertThat(result.context().authorizationPermissionActionCode()).isEqualTo("delete");
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
         assertThat(events.events()).extracting(RuntimeEvent::eventType)
                 .contains(RuntimeEventType.AFTER_DELETE, RuntimeEventType.ACTION_EXECUTED);
         RuntimeEvent action = events.events().getLast();
@@ -630,7 +630,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("create denied");
 
-        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap(), anyString());
     }
 
     @Test
@@ -743,7 +743,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("record data permission denied");
 
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -764,7 +764,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(DynamicActionExecutionException.class)
                 .hasMessageContaining("record data permission denied");
 
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -852,7 +852,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("record data permission denied");
 
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -874,7 +874,7 @@ class DynamicRecordServiceTest {
         assertThatThrownBy(() -> service.moveBefore(MODULE, "contract", "hidden", "visible"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("record data permission denied");
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -893,10 +893,10 @@ class DynamicRecordServiceTest {
         assertThatThrownBy(() -> service.moveInTree(MODULE, "contract", "hidden", "visible", null, "root"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("record data permission denied");
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
 
         service.moveInTree(MODULE, "contract", "visible", null, null, "root");
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
     }
 
     @Test
@@ -924,7 +924,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("record data permission denied");
 
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -956,7 +956,7 @@ class DynamicRecordServiceTest {
             assertThat(TenantContext.tenantFilterBypassed()).isFalse();
         }
 
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -1010,7 +1010,7 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("record data permission denied");
 
         assertThat(service.enable(MODULE, "contract", "visible")).isEqualTo(1);
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
     }
 
     @Test
@@ -1310,7 +1310,7 @@ class DynamicRecordServiceTest {
     void shouldExposeCurrentEntityOperationsToServiceActionWithSameTrace() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = actionService(operations, events, new WritingActionExecutor());
         DynamicRecord draft = service.newRecord(MODULE, "contract")
@@ -1324,7 +1324,7 @@ class DynamicRecordServiceTest {
         assertThat(result.body().type()).isEqualTo(DynamicActionResultType.COUNT);
         assertThat(result.value()).isEqualTo(1);
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue()).containsEntry("status", "submitted");
         assertThat(events.events()).extracting(RuntimeEvent::eventType)
                 .containsExactly(RuntimeEventType.AFTER_UPDATE, RuntimeEventType.ACTION_EXECUTED);
@@ -1336,7 +1336,7 @@ class DynamicRecordServiceTest {
     void shouldExecuteServiceActionInsideConfiguredTransactionOperator() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(actionRow("contract-1", "C-001", "draft")));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         RecordingActionTransactionOperator transactionOperator = new RecordingActionTransactionOperator();
         DynamicRecordService service = actionService(operations, RuntimeEventPublisher.noop(), new WritingActionExecutor(),
                 submitActionWithExecutorKey("contractSubmit"), transactionOperator);
@@ -1690,7 +1690,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldNotPublishActionFailureWhenSuccessEventPublisherFails() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         ThrowingActionEventPublisher events = new ThrowingActionEventPublisher();
         DynamicRecordService service = actionService(operations, events);
@@ -1709,7 +1709,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldNotPublishActionFailureWhenSuccessEventFailsAfterActionTransactionCommits() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         ThrowingActionEventPublisher events = new ThrowingActionEventPublisher();
         SpringLikeActionTransactionOperator transactionOperator = new SpringLikeActionTransactionOperator();
@@ -1732,7 +1732,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldNotPublishActionFailureWhenMutationEventFailsAfterActionTransactionCommits() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         ThrowingMutationEventPublisher events = new ThrowingMutationEventPublisher();
         SpringLikeActionTransactionOperator transactionOperator = new SpringLikeActionTransactionOperator();
@@ -1844,7 +1844,7 @@ class DynamicRecordServiceTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(3))
-                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getAllValues()).allSatisfy(value -> assertThat(value).containsKey("sort_order"));
     }
 
@@ -2465,7 +2465,7 @@ class DynamicRecordServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dynamic reference target not found")
                 .hasMessageContaining("sales.contract.contract.deleted-contract");
-        verify(operations, org.mockito.Mockito.never()).insertItem(anyString(), anyString(), anyMap());
+        verify(operations, org.mockito.Mockito.never()).insertItem(anyString(), anyString(), anyMap(), anyString());
     }
 
     @Test
@@ -2504,7 +2504,7 @@ class DynamicRecordServiceTest {
         AtomicReference<Boolean> enabled = new AtomicReference<>(Boolean.FALSE);
         when(operations.query(anyString(), anyMap()))
                 .thenAnswer(invocation -> List.of(enabledRow("contract-1", enabled.get())));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap()))
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString()))
                 .thenAnswer(invocation -> {
                     enabled.set((Boolean) invocation.<Map<String, Object>>getArgument(2).get("enabled"));
                     return 1;
@@ -2521,7 +2521,7 @@ class DynamicRecordServiceTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getAllValues().get(0)).containsEntry("enabled", Boolean.TRUE);
         assertThat(body.getAllValues().get(1)).containsEntry("enabled", Boolean.FALSE);
 
@@ -2546,14 +2546,14 @@ class DynamicRecordServiceTest {
         assertThat(result.body().refresh()).isTrue();
         assertThat(result.context().recordId()).isEqualTo("contract-1");
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
     }
 
     @Test
     void shouldPublishRecordMutationEventsThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("contract-1", "C-001", 0, false)));
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
@@ -2604,7 +2604,7 @@ class DynamicRecordServiceTest {
     void shouldBypassBusinessDataScopeForSystemUpdate() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("hidden", "C-001", 0, false)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = service(operations, dataScopedActionEntity(), events,
                 new FailingDataScopeCriteriaService());
@@ -2614,7 +2614,7 @@ class DynamicRecordServiceTest {
 
         assertThat(service.updateSystem(MODULE, "contract", record, "workflow submit")).isEqualTo(1);
 
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), anyMap(), anyMap(), eq("id"));
         assertThat(events.events()).singleElement()
                 .satisfies(event -> {
                     assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
@@ -2650,7 +2650,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldPublishRuntimeEventAfterCommitWhenTransactionIsActive() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = service(operations, contractEntity(), events);
@@ -2678,7 +2678,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldNotPublishRuntimeEventAfterRollback() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordService service = service(operations, contractEntity(), events);
@@ -2759,7 +2759,7 @@ class DynamicRecordServiceTest {
     @Test
     void shouldValidateDictionaryBoundFieldThroughRuntimeValidator() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicFieldValueValidator validator = (moduleAlias, entity, field, value) -> {
             FieldDictionaryBinding binding = field.dictionaryBinding();
@@ -2801,13 +2801,13 @@ class DynamicRecordServiceTest {
                     assertThat(exception.firstError().ruleId()).isEqualTo("amountPositive");
                     assertThat(exception.firstError().fieldPath()).isEqualTo("amount");
                 });
-        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap(), anyString());
     }
 
     @Test
     void shouldKeepFormulaWarningsOnRecordThroughStableServiceApi() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordService service = service(operations, formulaWarningEntity());
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -2823,13 +2823,13 @@ class DynamicRecordServiceTest {
                     assertThat(issue.ruleId()).isEqualTo("amountHighRisk");
                     assertThat(issue.message()).isEqualTo("amount is high");
                 });
-        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id"));
     }
 
     @Test
     void shouldApplyFieldDefaultAndRejectWriteProtectedInput() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_contract"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordService service = service(operations, behaviorEntity());
         DynamicRecord record = service.newRecord(MODULE, "contract")
@@ -2848,7 +2848,7 @@ class DynamicRecordServiceTest {
                 .hasMessageContaining("write protected");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_contract"), body.capture(), eq("id"));
         assertThat(body.getValue()).containsEntry("status", "draft");
         assertThat(body.getValue()).doesNotContainKey("server_code");
     }
@@ -2872,13 +2872,13 @@ class DynamicRecordServiceTest {
     void shouldAllowPlatformAbilityWriteOnWriteProtectedField() {
         IDatabaseOperations<Object> operations = operations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(enabledRow("contract-1", false)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         DynamicRecordService service = service(operations, writeProtectedEnabledEntity());
 
         assertThat(service.enable(MODULE, "contract", "contract-1")).isEqualTo(1);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq("app_contract"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
     }
 
@@ -2888,7 +2888,7 @@ class DynamicRecordServiceTest {
         AtomicReference<String> storedCode = new AtomicReference<>("C-001");
         when(operations.query(anyString(), anyMap()))
                 .thenAnswer(invocation -> List.of(row("contract-1", storedCode.get(), 0, false)));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap()))
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString()))
                 .thenAnswer(invocation -> {
                     storedCode.set(String.valueOf(invocation.<Map<String, Object>>getArgument(2).get("code")));
                     return 1;
@@ -2980,7 +2980,8 @@ class DynamicRecordServiceTest {
         }
 
         verify(operations).patchUpdateItemWhere(anyString(), anyString(), anyMap(),
-                org.mockito.ArgumentMatchers.argThat(where -> "tenant-b".equals(where.get("tenant_id"))));
+                org.mockito.ArgumentMatchers.argThat(where -> "tenant-b".equals(where.get("tenant_id"))),
+                anyString());
     }
 
     @Test
@@ -3068,7 +3069,7 @@ class DynamicRecordServiceTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

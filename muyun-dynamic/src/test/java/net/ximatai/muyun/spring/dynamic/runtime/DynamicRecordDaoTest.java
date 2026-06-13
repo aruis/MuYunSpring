@@ -61,7 +61,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldInsertWithTableColumnsAndEntityDefaults() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecord record = new DynamicRecord(contractEntity())
                 .setValue("code", "C-001")
@@ -71,7 +71,7 @@ class DynamicRecordDaoTest {
         String id = entityService(operations).insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(id).hasSize(32);
         assertThat(body.getValue())
                 .containsEntry("id", id)
@@ -95,20 +95,20 @@ class DynamicRecordDaoTest {
                 List.of(FieldDefinition.string("code", "Code")),
                 java.util.Set.of(EntityCapability.CRUD)
         );
-        when(operations.insertItem(eq("tenant_a"), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq("tenant_a"), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecord record = new DynamicRecord(entity).setValue("code", "C-001");
 
         new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
 
-        verify(operations).insertItem(eq("tenant_a"), eq(TABLE), anyMap());
+        verify(operations).insertItem(eq("tenant_a"), eq(TABLE), anyMap(), eq("id"));
     }
 
     @Test
     void shouldWriteAndReadDynamicDataScopeAbilityFields() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.ofEntries(
                 Map.entry("id", "contract-1"),
@@ -140,7 +140,7 @@ class DynamicRecordDaoTest {
         DynamicRecord selected = service.select("contract-1");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("auth_user_id", "user-1")
                 .containsEntry("auth_assignee_ids", "user-2,user-3")
@@ -160,7 +160,7 @@ class DynamicRecordDaoTest {
     void shouldPrepareDynamicDataScopeOwnershipFromCurrentUserOnInsert() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
         DynamicRecord record = new DynamicRecord(entity)
@@ -179,7 +179,7 @@ class DynamicRecordDaoTest {
         }
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("auth_user_id", "user-1")
                 .containsEntry("auth_organization_id", "org-1")
@@ -191,7 +191,7 @@ class DynamicRecordDaoTest {
     void shouldPrepareDynamicDataScopeOwnershipFromActingPrincipalOnInsert() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = contractEntity().withCapabilities(EntityCapability.DATA_SCOPE);
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService service = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
         DynamicRecord record = new DynamicRecord(entity)
@@ -214,7 +214,7 @@ class DynamicRecordDaoTest {
         }
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("auth_organization_id", "org-principal")
                 .containsEntry("auth_department_id", "dept-principal")
@@ -225,7 +225,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldRunLifecycleHooksAroundCrudOperations() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
@@ -253,7 +253,7 @@ class DynamicRecordDaoTest {
                         "beforeDelete:contract-1"
                 );
         ArgumentCaptor<Map<String, Object>> insertBody = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), insertBody.capture(), eq("id"));
         assertThat(insertBody.getValue()).containsEntry("code", "HOOK-CODE");
     }
 
@@ -261,7 +261,7 @@ class DynamicRecordDaoTest {
     void shouldApplyDynamicFormulaRulesBeforeInsert() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = formulaEntity();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecord record = new DynamicRecord(entity)
                 .setValue("quantity", BigDecimal.valueOf(2))
@@ -270,7 +270,7 @@ class DynamicRecordDaoTest {
         new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("30");
     }
 
@@ -296,7 +296,7 @@ class DynamicRecordDaoTest {
     void shouldApplyDynamicFormulaRulesAfterLifecycleHooks() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = formulaEntity();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordLifecycle lifecycle = new DynamicRecordLifecycle() {
             @Override
@@ -311,7 +311,7 @@ class DynamicRecordDaoTest {
         new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract", lifecycle).insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("60");
     }
 
@@ -334,7 +334,7 @@ class DynamicRecordDaoTest {
         new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("price", BigDecimal.valueOf(15))
                 .doesNotContainKey("quantity");
@@ -385,7 +385,7 @@ class DynamicRecordDaoTest {
                     assertThat(exception.firstError().code()).isEqualTo("FORMULA_RULE_NOT_MATCHED");
                     assertThat(exception.warnings()).isEmpty();
                 });
-        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap(), anyString());
     }
 
     @Test
@@ -421,7 +421,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldKeepFormulaWarningsOnRecordWithoutBlockingSave() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         EntityDefinition entity = new EntityDefinition(
                 "contract",
@@ -447,7 +447,7 @@ class DynamicRecordDaoTest {
                     assertThat(issue.code()).isEqualTo("FORMULA_RULE_NOT_MATCHED");
                     assertThat(issue.message()).isEqualTo("amount is high");
                 });
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id"));
     }
 
     @Test
@@ -788,7 +788,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("code", "C-001")
                 .containsEntry("amount", BigDecimal.TEN)
@@ -820,7 +820,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("amount", BigDecimal.ONE)
                 .containsEntry("version", 8)
@@ -857,7 +857,7 @@ class DynamicRecordDaoTest {
         assertThatThrownBy(() -> service.update(record))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("field companion is missing");
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
 
         DynamicRecord clearWithoutCompanion = new DynamicRecord(entity)
                 .setValue("meetingAt", null);
@@ -883,7 +883,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, times(2))
-                .patchUpdateItemWhere(eq(SCHEMA), eq("app_meeting"), body.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq("app_meeting"), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("meeting_at", Instant.parse("2026-01-02T01:30:00Z"))
                 .containsEntry("meeting_at_timezone", "Asia/Shanghai");
@@ -892,7 +892,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldRejectDynamicUpdateWhenExpectedVersionDoesNotMatch() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(0);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(0);
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
                 "code", "C-001",
@@ -911,7 +911,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture(), eq("id"));
         assertThat(where.getValue()).containsEntry("version", 1);
     }
 
@@ -962,7 +962,7 @@ class DynamicRecordDaoTest {
                 .contains("\"id\" =")
                 .contains("\"deleted\" =")
                 .contains("\"deleted\" IS NULL");
-        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap());
+        verify(operations, never()).patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString());
     }
 
     @Test
@@ -986,7 +986,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("deleted", Boolean.TRUE)
                 .containsEntry("version", 3);
@@ -1119,7 +1119,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldCreateEntityServiceThroughDynamicRecordRuntime() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService entityService = new DynamicRecordRuntime(operations)
                 .register(new ModuleDefinition("sales.contract", "Contract", List.of(contractEntity())))
@@ -1131,7 +1131,7 @@ class DynamicRecordDaoTest {
         String id = entityService.insert(record);
 
         assertThat(id).hasSize(32);
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id"));
     }
 
     @Test
@@ -1147,7 +1147,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(4))
-                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap(), eq("id"));
         assertThat(body.getAllValues()).allSatisfy(value -> assertThat(value).containsKey("sort_order"));
         assertThat((Integer) body.getAllValues().get(3).get("sort_order")).isPositive();
     }
@@ -1259,7 +1259,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         verify(operations, org.mockito.Mockito.times(1))
-                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap(), eq("id"));
         assertThat(body.getAllValues().getFirst()).containsKey("sort_order");
         assertThat((Integer) body.getAllValues().getFirst().get("sort_order")).isPositive();
     }
@@ -1284,7 +1284,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldPrepareDynamicTreeDefaultsThroughCrudAbility() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, treeEntity()), "sales.contract");
         DynamicRecord record = new DynamicRecord(treeEntity()).setValue("code", "C");
@@ -1293,7 +1293,7 @@ class DynamicRecordDaoTest {
         entityService.insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue()).containsEntry("parent_id", "root");
     }
 
@@ -1333,7 +1333,7 @@ class DynamicRecordDaoTest {
     @Test
     void shouldNotPrepareAbilityDefaultsForPlainDynamicCrudFields() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         EntityDefinition entity = new EntityDefinition(
                 "contract",
@@ -1352,14 +1352,14 @@ class DynamicRecordDaoTest {
         entityService.insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue()).doesNotContainKeys("parent_id", "active");
     }
 
     @Test
     void shouldPrepareDynamicEnableDefaultsOnlyWhenCapabilityDeclared() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         EntityDefinition entity = enabledEntity();
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
@@ -1371,14 +1371,14 @@ class DynamicRecordDaoTest {
         entityService.insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue()).containsEntry("enabled", Boolean.TRUE);
     }
 
     @Test
     void shouldPreserveExplicitDynamicEnabledValueOnInsert() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         EntityDefinition entity = enabledEntity();
         DynamicEntityService entityService = new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract");
@@ -1390,7 +1390,7 @@ class DynamicRecordDaoTest {
         entityService.insert(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue()).containsEntry("enabled", Boolean.FALSE);
     }
 
@@ -1410,7 +1410,7 @@ class DynamicRecordDaoTest {
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), where.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("enabled", Boolean.TRUE)
                 .containsEntry("version", 3);
@@ -1483,7 +1483,7 @@ class DynamicRecordDaoTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

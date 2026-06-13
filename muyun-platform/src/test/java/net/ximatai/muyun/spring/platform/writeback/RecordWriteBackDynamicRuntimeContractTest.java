@@ -526,14 +526,14 @@ class RecordWriteBackDynamicRuntimeContractTest {
             IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
             when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
             when(operations.getDefaultSchemaName()).thenReturn("public");
-            when(operations.insertItem(anyString(), anyString(), anyMap()))
+            when(operations.insertItem(anyString(), anyString(), anyMap(), anyString()))
                     .thenAnswer(invocation -> insert(invocation.getArgument(1), invocation.getArgument(2)));
             when(operations.query(anyString(), anyMap()))
                     .thenAnswer(invocation -> query(invocation.getArgument(0), invocation.getArgument(1)));
             when(operations.row(anyString(), anyMap()))
                     .thenAnswer(invocation -> Map.of("total_count", query(invocation.getArgument(0),
                             invocation.getArgument(1)).size()));
-            when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap()))
+            when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString()))
                     .thenAnswer(invocation -> update(invocation.getArgument(1), invocation.getArgument(2),
                             invocation.getArgument(3)));
             return operations;

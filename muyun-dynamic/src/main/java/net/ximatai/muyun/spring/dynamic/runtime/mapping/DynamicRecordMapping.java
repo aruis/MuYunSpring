@@ -1,8 +1,10 @@
 package net.ximatai.muyun.spring.dynamic.runtime.mapping;
 
+import net.ximatai.muyun.database.core.orm.RuntimeColumnMapper;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.PlatformDataScopeSchema;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -12,38 +14,30 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public final class DynamicRecordMapping {
+public final class DynamicRecordMapping implements RuntimeColumnMapper {
     private final Map<String, String> columns = new HashMap<>();
+    private final Map<String, String> fields = new HashMap<>();
     private final Set<String> protectedStorageFields = new HashSet<>();
 
     public DynamicRecordMapping(EntityDefinition entity) {
-        columns.put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
-        columns.put(StandardEntitySchema.ID_COLUMN, StandardEntitySchema.ID_COLUMN);
-        columns.put(StandardEntitySchema.TENANT_ID_FIELD, StandardEntitySchema.TENANT_ID_COLUMN);
-        columns.put(StandardEntitySchema.TENANT_ID_COLUMN, StandardEntitySchema.TENANT_ID_COLUMN);
-        columns.put(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN);
-        columns.put(StandardEntitySchema.VERSION_COLUMN, StandardEntitySchema.VERSION_COLUMN);
-        columns.put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);
-        columns.put(StandardEntitySchema.DELETED_COLUMN, StandardEntitySchema.DELETED_COLUMN);
-        columns.put(StandardEntitySchema.DELETED_AT_FIELD, StandardEntitySchema.DELETED_AT_COLUMN);
-        columns.put(StandardEntitySchema.DELETED_AT_COLUMN, StandardEntitySchema.DELETED_AT_COLUMN);
-        columns.put(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN);
-        columns.put(StandardEntitySchema.CREATED_BY_COLUMN, StandardEntitySchema.CREATED_BY_COLUMN);
-        columns.put(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN);
-        columns.put(StandardEntitySchema.CREATED_AT_COLUMN, StandardEntitySchema.CREATED_AT_COLUMN);
-        columns.put(StandardEntitySchema.UPDATED_BY_FIELD, StandardEntitySchema.UPDATED_BY_COLUMN);
-        columns.put(StandardEntitySchema.UPDATED_BY_COLUMN, StandardEntitySchema.UPDATED_BY_COLUMN);
-        columns.put(StandardEntitySchema.UPDATED_AT_FIELD, StandardEntitySchema.UPDATED_AT_COLUMN);
-        columns.put(StandardEntitySchema.UPDATED_AT_COLUMN, StandardEntitySchema.UPDATED_AT_COLUMN);
+        put(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN);
+        put(StandardEntitySchema.TENANT_ID_FIELD, StandardEntitySchema.TENANT_ID_COLUMN);
+        put(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN);
+        put(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN);
+        put(StandardEntitySchema.DELETED_AT_FIELD, StandardEntitySchema.DELETED_AT_COLUMN);
+        put(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN);
+        put(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN);
+        put(StandardEntitySchema.UPDATED_BY_FIELD, StandardEntitySchema.UPDATED_BY_COLUMN);
+        put(StandardEntitySchema.UPDATED_AT_FIELD, StandardEntitySchema.UPDATED_AT_COLUMN);
         if (entity.supports(EntityCapability.DATA_SCOPE)) {
-            PlatformDataScopeSchema.fieldToColumn().forEach((field, column) -> {
-                columns.put(field, column);
-                columns.put(column, column);
-            });
+            PlatformDataScopeSchema.fieldToColumn().forEach(this::put);
+        }
+        if (entity.supports(EntityCapability.APPROVAL)) {
+            DynamicAbilityFields.approvalFields()
+                    .forEach(field -> put(field.code(), field.columnName()));
         }
         for (FieldDefinition field : entity.fields()) {
-            columns.put(field.code(), field.columnName());
-            columns.put(field.columnName(), field.columnName());
+            put(field.code(), field.columnName());
             if (field.protection().hasStorageProtection()) {
                 protectedStorageFields.add(field.code());
                 protectedStorageFields.add(field.columnName());
@@ -55,8 +49,18 @@ public final class DynamicRecordMapping {
         }
     }
 
+    @Override
+    public String resolveColumnName(String fieldName) {
+        return columns.get(fieldName);
+    }
+
+    @Override
+    public String resolveFieldName(String columnName) {
+        return fields.getOrDefault(columnName, columnName);
+    }
+
     public String resolveColumn(String fieldOrColumn) {
-        String column = columns.get(fieldOrColumn);
+        String column = resolveColumnName(fieldOrColumn);
         if (column == null) {
             throw new IllegalArgumentException("unknown dynamic field or column: " + fieldOrColumn);
         }
@@ -69,5 +73,11 @@ public final class DynamicRecordMapping {
                     + fieldOrColumn);
         }
         return resolveColumn(fieldOrColumn);
+    }
+
+    private void put(String field, String column) {
+        columns.put(field, column);
+        columns.put(column, column);
+        fields.putIfAbsent(column, field);
     }
 }

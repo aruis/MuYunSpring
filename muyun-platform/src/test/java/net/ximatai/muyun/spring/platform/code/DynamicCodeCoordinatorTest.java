@@ -302,7 +302,7 @@ class DynamicCodeCoordinatorTest {
         AtomicInteger ids = new AtomicInteger();
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn("public");
-        when(operations.insertItem(anyString(), anyString(), anyMap())).thenAnswer(invocation -> {
+        when(operations.insertItem(anyString(), anyString(), anyMap(), anyString())).thenAnswer(invocation -> {
             Map<String, Object> body = new LinkedHashMap<>(invocation.getArgument(2));
             String id = "record-" + ids.incrementAndGet();
             body.put("id", id);
@@ -314,7 +314,7 @@ class DynamicCodeCoordinatorTest {
                 .map(LinkedHashMap::new)
                 .toList());
         when(operations.row(anyString(), anyMap())).thenAnswer(invocation -> Map.of("total_count", (long) rows.size()));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenAnswer(invocation -> {
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenAnswer(invocation -> {
             Map<String, Object> body = invocation.getArgument(2);
             Map<String, Object> where = invocation.getArgument(3);
             String id = String.valueOf(where.get("id"));
@@ -333,10 +333,10 @@ class DynamicCodeCoordinatorTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn("public");
-        when(operations.insertItem(anyString(), anyString(), anyMap())).thenReturn("record-1", "record-2", "record-3");
+        when(operations.insertItem(anyString(), anyString(), anyMap(), anyString())).thenReturn("record-1", "record-2", "record-3");
         when(operations.query(anyString(), anyMap())).thenReturn(List.of());
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 0L));
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

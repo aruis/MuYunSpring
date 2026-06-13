@@ -45,7 +45,7 @@ class DynamicRelationRuntimeTest {
     @Test
     void shouldNotifyMutationCoordinatorForDynamicRelationChildCreate() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         RecordingMutationCoordinator coordinator = new RecordingMutationCoordinator();
@@ -74,7 +74,7 @@ class DynamicRelationRuntimeTest {
     void shouldNotifyMutationCoordinatorForDynamicRelationChildReplace() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceAndLineRows(operations);
-        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         RecordingMutationCoordinator coordinator = new RecordingMutationCoordinator();
@@ -110,7 +110,7 @@ class DynamicRelationRuntimeTest {
     @Test
     void shouldInsertDynamicChildrenThroughSharedChildRelationAbility() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
@@ -122,7 +122,7 @@ class DynamicRelationRuntimeTest {
 
         ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).insertItem(eq(SCHEMA), table.capture(), body.capture());
+        verify(operations, times(2)).insertItem(eq(SCHEMA), table.capture(), body.capture(), eq("id"));
         assertThat(id).hasSize(32);
         assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
         assertThat(body.getAllValues().get(1))
@@ -134,7 +134,7 @@ class DynamicRelationRuntimeTest {
     @Test
     void shouldApplyDynamicChildFormulaBeforeChildRowsAreInserted() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(formulaInvoiceModule());
         DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
@@ -146,7 +146,7 @@ class DynamicRelationRuntimeTest {
         runtime.entityService(MODULE, "invoice").insert(invoice);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture(), eq("id"));
         assertThat((BigDecimal) body.getAllValues().get(1).get("line_amount")).isEqualByComparingTo("33");
     }
 
@@ -184,7 +184,7 @@ class DynamicRelationRuntimeTest {
         runtime.entityService(MODULE, "invoice").update(invoice);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), anyString(), body.capture(), anyMap());
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), anyString(), body.capture(), anyMap(), eq("id"));
         assertThat((BigDecimal) body.getAllValues().get(1).get("line_amount")).isEqualByComparingTo("35");
     }
 
@@ -192,7 +192,7 @@ class DynamicRelationRuntimeTest {
     @Test
     void shouldInsertDynamicChildrenWithCurrentTenant() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
@@ -204,7 +204,7 @@ class DynamicRelationRuntimeTest {
         }
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture(), eq("id"));
         assertThat(body.getAllValues().get(0)).containsEntry("tenant_id", "tenant-a");
         assertThat(body.getAllValues().get(1)).containsEntry("tenant_id", "tenant-a");
     }
@@ -212,7 +212,7 @@ class DynamicRelationRuntimeTest {
     @Test
     void shouldLetChildRelationSetWriteProtectedForeignKeyInternally() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(writeProtectedForeignKeyInvoiceModule());
         DynamicRecord invoice = runtime.newRecord(MODULE, "invoice").setValue("title", "I-001");
@@ -222,7 +222,7 @@ class DynamicRelationRuntimeTest {
         String id = runtime.entityService(MODULE, "invoice").insert(invoice);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture());
+        verify(operations, times(2)).insertItem(eq(SCHEMA), anyString(), body.capture(), eq("id"));
         assertThat(body.getAllValues().get(1)).containsEntry("invoice_id", id);
         DynamicRecord externalLine = runtime.newRecord(MODULE, "invoice_line")
                 .setValue("title", "L-002")
@@ -236,7 +236,7 @@ class DynamicRelationRuntimeTest {
     void shouldValidateExplicitDynamicReferenceTargetOnWrite() {
         IDatabaseOperations<Object> operations = operations();
         stubInvoiceRows(operations);
-        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), anyString(), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicEntityService lineService = new DynamicRecordRuntime(operations)
                 .register(invoiceModule())
@@ -283,7 +283,7 @@ class DynamicRelationRuntimeTest {
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture());
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture(), eq("id"));
         assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line");
         assertThat(where.getAllValues().get(0)).containsEntry("id", "invoice-1");
         assertThat(where.getAllValues().get(1)).containsEntry("id", "line-1");
@@ -316,7 +316,7 @@ class DynamicRelationRuntimeTest {
             }
             return List.of();
         });
-        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq("app_invoice_line"), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
@@ -335,7 +335,7 @@ class DynamicRelationRuntimeTest {
         ArgumentCaptor<String> table = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations, times(3)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture());
+        verify(operations, times(3)).patchUpdateItemWhere(eq(SCHEMA), table.capture(), body.capture(), where.capture(), eq("id"));
         assertThat(table.getAllValues()).containsExactly("app_invoice", "app_invoice_line", "app_invoice_line");
         assertThat(body.getAllValues().get(1))
                 .containsEntry("title", "L-001-updated")
@@ -345,7 +345,7 @@ class DynamicRelationRuntimeTest {
         assertThat(where.getAllValues().get(2)).containsEntry("id", "line-2");
 
         ArgumentCaptor<Map<String, Object>> inserted = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq("app_invoice_line"), inserted.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq("app_invoice_line"), inserted.capture(), eq("id"));
         assertThat(inserted.getValue())
                 .containsEntry("title", "L-003")
                 .containsEntry("invoice_id", "invoice-1")
@@ -511,7 +511,7 @@ class DynamicRelationRuntimeTest {
             }
             return List.of();
         });
-        when(operations.patchUpdateItemWhere(eq(SCHEMA), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), anyString(), anyMap(), anyMap(), eq("id"))).thenReturn(1);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations).register(invoiceModule());
         DynamicEntityService invoiceService = runtime.entityService(MODULE, "invoice");
         DynamicEntityService lineService = runtime.entityService(MODULE, "invoice_line");
@@ -1341,7 +1341,7 @@ class DynamicRelationRuntimeTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

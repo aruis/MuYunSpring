@@ -40,7 +40,7 @@ class DynamicRecordRuntimeTest {
     @Test
     void shouldCreateEntityServiceFromRegisteredModule() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations)
                 .register(contractModule());
@@ -55,7 +55,7 @@ class DynamicRecordRuntimeTest {
         assertThat(id).hasSize(32);
         assertThat(entityService.getModuleAlias()).isEqualTo("sales.contract");
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("id", id)
                 .containsEntry("code", "C-001")
@@ -67,7 +67,7 @@ class DynamicRecordRuntimeTest {
     @Test
     void shouldRunDynamicCrudThroughRuntimeServiceChain() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
                 "id", "contract-1",
@@ -92,9 +92,9 @@ class DynamicRecordRuntimeTest {
         entityService.pageQuery(Criteria.of().eq("code", "C-001"), PageRequest.of(1, 10));
         entityService.delete(id);
 
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id"));
         verify(operations, org.mockito.Mockito.times(2))
-                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap());
+                .patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap(), eq("id"));
         ArgumentCaptor<String> querySql = ArgumentCaptor.forClass(String.class);
         verify(operations, org.mockito.Mockito.atLeastOnce()).query(querySql.capture(), anyMap());
         assertThat(querySql.getAllValues()).anySatisfy(sql -> assertThat(sql)
@@ -128,7 +128,7 @@ class DynamicRecordRuntimeTest {
     @Test
     void shouldApplyDynamicFieldProtectionAcrossCrudReadsAndDescriptors() {
         IDatabaseOperations<Object> operations = operations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
         when(operations.row(anyString(), anyMap())).thenReturn(Map.of("total_count", 1));
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
@@ -153,7 +153,7 @@ class DynamicRecordRuntimeTest {
         Map<String, Map<String, Object>> projections = entityService.projections(List.of("contract-1"), List.of("secret"));
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("secret", "enc:sensitive-value")
                 .containsEntry("secret_signature", "sig:secret:sensitive-value");
@@ -289,7 +289,7 @@ class DynamicRecordRuntimeTest {
         entityService.update(record);
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap());
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("secret", null)
                 .containsEntry("secret_signature", null);
@@ -300,7 +300,7 @@ class DynamicRecordRuntimeTest {
         IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
         when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
         when(operations.getDefaultSchemaName()).thenReturn(SCHEMA);
-        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(anyString(), anyString(), anyMap(), anyMap(), anyString())).thenReturn(1);
         return operations;
     }
 

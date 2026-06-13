@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.publish;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.database.core.orm.MigrationChange;
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
@@ -69,7 +70,8 @@ class DynamicModulePublisherTest {
                 "changed", Boolean.TRUE,
                 "dryRun", Boolean.FALSE,
                 "nonAdditiveChanges", Boolean.FALSE,
-                "statements", List.of()
+                "statements", List.of(),
+                "changes", List.of()
         )));
     }
 
@@ -176,6 +178,13 @@ class DynamicModulePublisherTest {
         assertThat(result.dryRun()).isTrue();
         assertThat(result.hasNonAdditiveChanges()).isTrue();
         assertThat(result.statementsByEntity()).containsEntry("contract", List.of("alter table app_contract drop column name"));
+        assertThat(result.changesByEntity().get("contract"))
+                .singleElement()
+                .satisfies(change -> {
+                    assertThat(change.getType()).isEqualTo(MigrationChange.Type.DROP_COLUMN);
+                    assertThat(change.getTarget()).isEqualTo("app_contract.name");
+                    assertThat(change.isNonAdditive()).isTrue();
+                });
     }
 
     @Test
@@ -306,11 +315,20 @@ class DynamicModulePublisherTest {
             Map<String, MigrationResult> results = new LinkedHashMap<>();
             for (EntityDefinition entity : module.entities()) {
                 ensuredEntities.add(entity.alias());
+                List<String> statements = nonAdditive ? List.of("alter table app_contract drop column name") : List.of();
+                List<MigrationChange> changes = nonAdditive
+                        ? List.of(MigrationChange.nonAdditive(
+                                MigrationChange.Type.DROP_COLUMN,
+                                "app_contract.name",
+                                "alter table app_contract drop column name"
+                        ))
+                        : List.of();
                 results.put(entity.alias(), new MigrationResult(
                         true,
                         dryRun,
                         nonAdditive,
-                        nonAdditive ? List.of("alter table app_contract drop column name") : List.of()
+                        statements,
+                        changes
                 ));
             }
             return results;

@@ -56,7 +56,7 @@ class OrganizationRepositoryContractTest {
     @Test
     void abilityServiceShouldUseMuYunRepositoryProxyForInsert() {
         IDatabaseOperations<Object> operations = mockedOperations();
-        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap()))
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
                 .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
 
         OrganizationService service = organizationService(operations);
@@ -75,7 +75,7 @@ class OrganizationRepositoryContractTest {
         assertThat(organization.getTenantId()).isEqualTo("tenant_a");
 
         ArgumentCaptor<Map<String, Object>> body = mapCaptor();
-        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture());
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
         assertThat(body.getValue())
                 .containsEntry("id", id)
                 .containsEntry("code", "HQ")
@@ -96,7 +96,7 @@ class OrganizationRepositoryContractTest {
         verify(operations).execute(contains("comment on table \"public\".\"iam_organization\""));
         verify(operations).execute(contains("drop index"));
         verify(operations).execute(contains("\"tenant_id\",\"code\""));
-        verify(operations, never()).insertItem(anyString(), anyString(), anyMap());
+        verify(operations, never()).insertItem(anyString(), anyString(), anyMap(), anyString());
     }
 
     @Test
@@ -185,7 +185,7 @@ class OrganizationRepositoryContractTest {
     void abilityServiceShouldUseVersionConditionForStaticWrites() {
         IDatabaseOperations<Object> operations = mockedOperations();
         when(operations.query(anyString(), anyMap())).thenReturn(List.of(row("org-1", "Headquarters", 10, 2)));
-        when(operations.patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap())).thenReturn(1);
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), anyMap(), eq("id"))).thenReturn(1);
         OrganizationService service = organizationService(operations);
         Organization update = new Organization();
         update.setId("org-1");
@@ -199,7 +199,7 @@ class OrganizationRepositoryContractTest {
         }
 
         ArgumentCaptor<Map<String, Object>> where = mapCaptor();
-        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), where.capture());
+        verify(operations, times(2)).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), anyMap(), where.capture(), eq("id"));
         assertThat(where.getAllValues())
                 .allSatisfy(conditions -> assertThat(conditions).containsEntry("version", 2));
     }
