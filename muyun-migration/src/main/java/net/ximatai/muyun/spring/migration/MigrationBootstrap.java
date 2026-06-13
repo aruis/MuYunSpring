@@ -24,6 +24,9 @@ import java.util.List;
 @Order(100)
 public class MigrationBootstrap implements ApplicationRunner {
 
+    // PostgreSQL-specific partial unique index. The platform targets PostgreSQL (see
+    // testcontainers + postgres:16 in build.gradle.kts); supporting another database would
+    // require adapting this DDL. IF NOT EXISTS keeps bootstrap idempotent.
     static final String ALIAS_GLOBAL_PARTIAL_INDEX =
             "CREATE UNIQUE INDEX IF NOT EXISTS migration_record_alias_global_unique "
                     + "ON migration_record (alias) WHERE tenant_id IS NULL";
@@ -66,6 +69,7 @@ public class MigrationBootstrap implements ApplicationRunner {
     // gap. When per-tenant migration lands, a sibling partial index "WHERE tenant_id IS NOT
     // NULL" can be added without conflict.
     private void ensureAliasGlobalUnique() {
+        logger.info("Ensuring alias global unique index");
         operations.execute(ALIAS_GLOBAL_PARTIAL_INDEX);
     }
 }

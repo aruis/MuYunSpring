@@ -88,3 +88,4 @@ class FooMigrate extends AbstractMigration {
 - 每步独立事务；步骤之间不共享事务，失败的步骤不会回滚已提交的前序步骤。
 - 框架只保证"步骤不重复执行"，不保证"步骤内逻辑幂等"——迁移作者需自行保证步骤内逻辑能容忍部分记录已被改过的情况。
 - **步骤版本号一经发布不可删除、不可重排、不可改语义。** 执行器以"跳过 `version <= currentVersion` 的步骤"实现断点续传，并用 `currentVersion >= finalVersion` 做早退；若删除尾部步骤，`finalVersion` 减小会导致中间未应用的步骤被早退跳过。新增变更只能追加更大的版本号；若要废弃旧步骤，让 action 留空（`() -> { }`）而不是删除。
+- **多个 `AbstractMigration` 之间不保证执行顺序。** `MigrationBootstrap` 通过 Spring 注入 `List<AbstractMigration>`，顺序由容器决定，未显式排序。若一个迁移依赖另一个迁移已跑过，应在依赖方的步骤内做 defensive 查询（如 `findByAlias`），不要假设先后；必要时可以把两者合并成一个 migration 的多个 step。
