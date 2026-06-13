@@ -139,7 +139,10 @@ class PlatformModelSchemaTest {
                         "validation_regex", "dictionary_application_alias", "dictionary_category_alias",
                         "reference_module_alias", "reference_module_key_field", "reference_module_label_field",
                         "reference_generate_rule_id", "reference_query_template_id",
-                        "reference_module_plus_fields", "title", "sort_order");
+                        "reference_module_plus_fields", "unit_category_alias", "unit_mode",
+                        "fixed_unit_code", "default_unit_code", "unit_field_id", "base_value_field_id",
+                        "base_unit_code", "unit_conversion_mode", "conversion_scope_field_id", "unit_required",
+                        "title", "sort_order");
         assertThat(columnType(mapper.toTable(ModuleMetadataField.class), "reference_module_plus_fields"))
                 .isEqualTo(ColumnType.JSON_SET);
         assertThat(uniqueIndexes(mapper.toTable(ModuleMetadataField.class)))

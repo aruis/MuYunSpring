@@ -9,6 +9,8 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 
 import java.util.Set;
 
@@ -58,4 +60,35 @@ public class ModuleMetadataField extends StandardSortableEntity {
 
     @Column(name = "reference_module_plus_fields", type = ColumnType.JSON_SET, comment = "Reference module plus fields")
     private Set<String> referenceModulePlusFields;
+
+    @Column(name = "unit_category_alias", type = ColumnType.VARCHAR, length = 64, comment = "Measure unit category alias")
+    private String unitCategoryAlias;
+
+    @Column(name = "unit_mode", type = ColumnType.VARCHAR, length = 32, comment = "Measure unit input mode")
+    private FieldMeasureUnitMode unitMode;
+
+    @Column(name = "fixed_unit_code", type = ColumnType.VARCHAR, length = 64, comment = "Fixed measure unit code")
+    private String fixedUnitCode;
+
+    @Column(name = "default_unit_code", type = ColumnType.VARCHAR, length = 64, comment = "Default measure unit code")
+    private String defaultUnitCode;
+
+    @Column(name = "unit_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Companion unit metadata field id")
+    private String unitFieldId;
+
+    @Column(name = "base_value_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Shadow base value metadata field id")
+    private String baseValueFieldId;
+
+    @Column(name = "base_unit_code", type = ColumnType.VARCHAR, length = 64, comment = "Base measure unit code")
+    private String baseUnitCode;
+
+    @Column(name = "unit_conversion_mode", type = ColumnType.VARCHAR, length = 32, comment = "Measure unit conversion mode")
+    private FieldMeasureUnitConversionMode unitConversionMode;
+
+    @Column(name = "conversion_scope_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Measure conversion scope metadata field id")
+    private String conversionScopeFieldId;
+
+    @Column(name = "unit_required", type = ColumnType.BOOLEAN, comment = "Unit value required flag",
+            defaultVal = @Default(bool = TrueOrFalse.FALSE))
+    private Boolean unitRequired = Boolean.FALSE;
 }

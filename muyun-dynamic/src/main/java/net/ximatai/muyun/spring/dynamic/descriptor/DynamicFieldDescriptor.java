@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
 import java.util.List;
@@ -31,7 +32,8 @@ public record DynamicFieldDescriptor(
         boolean writeProtected,
         boolean encrypted,
         boolean signed,
-        String maskingPolicy
+        String maskingPolicy,
+        FieldMeasureUnitDefinition measureUnit
 ) {
     public DynamicFieldDescriptor {
         companions = companions == null ? List.of() : List.copyOf(companions);
@@ -61,7 +63,8 @@ public record DynamicFieldDescriptor(
                 field.behavior().writeProtected(),
                 field.protection().encryptionMode().enabled(),
                 field.protection().signatureMode().enabled(),
-                field.protection().maskingPolicy().enabled() ? field.protection().maskingPolicy().name() : null
+                field.protection().maskingPolicy().enabled() ? field.protection().maskingPolicy().name() : null,
+                field.measureUnit()
         );
     }
 
@@ -90,7 +93,8 @@ public record DynamicFieldDescriptor(
                 descriptor.writeProtected(),
                 descriptor.encrypted(),
                 descriptor.signed(),
-                descriptor.maskingPolicy()
+                descriptor.maskingPolicy(),
+                descriptor.measureUnit()
         );
     }
 

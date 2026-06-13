@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,19 +13,28 @@ public class MetadataFieldDefinitionCompiler {
     private final PlatformFieldTypeService fieldTypeService;
     private final MetadataFieldConfigService configService;
     private final MetadataFieldProtectionConfigService protectionConfigService;
+    private final MetadataFieldService fieldService;
 
     public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
                                            MetadataFieldConfigService configService) {
-        this(fieldTypeService, configService, null);
+        this(fieldTypeService, configService, null, null);
+    }
+
+    public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
+                                           MetadataFieldConfigService configService,
+                                           MetadataFieldProtectionConfigService protectionConfigService) {
+        this(fieldTypeService, configService, protectionConfigService, null);
     }
 
     @Autowired
     public MetadataFieldDefinitionCompiler(PlatformFieldTypeService fieldTypeService,
                                            MetadataFieldConfigService configService,
-                                           MetadataFieldProtectionConfigService protectionConfigService) {
+                                           MetadataFieldProtectionConfigService protectionConfigService,
+                                           MetadataFieldService fieldService) {
         this.fieldTypeService = fieldTypeService;
         this.configService = configService;
         this.protectionConfigService = protectionConfigService;
+        this.fieldService = fieldService;
     }
 
     public FieldDefinition compile(MetadataField field) {
@@ -74,7 +84,8 @@ public class MetadataFieldDefinitionCompiler {
                 behavior(fieldType, defaultConfig, relationConfig, moduleField, field.getId()),
                 protectionConfigService == null
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
-                        : protectionConfigService.definition(field.getId())
+                        : protectionConfigService.definition(field.getId()),
+                measureUnit(moduleField)
         );
         if (hasModuleDictionary) {
             validateModuleDictionary(fieldType, moduleField, field.getId());
@@ -158,5 +169,39 @@ public class MetadataFieldDefinitionCompiler {
                 || moduleField.getDictionaryApplicationAlias().isBlank()) {
             throw new IllegalArgumentException("module field dictionaryApplicationAlias must not be blank: " + fieldId);
         }
+    }
+
+    private FieldMeasureUnitDefinition measureUnit(ModuleMetadataField moduleField) {
+        if (moduleField == null
+                || moduleField.getUnitCategoryAlias() == null
+                || moduleField.getUnitCategoryAlias().isBlank()) {
+            return FieldMeasureUnitDefinition.NONE;
+        }
+        return new FieldMeasureUnitDefinition(
+                moduleField.getUnitCategoryAlias(),
+                moduleField.getUnitMode(),
+                moduleField.getFixedUnitCode(),
+                moduleField.getDefaultUnitCode(),
+                fieldName(moduleField.getUnitFieldId()),
+                fieldName(moduleField.getBaseValueFieldId()),
+                moduleField.getBaseUnitCode(),
+                moduleField.getUnitConversionMode(),
+                fieldName(moduleField.getConversionScopeFieldId()),
+                Boolean.TRUE.equals(moduleField.getUnitRequired())
+        );
+    }
+
+    private String fieldName(String fieldId) {
+        if (fieldId == null || fieldId.isBlank()) {
+            return null;
+        }
+        if (fieldService == null) {
+            throw new IllegalArgumentException("module field measure unit config requires MetadataFieldService");
+        }
+        MetadataField field = fieldService.select(fieldId);
+        if (field == null) {
+            throw new IllegalArgumentException("module field measure unit config points to missing field: " + fieldId);
+        }
+        return field.getFieldName();
     }
 }

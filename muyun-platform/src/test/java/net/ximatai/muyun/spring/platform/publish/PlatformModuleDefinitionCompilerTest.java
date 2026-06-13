@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -33,6 +34,8 @@ import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldReferenceConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldRole;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
@@ -95,7 +98,7 @@ class PlatformModuleDefinitionCompilerTest {
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
                     categoryService, relationService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
-            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService);
+            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, null, fieldService);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                     fieldTypeService, moduleService, relationService);
@@ -108,6 +111,7 @@ class PlatformModuleDefinitionCompilerTest {
             new ModuleMetadataFormulaRuleService(formulaRuleDao, relationService, fieldService);
     private final ModuleMetadataFieldService moduleFieldService =
             new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService,
+                    fieldTypeService,
                     Optional.of((ruleId, referenceModuleAlias, ownerModuleAlias) -> {
                     }));
     private final ModuleMetadataFieldFilterService moduleFieldFilterService =
@@ -124,6 +128,7 @@ class PlatformModuleDefinitionCompilerTest {
         fieldTypeService.insert(fieldType("string", FieldType.STRING, 128));
         fieldTypeService.insert(fieldType("id", FieldType.STRING, 32));
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
+        fieldTypeService.insert(fieldType("decimal", FieldType.DECIMAL, null));
         fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
     }
 
@@ -182,6 +187,45 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(compiled.behavior().validationRegex()).isEqualTo("[a-z]+");
         assertThat(compiled.behavior().copyable()).isFalse();
         assertThat(compiled.dictionaryBinding().categoryAlias()).isEqualTo("customer_status");
+    }
+
+    @Test
+    void shouldCompileMeasureUnitMetadataIntoDynamicFieldDefinition() {
+        moduleService.insert(module("sales.order", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField quantityUnit = field(metadataId, "quantityUnit", "quantity_unit", FieldType.STRING);
+        quantityUnit.setFieldForm(MetadataFieldForm.COMPANION);
+        quantityUnit.setFieldRole(MetadataFieldRole.MEASURE_UNIT);
+        quantityUnit.setOwnerFieldId(quantity.getId());
+        fieldService.insert(quantityUnit);
+        MetadataField quantityBase = field(metadataId, "quantityBase", "quantity_base", FieldType.DECIMAL);
+        quantityBase.setFieldForm(MetadataFieldForm.SHADOW);
+        quantityBase.setFieldRole(MetadataFieldRole.MEASURE_BASE_VALUE);
+        quantityBase.setOwnerFieldId(quantity.getId());
+        fieldService.insert(quantityBase);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setUnitFieldId(quantityUnit.getId());
+        moduleField.setBaseValueFieldId(quantityBase.getId());
+        moduleField.setUnitRequired(true);
+        moduleFieldService.update(moduleField);
+
+        ModuleDefinition definition = compiler.compile("sales.order");
+
+        FieldDefinition compiled = field(definition, "quantity");
+        assertThat(compiled.measureUnit().enabled()).isTrue();
+        assertThat(compiled.measureUnit().categoryAlias()).isEqualTo("package");
+        assertThat(compiled.measureUnit().mode()).isEqualTo(FieldMeasureUnitMode.SELECTABLE);
+        assertThat(compiled.measureUnit().defaultUnitCode()).isEqualTo("box");
+        assertThat(compiled.measureUnit().unitFieldName()).isEqualTo("quantityUnit");
+        assertThat(compiled.measureUnit().baseValueFieldName()).isEqualTo("quantityBase");
+        assertThat(compiled.measureUnit().baseUnitCode()).isEqualTo("bottle");
+        assertThat(compiled.measureUnit().unitRequired()).isTrue();
     }
 
     @Test

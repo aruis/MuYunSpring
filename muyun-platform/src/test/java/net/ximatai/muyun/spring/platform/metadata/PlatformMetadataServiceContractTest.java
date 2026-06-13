@@ -18,6 +18,8 @@ import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -72,7 +74,8 @@ class PlatformMetadataServiceContractTest {
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final ModuleMetadataFieldService moduleFieldService =
-            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService);
+            new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService,
+                    fieldTypeService, Optional.empty());
     private final ModuleMetadataFieldFilterService moduleFieldFilterService =
             new ModuleMetadataFieldFilterService(moduleFieldFilterDao, moduleFieldService);
     private final ModuleMetadataFieldAffectService moduleFieldAffectService =
@@ -83,7 +86,7 @@ class PlatformMetadataServiceContractTest {
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
                     categoryService, relationService, protectionConfigService);
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
-            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, protectionConfigService);
+            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, protectionConfigService, fieldService);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
                     fieldTypeService, moduleService, relationService);
@@ -1100,6 +1103,82 @@ class PlatformMetadataServiceContractTest {
         assertThatThrownBy(() -> moduleFieldAffectService.insert(affect))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("referenceModuleAlias");
+    }
+
+    @Test
+    void shouldSaveMeasureUnitConfigWithCompanionAndShadowFields() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField quantityUnit = field(metadataId, "quantityUnit", "quantity_unit", FieldType.STRING);
+        quantityUnit.setFieldForm(MetadataFieldForm.COMPANION);
+        quantityUnit.setFieldRole(MetadataFieldRole.MEASURE_UNIT);
+        quantityUnit.setOwnerFieldId(quantity.getId());
+        fieldService.insert(quantityUnit);
+        MetadataField quantityBase = field(metadataId, "quantityBase", "quantity_base", FieldType.DECIMAL);
+        quantityBase.setFieldForm(MetadataFieldForm.SHADOW);
+        quantityBase.setFieldRole(MetadataFieldRole.MEASURE_BASE_VALUE);
+        quantityBase.setOwnerFieldId(quantity.getId());
+        fieldService.insert(quantityBase);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitFieldId(quantityUnit.getId());
+        moduleField.setBaseValueFieldId(quantityBase.getId());
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setUnitRequired(true);
+
+        moduleFieldService.update(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        assertThat(saved.getUnitMode()).isEqualTo(FieldMeasureUnitMode.SELECTABLE);
+        assertThat(saved.getUnitConversionMode()).isEqualTo(FieldMeasureUnitConversionMode.LINEAR);
+        assertThat(saved.getUnitFieldId()).isEqualTo(quantityUnit.getId());
+        assertThat(saved.getBaseValueFieldId()).isEqualTo(quantityBase.getId());
+        assertThat(fieldService.select(quantityBase.getId()).getSystemManaged()).isTrue();
+    }
+
+    @Test
+    void shouldRejectMeasureUnitConfigWithoutCompanionUnitField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField unit = field(metadataId, "quantityUnit", "quantity_unit", FieldType.STRING);
+        fieldService.insert(unit);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitFieldId(unit.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("unitFieldId requires COMPANION MEASURE_UNIT");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitConfigWithoutBaseValueShadowField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField quantityUnit = field(metadataId, "quantityUnit", "quantity_unit", FieldType.STRING);
+        quantityUnit.setFieldForm(MetadataFieldForm.COMPANION);
+        quantityUnit.setFieldRole(MetadataFieldRole.MEASURE_UNIT);
+        quantityUnit.setOwnerFieldId(quantity.getId());
+        fieldService.insert(quantityUnit);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitFieldId(quantityUnit.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("baseValueFieldId");
     }
 
     @Test
