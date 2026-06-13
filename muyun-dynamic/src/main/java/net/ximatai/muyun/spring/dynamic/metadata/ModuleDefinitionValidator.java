@@ -97,6 +97,7 @@ public class ModuleDefinitionValidator {
         FieldDefinition titleField = null;
         FieldDefinition treeParentField = null;
         FieldDefinition enabledField = null;
+        List<FieldDefinition> fields = entity.fields();
         for (FieldDefinition field : entity.fields()) {
             validateField(field);
             requireUnique(fieldCodes, field.code(), "field code");
@@ -116,6 +117,9 @@ public class ModuleDefinitionValidator {
                 titleFields++;
                 titleField = field;
             }
+        }
+        for (FieldDefinition field : fields) {
+            validateMeasureUnit(entity, field, fields);
         }
         if (!entity.supports(EntityCapability.CRUD)) {
             throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.alias());
@@ -305,6 +309,72 @@ public class ModuleDefinitionValidator {
         } catch (RuntimeException e) {
             throw new ModuleDefinitionException(e.getMessage());
         }
+    }
+
+    private void validateMeasureUnit(EntityDefinition entity, FieldDefinition field, List<FieldDefinition> fields) {
+        FieldMeasureUnitDefinition measureUnit = field.measureUnit();
+        if (measureUnit == null || !measureUnit.enabled()) {
+            return;
+        }
+        if (field.type() != FieldType.DECIMAL && field.type() != FieldType.INTEGER && field.type() != FieldType.LONG) {
+            throw new ModuleDefinitionException("measure unit field requires numeric owner: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        requireIdentifier(measureUnit.categoryAlias(), "measure unit category alias");
+        if (measureUnit.mode() == null) {
+            throw new ModuleDefinitionException("measure unit mode must not be null: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (measureUnit.mode() == FieldMeasureUnitMode.FIXED) {
+            requireIdentifier(measureUnit.fixedUnitCode(), "measure fixed unit code");
+        }
+        if (measureUnit.mode() == FieldMeasureUnitMode.SELECTABLE) {
+            FieldDefinition unitField = requireMeasureField(entity, fields, measureUnit.unitFieldName(),
+                    "measure unit companion field");
+            if (unitField.type() != FieldType.STRING && unitField.type() != FieldType.TEXT) {
+                throw new ModuleDefinitionException("measure unit companion field must be text: "
+                        + entity.alias() + "." + measureUnit.unitFieldName());
+            }
+        } else if (measureUnit.unitFieldName() != null && !measureUnit.unitFieldName().isBlank()) {
+            requireMeasureField(entity, fields, measureUnit.unitFieldName(), "measure unit companion field");
+        }
+        FieldDefinition baseValueField = requireMeasureField(entity, fields, measureUnit.baseValueFieldName(),
+                "measure base value field");
+        if (field.fieldName().equals(baseValueField.fieldName())) {
+            throw new ModuleDefinitionException("measure base value field must be different from owner: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (baseValueField.type() != FieldType.DECIMAL && baseValueField.type() != FieldType.INTEGER
+                && baseValueField.type() != FieldType.LONG) {
+            throw new ModuleDefinitionException("measure base value field must be numeric: "
+                    + entity.alias() + "." + measureUnit.baseValueFieldName());
+        }
+        if (measureUnit.baseUnitCategoryAlias() != null && !measureUnit.baseUnitCategoryAlias().isBlank()) {
+            requireIdentifier(measureUnit.baseUnitCategoryAlias(), "measure base unit category alias");
+        }
+        requireIdentifier(measureUnit.baseUnitCode(), "measure base unit code");
+        if (measureUnit.defaultUnitCode() != null && !measureUnit.defaultUnitCode().isBlank()) {
+            requireIdentifier(measureUnit.defaultUnitCode(), "measure default unit code");
+        }
+        if (measureUnit.conversionMode() == null) {
+            throw new ModuleDefinitionException("measure unit conversion mode must not be null: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (measureUnit.conversionScopeFieldName() != null && !measureUnit.conversionScopeFieldName().isBlank()) {
+            requireMeasureField(entity, fields, measureUnit.conversionScopeFieldName(), "measure conversion scope field");
+        }
+    }
+
+    private FieldDefinition requireMeasureField(EntityDefinition entity,
+                                                List<FieldDefinition> fields,
+                                                String fieldName,
+                                                String name) {
+        requireFieldName(fieldName, name);
+        return fields.stream()
+                .filter(field -> field.fieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": "
+                        + entity.alias() + "." + fieldName));
     }
 
     public void validateRelation(EntityRelationDefinition relation, Map<String, EntityDefinition> entities) {
