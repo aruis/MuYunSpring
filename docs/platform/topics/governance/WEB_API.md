@@ -27,6 +27,30 @@
 | `POST` | `/platform.low_code_governance/imports/drafts` | 在预检不阻断时准备导入草稿，记录基线版本信息 |
 | `POST` | `/platform.low_code_governance/imports/drafts/publish` | 发布导入草稿；若草稿基线版本已变化则由服务层拒绝 |
 
+## 计量单位诊断
+
+计量单位字段的发布前诊断复用配置包健康检查和导入 dry-run：
+
+| 入口 | 用途 |
+| --- | --- |
+| `POST /platform.low_code_governance/packages/health` | 校验当前模块包中的计量单位字段契约和依赖声明 |
+| `POST /platform.low_code_governance/imports/dry-run` | 在跨环境导入前校验计量单位依赖、字段契约和冲突诊断 |
+
+健康检查会扫描 `METADATA` bundle 中的字段清单，支持字段扁平属性和运行态 `measureUnit` 对象两种形态。常见诊断码：
+
+| 诊断码 | 级别 | 含义 |
+| --- | --- | --- |
+| `MEASURE_UNIT_DEPENDENCY_MISSING` | `WARN` | 模块包使用了计量单位分类，但 dependency manifest 未声明 `MEASURE_UNIT` 依赖 |
+| `MEASURE_UNIT_BASE_UNIT_MISSING` | `ERROR` | 计量单位字段缺少 `baseUnitCode` |
+| `MEASURE_UNIT_BASE_VALUE_MISSING` | `ERROR` | 缺少标准值影子字段或包内字段清单未包含该字段 |
+| `MEASURE_UNIT_BASE_VALUE_CONFLICT` | `ERROR` | 标准值字段和主业务字段冲突 |
+| `MEASURE_UNIT_MODE_MISSING` | `ERROR` | 计量单位字段缺少固定/可选单位模式 |
+| `MEASURE_UNIT_FIXED_UNIT_MISSING` | `ERROR` | 固定单位模式缺少 `fixedUnitCode` |
+| `MEASURE_UNIT_COMPANION_MISSING` | `ERROR` | 可选单位模式缺少单位伴生字段 |
+| `MEASURE_UNIT_SCOPE_FIELD_MISSING` | `ERROR` | 配置了换算上下文字段，但包内字段清单缺失该字段 |
+
+`WARN` 不阻断发布或导入预检，但会提示跨环境迁移风险；`ERROR` 会使健康状态进入 `FAIL`，发布门面会拒绝继续发布。
+
 ## 模板复用
 
 | 方法 | URL | 功能点 |

@@ -158,6 +158,35 @@
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
 
+计量单位验收优先使用换算预览接口，不需要先发布动态模块。
+
+同分类线性换算请求示例：
+
+```json
+{
+  "value": 2.5,
+  "fromUnitCode": "kg",
+  "toUnitCode": "g"
+}
+```
+
+业务硬换算请求示例：
+
+```json
+{
+  "moduleAlias": "sales.order",
+  "contextObjectType": "sku_id",
+  "contextObjectId": "sku-1",
+  "value": 2,
+  "fromCategoryAlias": "package",
+  "fromUnitCode": "pallet",
+  "toCategoryAlias": "package",
+  "toUnitCode": "bottle"
+}
+```
+
+返回 `convertedValue=1152` 表示当前规则链可把 `2托` 换算为 `1152瓶`。跨分类硬换算使用同一入口，例如 `roll:roll -> length:m` 返回 `convertedValue=60` 可验收 `2卷=60米`。
+
 ## 菜单配置
 
 菜单配置维护面分为菜单方案和方案内菜单树。菜单消费入口仍是 `/platform.menu/mine` 和 `/platform.menu/{menuId}/entry`，不替代配置维护接口。
