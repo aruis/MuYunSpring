@@ -103,6 +103,16 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         if (field.getFieldRole() == MetadataFieldRole.SIGNATURE && field.getFieldForm() != MetadataFieldForm.COMPANION) {
             throw new PlatformException("SIGNATURE field role requires companion field: " + field.getFieldName());
         }
+        if (field.getFieldRole() == MetadataFieldRole.MEASURE_UNIT
+                && field.getFieldForm() != MetadataFieldForm.COMPANION) {
+            throw new PlatformException("MEASURE_UNIT field role requires companion field: " + field.getFieldName());
+        }
+        if (field.getFieldRole() == MetadataFieldRole.MEASURE_BASE_VALUE) {
+            if (field.getFieldForm() != MetadataFieldForm.SHADOW) {
+                throw new PlatformException("MEASURE_BASE_VALUE field role requires shadow field: " + field.getFieldName());
+            }
+            field.setSystemManaged(Boolean.TRUE);
+        }
     }
 
     private void requireOwnerField(MetadataField field) {

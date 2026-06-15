@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.config;
 public enum LowCodePackageDependencyType {
     MODULE,
     DICTIONARY,
+    MEASURE_UNIT,
     ACTION,
     WORKFLOW,
     FILE_SERVICE,
@@ -10,7 +11,7 @@ public enum LowCodePackageDependencyType {
 
     public boolean platformResolvedByDefault() {
         return switch (this) {
-            case MODULE, DICTIONARY, ACTION -> true;
+            case MODULE, DICTIONARY, MEASURE_UNIT, ACTION -> true;
             case WORKFLOW, FILE_SERVICE, EXTERNAL -> false;
         };
     }

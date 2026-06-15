@@ -35,6 +35,15 @@ import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
+import net.ximatai.muyun.database.core.annotation.Column;
+import net.ximatai.muyun.database.core.annotation.Table;
+import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.ability.AbstractAbilityService;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.measure.MeasureUnitField;
+import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -445,6 +454,36 @@ class StaticModuleDefinitionScannerTest {
         }
     }
 
+    @Test
+    void shouldCompileStaticServiceModelMeasureUnitFieldsIntoModuleDefinition() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            StaticMeasureOrderService service = new StaticMeasureOrderService();
+            context.registerBean(StaticMeasureOrderWeb.class, () -> new StaticMeasureOrderWeb(service));
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("sales.order_line");
+            assertThat(definition.entities()).singleElement().satisfies(entity -> {
+                assertThat(entity.alias()).isEqualTo("order_line");
+                assertThat(entity.tableName()).isEqualTo("sales_order_line");
+                assertThat(entity.fields()).extracting("fieldName")
+                        .contains("quantity", "quantityUnit", "quantityBase", "skuId");
+                assertThat(entity.fields()).filteredOn(field -> field.fieldName().equals("quantity"))
+                        .singleElement()
+                        .satisfies(field -> assertThat(field.measureUnit()).satisfies(measureUnit -> {
+                            assertThat(measureUnit.categoryAlias()).isEqualTo("quantity");
+                            assertThat(measureUnit.mode()).isEqualTo(FieldMeasureUnitMode.SELECTABLE);
+                            assertThat(measureUnit.unitFieldName()).isEqualTo("quantityUnit");
+                            assertThat(measureUnit.baseValueFieldName()).isEqualTo("quantityBase");
+                            assertThat(measureUnit.baseUnitCode()).isEqualTo("bottle");
+                            assertThat(measureUnit.conversionMode()).isEqualTo(FieldMeasureUnitConversionMode.BUSINESS_RULE);
+                            assertThat(measureUnit.conversionScopeFieldName()).isEqualTo("skuId");
+                        }));
+            });
+        }
+    }
+
     private void assertCustomRecordAction(StaticModuleActionDefinition action, String actionCode, String title) {
         assertThat(action.actionCode()).isEqualTo(actionCode);
         assertThat(action.permissionActionCode()).isEqualTo(actionCode);
@@ -485,5 +524,44 @@ class StaticModuleDefinitionScannerTest {
     @PlatformStaticModule(application = "sales", alias = "sales.contract", title = "合同",
             capabilities = EntityCapability.APPROVAL)
     static class WorkflowEnabledWeb {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "sales", alias = "sales.order_line", title = "订单明细")
+    static class StaticMeasureOrderWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<StaticMeasureOrderService> {
+        StaticMeasureOrderWeb(StaticMeasureOrderService service) {
+            this.service = service;
+        }
+    }
+
+    private static class StaticMeasureOrderService extends AbstractAbilityService<StaticMeasureOrderLine> {
+        @SuppressWarnings("unchecked")
+        StaticMeasureOrderService() {
+            super("sales.order_line", StaticMeasureOrderLine.class, mock(BaseDao.class));
+        }
+    }
+
+    @Table(name = "sales_order_line", comment = "Sales order line")
+    private static class StaticMeasureOrderLine extends StandardEntity {
+        @MeasureUnitField(
+                categoryAlias = "quantity",
+                defaultUnitCode = "box",
+                unitFieldName = "quantityUnit",
+                baseValueFieldName = "quantityBase",
+                baseUnitCode = "bottle",
+                conversionMode = MeasureUnitField.ConversionMode.BUSINESS_RULE,
+                conversionScopeFieldName = "skuId"
+        )
+        @Column(name = "quantity", type = ColumnType.NUMERIC, precision = 18, scale = 2)
+        private java.math.BigDecimal quantity;
+
+        @Column(name = "quantity_unit", type = ColumnType.VARCHAR, length = 64)
+        private String quantityUnit;
+
+        @Column(name = "quantity_base", type = ColumnType.NUMERIC, precision = 18, scale = 2)
+        private java.math.BigDecimal quantityBase;
+
+        @Column(name = "sku_id", type = ColumnType.VARCHAR, length = 64)
+        private String skuId;
     }
 }

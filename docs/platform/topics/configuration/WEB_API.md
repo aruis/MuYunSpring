@@ -32,6 +32,9 @@
 | 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
 | 数据字典类目 | `DictionaryCategoryService` | `/platform.application/{applicationAlias}/dictionary-categories` |
 | 数据字典项目 | `DictionaryItemService` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items` |
+| 计量单位分类 | `MeasureUnitCategoryService` | `/platform.application/{applicationAlias}/measure-unit-categories` |
+| 计量单位 | `MeasureUnitService` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units` |
+| 计量单位换算规则 | `MeasureUnitConversionRuleService` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -123,6 +126,37 @@
 | 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/enable/{id}`、`/disable/{id}` | 启用或停用字典项目 |
 | 字典项目 | `POST` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items/sort/{id}` | 在同一类目和父项目范围内调整项目顺序 |
 
+## 计量单位
+
+计量单位分类挂在应用下，单位项目挂在分类下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准。单位目录换算入口只处理同分类线性换算；跨分类或依赖模块、记录上下文的硬换算由计量单位换算规则入口承接。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/query` | 查询应用下的计量单位分类 |
+| 计量单位分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/view/{id}` | 查看计量单位分类，并校验分类属于该应用 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/insert` | 新增计量单位分类；后端以 URL 中的 `applicationAlias` 为准 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/update/{id}` | 更新计量单位分类，并保持应用归属不跨应用 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/delete/{id}` | 删除计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/enable/{id}`、`/disable/{id}` | 启用或停用计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/sort/{id}` | 在同一应用内调整分类顺序 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/query` | 查询分类下的计量单位 |
+| 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/options` | 获取分类下的单位候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/view/{id}` | 查看计量单位，并校验单位属于该分类 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/insert` | 新增计量单位；后端以 URL 中的应用和分类为准 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/update/{id}` | 更新计量单位，并保持分类归属不跨分类 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/delete/{id}` | 删除计量单位 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/enable/{id}`、`/disable/{id}` | 启用或停用计量单位 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/sort/{id}` | 在同一分类内调整单位顺序 |
+| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/convert` | 按同分类线性换算参数执行单位换算 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/query` | 查询应用下的业务硬换算规则 |
+| 换算规则 | `GET` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/view/{id}` | 查看换算规则，并校验规则属于该应用 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/insert` | 新增换算规则；后端以 URL 中的 `applicationAlias` 为准 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/update/{id}` | 更新换算规则，并保持应用归属不跨应用 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/delete/{id}` | 删除换算规则 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/enable/{id}`、`/disable/{id}` | 启用或停用换算规则 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
+| 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
+
 ## 菜单配置
 
 菜单配置维护面分为菜单方案和方案内菜单树。菜单消费入口仍是 `/platform.menu/mine` 和 `/platform.menu/{menuId}/entry`，不替代配置维护接口。
@@ -177,6 +211,10 @@
 
 模块聚合接口只处理天然归属模块的配置。请求体里即使传入 `moduleAlias` 或 `relationId`，后端也以 URL 路径为准，并校验存量记录不能跨模块操作。
 
+模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时必须绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 必须绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
+
+模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
+
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/query` | 查询模块动作 |
@@ -208,6 +246,7 @@
 | 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/sort/{id}` | 在视图内调整字段顺序 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/query` | 查询关系下的模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/ensure` | 按元数据字段同步生成模块字段配置 |
+| 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{id}/measure-unit/prepare` | 为主数值字段准备单位伴生字段、标准值影子字段并回填计量单位配置 |
 | 模块字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/view/{id}` | 查看模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/insert` | 新增模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/update/{id}` | 更新模块字段配置 |

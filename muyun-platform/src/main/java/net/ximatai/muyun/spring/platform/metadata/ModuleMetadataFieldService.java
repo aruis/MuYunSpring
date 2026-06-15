@@ -10,8 +10,12 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,13 +33,22 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     private final ModuleMetadataRelationService relationService;
     private final MetadataService metadataService;
     private final MetadataFieldService fieldService;
+    private final PlatformFieldTypeService fieldTypeService;
     private final ModuleMetadataFieldReferenceGenerateRuleValidator referenceGenerateRuleValidator;
 
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService) {
-        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, Optional.empty());
+        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, null, Optional.empty());
+    }
+
+    public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataService metadataService,
+                                      MetadataFieldService fieldService,
+                                      Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
+        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, null, referenceGenerateRuleValidator);
     }
 
     @Autowired
@@ -43,11 +56,13 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService,
+                                      PlatformFieldTypeService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
         super(MODULE_ALIAS, ModuleMetadataField.class, moduleMetadataFieldDao);
         this.relationService = relationService;
         this.metadataService = metadataService;
         this.fieldService = fieldService;
+        this.fieldTypeService = fieldTypeService;
         this.referenceGenerateRuleValidator = referenceGenerateRuleValidator == null
                 ? null
                 : referenceGenerateRuleValidator.orElse(null);
@@ -160,6 +175,74 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         );
     }
 
+    @Transactional
+    public ModuleMetadataMeasureUnitPrepareResult prepareMeasureUnitConfig(
+            String moduleMetadataFieldId,
+            ModuleMetadataMeasureUnitPrepareCommand command) {
+        ModuleMetadataField moduleField = moduleMetadataFieldId == null || moduleMetadataFieldId.isBlank()
+                ? null
+                : select(moduleMetadataFieldId);
+        if (moduleField == null) {
+            throw new PlatformException("Module metadata field requires existing config: " + moduleMetadataFieldId);
+        }
+        ModuleMetadataRelation relation = requireRelation(moduleField.getRelationId());
+        Metadata metadata = requireMetadata(relation.getMetadataId());
+        MetadataField owner = requireField(moduleField.getMetadataFieldId());
+        if (!Objects.equals(owner.getMetadataId(), metadata.getId())) {
+            throw new PlatformException("Module metadata field metadata mismatch: " + moduleMetadataFieldId);
+        }
+        if (owner.getFieldRole() == MetadataFieldRole.MEASURE_UNIT
+                || owner.getFieldRole() == MetadataFieldRole.MEASURE_BASE_VALUE) {
+            throw new PlatformException("measure unit config must be prepared on owner value field: "
+                    + owner.getFieldName());
+        }
+        ModuleMetadataMeasureUnitPrepareCommand validCommand = command == null
+                ? new ModuleMetadataMeasureUnitPrepareCommand(null, null, null, null, null, null,
+                null, null, null, null, null, null, null)
+                : command;
+        requireNumericField(owner, "measure unit value field");
+        String unitCategoryAlias = PlatformNameRules.requireIdentifier(
+                validCommand.unitCategoryAlias(), "unitCategoryAlias");
+        FieldMeasureUnitMode unitMode = validCommand.unitMode() == null
+                ? FieldMeasureUnitMode.SELECTABLE
+                : validCommand.unitMode();
+        validatePrepareCommand(metadata, owner, validCommand, unitMode);
+        MetadataField unitField = null;
+        if (unitMode == FieldMeasureUnitMode.SELECTABLE) {
+            unitField = ensureRelatedField(
+                    metadata,
+                    owner,
+                    MetadataFieldForm.COMPANION,
+                    MetadataFieldRole.MEASURE_UNIT,
+                    defaultText(validCommand.unitFieldName(), owner.getFieldName() + "Unit"),
+                    defaultText(validCommand.unitFieldTypeAlias(), "string"),
+                    "Unit"
+            );
+        }
+        MetadataField baseValueField = ensureRelatedField(
+                metadata,
+                owner,
+                MetadataFieldForm.SHADOW,
+                MetadataFieldRole.MEASURE_BASE_VALUE,
+                defaultText(validCommand.baseValueFieldName(), owner.getFieldName() + "Base"),
+                defaultText(validCommand.baseValueFieldTypeAlias(), owner.getFieldTypeAlias()),
+                "Base"
+        );
+        moduleField.setUnitCategoryAlias(unitCategoryAlias);
+        moduleField.setUnitMode(unitMode);
+        moduleField.setFixedUnitCode(validCommand.fixedUnitCode());
+        moduleField.setDefaultUnitCode(validCommand.defaultUnitCode());
+        moduleField.setUnitFieldId(unitField == null ? null : unitField.getId());
+        moduleField.setBaseValueFieldId(baseValueField.getId());
+        moduleField.setBaseUnitCategoryAlias(validCommand.baseUnitCategoryAlias());
+        moduleField.setBaseUnitCode(validCommand.baseUnitCode());
+        moduleField.setUnitConversionMode(validCommand.unitConversionMode());
+        moduleField.setConversionScopeFieldId(validCommand.conversionScopeFieldId());
+        moduleField.setUnitRequired(validCommand.unitRequired());
+        update(moduleField);
+        return new ModuleMetadataMeasureUnitPrepareResult(select(moduleField.getId()), unitField, baseValueField);
+    }
+
     private void normalizeAndValidate(ModuleMetadataField moduleField) {
         ModuleMetadataRelation relation = requireRelation(moduleField.getRelationId());
         Metadata metadata = requireMetadata(relation.getMetadataId());
@@ -169,6 +252,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     + moduleField.getMetadataFieldId());
         }
         normalizeReferenceConfig(moduleField, metadata, relation);
+        normalizeMeasureUnitConfig(moduleField, metadata, field);
         rejectDuplicate(moduleField, Criteria.of()
                         .eq("relationId", relation.getId())
                         .eq("metadataFieldId", field.getId()),
@@ -220,6 +304,282 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         }
         moduleField.setReferenceModulePlusFields(normalizeFieldNameSet(
                 moduleField.getReferenceModulePlusFields(), "referenceModulePlusFields"));
+    }
+
+    private void normalizeMeasureUnitConfig(ModuleMetadataField moduleField,
+                                            Metadata metadata,
+                                            MetadataField field) {
+        if (!hasText(moduleField.getUnitCategoryAlias())) {
+            clearMeasureUnitConfig(moduleField);
+            return;
+        }
+        if (field.getFieldRole() == MetadataFieldRole.MEASURE_UNIT
+                || field.getFieldRole() == MetadataFieldRole.MEASURE_BASE_VALUE) {
+            throw new PlatformException("measure unit config must be declared on owner value field: "
+                    + field.getFieldName());
+        }
+        requireNumericField(field, "measure unit value field");
+        moduleField.setUnitCategoryAlias(PlatformNameRules.requireIdentifier(
+                moduleField.getUnitCategoryAlias(), "unitCategoryAlias"));
+        if (hasText(moduleField.getBaseUnitCategoryAlias())) {
+            moduleField.setBaseUnitCategoryAlias(PlatformNameRules.requireIdentifier(
+                    moduleField.getBaseUnitCategoryAlias(), "baseUnitCategoryAlias"));
+        } else {
+            moduleField.setBaseUnitCategoryAlias(moduleField.getUnitCategoryAlias());
+        }
+        moduleField.setBaseUnitCode(PlatformNameRules.requireIdentifier(moduleField.getBaseUnitCode(), "baseUnitCode"));
+        if (moduleField.getUnitConversionMode() == null) {
+            moduleField.setUnitConversionMode(FieldMeasureUnitConversionMode.LINEAR);
+        }
+        if (moduleField.getUnitMode() == null) {
+            moduleField.setUnitMode(hasText(moduleField.getFixedUnitCode())
+                    ? FieldMeasureUnitMode.FIXED
+                    : FieldMeasureUnitMode.SELECTABLE);
+        }
+        if (moduleField.getUnitRequired() == null) {
+            moduleField.setUnitRequired(Boolean.FALSE);
+        }
+        if (hasText(moduleField.getDefaultUnitCode())) {
+            moduleField.setDefaultUnitCode(PlatformNameRules.requireIdentifier(
+                    moduleField.getDefaultUnitCode(), "defaultUnitCode"));
+        }
+        if (moduleField.getUnitMode() == FieldMeasureUnitMode.FIXED) {
+            moduleField.setFixedUnitCode(PlatformNameRules.requireIdentifier(moduleField.getFixedUnitCode(), "fixedUnitCode"));
+            moduleField.setUnitFieldId(null);
+            if (!hasText(moduleField.getDefaultUnitCode())) {
+                moduleField.setDefaultUnitCode(moduleField.getFixedUnitCode());
+            }
+        } else {
+            moduleField.setFixedUnitCode(null);
+            MetadataField unitField = requireRelatedField(moduleField.getUnitFieldId(), metadata, field,
+                    MetadataFieldForm.COMPANION, MetadataFieldRole.MEASURE_UNIT, "unitFieldId");
+            requireFieldType(unitField, FieldType.STRING, "measure unit companion field");
+            moduleField.setUnitFieldId(unitField.getId());
+        }
+        MetadataField baseValueField = requireRelatedField(moduleField.getBaseValueFieldId(), metadata, field,
+                MetadataFieldForm.SHADOW, MetadataFieldRole.MEASURE_BASE_VALUE, "baseValueFieldId");
+        requireNumericField(baseValueField, "measure base value shadow field");
+        moduleField.setBaseValueFieldId(baseValueField.getId());
+        if (hasText(moduleField.getConversionScopeFieldId())) {
+            MetadataField scopeField = requireField(moduleField.getConversionScopeFieldId());
+            if (!Objects.equals(scopeField.getMetadataId(), metadata.getId())) {
+                throw new PlatformException("conversionScopeFieldId must belong to same metadata: "
+                        + moduleField.getConversionScopeFieldId());
+            }
+            moduleField.setConversionScopeFieldId(scopeField.getId());
+        }
+    }
+
+    private void clearMeasureUnitConfig(ModuleMetadataField moduleField) {
+        moduleField.setUnitCategoryAlias(null);
+        moduleField.setUnitMode(null);
+        moduleField.setFixedUnitCode(null);
+        moduleField.setDefaultUnitCode(null);
+        moduleField.setUnitFieldId(null);
+        moduleField.setBaseValueFieldId(null);
+        moduleField.setBaseUnitCategoryAlias(null);
+        moduleField.setBaseUnitCode(null);
+        moduleField.setUnitConversionMode(null);
+        moduleField.setConversionScopeFieldId(null);
+        moduleField.setUnitRequired(Boolean.FALSE);
+    }
+
+    private MetadataField requireRelatedField(String fieldId,
+                                              Metadata metadata,
+                                              MetadataField owner,
+                                              MetadataFieldForm form,
+                                              MetadataFieldRole role,
+                                              String label) {
+        if (!hasText(fieldId)) {
+            throw new PlatformException(label + " must not be blank");
+        }
+        MetadataField related = requireField(fieldId);
+        if (!Objects.equals(related.getMetadataId(), metadata.getId())) {
+            throw new PlatformException(label + " must belong to same metadata: " + fieldId);
+        }
+        if (related.getFieldForm() != form || related.getFieldRole() != role) {
+            throw new PlatformException(label + " requires " + form + " " + role + " field: " + fieldId);
+        }
+        if (!Objects.equals(related.getOwnerFieldId(), owner.getId())) {
+            throw new PlatformException(label + " must be owned by measure value field: " + fieldId);
+        }
+        return related;
+    }
+
+    private MetadataField ensureRelatedField(Metadata metadata,
+                                             MetadataField owner,
+                                             MetadataFieldForm form,
+                                             MetadataFieldRole role,
+                                             String fieldName,
+                                             String fieldTypeAlias,
+                                             String titleSuffix) {
+        MetadataField existing = findOneRelatedField(metadata.getId(), owner.getId(), role);
+        if (existing != null) {
+            if (existing.getFieldForm() != form) {
+                throw new PlatformException("measure related field form mismatch: " + existing.getFieldName());
+            }
+            return existing;
+        }
+        String validFieldName = PlatformNameRules.requireFieldName(fieldName, "measureRelatedFieldName");
+        rejectRelatedFieldNameCollision(metadata.getId(), validFieldName, role);
+        rejectRelatedColumnNameCollision(metadata.getId(), toColumnName(validFieldName));
+        MetadataField field = new MetadataField();
+        field.setMetadataId(metadata.getId());
+        field.setFieldName(validFieldName);
+        field.setColumnName(toColumnName(validFieldName));
+        field.setFieldTypeAlias(PlatformNameRules.requireIdentifier(fieldTypeAlias, "measureRelatedFieldTypeAlias"));
+        field.setTitle(defaultText(owner.getTitle(), owner.getFieldName()) + " " + titleSuffix);
+        field.setFieldForm(form);
+        field.setFieldRole(role);
+        field.setOwnerFieldId(owner.getId());
+        field.setSystemManaged(role == MetadataFieldRole.MEASURE_BASE_VALUE);
+        field.setSortOrder(nextSortOrder(metadata.getId()));
+        String id = fieldService.insert(field);
+        return fieldService.select(id);
+    }
+
+    private void validatePrepareCommand(Metadata metadata,
+                                        MetadataField owner,
+                                        ModuleMetadataMeasureUnitPrepareCommand command,
+                                        FieldMeasureUnitMode unitMode) {
+        PlatformNameRules.requireIdentifier(command.unitCategoryAlias(), "unitCategoryAlias");
+        PlatformNameRules.requireIdentifier(command.baseUnitCode(), "baseUnitCode");
+        if (hasText(command.baseUnitCategoryAlias())) {
+            PlatformNameRules.requireIdentifier(command.baseUnitCategoryAlias(), "baseUnitCategoryAlias");
+        }
+        if (hasText(command.defaultUnitCode())) {
+            PlatformNameRules.requireIdentifier(command.defaultUnitCode(), "defaultUnitCode");
+        }
+        if (unitMode == FieldMeasureUnitMode.FIXED) {
+            PlatformNameRules.requireIdentifier(command.fixedUnitCode(), "fixedUnitCode");
+        } else {
+            validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MEASURE_UNIT,
+                    defaultText(command.unitFieldName(), owner.getFieldName() + "Unit"),
+                    defaultText(command.unitFieldTypeAlias(), "string"),
+                    FieldType.STRING);
+        }
+        validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MEASURE_BASE_VALUE,
+                defaultText(command.baseValueFieldName(), owner.getFieldName() + "Base"),
+                defaultText(command.baseValueFieldTypeAlias(), owner.getFieldTypeAlias()),
+                null);
+        if (hasText(command.conversionScopeFieldId())) {
+            MetadataField scopeField = requireField(command.conversionScopeFieldId());
+            if (!Objects.equals(scopeField.getMetadataId(), metadata.getId())) {
+                throw new PlatformException("conversionScopeFieldId must belong to same metadata: "
+                        + command.conversionScopeFieldId());
+            }
+        }
+    }
+
+    private void validatePreparedFieldSpec(Metadata metadata,
+                                           MetadataField owner,
+                                           MetadataFieldRole role,
+                                           String fieldName,
+                                           String fieldTypeAlias,
+                                           FieldType expectedType) {
+        MetadataField existing = findOneRelatedField(metadata.getId(), owner.getId(), role);
+        if (existing != null) {
+            return;
+        }
+        String validFieldName = PlatformNameRules.requireFieldName(fieldName, "measureRelatedFieldName");
+        rejectRelatedFieldNameCollision(metadata.getId(), validFieldName, role);
+        rejectRelatedColumnNameCollision(metadata.getId(), toColumnName(validFieldName));
+        PlatformFieldType fieldType = fieldTypeService.requireFieldType(
+                PlatformNameRules.requireIdentifier(fieldTypeAlias, "measureRelatedFieldTypeAlias"));
+        if (expectedType != null && fieldType.getFieldType() != expectedType) {
+            throw new PlatformException("measure related field requires " + expectedType + " field type: "
+                    + validFieldName);
+        }
+        if (role == MetadataFieldRole.MEASURE_BASE_VALUE
+                && fieldType.getFieldType() != FieldType.INTEGER
+                && fieldType.getFieldType() != FieldType.LONG
+                && fieldType.getFieldType() != FieldType.DECIMAL) {
+            throw new PlatformException("measure base value field requires numeric field type: " + validFieldName);
+        }
+    }
+
+    private MetadataField findOneRelatedField(String metadataId, String ownerFieldId, MetadataFieldRole role) {
+        List<MetadataField> fields = fieldService.list(Criteria.of()
+                        .eq("metadataId", metadataId)
+                        .eq("ownerFieldId", ownerFieldId)
+                        .eq("fieldRole", role),
+                ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        if (fields.size() > 1) {
+            throw new PlatformException("measure related field must be unique for owner and role: "
+                    + ownerFieldId + "." + role);
+        }
+        return fields.stream().findFirst().orElse(null);
+    }
+
+    private void rejectRelatedFieldNameCollision(String metadataId, String fieldName, MetadataFieldRole role) {
+        MetadataField existing = fieldService.list(Criteria.of()
+                        .eq("metadataId", metadataId)
+                        .eq("fieldName", fieldName),
+                PageRequest.of(1, 1)).stream().findFirst().orElse(null);
+        if (existing != null) {
+            throw new PlatformException("measure related field name is already used: " + fieldName);
+        }
+    }
+
+    private void rejectRelatedColumnNameCollision(String metadataId, String columnName) {
+        MetadataField existing = fieldService.list(Criteria.of()
+                        .eq("metadataId", metadataId)
+                        .eq("columnName", columnName),
+                PageRequest.of(1, 1)).stream().findFirst().orElse(null);
+        if (existing != null) {
+            throw new PlatformException("measure related column name is already used: " + columnName);
+        }
+    }
+
+    private Integer nextSortOrder(String metadataId) {
+        return fieldService.list(Criteria.of().eq("metadataId", metadataId), ALL, Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .map(MetadataField::getSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .map(value -> value + 10)
+                .orElse(10);
+    }
+
+    private String toColumnName(String fieldName) {
+        StringBuilder column = new StringBuilder();
+        for (int i = 0; i < fieldName.length(); i++) {
+            char ch = fieldName.charAt(i);
+            if (Character.isUpperCase(ch)) {
+                if (i > 0) {
+                    column.append('_');
+                }
+                column.append(Character.toLowerCase(ch));
+            } else {
+                column.append(ch);
+            }
+        }
+        return PlatformNameRules.requireDatabaseName(column.toString(), "measureRelatedColumnName");
+    }
+
+    private String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private void requireNumericField(MetadataField field, String label) {
+        FieldType type = requireFieldType(field);
+        if (type != FieldType.INTEGER && type != FieldType.LONG && type != FieldType.DECIMAL) {
+            throw new PlatformException(label + " requires numeric field: " + field.getFieldName());
+        }
+    }
+
+    private void requireFieldType(MetadataField field, FieldType expected, String label) {
+        FieldType type = requireFieldType(field);
+        if (type != expected) {
+            throw new PlatformException(label + " requires " + expected + " field: " + field.getFieldName());
+        }
+    }
+
+    private FieldType requireFieldType(MetadataField field) {
+        if (fieldTypeService == null) {
+            throw new PlatformException("measure unit config requires PlatformFieldTypeService");
+        }
+        return fieldTypeService.requireFieldType(field.getFieldTypeAlias()).getFieldType();
     }
 
     private boolean hasReferenceDependentConfig(ModuleMetadataField moduleField) {

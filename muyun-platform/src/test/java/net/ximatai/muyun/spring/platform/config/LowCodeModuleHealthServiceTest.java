@@ -218,12 +218,243 @@ class LowCodeModuleHealthServiceTest {
     }
 
     @Test
+    void measureUnitCheckerShouldWarnWhenCategoryDependencyIsMissing() {
+        LowCodeModulePackage modulePackage = measureUnitPackage(List.of());
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.WARN);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::scope, LowCodeConfigHealthItem::code,
+                        LowCodeConfigHealthItem::targetType, LowCodeConfigHealthItem::targetId)
+                .containsExactly(tuple(LowCodeConfigHealthScope.DEPENDENCY, "MEASURE_UNIT_DEPENDENCY_MISSING",
+                        "measureUnit", "quantity"));
+    }
+
+    @Test
+    void measureUnitCheckerShouldPassWhenMetadataFieldsAndDependencyAreComplete() {
+        LowCodeModulePackage modulePackage = measureUnitPackage(
+                List.of(LowCodePackageDependency.measureUnit("crm", "quantity")));
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
+        assertThat(report.items()).isEmpty();
+    }
+
+    @Test
+    void measureUnitCheckerShouldSupportRuntimeNestedMeasureUnitContract() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "fields", List.of(
+                                        Map.of(
+                                                "fieldName", "quantity",
+                                                "measureUnit", Map.of(
+                                                        "categoryAlias", "quantity",
+                                                        "mode", "SELECTABLE",
+                                                        "baseUnitCode", "bottle",
+                                                        "baseValueFieldName", "quantityBase",
+                                                        "unitFieldName", "quantityUnit"
+                                                )
+                                        ),
+                                        Map.of("fieldName", "quantityUnit"),
+                                        Map.of("fieldName", "quantityBase")
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "quantity"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
+    }
+
+    @Test
+    void measureUnitCheckerShouldResolveConfigurationFieldIds() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "metadataFields", List.of(
+                                        Map.of("id", "f_qty", "fieldName", "quantity"),
+                                        Map.of("id", "f_unit", "fieldName", "quantityUnit"),
+                                        Map.of("id", "f_base", "fieldName", "quantityBase"),
+                                        Map.of("id", "f_sku", "fieldName", "skuId")
+                                ),
+                                "moduleFields", List.of(
+                                        Map.of(
+                                                "metadataFieldId", "f_qty",
+                                                "fieldName", "quantity",
+                                                "unitCategoryAlias", "quantity",
+                                                "unitMode", "SELECTABLE",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldId", "f_base",
+                                                "unitFieldId", "f_unit",
+                                                "conversionScopeFieldId", "f_sku"
+                                        )
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "quantity"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
+    }
+
+    @Test
+    void measureUnitCheckerShouldRejectConfigurationBaseValueIdPointingToOwner() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "metadataFields", List.of(
+                                        Map.of("id", "f_qty", "fieldName", "quantity"),
+                                        Map.of("id", "f_unit", "fieldName", "quantityUnit")
+                                ),
+                                "moduleFields", List.of(
+                                        Map.of(
+                                                "metadataFieldId", "f_qty",
+                                                "unitCategoryAlias", "quantity",
+                                                "unitMode", "SELECTABLE",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldId", "f_qty",
+                                                "unitFieldId", "f_unit"
+                                        )
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "quantity"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::code, LowCodeConfigHealthItem::targetId)
+                .containsExactly(tuple("MEASURE_UNIT_BASE_VALUE_CONFLICT", "quantity"));
+    }
+
+    @Test
+    void measureUnitCheckerShouldRequireBaseUnitCategoryDependencyWhenDifferent() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "fields", List.of(
+                                        Map.of(
+                                                "fieldName", "quantity",
+                                                "unitCategoryAlias", "package",
+                                                "baseUnitCategoryAlias", "quantity",
+                                                "unitMode", "FIXED",
+                                                "fixedUnitCode", "box",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldName", "quantityBase"
+                                        ),
+                                        Map.of("fieldName", "quantityBase")
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "package"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.WARN);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::code, LowCodeConfigHealthItem::targetId)
+                .containsExactly(tuple("MEASURE_UNIT_DEPENDENCY_MISSING", "quantity"));
+    }
+
+    @Test
+    void measureUnitCheckerShouldReportBrokenMetadataFieldContract() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "fields", List.of(
+                                        Map.of(
+                                                "fieldName", "quantity",
+                                                "unitCategoryAlias", "quantity",
+                                                "unitMode", "SELECTABLE",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldName", "quantity",
+                                                "unitFieldName", "quantityUnit",
+                                                "conversionScopeFieldName", "skuId"
+                                        ),
+                                        Map.of("fieldName", "quantityUnit")
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "quantity"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::code)
+                .containsExactlyInAnyOrder("MEASURE_UNIT_BASE_VALUE_CONFLICT", "MEASURE_UNIT_SCOPE_FIELD_MISSING");
+    }
+
+    @Test
+    void dependencyCheckerShouldResolveMeasureUnitCategoryDependency() {
+        LowCodeModulePackage modulePackage = measureUnitPackage(
+                List.of(LowCodePackageDependency.measureUnit("crm", "quantity")));
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeModuleDependencyHealthChecker(List.of(new LowCodeConfigTestFixtures.RecordingDependencyResolver(
+                        Set.of(LowCodePackageDependencyType.MEASURE_UNIT), Set.of()
+                )))));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items().getFirst().code()).isEqualTo("REQUIRED_DEPENDENCY_MISSING");
+        assertThat(report.items().getFirst().targetId()).isEqualTo("crm:quantity");
+    }
+
+    @Test
     void shouldWireHealthServiceWithPackageCheckerInSpringContext() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.register(LowCodeModuleHealthService.class,
                     LowCodeModulePackageHealthChecker.class,
                     LowCodeModuleBundleIdentityHealthChecker.class,
-                    LowCodeModuleDependencyHealthChecker.class);
+                    LowCodeModuleDependencyHealthChecker.class,
+                    LowCodeMeasureUnitHealthChecker.class);
             context.refresh();
             LowCodeModuleHealthService service = context.getBean(LowCodeModuleHealthService.class);
 
@@ -241,5 +472,34 @@ class LowCodeModuleHealthServiceTest {
         assertThatThrownBy(() -> service.check(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("health context must not be null");
+    }
+
+    private LowCodeModulePackage measureUnitPackage(List<LowCodePackageDependency> dependencies) {
+        return new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "fields", List.of(
+                                        Map.of(
+                                                "fieldName", "quantity",
+                                                "unitCategoryAlias", "quantity",
+                                                "unitMode", "SELECTABLE",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldName", "quantityBase",
+                                                "unitFieldName", "quantityUnit",
+                                                "conversionScopeFieldName", "skuId"
+                                        ),
+                                        Map.of("fieldName", "quantityUnit"),
+                                        Map.of("fieldName", "quantityBase"),
+                                        Map.of("fieldName", "skuId")
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(dependencies),
+                null
+        );
     }
 }
