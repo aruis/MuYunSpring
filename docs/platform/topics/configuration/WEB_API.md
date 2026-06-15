@@ -216,6 +216,53 @@
 
 模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
 
+管理端可以按两种方式配置计量单位字段：
+
+1. 使用 `fields/{id}/measure-unit/prepare`，由平台按主数值字段自动创建或复用单位伴生字段、标准值影子字段，并回填当前模块字段配置。
+2. 使用 `fields/update/{id}`，保存已存在的 `unitFieldId`、`baseValueFieldId`、`conversionScopeFieldId` 等绑定关系。标准更新不是局部 patch，管理端应先读取 `view/{id}`，合并计量单位字段后提交完整模块字段配置。
+
+`measure-unit/prepare` 请求体为 `ModuleMetadataMeasureUnitPrepareCommand`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `unitCategoryAlias` | 必填，主业务值使用的单位分类 alias |
+| `unitMode` | `SELECTABLE` 或 `FIXED`，为空时默认 `SELECTABLE` |
+| `fixedUnitCode` | 固定单位模式必填 |
+| `defaultUnitCode` | 可选单位模式的默认单位；固定单位模式未传时默认等于 `fixedUnitCode` |
+| `unitFieldName` | 可选单位模式下准备的伴生字段名，默认 `<ownerFieldName>Unit` |
+| `baseValueFieldName` | 准备的标准值影子字段名，默认 `<ownerFieldName>Base` |
+| `baseUnitCategoryAlias` | 标准值单位分类，空时默认等于 `unitCategoryAlias` |
+| `baseUnitCode` | 必填，标准值使用的基准单位 code |
+| `unitConversionMode` | `LINEAR` 或 `BUSINESS_RULE`，为空时默认 `LINEAR` |
+| `conversionScopeFieldId` | 可选，业务硬换算的记录上下文字段 |
+| `unitRequired` | 可选，单位是否必填；为空时按后端默认值处理 |
+| `unitFieldTypeAlias` | 伴生单位字段类型，默认 `string` |
+| `baseValueFieldTypeAlias` | 标准值影子字段类型，默认等于主数值字段类型 |
+
+返回体为 `ModuleMetadataMeasureUnitPrepareResult`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `moduleField` | 已回填计量单位契约的模块字段配置 |
+| `unitField` | 可选单位模式下创建或复用的单位伴生元数据字段；固定单位模式为空 |
+| `baseValueField` | 创建或复用的标准值影子元数据字段 |
+
+典型请求：
+
+```json
+{
+  "unitCategoryAlias": "package",
+  "unitMode": "SELECTABLE",
+  "defaultUnitCode": "box",
+  "unitFieldName": "quantityUnit",
+  "baseValueFieldName": "quantityBase",
+  "baseUnitCategoryAlias": "package",
+  "baseUnitCode": "bottle",
+  "unitConversionMode": "BUSINESS_RULE",
+  "unitRequired": true
+}
+```
+
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
 | 模块动作 | `POST` | `/platform.module/{moduleAlias}/actions/query` | 查询模块动作 |
