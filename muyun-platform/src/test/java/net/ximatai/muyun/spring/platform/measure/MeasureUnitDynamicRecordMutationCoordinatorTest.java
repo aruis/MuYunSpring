@@ -135,6 +135,30 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
     }
 
     @Test
+    void shouldNormalizeConfiguredBusinessHardConversionsBeforeDynamicCreate() {
+        packageUnits();
+        unit("sales", "package", "pallet", BigDecimal.ONE);
+        rollAndLengthUnits();
+        ruleService.insert(rule("sales", MeasureUnitConversionScopeType.GLOBAL,
+                "package", "box", "package", "bottle", "12"));
+        ruleService.insert(rule("sales", MeasureUnitConversionScopeType.GLOBAL,
+                "package", "pallet", "package", "box", "48"));
+        ruleService.insert(rule("sales", MeasureUnitConversionScopeType.GLOBAL,
+                "roll", "roll", "length", "m", "30"));
+        DynamicRecord palletLine = new DynamicRecord(packageBusinessRuleEntity())
+                .setValue("quantity", new BigDecimal("2"))
+                .setValue("quantityUnit", "pallet");
+        DynamicRecord rollLine = new DynamicRecord(rollEntity())
+                .setValue("quantity", new BigDecimal("2"));
+
+        coordinator.beforeCreate("sales.order", "line", palletLine);
+        coordinator.beforeCreate("sales.order", "line", rollLine);
+
+        assertThat(baseValue(palletLine)).isEqualByComparingTo("1152");
+        assertThat(baseValue(rollLine)).isEqualByComparingTo("60");
+    }
+
+    @Test
     void shouldReuseExistingConversionScopeWhenOnlyMeasureValueChangesOnUpdate() {
         rollAndLengthUnits();
         MeasureUnitConversionRule rule = new MeasureUnitConversionRule();
@@ -166,6 +190,32 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
 
     private EntityDefinition packageEntityWithDefaultUnit() {
         return packageEntity("box");
+    }
+
+    private EntityDefinition packageBusinessRuleEntity() {
+        return new EntityDefinition(
+                "line",
+                "sales_order_line",
+                "Line",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").measureUnit(new FieldMeasureUnitDefinition(
+                                "package",
+                                FieldMeasureUnitMode.SELECTABLE,
+                                null,
+                                null,
+                                "quantityUnit",
+                                "quantityBase",
+                                "package",
+                                "bottle",
+                                FieldMeasureUnitConversionMode.BUSINESS_RULE,
+                                null,
+                                true
+                        )),
+                        FieldDefinition.string("quantityUnit", "Unit").column("quantity_unit").length(64),
+                        FieldDefinition.decimal("quantityBase", "Base Quantity").column("quantity_base")
+                ),
+                Set.of(EntityCapability.CRUD)
+        );
     }
 
     private EntityDefinition packageEntity(String defaultUnitCode) {
@@ -261,6 +311,24 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
         unit.setTitle(code);
         unit.setFactorToBase(factorToBase);
         unitService.insert(unit);
+    }
+
+    private MeasureUnitConversionRule rule(String applicationAlias,
+                                           MeasureUnitConversionScopeType scopeType,
+                                           String fromCategoryAlias,
+                                           String fromUnitCode,
+                                           String toCategoryAlias,
+                                           String toUnitCode,
+                                           String factor) {
+        MeasureUnitConversionRule rule = new MeasureUnitConversionRule();
+        rule.setApplicationAlias(applicationAlias);
+        rule.setScopeType(scopeType);
+        rule.setFromCategoryAlias(fromCategoryAlias);
+        rule.setFromUnitCode(fromUnitCode);
+        rule.setToCategoryAlias(toCategoryAlias);
+        rule.setToUnitCode(toUnitCode);
+        rule.setFactor(new BigDecimal(factor));
+        return rule;
     }
 
     private BigDecimal baseValue(DynamicRecord record) {
