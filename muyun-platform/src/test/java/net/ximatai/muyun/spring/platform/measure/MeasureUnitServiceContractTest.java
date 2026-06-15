@@ -58,6 +58,83 @@ class MeasureUnitServiceContractTest {
     }
 
     @Test
+    void shouldResolveSharedGlobalCategoryFromApplicationContext() {
+        categoryService.insert(category(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "length", MeasureDimension.LENGTH, "m"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "length", "m", "m", 2, "1", "0"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "length", "cm", "cm", 2, "0.01", "0"));
+
+        MeasureUnitConversion conversion =
+                conversionService.convert("crm", "length", new BigDecimal("250"), "cm", "m");
+
+        assertThat(conversion.convertedValue()).isEqualByComparingTo("2.50");
+        assertThat(unitService.listVisibleUnits("crm", "length", true))
+                .extracting(MeasureUnit::getCode)
+                .containsExactly("m", "cm");
+    }
+
+    @Test
+    void shouldPreferTenantSharedCategoryOverGlobalSharedCategory() {
+        categoryService.insert(category(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "quantity", MeasureDimension.COUNT, "bottle"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "quantity", "bottle", "瓶", 0, "1", "0"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "quantity", "box", "箱", 0, "12", "0"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            categoryService.insert(category(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", MeasureDimension.COUNT, "bottle"));
+            unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", "bottle", "瓶", 0, "1", "0"));
+            unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", "box", "箱", 0, "10", "0"));
+
+            MeasureUnitConversion conversion =
+                    conversionService.convert("crm", "quantity", BigDecimal.ONE, "box", "bottle");
+
+            assertThat(conversion.convertedValue()).isEqualByComparingTo("10");
+        }
+    }
+
+    @Test
+    void shouldPreferTenantSharedCategoryOverApplicationCompatibleCategory() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            categoryService.insert(category(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", MeasureDimension.COUNT, "bottle"));
+            unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", "bottle", "瓶", 0, "1", "0"));
+            unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                    "quantity", "box", "箱", 0, "10", "0"));
+
+            categoryService.insert(category("crm", "quantity", MeasureDimension.COUNT, "bottle"));
+            unitService.insert(unit("crm", "quantity", "bottle", "瓶", 0, "1", "0"));
+            unitService.insert(unit("crm", "quantity", "box", "箱", 0, "8", "0"));
+
+            MeasureUnitConversion conversion =
+                    conversionService.convert("crm", "quantity", BigDecimal.ONE, "box", "bottle");
+
+            assertThat(conversion.convertedValue()).isEqualByComparingTo("10");
+        }
+    }
+
+    @Test
+    void shouldFallBackToApplicationCompatibleCategoryWhenSharedCategoryIsMissing() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            categoryService.insert(category("crm", "quantity", MeasureDimension.COUNT, "bottle"));
+            unitService.insert(unit("crm", "quantity", "bottle", "瓶", 0, "1", "0"));
+            unitService.insert(unit("crm", "quantity", "box", "箱", 0, "8", "0"));
+
+            MeasureUnitConversion conversion =
+                    conversionService.convert("crm", "quantity", BigDecimal.ONE, "box", "bottle");
+
+            assertThat(conversion.convertedValue()).isEqualByComparingTo("8");
+        }
+    }
+
+    @Test
     void shouldRejectCategorySemanticIdentityChanges() {
         String id = categoryService.insert(category("crm", "weight", MeasureDimension.MASS, "g"));
 

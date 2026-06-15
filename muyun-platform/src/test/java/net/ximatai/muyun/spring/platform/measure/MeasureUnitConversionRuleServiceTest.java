@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.measure;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
@@ -80,6 +81,40 @@ class MeasureUnitConversionRuleServiceTest {
 
         assertThat(conversion.convertedValue()).isEqualByComparingTo("90");
     }
+
+    @Test
+    void shouldPreferTenantSharedBusinessRuleOverGlobalSharedRule() {
+        prepareSharedQuantityUnits();
+        ruleService.insert(rule(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, MeasureUnitConversionScopeType.GLOBAL,
+                null, null, null, "quantity", "box", "quantity", "bottle", "12"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            prepareSharedQuantityUnits();
+            ruleService.insert(rule(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, MeasureUnitConversionScopeType.GLOBAL,
+                    null, null, null, "quantity", "box", "quantity", "bottle", "10"));
+
+            MeasureUnitBusinessConversion conversion = conversionService.convert(context("crm", null, null, null),
+                    new BigDecimal("2"), "quantity", "box", "quantity", "bottle");
+
+            assertThat(conversion.convertedValue()).isEqualByComparingTo("20");
+        }
+    }
+
+    @Test
+    void shouldPreferSharedBusinessRuleOverApplicationCompatibleRuleForSameEdge() {
+        prepareSharedQuantityUnits();
+        prepareQuantityUnits();
+        ruleService.insert(rule("crm", MeasureUnitConversionScopeType.GLOBAL,
+                null, null, null, "quantity", "box", "quantity", "bottle", "8"));
+        ruleService.insert(rule(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, MeasureUnitConversionScopeType.GLOBAL,
+                null, null, null, "quantity", "box", "quantity", "bottle", "10"));
+
+        MeasureUnitBusinessConversion conversion = conversionService.convert(context("crm", null, null, null),
+                new BigDecimal("2"), "quantity", "box", "quantity", "bottle");
+
+        assertThat(conversion.convertedValue()).isEqualByComparingTo("20");
+    }
+
 
     @Test
     void shouldSupportReverseConversionFromSameRule() {
@@ -200,6 +235,13 @@ class MeasureUnitConversionRuleServiceTest {
     private void prepareLengthUnits() {
         categoryService.insert(category("crm", "length", MeasureDimension.LENGTH, "m"));
         unitService.insert(unit("crm", "length", "m"));
+    }
+
+    private void prepareSharedQuantityUnits() {
+        categoryService.insert(category(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
+                "quantity", MeasureDimension.COUNT, "bottle"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, "quantity", "bottle"));
+        unitService.insert(unit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, "quantity", "box"));
     }
 
     private MeasureUnitCategory category(String applicationAlias,

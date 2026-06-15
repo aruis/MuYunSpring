@@ -12,12 +12,15 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> implements
@@ -49,14 +52,15 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     @Override
     public Criteria sortScope(MeasureUnit unit) {
-        return categoryScope(unit.getApplicationAlias(), unit.getCategoryAlias());
+        return categoryScope(unit.getApplicationAlias(), unit.getCategoryAlias())
+                .eq(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId());
     }
 
     @Override
     public void validateSortScope(MeasureUnit left, MeasureUnit right) {
         validateSortScopeByFields(left, right,
                 "Measure unit sort can only move records within the same category",
-                "applicationAlias", "categoryAlias");
+                "tenantId", "applicationAlias", "categoryAlias");
     }
 
     public MeasureUnit resolveUnit(String applicationAlias, String categoryAlias, String unitCode) {
@@ -85,6 +89,46 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
         return unit;
     }
 
+    public MeasureUnit resolveVisibleUnit(String applicationAlias, String categoryAlias, String unitCode) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validUnitCode = requireCode(unitCode, "measureUnitCode");
+        MeasureUnitCategory category = categoryService.resolveVisibleCategory(validApplicationAlias, validCategoryAlias);
+        if (category == null) {
+            return null;
+        }
+        return resolveUnitInCategoryScope(category, validUnitCode);
+    }
+
+    public MeasureUnit requireVisibleUnit(String applicationAlias, String categoryAlias, String unitCode) {
+        MeasureUnit unit = resolveVisibleUnit(applicationAlias, categoryAlias, unitCode);
+        if (unit == null) {
+            throw new PlatformException("Measure unit requires existing visible unit: " + unitCode);
+        }
+        return unit;
+    }
+
+    public MeasureUnit requireEnabledVisibleUnit(String applicationAlias, String categoryAlias, String unitCode) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validUnitCode = requireCode(unitCode, "measureUnitCode");
+        MeasureUnitCategory category = categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias);
+        MeasureUnit unit = resolveUnitInCategoryScope(category, validUnitCode);
+        if (unit == null || !Boolean.TRUE.equals(unit.getEnabled())) {
+            throw new PlatformException("Measure unit requires enabled unit in visible scope: " + unitCode);
+        }
+        return unit;
+    }
+
+    MeasureUnit requireEnabledUnitInCategory(MeasureUnitCategory category, String unitCode) {
+        String validUnitCode = requireCode(unitCode, "measureUnitCode");
+        MeasureUnit unit = resolveUnitInCategoryScope(category, validUnitCode);
+        if (unit == null || !Boolean.TRUE.equals(unit.getEnabled())) {
+            throw new PlatformException("Measure unit requires enabled unit: " + unitCode);
+        }
+        return unit;
+    }
+
     public List<MeasureUnit> listUnits(String applicationAlias, String categoryAlias, boolean enabledOnly) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
@@ -98,6 +142,19 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
             criteria.eq("enabled", Boolean.TRUE);
         }
         return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    public List<MeasureUnit> listVisibleUnits(String applicationAlias, String categoryAlias, boolean enabledOnly) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        MeasureUnitCategory category = enabledOnly
+                ? categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias)
+                : categoryService.requireVisibleCategory(validApplicationAlias, validCategoryAlias);
+        Criteria criteria = categoryScope(category.getApplicationAlias(), category.getAlias());
+        if (enabledOnly) {
+            criteria.eq("enabled", Boolean.TRUE);
+        }
+        return listInCategoryScope(category, criteria);
     }
 
     private void normalizeAndValidate(MeasureUnit unit) {
@@ -127,6 +184,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
             unit.setRoundingMode(RoundingMode.HALF_UP);
         }
         rejectDuplicate(unit, categoryScope(unit.getApplicationAlias(), unit.getCategoryAlias())
+                        .eq(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId())
                         .eq("code", unit.getCode()),
                 "measure unit code must be unique within category: " + unit.getCode());
     }
@@ -142,6 +200,30 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
         return Criteria.of()
                 .eq("applicationAlias", applicationAlias)
                 .eq("categoryAlias", categoryAlias);
+    }
+
+    private MeasureUnit resolveUnitInCategoryScope(MeasureUnitCategory category, String unitCode) {
+        Criteria criteria = categoryScope(category.getApplicationAlias(), category.getAlias()).eq("code", unitCode);
+        return listInCategoryScope(category, criteria).stream()
+                .filter(unit -> categoryService.sameVisibilityScope(category, unit))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private List<MeasureUnit> listInCategoryScope(MeasureUnitCategory category, Criteria criteria) {
+        if (category.getTenantId() == null || category.getTenantId().isBlank()) {
+            try (TenantContext.Scope ignored = TenantContext.system("select global measure units")) {
+                return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                        .stream()
+                        .filter(unit -> unit.getTenantId() == null || unit.getTenantId().isBlank())
+                        .toList();
+            }
+        }
+        return list(criteria.eq(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId()),
+                new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                .stream()
+                .filter(unit -> Objects.equals(unit.getTenantId(), category.getTenantId()))
+                .toList();
     }
 
     private String requireCode(String value, String name) {

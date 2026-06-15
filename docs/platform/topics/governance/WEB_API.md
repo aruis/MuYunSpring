@@ -40,7 +40,7 @@
 
 | 诊断码 | 级别 | 含义 |
 | --- | --- | --- |
-| `MEASURE_UNIT_DEPENDENCY_MISSING` | `WARN` | 模块包使用了计量单位分类，但 dependency manifest 未声明 `MEASURE_UNIT` 依赖 |
+| `MEASURE_UNIT_DEPENDENCY_MISSING` | `WARN` | 模块包使用了计量单位分类，但 dependency manifest 未声明共享 `MEASURE_UNIT` 依赖 |
 | `MEASURE_UNIT_BASE_UNIT_MISSING` | `ERROR` | 计量单位字段缺少 `baseUnitCode` |
 | `MEASURE_UNIT_BASE_VALUE_MISSING` | `ERROR` | 缺少标准值影子字段或包内字段清单未包含该字段 |
 | `MEASURE_UNIT_BASE_VALUE_CONFLICT` | `ERROR` | 标准值字段和主业务字段冲突 |
@@ -49,7 +49,7 @@
 | `MEASURE_UNIT_COMPANION_MISSING` | `ERROR` | 可选单位模式缺少单位伴生字段 |
 | `MEASURE_UNIT_SCOPE_FIELD_MISSING` | `ERROR` | 配置了换算上下文字段，但包内字段清单缺失该字段 |
 
-`WARN` 不阻断发布或导入预检，但会提示跨环境迁移风险；`ERROR` 会使健康状态进入 `FAIL`，发布门面会拒绝继续发布。
+`MEASURE_UNIT` 依赖推荐声明为 `platform + categoryAlias`，对应共享单位库；历史 `applicationAlias + categoryAlias` 仍兼容。`WARN` 不阻断发布或导入预检，但会提示跨环境迁移风险；`ERROR` 会使健康状态进入 `FAIL`，发布门面会拒绝继续发布。
 
 ## 模板复用
 

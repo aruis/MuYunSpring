@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 
 public record LowCodePackageDependency(
         LowCodePackageDependencyType type,
@@ -41,6 +42,10 @@ public record LowCodePackageDependency(
     public static LowCodePackageDependency measureUnit(String applicationAlias, String categoryAlias) {
         return new LowCodePackageDependency(LowCodePackageDependencyType.MEASURE_UNIT,
                 applicationAlias, null, categoryAlias, true);
+    }
+
+    public static LowCodePackageDependency sharedMeasureUnit(String categoryAlias) {
+        return measureUnit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, categoryAlias);
     }
 
     private static String normalize(String value) {
