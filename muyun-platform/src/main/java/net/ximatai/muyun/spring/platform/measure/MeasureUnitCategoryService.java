@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.platform.measure;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CacheAbility;
@@ -9,8 +11,11 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUnitCategory> implements
@@ -65,6 +70,15 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
             throw new PlatformException("Measure unit category is disabled: " + categoryAlias);
         }
         return category;
+    }
+
+    public List<MeasureUnitCategory> listCategories(String applicationAlias, boolean enabledOnly) {
+        String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
+        Criteria criteria = Criteria.of().eq("applicationAlias", validApplicationAlias);
+        if (enabledOnly) {
+            criteria.eq("enabled", Boolean.TRUE);
+        }
+        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     private void normalizeAndValidate(MeasureUnitCategory category) {

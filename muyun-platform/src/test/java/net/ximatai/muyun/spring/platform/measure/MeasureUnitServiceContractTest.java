@@ -43,6 +43,21 @@ class MeasureUnitServiceContractTest {
     }
 
     @Test
+    void shouldListCategoriesWithinApplicationScope() {
+        categoryService.insert(category("crm", "quantity", MeasureDimension.COUNT, "bottle"));
+        String lengthId = categoryService.insert(category("crm", "length", MeasureDimension.LENGTH, "m"));
+        categoryService.insert(category("sales", "quantity", MeasureDimension.COUNT, "bottle"));
+        categoryService.disable(lengthId);
+
+        assertThat(categoryService.listCategories("crm", true))
+                .extracting(MeasureUnitCategory::getAlias)
+                .containsExactly("quantity");
+        assertThat(categoryService.listCategories("crm", false))
+                .extracting(MeasureUnitCategory::getAlias)
+                .containsExactly("quantity", "length");
+    }
+
+    @Test
     void shouldRejectCategorySemanticIdentityChanges() {
         String id = categoryService.insert(category("crm", "weight", MeasureDimension.MASS, "g"));
 

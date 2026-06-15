@@ -54,6 +54,22 @@ class MeasureUnitWebControllerTest {
     }
 
     @Test
+    void shouldExposeCategoryOptionsWithinPathApplication() throws Exception {
+        MeasureUnitCategoryService service = mock(MeasureUnitCategoryService.class);
+        MeasureUnitCategoryWebController controller = new MeasureUnitCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.listCategories("crm", true)).thenReturn(List.of(category("crm", "quantity")));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(get("/platform.application/crm/measure-unit-categories/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].applicationAlias").value("crm"))
+                .andExpect(jsonPath("$.records[0].alias").value("quantity"));
+
+        verify(service).listCategories("crm", true);
+    }
+
+    @Test
     void shouldForceUnitScopeFromPathOnInsert() throws Exception {
         MeasureUnitService service = mock(MeasureUnitService.class);
         MeasureUnitConversionService conversionService = mock(MeasureUnitConversionService.class);

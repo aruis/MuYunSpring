@@ -133,6 +133,7 @@
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/query` | 查询应用下的计量单位分类 |
+| 计量单位分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/options` | 获取应用下的计量单位分类候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
 | 计量单位分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/view/{id}` | 查看计量单位分类，并校验分类属于该应用 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/insert` | 新增计量单位分类；后端以 URL 中的 `applicationAlias` 为准 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/update/{id}` | 更新计量单位分类，并保持应用归属不跨应用 |
