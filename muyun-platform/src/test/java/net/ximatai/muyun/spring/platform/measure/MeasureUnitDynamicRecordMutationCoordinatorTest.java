@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
@@ -115,6 +116,32 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
     }
 
     @Test
+    void shouldAllowMissingOptionalSelectableUnitWhenMeasureValueExists() {
+        packageUnits();
+        DynamicRecord record = new DynamicRecord(packageOptionalUnitEntity())
+                .setValue("quantity", new BigDecimal("2"));
+
+        coordinator.beforeCreate("sales.order", "line", record);
+
+        assertThat(baseValue(record)).isNull();
+    }
+
+    @Test
+    void shouldClearBaseValueWhenOptionalSelectableUnitIsExplicitlyClearedOnUpdate() {
+        packageUnits();
+        DynamicRecord before = new DynamicRecord(packageOptionalUnitEntity())
+                .setValue("quantity", new BigDecimal("2"))
+                .setValue("quantityUnit", "box");
+        coordinator.beforeCreate("sales.order", "line", before);
+        DynamicRecord incoming = new DynamicRecord(packageOptionalUnitEntity())
+                .setValue("quantityUnit", null);
+
+        coordinator.beforeUpdate("sales.order", "line", before, incoming);
+
+        assertThat(baseValue(incoming)).isNull();
+    }
+
+    @Test
     void shouldApplyBusinessRuleForCrossCategoryBaseUnit() {
         rollAndLengthUnits();
         MeasureUnitConversionRule rule = new MeasureUnitConversionRule();
@@ -125,6 +152,22 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
         rule.setToCategoryAlias("length");
         rule.setToUnitCode("m");
         rule.setFactor(new BigDecimal("30"));
+        ruleService.insert(rule);
+        DynamicRecord record = new DynamicRecord(rollEntity())
+                .setValue("quantity", new BigDecimal("2"));
+
+        coordinator.beforeCreate("sales.order", "line", record);
+
+        assertThat(baseValue(record)).isEqualByComparingTo("60");
+    }
+
+    @Test
+    void shouldUseInjectedClockZoneForBusinessRuleEffectiveTime() {
+        rollAndLengthUnits();
+        MeasureUnitConversionRule rule = rule("sales", MeasureUnitConversionScopeType.GLOBAL,
+                "roll", "roll", "length", "m", "30");
+        rule.setEffectiveFrom(LocalDateTime.of(2026, 6, 13, 0, 0));
+        rule.setEffectiveTo(LocalDateTime.of(2026, 6, 13, 1, 0));
         ruleService.insert(rule);
         DynamicRecord record = new DynamicRecord(rollEntity())
                 .setValue("quantity", new BigDecimal("2"));
@@ -190,6 +233,32 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
 
     private EntityDefinition packageEntityWithDefaultUnit() {
         return packageEntity("box");
+    }
+
+    private EntityDefinition packageOptionalUnitEntity() {
+        return new EntityDefinition(
+                "line",
+                "sales_order_line",
+                "Line",
+                List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").measureUnit(new FieldMeasureUnitDefinition(
+                                "package",
+                                FieldMeasureUnitMode.SELECTABLE,
+                                null,
+                                null,
+                                "quantityUnit",
+                                "quantityBase",
+                                "package",
+                                "bottle",
+                                FieldMeasureUnitConversionMode.LINEAR,
+                                null,
+                                false
+                        )),
+                        FieldDefinition.string("quantityUnit", "Unit").column("quantity_unit").length(64),
+                        FieldDefinition.decimal("quantityBase", "Base Quantity").column("quantity_base")
+                ),
+                Set.of(EntityCapability.CRUD)
+        );
     }
 
     private EntityDefinition packageBusinessRuleEntity() {

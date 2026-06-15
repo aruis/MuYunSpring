@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Map;
 
 @Component
@@ -108,6 +107,10 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
             return;
         }
         String unitCode = resolveUnitCode(incoming, before, create, measure);
+        if (unitCode == null) {
+            incoming.putGeneratedValue(measure.baseValueFieldName(), null);
+            return;
+        }
         BigDecimal baseValue = convert(applicationAlias, moduleAlias, incoming, before, value, unitCode, measure);
         incoming.putGeneratedValue(measure.baseValueFieldName(), baseValue);
     }
@@ -122,8 +125,11 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
         boolean unitExplicitlySet = incoming.isExplicitlySet(measure.unitFieldName());
         String unitCode = stringValue(incoming.getPlatformValues().get(measure.unitFieldName()));
         if (unitExplicitlySet && unitCode == null) {
-            throw new PlatformException("measure unit field must not be blank when measure value exists: "
-                    + measure.unitFieldName());
+            if (measure.unitRequired()) {
+                throw new PlatformException("measure unit field must not be blank when measure value exists: "
+                        + measure.unitFieldName());
+            }
+            return null;
         }
         if (unitCode == null && before != null) {
             unitCode = stringValue(valueOf(before, measure.unitFieldName()));
@@ -132,9 +138,12 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
             unitCode = PlatformNameRules.requireCode(measure.defaultUnitCode(), "defaultUnitCode");
             incoming.putGeneratedValue(measure.unitFieldName(), unitCode);
         }
-        if (unitCode == null) {
+        if (unitCode == null && measure.unitRequired()) {
             throw new PlatformException("measure unit field is required when measure value exists: "
                     + measure.unitFieldName());
+        }
+        if (unitCode == null) {
+            return null;
         }
         return PlatformNameRules.requireCode(unitCode, "measureUnitCode");
     }
@@ -185,7 +194,7 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
             contextObjectId = scopeValue == null ? null : String.valueOf(scopeValue);
         }
         return new MeasureUnitConversionContext(applicationAlias, moduleAlias, contextObjectType, contextObjectId,
-                LocalDateTime.ofInstant(clock.instant(), ZoneId.systemDefault()));
+                LocalDateTime.now(clock));
     }
 
     private String contextObjectType(String fieldName) {
