@@ -13,9 +13,13 @@ import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareCommand;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +35,9 @@ public class PlatformModuleMetadataFieldWebController
             "dictionaryApplicationAlias", "dictionaryCategoryAlias",
             "referenceModuleAlias", "referenceModuleKeyField", "referenceModuleLabelField",
             "referenceGenerateRuleId", "referenceQueryTemplateId",
+            "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode",
+            "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode",
+            "unitConversionMode", "conversionScopeFieldId", "unitRequired",
             "title", "sortOrder", "createdAt", "updatedAt");
 
     private final ModuleMetadataRelationService relationService;
@@ -80,6 +87,19 @@ public class PlatformModuleMetadataFieldWebController
             requireRelation(request);
             return new WebListResponse<>(WebOutputSupport.records(service(),
                     service().ensureForRelation(relationId(request)), FieldOutputContext.VIEW));
+        });
+    }
+
+    @PostMapping("/{id}/measure-unit/prepare")
+    @CustomActionEndpoint(value = "prepareMeasureUnit", title = "准备计量单位字段",
+            level = PlatformActionLevel.RECORD, dataAuth = false)
+    public ModuleMetadataMeasureUnitPrepareResult prepareMeasureUnit(HttpServletRequest request,
+                                                                     @PathVariable String id,
+                                                                     @RequestBody(required = false)
+                                                                     ModuleMetadataMeasureUnitPrepareCommand command) {
+        return webScope(() -> {
+            requireScopedRecord(request, id);
+            return service().prepareMeasureUnitConfig(id, command);
         });
     }
 

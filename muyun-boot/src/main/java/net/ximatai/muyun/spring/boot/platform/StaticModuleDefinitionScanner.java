@@ -7,11 +7,14 @@ import net.ximatai.muyun.spring.boot.web.ReferenceWeb;
 import net.ximatai.muyun.spring.boot.web.ScopedWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.TreeWeb;
+import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -52,8 +55,41 @@ public class StaticModuleDefinitionScanner {
                 module.title(),
                 module.parent().isBlank() ? null : module.parent(),
                 java.util.Set.of(module.capabilities()),
-                actions(beanClass, java.util.Set.of(module.capabilities()))
+                actions(beanClass, java.util.Set.of(module.capabilities())),
+                entities(beanClass, module)
         );
+    }
+
+    private List<EntityDefinition> entities(Class<?> beanClass, PlatformStaticModule module) {
+        Object service = service(beanClass);
+        if (!(service instanceof CrudAbility<?> ability)) {
+            return List.of();
+        }
+        Class<?> modelClass = ability.modelClass();
+        if (modelClass == null || modelClass == Object.class) {
+            return List.of();
+        }
+        return List.of(new StaticEntityDefinitionCompiler().compile(
+                module.alias().substring(module.application().length() + 1),
+                module.title(),
+                modelClass
+        ));
+    }
+
+    private Object service(Class<?> beanClass) {
+        try {
+            String[] beanNames = applicationContext.getBeanNamesForType(beanClass);
+            if (beanNames.length == 0) {
+                return null;
+            }
+            Object bean = applicationContext.getBean(beanNames[0]);
+            if (!(bean instanceof ScopedWeb<?> scopedWeb)) {
+                return null;
+            }
+            return scopedWeb.service();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private void validateScopeAlias(Class<?> beanClass, PlatformStaticModule module) {

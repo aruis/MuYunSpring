@@ -4,5 +4,7 @@ public enum MetadataFieldRole {
     TITLE,
     CODE,
     TIME_ZONE,
-    SIGNATURE
+    SIGNATURE,
+    MEASURE_UNIT,
+    MEASURE_BASE_VALUE
 }

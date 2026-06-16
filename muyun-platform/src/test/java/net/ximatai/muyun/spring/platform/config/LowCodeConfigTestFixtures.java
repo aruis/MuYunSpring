@@ -142,6 +142,7 @@ final class LowCodeConfigTestFixtures {
                 Set.of(
                         LowCodePackageDependencyType.MODULE,
                         LowCodePackageDependencyType.DICTIONARY,
+                        LowCodePackageDependencyType.MEASURE_UNIT,
                         LowCodePackageDependencyType.ACTION,
                         LowCodePackageDependencyType.WORKFLOW,
                         LowCodePackageDependencyType.FILE_SERVICE,
@@ -172,6 +173,7 @@ final class LowCodeConfigTestFixtures {
         return switch (dependency.type()) {
             case MODULE -> "MODULE:" + dependency.moduleAlias();
             case DICTIONARY -> "DICTIONARY:" + dependency.applicationAlias() + ":" + dependency.alias();
+            case MEASURE_UNIT -> "MEASURE_UNIT:" + dependency.applicationAlias() + ":" + dependency.alias();
             case ACTION -> "ACTION:" + dependency.moduleAlias() + ":" + dependency.alias();
             case WORKFLOW -> "WORKFLOW:" + dependency.alias();
             case FILE_SERVICE -> "FILE_SERVICE:" + dependency.alias();

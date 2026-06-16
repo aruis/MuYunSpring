@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -13,14 +14,24 @@ public record StaticModuleDefinition(
         String title,
         String parentModuleAlias,
         Set<EntityCapability> capabilities,
-        List<StaticModuleActionDefinition> actions
+        List<StaticModuleActionDefinition> actions,
+        List<EntityDefinition> entities
 ) {
     public StaticModuleDefinition(String applicationAlias,
                                   String moduleAlias,
                                   String title,
                                   String parentModuleAlias,
                                   List<StaticModuleActionDefinition> actions) {
-        this(applicationAlias, moduleAlias, title, parentModuleAlias, Set.of(), actions);
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, Set.of(), actions, List.of());
+    }
+
+    public StaticModuleDefinition(String applicationAlias,
+                                  String moduleAlias,
+                                  String title,
+                                  String parentModuleAlias,
+                                  Set<EntityCapability> capabilities,
+                                  List<StaticModuleActionDefinition> actions) {
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, capabilities, actions, List.of());
     }
 
     public StaticModuleDefinition {
@@ -35,6 +46,7 @@ public record StaticModuleDefinition(
         }
         capabilities = normalizeCapabilities(capabilities);
         actions = actions == null ? List.of() : List.copyOf(actions);
+        entities = entities == null ? List.of() : List.copyOf(entities);
     }
 
     public boolean supports(EntityCapability capability) {

@@ -228,6 +228,111 @@ class ModuleDefinitionValidatorTest {
         validator.validate(module);
     }
 
+    @Test
+    void shouldAllowMeasureUnitFieldWithSelectableCompanionAndBaseValue() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(measureEntity(selectableMeasureField()))
+        );
+
+        validator.validate(module);
+    }
+
+    @Test
+    void shouldAllowMeasureUnitFieldWithFixedUnitAndBaseValue() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(measureEntity(fixedMeasureField()))
+        );
+
+        validator.validate(module);
+    }
+
+    @Test
+    void shouldRejectMeasureUnitFieldWhenBaseValueFieldIsMissing() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        selectableMeasureField(),
+                        FieldDefinition.string("quantityUnit", "Quantity Unit").column("quantity_unit").length(64)
+                )))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("unknown measure base value field: contract.quantityBase");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitFieldWhenUnitCompanionIsNotText() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        selectableMeasureField(),
+                        FieldDefinition.decimal("quantityUnit", "Quantity Unit").column("quantity_unit").precision(18, 2),
+                        FieldDefinition.decimal("quantityBase", "Quantity Base").column("quantity_base").precision(18, 2)
+                )))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("measure unit companion field must be text: contract.quantityUnit");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitFieldWhenOwnerIsNotNumeric() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(measureEntity(FieldDefinition.string("quantity", "Quantity").length(64)
+                        .measureUnit(selectableMeasureDefinition("quantityBase", "skuId"))))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("measure unit field requires numeric owner: contract.quantity");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitFieldWhenBaseValuePointsToOwner() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2)
+                                .measureUnit(selectableMeasureDefinition("quantity", "skuId")),
+                        FieldDefinition.string("quantityUnit", "Quantity Unit").column("quantity_unit").length(64),
+                        FieldDefinition.string("skuId", "SKU").column("sku_id").length(64)
+                )))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("measure base value field must be different from owner: contract.quantity");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitFieldWhenConversionScopeFieldIsMissing() {
+        ModuleDefinition module = new ModuleDefinition(
+                "sales.contract",
+                "Contract",
+                List.of(new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                        FieldDefinition.decimal("quantity", "Quantity").precision(18, 2)
+                                .measureUnit(selectableMeasureDefinition("quantityBase", "skuId")),
+                        FieldDefinition.string("quantityUnit", "Quantity Unit").column("quantity_unit").length(64),
+                        FieldDefinition.decimal("quantityBase", "Quantity Base").column("quantity_base").precision(18, 2)
+                )))
+        );
+
+        assertThatThrownBy(() -> validator.validate(module))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("unknown measure conversion scope field: contract.skuId");
+    }
+
     private EntityActionDefinition customAction(String actionCode) {
         return new EntityActionDefinition("contract", actionCode, "Custom " + actionCode, true, EntityActionLevel.LIST,
                 EntityActionCategory.CUSTOM, EntityActionAccessMode.AUTH_REQUIRED,
@@ -238,5 +343,52 @@ class ModuleDefinitionValidatorTest {
         return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").length(64).required()
         ));
+    }
+
+    private EntityDefinition measureEntity(FieldDefinition measureField) {
+        return new EntityDefinition("contract", "sales_contract", "Contract", List.of(
+                measureField,
+                FieldDefinition.string("quantityUnit", "Quantity Unit").column("quantity_unit").length(64),
+                FieldDefinition.decimal("quantityBase", "Quantity Base").column("quantity_base").precision(18, 2),
+                FieldDefinition.string("skuId", "SKU").column("sku_id").length(64)
+        ));
+    }
+
+    private FieldDefinition selectableMeasureField() {
+        return FieldDefinition.decimal("quantity", "Quantity").precision(18, 2)
+                .measureUnit(selectableMeasureDefinition("quantityBase", "skuId"));
+    }
+
+    private FieldMeasureUnitDefinition selectableMeasureDefinition(String baseValueFieldName, String conversionScopeFieldName) {
+        return new FieldMeasureUnitDefinition(
+                        "quantity",
+                        FieldMeasureUnitMode.SELECTABLE,
+                        null,
+                        "box",
+                        "quantityUnit",
+                baseValueFieldName,
+                        "quantity",
+                        "bottle",
+                        FieldMeasureUnitConversionMode.BUSINESS_RULE,
+                conversionScopeFieldName,
+                        true
+        );
+    }
+
+    private FieldDefinition fixedMeasureField() {
+        return FieldDefinition.decimal("quantity", "Quantity").precision(18, 2)
+                .measureUnit(new FieldMeasureUnitDefinition(
+                        "quantity",
+                        FieldMeasureUnitMode.FIXED,
+                        "bottle",
+                        null,
+                        null,
+                        "quantityBase",
+                        "quantity",
+                        "bottle",
+                        FieldMeasureUnitConversionMode.LINEAR,
+                        null,
+                        false
+                ));
     }
 }
