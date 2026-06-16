@@ -333,6 +333,49 @@ class MoneyDynamicRecordMutationCoordinatorTest {
                 .hasMessageContaining("currencyCode");
     }
 
+    @Test
+    void shouldReportMoneyFieldContextWhenConversionFails() {
+        currencyService.insert(currency("USD", "840", "US Dollar", "$", 2));
+        currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
+        rateTypeService.insert(rateType("SPOT", "Spot"));
+        DynamicRecord record = new DynamicRecord(orderEntity())
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("currencyCode", "USD")
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+
+        assertThatThrownBy(() -> coordinator.beforeCreate("sales.order", "order", record))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("money normalization failed")
+                .hasMessageContaining("module=sales.order")
+                .hasMessageContaining("entity=order")
+                .hasMessageContaining("field=amount")
+                .hasMessageContaining("Exchange rate requires effective rate")
+                .cause()
+                .isInstanceOf(PlatformException.class);
+    }
+
+    @Test
+    void shouldReportMoneyChildEntityContextWhenRelationChildConversionFails() {
+        currencyService.insert(currency("USD", "840", "US Dollar", "$", 2));
+        currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
+        rateTypeService.insert(rateType("SPOT", "Spot"));
+        DynamicRecord parent = new DynamicRecord(orderEntity());
+        DynamicRecord child = new DynamicRecord(orderEntity())
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("currencyCode", "USD")
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+
+        assertThatThrownBy(() -> coordinator.beforeRelationChildCreate("sales.order", "order", "lines", "line",
+                parent, child))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("money normalization failed")
+                .hasMessageContaining("module=sales.order")
+                .hasMessageContaining("entity=line")
+                .hasMessageContaining("field=amount")
+                .cause()
+                .isInstanceOf(PlatformException.class);
+    }
+
     private EntityDefinition orderEntity() {
         return orderEntity(null, "CNY", "orderDate");
     }

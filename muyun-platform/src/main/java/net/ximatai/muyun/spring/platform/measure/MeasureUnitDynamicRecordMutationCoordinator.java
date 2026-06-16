@@ -39,7 +39,7 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
 
     @Override
     public void beforeCreate(String moduleAlias, String entityAlias, DynamicRecord record) {
-        normalizeMeasureFields(moduleAlias, record, null, true);
+        normalizeMeasureFields(moduleAlias, entityAlias, record, null, true);
     }
 
     @Override
@@ -49,12 +49,12 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
                                           String childEntityAlias,
                                           DynamicRecord parent,
                                           DynamicRecord child) {
-        normalizeMeasureFields(moduleAlias, child, null, true);
+        normalizeMeasureFields(moduleAlias, childEntityAlias, child, null, true);
     }
 
     @Override
     public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
-        normalizeMeasureFields(moduleAlias, incoming, before, false);
+        normalizeMeasureFields(moduleAlias, entityAlias, incoming, before, false);
     }
 
     @Override
@@ -66,10 +66,11 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
                                           DynamicRecord parentIncoming,
                                           DynamicRecord childBefore,
                                           DynamicRecord childIncoming) {
-        normalizeMeasureFields(moduleAlias, childIncoming, childBefore, false);
+        normalizeMeasureFields(moduleAlias, childEntityAlias, childIncoming, childBefore, false);
     }
 
     private void normalizeMeasureFields(String moduleAlias,
+                                        String entityAlias,
                                         DynamicRecord incoming,
                                         DynamicRecord before,
                                         boolean create) {
@@ -82,7 +83,14 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
             if (measure == null || !measure.enabled()) {
                 continue;
             }
-            normalizeMeasureField(applicationAlias, moduleAlias, incoming, before, create, field, measure);
+            try {
+                normalizeMeasureField(applicationAlias, moduleAlias, incoming, before, create, field, measure);
+            } catch (PlatformException ex) {
+                throw new PlatformException("measure unit normalization failed: module=" + moduleAlias
+                        + ", entity=" + entityAlias
+                        + ", field=" + field.fieldName()
+                        + "; " + ex.getMessage(), ex);
+            }
         }
     }
 
