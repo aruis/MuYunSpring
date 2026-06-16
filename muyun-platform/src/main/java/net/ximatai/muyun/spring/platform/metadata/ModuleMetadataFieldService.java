@@ -121,12 +121,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         );
         for (MetadataField field : fields) {
             if (findByRelationAndField(relation.getId(), field.getId()) == null) {
-                ModuleMetadataField moduleField = new ModuleMetadataField();
-                moduleField.setRelationId(relation.getId());
-                moduleField.setMetadataFieldId(field.getId());
-                moduleField.setTitle(field.getTitle());
-                moduleField.setSortOrder(field.getSortOrder());
-                insert(moduleField);
+                insert(createModuleField(relation, field));
             }
         }
         return listByRelationId(relation.getId());
@@ -240,6 +235,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     defaultText(validCommand.unitFieldTypeAlias(), "string"),
                     "Unit"
             );
+            ensureModuleFieldForRelation(relation, unitField);
         }
         MetadataField baseValueField = ensureRelatedField(
                 metadata,
@@ -250,6 +246,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 defaultText(validCommand.baseValueFieldTypeAlias(), owner.getFieldTypeAlias()),
                 "Base"
         );
+        ensureModuleFieldForRelation(relation, baseValueField);
         moduleField.setUnitCategoryAlias(unitCategoryAlias);
         moduleField.setUnitMode(unitMode);
         moduleField.setFixedUnitCode(validCommand.fixedUnitCode());
@@ -304,6 +301,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     defaultText(validCommand.currencyFieldTypeAlias(), "string"),
                     "Currency"
             );
+            ensureModuleFieldForRelation(relation, currencyField);
         }
         MetadataField baseAmountField = ensureRelatedField(
                 metadata,
@@ -314,6 +312,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 defaultText(validCommand.baseAmountFieldTypeAlias(), owner.getFieldTypeAlias()),
                 "Base Amount"
         );
+        ensureModuleFieldForRelation(relation, baseAmountField);
         MetadataField exchangeRateField = null;
         if (Boolean.TRUE.equals(validCommand.createExchangeRateField())
                 || hasText(validCommand.exchangeRateFieldName())) {
@@ -326,6 +325,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     defaultText(validCommand.exchangeRateFieldTypeAlias(), "decimal"),
                     "Exchange Rate"
             );
+            ensureModuleFieldForRelation(relation, exchangeRateField);
         }
         moduleField.setMoneyCurrencyMode(currencyMode);
         moduleField.setMoneyFixedCurrencyCode(validCommand.fixedCurrencyCode());
@@ -621,6 +621,26 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         field.setSortOrder(nextSortOrder(metadata.getId()));
         String id = fieldService.insert(field);
         return fieldService.select(id);
+    }
+
+    private ModuleMetadataField ensureModuleFieldForRelation(ModuleMetadataRelation relation,
+                                                             MetadataField field) {
+        ModuleMetadataField existing = findByRelationAndField(relation.getId(), field.getId());
+        if (existing != null) {
+            return existing;
+        }
+        String id = insert(createModuleField(relation, field));
+        return select(id);
+    }
+
+    private ModuleMetadataField createModuleField(ModuleMetadataRelation relation,
+                                                  MetadataField field) {
+        ModuleMetadataField moduleField = new ModuleMetadataField();
+        moduleField.setRelationId(relation.getId());
+        moduleField.setMetadataFieldId(field.getId());
+        moduleField.setTitle(field.getTitle());
+        moduleField.setSortOrder(field.getSortOrder());
+        return moduleField;
     }
 
     private void validatePrepareCommand(Metadata metadata,

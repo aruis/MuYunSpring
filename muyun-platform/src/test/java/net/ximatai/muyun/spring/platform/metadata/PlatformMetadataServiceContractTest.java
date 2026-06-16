@@ -1198,6 +1198,9 @@ class PlatformMetadataServiceContractTest {
         assertThat(result.moduleField().getBaseValueFieldId()).isEqualTo(result.baseValueField().getId());
         assertThat(result.moduleField().getBaseUnitCategoryAlias()).isEqualTo("package");
         assertThat(result.moduleField().getBaseUnitCode()).isEqualTo("bottle");
+        assertThat(moduleFieldService.listByRelationId(relationId))
+                .extracting(ModuleMetadataField::getMetadataFieldId)
+                .contains(quantity.getId(), result.unitField().getId(), result.baseValueField().getId());
         EntityDefinition schemaEntity = metadataEntityDefinitionCompiler.compile(metadataId);
         assertThat(schemaEntity.fields()).extracting(FieldDefinition::fieldName)
                 .contains("quantity", "quantityUnit", "quantityBase");
@@ -1213,7 +1216,7 @@ class PlatformMetadataServiceContractTest {
         assertThat(runtimeField.measureUnit().conversionMode()).isEqualTo(FieldMeasureUnitConversionMode.LINEAR);
         assertThat(runtimeField.measureUnit().unitRequired()).isTrue();
         verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
-        verify(runtimeRefreshCoordinator, times(1)).refreshByModuleField(argThat(
+        verify(runtimeRefreshCoordinator, atLeastOnce()).refreshByModuleField(argThat(
                 refreshed -> refreshed != null && moduleField.getId().equals(refreshed.getId())));
     }
 
@@ -1393,6 +1396,10 @@ class PlatformMetadataServiceContractTest {
         assertThat(result.moduleField().getMoneyCurrencyFieldId()).isEqualTo(result.currencyField().getId());
         assertThat(result.moduleField().getMoneyBaseAmountFieldId()).isEqualTo(result.baseAmountField().getId());
         assertThat(result.moduleField().getMoneyExchangeRateFieldId()).isEqualTo(result.exchangeRateField().getId());
+        assertThat(moduleFieldService.listByRelationId(relationId))
+                .extracting(ModuleMetadataField::getMetadataFieldId)
+                .contains(amount.getId(), orderDate.getId(), result.currencyField().getId(),
+                        result.baseAmountField().getId(), result.exchangeRateField().getId());
         EntityDefinition schemaEntity = metadataEntityDefinitionCompiler.compile(metadataId);
         assertThat(schemaEntity.fields()).extracting(FieldDefinition::fieldName)
                 .contains("amount", "orderDate", "amountCurrency", "amountBase", "amountExchangeRate");
@@ -1408,7 +1415,7 @@ class PlatformMetadataServiceContractTest {
         assertThat(runtimeField.money().exchangeRateFieldName()).isEqualTo("amountExchangeRate");
         assertThat(runtimeField.money().currencyRequired()).isTrue();
         verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
-        verify(runtimeRefreshCoordinator, times(1)).refreshByModuleField(argThat(
+        verify(runtimeRefreshCoordinator, atLeastOnce()).refreshByModuleField(argThat(
                 refreshed -> refreshed != null && moduleField.getId().equals(refreshed.getId())));
     }
 

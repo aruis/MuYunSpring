@@ -325,11 +325,11 @@
 
 模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时必须绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 必须绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
 
-模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
+模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，同步当前 relation 下的伴生/影子模块字段配置，并回填主字段模块配置上的单位消费契约。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
 
 模块字段配置也可声明金额消费契约。主金额字段通过 `moneyCurrencyMode` 进入金额能力；`FIXED` 时使用 `moneyFixedCurrencyCode`，`SELECTABLE` 时绑定同元数据、同 owner 的币种伴生字段 `moneyCurrencyFieldId`。`moneyBaseAmountFieldId` 是动态保存时写入的本位金额影子字段；`moneyBaseCurrencyCode` 可固定本位币，未配置时运行态按租户本位币设置解析；`moneyRateTypeCode` 必填；`moneyRateDateFieldId` 可绑定业务日期字段；`moneyExchangeRateFieldId` 可选，用于保存本次折算汇率。
 
-模块字段配置提供金额字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选币种伴生字段、本位金额影子字段和可选汇率影子字段，并回填模块字段上的金额消费配置。固定币种模式不创建币种伴生字段；本位金额影子字段始终会被准备。
+模块字段配置提供金额字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选币种伴生字段、本位金额影子字段和可选汇率影子字段，同步当前 relation 下的伴生/影子模块字段配置，并回填主字段模块配置上的金额消费契约。固定币种模式不创建币种伴生字段；本位金额影子字段始终会被准备。
 
 `measure-unit/prepare` 和 `money/prepare` 是保存辅助动作，不是发布、预览或可逆开关。它们会真实创建或复用元数据伴生/影子字段，并保存当前模块字段配置；新建或更新的元数据字段会按元数据保存即生效规则触发 schema ensure。管理端如果已经自行维护好伴生/影子字段，也可以直接走标准 `fields/update/{id}` 保存绑定关系，避免把 prepare 当成额外的发布状态。
 
