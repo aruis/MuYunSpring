@@ -1,5 +1,7 @@
 # MuYunSpring
 
+[![CI](https://github.com/aruis/MuYunSpring/actions/workflows/ci.yml/badge.svg)](https://github.com/aruis/MuYunSpring/actions/workflows/ci.yml)
+
 MuYunSpring 是一个基于 Java 21 和 Spring Boot 的企业应用平台底座，核心目标是让静态 Java 业务模型和动态元数据模型复用同一套平台能力。
 
 平台不是简单的动态 CRUD，也不是把低代码能力和 Java 业务能力拆成两套系统。MuYunSpring 以“动静一体”为主线，把数据访问、生命周期、租户、权限、审计、字段治理、页面交付和配置治理组织为可复用能力，让业务模块通过声明能力组合完成接入，减少重复 service 代码和模块专用接口。
