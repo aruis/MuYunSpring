@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.metadata;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,7 +87,7 @@ public class MetadataFieldDefinitionCompiler {
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
                         : protectionConfigService.definition(field.getId()),
                 measureUnit(moduleField),
-                null
+                money(moduleField)
         );
         if (hasModuleDictionary) {
             validateModuleDictionary(fieldType, moduleField, field.getId());
@@ -198,12 +199,32 @@ public class MetadataFieldDefinitionCompiler {
             return null;
         }
         if (fieldService == null) {
-            throw new IllegalArgumentException("module field measure unit config requires MetadataFieldService");
+            throw new IllegalArgumentException("module field config requires MetadataFieldService");
         }
         MetadataField field = fieldService.select(fieldId);
         if (field == null) {
-            throw new IllegalArgumentException("module field measure unit config points to missing field: " + fieldId);
+            throw new IllegalArgumentException("module field config points to missing field: " + fieldId);
         }
         return field.getFieldName();
+    }
+
+    private FieldMoneyDefinition money(ModuleMetadataField moduleField) {
+        if (moduleField == null
+                || moduleField.getMoneyBaseAmountFieldId() == null
+                || moduleField.getMoneyBaseAmountFieldId().isBlank()) {
+            return FieldMoneyDefinition.NONE;
+        }
+        return new FieldMoneyDefinition(
+                moduleField.getMoneyCurrencyMode(),
+                moduleField.getMoneyFixedCurrencyCode(),
+                moduleField.getMoneyDefaultCurrencyCode(),
+                fieldName(moduleField.getMoneyCurrencyFieldId()),
+                fieldName(moduleField.getMoneyBaseAmountFieldId()),
+                moduleField.getMoneyBaseCurrencyCode(),
+                moduleField.getMoneyRateTypeCode(),
+                fieldName(moduleField.getMoneyRateDateFieldId()),
+                fieldName(moduleField.getMoneyExchangeRateFieldId()),
+                Boolean.TRUE.equals(moduleField.getMoneyCurrencyRequired())
+        );
     }
 }

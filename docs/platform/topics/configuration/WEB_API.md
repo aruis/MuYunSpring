@@ -221,7 +221,7 @@
 
 ## 币种与汇率
 
-币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护和基础折算；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置维护 API 暂不提供金额字段一键配置、配置包健康检查和导入导出金额列联动。
+币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护、基础折算和模块金额字段准备动作；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置包健康检查和导入导出金额列联动属于后续能力。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
@@ -324,6 +324,10 @@
 
 模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
 
+模块字段配置也可声明金额消费契约。主金额字段通过 `moneyCurrencyMode` 进入金额能力；`FIXED` 时使用 `moneyFixedCurrencyCode`，`SELECTABLE` 时绑定同元数据、同 owner 的币种伴生字段 `moneyCurrencyFieldId`。`moneyBaseAmountFieldId` 是动态保存时写入的本位金额影子字段；`moneyBaseCurrencyCode` 可固定本位币，未配置时运行态按租户本位币设置解析；`moneyRateTypeCode` 必填；`moneyRateDateFieldId` 可绑定业务日期字段；`moneyExchangeRateFieldId` 可选，用于保存本次折算汇率。
+
+模块字段配置提供金额字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选币种伴生字段、本位金额影子字段和可选汇率影子字段，并回填模块字段上的金额消费配置。固定币种模式不创建币种伴生字段；本位金额影子字段始终会被准备。
+
 管理端可以按两种方式配置计量单位字段：
 
 1. 使用 `fields/{id}/measure-unit/prepare`，由平台按主数值字段自动创建或复用单位伴生字段、标准值影子字段，并回填当前模块字段配置。
@@ -354,6 +358,39 @@
 | `moduleField` | 已回填计量单位契约的模块字段配置 |
 | `unitField` | 可选单位模式下创建或复用的单位伴生元数据字段；固定单位模式为空 |
 | `baseValueField` | 创建或复用的标准值影子元数据字段 |
+
+管理端可以按两种方式配置金额字段：
+
+1. 使用 `fields/{id}/money/prepare`，由平台按主金额字段自动创建或复用币种伴生字段、本位金额影子字段和可选汇率影子字段，并回填当前模块字段配置。
+2. 使用 `fields/update/{id}`，保存已存在的 `moneyCurrencyFieldId`、`moneyBaseAmountFieldId`、`moneyRateDateFieldId`、`moneyExchangeRateFieldId` 等绑定关系。标准更新不是局部 patch，管理端应先读取 `view/{id}`，合并金额字段后提交完整模块字段配置。
+
+`money/prepare` 请求体为 `ModuleMetadataMoneyPrepareCommand`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `currencyMode` | `SELECTABLE` 或 `FIXED`，为空时默认 `SELECTABLE` |
+| `fixedCurrencyCode` | 固定币种模式必填，ISO 4217 alpha-3 |
+| `defaultCurrencyCode` | 可选币种模式的默认币种；固定币种模式未传时默认等于 `fixedCurrencyCode` |
+| `currencyFieldName` | 可选币种模式下准备的币种伴生字段名，默认 `<ownerFieldName>Currency` |
+| `baseAmountFieldName` | 准备的本位金额影子字段名，默认 `<ownerFieldName>Base` |
+| `baseCurrencyCode` | 可选，固定本位币；空时运行态按租户本位币设置解析 |
+| `rateTypeCode` | 必填，汇率类型 code |
+| `rateDateFieldId` | 可选，同元数据下的业务日期字段，支持 `DATE`、`TIMESTAMP`、`ZONED_TIMESTAMP` |
+| `exchangeRateFieldName` | 可选，准备的汇率影子字段名；传入时会创建汇率字段 |
+| `createExchangeRateField` | 可选，`true` 时按默认字段名创建汇率字段 |
+| `currencyRequired` | 可选，币种是否必填，默认 `true` |
+| `currencyFieldTypeAlias` | 可选，币种字段类型，默认 `string` |
+| `baseAmountFieldTypeAlias` | 可选，本位金额字段类型，默认等于主金额字段类型 |
+| `exchangeRateFieldTypeAlias` | 可选，汇率字段类型，默认 `decimal` |
+
+返回体为 `ModuleMetadataMoneyPrepareResult`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `moduleField` | 已回填金额契约的模块字段配置 |
+| `currencyField` | 可选币种模式下创建或复用的币种伴生元数据字段；固定币种模式为空 |
+| `baseAmountField` | 创建或复用的本位金额影子元数据字段 |
+| `exchangeRateField` | 创建或复用的汇率影子元数据字段；未请求汇率字段时为空 |
 
 典型请求：
 
@@ -403,6 +440,7 @@
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/query` | 查询关系下的模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/ensure` | 按元数据字段同步生成模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{id}/measure-unit/prepare` | 为主数值字段准备单位伴生字段、标准值影子字段并回填计量单位配置 |
+| 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{id}/money/prepare` | 为主金额字段准备币种伴生字段、本位金额影子字段、可选汇率影子字段并回填金额配置 |
 | 模块字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/view/{id}` | 查看模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/insert` | 新增模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/update/{id}` | 更新模块字段配置 |

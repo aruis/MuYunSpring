@@ -21,6 +21,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -130,6 +131,7 @@ class PlatformModuleDefinitionCompilerTest {
         fieldTypeService.insert(fieldType("integer", FieldType.INTEGER, null));
         fieldTypeService.insert(fieldType("decimal", FieldType.DECIMAL, null));
         fieldTypeService.insert(fieldType("boolean", FieldType.BOOLEAN, null));
+        fieldTypeService.insert(fieldType("date", FieldType.DATE, null));
     }
 
     @Test
@@ -227,6 +229,57 @@ class PlatformModuleDefinitionCompilerTest {
         assertThat(compiled.measureUnit().baseUnitCategoryAlias()).isEqualTo("package");
         assertThat(compiled.measureUnit().baseUnitCode()).isEqualTo("bottle");
         assertThat(compiled.measureUnit().unitRequired()).isTrue();
+    }
+
+    @Test
+    void shouldCompileMoneyMetadataIntoDynamicFieldDefinition() {
+        moduleService.insert(module("sales.order", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField amountCurrency = field(metadataId, "amountCurrency", "amount_currency", FieldType.STRING);
+        amountCurrency.setFieldForm(MetadataFieldForm.COMPANION);
+        amountCurrency.setFieldRole(MetadataFieldRole.MONEY_CURRENCY);
+        amountCurrency.setOwnerFieldId(amount.getId());
+        fieldService.insert(amountCurrency);
+        MetadataField amountBase = field(metadataId, "amountBase", "amount_base", FieldType.DECIMAL);
+        amountBase.setFieldForm(MetadataFieldForm.SHADOW);
+        amountBase.setFieldRole(MetadataFieldRole.MONEY_BASE_AMOUNT);
+        amountBase.setOwnerFieldId(amount.getId());
+        fieldService.insert(amountBase);
+        MetadataField orderDate = field(metadataId, "orderDate", "order_date", FieldType.DATE);
+        fieldService.insert(orderDate);
+        MetadataField amountExchangeRate = field(metadataId, "amountExchangeRate", "amount_exchange_rate", FieldType.DECIMAL);
+        amountExchangeRate.setFieldForm(MetadataFieldForm.SHADOW);
+        amountExchangeRate.setFieldRole(MetadataFieldRole.MONEY_EXCHANGE_RATE);
+        amountExchangeRate.setOwnerFieldId(amount.getId());
+        fieldService.insert(amountExchangeRate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyDefaultCurrencyCode("USD");
+        moduleField.setMoneyCurrencyFieldId(amountCurrency.getId());
+        moduleField.setMoneyBaseAmountFieldId(amountBase.getId());
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleField.setMoneyRateDateFieldId(orderDate.getId());
+        moduleField.setMoneyExchangeRateFieldId(amountExchangeRate.getId());
+        moduleField.setMoneyCurrencyRequired(true);
+        moduleFieldService.update(moduleField);
+
+        ModuleDefinition definition = compiler.compile("sales.order");
+
+        FieldDefinition compiled = field(definition, "amount");
+        assertThat(compiled.money().enabled()).isTrue();
+        assertThat(compiled.money().currencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(compiled.money().defaultCurrencyCode()).isEqualTo("USD");
+        assertThat(compiled.money().currencyFieldName()).isEqualTo("amountCurrency");
+        assertThat(compiled.money().baseAmountFieldName()).isEqualTo("amountBase");
+        assertThat(compiled.money().baseCurrencyCode()).isEqualTo("CNY");
+        assertThat(compiled.money().rateTypeCode()).isEqualTo("SPOT");
+        assertThat(compiled.money().rateDateFieldName()).isEqualTo("orderDate");
+        assertThat(compiled.money().exchangeRateFieldName()).isEqualTo("amountExchangeRate");
+        assertThat(compiled.money().currencyRequired()).isTrue();
     }
 
     @Test

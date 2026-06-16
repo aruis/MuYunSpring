@@ -21,6 +21,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
@@ -1320,6 +1321,140 @@ class PlatformMetadataServiceContractTest {
         assertThatThrownBy(() -> moduleFieldService.update(moduleField))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("baseValueFieldId");
+    }
+
+    @Test
+    void shouldPrepareMoneyCompanionAndShadowFieldsForModuleField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField orderDate = field(metadataId, "orderDate", "order_date", FieldType.DATE);
+        fieldService.insert(orderDate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+
+        ModuleMetadataMoneyPrepareResult result = moduleFieldService.prepareMoneyConfig(
+                moduleField.getId(),
+                new ModuleMetadataMoneyPrepareCommand(
+                        FieldMoneyMode.SELECTABLE, null, "usd", null, null, "cny", "spot",
+                        orderDate.getId(), null, true, true, null, null, null
+                ));
+
+        assertThat(result.currencyField().getFieldName()).isEqualTo("amountCurrency");
+        assertThat(result.currencyField().getColumnName()).isEqualTo("amount_currency");
+        assertThat(result.currencyField().getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
+        assertThat(result.currencyField().getFieldRole()).isEqualTo(MetadataFieldRole.MONEY_CURRENCY);
+        assertThat(result.currencyField().getOwnerFieldId()).isEqualTo(amount.getId());
+        assertThat(result.baseAmountField().getFieldName()).isEqualTo("amountBase");
+        assertThat(result.baseAmountField().getFieldRole()).isEqualTo(MetadataFieldRole.MONEY_BASE_AMOUNT);
+        assertThat(result.baseAmountField().getSystemManaged()).isTrue();
+        assertThat(result.exchangeRateField().getFieldName()).isEqualTo("amountExchangeRate");
+        assertThat(result.exchangeRateField().getFieldRole()).isEqualTo(MetadataFieldRole.MONEY_EXCHANGE_RATE);
+        assertThat(result.exchangeRateField().getSystemManaged()).isTrue();
+        assertThat(result.moduleField().getMoneyCurrencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(result.moduleField().getMoneyDefaultCurrencyCode()).isEqualTo("USD");
+        assertThat(result.moduleField().getMoneyBaseCurrencyCode()).isEqualTo("CNY");
+        assertThat(result.moduleField().getMoneyRateTypeCode()).isEqualTo("SPOT");
+        assertThat(result.moduleField().getMoneyRateDateFieldId()).isEqualTo(orderDate.getId());
+        assertThat(result.moduleField().getMoneyCurrencyFieldId()).isEqualTo(result.currencyField().getId());
+        assertThat(result.moduleField().getMoneyBaseAmountFieldId()).isEqualTo(result.baseAmountField().getId());
+        assertThat(result.moduleField().getMoneyExchangeRateFieldId()).isEqualTo(result.exchangeRateField().getId());
+    }
+
+    @Test
+    void shouldReusePreparedMoneyFieldsWithoutDuplicatingMetadataFields() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        ModuleMetadataMoneyPrepareCommand command = new ModuleMetadataMoneyPrepareCommand(
+                FieldMoneyMode.SELECTABLE, null, null, null, null, "CNY", "SPOT",
+                null, null, true, true, null, null, null);
+
+        ModuleMetadataMoneyPrepareResult first = moduleFieldService.prepareMoneyConfig(moduleField.getId(), command);
+        ModuleMetadataMoneyPrepareResult second = moduleFieldService.prepareMoneyConfig(moduleField.getId(), command);
+
+        assertThat(second.currencyField().getId()).isEqualTo(first.currencyField().getId());
+        assertThat(second.baseAmountField().getId()).isEqualTo(first.baseAmountField().getId());
+        assertThat(second.exchangeRateField().getId()).isEqualTo(first.exchangeRateField().getId());
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("amount", "amountCurrency", "amountBase", "amountExchangeRate");
+    }
+
+    @Test
+    void shouldPrepareFixedMoneyWithoutCompanionCurrencyField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+
+        ModuleMetadataMoneyPrepareResult result = moduleFieldService.prepareMoneyConfig(
+                moduleField.getId(),
+                new ModuleMetadataMoneyPrepareCommand(
+                        FieldMoneyMode.FIXED, "usd", null, null, null, "cny", "spot",
+                        null, null, false, true, null, null, null
+                ));
+
+        assertThat(result.currencyField()).isNull();
+        assertThat(result.exchangeRateField()).isNull();
+        assertThat(result.baseAmountField().getFieldName()).isEqualTo("amountBase");
+        assertThat(result.moduleField().getMoneyCurrencyMode()).isEqualTo(FieldMoneyMode.FIXED);
+        assertThat(result.moduleField().getMoneyFixedCurrencyCode()).isEqualTo("USD");
+        assertThat(result.moduleField().getMoneyDefaultCurrencyCode()).isEqualTo("USD");
+        assertThat(result.moduleField().getMoneyCurrencyFieldId()).isNull();
+    }
+
+    @Test
+    void shouldCompilePreparedMoneyConfigIntoFieldDefinition() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        ModuleMetadataMoneyPrepareResult result = moduleFieldService.prepareMoneyConfig(
+                moduleField.getId(),
+                new ModuleMetadataMoneyPrepareCommand(
+                        FieldMoneyMode.SELECTABLE, null, "USD", null, null, "CNY", "SPOT",
+                        null, null, true, true, null, null, null
+                ));
+
+        FieldDefinition compiled = fieldDefinitionCompiler.compile(amount, relationId, result.moduleField());
+
+        assertThat(compiled.money().enabled()).isTrue();
+        assertThat(compiled.money().currencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(compiled.money().currencyFieldName()).isEqualTo("amountCurrency");
+        assertThat(compiled.money().baseAmountFieldName()).isEqualTo("amountBase");
+        assertThat(compiled.money().baseCurrencyCode()).isEqualTo("CNY");
+        assertThat(compiled.money().rateTypeCode()).isEqualTo("SPOT");
+        assertThat(compiled.money().exchangeRateFieldName()).isEqualTo("amountExchangeRate");
+    }
+
+    @Test
+    void shouldRejectPrepareMoneyBeforeCreatingFieldsWhenConfigIsInvalid() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.prepareMoneyConfig(
+                moduleField.getId(),
+                new ModuleMetadataMoneyPrepareCommand(
+                        FieldMoneyMode.SELECTABLE, null, null, null, null, "CNY", null,
+                        null, null, true, true, null, null, null
+                )))
+                .hasMessageContaining("rateTypeCode");
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("amount");
     }
 
     @Test

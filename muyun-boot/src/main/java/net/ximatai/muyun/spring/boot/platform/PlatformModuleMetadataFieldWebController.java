@@ -13,6 +13,8 @@ import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMoneyPrepareCommand;
+import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMoneyPrepareResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareCommand;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
@@ -38,6 +40,10 @@ public class PlatformModuleMetadataFieldWebController
             "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode",
             "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode",
             "unitConversionMode", "conversionScopeFieldId", "unitRequired",
+            "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode",
+            "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode",
+            "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId",
+            "moneyCurrencyRequired",
             "title", "sortOrder", "createdAt", "updatedAt");
 
     private final ModuleMetadataRelationService relationService;
@@ -100,6 +106,19 @@ public class PlatformModuleMetadataFieldWebController
         return webScope(() -> {
             requireScopedRecord(request, id);
             return service().prepareMeasureUnitConfig(id, command);
+        });
+    }
+
+    @PostMapping("/{id}/money/prepare")
+    @CustomActionEndpoint(value = "prepareMoney", title = "准备金额字段",
+            level = PlatformActionLevel.RECORD, dataAuth = false)
+    public ModuleMetadataMoneyPrepareResult prepareMoney(HttpServletRequest request,
+                                                         @PathVariable String id,
+                                                         @RequestBody(required = false)
+                                                         ModuleMetadataMoneyPrepareCommand command) {
+        return webScope(() -> {
+            requireScopedRecord(request, id);
+            return service().prepareMoneyConfig(id, command);
         });
     }
 

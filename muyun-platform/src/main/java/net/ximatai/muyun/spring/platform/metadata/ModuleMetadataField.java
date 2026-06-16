@@ -11,6 +11,7 @@ import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardSortableEntity;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 
 import java.util.Set;
 
@@ -94,4 +95,35 @@ public class ModuleMetadataField extends StandardSortableEntity {
     @Column(name = "unit_required", type = ColumnType.BOOLEAN, comment = "Unit value required flag",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean unitRequired = Boolean.FALSE;
+
+    @Column(name = "money_currency_mode", type = ColumnType.VARCHAR, length = 32, comment = "Money currency input mode")
+    private FieldMoneyMode moneyCurrencyMode;
+
+    @Column(name = "money_fixed_currency_code", type = ColumnType.VARCHAR, length = 3, comment = "Fixed money currency code")
+    private String moneyFixedCurrencyCode;
+
+    @Column(name = "money_default_currency_code", type = ColumnType.VARCHAR, length = 3, comment = "Default money currency code")
+    private String moneyDefaultCurrencyCode;
+
+    @Column(name = "money_currency_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Companion money currency metadata field id")
+    private String moneyCurrencyFieldId;
+
+    @Column(name = "money_base_amount_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Shadow money base amount metadata field id")
+    private String moneyBaseAmountFieldId;
+
+    @Column(name = "money_base_currency_code", type = ColumnType.VARCHAR, length = 3, comment = "Money base currency code")
+    private String moneyBaseCurrencyCode;
+
+    @Column(name = "money_rate_type_code", type = ColumnType.VARCHAR, length = 64, comment = "Money exchange rate type code")
+    private String moneyRateTypeCode;
+
+    @Column(name = "money_rate_date_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Money rate date metadata field id")
+    private String moneyRateDateFieldId;
+
+    @Column(name = "money_exchange_rate_field_id", type = ColumnType.VARCHAR, length = 32, comment = "Shadow money exchange rate metadata field id")
+    private String moneyExchangeRateFieldId;
+
+    @Column(name = "money_currency_required", type = ColumnType.BOOLEAN, comment = "Money currency value required flag",
+            defaultVal = @Default(bool = TrueOrFalse.TRUE))
+    private Boolean moneyCurrencyRequired = Boolean.TRUE;
 }
