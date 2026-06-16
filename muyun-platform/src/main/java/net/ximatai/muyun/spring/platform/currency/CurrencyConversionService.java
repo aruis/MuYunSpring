@@ -30,7 +30,8 @@ public class CurrencyConversionService {
         Currency toCurrency = currencyService.requireEnabledCurrency(toCurrencyCode);
         LocalDate validRateDate = rateDate == null ? LocalDate.now() : rateDate;
         if (fromCurrency.getCode().equals(toCurrency.getCode())) {
-            return new CurrencyConversion(fromCurrency.getCode(), toCurrency.getCode(), rateTypeCode,
+            String validRateTypeCode = requireEnabledRateTypeCode(rateTypeCode);
+            return new CurrencyConversion(fromCurrency.getCode(), toCurrency.getCode(), validRateTypeCode,
                     validRateDate, amount, BigDecimal.ONE, round(amount, toCurrency));
         }
         ExchangeRate rate = exchangeRateService.requireEffectiveRate(
@@ -44,5 +45,9 @@ public class CurrencyConversionService {
         Integer scale = currency.getDecimalScale();
         RoundingMode roundingMode = currency.getRoundingMode() == null ? RoundingMode.HALF_UP : currency.getRoundingMode();
         return scale == null ? amount : amount.setScale(scale, roundingMode);
+    }
+
+    private String requireEnabledRateTypeCode(String rateTypeCode) {
+        return exchangeRateService.requireEnabledRateTypeCode(rateTypeCode);
     }
 }

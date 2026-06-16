@@ -73,8 +73,11 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
         String to = requireCurrencyCode(toCurrencyCode);
         String typeCode = rateTypeService.requireEnabledRateType(rateTypeCode).getCode();
         LocalDate date = requireRateDate(rateDate);
+        if (TenantContext.currentTenantId().isEmpty()) {
+            return effectiveRate(listGlobalRateLayer(from, to, typeCode), date);
+        }
         ExchangeRate tenantRate = effectiveRate(listRateLayer(from, to, typeCode), date);
-        if (tenantRate != null || TenantContext.currentTenantId().isEmpty()) {
+        if (tenantRate != null) {
             return tenantRate;
         }
         return effectiveRate(listGlobalRateLayer(from, to, typeCode), date);
@@ -90,6 +93,10 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
                     + fromCurrencyCode + " -> " + toCurrencyCode + " " + rateTypeCode + " " + rateDate);
         }
         return rate;
+    }
+
+    public String requireEnabledRateTypeCode(String rateTypeCode) {
+        return rateTypeService.requireEnabledRateType(rateTypeCode).getCode();
     }
 
     private void normalizeAndValidate(ExchangeRate rate) {

@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSupport<ExchangeRate, ExchangeRateService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate",
-            "rate", "source", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
+            "rate", "source", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     private final CurrencyConversionService conversionService;
 

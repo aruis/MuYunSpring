@@ -65,6 +65,54 @@ class CurrencyServiceContractTest {
     }
 
     @Test
+    void shouldNotReadTenantCurrencyWithoutTenantContext() {
+        currencyService.insert(currency("USD", "840", "Global Dollar", "$", 2));
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            currencyService.insert(currency("USD", "840", "Tenant Dollar", "US$", 3));
+        }
+
+        Currency visible = currencyService.requireCurrency("USD");
+
+        assertThat(visible.getTitle()).isEqualTo("Global Dollar");
+        assertThat(visible.getTenantId()).isNull();
+    }
+
+    @Test
+    void shouldNotFallbackToGlobalCurrencyWhenTenantCurrencyIsDisabled() {
+        currencyService.insert(currency("USD", "840", "Global Dollar", "$", 2));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String tenantCurrencyId = currencyService.insert(currency("USD", "840", "Tenant Dollar", "US$", 2));
+            currencyService.disable(tenantCurrencyId);
+
+            assertThatThrownBy(() -> currencyService.requireEnabledCurrency("USD"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("disabled");
+        }
+    }
+
+    @Test
+    void shouldHideGlobalCurrencyOptionWhenTenantCurrencyIsDisabled() {
+        currencyService.insert(currency("USD", "840", "Global Dollar", "$", 2));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String tenantCurrencyId = currencyService.insert(currency("USD", "840", "Tenant Dollar", "US$", 2));
+            currencyService.disable(tenantCurrencyId);
+
+            assertThat(currencyService.listVisibleCurrencies(true))
+                    .extracting(Currency::getCode)
+                    .doesNotContain("USD");
+            assertThat(currencyService.listVisibleCurrencies(false))
+                    .singleElement()
+                    .satisfies(currency -> {
+                        assertThat(currency.getCode()).isEqualTo("USD");
+                        assertThat(currency.getTitle()).isEqualTo("Tenant Dollar");
+                        assertThat(currency.getEnabled()).isFalse();
+                    });
+        }
+    }
+
+    @Test
     void shouldConfigureTenantBaseCurrencyFromVisibleCurrency() {
         currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
 
@@ -85,6 +133,38 @@ class CurrencyServiceContractTest {
         assertThatThrownBy(() -> rateTypeService.requireEnabledRateType("SPOT"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void shouldNotReadTenantRateTypeWithoutTenantContext() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            rateTypeService.insert(rateType("spot", "Tenant Spot"));
+        }
+
+        assertThatThrownBy(() -> rateTypeService.requireRateType("SPOT"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("requires existing");
+    }
+
+    @Test
+    void shouldHideGlobalRateTypeOptionWhenTenantRateTypeIsDisabled() {
+        rateTypeService.insert(rateType("spot", "Global Spot"));
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String tenantRateTypeId = rateTypeService.insert(rateType("spot", "Tenant Spot"));
+            rateTypeService.disable(tenantRateTypeId);
+
+            assertThat(rateTypeService.listVisibleRateTypes(true))
+                    .extracting(ExchangeRateType::getCode)
+                    .doesNotContain("SPOT");
+            assertThat(rateTypeService.listVisibleRateTypes(false))
+                    .singleElement()
+                    .satisfies(rateType -> {
+                        assertThat(rateType.getCode()).isEqualTo("SPOT");
+                        assertThat(rateType.getTitle()).isEqualTo("Tenant Spot");
+                        assertThat(rateType.getEnabled()).isFalse();
+                    });
+        }
     }
 
     @Test
@@ -129,6 +209,50 @@ class CurrencyServiceContractTest {
                     "USD", "CNY", "SPOT", LocalDate.of(2026, 2, 10));
             assertThat(tenantRate.exchangeRate()).isEqualByComparingTo("7.2000");
         }
+    }
+
+    @Test
+    void shouldNotReadTenantExchangeRateWithoutTenantContext() {
+        prepareCurrenciesAndRateType();
+        rateService.insert(rate("USD", "CNY", "SPOT", "2026-01-01", "7.1000"));
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            rateService.insert(rate("USD", "CNY", "SPOT", "2026-01-01", "8.0000"));
+        }
+
+        CurrencyConversion conversion = conversionService.convert(BigDecimal.ONE,
+                "USD", "CNY", "SPOT", LocalDate.of(2026, 1, 10));
+
+        assertThat(conversion.exchangeRate()).isEqualByComparingTo("7.1000");
+    }
+
+    @Test
+    void shouldValidateRateTypeWhenConvertingSameCurrency() {
+        prepareCurrenciesAndRateType();
+
+        CurrencyConversion conversion = conversionService.convert(new BigDecimal("1.234"),
+                "CNY", "CNY", "spot", LocalDate.of(2026, 1, 10));
+
+        assertThat(conversion.rateTypeCode()).isEqualTo("SPOT");
+        assertThat(conversion.exchangeRate()).isEqualByComparingTo("1");
+        assertThat(conversion.convertedAmount()).isEqualByComparingTo("1.23");
+        rateTypeService.disable(rateTypeService.requireRateType("SPOT").getId());
+        assertThatThrownBy(() -> conversionService.convert(BigDecimal.ONE,
+                "CNY", "CNY", "SPOT", LocalDate.of(2026, 1, 10)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void shouldNotValidateSameCurrencyConversionWithTenantOnlyRateTypeWithoutTenantContext() {
+        currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            rateTypeService.insert(rateType("spot", "Tenant Spot"));
+        }
+
+        assertThatThrownBy(() -> conversionService.convert(BigDecimal.ONE,
+                "CNY", "CNY", "SPOT", LocalDate.of(2026, 1, 10)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("requires existing");
     }
 
     @Test

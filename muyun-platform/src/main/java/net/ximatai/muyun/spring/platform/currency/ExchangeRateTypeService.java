@@ -87,12 +87,14 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
     public List<ExchangeRateType> listVisibleRateTypes(boolean enabledOnly) {
         Map<String, ExchangeRateType> rateTypes = new LinkedHashMap<>();
         if (TenantContext.currentTenantId().isPresent()) {
-            listTenantLayer(enabledOnly).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
-            listGlobalLayer(enabledOnly).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
+            listTenantLayer(false).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
+            listGlobalLayer(false).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
         } else {
-            listTenantLayer(enabledOnly).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
+            listGlobalLayer(false).forEach(rateType -> rateTypes.putIfAbsent(rateType.getCode(), rateType));
         }
-        return List.copyOf(rateTypes.values());
+        return rateTypes.values().stream()
+                .filter(rateType -> !enabledOnly || Boolean.TRUE.equals(rateType.getEnabled()))
+                .toList();
     }
 
     private List<ExchangeRateType> visibleRateTypeCandidates(String rateTypeCode, boolean enabledOnly) {

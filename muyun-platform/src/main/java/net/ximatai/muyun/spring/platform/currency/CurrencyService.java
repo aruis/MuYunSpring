@@ -74,22 +74,24 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
     }
 
     public Currency requireEnabledCurrency(String currencyCode) {
-        String code = requireCurrencyCode(currencyCode);
-        for (Currency currency : visibleCurrencyCandidates(code, true)) {
-            return currency;
+        Currency currency = requireCurrency(currencyCode);
+        if (!Boolean.TRUE.equals(currency.getEnabled())) {
+            throw new PlatformException("Currency is disabled: " + currencyCode);
         }
-        throw new PlatformException("Currency requires enabled visible currency: " + currencyCode);
+        return currency;
     }
 
     public List<Currency> listVisibleCurrencies(boolean enabledOnly) {
         Map<String, Currency> currencies = new LinkedHashMap<>();
         if (TenantContext.currentTenantId().isPresent()) {
-            listTenantLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
-            listGlobalLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+            listTenantLayer(false).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+            listGlobalLayer(false).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
         } else {
-            listTenantLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+            listGlobalLayer(false).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
         }
-        return List.copyOf(currencies.values());
+        return currencies.values().stream()
+                .filter(currency -> !enabledOnly || Boolean.TRUE.equals(currency.getEnabled()))
+                .toList();
     }
 
     private List<Currency> visibleCurrencyCandidates(String currencyCode, boolean enabledOnly) {

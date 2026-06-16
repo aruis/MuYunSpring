@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 public class ExchangeRateTypeWebController
         extends NestedEnabledSortableCrudWebSupport<ExchangeRateType, ExchangeRateTypeService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "code", "systemManaged", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
+            "id", "code", "systemManaged", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     @Override
     public <T> T webScope(Supplier<T> action) {

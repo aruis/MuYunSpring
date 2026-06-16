@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<Currency, CurrencyService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "code", "numericCode", "symbol", "decimalScale", "roundingMode",
-            "title", "enabled", "sortOrder", "createdAt", "updatedAt");
+            "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     @Override
     public <T> T webScope(Supplier<T> action) {
