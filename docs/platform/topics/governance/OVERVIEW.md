@@ -4,7 +4,7 @@
 
 配置治理专题覆盖低代码模块从“能配能跑”进入“可治理、可迁移、可复用、可验收”的生产化能力。它的核心单元是低代码模块包 `LowCodeModulePackage`，不是单个 UI JSON、单张元数据表或整库配置。
 
-本专题与平台配置专题分工明确：平台配置负责应用、模块、元数据、菜单、字典等基础配置；配置治理负责配置包、版本快照、发布回滚、配置包迁移、模板复用和健康门禁。
+本专题与平台配置专题分工明确：平台配置负责应用、模块、元数据、菜单、字典等基础配置；配置治理负责配置包、版本快照、归档指针、配置包迁移、模板复用和健康门禁。
 
 ## 核心对象
 
@@ -15,7 +15,7 @@
 | `dependencyManifest` | 声明迁移和发布前需要满足的外部事实 | 覆盖模块、动作、字典、工作流、文件服务和外部依赖 |
 | `publishManifest` | 记录包协议、来源版本、来源环境和导出信息 | 用于跨环境迁移和版本追踪，不替代版本表 |
 | 健康报告 | 发布、导入和模板复用前的结构化门禁 | `FAIL` 阻断，`WARN` 可继续但必须保留诊断 |
-| 配置版本 | 已发布模块包的不可变快照 | 当前版本只表达线上指针，历史版本保留发布事实 |
+| 配置版本 | 已归档模块包的不可变快照 | 当前版本只表达治理导出和迁移基线指针，历史版本保留归档事实 |
 | 导入草稿 | dry-run 之后的最小导入执行承接 | 当前为内存 draft，不持久化、不做复杂合并 |
 | 模板 | 从已发布版本生成的可复用样板包 | 模板实例化后生成 `MODULE_FULL` 包，再进入治理链路 |
 
@@ -33,7 +33,7 @@
 
 包模式固定为：
 
-1. `MODULE_FULL`：完整模块包，必须包含 `METADATA`，可发布为配置版本。
+1. `MODULE_FULL`：完整模块包，必须包含 `METADATA`，可归档为配置版本。
 2. `PAGE_ONLY`：页面迁移包，只允许 `PAGE/INTERACTION/ENTRY`，不直接发布为当前完整版本。
 3. `TEMPLATE`：模板包，必须包含 `METADATA`，需实例化为 `MODULE_FULL` 后再进入发布链路。
 
@@ -45,27 +45,28 @@
 2. bundle 顶层 `module/moduleAlias` 与包身份一致。
 3. 依赖 manifest 的 resolver 诊断和缺失依赖诊断。
 4. 元数据 bundle 中计量单位字段的伴生字段、标准值字段、上下文字段和单位分类依赖声明。
+5. 元数据 bundle 中金额字段的币种伴生字段、基准金额字段、汇率日期字段和汇率字段契约。
 
 健康检查当前只承诺包级身份、依赖事实和少量会影响迁移可用性的字段契约，不深度解析 UI、工作流或自动化配置语义。后续补强时应继续增加独立 checker，避免把治理逻辑堆成单体判断。
 
-## 发布与回滚
+## 版本归档与指针切换
 
-`LowCodeModuleConfigPublishFacade` 发布 `MODULE_FULL` 包时先执行健康检查。`FAIL` 阻断发布，`PASS/WARN` 可生成配置版本。
+`LowCodeModuleConfigPublishFacade` 保留 publish 命名以兼容既有 Web API，但业务语义是将 `MODULE_FULL` 配置包归档为不可变版本快照。执行时先运行健康检查；`FAIL` 阻断归档，`PASS/WARN` 可生成配置版本。
 
-发布版本保存：
+配置版本保存：
 
-1. `packageSnapshotText`：发布时完整包快照。
+1. `packageSnapshotText`：归档时完整包快照。
 2. `packageHash`：快照 hash。
 3. `summaryJson`：包模式、包含 bundle、健康状态和问题数。
-4. `currentVersion`：当前在线版本指针。
+4. `currentVersion`：当前治理导出和迁移基线指针。
 
-回滚首期只切换当前版本，不改写底层 UI、查询、菜单配置，不自动执行数据迁移，也不接入工作流审批。已发布快照不可变，历史版本仍保持 `PUBLISHED` 事实。
+指针切换首期只影响 `LowCodeModulePackageExchangeService.exportCurrentPackage`、导入 dry-run 和导入草稿的基线判断，不改写底层元数据、UI、查询、菜单配置，不切换动态运行态，不自动执行数据迁移，也不接入工作流审批。已归档快照不可变，历史版本仍保持 `PUBLISHED` 事实。
 
 ## 迁移与导入
 
 `LowCodeModulePackageExchangeService` 承接导出、解析和 dry-run：
 
-1. 从当前在线版本或指定历史版本导出模块包 JSON。
+1. 从当前治理指针版本或指定历史版本导出模块包 JSON。
 2. 解析模块包 JSON 为 `LowCodeModulePackage`。
 3. dry-run 复用健康检查，并输出冲突列表。
 4. `MODULE_FULL` 指向已有模块时返回 `WARN`，表示后续需要显式发布新版本。

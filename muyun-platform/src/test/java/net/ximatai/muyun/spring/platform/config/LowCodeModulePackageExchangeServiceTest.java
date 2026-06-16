@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.pageOnlyPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.salesContractPackage;
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.templatePackage;
 
 class LowCodeModulePackageExchangeServiceTest {
@@ -35,6 +36,36 @@ class LowCodeModulePackageExchangeServiceTest {
         assertThat(currentJson).contains("\"moduleAlias\":\"crm.contract\"");
         assertThat(versionJson).isEqualTo(currentJson);
         assertThat(exchangeService.parsePackage(currentJson).moduleAlias()).isEqualTo("crm.contract");
+    }
+
+    @Test
+    void shouldUseCurrentVersionOnlyAsGovernanceExportPointer() {
+        LowCodeModuleConfigVersion baseline = publishFacade
+                .publish(salesContractPackage("合同基线", "sales_contract_v1", "draft"), "tester", "baseline")
+                .version();
+        LowCodeModuleConfigVersion revised = publishFacade
+                .publish(salesContractPackage("合同归档", "sales_contract_v2", "archived"), "tester", "revised")
+                .version();
+
+        assertThat(exchangeService.exportCurrentPackage("sales.contract"))
+                .contains("sales_contract_v2")
+                .doesNotContain("sales_contract_v1");
+        assertThat(exchangeService.exportVersionPackage(baseline.getId()))
+                .contains("sales_contract_v1")
+                .doesNotContain("sales_contract_v2");
+
+        publishFacade.rollback("sales.contract", baseline.getId());
+
+        assertThat(exchangeService.exportCurrentPackage("sales.contract"))
+                .contains("sales_contract_v1")
+                .doesNotContain("sales_contract_v2");
+        assertThat(exchangeService.exportVersionPackage(revised.getId()))
+                .contains("sales_contract_v2");
+        assertThat(versionService.listByModule("sales.contract")).hasSize(2);
+        assertThat(versionService.select(baseline.getId()).getVersionStatus())
+                .isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
+        assertThat(versionService.select(revised.getId()).getVersionStatus())
+                .isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
     }
 
     @Test

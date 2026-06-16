@@ -14,10 +14,12 @@
 | 方法 | URL | 功能点 |
 | --- | --- | --- |
 | `POST` | `/platform.low_code_governance/packages/health` | 对提交的模块配置包执行健康检查，返回 `LowCodeConfigHealthReport` |
-| `POST` | `/platform.low_code_governance/packages/publish` | 发布 `MODULE_FULL` 配置包，生成不可变版本快照并切换当前版本 |
-| `POST` | `/platform.low_code_governance/modules/{moduleAlias}/versions/{versionId}/rollback` | 将指定模块当前版本指针切换到历史版本 |
+| `POST` | `/platform.low_code_governance/packages/publish` | 归档 `MODULE_FULL` 配置包，生成不可变版本快照并切换当前治理指针 |
+| `POST` | `/platform.low_code_governance/modules/{moduleAlias}/versions/{versionId}/rollback` | 将指定模块当前治理指针切换到历史版本 |
 | `GET` | `/platform.low_code_governance/modules/{moduleAlias}/package` | 导出模块当前配置包 |
 | `GET` | `/platform.low_code_governance/versions/{versionId}/package` | 导出指定历史版本配置包 |
+
+`publish` 和 `rollback` 是兼容既有接口的命名；平台语义是配置包版本归档和治理指针切换。它们不切换动态运行态，不改写元数据、UI、查询或菜单配置。
 
 ## 导入迁移
 
@@ -27,16 +29,16 @@
 | `POST` | `/platform.low_code_governance/imports/drafts` | 在预检不阻断时准备导入草稿，记录基线版本信息 |
 | `POST` | `/platform.low_code_governance/imports/drafts/publish` | 发布导入草稿；若草稿基线版本已变化则由服务层拒绝 |
 
-## 计量单位诊断
+## 计量单位与金额诊断
 
-计量单位字段的发布前诊断复用配置包健康检查和导入 dry-run：
+计量单位和金额字段的发布前诊断复用配置包健康检查和导入 dry-run：
 
 | 入口 | 用途 |
 | --- | --- |
-| `POST /platform.low_code_governance/packages/health` | 校验当前模块包中的计量单位字段契约和依赖声明 |
-| `POST /platform.low_code_governance/imports/dry-run` | 在跨环境导入前校验计量单位依赖、字段契约和冲突诊断 |
+| `POST /platform.low_code_governance/packages/health` | 校验当前模块包中的计量单位字段契约、金额字段契约和依赖声明 |
+| `POST /platform.low_code_governance/imports/dry-run` | 在跨环境导入前校验计量单位依赖、计量/金额字段契约和冲突诊断 |
 
-健康检查会扫描 `METADATA` bundle 中的字段清单，支持字段扁平属性和运行态 `measureUnit` 对象两种形态。常见诊断码：
+健康检查会扫描 `METADATA` bundle 中的字段清单，支持字段扁平属性、运行态 `measureUnit` 对象和运行态 `money` 对象形态。计量单位常见诊断码：
 
 | 诊断码 | 级别 | 含义 |
 | --- | --- | --- |
@@ -50,6 +52,20 @@
 | `MEASURE_UNIT_SCOPE_FIELD_MISSING` | `ERROR` | 配置了换算上下文字段，但包内字段清单缺失该字段 |
 
 `MEASURE_UNIT` 依赖推荐声明为 `platform + categoryAlias`，对应共享单位库；历史 `applicationAlias + categoryAlias` 仍兼容。`WARN` 不阻断发布或导入预检，但会提示跨环境迁移风险；`ERROR` 会使健康状态进入 `FAIL`，发布门面会拒绝继续发布。
+
+金额字段常见诊断码：
+
+| 诊断码 | 级别 | 含义 |
+| --- | --- | --- |
+| `MONEY_OWNER_NOT_NUMERIC` | `ERROR` | 金额主字段不是数值类型 |
+| `MONEY_CURRENCY_MODE_MISSING` / `MONEY_CURRENCY_MODE_INVALID` | `ERROR` | 金额字段缺少或错误配置固定/可选币种模式 |
+| `MONEY_CURRENCY_COMPANION_MISSING` / `MONEY_CURRENCY_COMPANION_NOT_TEXT` | `ERROR` | 可选币种模式缺少文本型币种伴生字段 |
+| `MONEY_BASE_AMOUNT_MISSING` / `MONEY_BASE_AMOUNT_CONFLICT` / `MONEY_BASE_AMOUNT_NOT_NUMERIC` | `ERROR` | 基准金额影子字段缺失、冲突或类型不兼容 |
+| `MONEY_FIXED_CURRENCY_MISSING` / `MONEY_FIXED_CURRENCY_INVALID` | `ERROR` | 固定币种缺失或不是 ISO 4217 三位字母代码 |
+| `MONEY_DEFAULT_CURRENCY_INVALID` / `MONEY_BASE_CURRENCY_INVALID` | `ERROR` | 默认币种或基准币种不是 ISO 4217 三位字母代码 |
+| `MONEY_RATE_TYPE_MISSING` / `MONEY_RATE_TYPE_INVALID` | `ERROR` | 汇率类型缺失或不是平台代码格式 |
+| `MONEY_RATE_DATE_FIELD_MISSING` / `MONEY_RATE_DATE_FIELD_NOT_DATE` | `ERROR` | 汇率日期字段缺失或不是日期/时间类型 |
+| `MONEY_EXCHANGE_RATE_FIELD_MISSING` / `MONEY_EXCHANGE_RATE_FIELD_NOT_NUMERIC` | `ERROR` | 汇率影子字段缺失或不是数值类型 |
 
 ## 模板复用
 
