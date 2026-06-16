@@ -31,14 +31,15 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 3. 为动态模块维护元数据、字段、关系、视图和字典绑定。
 4. 通过模块-元数据关系绑定主元数据和子元数据，并维护关系下的模块字段、元数据视图和字段行为。
 5. 配置菜单方案和菜单节点，将模块挂载为运行入口。
-6. 刷新运行态，把当前配置编译为动态 `ModuleDefinition`、`EntityDefinition`、`FieldDefinition` 等运行态定义。
-7. 运行态刷新链路必要时执行 schema ensure，并刷新动态运行态 registry。
-8. 运行态通过动态记录入口按 `moduleAlias + metadataAlias` 执行描述读取、CRUD、查询和引用等能力。
+6. 元数据或字段保存后，平台在事务提交后按单个 metadata 编译动态 `EntityDefinition` 并执行 schema ensure；无事务时立即执行。
+7. 刷新运行态，把当前模块配置编译为动态 `ModuleDefinition`、`EntityDefinition`、`FieldDefinition` 等运行态定义。
+8. 运行态刷新链路必要时再次执行模块级 schema ensure，并刷新动态运行态 registry。
+9. 运行态通过动态记录入口按 `moduleAlias + metadataAlias` 执行描述读取、CRUD、查询和引用等能力。
 
 最小闭环是：
 
 ```text
-应用 -> 模块 -> 元数据 -> 字段/关系/菜单/字典 -> runtime refresh -> DynamicRecordService -> CRUD/query
+应用 -> 模块 -> 元数据 -> 字段 -> schema ensure -> 关系/菜单/字典 -> runtime refresh -> DynamicRecordService -> CRUD/query
 ```
 
 ## 边界说明
@@ -48,8 +49,9 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 3. 字段定义只承载运行态必须知道的轻量字段事实和行为；引用过滤、引用回填、字段保护和公式规则属于配置态字段行为，按元数据字段或模块字段归属聚合。
 4. 菜单模型只表达入口树和模块挂载；权限剪枝属于权限专题，不能反向污染菜单配置。
 5. 运行态 URL、权限、审计和 OpenAPI 统一围绕 `moduleAlias`，不暴露内部实体定位作为业务入口。
-6. Runtime refresh 是配置态到运行态的同步边界，不应在普通业务保存动作中隐式触发表结构变更。影响 `ModuleDefinition` 编译结果的配置保存后，平台会在事务提交后自动刷新受影响模块；无事务时立即刷新。自动刷新覆盖模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变更后引用该 metadata 的动态模块。手动 refresh 仍保留为运维入口。模块级配置包 publish 更偏治理版本定稿、归档和跨环境迁移，不是业务运行的硬前置；UI 配置和查询模板 publish 仍表达用户可见生效，不触发 runtime refresh。
-7. 本专题不复盘推进过程，不记录测试流水；稳定契约优先由代码和 contract 测试支撑。
+6. 元数据结构保存即生效：元数据和元数据字段新增、更新后，平台会在事务提交后执行单 metadata schema ensure；无事务时立即执行。该链路只承诺安全加法和当前 `DynamicSchemaService.ensureTable` 的默认治理口径，不把字段删除、破坏性类型变更或复杂迁移策略作为普通保存副作用。字段保护、字典绑定等轻量字段事实可进入结构编译；模块字段消费配置、UI/query 配置和模块动作不参与单 metadata schema ensure。
+7. Runtime refresh 是配置态到运行态契约的同步边界，负责把模块关系、模块字段消费配置、视图、动作等编译进动态运行态；结构 ensure 是物理结构层，两者职责不同。影响 `ModuleDefinition` 编译结果的配置保存后，平台会在事务提交后自动刷新受影响模块；无事务时立即刷新。自动刷新覆盖模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变更后引用该 metadata 的动态模块。手动 refresh 仍保留为运维入口。模块级配置包 publish 更偏治理版本定稿、归档和跨环境迁移，不是业务运行的硬前置；UI 配置和查询模板 publish 仍表达用户可见生效，不触发 runtime refresh 或 schema ensure。
+8. 本专题不复盘推进过程，不记录测试流水；稳定契约优先由代码和 contract 测试支撑。
 
 ## 计量单位边界
 

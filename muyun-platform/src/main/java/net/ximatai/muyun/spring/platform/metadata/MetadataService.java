@@ -8,7 +8,12 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataService extends AbstractAbilityService<Metadata> implements
@@ -18,8 +23,23 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     public static final String MODULE_ALIAS = "platform.metadata";
     public static final String DEFAULT_SCHEMA = "public";
 
+    private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
+
     public MetadataService(BaseDao<Metadata, String> metadataDao) {
+        this(metadataDao, provider(null));
+    }
+
+    public MetadataService(BaseDao<Metadata, String> metadataDao,
+                           Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
+        this(metadataDao, provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)));
+    }
+
+    @Autowired
+    public MetadataService(BaseDao<Metadata, String> metadataDao,
+                           ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider) {
         super(MODULE_ALIAS, Metadata.class, metadataDao);
+        this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
+                "schemaEnsureServiceProvider must not be null");
     }
 
     @Override
@@ -41,6 +61,26 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     public void validateSortScope(Metadata left, Metadata right) {
         validateSortScopeByFields(left, right,
                 "Metadata sort can only move records within the same application", "applicationAlias");
+    }
+
+    @Override
+    public void afterInsert(String id, Metadata metadata) {
+        PlatformMetadataSchemaEnsureService schemaEnsureService = schemaEnsureService();
+        if (schemaEnsureService != null) {
+            schemaEnsureService.ensure(id);
+        }
+    }
+
+    @Override
+    public void afterUpdate(Metadata metadata, int updated) {
+        PlatformMetadataSchemaEnsureService schemaEnsureService = schemaEnsureService();
+        if (updated > 0 && schemaEnsureService != null) {
+            schemaEnsureService.ensure(metadata.getId());
+        }
+    }
+
+    private PlatformMetadataSchemaEnsureService schemaEnsureService() {
+        return schemaEnsureServiceProvider.getIfAvailable();
     }
 
     private void normalizeAndValidate(Metadata metadata) {
@@ -75,5 +115,29 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
                 .eq("schemaName", metadata.getSchemaName())
                 .eq("tableName", metadata.getTableName()),
                 "metadata physical table must be unique: " + metadata.getSchemaName() + "." + metadata.getTableName());
+    }
+
+    private static <T> ObjectProvider<T> provider(T value) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject(Object... args) {
+                return value;
+            }
+
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+
+            @Override
+            public T getIfUnique() {
+                return value;
+            }
+
+            @Override
+            public T getObject() {
+                return value;
+            }
+        };
     }
 }
