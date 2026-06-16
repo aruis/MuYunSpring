@@ -61,10 +61,11 @@ public class MeasureUnitBusinessConversionService {
         for (MeasureUnitConversionRule rule : ruleService.applicableRules(context)) {
             UnitKey from = unitKey(rule.getApplicationAlias(), rule.getFromCategoryAlias(), rule.getFromUnitCode(), true);
             UnitKey to = unitKey(rule.getApplicationAlias(), rule.getToCategoryAlias(), rule.getToUnitCode(), true);
-            addBest(bestEdges, new Edge(from, to, rule.getFactor(), rule.getId(), specificity(rule), priority(rule)));
+            addBest(bestEdges, new Edge(from, to, rule.getFactor(), rule.getId(),
+                    specificity(rule), priority(rule), visibilityPriority(context, rule)));
             addBest(bestEdges, new Edge(to, from,
                     BigDecimal.ONE.divide(rule.getFactor(), MathContext.DECIMAL128),
-                    rule.getId(), specificity(rule), priority(rule)));
+                    rule.getId(), specificity(rule), priority(rule), visibilityPriority(context, rule)));
         }
         Map<UnitKey, List<Edge>> graph = new LinkedHashMap<>();
         for (Edge edge : bestEdges.values()) {
@@ -72,7 +73,8 @@ public class MeasureUnitBusinessConversionService {
         }
         for (List<Edge> edges : graph.values()) {
             edges.sort(Comparator.comparingInt(Edge::specificity).reversed()
-                    .thenComparing(Comparator.comparingInt(Edge::priority).reversed()));
+                    .thenComparing(Comparator.comparingInt(Edge::priority).reversed())
+                    .thenComparing(Comparator.comparingInt(Edge::visibilityPriority).reversed()));
         }
         return graph;
     }
@@ -80,10 +82,21 @@ public class MeasureUnitBusinessConversionService {
     private void addBest(Map<EdgeKey, Edge> edges, Edge candidate) {
         EdgeKey key = new EdgeKey(candidate.from(), candidate.to());
         Edge existing = edges.get(key);
-        if (existing == null || candidate.specificity() > existing.specificity()
-                || (candidate.specificity() == existing.specificity() && candidate.priority() > existing.priority())) {
+        if (existing == null || compareEdge(candidate, existing) > 0) {
             edges.put(key, candidate);
         }
+    }
+
+    private int compareEdge(Edge left, Edge right) {
+        int specificity = Integer.compare(left.specificity(), right.specificity());
+        if (specificity != 0) {
+            return specificity;
+        }
+        int priority = Integer.compare(left.priority(), right.priority());
+        if (priority != 0) {
+            return priority;
+        }
+        return Integer.compare(left.visibilityPriority(), right.visibilityPriority());
     }
 
     private Path findBestPath(UnitKey source, UnitKey target, Map<UnitKey, List<Edge>> graph) {
@@ -130,6 +143,10 @@ public class MeasureUnitBusinessConversionService {
         if (priority != 0) {
             return priority;
         }
+        int visibility = Integer.compare(totalVisibilityPriority(left), totalVisibilityPriority(right));
+        if (visibility != 0) {
+            return visibility;
+        }
         return Integer.compare(right.edges().size(), left.edges().size());
     }
 
@@ -141,14 +158,18 @@ public class MeasureUnitBusinessConversionService {
         return path.edges().stream().mapToInt(Edge::priority).sum();
     }
 
+    private int totalVisibilityPriority(Path path) {
+        return path.edges().stream().mapToInt(Edge::visibilityPriority).sum();
+    }
+
     private UnitKey unitKey(String applicationAlias, String categoryAlias, String unitCode, boolean requireEnabled) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = PlatformNameRules.requireIdentifier(categoryAlias, "measureUnitCategoryAlias");
         String validUnitCode = PlatformNameRules.requireCode(unitCode, "measureUnitCode");
         if (requireEnabled) {
-            unitService.requireEnabledUnit(validApplicationAlias, validCategoryAlias, validUnitCode);
+            unitService.requireEnabledVisibleUnit(validApplicationAlias, validCategoryAlias, validUnitCode);
         }
-        return new UnitKey(validApplicationAlias, validCategoryAlias, validUnitCode);
+        return new UnitKey(validCategoryAlias, validUnitCode);
     }
 
     private MeasureUnitConversionContext normalizeContext(MeasureUnitConversionContext context) {
@@ -181,16 +202,32 @@ public class MeasureUnitBusinessConversionService {
         return rule.getPriority() == null ? 0 : rule.getPriority();
     }
 
-    private record UnitKey(String applicationAlias, String categoryAlias, String unitCode) {
+    private int visibilityPriority(MeasureUnitConversionContext context, MeasureUnitConversionRule rule) {
+        if (MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS.equals(rule.getApplicationAlias())) {
+            return 2;
+        }
+        if (Objects.equals(context.applicationAlias(), rule.getApplicationAlias())) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private record UnitKey(String categoryAlias, String unitCode) {
         String label() {
-            return applicationAlias + "." + categoryAlias + "." + unitCode;
+            return categoryAlias + "." + unitCode;
         }
     }
 
     private record EdgeKey(UnitKey from, UnitKey to) {
     }
 
-    private record Edge(UnitKey from, UnitKey to, BigDecimal factor, String ruleId, int specificity, int priority) {
+    private record Edge(UnitKey from,
+                        UnitKey to,
+                        BigDecimal factor,
+                        String ruleId,
+                        int specificity,
+                        int priority,
+                        int visibilityPriority) {
     }
 
     private record Path(UnitKey current, List<Edge> edges) {

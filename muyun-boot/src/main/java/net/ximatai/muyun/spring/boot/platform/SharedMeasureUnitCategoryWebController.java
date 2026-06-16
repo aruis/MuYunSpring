@@ -21,12 +21,11 @@ import java.util.Objects;
 import java.util.Set;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MeasureUnitCategoryService.MODULE_ALIAS, title = "平台计量单位分类")
-@RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories")
-public class MeasureUnitCategoryWebController
+@RequestMapping("/platform.measure_unit/categories")
+public class SharedMeasureUnitCategoryWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitCategory, MeasureUnitCategoryService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "alias", "dimension", "baseUnitCode", "title",
+            "id", "tenantId", "applicationAlias", "alias", "dimension", "baseUnitCode", "title",
             "enabled", "sortOrder", "createdAt", "updatedAt");
 
     @Override
@@ -41,22 +40,22 @@ public class MeasureUnitCategoryWebController
 
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
-        criteria.eq("applicationAlias", applicationAlias(request));
+        criteria.eq("applicationAlias", MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
     protected void bindScope(MeasureUnitCategory record, HttpServletRequest request) {
-        record.setApplicationAlias(applicationAlias(request));
+        record.setApplicationAlias(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
     protected boolean inScope(MeasureUnitCategory record, HttpServletRequest request) {
-        return Objects.equals(record.getApplicationAlias(), applicationAlias(request));
+        return Objects.equals(record.getApplicationAlias(), MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
     }
 
     @Override
     protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
-        return "measure unit category does not belong to application: " + applicationAlias(request) + "." + id;
+        return "shared measure unit category does not exist: " + id;
     }
 
     @GetMapping("/options")
@@ -64,15 +63,7 @@ public class MeasureUnitCategoryWebController
     public WebListResponse<MeasureUnitCategory> options(HttpServletRequest request,
                                                         @RequestParam(defaultValue = "true") boolean enabledOnly) {
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
-                service().listVisibleCategories(applicationAlias(request), enabledOnly),
+                service().listCategories(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, enabledOnly),
                 FieldOutputContext.LIST)));
-    }
-
-    private String applicationAlias(HttpServletRequest request) {
-        String value = pathVariable(request, "applicationAlias");
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("applicationAlias is required");
-        }
-        return value;
     }
 }

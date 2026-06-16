@@ -104,6 +104,83 @@ class MeasureUnitConversionRuleWebControllerTest {
         assertThat(context.getValue().contextObjectId()).isEqualTo("sku-1");
     }
 
+    @Test
+    void shouldForceSharedRuleApplicationAliasOnInsert() throws Exception {
+        MeasureUnitConversionRuleService service = mock(MeasureUnitConversionRuleService.class);
+        MeasureUnitBusinessConversionService conversionService = mock(MeasureUnitBusinessConversionService.class);
+        SharedMeasureUnitConversionRuleWebController controller =
+                new SharedMeasureUnitConversionRuleWebController(conversionService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        MeasureUnitConversionRule inserted = rule("platform");
+        inserted.setId("rule-1");
+        when(service.insert(any(MeasureUnitConversionRule.class))).thenReturn("rule-1");
+        when(service.select("rule-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.measure_unit/conversion-rules/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "applicationAlias":"crm",
+                                  "scopeType":"GLOBAL",
+                                  "fromCategoryAlias":"quantity",
+                                  "fromUnitCode":"box",
+                                  "toCategoryAlias":"quantity",
+                                  "toUnitCode":"bottle",
+                                  "factor":12
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.applicationAlias").value("platform"));
+
+        ArgumentCaptor<MeasureUnitConversionRule> captor =
+                ArgumentCaptor.forClass(MeasureUnitConversionRule.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+    }
+
+    @Test
+    void shouldPreviewSharedBusinessConversionForConsumerApplication() throws Exception {
+        MeasureUnitConversionRuleService service = mock(MeasureUnitConversionRuleService.class);
+        MeasureUnitBusinessConversionService conversionService = mock(MeasureUnitBusinessConversionService.class);
+        SharedMeasureUnitConversionRuleWebController controller =
+                new SharedMeasureUnitConversionRuleWebController(conversionService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(conversionService.convert(any(MeasureUnitConversionContext.class), eq(new BigDecimal("2")),
+                eq("quantity"), eq("box"), eq("quantity"), eq("bottle")))
+                .thenReturn(new MeasureUnitBusinessConversion(
+                        new MeasureUnitConversionContext("crm", "crm.order", "sku", "sku-1", null),
+                        new BigDecimal("2"), "quantity", "box", "quantity", "bottle",
+                        new BigDecimal("24"), List.of("rule-1")));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.measure_unit/conversion-rules/convert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "applicationAlias":"crm",
+                                  "moduleAlias":"crm.order",
+                                  "contextObjectType":"sku",
+                                  "contextObjectId":"sku-1",
+                                  "value":2,
+                                  "fromCategoryAlias":"quantity",
+                                  "fromUnitCode":"box",
+                                  "toCategoryAlias":"quantity",
+                                  "toUnitCode":"bottle"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.context.applicationAlias").value("crm"))
+                .andExpect(jsonPath("$.convertedValue").value(24));
+
+        ArgumentCaptor<MeasureUnitConversionContext> context =
+                ArgumentCaptor.forClass(MeasureUnitConversionContext.class);
+        verify(conversionService).convert(context.capture(), eq(new BigDecimal("2")),
+                eq("quantity"), eq("box"), eq("quantity"), eq("bottle"));
+        assertThat(context.getValue().applicationAlias()).isEqualTo("crm");
+        assertThat(context.getValue().moduleAlias()).isEqualTo("crm.order");
+    }
+
     private MeasureUnitConversionRule rule(String applicationAlias) {
         MeasureUnitConversionRule rule = new MeasureUnitConversionRule();
         rule.setApplicationAlias(applicationAlias);

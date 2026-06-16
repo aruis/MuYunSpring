@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnit;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversion;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitService;
@@ -26,17 +27,16 @@ import java.util.Objects;
 import java.util.Set;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位")
-@RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units")
-public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
+@RequestMapping("/platform.measure_unit/categories/{categoryAlias}/units")
+public class SharedMeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "categoryAlias", "code", "symbol", "scale",
+            "id", "tenantId", "applicationAlias", "categoryAlias", "code", "symbol", "scale",
             "factorToBase", "offsetToBase", "roundingMode", "title", "enabled",
             "sortOrder", "createdAt", "updatedAt");
 
     private final MeasureUnitConversionService conversionService;
 
-    public MeasureUnitWebController(MeasureUnitConversionService conversionService) {
+    public SharedMeasureUnitWebController(MeasureUnitConversionService conversionService) {
         this.conversionService = conversionService;
     }
 
@@ -52,26 +52,25 @@ public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSuppor
 
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
-        criteria.eq("applicationAlias", applicationAlias(request));
+        criteria.eq("applicationAlias", MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
         criteria.eq("categoryAlias", categoryAlias(request));
     }
 
     @Override
     protected void bindScope(MeasureUnit record, HttpServletRequest request) {
-        record.setApplicationAlias(applicationAlias(request));
+        record.setApplicationAlias(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
         record.setCategoryAlias(categoryAlias(request));
     }
 
     @Override
     protected boolean inScope(MeasureUnit record, HttpServletRequest request) {
-        return Objects.equals(record.getApplicationAlias(), applicationAlias(request))
+        return Objects.equals(record.getApplicationAlias(), MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS)
                 && Objects.equals(record.getCategoryAlias(), categoryAlias(request));
     }
 
     @Override
     protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
-        return "measure unit does not belong to category: "
-                + applicationAlias(request) + "." + categoryAlias(request) + "." + id;
+        return "shared measure unit does not belong to category: " + categoryAlias(request) + "." + id;
     }
 
     @GetMapping("/options")
@@ -79,7 +78,7 @@ public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSuppor
     public WebListResponse<MeasureUnit> options(HttpServletRequest request,
                                                 @RequestParam(defaultValue = "true") boolean enabledOnly) {
         return webScope(() -> new WebListResponse<>(WebOutputSupport.records(service(),
-                service().listVisibleUnits(applicationAlias(request), categoryAlias(request), enabledOnly),
+                service().listUnits(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, categoryAlias(request), enabledOnly),
                 FieldOutputContext.LIST)));
     }
 
@@ -88,19 +87,11 @@ public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSuppor
     public MeasureUnitConversion convert(HttpServletRequest request,
                                          @RequestBody MeasureUnitConversionRequest body) {
         return webScope(() -> conversionService.convert(
-                applicationAlias(request),
+                MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS,
                 categoryAlias(request),
                 body.value(),
                 body.fromUnitCode(),
                 body.toUnitCode()));
-    }
-
-    private String applicationAlias(HttpServletRequest request) {
-        String value = pathVariable(request, "applicationAlias");
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("applicationAlias is required");
-        }
-        return value;
     }
 
     private String categoryAlias(HttpServletRequest request) {

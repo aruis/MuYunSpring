@@ -54,6 +54,22 @@ class MeasureUnitWebControllerTest {
     }
 
     @Test
+    void shouldExposeCategoryOptionsWithinPathApplication() throws Exception {
+        MeasureUnitCategoryService service = mock(MeasureUnitCategoryService.class);
+        MeasureUnitCategoryWebController controller = new MeasureUnitCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        when(service.listVisibleCategories("crm", true)).thenReturn(List.of(category("platform", "quantity")));
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(get("/platform.application/crm/measure-unit-categories/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.records[0].alias").value("quantity"));
+
+        verify(service).listVisibleCategories("crm", true);
+    }
+
+    @Test
     void shouldForceUnitScopeFromPathOnInsert() throws Exception {
         MeasureUnitService service = mock(MeasureUnitService.class);
         MeasureUnitConversionService conversionService = mock(MeasureUnitConversionService.class);
@@ -87,14 +103,67 @@ class MeasureUnitWebControllerTest {
         MeasureUnitConversionService conversionService = mock(MeasureUnitConversionService.class);
         MeasureUnitWebController controller = new MeasureUnitWebController(conversionService);
         ReflectionTestUtils.setField(controller, "service", service);
-        when(service.listUnits("crm", "weight", true)).thenReturn(List.of(unit("crm", "weight", "kg")));
+        when(service.listVisibleUnits("crm", "weight", true)).thenReturn(List.of(unit("platform", "weight", "kg")));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(get("/platform.application/crm/measure-unit-categories/weight/units/options"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].code").value("kg"));
 
-        verify(service).listUnits("crm", "weight", true);
+        verify(service).listVisibleUnits("crm", "weight", true);
+    }
+
+    @Test
+    void shouldForceSharedCategoryApplicationAliasOnInsert() throws Exception {
+        MeasureUnitCategoryService service = mock(MeasureUnitCategoryService.class);
+        SharedMeasureUnitCategoryWebController controller = new SharedMeasureUnitCategoryWebController();
+        ReflectionTestUtils.setField(controller, "service", service);
+        MeasureUnitCategory inserted = category("platform", "quantity");
+        inserted.setId("cat-1");
+        when(service.insert(any(MeasureUnitCategory.class))).thenReturn("cat-1");
+        when(service.select("cat-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.measure_unit/categories/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"applicationAlias":"crm","alias":"quantity","title":"Quantity","dimension":"COUNT"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.alias").value("quantity"));
+
+        ArgumentCaptor<MeasureUnitCategory> captor = ArgumentCaptor.forClass(MeasureUnitCategory.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+    }
+
+    @Test
+    void shouldForceSharedUnitApplicationAliasOnInsert() throws Exception {
+        MeasureUnitService service = mock(MeasureUnitService.class);
+        MeasureUnitConversionService conversionService = mock(MeasureUnitConversionService.class);
+        SharedMeasureUnitWebController controller = new SharedMeasureUnitWebController(conversionService);
+        ReflectionTestUtils.setField(controller, "service", service);
+        MeasureUnit inserted = unit("platform", "quantity", "box");
+        inserted.setId("unit-1");
+        when(service.insert(any(MeasureUnit.class))).thenReturn("unit-1");
+        when(service.select("unit-1")).thenReturn(inserted);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/platform.measure_unit/categories/quantity/units/insert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"applicationAlias":"crm","categoryAlias":"other","code":"box","title":"Box"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.categoryAlias").value("quantity"))
+                .andExpect(jsonPath("$.code").value("box"));
+
+        ArgumentCaptor<MeasureUnit> captor = ArgumentCaptor.forClass(MeasureUnit.class);
+        verify(service).insert(captor.capture());
+        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+        assertThat(captor.getValue().getCategoryAlias()).isEqualTo("quantity");
     }
 
     @Test

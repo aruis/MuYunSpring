@@ -235,7 +235,7 @@ class LowCodeModuleHealthServiceTest {
     @Test
     void measureUnitCheckerShouldPassWhenMetadataFieldsAndDependencyAreComplete() {
         LowCodeModulePackage modulePackage = measureUnitPackage(
-                List.of(LowCodePackageDependency.measureUnit("crm", "quantity")));
+                List.of(LowCodePackageDependency.sharedMeasureUnit("quantity")));
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
                 List.of(new LowCodeMeasureUnitHealthChecker()));
 

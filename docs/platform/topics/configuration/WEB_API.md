@@ -32,9 +32,9 @@
 | 模块公式规则 | `ModuleMetadataFormulaRuleService` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules` |
 | 数据字典类目 | `DictionaryCategoryService` | `/platform.application/{applicationAlias}/dictionary-categories` |
 | 数据字典项目 | `DictionaryItemService` | `/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items` |
-| 计量单位分类 | `MeasureUnitCategoryService` | `/platform.application/{applicationAlias}/measure-unit-categories` |
-| 计量单位 | `MeasureUnitService` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units` |
-| 计量单位换算规则 | `MeasureUnitConversionRuleService` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules` |
+| 计量单位分类 | `MeasureUnitCategoryService` | `/platform.measure_unit/categories` |
+| 计量单位 | `MeasureUnitService` | `/platform.measure_unit/categories/{categoryAlias}/units` |
+| 计量单位换算规则 | `MeasureUnitConversionRuleService` | `/platform.measure_unit/conversion-rules` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -128,19 +128,47 @@
 
 ## 计量单位
 
-计量单位分类挂在应用下，单位项目挂在分类下。请求体中的 `applicationAlias` 和 `categoryAlias` 以后端 URL 为准。单位目录换算入口只处理同分类线性换算；跨分类或依赖模块、记录上下文的硬换算由计量单位换算规则入口承接。
+计量单位主数据以共享单位库为主：`tenantId` 为空表示平台全局公开，`tenantId` 有值表示租户公开。共享入口固定把 `applicationAlias` 绑定为 `platform`，由平台配置管理员代管全局和租户公开单位；应用路径继续保留为兼容入口和应用视角消费入口，仍承担计量单位静态模块定义注册。运行态字段消费按“租户公开优先、平台全局公开兜底”解析，共享单位库优先于历史应用路径配置，应用路径只作为兼容兜底。
+
+单位目录换算入口只处理同分类线性换算；跨分类或依赖模块、记录上下文的硬换算由计量单位换算规则入口承接。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
-| 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/query` | 查询应用下的计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/query` | 查询共享计量单位分类，可按 `tenantId` 区分平台全局和租户公开 |
+| 计量单位分类 | `GET` | `/platform.measure_unit/categories/options` | 获取共享计量单位分类候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 计量单位分类 | `GET` | `/platform.measure_unit/categories/view/{id}` | 查看共享计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/insert` | 新增共享计量单位分类；后端强制 `applicationAlias=platform` |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/update/{id}` | 更新共享计量单位分类，分类身份不可随意改动 |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/delete/{id}` | 删除共享计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/enable/{id}`、`/disable/{id}` | 启用或停用共享计量单位分类 |
+| 计量单位分类 | `POST` | `/platform.measure_unit/categories/sort/{id}` | 在同一租户和共享单位库内调整分类顺序 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/query` | 查询共享分类下的计量单位 |
+| 计量单位 | `GET` | `/platform.measure_unit/categories/{categoryAlias}/units/options` | 获取共享分类下的单位候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 计量单位 | `GET` | `/platform.measure_unit/categories/{categoryAlias}/units/view/{id}` | 查看共享计量单位 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/insert` | 新增共享计量单位；后端强制 `applicationAlias=platform` 和 URL 中的 `categoryAlias` |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/update/{id}` | 更新共享计量单位，单位身份不可随意改动 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/delete/{id}` | 删除共享计量单位 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/enable/{id}`、`/disable/{id}` | 启用或停用共享计量单位 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/sort/{id}` | 在同一租户和分类内调整单位顺序 |
+| 计量单位 | `POST` | `/platform.measure_unit/categories/{categoryAlias}/units/convert` | 按共享分类线性换算参数执行单位换算 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/query` | 查询共享业务硬换算规则，可按 `tenantId` 区分平台全局和租户公开 |
+| 换算规则 | `GET` | `/platform.measure_unit/conversion-rules/view/{id}` | 查看共享换算规则 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/insert` | 新增共享换算规则；后端强制 `applicationAlias=platform` |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/update/{id}` | 更新共享换算规则，规则身份不可随意改动 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/delete/{id}` | 删除共享换算规则 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/enable/{id}`、`/disable/{id}` | 启用或停用共享换算规则 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/sort/{id}` | 在同一租户和规则作用域内调整规则顺序 |
+| 换算规则 | `POST` | `/platform.measure_unit/conversion-rules/convert` | 按共享单位库、模块和记录上下文预览业务硬换算 |
+| 兼容分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/query` | 查询应用路径下的计量单位分类 |
+| 兼容分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/options` | 获取应用视角可见的计量单位分类候选，包含共享单位库兜底 |
 | 计量单位分类 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/view/{id}` | 查看计量单位分类，并校验分类属于该应用 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/insert` | 新增计量单位分类；后端以 URL 中的 `applicationAlias` 为准 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/update/{id}` | 更新计量单位分类，并保持应用归属不跨应用 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/delete/{id}` | 删除计量单位分类 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/enable/{id}`、`/disable/{id}` | 启用或停用计量单位分类 |
 | 计量单位分类 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/sort/{id}` | 在同一应用内调整分类顺序 |
-| 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/query` | 查询分类下的计量单位 |
-| 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/options` | 获取分类下的单位候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 兼容单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/query` | 查询应用路径分类下的计量单位 |
+| 兼容单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/options` | 获取应用视角可见单位候选，包含共享单位库兜底 |
 | 计量单位 | `GET` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/view/{id}` | 查看计量单位，并校验单位属于该分类 |
 | 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/insert` | 新增计量单位；后端以 URL 中的应用和分类为准 |
 | 计量单位 | `POST` | `/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units/update/{id}` | 更新计量单位，并保持分类归属不跨分类 |
@@ -156,6 +184,36 @@
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/enable/{id}`、`/disable/{id}` | 启用或停用换算规则 |
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
+
+计量单位验收优先使用换算预览接口，不需要先发布动态模块。
+
+同分类线性换算请求示例：
+
+```json
+{
+  "value": 2.5,
+  "fromUnitCode": "kg",
+  "toUnitCode": "g"
+}
+```
+
+业务硬换算请求示例：
+
+```json
+{
+  "applicationAlias": "sales",
+  "moduleAlias": "sales.order",
+  "contextObjectType": "sku_id",
+  "contextObjectId": "sku-1",
+  "value": 2,
+  "fromCategoryAlias": "package",
+  "fromUnitCode": "pallet",
+  "toCategoryAlias": "package",
+  "toUnitCode": "bottle"
+}
+```
+
+共享换算预览入口使用 `applicationAlias` 表示消费方应用，用于校验 `moduleAlias` 和查找兼容应用路径规则；不传时默认按 `platform`。返回 `convertedValue=1152` 表示当前规则链可把 `2托` 换算为 `1152瓶`。跨分类硬换算使用同一入口，例如 `roll:roll -> length:m` 返回 `convertedValue=60` 可验收 `2卷=60米`。
 
 ## 菜单配置
 
@@ -214,6 +272,53 @@
 模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时必须绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 必须绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
 
 模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
+
+管理端可以按两种方式配置计量单位字段：
+
+1. 使用 `fields/{id}/measure-unit/prepare`，由平台按主数值字段自动创建或复用单位伴生字段、标准值影子字段，并回填当前模块字段配置。
+2. 使用 `fields/update/{id}`，保存已存在的 `unitFieldId`、`baseValueFieldId`、`conversionScopeFieldId` 等绑定关系。标准更新不是局部 patch，管理端应先读取 `view/{id}`，合并计量单位字段后提交完整模块字段配置。
+
+`measure-unit/prepare` 请求体为 `ModuleMetadataMeasureUnitPrepareCommand`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `unitCategoryAlias` | 必填，主业务值使用的单位分类 alias |
+| `unitMode` | `SELECTABLE` 或 `FIXED`，为空时默认 `SELECTABLE` |
+| `fixedUnitCode` | 固定单位模式必填 |
+| `defaultUnitCode` | 可选单位模式的默认单位；固定单位模式未传时默认等于 `fixedUnitCode` |
+| `unitFieldName` | 可选单位模式下准备的伴生字段名，默认 `<ownerFieldName>Unit` |
+| `baseValueFieldName` | 准备的标准值影子字段名，默认 `<ownerFieldName>Base` |
+| `baseUnitCategoryAlias` | 标准值单位分类，空时默认等于 `unitCategoryAlias` |
+| `baseUnitCode` | 必填，标准值使用的基准单位 code |
+| `unitConversionMode` | `LINEAR` 或 `BUSINESS_RULE`，为空时默认 `LINEAR` |
+| `conversionScopeFieldId` | 可选，业务硬换算的记录上下文字段 |
+| `unitRequired` | 可选，单位是否必填；为空时按后端默认值处理 |
+| `unitFieldTypeAlias` | 伴生单位字段类型，默认 `string` |
+| `baseValueFieldTypeAlias` | 标准值影子字段类型，默认等于主数值字段类型 |
+
+返回体为 `ModuleMetadataMeasureUnitPrepareResult`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `moduleField` | 已回填计量单位契约的模块字段配置 |
+| `unitField` | 可选单位模式下创建或复用的单位伴生元数据字段；固定单位模式为空 |
+| `baseValueField` | 创建或复用的标准值影子元数据字段 |
+
+典型请求：
+
+```json
+{
+  "unitCategoryAlias": "package",
+  "unitMode": "SELECTABLE",
+  "defaultUnitCode": "box",
+  "unitFieldName": "quantityUnit",
+  "baseValueFieldName": "quantityBase",
+  "baseUnitCategoryAlias": "package",
+  "baseUnitCode": "bottle",
+  "unitConversionMode": "BUSINESS_RULE",
+  "unitRequired": true
+}
+```
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |

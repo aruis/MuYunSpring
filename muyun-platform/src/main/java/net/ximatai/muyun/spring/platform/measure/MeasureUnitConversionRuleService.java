@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
@@ -49,6 +51,7 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
     @Override
     public Criteria sortScope(MeasureUnitConversionRule rule) {
         return Criteria.of()
+                .eq(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
                 .eq("applicationAlias", rule.getApplicationAlias())
                 .eq("scopeType", rule.getScopeType())
                 .eq("moduleAlias", rule.getModuleAlias())
@@ -59,18 +62,14 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
     @Override
     public void validateSortScope(MeasureUnitConversionRule left, MeasureUnitConversionRule right) {
         validateSortScopeByFields(left, right,
-                "Measure unit conversion rule sort can only move records within the same scope",
-                "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId");
+                "Measure unit conversion rule sort can only move records within the same tenant and scope",
+                "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId");
     }
 
     public List<MeasureUnitConversionRule> applicableRules(MeasureUnitConversionContext context) {
         MeasureUnitConversionContext validContext = normalizeContext(context);
         LocalDateTime operatedAt = validContext.operatedAt() == null ? LocalDateTime.now() : validContext.operatedAt();
-        return list(Criteria.of()
-                        .eq("applicationAlias", validContext.applicationAlias())
-                        .eq("enabled", Boolean.TRUE),
-                new PageRequest(0, Integer.MAX_VALUE),
-                Sort.desc("priority"), Sort.asc(PlatformAbilityFields.SORT_FIELD))
+        return listVisibleRules(validContext)
                 .stream()
                 .filter(rule -> isApplicable(rule, validContext, operatedAt))
                 .toList();
@@ -86,8 +85,8 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
         rule.setFromUnitCode(requireCode(rule.getFromUnitCode(), "fromUnitCode"));
         rule.setToCategoryAlias(requireCode(rule.getToCategoryAlias(), "toCategoryAlias"));
         rule.setToUnitCode(requireCode(rule.getToUnitCode(), "toUnitCode"));
-        unitService.requireUnit(rule.getApplicationAlias(), rule.getFromCategoryAlias(), rule.getFromUnitCode());
-        unitService.requireUnit(rule.getApplicationAlias(), rule.getToCategoryAlias(), rule.getToUnitCode());
+        unitService.requireVisibleUnit(rule.getApplicationAlias(), rule.getFromCategoryAlias(), rule.getFromUnitCode());
+        unitService.requireVisibleUnit(rule.getApplicationAlias(), rule.getToCategoryAlias(), rule.getToUnitCode());
         if (rule.getFromCategoryAlias().equals(rule.getToCategoryAlias())
                 && rule.getFromUnitCode().equals(rule.getToUnitCode())) {
             throw new PlatformException("measure conversion rule source and target must be different");
@@ -116,14 +115,12 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
                 rule.setContextObjectId(null);
             }
             case MODULE -> {
-                rule.setModuleAlias(PlatformNameRules.requireModuleAliasInApplication(
-                        rule.getModuleAlias(), rule.getApplicationAlias()));
+                rule.setModuleAlias(PlatformNameRules.requireModuleAlias(rule.getModuleAlias()));
                 rule.setContextObjectType(null);
                 rule.setContextObjectId(null);
             }
             case RECORD_CONTEXT -> {
-                rule.setModuleAlias(PlatformNameRules.requireModuleAliasInApplication(
-                        rule.getModuleAlias(), rule.getApplicationAlias()));
+                rule.setModuleAlias(PlatformNameRules.requireModuleAlias(rule.getModuleAlias()));
                 rule.setContextObjectType(requireCode(rule.getContextObjectType(), "contextObjectType"));
                 if (rule.getContextObjectId() == null || rule.getContextObjectId().isBlank()) {
                     throw new PlatformException("measure conversion rule contextObjectId must not be blank");
@@ -163,6 +160,43 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
         };
     }
 
+    private List<MeasureUnitConversionRule> listVisibleRules(MeasureUnitConversionContext context) {
+        List<MeasureUnitConversionRule> rules = new java.util.ArrayList<>();
+        for (String applicationAlias : applicationCandidates(context.applicationAlias())) {
+            Criteria criteria = Criteria.of()
+                    .eq("applicationAlias", applicationAlias)
+                    .eq("enabled", Boolean.TRUE);
+            rules.addAll(list(criteria, new PageRequest(0, Integer.MAX_VALUE),
+                    Sort.desc("priority"), Sort.asc(PlatformAbilityFields.SORT_FIELD)));
+        }
+        if (TenantContext.currentTenantId().isPresent()) {
+            for (String applicationAlias : applicationCandidates(context.applicationAlias())) {
+                Criteria criteria = Criteria.of()
+                        .eq("applicationAlias", applicationAlias)
+                        .eq("enabled", Boolean.TRUE);
+                rules.addAll(listGlobalRules(criteria));
+            }
+        }
+        return List.copyOf(rules);
+    }
+
+    private List<MeasureUnitConversionRule> listGlobalRules(Criteria criteria) {
+        try (TenantContext.Scope ignored = TenantContext.system("select global measure unit conversion rules")) {
+            return list(criteria, new PageRequest(0, Integer.MAX_VALUE),
+                    Sort.desc("priority"), Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                    .stream()
+                    .filter(rule -> rule.getTenantId() == null || rule.getTenantId().isBlank())
+                    .toList();
+        }
+    }
+
+    private List<String> applicationCandidates(String applicationAlias) {
+        if (MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS.equals(applicationAlias)) {
+            return List.of(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS);
+        }
+        return List.of(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, applicationAlias);
+    }
+
     private MeasureUnitConversionContext normalizeContext(MeasureUnitConversionContext context) {
         if (context == null) {
             throw new PlatformException("measure conversion context must not be null");
@@ -183,6 +217,7 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
 
     private void validateNoOverlappingRule(MeasureUnitConversionRule rule) {
         for (MeasureUnitConversionRule existing : list(Criteria.of()
+                        .eq(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
                         .eq("applicationAlias", rule.getApplicationAlias()),
                 new PageRequest(0, Integer.MAX_VALUE))) {
             if (Objects.equals(existing.getId(), rule.getId())) {

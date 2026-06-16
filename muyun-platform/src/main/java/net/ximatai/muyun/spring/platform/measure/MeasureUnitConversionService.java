@@ -21,9 +21,9 @@ public class MeasureUnitConversionService {
     public BigDecimal normalize(String applicationAlias, String categoryAlias, BigDecimal value, String unitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = PlatformNameRules.requireIdentifier(categoryAlias, "measureUnitCategoryAlias");
-        MeasureUnitCategory category = categoryService.requireEnabledCategory(validApplicationAlias, validCategoryAlias);
+        MeasureUnitCategory category = categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias);
         requireValidBaseUnit(category);
-        MeasureUnit unit = unitService.requireEnabledUnit(validApplicationAlias, validCategoryAlias, unitCode);
+        MeasureUnit unit = unitService.requireEnabledUnitInCategory(category, unitCode);
         return normalize(value, unit);
     }
 
@@ -34,10 +34,10 @@ public class MeasureUnitConversionService {
                                          String toUnitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
         String validCategoryAlias = PlatformNameRules.requireIdentifier(categoryAlias, "measureUnitCategoryAlias");
-        MeasureUnitCategory category = categoryService.requireEnabledCategory(validApplicationAlias, validCategoryAlias);
+        MeasureUnitCategory category = categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias);
         requireValidBaseUnit(category);
-        MeasureUnit from = unitService.requireEnabledUnit(validApplicationAlias, validCategoryAlias, fromUnitCode);
-        MeasureUnit to = unitService.requireEnabledUnit(validApplicationAlias, validCategoryAlias, toUnitCode);
+        MeasureUnit from = unitService.requireEnabledUnitInCategory(category, fromUnitCode);
+        MeasureUnit to = unitService.requireEnabledUnitInCategory(category, toUnitCode);
         BigDecimal baseValue = normalize(value, from);
         BigDecimal convertedValue = denormalize(baseValue, to);
         return new MeasureUnitConversion(validApplicationAlias, validCategoryAlias, value,
@@ -55,8 +55,7 @@ public class MeasureUnitConversionService {
         if (category.getBaseUnitCode() == null || category.getBaseUnitCode().isBlank()) {
             throw new PlatformException("measure unit category requires baseUnitCode: " + category.getAlias());
         }
-        MeasureUnit baseUnit = unitService.requireEnabledUnit(
-                category.getApplicationAlias(), category.getAlias(), category.getBaseUnitCode());
+        MeasureUnit baseUnit = unitService.requireEnabledUnitInCategory(category, category.getBaseUnitCode());
         if (baseUnit.getFactorToBase().compareTo(BigDecimal.ONE) != 0
                 || baseUnit.getOffsetToBase().compareTo(BigDecimal.ZERO) != 0) {
             throw new PlatformException("measure base unit must use factorToBase=1 and offsetToBase=0: "

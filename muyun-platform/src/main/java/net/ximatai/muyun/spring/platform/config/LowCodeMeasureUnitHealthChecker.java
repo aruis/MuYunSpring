@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.config;
 
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -74,7 +75,8 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                                    Set<String> dependencies,
                                    String targetId) {
         String dependencyKey = applicationAlias + ":" + categoryAlias;
-        if (dependencies.contains(dependencyKey)) {
+        String sharedDependencyKey = MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS + ":" + categoryAlias;
+        if (dependencies.contains(sharedDependencyKey) || dependencies.contains(dependencyKey)) {
             return;
         }
         items.add(LowCodeConfigHealthItem.warn(
@@ -83,7 +85,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 "measure unit category is not declared in dependency manifest",
                 "measureUnit",
                 targetId,
-                "Declare MEASURE_UNIT dependency " + dependencyKey + " for cross-environment migration"
+                "Declare MEASURE_UNIT dependency " + sharedDependencyKey + " for cross-environment migration"
         ));
     }
 

@@ -20,7 +20,7 @@ public class LowCodeMeasureUnitDependencyResolver implements LowCodePackageDepen
     @Override
     public boolean exists(LowCodePackageDependency dependency) {
         try {
-            categoryService.requireEnabledCategory(dependency.applicationAlias(), dependency.alias());
+            categoryService.requireEnabledVisibleCategory(dependency.applicationAlias(), dependency.alias());
             return true;
         } catch (PlatformException exception) {
             return false;
