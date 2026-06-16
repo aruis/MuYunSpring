@@ -10,7 +10,7 @@ testcontainers = "1.21.4"
 lombok = "1.18.42"
 caffeine = "3.2.4"
 jackson = "2.19.0"
-poi = "5.4.1"
+poi = "5.5.1"
 
 [libraries]
 muyun-database-core = { module = "net.ximatai.muyun.database:muyun-database-core", version.ref = "muyun-database" }
