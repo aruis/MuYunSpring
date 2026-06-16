@@ -120,6 +120,7 @@ public class ModuleDefinitionValidator {
         }
         for (FieldDefinition field : fields) {
             validateMeasureUnit(entity, field, fields);
+            validateMoney(entity, field, fields);
         }
         if (!entity.supports(EntityCapability.CRUD)) {
             throw new ModuleDefinitionException("dynamic entity requires CRUD capability: " + entity.alias());
@@ -375,6 +376,114 @@ public class ModuleDefinitionValidator {
                 .findFirst()
                 .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": "
                         + entity.alias() + "." + fieldName));
+    }
+
+    private void validateMoney(EntityDefinition entity, FieldDefinition field, List<FieldDefinition> fields) {
+        FieldMoneyDefinition money = field.money();
+        if (money == null || !money.enabled()) {
+            return;
+        }
+        if (!isNumeric(field)) {
+            throw new ModuleDefinitionException("money field requires numeric owner: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (money.currencyMode() == null) {
+            throw new ModuleDefinitionException("money currency mode must not be null: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (money.currencyMode() == FieldMoneyMode.FIXED) {
+            requireCurrencyCode(money.fixedCurrencyCode(), "money fixed currency code");
+        }
+        if (money.currencyMode() == FieldMoneyMode.SELECTABLE) {
+            FieldDefinition currencyField = requireMoneyField(entity, fields, money.currencyFieldName(),
+                    "money currency companion field");
+            requireTextMoneyField(entity, currencyField, money.currencyFieldName(), "money currency companion field");
+        } else if (money.currencyFieldName() != null && !money.currencyFieldName().isBlank()) {
+            FieldDefinition currencyField = requireMoneyField(entity, fields, money.currencyFieldName(),
+                    "money currency companion field");
+            requireTextMoneyField(entity, currencyField, money.currencyFieldName(), "money currency companion field");
+        }
+        FieldDefinition baseAmountField = requireMoneyField(entity, fields, money.baseAmountFieldName(),
+                "money base amount field");
+        if (field.fieldName().equals(baseAmountField.fieldName())) {
+            throw new ModuleDefinitionException("money base amount field must be different from owner: "
+                    + entity.alias() + "." + field.fieldName());
+        }
+        if (!isNumeric(baseAmountField)) {
+            throw new ModuleDefinitionException("money base amount field must be numeric: "
+                    + entity.alias() + "." + money.baseAmountFieldName());
+        }
+        if (money.defaultCurrencyCode() != null && !money.defaultCurrencyCode().isBlank()) {
+            requireCurrencyCode(money.defaultCurrencyCode(), "money default currency code");
+        }
+        if (money.baseCurrencyCode() != null && !money.baseCurrencyCode().isBlank()) {
+            requireCurrencyCode(money.baseCurrencyCode(), "money base currency code");
+        }
+        requireRateTypeCode(money.rateTypeCode(), "money rate type code");
+        if (money.rateDateFieldName() != null && !money.rateDateFieldName().isBlank()) {
+            FieldDefinition rateDateField = requireMoneyField(entity, fields, money.rateDateFieldName(),
+                    "money rate date field");
+            if (rateDateField.type() != FieldType.DATE
+                    && rateDateField.type() != FieldType.TIMESTAMP
+                    && rateDateField.type() != FieldType.ZONED_TIMESTAMP) {
+                throw new ModuleDefinitionException("money rate date field must be date or timestamp: "
+                        + entity.alias() + "." + money.rateDateFieldName());
+            }
+        }
+        if (money.exchangeRateFieldName() != null && !money.exchangeRateFieldName().isBlank()) {
+            FieldDefinition exchangeRateField = requireMoneyField(entity, fields, money.exchangeRateFieldName(),
+                    "money exchange rate field");
+            if (!isNumeric(exchangeRateField)) {
+                throw new ModuleDefinitionException("money exchange rate field must be numeric: "
+                        + entity.alias() + "." + money.exchangeRateFieldName());
+            }
+        }
+    }
+
+    private FieldDefinition requireMoneyField(EntityDefinition entity,
+                                              List<FieldDefinition> fields,
+                                              String fieldName,
+                                              String name) {
+        requireFieldName(fieldName, name);
+        return fields.stream()
+                .filter(field -> field.fieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow(() -> new ModuleDefinitionException("unknown " + name + ": "
+                        + entity.alias() + "." + fieldName));
+    }
+
+    private void requireTextMoneyField(EntityDefinition entity,
+                                       FieldDefinition field,
+                                       String fieldName,
+                                       String name) {
+        if (field.type() != FieldType.STRING && field.type() != FieldType.TEXT) {
+            throw new ModuleDefinitionException(name + " must be text: "
+                    + entity.alias() + "." + fieldName);
+        }
+    }
+
+    private boolean isNumeric(FieldDefinition field) {
+        return field.type() == FieldType.DECIMAL || field.type() == FieldType.INTEGER || field.type() == FieldType.LONG;
+    }
+
+    private void requireCurrencyCode(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new ModuleDefinitionException(name + " must not be blank");
+        }
+        String code = value.trim().toUpperCase();
+        if (!code.matches("[A-Z]{3}")) {
+            throw new ModuleDefinitionException(name + " must be ISO 4217 alpha-3 code: " + value);
+        }
+    }
+
+    private void requireRateTypeCode(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new ModuleDefinitionException(name + " must not be blank");
+        }
+        String code = value.trim().toUpperCase();
+        if (!code.matches("[A-Z][A-Z0-9_]{0,63}")) {
+            throw new ModuleDefinitionException(name + " must use upper snake code: " + value);
+        }
     }
 
     public void validateRelation(EntityRelationDefinition relation, Map<String, EntityDefinition> entities) {

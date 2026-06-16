@@ -70,7 +70,9 @@ public class StaticEntityDefinitionCompiler {
                     null,
                     null
             );
-            fields.add(StaticMeasureUnitFieldDefinitionCompiler.compile(definition, field));
+            definition = StaticMeasureUnitFieldDefinitionCompiler.compile(definition, field);
+            definition = StaticMoneyFieldDefinitionCompiler.compile(definition, field);
+            fields.add(definition);
         }
         return List.copyOf(fields);
     }

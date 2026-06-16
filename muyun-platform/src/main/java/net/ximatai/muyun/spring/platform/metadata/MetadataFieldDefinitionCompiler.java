@@ -85,7 +85,8 @@ public class MetadataFieldDefinitionCompiler {
                 protectionConfigService == null
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
                         : protectionConfigService.definition(field.getId()),
-                measureUnit(moduleField)
+                measureUnit(moduleField),
+                null
         );
         if (hasModuleDictionary) {
             validateModuleDictionary(fieldType, moduleField, field.getId());
