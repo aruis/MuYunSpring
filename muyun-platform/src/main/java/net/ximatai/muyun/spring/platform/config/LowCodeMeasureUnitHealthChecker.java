@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,8 +22,9 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         if (bundle == null || bundle.content().isEmpty()) {
             return List.of();
         }
-        List<Map<String, Object>> rawFields = fields(bundle.content());
-        List<FieldContract> fields = contracts(rawFields);
+        List<FieldContract> fields = LowCodeMetadataFieldProjection.from(bundle).stream()
+                .map(this::contract)
+                .toList();
         if (fields.isEmpty()) {
             return List.of();
         }
@@ -159,109 +159,21 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         );
     }
 
-    private List<Map<String, Object>> fields(Map<String, Object> content) {
-        List<Map<String, Object>> fields = new ArrayList<>();
-        addFields(fields, content.get("fields"));
-        addFields(fields, content.get("metadataFields"));
-        addFields(fields, content.get("moduleFields"));
-        return List.copyOf(fields);
-    }
-
-    private List<FieldContract> contracts(List<Map<String, Object>> rawFields) {
-        Map<String, String> fieldNameById = rawFields.stream()
-                .filter(field -> text(field, "id") != null || text(field, "metadataFieldId") != null)
-                .filter(field -> text(field, "fieldName") != null)
-                .collect(Collectors.toMap(
-                        this::fieldIdentity,
-                        field -> text(field, "fieldName"),
-                        (left, right) -> left
-                ));
-        return rawFields.stream()
-                .map(field -> contract(field, fieldNameById))
-                .toList();
-    }
-
-    @SuppressWarnings("unchecked")
-    private FieldContract contract(Map<String, Object> field, Map<String, String> fieldNameById) {
-        Map<String, Object> measureUnit = field.get("measureUnit") instanceof Map<?, ?> map
-                ? normalizeMap(map)
-                : Map.of();
-        String ownerFieldId = firstText(field, measureUnit, "metadataFieldId", "id");
+    private FieldContract contract(LowCodeMetadataFieldProjection field) {
+        Map<String, Object> measureUnit = field.nested("measureUnit");
         return new FieldContract(
-                firstNonBlank(text(field, "fieldName"), fieldNameById.get(ownerFieldId)),
-                ownerFieldId,
-                firstText(field, measureUnit, "unitCategoryAlias", "categoryAlias"),
-                firstText(field, measureUnit, "unitMode", "mode"),
-                firstText(field, measureUnit, "fixedUnitCode"),
-                firstText(field, measureUnit, "baseUnitCategoryAlias"),
-                firstText(field, measureUnit, "baseUnitCode"),
-                relatedFieldName(field, measureUnit, fieldNameById, "unitFieldName", "unitFieldId"),
-                relatedFieldName(field, measureUnit, fieldNameById, "baseValueFieldName", "baseValueFieldId"),
-                firstText(field, measureUnit, "baseValueFieldId"),
-                relatedFieldName(field, measureUnit, fieldNameById, "conversionScopeFieldName", "conversionScopeFieldId")
+                field.fieldName(),
+                field.ownerFieldId(),
+                field.firstText(measureUnit, "unitCategoryAlias", "categoryAlias"),
+                field.firstText(measureUnit, "unitMode", "mode"),
+                field.firstText(measureUnit, "fixedUnitCode"),
+                field.firstText(measureUnit, "baseUnitCategoryAlias"),
+                field.firstText(measureUnit, "baseUnitCode"),
+                field.relatedFieldName(measureUnit, "unitFieldName", "unitFieldId"),
+                field.relatedFieldName(measureUnit, "baseValueFieldName", "baseValueFieldId"),
+                field.firstText(measureUnit, "baseValueFieldId"),
+                field.relatedFieldName(measureUnit, "conversionScopeFieldName", "conversionScopeFieldId")
         );
-    }
-
-    private String fieldIdentity(Map<String, Object> field) {
-        String id = text(field, "id");
-        return id == null ? text(field, "metadataFieldId") : id;
-    }
-
-    private String relatedFieldName(Map<String, Object> field,
-                                    Map<String, Object> measureUnit,
-                                    Map<String, String> fieldNameById,
-                                    String nameKey,
-                                    String idKey) {
-        String fieldName = firstText(field, measureUnit, nameKey);
-        if (fieldName != null) {
-            return fieldName;
-        }
-        String fieldId = firstText(field, measureUnit, idKey);
-        return fieldId == null ? null : fieldNameById.get(fieldId);
-    }
-
-    private String firstText(Map<String, Object> field, Map<String, Object> measureUnit, String... keys) {
-        for (String key : keys) {
-            String value = text(field, key);
-            if (value != null) {
-                return value;
-            }
-            value = text(measureUnit, key);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String firstNonBlank(String first, String second) {
-        return first != null ? first : second;
-    }
-
-    private void addFields(List<Map<String, Object>> fields, Object value) {
-        if (!(value instanceof List<?> list)) {
-            return;
-        }
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> map) {
-                fields.add(normalizeMap(map));
-            }
-        }
-    }
-
-    private Map<String, Object> normalizeMap(Map<?, ?> map) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            if (entry.getKey() instanceof String key) {
-                normalized.put(key, entry.getValue());
-            }
-        }
-        return normalized;
-    }
-
-    private String text(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value == null || value.toString().isBlank() ? null : value.toString().trim();
     }
 
     private record FieldContract(
