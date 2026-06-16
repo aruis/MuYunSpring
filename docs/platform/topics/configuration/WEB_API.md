@@ -35,6 +35,10 @@
 | 计量单位分类 | `MeasureUnitCategoryService` | `/platform.measure_unit/categories` |
 | 计量单位 | `MeasureUnitService` | `/platform.measure_unit/categories/{categoryAlias}/units` |
 | 计量单位换算规则 | `MeasureUnitConversionRuleService` | `/platform.measure_unit/conversion-rules` |
+| 币种 | `CurrencyService` | `/platform.currencies` |
+| 租户币种设置 | `TenantCurrencySettingService` | `/platform.tenant-currency-settings` |
+| 汇率类型 | `ExchangeRateTypeService` | `/platform.exchange-rate-types` |
+| 汇率 | `ExchangeRateService` | `/platform.exchange-rates` |
 | 菜单方案 | `MenuSchemeService` | `/platform.menu_scheme` |
 | 菜单维护 | `MenuService` | `/platform.menu-scheme/{schemeId}/menus` |
 
@@ -214,6 +218,53 @@
 ```
 
 共享换算预览入口使用 `applicationAlias` 表示消费方应用，用于校验 `moduleAlias` 和查找兼容应用路径规则；不传时默认按 `platform`。返回 `convertedValue=1152` 表示当前规则链可把 `2托` 换算为 `1152瓶`。跨分类硬换算使用同一入口，例如 `roll:roll -> length:m` 返回 `convertedValue=60` 可验收 `2卷=60米`。
+
+## 币种与汇率
+
+币种与汇率是平台金额口径的基础维护面。当前阶段只提供币种目录、租户本位币、汇率类型、汇率维护和基础折算；金额字段契约和动态保存归一属于后续能力。
+
+| 对象 | 方法 | URL | 功能点 |
+| --- | --- | --- | --- |
+| 币种 | `POST` | `/platform.currencies/query` | 查询币种目录，可按当前租户看到租户配置和平台全局兜底配置 |
+| 币种 | `GET` | `/platform.currencies/options` | 获取可见币种候选，可用 `enabledOnly=false` 返回包含停用项的列表 |
+| 币种 | `GET` | `/platform.currencies/view/{id}` | 查看币种 |
+| 币种 | `POST` | `/platform.currencies/insert` | 新增币种；业务 code 使用 ISO 4217 alpha-3 |
+| 币种 | `POST` | `/platform.currencies/update/{id}` | 更新币种，币种 code 和 numericCode 不允许随意改动 |
+| 币种 | `POST` | `/platform.currencies/delete/{id}` | 删除币种 |
+| 币种 | `POST` | `/platform.currencies/enable/{id}`、`/disable/{id}` | 启用或停用币种 |
+| 币种 | `POST` | `/platform.currencies/sort/{id}` | 在同一租户 scope 内调整币种顺序 |
+| 租户币种设置 | `POST` | `/platform.tenant-currency-settings/query` | 查询当前租户币种设置 |
+| 租户币种设置 | `GET` | `/platform.tenant-currency-settings/view/{id}` | 查看当前租户币种设置 |
+| 租户币种设置 | `POST` | `/platform.tenant-currency-settings/insert` | 设置当前租户本位币 |
+| 租户币种设置 | `POST` | `/platform.tenant-currency-settings/update/{id}` | 更新当前租户本位币 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/query` | 查询汇率类型 |
+| 汇率类型 | `GET` | `/platform.exchange-rate-types/options` | 获取汇率类型候选 |
+| 汇率类型 | `GET` | `/platform.exchange-rate-types/view/{id}` | 查看汇率类型 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/insert` | 新增汇率类型 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/update/{id}` | 更新汇率类型，类型 code 不允许随意改动 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/delete/{id}` | 删除汇率类型 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/enable/{id}`、`/disable/{id}` | 启用或停用汇率类型 |
+| 汇率类型 | `POST` | `/platform.exchange-rate-types/sort/{id}` | 在同一租户 scope 内调整汇率类型顺序 |
+| 汇率 | `POST` | `/platform.exchange-rates/query` | 查询汇率，可按币种对、汇率类型和生效日期过滤 |
+| 汇率 | `GET` | `/platform.exchange-rates/view/{id}` | 查看汇率 |
+| 汇率 | `POST` | `/platform.exchange-rates/insert` | 新增汇率 |
+| 汇率 | `POST` | `/platform.exchange-rates/update/{id}` | 更新汇率，币种对、汇率类型和生效日期不允许随意改动 |
+| 汇率 | `POST` | `/platform.exchange-rates/delete/{id}` | 删除汇率 |
+| 汇率 | `POST` | `/platform.exchange-rates/enable/{id}`、`/disable/{id}` | 启用或停用汇率 |
+| 汇率 | `POST` | `/platform.exchange-rates/sort/{id}` | 在同一币种对和汇率类型内调整汇率顺序 |
+| 汇率 | `POST` | `/platform.exchange-rates/convert` | 按金额、源币种、目标币种、汇率类型和业务日期执行基础折算 |
+
+汇率折算请求示例：
+
+```json
+{
+  "amount": 12.34,
+  "fromCurrencyCode": "USD",
+  "toCurrencyCode": "CNY",
+  "rateTypeCode": "SPOT",
+  "rateDate": "2026-02-16"
+}
+```
 
 ## 菜单配置
 

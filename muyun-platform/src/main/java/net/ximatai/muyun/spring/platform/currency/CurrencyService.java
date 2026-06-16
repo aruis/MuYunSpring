@@ -1,0 +1,171 @@
+package net.ximatai.muyun.spring.platform.currency;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.AbstractAbilityService;
+import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.CacheAbility;
+import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.springframework.stereotype.Service;
+
+import java.math.RoundingMode;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+@Service
+public class CurrencyService extends AbstractAbilityService<Currency> implements
+        SoftDeleteAbility<Currency>,
+        EnableAbility<Currency>,
+        SortAbility<Currency>,
+        ReferenceAbility<Currency>,
+        CacheAbility<Currency> {
+    public static final String MODULE_ALIAS = "platform.currency";
+
+    public CurrencyService(BaseDao<Currency, String> currencyDao) {
+        super(MODULE_ALIAS, Currency.class, currencyDao);
+    }
+
+    @Override
+    public void beforeInsert(Currency currency) {
+        normalizeAndValidate(currency);
+    }
+
+    @Override
+    public void beforeUpdate(Currency currency) {
+        normalizeAndValidate(currency);
+        validateImmutableIdentity(currency);
+    }
+
+    @Override
+    public Criteria sortScope(Currency currency) {
+        return Criteria.of().eq(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId());
+    }
+
+    @Override
+    public void validateSortScope(Currency left, Currency right) {
+        validateSortScopeByFields(left, right,
+                "Currency sort can only move records within the same tenant scope", "tenantId");
+    }
+
+    public Currency resolveCurrency(String currencyCode) {
+        String code = requireCurrencyCode(currencyCode);
+        for (Currency currency : visibleCurrencyCandidates(code, false)) {
+            return currency;
+        }
+        return null;
+    }
+
+    public Currency requireCurrency(String currencyCode) {
+        Currency currency = resolveCurrency(currencyCode);
+        if (currency == null) {
+            throw new PlatformException("Currency requires existing visible currency: " + currencyCode);
+        }
+        return currency;
+    }
+
+    public Currency requireEnabledCurrency(String currencyCode) {
+        String code = requireCurrencyCode(currencyCode);
+        for (Currency currency : visibleCurrencyCandidates(code, true)) {
+            return currency;
+        }
+        throw new PlatformException("Currency requires enabled visible currency: " + currencyCode);
+    }
+
+    public List<Currency> listVisibleCurrencies(boolean enabledOnly) {
+        Map<String, Currency> currencies = new LinkedHashMap<>();
+        if (TenantContext.currentTenantId().isPresent()) {
+            listTenantLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+            listGlobalLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+        } else {
+            listTenantLayer(enabledOnly).forEach(currency -> currencies.putIfAbsent(currency.getCode(), currency));
+        }
+        return List.copyOf(currencies.values());
+    }
+
+    private List<Currency> visibleCurrencyCandidates(String currencyCode, boolean enabledOnly) {
+        return listVisibleCurrencies(enabledOnly).stream()
+                .filter(currency -> Objects.equals(currency.getCode(), currencyCode))
+                .toList();
+    }
+
+    private List<Currency> listTenantLayer(boolean enabledOnly) {
+        Criteria criteria = Criteria.of();
+        if (enabledOnly) {
+            criteria.eq("enabled", Boolean.TRUE);
+        }
+        return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+    }
+
+    private List<Currency> listGlobalLayer(boolean enabledOnly) {
+        try (TenantContext.Scope ignored = TenantContext.system("select global currencies")) {
+            Criteria criteria = Criteria.of();
+            if (enabledOnly) {
+                criteria.eq("enabled", Boolean.TRUE);
+            }
+            return list(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD))
+                    .stream()
+                    .filter(currency -> currency.getTenantId() == null || currency.getTenantId().isBlank())
+                    .toList();
+        }
+    }
+
+    private void normalizeAndValidate(Currency currency) {
+        currency.setCode(requireCurrencyCode(currency.getCode()));
+        if (currency.getNumericCode() != null && !currency.getNumericCode().isBlank()) {
+            currency.setNumericCode(requireNumericCode(currency.getNumericCode()));
+        } else {
+            currency.setNumericCode(null);
+        }
+        if (currency.getSymbol() != null && currency.getSymbol().isBlank()) {
+            currency.setSymbol(null);
+        }
+        if (currency.getDecimalScale() == null) {
+            currency.setDecimalScale(2);
+        }
+        if (currency.getDecimalScale() < 0) {
+            throw new PlatformException("currency decimalScale must not be negative: " + currency.getCode());
+        }
+        if (currency.getRoundingMode() == null) {
+            currency.setRoundingMode(RoundingMode.HALF_UP);
+        }
+        rejectDuplicate(currency, Criteria.of()
+                        .eq(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId())
+                        .eq("code", currency.getCode()),
+                "currency code must be unique within tenant scope: " + currency.getCode());
+    }
+
+    private void validateImmutableIdentity(Currency currency) {
+        Currency existing = selectIncludingDeleted(currency.getId());
+        rejectChanged(existing, currency, "Currency code", Currency::getCode);
+        rejectChanged(existing, currency, "Currency numeric code", Currency::getNumericCode);
+    }
+
+    private String requireCurrencyCode(String value) {
+        if (value == null || value.isBlank()) {
+            throw new PlatformException("currencyCode must not be blank");
+        }
+        String code = value.trim().toUpperCase();
+        if (!code.matches("[A-Z]{3}")) {
+            throw new PlatformException("currencyCode must be ISO 4217 alpha-3 code: " + value);
+        }
+        return code;
+    }
+
+    private String requireNumericCode(String value) {
+        String text = value.trim();
+        if (!text.matches("\\d{3}")) {
+            throw new PlatformException("currency numericCode must be 3 digits: " + value);
+        }
+        return text;
+    }
+}

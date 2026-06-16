@@ -10,6 +10,10 @@ import net.ximatai.muyun.spring.platform.code.CodeRecycleEntry;
 import net.ximatai.muyun.spring.platform.code.CodeRule;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceState;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigVersion;
+import net.ximatai.muyun.spring.platform.currency.Currency;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRate;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateType;
+import net.ximatai.muyun.spring.platform.currency.TenantCurrencySetting;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationFieldMapping;
@@ -225,6 +229,29 @@ class PlatformModelSchemaTest {
                 .contains(List.of("tenant_id", "application_alias", "alias"));
         assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
                 .contains(List.of("tenant_id", "application_alias", "category_alias", "code"));
+    }
+
+    @Test
+    void shouldMapCurrencyModelsAsPlatformTables() {
+        assertThat(columnNames(mapper.toTable(Currency.class)))
+                .contains("id", "tenant_id", "code", "numeric_code", "symbol",
+                        "decimal_scale", "rounding_mode", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(Currency.class)))
+                .contains(List.of("tenant_id", "code"));
+        assertThat(columnNames(mapper.toTable(ExchangeRateType.class)))
+                .contains("id", "tenant_id", "code", "system_managed", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(ExchangeRateType.class)))
+                .contains(List.of("tenant_id", "code"));
+        assertThat(columnNames(mapper.toTable(ExchangeRate.class)))
+                .contains("id", "tenant_id", "from_currency_code", "to_currency_code", "rate_type_code",
+                        "effective_date", "rate", "source", "title", "enabled", "sort_order");
+        assertThat(uniqueIndexes(mapper.toTable(ExchangeRate.class)))
+                .contains(List.of("tenant_id", "from_currency_code", "to_currency_code",
+                        "rate_type_code", "effective_date"));
+        assertThat(columnNames(mapper.toTable(TenantCurrencySetting.class)))
+                .contains("id", "tenant_id", "base_currency_code", "title");
+        assertThat(uniqueIndexes(mapper.toTable(TenantCurrencySetting.class)))
+                .contains(List.of("tenant_id"));
     }
 
     @Test
