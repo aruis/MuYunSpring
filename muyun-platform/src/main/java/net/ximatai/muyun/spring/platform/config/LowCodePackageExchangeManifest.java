@@ -2,7 +2,7 @@ package net.ximatai.muyun.spring.platform.config;
 
 import java.time.Instant;
 
-public record LowCodePackagePublishManifest(
+public record LowCodePackageExchangeManifest(
         String packageVersion,
         String sourceEnvironment,
         String sourceVersionId,
@@ -10,7 +10,7 @@ public record LowCodePackagePublishManifest(
         Instant exportedAt,
         String remark
 ) {
-    public LowCodePackagePublishManifest {
+    public LowCodePackageExchangeManifest {
         packageVersion = requireText(packageVersion, "packageVersion");
         sourceEnvironment = normalize(sourceEnvironment);
         sourceVersionId = normalize(sourceVersionId);
@@ -19,8 +19,8 @@ public record LowCodePackagePublishManifest(
         remark = normalize(remark);
     }
 
-    public static LowCodePackagePublishManifest draft(String packageVersion) {
-        return new LowCodePackagePublishManifest(packageVersion, null, null, null, Instant.EPOCH, null);
+    public static LowCodePackageExchangeManifest draft(String packageVersion) {
+        return new LowCodePackageExchangeManifest(packageVersion, null, null, null, Instant.EPOCH, null);
     }
 
     private static String requireText(String value, String name) {

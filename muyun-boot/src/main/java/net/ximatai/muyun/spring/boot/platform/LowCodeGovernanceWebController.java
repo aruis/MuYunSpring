@@ -5,8 +5,8 @@ import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.config.LowCodeConfigHealthReport;
-import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
-import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishResult;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveFacade;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveResult;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigVersion;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthContext;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
@@ -28,19 +28,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @PlatformStaticModule(application = "platform", alias = "platform.low_code_governance", title = "平台低代码治理")
 @RequestMapping({"/platform.low_code_governance", "/platform/low-code-governance"})
-public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConfigPublishFacade>
-        implements SystemScope<LowCodeModuleConfigPublishFacade> {
+public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConfigArchiveFacade>
+        implements SystemScope<LowCodeModuleConfigArchiveFacade> {
     private final LowCodeModuleHealthService healthService;
     private final LowCodeModulePackageExchangeService exchangeService;
     private final LowCodeModulePackageImportService importService;
     private final LowCodeModuleTemplateService templateService;
 
-    public LowCodeGovernanceWebController(LowCodeModuleConfigPublishFacade publishFacade,
+    public LowCodeGovernanceWebController(LowCodeModuleConfigArchiveFacade archiveFacade,
                                           LowCodeModuleHealthService healthService,
                                           LowCodeModulePackageExchangeService exchangeService,
                                           LowCodeModulePackageImportService importService,
                                           LowCodeModuleTemplateService templateService) {
-        this.service = publishFacade;
+        this.service = archiveFacade;
         this.healthService = healthService;
         this.exchangeService = exchangeService;
         this.importService = importService;
@@ -54,18 +54,18 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
         return webScope(() -> healthService.check(LowCodeModuleHealthContext.ofPackage(modulePackage)));
     }
 
-    @PostMapping("/packages/publish")
-    @CustomActionEndpoint(value = "publishPackage", title = "发布配置包", level = PlatformActionLevel.LIST)
-    public LowCodeModuleConfigPublishResult publishPackage(@RequestBody PublishPackageRequest request) {
-        return webScope(() -> service().publish(request.modulePackage(), request.operatorId(), request.remark()));
+    @PostMapping("/packages/archive")
+    @CustomActionEndpoint(value = "archivePackage", title = "归档配置包", level = PlatformActionLevel.LIST)
+    public LowCodeModuleConfigArchiveResult archivePackage(@RequestBody ArchivePackageRequest request) {
+        return webScope(() -> service().archive(request.modulePackage(), request.operatorId(), request.remark()));
     }
 
-    @PostMapping("/modules/{moduleAlias}/versions/{versionId}/rollback")
-    @CustomActionEndpoint(value = "rollbackPackageVersion", title = "回滚配置包版本",
+    @PostMapping("/modules/{moduleAlias}/versions/{versionId}/switch-current")
+    @CustomActionEndpoint(value = "switchCurrentPackageVersion", title = "切换当前配置包版本",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "versionId")
-    public LowCodeModuleConfigVersion rollbackPackageVersion(@PathVariable String moduleAlias,
+    public LowCodeModuleConfigVersion switchCurrentPackageVersion(@PathVariable String moduleAlias,
                                                             @PathVariable String versionId) {
-        return webScope(() -> service().rollback(moduleAlias, versionId));
+        return webScope(() -> service().switchCurrentVersion(moduleAlias, versionId));
     }
 
     @GetMapping("/modules/{moduleAlias}/package")
@@ -95,10 +95,10 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
         return webScope(() -> importService.prepareDraft(modulePackage));
     }
 
-    @PostMapping("/imports/drafts/publish")
-    @CustomActionEndpoint(value = "publishImportDraft", title = "发布导入草稿", level = PlatformActionLevel.LIST)
-    public LowCodeModuleConfigPublishResult publishImportDraft(@RequestBody PublishImportDraftRequest request) {
-        return webScope(() -> importService.publishDraft(request.draft(), request.operatorId(), request.remark()));
+    @PostMapping("/imports/drafts/archive")
+    @CustomActionEndpoint(value = "archiveImportDraft", title = "归档导入草稿", level = PlatformActionLevel.LIST)
+    public LowCodeModuleConfigArchiveResult archiveImportDraft(@RequestBody ArchiveImportDraftRequest request) {
+        return webScope(() -> importService.archiveDraft(request.draft(), request.operatorId(), request.remark()));
     }
 
     @PostMapping("/templates/from-version")
@@ -116,14 +116,14 @@ public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConf
         return webScope(() -> templateService.instantiate(request.template(), request.request()));
     }
 
-    public record PublishPackageRequest(
+    public record ArchivePackageRequest(
             LowCodeModulePackage modulePackage,
             String operatorId,
             String remark
     ) {
     }
 
-    public record PublishImportDraftRequest(
+    public record ArchiveImportDraftRequest(
             LowCodeModulePackageImportDraft draft,
             String operatorId,
             String remark

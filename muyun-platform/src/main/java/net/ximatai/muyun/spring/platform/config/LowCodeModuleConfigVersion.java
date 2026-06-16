@@ -26,10 +26,10 @@ public class LowCodeModuleConfigVersion extends StandardEntity {
 
     @Column(name = "version_status", type = ColumnType.VARCHAR, length = 32, nullable = false,
             comment = "Version status")
-    private LowCodeConfigVersionStatus versionStatus = LowCodeConfigVersionStatus.PUBLISHED;
+    private LowCodeConfigVersionStatus versionStatus = LowCodeConfigVersionStatus.ARCHIVED;
 
     @Column(name = "current_version", type = ColumnType.BOOLEAN, nullable = false,
-            comment = "Current online version", defaultVal = @Default(bool = TrueOrFalse.FALSE))
+            comment = "Current governance pointer", defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean currentVersion = Boolean.FALSE;
 
     @Column(name = "package_snapshot_text", type = ColumnType.TEXT, nullable = false,
@@ -46,12 +46,12 @@ public class LowCodeModuleConfigVersion extends StandardEntity {
     @Column(name = "source_version_id", type = ColumnType.VARCHAR, length = 32, comment = "Source version id")
     private String sourceVersionId;
 
-    @Column(name = "published_by", type = ColumnType.VARCHAR, length = 64, comment = "Published by")
-    private String publishedBy;
+    @Column(name = "archived_by", type = ColumnType.VARCHAR, length = 64, comment = "Archived by")
+    private String archivedBy;
 
-    @Column(name = "published_at", type = ColumnType.TIMESTAMP, comment = "Published at")
-    private Instant publishedAt;
+    @Column(name = "archived_at", type = ColumnType.TIMESTAMP, comment = "Archived at")
+    private Instant archivedAt;
 
-    @Column(name = "remark", type = ColumnType.TEXT, comment = "Publish remark")
+    @Column(name = "remark", type = ColumnType.TEXT, comment = "Archive remark")
     private String remark;
 }

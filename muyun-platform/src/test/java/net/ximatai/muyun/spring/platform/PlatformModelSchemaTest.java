@@ -200,7 +200,7 @@ class PlatformModelSchemaTest {
         assertThat(columnNames(mapper.toTable(LowCodeModuleConfigVersion.class)))
                 .contains("id", "tenant_id", "module_alias", "version_no", "version_status", "current_version",
                         "package_snapshot_text", "package_hash", "summary_json", "source_version_id",
-                        "published_by", "published_at", "remark");
+                        "archived_by", "archived_at", "remark");
         assertThat(uniqueIndexes(mapper.toTable(LowCodeModuleConfigVersion.class)))
                 .contains(List.of("tenant_id", "module_alias", "version_no"));
     }

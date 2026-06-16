@@ -21,14 +21,14 @@ class LowCodeModulePackageExchangeServiceTest {
             new LowCodeModuleConfigVersionService(new TestMemoryDao<>());
     private final LowCodeModuleHealthService healthService =
             new LowCodeModuleHealthService(List.of(new LowCodeModulePackageHealthChecker()));
-    private final LowCodeModuleConfigPublishFacade publishFacade =
-            new LowCodeModuleConfigPublishFacade(versionService, healthService);
+    private final LowCodeModuleConfigArchiveFacade archiveFacade =
+            new LowCodeModuleConfigArchiveFacade(versionService, healthService);
     private final LowCodeModulePackageExchangeService exchangeService =
             new LowCodeModulePackageExchangeService(versionService, healthService);
 
     @Test
     void shouldExportCurrentAndSpecificVersionPackage() {
-        LowCodeModuleConfigVersion version = publishFacade.publish(fullPackage("crm.contract"), "tester", null).version();
+        LowCodeModuleConfigVersion version = archiveFacade.archive(fullPackage("crm.contract"), "tester", null).version();
 
         String currentJson = exchangeService.exportCurrentPackage("crm.contract");
         String versionJson = exchangeService.exportVersionPackage(version.getId());
@@ -40,11 +40,11 @@ class LowCodeModulePackageExchangeServiceTest {
 
     @Test
     void shouldUseCurrentVersionOnlyAsGovernanceExportPointer() {
-        LowCodeModuleConfigVersion baseline = publishFacade
-                .publish(salesContractPackage("合同基线", "sales_contract_v1", "draft"), "tester", "baseline")
+        LowCodeModuleConfigVersion baseline = archiveFacade
+                .archive(salesContractPackage("合同基线", "sales_contract_v1", "draft"), "tester", "baseline")
                 .version();
-        LowCodeModuleConfigVersion revised = publishFacade
-                .publish(salesContractPackage("合同归档", "sales_contract_v2", "archived"), "tester", "revised")
+        LowCodeModuleConfigVersion revised = archiveFacade
+                .archive(salesContractPackage("合同归档", "sales_contract_v2", "archived"), "tester", "revised")
                 .version();
 
         assertThat(exchangeService.exportCurrentPackage("sales.contract"))
@@ -54,7 +54,7 @@ class LowCodeModulePackageExchangeServiceTest {
                 .contains("sales_contract_v1")
                 .doesNotContain("sales_contract_v2");
 
-        publishFacade.rollback("sales.contract", baseline.getId());
+        archiveFacade.switchCurrentVersion("sales.contract", baseline.getId());
 
         assertThat(exchangeService.exportCurrentPackage("sales.contract"))
                 .contains("sales_contract_v1")
@@ -63,9 +63,9 @@ class LowCodeModulePackageExchangeServiceTest {
                 .contains("sales_contract_v2");
         assertThat(versionService.listByModule("sales.contract")).hasSize(2);
         assertThat(versionService.select(baseline.getId()).getVersionStatus())
-                .isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
+                .isEqualTo(LowCodeConfigVersionStatus.ARCHIVED);
         assertThat(versionService.select(revised.getId()).getVersionStatus())
-                .isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
+                .isEqualTo(LowCodeConfigVersionStatus.ARCHIVED);
     }
 
     @Test
@@ -98,7 +98,7 @@ class LowCodeModulePackageExchangeServiceTest {
 
     @Test
     void shouldWarnWhenFullModulePackageTargetsExistingModule() {
-        publishFacade.publish(fullPackage("crm.contract"), "tester", null);
+        archiveFacade.archive(fullPackage("crm.contract"), "tester", null);
 
         LowCodePackageDryRunResult result = exchangeService.dryRunImport(fullPackage("crm.contract"));
 
@@ -195,7 +195,7 @@ class LowCodeModulePackageExchangeServiceTest {
 
     @Test
     void shouldBlockTemplatePackageWhenTargetModuleAlreadyExists() {
-        publishFacade.publish(fullPackage("crm.contract"), "tester", null);
+        archiveFacade.archive(fullPackage("crm.contract"), "tester", null);
 
         LowCodePackageDryRunResult result = exchangeService.dryRunImport(templatePackage("crm.contract"));
 

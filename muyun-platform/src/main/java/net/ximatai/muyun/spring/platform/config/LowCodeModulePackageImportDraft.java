@@ -31,7 +31,7 @@ public record LowCodeModulePackageImportDraft(
         return modulePackage.mode();
     }
 
-    public boolean publishable() {
+    public boolean dryRunPassed() {
         return !dryRunResult.blocked();
     }
 

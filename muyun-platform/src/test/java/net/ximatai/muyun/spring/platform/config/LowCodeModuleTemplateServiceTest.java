@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
@@ -13,20 +15,23 @@ import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.pageOnlyPackage;
 
 class LowCodeModuleTemplateServiceTest {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
+
     private final LowCodeModuleConfigVersionService versionService =
             new LowCodeModuleConfigVersionService(new TestMemoryDao<>());
     private final LowCodeModuleHealthService healthService =
             new LowCodeModuleHealthService(List.of(new LowCodeModulePackageHealthChecker()));
-    private final LowCodeModuleConfigPublishFacade publishFacade =
-            new LowCodeModuleConfigPublishFacade(versionService, healthService);
+    private final LowCodeModuleConfigArchiveFacade archiveFacade =
+            new LowCodeModuleConfigArchiveFacade(versionService, healthService);
     private final LowCodeModulePackageExchangeService exchangeService =
             new LowCodeModulePackageExchangeService(versionService, healthService);
     private final LowCodeModuleTemplateService templateService =
             new LowCodeModuleTemplateService(exchangeService);
 
     @Test
-    void shouldCreateTemplateFromPublishedVersionAndInstantiateNewModulePackage() {
-        LowCodeModuleConfigVersion version = publishFacade.publish(fullPackageWithPageBundle("crm.contract"), "tester", null).version();
+    void shouldCreateTemplateFromArchivedVersionAndInstantiateNewModulePackage() {
+        LowCodeModuleConfigVersion version = archiveFacade.archive(fullPackageWithPageBundle("crm.contract"), "tester", null).version();
 
         LowCodeModuleTemplate template = templateService.createTemplateFromVersion(
                 "contract_template", "Contract Template", version.getId());
@@ -53,7 +58,7 @@ class LowCodeModuleTemplateServiceTest {
 
     @Test
     void instantiatedPackageShouldPassDryRunForNewModule() {
-        LowCodeModuleConfigVersion version = publishFacade.publish(fullPackage("crm.contract"), "tester", null).version();
+        LowCodeModuleConfigVersion version = archiveFacade.archive(fullPackage("crm.contract"), "tester", null).version();
         LowCodeModuleTemplate template = templateService.createTemplateFromVersion(
                 "contract_template", "Contract Template", version.getId());
 
@@ -66,7 +71,7 @@ class LowCodeModuleTemplateServiceTest {
 
     @Test
     void shouldRejectTemplateTargetOutsideApplication() {
-        LowCodeModuleConfigVersion version = publishFacade.publish(fullPackage("crm.contract"), "tester", null).version();
+        LowCodeModuleConfigVersion version = archiveFacade.archive(fullPackage("crm.contract"), "tester", null).version();
         LowCodeModuleTemplate template = templateService.createTemplateFromVersion(
                 "contract_template", "Contract Template", version.getId());
 
@@ -108,13 +113,25 @@ class LowCodeModuleTemplateServiceTest {
     }
 
     @Test
-    void shouldRejectPageOnlyVersionAsTemplateSource() {
-        LowCodeModuleConfigVersion version = publishFacade.publish(pageOnlyPackage("crm.contract"), "tester", null).version();
+    void shouldRejectPageOnlyVersionAsTemplateSource() throws Exception {
+        LowCodeModuleConfigVersion version = rawArchivedVersion(pageOnlyPackage("crm.contract"));
+        versionService.insert(version);
 
         assertThatThrownBy(() -> templateService.createTemplateFromVersion(
                 "contract_template", "Contract Template", version.getId()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("template source package must be MODULE_FULL with METADATA bundle");
+    }
+
+    private LowCodeModuleConfigVersion rawArchivedVersion(LowCodeModulePackage modulePackage) throws Exception {
+        LowCodeModuleConfigVersion version = new LowCodeModuleConfigVersion();
+        version.setModuleAlias(modulePackage.moduleAlias());
+        version.setVersionNo(versionService.nextVersionNo(modulePackage.moduleAlias()));
+        version.setVersionStatus(LowCodeConfigVersionStatus.ARCHIVED);
+        version.setCurrentVersion(Boolean.FALSE);
+        version.setPackageSnapshotText(OBJECT_MAPPER.writeValueAsString(modulePackage));
+        version.setPackageHash("raw-test-hash");
+        return version;
     }
 
 }

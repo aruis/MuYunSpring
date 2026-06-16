@@ -30,7 +30,7 @@ public class LowCodeModulePackageHealthChecker implements LowCodeModuleHealthChe
                     "package moduleAlias does not match health context",
                     "module",
                     modulePackage.moduleAlias(),
-                    "Check the target module before importing or publishing this package"
+                    "Check the target module before importing or archiving this package"
             ));
         }
         try {
@@ -43,7 +43,7 @@ public class LowCodeModulePackageHealthChecker implements LowCodeModuleHealthChe
                     ex.getMessage(),
                     "package",
                     modulePackage.moduleAlias(),
-                    "Fix the package structure before running publish, migration or template operations"
+                    "Fix the package structure before running archive, migration or template operations"
             ));
         }
     }

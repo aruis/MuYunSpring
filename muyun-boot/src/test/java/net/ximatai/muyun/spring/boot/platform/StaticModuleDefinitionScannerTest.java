@@ -30,7 +30,7 @@ import net.ximatai.muyun.spring.platform.workflow.WorkflowPublishFacade;
 import net.ximatai.muyun.spring.platform.workflow.WorkflowVersionService;
 import net.ximatai.muyun.spring.platform.code.CodePreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
-import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigPublishFacade;
+import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveFacade;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
@@ -419,8 +419,8 @@ class StaticModuleDefinitionScannerTest {
     @Test
     void shouldRegisterLowCodeGovernanceActionsAsStaticModuleActions() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
-            context.registerBean(LowCodeModuleConfigPublishFacade.class,
-                    () -> mock(LowCodeModuleConfigPublishFacade.class));
+            context.registerBean(LowCodeModuleConfigArchiveFacade.class,
+                    () -> mock(LowCodeModuleConfigArchiveFacade.class));
             context.registerBean(LowCodeModuleHealthService.class, () -> mock(LowCodeModuleHealthService.class));
             context.registerBean(LowCodeModulePackageExchangeService.class,
                     () -> mock(LowCodeModulePackageExchangeService.class));
@@ -435,20 +435,20 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.low_code_governance");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                    .containsExactlyInAnyOrder("checkPackageHealth", "publishPackage", "rollbackPackageVersion",
+                    .containsExactlyInAnyOrder("checkPackageHealth", "archivePackage", "switchCurrentPackageVersion",
                             "exportCurrentPackage", "exportVersionPackage", "dryRunImportPackage",
-                            "prepareImportDraft", "publishImportDraft",
+                            "prepareImportDraft", "archiveImportDraft",
                             "createTemplateFromVersion", "instantiateTemplate");
             Map<String, StaticModuleActionDefinition> actions = definition.actions().stream()
                     .collect(Collectors.toMap(StaticModuleActionDefinition::actionCode, Function.identity()));
             assertThat(actions.get("checkPackageHealth").actionLevel()).isEqualTo(EntityActionLevel.LIST);
-            assertThat(actions.get("publishPackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("archivePackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("dryRunImportPackage").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("prepareImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
-            assertThat(actions.get("publishImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
+            assertThat(actions.get("archiveImportDraft").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("createTemplateFromVersion").actionLevel()).isEqualTo(EntityActionLevel.LIST);
             assertThat(actions.get("instantiateTemplate").actionLevel()).isEqualTo(EntityActionLevel.LIST);
-            assertThat(actions.get("rollbackPackageVersion").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
+            assertThat(actions.get("switchCurrentPackageVersion").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportCurrentPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
             assertThat(actions.get("exportVersionPackage").actionLevel()).isEqualTo(EntityActionLevel.RECORD);
         }

@@ -27,7 +27,7 @@ public class LowCodeModuleConfigVersionService extends AbstractAbilityService<Lo
     public void beforeInsert(LowCodeModuleConfigVersion version) {
         normalizeAndValidate(version);
         if (Boolean.TRUE.equals(version.getCurrentVersion())) {
-            throw new PlatformException("low code config current version can only be switched by publish facade");
+            throw new PlatformException("low code config current version can only be switched by archive facade");
         }
     }
 
@@ -64,8 +64,8 @@ public class LowCodeModuleConfigVersionService extends AbstractAbilityService<Lo
         if (target == null || !validModuleAlias.equals(target.getModuleAlias())) {
             throw new PlatformException("low code config version not found in module: " + versionId);
         }
-        if (target.getVersionStatus() != LowCodeConfigVersionStatus.PUBLISHED) {
-            throw new PlatformException("only published low code config version can be current: " + versionId);
+        if (target.getVersionStatus() != LowCodeConfigVersionStatus.ARCHIVED) {
+            throw new PlatformException("only archived low code config version can be current: " + versionId);
         }
         for (LowCodeModuleConfigVersion version : listByModule(validModuleAlias)) {
             boolean current = version.getId().equals(versionId);
@@ -82,7 +82,7 @@ public class LowCodeModuleConfigVersionService extends AbstractAbilityService<Lo
             throw new PlatformException("low code config version number must be positive");
         }
         if (version.getVersionStatus() == null) {
-            version.setVersionStatus(LowCodeConfigVersionStatus.PUBLISHED);
+            version.setVersionStatus(LowCodeConfigVersionStatus.ARCHIVED);
         }
         if (version.getCurrentVersion() == null) {
             version.setCurrentVersion(Boolean.FALSE);
@@ -112,8 +112,8 @@ public class LowCodeModuleConfigVersionService extends AbstractAbilityService<Lo
         rejectChanged("packageHash", existing.getPackageHash(), incoming.getPackageHash());
         rejectChanged("summaryJson", existing.getSummaryJson(), incoming.getSummaryJson());
         rejectChanged("sourceVersionId", existing.getSourceVersionId(), incoming.getSourceVersionId());
-        rejectChanged("publishedBy", existing.getPublishedBy(), incoming.getPublishedBy());
-        rejectChanged("publishedAt", existing.getPublishedAt(), incoming.getPublishedAt());
+        rejectChanged("archivedBy", existing.getArchivedBy(), incoming.getArchivedBy());
+        rejectChanged("archivedAt", existing.getArchivedAt(), incoming.getArchivedAt());
         rejectChanged("remark", existing.getRemark(), incoming.getRemark());
     }
 }

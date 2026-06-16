@@ -33,7 +33,7 @@ class LowCodeModulePackageValidatorTest {
                         LowCodePackageDependency.action("crm.contract", "localEdit"),
                         LowCodePackageDependency.dictionary("crm", "contract_status")
                 )),
-                new LowCodePackagePublishManifest("m10.v1", "dev", "version-1", "tester",
+                new LowCodePackageExchangeManifest("m10.v1", "dev", "version-1", "tester",
                         Instant.parse("2026-06-11T00:00:00Z"), "baseline")
         );
 

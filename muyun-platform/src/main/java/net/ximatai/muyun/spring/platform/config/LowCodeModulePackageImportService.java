@@ -10,14 +10,14 @@ import java.util.UUID;
 public class LowCodeModulePackageImportService {
     private final LowCodeModulePackageExchangeService exchangeService;
     private final LowCodeModuleConfigVersionService versionService;
-    private final LowCodeModuleConfigPublishFacade publishFacade;
+    private final LowCodeModuleConfigArchiveFacade archiveFacade;
 
     public LowCodeModulePackageImportService(LowCodeModulePackageExchangeService exchangeService,
                                              LowCodeModuleConfigVersionService versionService,
-                                             LowCodeModuleConfigPublishFacade publishFacade) {
+                                             LowCodeModuleConfigArchiveFacade archiveFacade) {
         this.exchangeService = exchangeService;
         this.versionService = versionService;
-        this.publishFacade = publishFacade;
+        this.archiveFacade = archiveFacade;
     }
 
     public LowCodeModulePackageImportDraft prepareDraft(String packageJson) {
@@ -39,20 +39,20 @@ public class LowCodeModulePackageImportService {
         );
     }
 
-    public LowCodeModuleConfigPublishResult publishDraft(LowCodeModulePackageImportDraft draft,
+    public LowCodeModuleConfigArchiveResult archiveDraft(LowCodeModulePackageImportDraft draft,
                                                          String operatorId,
                                                          String remark) {
         if (draft == null) {
             throw new IllegalArgumentException("import draft must not be null");
         }
-        if (!draft.publishable()) {
-            throw new PlatformException("low code package import draft is not publishable: " + draft.moduleAlias());
+        if (!draft.dryRunPassed()) {
+            throw new PlatformException("low code package import draft is not ready to archive: " + draft.moduleAlias());
         }
         if (draft.mode() != LowCodePackageMode.MODULE_FULL) {
-            throw new PlatformException("only MODULE_FULL import draft can be published: " + draft.moduleAlias());
+            throw new PlatformException("only MODULE_FULL import draft can be archived: " + draft.moduleAlias());
         }
         rejectStaleDraft(draft);
-        return publishFacade.publish(draft.modulePackage(), operatorId, remark);
+        return archiveFacade.archive(draft.modulePackage(), operatorId, remark);
     }
 
     private void rejectStaleDraft(LowCodeModulePackageImportDraft draft) {
