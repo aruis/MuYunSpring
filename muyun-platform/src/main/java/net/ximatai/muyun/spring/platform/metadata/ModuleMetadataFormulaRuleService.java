@@ -15,10 +15,13 @@ import net.ximatai.muyun.spring.common.formula.FormulaIssueLevel;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<ModuleMetadataFormulaRule> implements
@@ -32,13 +35,23 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
     private final ModuleMetadataRelationService relationService;
     private final FormulaEngine formulaEngine = new FormulaEngine();
     private final MetadataFormulaFieldValidator fieldValidator;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public ModuleMetadataFormulaRuleService(BaseDao<ModuleMetadataFormulaRule, String> formulaRuleDao,
                                             ModuleMetadataRelationService relationService,
                                             MetadataFieldService fieldService) {
+        this(formulaRuleDao, relationService, fieldService, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataFormulaRuleService(BaseDao<ModuleMetadataFormulaRule, String> formulaRuleDao,
+                                            ModuleMetadataRelationService relationService,
+                                            MetadataFieldService fieldService,
+                                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, ModuleMetadataFormulaRule.class, formulaRuleDao);
         this.relationService = relationService;
         this.fieldValidator = new MetadataFormulaFieldValidator(relationService, fieldService);
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -60,6 +73,13 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
     public void validateSortScope(ModuleMetadataFormulaRule left, ModuleMetadataFormulaRule right) {
         if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
             throw new PlatformException("Metadata formula rule sort can only move records within the same relation");
+        }
+    }
+
+    @Override
+    public void afterChanged(ModuleMetadataFormulaRule rule) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByFormulaRule(rule);
         }
     }
 

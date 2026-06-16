@@ -8,9 +8,12 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
@@ -21,13 +24,23 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     private final MetadataService metadataService;
     private final PlatformFieldTypeService fieldTypeService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService) {
+        this(fieldDao, metadataService, fieldTypeService, Optional.empty());
+    }
+
+    @Autowired
+    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
+                                MetadataService metadataService,
+                                PlatformFieldTypeService fieldTypeService,
+                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -49,6 +62,13 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     public void validateSortScope(MetadataField left, MetadataField right) {
         if (!java.util.Objects.equals(left.getMetadataId(), right.getMetadataId())) {
             throw new PlatformException("Metadata field sort can only move records within the same metadata");
+        }
+    }
+
+    @Override
+    public void afterChanged(MetadataField field) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByMetadataField(field);
         }
     }
 

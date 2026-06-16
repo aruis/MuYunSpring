@@ -14,10 +14,13 @@ import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class PlatformModuleActionService extends AbstractAbilityService<PlatformModuleAction> implements
@@ -28,11 +31,20 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final PlatformModuleService moduleService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
                                        PlatformModuleService moduleService) {
+        this(actionDao, moduleService, Optional.empty());
+    }
+
+    @Autowired
+    public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
+                                       PlatformModuleService moduleService,
+                                       Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, PlatformModuleAction.class, actionDao);
         this.moduleService = moduleService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -54,6 +66,13 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
     public void validateSortScope(PlatformModuleAction left, PlatformModuleAction right) {
         if (!Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
             throw new PlatformException("Module action sort can only move records within the same module");
+        }
+    }
+
+    @Override
+    public void afterChanged(PlatformModuleAction action) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByModuleAction(action);
         }
     }
 

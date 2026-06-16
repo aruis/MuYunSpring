@@ -6,9 +6,12 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class ModuleMetadataFieldAffectService extends AbstractAbilityService<ModuleMetadataFieldAffect> implements
@@ -17,11 +20,20 @@ public class ModuleMetadataFieldAffectService extends AbstractAbilityService<Mod
     public static final String MODULE_ALIAS = "platform.module_metadata_field_affect";
 
     private final ModuleMetadataFieldService moduleFieldService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public ModuleMetadataFieldAffectService(BaseDao<ModuleMetadataFieldAffect, String> affectDao,
                                             ModuleMetadataFieldService moduleFieldService) {
+        this(affectDao, moduleFieldService, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataFieldAffectService(BaseDao<ModuleMetadataFieldAffect, String> affectDao,
+                                            ModuleMetadataFieldService moduleFieldService,
+                                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, ModuleMetadataFieldAffect.class, affectDao);
         this.moduleFieldService = moduleFieldService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -43,6 +55,13 @@ public class ModuleMetadataFieldAffectService extends AbstractAbilityService<Mod
     public void validateSortScope(ModuleMetadataFieldAffect left, ModuleMetadataFieldAffect right) {
         if (!Objects.equals(left.getModuleMetadataFieldId(), right.getModuleMetadataFieldId())) {
             throw new PlatformException("Module metadata field affect sort can only move records within the same field");
+        }
+    }
+
+    @Override
+    public void afterChanged(ModuleMetadataFieldAffect affect) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByFieldAffect(affect);
         }
     }
 

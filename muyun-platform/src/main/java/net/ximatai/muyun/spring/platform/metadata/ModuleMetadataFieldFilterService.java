@@ -6,9 +6,12 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class ModuleMetadataFieldFilterService extends AbstractAbilityService<ModuleMetadataFieldFilter> implements
@@ -17,11 +20,20 @@ public class ModuleMetadataFieldFilterService extends AbstractAbilityService<Mod
     public static final String MODULE_ALIAS = "platform.module_metadata_field_filter";
 
     private final ModuleMetadataFieldService moduleFieldService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public ModuleMetadataFieldFilterService(BaseDao<ModuleMetadataFieldFilter, String> filterDao,
                                             ModuleMetadataFieldService moduleFieldService) {
+        this(filterDao, moduleFieldService, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataFieldFilterService(BaseDao<ModuleMetadataFieldFilter, String> filterDao,
+                                            ModuleMetadataFieldService moduleFieldService,
+                                            Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, ModuleMetadataFieldFilter.class, filterDao);
         this.moduleFieldService = moduleFieldService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -43,6 +55,13 @@ public class ModuleMetadataFieldFilterService extends AbstractAbilityService<Mod
     public void validateSortScope(ModuleMetadataFieldFilter left, ModuleMetadataFieldFilter right) {
         if (!Objects.equals(left.getModuleMetadataFieldId(), right.getModuleMetadataFieldId())) {
             throw new PlatformException("Module metadata field filter sort can only move records within the same field");
+        }
+    }
+
+    @Override
+    public void afterChanged(ModuleMetadataFieldFilter filter) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByFieldFilter(filter);
         }
     }
 

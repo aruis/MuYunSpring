@@ -9,7 +9,11 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 public class ModuleMetadataRelationService extends AbstractAbilityService<ModuleMetadataRelation> implements
@@ -19,13 +23,23 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
 
     private final PlatformModuleService moduleService;
     private final MetadataService metadataService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,
                                          MetadataService metadataService) {
+        this(relationDao, moduleService, metadataService, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
+                                         PlatformModuleService moduleService,
+                                         MetadataService metadataService,
+                                         Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, ModuleMetadataRelation.class, relationDao);
         this.moduleService = moduleService;
         this.metadataService = metadataService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -47,6 +61,13 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
     public void validateSortScope(ModuleMetadataRelation left, ModuleMetadataRelation right) {
         if (!java.util.Objects.equals(left.getModuleAlias(), right.getModuleAlias())) {
             throw new PlatformException("Module metadata relation sort can only move records within the same module");
+        }
+    }
+
+    @Override
+    public void afterChanged(ModuleMetadataRelation relation) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByRelation(relation);
         }
     }
 

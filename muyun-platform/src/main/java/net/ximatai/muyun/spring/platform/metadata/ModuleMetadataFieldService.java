@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     private final MetadataFieldService fieldService;
     private final PlatformFieldTypeService fieldTypeService;
     private final ModuleMetadataFieldReferenceGenerateRuleValidator referenceGenerateRuleValidator;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
@@ -52,13 +54,24 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         this(moduleMetadataFieldDao, relationService, metadataService, fieldService, null, referenceGenerateRuleValidator);
     }
 
-    @Autowired
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,
                                       MetadataFieldService fieldService,
                                       PlatformFieldTypeService fieldTypeService,
                                       Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator) {
+        this(moduleMetadataFieldDao, relationService, metadataService, fieldService, fieldTypeService,
+                referenceGenerateRuleValidator, Optional.empty());
+    }
+
+    @Autowired
+    public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataService metadataService,
+                                      MetadataFieldService fieldService,
+                                      PlatformFieldTypeService fieldTypeService,
+                                      Optional<ModuleMetadataFieldReferenceGenerateRuleValidator> referenceGenerateRuleValidator,
+                                      Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, ModuleMetadataField.class, moduleMetadataFieldDao);
         this.relationService = relationService;
         this.metadataService = metadataService;
@@ -67,6 +80,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         this.referenceGenerateRuleValidator = referenceGenerateRuleValidator == null
                 ? null
                 : referenceGenerateRuleValidator.orElse(null);
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -88,6 +102,13 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     public void validateSortScope(ModuleMetadataField left, ModuleMetadataField right) {
         if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
             throw new PlatformException("Module metadata field sort can only move records within the same relation");
+        }
+    }
+
+    @Override
+    public void afterChanged(ModuleMetadataField moduleField) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByModuleField(moduleField);
         }
     }
 
