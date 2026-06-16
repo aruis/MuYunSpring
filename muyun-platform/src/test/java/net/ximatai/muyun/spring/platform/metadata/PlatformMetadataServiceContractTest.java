@@ -42,6 +42,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class PlatformMetadataServiceContractTest {
     private final MemoryDao<PlatformModule> moduleDao = new MemoryDao<>();
@@ -71,7 +75,9 @@ class PlatformMetadataServiceContractTest {
             new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
     private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
             new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
-    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+    private final PlatformMetadataSchemaEnsureService schemaEnsureService = mock(PlatformMetadataSchemaEnsureService.class);
+    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService,
+            Optional.empty(), Optional.of(schemaEnsureService));
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final ModuleMetadataFieldService moduleFieldService =
@@ -1149,6 +1155,7 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(quantity);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        clearInvocations(schemaEnsureService);
 
         ModuleMetadataMeasureUnitPrepareResult result = moduleFieldService.prepareMeasureUnitConfig(
                 moduleField.getId(),
@@ -1183,6 +1190,7 @@ class PlatformMetadataServiceContractTest {
         assertThat(result.moduleField().getBaseValueFieldId()).isEqualTo(result.baseValueField().getId());
         assertThat(result.moduleField().getBaseUnitCategoryAlias()).isEqualTo("package");
         assertThat(result.moduleField().getBaseUnitCode()).isEqualTo("bottle");
+        verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
     }
 
     @Test
@@ -1333,6 +1341,7 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(orderDate);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        clearInvocations(schemaEnsureService);
 
         ModuleMetadataMoneyPrepareResult result = moduleFieldService.prepareMoneyConfig(
                 moduleField.getId(),
@@ -1360,6 +1369,7 @@ class PlatformMetadataServiceContractTest {
         assertThat(result.moduleField().getMoneyCurrencyFieldId()).isEqualTo(result.currencyField().getId());
         assertThat(result.moduleField().getMoneyBaseAmountFieldId()).isEqualTo(result.baseAmountField().getId());
         assertThat(result.moduleField().getMoneyExchangeRateFieldId()).isEqualTo(result.exchangeRateField().getId());
+        verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
     }
 
     @Test
