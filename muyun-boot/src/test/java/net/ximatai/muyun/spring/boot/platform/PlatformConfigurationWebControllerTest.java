@@ -6,6 +6,9 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
@@ -46,6 +49,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigPublishService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
@@ -97,6 +101,40 @@ class PlatformConfigurationWebControllerTest {
                 .andExpect(jsonPath("$.records[0].children[0].record.id").value("platform.sales.order"));
 
         verify(service).rootModules("platform");
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeThroughModuleConfigurationEndpoint() throws Exception {
+        PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
+        when(refreshService.refresh("crm.contract")).thenReturn(runtimeRefreshResult(false));
+        PlatformModuleWebController controller = new PlatformModuleWebController(refreshService);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(post("/platform.module/crm.contract/runtime/refresh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.module.moduleAlias").value("crm.contract"))
+                    .andExpect(jsonPath("$.dryRun").value(false));
+        }
+
+        verify(refreshService).refresh("crm.contract");
+    }
+
+    @Test
+    void shouldPreviewRefreshDynamicRuntimeThroughDryRunEndpoint() throws Exception {
+        PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
+        when(refreshService.previewRefresh("crm.contract")).thenReturn(runtimeRefreshResult(true));
+        PlatformModuleWebController controller = new PlatformModuleWebController(refreshService);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(post("/platform.module/crm.contract/runtime/preview-refresh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.module.moduleAlias").value("crm.contract"))
+                    .andExpect(jsonPath("$.dryRun").value(true));
+        }
+
+        verify(refreshService).previewRefresh("crm.contract");
     }
 
     @Test
@@ -974,6 +1012,13 @@ class PlatformConfigurationWebControllerTest {
                 .andExpect(jsonPath("$.count").value(1));
 
         verify(service).publishUiConfig("ui-config-1");
+    }
+
+    private DynamicModulePublishResult runtimeRefreshResult(boolean dryRun) {
+        return new DynamicModulePublishResult(
+                new ModuleDefinition("crm.contract", "Contract", List.of()),
+                Map.of(),
+                dryRun);
     }
 
     private PlatformModule module(String id, String applicationAlias, String parentId) {

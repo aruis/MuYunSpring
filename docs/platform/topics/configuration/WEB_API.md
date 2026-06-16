@@ -20,6 +20,7 @@
 | UI 字段配置 | `PlatformUiConfigFieldService` | `/platform.ui-config/{uiConfigId}/fields` |
 | 查询模板 | `PlatformQueryTemplateService` | `/platform.module/{moduleAlias}/query-templates` |
 | 查询项 | `PlatformQueryItemService` | `/platform.query-template/{queryTemplateId}/items` |
+| 动态运行态刷新 | `PlatformDynamicRuntimeRefreshService` | `/platform.module/{moduleAlias}/runtime` |
 | 页面配置发布 | `PlatformPageConfigPublishService` | `/platform.page_config_publish` |
 | 字段引用配置 | `MetadataFieldReferenceConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs` |
 | 字段保护配置 | `MetadataFieldProtectionConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs` |
@@ -64,6 +65,8 @@
 | 模块 | `POST` | `/platform.module/sort/{id}` | 在应用内调整模块树位置 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}` | 获取指定应用下的模块树 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}/{parentId}` | 获取指定父模块下的子树或扁平列表 |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/preview-refresh` | 预览把当前模块配置编译并同步到动态运行态的 schema 变更；dry-run，不更新运行态 registry |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/refresh` | 把当前模块配置编译为 `ModuleDefinition`，必要时执行 schema ensure，并刷新 `DynamicRecordRuntime` registry |
 | 元数据 | `POST` | `/platform.metadata/query` | 查询元数据列表，支持按应用、别名、物理表等字段过滤 |
 | 元数据 | `GET` | `/platform.metadata/view/{id}` | 查看元数据 |
 | 元数据 | `POST` | `/platform.metadata/insert` | 新增元数据 |
@@ -521,15 +524,15 @@
 
 上述两个 URL 是已存在的菜单消费/页面入口：`MenuWebController` 提供 `/mine`，`DynamicPageBootstrapWebController` 提供 `/{menuId}/entry`。它们不等同于菜单方案或菜单节点的配置维护接口。
 
-## 发布后的消费入口
+## 刷新后的消费入口
 
-动态模块发布后，运行态 Web 入口使用业务根路径 `/{moduleAlias}`。这里是配置发布后的消费面，不是配置维护面；完整接口清单归属运行态专题。
+动态模块刷新到运行态后，运行态 Web 入口使用业务根路径 `/{moduleAlias}`。这里是配置刷新后的消费面，不是配置维护面；完整接口清单归属运行态专题。
 
 | 方法 | URL | 功能点 |
 | --- | --- | --- |
 | `GET` | `/{moduleAlias}/describe` | 读取动态模块运行态描述 |
 
-页面配置和查询模板发布通过 `/platform.page_config_publish` 完成；动态模块定义发布和配置包治理仍归属配置治理专题。
+动态运行态刷新通过 `/platform.module/{moduleAlias}/runtime/refresh` 完成，返回 `DynamicModulePublishResult`。它表达“当前配置同步到运行态”，不是配置包定稿、归档或跨环境迁移版本；配置包版本发布、回滚、导入 dry-run 仍归属配置治理专题。页面配置和查询模板发布通过 `/platform.page_config_publish` 完成，保留“用户可见生效/取消生效”的发布语义。
 
 ## 关联专题入口
 
