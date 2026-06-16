@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | `LowCodeModulePackage` | 低代码生产化治理的模块级载体 | 以 `applicationAlias + moduleAlias` 作为稳定身份 |
 | bundle 分层 | 按配置类型拆分包内容 | 元数据、页面、交互、入口、自动化分别归档，不混成一坨 JSON |
-| `dependencyManifest` | 声明迁移和归档前需要满足的外部事实 | 覆盖模块、动作、字典、工作流、文件服务和外部依赖 |
+| `dependencyManifest` | 声明迁移和归档前需要满足的外部事实 | 覆盖模块、动作、字典、计量单位、币种、汇率类型、工作流、文件服务和外部依赖 |
 | `exchangeManifest` | 记录包协议、来源版本、来源环境和导出信息 | 用于跨环境迁移和版本追踪，不替代版本表 |
 | 健康报告 | 归档、导入和模板复用前的结构化门禁 | `FAIL` 阻断，`WARN` 可继续但必须保留诊断 |
 | 配置版本 | 已归档模块包的不可变快照 | 当前版本只表达治理导出和迁移基线指针，历史版本保留归档事实 |
@@ -45,7 +45,7 @@
 2. bundle 顶层 `module/moduleAlias` 与包身份一致。
 3. 依赖 manifest 的 resolver 诊断和缺失依赖诊断。
 4. 元数据 bundle 中计量单位字段的伴生字段、标准值字段、上下文字段和单位分类依赖声明。
-5. 元数据 bundle 中金额字段的币种伴生字段、基准金额字段、汇率日期字段和汇率字段契约。
+5. 元数据 bundle 中金额字段的币种伴生字段、基准金额字段、汇率日期字段、汇率字段契约，以及币种和汇率类型依赖声明。
 
 健康检查当前只承诺包级身份、依赖事实和少量会影响迁移可用性的字段契约，不深度解析 UI、工作流或自动化配置语义。后续补强时应继续增加独立 checker，避免把治理逻辑堆成单体判断。
 
@@ -75,10 +75,12 @@
 
 依赖按两类处理：
 
-1. `MODULE/ACTION/DICTIONARY/MEASURE_UNIT` 是平台默认可解析依赖；required 依赖缺 resolver 或缺失会阻断，optional 依赖只诊断告警。
+1. `MODULE/ACTION/DICTIONARY/MEASURE_UNIT/CURRENCY/EXCHANGE_RATE_TYPE` 是平台默认可解析依赖；required 依赖缺 resolver 或缺失会阻断，optional 依赖只诊断告警。
 2. `WORKFLOW/FILE_SERVICE/EXTERNAL` 当前为 manifest-only，缺 resolver 只返回 `WARN`；后续若提供显式 resolver，required 缺失仍应阻断。
 
 计量单位字段使用 `unitCategoryAlias` 时，模块包应在 dependency manifest 中声明 `MEASURE_UNIT` 依赖。推荐依赖身份为 `platform + categoryAlias`，对应平台全局公开或租户公开的共享单位库；历史 `applicationAlias + categoryAlias` 继续兼容。健康检查会对 metadata bundle 的字段清单做轻量契约检查：可选单位必须存在单位伴生字段，标准值字段必须独立存在，记录上下文字段如已配置也必须在包内字段清单中出现。
+
+金额字段使用明确币种码或汇率类型码时，模块包应在 dependency manifest 中声明 `CURRENCY` 与 `EXCHANGE_RATE_TYPE` 依赖。健康检查只校验字段形态、伴生/影子字段和可迁移依赖事实，不在治理层展开业务汇率规则、定价策略或财务结算语义。
 
 `LowCodeModulePackageImportService` 当前只提供最小导入门面：`prepareDraft` 在 dry-run 不阻断时生成内存草稿，`archiveDraft` 校验基线版本未变化后，只允许 `MODULE_FULL` 草稿交给归档门面生成配置版本。当前不持久化草稿、不批量写真实配置表、不做字段级 diff、审批流或合并策略。
 

@@ -149,7 +149,9 @@ class LowCodeModulePackageExchangeServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = LowCodePackageDependencyType.class, names = {"MODULE", "ACTION", "DICTIONARY", "MEASURE_UNIT"})
+    @EnumSource(value = LowCodePackageDependencyType.class, names = {
+            "MODULE", "ACTION", "DICTIONARY", "MEASURE_UNIT", "CURRENCY", "EXCHANGE_RATE_TYPE"
+    })
     void shouldBlockPlatformResolvedDependencyWhenNoResolverIsAvailable(LowCodePackageDependencyType type) {
         LowCodeModulePackage modulePackage = fullPackage("crm.contract", List.of(dependency(type)));
 
@@ -250,6 +252,8 @@ class LowCodeModulePackageExchangeServiceTest {
             case ACTION -> LowCodePackageDependency.action("crm.contract", "submit");
             case DICTIONARY -> LowCodePackageDependency.dictionary("crm", "contract_status");
             case MEASURE_UNIT -> LowCodePackageDependency.measureUnit("crm", "quantity");
+            case CURRENCY -> LowCodePackageDependency.currency("USD");
+            case EXCHANGE_RATE_TYPE -> LowCodePackageDependency.exchangeRateType("SPOT");
             case WORKFLOW -> new LowCodePackageDependency(type, null, null, "contract_approval", true);
             case FILE_SERVICE -> new LowCodePackageDependency(type, null, null, "record_attachment", true);
             case EXTERNAL -> new LowCodePackageDependency(type, null, null, "erp_credit_check", true);

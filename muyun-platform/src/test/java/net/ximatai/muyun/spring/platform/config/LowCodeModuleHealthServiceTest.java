@@ -247,7 +247,7 @@ class LowCodeModuleHealthServiceTest {
 
     @Test
     void moneyCheckerShouldPassWhenMetadataFieldsAreComplete() {
-        LowCodeModulePackage modulePackage = moneyPackage();
+        LowCodeModulePackage modulePackage = moneyPackage(moneyDependencies());
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
                 List.of(new LowCodeMoneyHealthChecker()));
 
@@ -255,6 +255,27 @@ class LowCodeModuleHealthServiceTest {
 
         assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
         assertThat(report.items()).isEmpty();
+    }
+
+    @Test
+    void moneyCheckerShouldWarnWhenCurrencyOrRateTypeDependencyIsMissing() {
+        LowCodeModulePackage modulePackage = moneyPackage(List.of());
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMoneyHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.WARN);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::scope, LowCodeConfigHealthItem::code,
+                        LowCodeConfigHealthItem::targetType, LowCodeConfigHealthItem::targetId)
+                .containsExactlyInAnyOrder(
+                        tuple(LowCodeConfigHealthScope.DEPENDENCY, "MONEY_CURRENCY_DEPENDENCY_MISSING",
+                                "currency", "USD"),
+                        tuple(LowCodeConfigHealthScope.DEPENDENCY, "MONEY_CURRENCY_DEPENDENCY_MISSING",
+                                "currency", "CNY"),
+                        tuple(LowCodeConfigHealthScope.DEPENDENCY, "MONEY_RATE_TYPE_DEPENDENCY_MISSING",
+                                "exchangeRateType", "SPOT")
+                );
     }
 
     @Test
@@ -288,7 +309,7 @@ class LowCodeModuleHealthServiceTest {
                                         Map.of("fieldName", "amountExchangeRate", "type", "DECIMAL")
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(moneyDependencies()),
                 null
         );
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
@@ -358,7 +379,7 @@ class LowCodeModuleHealthServiceTest {
                                         Map.of("fieldName", "rateAt", "fieldTypeAlias", "zoned_datetime")
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.exchangeRateType("SPOT"))),
                 null
         );
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
@@ -401,7 +422,7 @@ class LowCodeModuleHealthServiceTest {
                                         )
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(moneyDependencies()),
                 null
         );
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
@@ -438,7 +459,7 @@ class LowCodeModuleHealthServiceTest {
                                         Map.of("fieldName", "orderDate", "type", "STRING")
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.exchangeRateType("SPOT"))),
                 null
         );
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
@@ -482,7 +503,7 @@ class LowCodeModuleHealthServiceTest {
                                         )
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.exchangeRateType("SPOT"))),
                 null
         );
         LowCodeModuleHealthService service = new LowCodeModuleHealthService(
@@ -754,7 +775,7 @@ class LowCodeModuleHealthServiceTest {
         );
     }
 
-    private LowCodeModulePackage moneyPackage() {
+    private LowCodeModulePackage moneyPackage(List<LowCodePackageDependency> dependencies) {
         return new LowCodeModulePackage(
                 "m10.v1",
                 LowCodePackageMode.MODULE_FULL,
@@ -782,8 +803,16 @@ class LowCodeModuleHealthServiceTest {
                                         Map.of("fieldName", "amountExchangeRate", "type", "DECIMAL")
                                 )
                         ))),
-                new LowCodePackageDependencyManifest(List.of()),
+                new LowCodePackageDependencyManifest(dependencies),
                 null
+        );
+    }
+
+    private List<LowCodePackageDependency> moneyDependencies() {
+        return List.of(
+                LowCodePackageDependency.currency("USD"),
+                LowCodePackageDependency.currency("CNY"),
+                LowCodePackageDependency.exchangeRateType("SPOT")
         );
     }
 }

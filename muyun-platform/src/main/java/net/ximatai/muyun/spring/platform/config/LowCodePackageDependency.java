@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.config;
 
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.currency.CurrencyCodeRules;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 
 public record LowCodePackageDependency(
@@ -17,6 +18,12 @@ public record LowCodePackageDependency(
         applicationAlias = normalize(applicationAlias);
         moduleAlias = normalize(moduleAlias);
         alias = normalize(alias);
+        if (type == LowCodePackageDependencyType.CURRENCY) {
+            alias = CurrencyCodeRules.normalizeCurrencyCode(alias);
+        }
+        if (type == LowCodePackageDependencyType.EXCHANGE_RATE_TYPE) {
+            alias = CurrencyCodeRules.normalizeRateTypeCode(alias);
+        }
         if (applicationAlias != null) {
             PlatformNameRules.requireApplicationAlias(applicationAlias);
         }
@@ -48,12 +55,34 @@ public record LowCodePackageDependency(
         return measureUnit(MeasureUnitCategoryService.SHARED_APPLICATION_ALIAS, categoryAlias);
     }
 
+    public static LowCodePackageDependency currency(String currencyCode) {
+        return new LowCodePackageDependency(LowCodePackageDependencyType.CURRENCY,
+                null, null, currencyCode, true);
+    }
+
+    public static LowCodePackageDependency exchangeRateType(String rateTypeCode) {
+        return new LowCodePackageDependency(LowCodePackageDependencyType.EXCHANGE_RATE_TYPE,
+                null, null, rateTypeCode, true);
+    }
+
     private static String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static void validateAlias(LowCodePackageDependencyType type, String alias) {
         if (alias == null) {
+            return;
+        }
+        if (type == LowCodePackageDependencyType.CURRENCY) {
+            if (!CurrencyCodeRules.isCurrencyCode(alias)) {
+                throw new IllegalArgumentException("dependency currency code must be ISO 4217 alpha-3 code: " + alias);
+            }
+            return;
+        }
+        if (type == LowCodePackageDependencyType.EXCHANGE_RATE_TYPE) {
+            if (!CurrencyCodeRules.isRateTypeCode(alias)) {
+                throw new IllegalArgumentException("dependency exchange rate type must use upper snake code: " + alias);
+            }
             return;
         }
         if (type == LowCodePackageDependencyType.ACTION) {

@@ -1,13 +1,16 @@
 package net.ximatai.muyun.spring.platform.config;
 
+import net.ximatai.muyun.spring.platform.currency.CurrencyCodeRules;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
@@ -36,12 +39,16 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                 .map(FieldContract::fieldName)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Set<String> currencyDependencies = dependencies(modulePackage, LowCodePackageDependencyType.CURRENCY);
+        Set<String> rateTypeDependencies = dependencies(modulePackage, LowCodePackageDependencyType.EXCHANGE_RATE_TYPE);
         Map<String, String> fieldTypes = fields.stream()
                 .filter(field -> field.fieldName() != null)
                 .filter(field -> field.fieldType() != null)
                 .collect(Collectors.toMap(FieldContract::fieldName, FieldContract::fieldType, (left, right) -> left));
 
         List<LowCodeConfigHealthItem> items = new ArrayList<>();
+        Set<String> reportedCurrencyDependencies = new HashSet<>();
+        Set<String> reportedRateTypeDependencies = new HashSet<>();
         for (FieldContract field : fields) {
             if (!field.moneyConfigured()) {
                 continue;
@@ -71,6 +78,8 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                     "money baseCurrencyCode must be ISO 4217 alpha-3 code", targetId);
             requireBaseAmountField(items, field, fieldNames, fieldTypes, targetId);
             requireRateTypeCode(items, field.rateTypeCode(), targetId);
+            requireCurrencyDependencies(items, field, currencyDependencies, reportedCurrencyDependencies);
+            requireRateTypeDependency(items, field.rateTypeCode(), rateTypeDependencies, reportedRateTypeDependencies);
             requireOptionalRelatedField(items, field.rateDateFieldName(), fieldNames,
                     "MONEY_RATE_DATE_FIELD_MISSING", "money rate date field is missing", targetId);
             requireRelatedType(items, field.rateDateFieldName(), fieldTypes, DATE_TYPES,
@@ -83,6 +92,58 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                     "money exchange rate field must be numeric", targetId);
         }
         return List.copyOf(items);
+    }
+
+    private Set<String> dependencies(LowCodeModulePackage modulePackage, LowCodePackageDependencyType type) {
+        return modulePackage.dependencyManifest().dependencies().stream()
+                .filter(Objects::nonNull)
+                .filter(dependency -> dependency.type() == type)
+                .map(LowCodePackageDependency::alias)
+                .filter(Objects::nonNull)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+    }
+
+    private void requireCurrencyDependencies(List<LowCodeConfigHealthItem> items,
+                                             FieldContract field,
+                                             Set<String> dependencies,
+                                             Set<String> reportedDependencies) {
+        Set<String> requiredCodes = Stream.of(
+                        field.fixedCurrencyCode(),
+                        field.defaultCurrencyCode(),
+                        field.baseCurrencyCode()
+                )
+                .filter(Objects::nonNull)
+                .map(CurrencyCodeRules::normalizeCurrencyCode)
+                .filter(CurrencyCodeRules::isCurrencyCode)
+                .collect(Collectors.toSet());
+        for (String currencyCode : requiredCodes) {
+            if (!dependencies.contains(currencyCode) && reportedDependencies.add(currencyCode)) {
+                items.add(warn("MONEY_CURRENCY_DEPENDENCY_MISSING",
+                        "money currency is not declared in dependency manifest",
+                        "currency",
+                        currencyCode,
+                        "Declare CURRENCY dependency " + currencyCode + " for cross-environment migration"));
+            }
+        }
+    }
+
+    private void requireRateTypeDependency(List<LowCodeConfigHealthItem> items,
+                                           String rateTypeCode,
+                                           Set<String> dependencies,
+                                           Set<String> reportedDependencies) {
+        if (rateTypeCode == null) {
+            return;
+        }
+        String normalized = CurrencyCodeRules.normalizeRateTypeCode(rateTypeCode);
+        if (CurrencyCodeRules.isRateTypeCode(normalized) && !dependencies.contains(normalized)
+                && reportedDependencies.add(normalized)) {
+            items.add(warn("MONEY_RATE_TYPE_DEPENDENCY_MISSING",
+                    "money exchange rate type is not declared in dependency manifest",
+                    "exchangeRateType",
+                    normalized,
+                    "Declare EXCHANGE_RATE_TYPE dependency " + normalized + " for cross-environment migration"));
+        }
     }
 
     private void requireBaseAmountField(List<LowCodeConfigHealthItem> items,
@@ -168,7 +229,7 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                     targetId, "Set fixedCurrencyCode"));
             return;
         }
-        if (!value.toUpperCase().matches("[A-Z]{3}")) {
+        if (!CurrencyCodeRules.isCurrencyCode(value)) {
             items.add(error("MONEY_FIXED_CURRENCY_INVALID",
                     "money fixedCurrencyCode must be ISO 4217 alpha-3 code",
                     targetId, "Use ISO 4217 alpha-3 currency code"));
@@ -180,7 +241,7 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                                      String code,
                                      String message,
                                      String targetId) {
-        if (value != null && !value.toUpperCase().matches("[A-Z]{3}")) {
+        if (value != null && !CurrencyCodeRules.isCurrencyCode(value)) {
             items.add(error(code, message, targetId, "Use ISO 4217 alpha-3 currency code"));
         }
     }
@@ -191,7 +252,7 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                     "Set exchange rate type code"));
             return;
         }
-        if (!value.toUpperCase().matches("[A-Z][A-Z0-9_]{0,63}")) {
+        if (!CurrencyCodeRules.isRateTypeCode(value)) {
             items.add(error("MONEY_RATE_TYPE_INVALID", "money rateTypeCode must use upper snake code", targetId,
                     "Use upper snake exchange rate type code"));
         }
@@ -203,6 +264,21 @@ public class LowCodeMoneyHealthChecker implements LowCodeModuleHealthChecker {
                 code,
                 message,
                 "field",
+                targetId,
+                suggestion
+        );
+    }
+
+    private LowCodeConfigHealthItem warn(String code,
+                                         String message,
+                                         String targetType,
+                                         String targetId,
+                                         String suggestion) {
+        return LowCodeConfigHealthItem.warn(
+                LowCodeConfigHealthScope.DEPENDENCY,
+                code,
+                message,
+                targetType,
                 targetId,
                 suggestion
         );

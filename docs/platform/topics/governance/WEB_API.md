@@ -63,9 +63,13 @@
 | `MONEY_BASE_AMOUNT_MISSING` / `MONEY_BASE_AMOUNT_CONFLICT` / `MONEY_BASE_AMOUNT_NOT_NUMERIC` | `ERROR` | 基准金额影子字段缺失、冲突或类型不兼容 |
 | `MONEY_FIXED_CURRENCY_MISSING` / `MONEY_FIXED_CURRENCY_INVALID` | `ERROR` | 固定币种缺失或不是 ISO 4217 三位字母代码 |
 | `MONEY_DEFAULT_CURRENCY_INVALID` / `MONEY_BASE_CURRENCY_INVALID` | `ERROR` | 默认币种或基准币种不是 ISO 4217 三位字母代码 |
+| `MONEY_CURRENCY_DEPENDENCY_MISSING` | `WARN` | 金额字段引用了明确币种码，但 dependency manifest 未声明 `CURRENCY` 依赖 |
 | `MONEY_RATE_TYPE_MISSING` / `MONEY_RATE_TYPE_INVALID` | `ERROR` | 汇率类型缺失或不是平台代码格式 |
+| `MONEY_RATE_TYPE_DEPENDENCY_MISSING` | `WARN` | 金额字段引用了明确汇率类型，但 dependency manifest 未声明 `EXCHANGE_RATE_TYPE` 依赖 |
 | `MONEY_RATE_DATE_FIELD_MISSING` / `MONEY_RATE_DATE_FIELD_NOT_DATE` | `ERROR` | 汇率日期字段缺失或不是日期/时间类型 |
 | `MONEY_EXCHANGE_RATE_FIELD_MISSING` / `MONEY_EXCHANGE_RATE_FIELD_NOT_NUMERIC` | `ERROR` | 汇率影子字段缺失或不是数值类型 |
+
+金额字段如声明了 `fixedCurrencyCode`、`defaultCurrencyCode`、`baseCurrencyCode` 或 `rateTypeCode`，模块包应同步声明 `CURRENCY` 与 `EXCHANGE_RATE_TYPE` 依赖，便于跨环境迁移前确认目标环境已有对应平台事实。
 
 ## 模板复用
 

@@ -156,8 +156,8 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
         if (value == null || value.isBlank()) {
             throw new PlatformException("currencyCode must not be blank");
         }
-        String code = value.trim().toUpperCase();
-        if (!code.matches("[A-Z]{3}")) {
+        String code = CurrencyCodeRules.normalizeCurrencyCode(value);
+        if (!CurrencyCodeRules.isCurrencyCode(code)) {
             throw new PlatformException("currencyCode must be ISO 4217 alpha-3 code: " + value);
         }
         return code;

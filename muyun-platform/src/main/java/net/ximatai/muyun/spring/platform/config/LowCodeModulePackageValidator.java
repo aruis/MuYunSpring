@@ -90,6 +90,9 @@ public class LowCodeModulePackageValidator {
                     requireText(dependency.applicationAlias(), "MEASURE_UNIT dependency applicationAlias");
                     requireText(dependency.alias(), "MEASURE_UNIT dependency alias");
                 }
+                case CURRENCY -> requireText(dependency.alias(), "CURRENCY dependency currencyCode");
+                case EXCHANGE_RATE_TYPE -> requireText(dependency.alias(),
+                        "EXCHANGE_RATE_TYPE dependency rateTypeCode");
                 case WORKFLOW, FILE_SERVICE, EXTERNAL -> requireText(dependency.alias(), dependency.type() + " dependency alias");
                 default -> throw new IllegalArgumentException("unsupported dependency type: " + dependency.type());
             }

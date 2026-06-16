@@ -143,6 +143,8 @@ final class LowCodeConfigTestFixtures {
                         LowCodePackageDependencyType.MODULE,
                         LowCodePackageDependencyType.DICTIONARY,
                         LowCodePackageDependencyType.MEASURE_UNIT,
+                        LowCodePackageDependencyType.CURRENCY,
+                        LowCodePackageDependencyType.EXCHANGE_RATE_TYPE,
                         LowCodePackageDependencyType.ACTION,
                         LowCodePackageDependencyType.WORKFLOW,
                         LowCodePackageDependencyType.FILE_SERVICE,
@@ -174,6 +176,8 @@ final class LowCodeConfigTestFixtures {
             case MODULE -> "MODULE:" + dependency.moduleAlias();
             case DICTIONARY -> "DICTIONARY:" + dependency.applicationAlias() + ":" + dependency.alias();
             case MEASURE_UNIT -> "MEASURE_UNIT:" + dependency.applicationAlias() + ":" + dependency.alias();
+            case CURRENCY -> "CURRENCY:" + dependency.alias();
+            case EXCHANGE_RATE_TYPE -> "EXCHANGE_RATE_TYPE:" + dependency.alias();
             case ACTION -> "ACTION:" + dependency.moduleAlias() + ":" + dependency.alias();
             case WORKFLOW -> "WORKFLOW:" + dependency.alias();
             case FILE_SERVICE -> "FILE_SERVICE:" + dependency.alias();
