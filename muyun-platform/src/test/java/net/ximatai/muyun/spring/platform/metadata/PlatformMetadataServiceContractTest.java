@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
+import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -7,11 +9,14 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
@@ -19,22 +24,47 @@ import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
-import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.platform.currency.Currency;
+import net.ximatai.muyun.spring.platform.currency.CurrencyConversionService;
+import net.ximatai.muyun.spring.platform.currency.CurrencyService;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRate;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateService;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateType;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateTypeService;
+import net.ximatai.muyun.spring.platform.currency.MoneyDynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.platform.currency.TenantCurrencySettingService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.platform.publish.PlatformModuleDefinitionCompiler;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.lang.reflect.Method;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -44,12 +74,15 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class PlatformMetadataServiceContractTest {
     private final MemoryDao<PlatformModule> moduleDao = new MemoryDao<>();
@@ -1429,6 +1462,50 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistMoneyValuesThroughRuntimeEntityCompiledFromSavedMetadata() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField orderDate = field(metadataId, "orderDate", "order_date", FieldType.DATE);
+        fieldService.insert(orderDate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyDefaultCurrencyCode("USD");
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleField.setMoneyRateDateFieldId(orderDate.getId());
+        moduleFieldService.update(moduleField);
+
+        IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+        when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+        when(operations.getDefaultSchemaName()).thenReturn(MetadataService.DEFAULT_SCHEMA);
+        when(operations.insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order"), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn("order-1");
+        DynamicRecordService recordService = dynamicRecordService(
+                operations,
+                moduleDefinitionCompiler().compile("sales.order"),
+                moneyCoordinator()
+        );
+
+        DynamicRecord record = recordService.newRecord("sales.order", "order")
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+        recordService.create("sales.order", "order", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(operations).insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order"), body.capture(),
+                eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("amount", new BigDecimal("2"))
+                .containsEntry("amount_currency", "USD")
+                .containsEntry("order_date", LocalDate.of(2026, 2, 16));
+        assertThat((BigDecimal) body.getValue().get("amount_base")).isEqualByComparingTo("14.47");
+    }
+
+    @Test
     void shouldSaveMoneyConfigWithExplicitExchangeRateShadowField() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order"));
@@ -1726,6 +1803,91 @@ class PlatformMetadataServiceContractTest {
         category.setCategoryKind(kind);
         category.setTitle(alias);
         return category;
+    }
+
+    private Currency currency(String code, String numericCode, String title, String symbol, int scale) {
+        Currency currency = new Currency();
+        currency.setCode(code);
+        currency.setNumericCode(numericCode);
+        currency.setTitle(title);
+        currency.setSymbol(symbol);
+        currency.setDecimalScale(scale);
+        return currency;
+    }
+
+    private ExchangeRateType exchangeRateType(String code, String title) {
+        ExchangeRateType rateType = new ExchangeRateType();
+        rateType.setCode(code);
+        rateType.setTitle(title);
+        return rateType;
+    }
+
+    private ExchangeRate exchangeRate(String from, String to, String type, String effectiveDate, String rateValue) {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setFromCurrencyCode(from);
+        rate.setToCurrencyCode(to);
+        rate.setRateTypeCode(type);
+        rate.setEffectiveDate(LocalDate.parse(effectiveDate));
+        rate.setRate(new BigDecimal(rateValue));
+        rate.setTitle(from + "/" + to + " " + type);
+        return rate;
+    }
+
+    private MoneyDynamicRecordMutationCoordinator moneyCoordinator() {
+        CurrencyService currencyService = new CurrencyService(new MemoryDao<>());
+        ExchangeRateTypeService rateTypeService = new ExchangeRateTypeService(new MemoryDao<>());
+        ExchangeRateService rateService = new ExchangeRateService(new MemoryDao<>(), currencyService, rateTypeService);
+        TenantCurrencySettingService tenantCurrencySettingService =
+                new TenantCurrencySettingService(new MemoryDao<>(), currencyService);
+        currencyService.insert(currency("USD", "840", "US Dollar", "$", 2));
+        currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
+        rateTypeService.insert(exchangeRateType("SPOT", "Spot"));
+        rateService.insert(exchangeRate("USD", "CNY", "SPOT", "2026-02-01", "7.2345"));
+        return new MoneyDynamicRecordMutationCoordinator(
+                new CurrencyConversionService(currencyService, rateService),
+                tenantCurrencySettingService,
+                Clock.fixed(Instant.parse("2026-06-16T00:00:00Z"), ZoneOffset.UTC)
+        );
+    }
+
+    private PlatformModuleDefinitionCompiler moduleDefinitionCompiler() {
+        PlatformModuleActionService actionService =
+                new PlatformModuleActionService(new MemoryDao<PlatformModuleAction>(), moduleService);
+        ModuleMetadataFormulaRuleService formulaRuleService =
+                new ModuleMetadataFormulaRuleService(new MemoryDao<>(), relationService, fieldService);
+        return new PlatformModuleDefinitionCompiler(
+                moduleService,
+                metadataService,
+                fieldService,
+                fieldDefinitionCompiler,
+                referenceConfigService,
+                relationService,
+                viewService,
+                viewFieldService,
+                actionService,
+                formulaRuleService,
+                moduleFieldService,
+                moduleFieldFilterService,
+                moduleFieldAffectService,
+                new ModuleDefinitionValidator()
+        );
+    }
+
+    private DynamicRecordService dynamicRecordService(IDatabaseOperations<Object> operations,
+                                                      ModuleDefinition definition,
+                                                      MoneyDynamicRecordMutationCoordinator mutationCoordinator) {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                null
+        ).register(definition);
+        return new DynamicRecordService(
+                runtime,
+                new AllowAllActionExecutionPolicyService(),
+                new AllowAllDataScopeCriteriaService(),
+                mutationCoordinator
+        );
     }
 
     private PlatformModule module(String alias, String applicationAlias, ModuleKind kind) {
