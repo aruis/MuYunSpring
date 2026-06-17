@@ -61,8 +61,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.HandlerMapping;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -217,6 +222,24 @@ class PlatformConfigurationWebControllerTest {
         assertThatThrownBy(() -> controller.ensure(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong to module");
+    }
+
+    @Test
+    void shouldNotExposeFieldCapabilityPrepareEndpoints() {
+        List<String> paths = Stream.concat(
+                        Stream.of(PlatformModuleMetadataFieldWebController.class.getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class))
+                                .filter(Objects::nonNull)
+                                .flatMap(this::mappingValues),
+                        Stream.of(PlatformModuleMetadataFieldWebController.class.getMethods())
+                                .flatMap(this::mappingValues)
+                )
+                .toList();
+
+        assertThat(paths)
+                .noneMatch(path -> path.contains("measure-unit/prepare")
+                        || path.contains("money/prepare")
+                        || path.contains("/capabilities/")
+                        || path.contains("{capability}"));
     }
 
     @Test
@@ -1057,5 +1080,30 @@ class PlatformConfigurationWebControllerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, variables);
         return request;
+    }
+
+    private Stream<String> mappingValues(Method method) {
+        return Stream.of(
+                        method.getAnnotation(org.springframework.web.bind.annotation.GetMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.PostMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.PutMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.DeleteMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class)
+                )
+                .filter(Objects::nonNull)
+                .flatMap(this::mappingValues);
+    }
+
+    private Stream<String> mappingValues(Annotation annotation) {
+        return Stream.concat(annotationStringArray(annotation, "value"), annotationStringArray(annotation, "path"));
+    }
+
+    private Stream<String> annotationStringArray(Annotation annotation, String methodName) {
+        try {
+            Method method = annotation.annotationType().getMethod(methodName);
+            return Arrays.stream((String[]) method.invoke(annotation));
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Unable to read mapping annotation " + methodName, ex);
+        }
     }
 }

@@ -35,6 +35,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.currency.Currency;
@@ -49,6 +50,15 @@ import net.ximatai.muyun.spring.platform.currency.TenantCurrencySettingService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.measure.MeasureDimension;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnit;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversionService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategory;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRuleService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitDynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -1400,6 +1410,46 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistMeasureUnitValuesThroughRuntimeEntityCompiledFromSavedMetadata() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitConversionMode(FieldMeasureUnitConversionMode.LINEAR);
+        moduleField.setUnitRequired(true);
+        moduleFieldService.update(moduleField);
+
+        IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+        when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+        when(operations.getDefaultSchemaName()).thenReturn(MetadataService.DEFAULT_SCHEMA);
+        when(operations.insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order_line"), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn("line-1");
+        DynamicRecordService recordService = dynamicRecordService(
+                operations,
+                moduleDefinitionCompiler().compile("sales.order"),
+                measureUnitCoordinator()
+        );
+
+        DynamicRecord record = recordService.newRecord("sales.order", "order_line")
+                .setValue("quantity", new BigDecimal("2"));
+        recordService.create("sales.order", "order_line", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(operations).insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order_line"), body.capture(),
+                eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("quantity", new BigDecimal("2"))
+                .containsEntry("quantity_unit", "box");
+        assertThat((BigDecimal) body.getValue().get("quantity_base")).isEqualByComparingTo("24");
+    }
+
+    @Test
     void shouldSaveMoneyConfigAndEnsureCompanionAndShadowFields() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order"));
@@ -1850,6 +1900,46 @@ class PlatformMetadataServiceContractTest {
         );
     }
 
+    private MeasureUnitDynamicRecordMutationCoordinator measureUnitCoordinator() {
+        MeasureUnitCategoryService categoryService = new MeasureUnitCategoryService(new MemoryDao<>());
+        MeasureUnitService unitService = new MeasureUnitService(new MemoryDao<>(), categoryService);
+        MeasureUnitConversionRuleService ruleService = new MeasureUnitConversionRuleService(new MemoryDao<>(), unitService);
+        categoryService.insert(measureUnitCategory("sales", "package", MeasureDimension.COUNT, "bottle"));
+        unitService.insert(measureUnit("sales", "package", "bottle", BigDecimal.ONE));
+        unitService.insert(measureUnit("sales", "package", "box", new BigDecimal("12")));
+        return new MeasureUnitDynamicRecordMutationCoordinator(
+                new MeasureUnitConversionService(categoryService, unitService),
+                new MeasureUnitBusinessConversionService(unitService, ruleService),
+                Clock.fixed(Instant.parse("2026-06-16T00:00:00Z"), ZoneOffset.UTC)
+        );
+    }
+
+    private MeasureUnitCategory measureUnitCategory(String applicationAlias,
+                                                    String alias,
+                                                    MeasureDimension dimension,
+                                                    String baseUnitCode) {
+        MeasureUnitCategory category = new MeasureUnitCategory();
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setDimension(dimension);
+        category.setBaseUnitCode(baseUnitCode);
+        category.setTitle(alias);
+        return category;
+    }
+
+    private MeasureUnit measureUnit(String applicationAlias,
+                                    String categoryAlias,
+                                    String code,
+                                    BigDecimal factorToBase) {
+        MeasureUnit unit = new MeasureUnit();
+        unit.setApplicationAlias(applicationAlias);
+        unit.setCategoryAlias(categoryAlias);
+        unit.setCode(code);
+        unit.setTitle(code);
+        unit.setFactorToBase(factorToBase);
+        return unit;
+    }
+
     private PlatformModuleDefinitionCompiler moduleDefinitionCompiler() {
         PlatformModuleActionService actionService =
                 new PlatformModuleActionService(new MemoryDao<PlatformModuleAction>(), moduleService);
@@ -1876,6 +1966,19 @@ class PlatformMetadataServiceContractTest {
     private DynamicRecordService dynamicRecordService(IDatabaseOperations<Object> operations,
                                                       ModuleDefinition definition,
                                                       MoneyDynamicRecordMutationCoordinator mutationCoordinator) {
+        return dynamicRecordService(operations, definition, (DynamicRecordMutationCoordinator) mutationCoordinator);
+    }
+
+    private DynamicRecordService dynamicRecordService(IDatabaseOperations<Object> operations,
+                                                      ModuleDefinition definition,
+                                                      MeasureUnitDynamicRecordMutationCoordinator mutationCoordinator) {
+        return dynamicRecordService(operations, definition, (DynamicRecordMutationCoordinator) mutationCoordinator);
+    }
+
+    private DynamicRecordService dynamicRecordService(
+            IDatabaseOperations<Object> operations,
+            ModuleDefinition definition,
+            DynamicRecordMutationCoordinator mutationCoordinator) {
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(
                 operations,
                 new DynamicModuleRegistry(),
