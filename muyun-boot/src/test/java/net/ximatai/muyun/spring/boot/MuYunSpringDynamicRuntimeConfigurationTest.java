@@ -8,6 +8,9 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
@@ -26,9 +29,14 @@ import org.springframework.core.annotation.Order;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -204,6 +212,44 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
 
                     verify(transactionManager).getTransaction(any());
                     verify(transactionManager).rollback(any());
+                });
+    }
+
+    @Test
+    void shouldConfigurePlatformTimeServiceDefaultZone() {
+        contextRunner
+                .withBean(Clock.class, () -> Clock.fixed(Instant.parse("2026-06-17T00:00:00Z"), ZoneOffset.UTC))
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .run(context -> {
+                    PlatformTimeService timeService = context.getBean(PlatformTimeService.class);
+
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.empty()))
+                            .isEqualTo(ZoneId.of("Asia/Shanghai"));
+                });
+    }
+
+    @Test
+    void shouldRejectInvalidPlatformDefaultZone() {
+        contextRunner
+                .withPropertyValues("muyun.platform.time.default-zone-id=+08:00")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void shouldPreferBusinessTimeZoneResolverBeforeConfiguredDefaultZone() {
+        contextRunner
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .withBean("newYorkResolver", BusinessTimeZoneResolver.class,
+                        () -> context -> "org-new-york".equals(context.organizationId())
+                                ? Optional.of(ZoneId.of("America/New_York"))
+                                : Optional.empty())
+                .run(context -> {
+                    PlatformTimeService timeService = context.getBean(PlatformTimeService.class);
+
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.ofOrganization("org-new-york")))
+                            .isEqualTo(ZoneId.of("America/New_York"));
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.ofOrganization("org-shanghai")))
+                            .isEqualTo(ZoneId.of("Asia/Shanghai"));
                 });
     }
 

@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicySer
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
@@ -29,14 +30,17 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.ZoneId;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(MuYunSpringPlatformTimeProperties.class)
 public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
     @ConditionalOnBean(DictionaryItemService.class)
@@ -53,8 +57,24 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    PlatformTimeService platformTimeService(ObjectProvider<Clock> clockProvider) {
-        return new PlatformTimeService(clockProvider == null ? null : clockProvider.getIfAvailable());
+    PlatformTimeService platformTimeService(ObjectProvider<Clock> clockProvider,
+                                            ObjectProvider<BusinessTimeZoneResolver> zoneResolvers,
+                                            MuYunSpringPlatformTimeProperties timeProperties) {
+        Clock clock = clockProvider == null ? null : clockProvider.getIfAvailable();
+        ZoneId defaultZoneId = defaultZoneId(timeProperties);
+        return new PlatformTimeService(
+                clock,
+                defaultZoneId,
+                zoneResolvers == null ? null : zoneResolvers.orderedStream().toList()
+        );
+    }
+
+    private ZoneId defaultZoneId(MuYunSpringPlatformTimeProperties timeProperties) {
+        String configured = timeProperties == null ? null : timeProperties.getDefaultZoneId();
+        if (configured == null || configured.isBlank()) {
+            return null;
+        }
+        return PlatformTimeService.requireIanaZoneId(configured);
     }
 
     @Bean

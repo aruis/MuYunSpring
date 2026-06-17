@@ -72,6 +72,8 @@ OpenAPI 链路以 descriptor 为输入，输出基础文档模型，用于联调
 
 `ZONED_TIMESTAMP` 当前契约是 `instant + timeZone`，用于保留业务时区来源并支撑后续展示、导入导出和查询口径。一期不额外保存原始 `LocalDateTime`；周期性本地时间、工作日历、营业时间和跨时区调度属于后续业务时间能力。
 
+平台业务时间服务的默认时区由 `muyun.platform.time.default-zone-id` 配置，必须是 IANA `ZoneId`，例如 `Asia/Shanghai`。运行态解析顺序是显式上下文时区、业务时区 resolver、平台默认时区；未配置平台默认时区时才回落到 `Clock`/JVM 默认时区。
+
 ## 边界说明
 
 1. 动态运行态只执行当前运行态快照，不负责配置态编辑、版本归档、指针切换和迁移治理。
