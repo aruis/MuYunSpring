@@ -4,6 +4,9 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -109,6 +112,23 @@ class LowCodeModuleConfigArchiveFacadeTest {
                 .hasMessageContaining("packageHash cannot be changed");
     }
 
+    @Test
+    void governanceArchiveShouldNotDependOnDynamicRuntimeRefresh() throws IOException {
+        Path configSourceRoot = Path.of("src/main/java/net/ximatai/muyun/spring/platform/config");
+
+        try (var files = Files.walk(configSourceRoot)) {
+            assertThat(files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> source(path).contains("platform.runtime")
+                            || source(path).contains("DynamicModuleRefresh")
+                            || source(path).contains("DynamicModuleRuntimeRefresher"))
+                    .map(configSourceRoot::relativize)
+                    .map(Path::toString)
+                    .toList())
+                    .isEmpty();
+        }
+    }
+
     private LowCodeModuleConfigVersion rawVersion(String moduleAlias, int versionNo) {
         LowCodeModuleConfigVersion version = new LowCodeModuleConfigVersion();
         version.setModuleAlias(moduleAlias);
@@ -141,5 +161,13 @@ class LowCodeModuleConfigArchiveFacadeTest {
         copy.setArchivedAt(source.getArchivedAt());
         copy.setRemark(source.getRemark());
         return copy;
+    }
+
+    private String source(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException("cannot read source: " + path, exception);
+        }
     }
 }
