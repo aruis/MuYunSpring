@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.descriptor;
 
+import net.ximatai.muyun.spring.dynamic.metadata.FieldTemporalSemantics;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.List;
 public record DynamicViewFieldDescriptor(
         String fieldName,
         String title,
+        FieldTemporalSemantics temporalSemantics,
         boolean visible,
         ViewControlType controlType,
         String fieldUiTypeAlias,
@@ -15,6 +17,7 @@ public record DynamicViewFieldDescriptor(
         boolean required
 ) {
     public DynamicViewFieldDescriptor {
+        temporalSemantics = temporalSemantics == null ? FieldTemporalSemantics.NONE : temporalSemantics;
         companions = companions == null ? List.of() : List.copyOf(companions);
     }
 }

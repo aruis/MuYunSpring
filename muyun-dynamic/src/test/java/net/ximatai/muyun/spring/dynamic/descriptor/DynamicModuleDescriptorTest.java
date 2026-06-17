@@ -22,6 +22,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldTemporalSemantics;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
@@ -47,6 +48,7 @@ class DynamicModuleDescriptorTest {
         DynamicEntityDescriptor entity = DynamicModuleDescriptor.from(module).entities().getFirst();
 
         assertThat(entity.fields().getFirst().fieldName()).isEqualTo("meetingAt");
+        assertThat(entity.fields().getFirst().temporalSemantics()).isEqualTo(FieldTemporalSemantics.ZONED_INSTANT);
         assertThat(entity.fields().getFirst().companions())
                 .containsExactly(new DynamicFieldCompanionDescriptor(
                         "meetingAtTimeZone",
@@ -56,6 +58,8 @@ class DynamicModuleDescriptorTest {
                         true
                 ));
         assertThat(entity.fields().get(1).companions()).isEmpty();
+        assertThat(entity.views().getFirst().fields().getFirst().temporalSemantics())
+                .isEqualTo(FieldTemporalSemantics.ZONED_INSTANT);
         assertThat(entity.views().getFirst().fields().getFirst().companions())
                 .containsExactly(new DynamicFieldCompanionDescriptor(
                         "meetingAtTimeZone",

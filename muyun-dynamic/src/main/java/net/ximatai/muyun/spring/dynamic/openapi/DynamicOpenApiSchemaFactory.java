@@ -169,6 +169,7 @@ final class DynamicOpenApiSchemaFactory {
                 reference == null ? null : reference.targetModuleAlias(),
                 reference == null ? null : reference.targetEntityAlias(),
                 null,
+                field.temporalSemantics().name(),
                 field.companions().stream()
                         .map(companion -> companion.fieldName())
                         .toList()
@@ -254,6 +255,7 @@ final class DynamicOpenApiSchemaFactory {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("fieldName", stringProperty(false));
         properties.put("type", stringProperty(false));
+        properties.put("temporalSemantics", stringProperty(false));
         properties.put("title", stringProperty(false));
         properties.put("required", booleanProperty(false));
         properties.put("unique", booleanProperty(false));
@@ -490,6 +492,7 @@ final class DynamicOpenApiSchemaFactory {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
         properties.put("fieldName", stringProperty(false));
         properties.put("title", stringProperty(false));
+        properties.put("temporalSemantics", stringProperty(false));
         properties.put("visible", booleanProperty(false));
         properties.put("controlType", stringProperty(false));
         properties.put("companions", arrayProperty("DynamicFieldCompanionDescriptor"));
@@ -554,6 +557,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("referenceModuleAlias", stringProperty(true));
         properties.put("referenceEntityAlias", stringProperty(true));
         properties.put("itemType", stringProperty(true));
+        properties.put("temporalSemantics", stringProperty(true));
         properties.put("companionFields", arrayProperty("string"));
         return new DynamicOpenApiDocument.Schema("DynamicOpenApiProperty", "object", null,
                 List.of("type"), properties, null);

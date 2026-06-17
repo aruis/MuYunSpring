@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldTemporalSemantics;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.List;
 public record DynamicFieldDescriptor(
         String fieldName,
         FieldType type,
+        FieldTemporalSemantics temporalSemantics,
         String title,
         boolean required,
         boolean unique,
@@ -36,6 +38,9 @@ public record DynamicFieldDescriptor(
         FieldMeasureUnitDefinition measureUnit
 ) {
     public DynamicFieldDescriptor {
+        temporalSemantics = temporalSemantics == null
+                ? (type == null ? FieldTemporalSemantics.NONE : type.temporalSemantics())
+                : temporalSemantics;
         companions = companions == null ? List.of() : List.copyOf(companions);
     }
 
@@ -43,6 +48,7 @@ public record DynamicFieldDescriptor(
         return new DynamicFieldDescriptor(
                 field.fieldName(),
                 field.type(),
+                field.type().temporalSemantics(),
                 field.name(),
                 field.isRequired(),
                 field.isUnique(),
@@ -73,6 +79,7 @@ public record DynamicFieldDescriptor(
         return new DynamicFieldDescriptor(
                 descriptor.fieldName(),
                 descriptor.type(),
+                descriptor.temporalSemantics(),
                 descriptor.title(),
                 descriptor.required(),
                 descriptor.unique(),

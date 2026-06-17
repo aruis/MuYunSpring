@@ -71,10 +71,26 @@ public record DynamicOpenApiDocument(
             String referenceModuleAlias,
             String referenceEntityAlias,
             String itemType,
+            String temporalSemantics,
             List<String> companionFields
     ) {
         public Property {
             companionFields = companionFields == null ? List.of() : List.copyOf(companionFields);
+        }
+
+        public Property(String type,
+                        String format,
+                        boolean required,
+                        boolean nullable,
+                        boolean multiple,
+                        String optionSourceType,
+                        String optionSource,
+                        String referenceModuleAlias,
+                        String referenceEntityAlias,
+                        String itemType,
+                        List<String> companionFields) {
+            this(type, format, required, nullable, multiple, optionSourceType, optionSource,
+                    referenceModuleAlias, referenceEntityAlias, itemType, null, companionFields);
         }
     }
 
