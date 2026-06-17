@@ -11,7 +11,9 @@ import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicySer
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
@@ -75,6 +77,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
             return null;
         }
         return PlatformTimeService.requireIanaZoneId(configured);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    BusinessCalendarService businessCalendarService(PlatformTimeService platformTimeService) {
+        return new NaturalBusinessCalendarService(platformTimeService);
     }
 
     @Bean

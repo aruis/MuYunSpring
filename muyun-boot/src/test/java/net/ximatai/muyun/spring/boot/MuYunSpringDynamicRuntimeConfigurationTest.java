@@ -8,8 +8,10 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
@@ -251,6 +253,15 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                     assertThat(timeService.resolveZoneId(BusinessTimeContext.ofOrganization("org-shanghai")))
                             .isEqualTo(ZoneId.of("Asia/Shanghai"));
                 });
+    }
+
+    @Test
+    void shouldConfigureNaturalBusinessCalendarServiceByDefault() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(BusinessCalendarService.class);
+            assertThat(context.getBean(BusinessCalendarService.class))
+                    .isInstanceOf(NaturalBusinessCalendarService.class);
+        });
     }
 
     private RuntimeEvent event() {
