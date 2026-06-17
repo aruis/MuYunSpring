@@ -99,8 +99,8 @@ public class DynamicRecordRuntime implements AutoCloseable {
         return this;
     }
 
-    public DynamicRecordRuntime publish(ModuleDefinition module) {
-        registry.publish(module);
+    public DynamicRecordRuntime refresh(ModuleDefinition module) {
+        registry.refresh(module);
         return this;
     }
 

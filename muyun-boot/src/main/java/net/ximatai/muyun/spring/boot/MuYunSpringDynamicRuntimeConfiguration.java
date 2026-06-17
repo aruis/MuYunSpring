@@ -15,7 +15,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -113,8 +113,8 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    DynamicModulePublisher dynamicModulePublisher(DynamicSchemaService schemaService,
+    DynamicModuleRuntimeRefresher dynamicModuleRuntimeRefresher(DynamicSchemaService schemaService,
                                                   DynamicRecordRuntime runtime) {
-        return new DynamicModulePublisher(schemaService, runtime);
+        return new DynamicModuleRuntimeRefresher(schemaService, runtime);
     }
 }

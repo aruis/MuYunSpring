@@ -29,7 +29,7 @@ MuYunSpring 是一个基于 Java 21 和 Spring Boot 的企业应用平台底座�
 ```text
 muyun-common    通用基础设施、异常、上下文和公共工具
 muyun-ability   平台能力接口、默认实现、生命周期和数据访问契约
-muyun-dynamic   动态元数据、动态记录运行态和动态模块发布
+muyun-dynamic   动态元数据、动态记录运行态和动态运行态刷新
 muyun-platform  平台配置、页面交付、自动化、工作流和治理能力
 muyun-iam       租户、组织、用户、角色、权限和身份上下文
 muyun-boot      Spring Boot 启动与装配入口

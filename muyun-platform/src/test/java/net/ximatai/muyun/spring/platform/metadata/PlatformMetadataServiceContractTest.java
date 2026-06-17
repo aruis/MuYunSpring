@@ -64,8 +64,8 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshCoordinator;
-import net.ximatai.muyun.spring.platform.publish.PlatformModuleDefinitionCompiler;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.platform.runtime.PlatformModuleDefinitionCompiler;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 

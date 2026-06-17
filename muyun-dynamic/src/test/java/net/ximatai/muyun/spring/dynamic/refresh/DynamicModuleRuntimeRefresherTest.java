@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.publish;
+package net.ximatai.muyun.spring.dynamic.refresh;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
@@ -30,14 +30,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class DynamicModulePublisherTest {
+class DynamicModuleRuntimeRefresherTest {
     @Test
     void shouldEnsureSchemaThenRegisterRuntimeModule() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.publish(contractModule());
+        DynamicModuleRefreshResult result = refresher.refresh(contractModule());
 
         assertThat(result.changed()).isTrue();
         assertThat(result.migrations()).containsKey("contract");
@@ -47,21 +47,21 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldPublishModuleEventAfterRuntimePublication() {
+    void shouldEmitModuleRefreshEventAfterRuntimeRefresh() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
         DynamicRecordRuntime runtime = runtime(events);
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        publisher.publish(contractModule());
+        refresher.refresh(contractModule());
 
         assertThat(events.events()).hasSize(1);
         RuntimeEvent event = events.events().getFirst();
-        assertThat(event.eventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
+        assertThat(event.eventType()).isEqualTo(RuntimeEventType.MODULE_REFRESHED);
         assertThat(event.moduleAlias()).isEqualTo("sales.contract");
         assertThat(event.entityAlias()).isNull();
         assertThat(event.systemContext()).isTrue();
-        assertThat(event.systemReason()).isEqualTo("dynamic module publication");
+        assertThat(event.systemReason()).isEqualTo("dynamic module refresh");
         assertThat(event.mutationSource()).isEqualTo(RuntimeMutationSource.SYSTEM);
         assertThat(event.payload()).containsEntry("changed", Boolean.TRUE)
                 .containsEntry("nonAdditiveChanges", Boolean.FALSE);
@@ -76,24 +76,24 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldNotPublishModuleEventForPreview() {
+    void shouldNotEmitModuleRefreshEventForPreview() {
         RecordingSchemaService schemaService = new RecordingSchemaService(true);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime(events));
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime(events));
 
-        publisher.preview(contractModule());
+        refresher.previewRefresh(contractModule());
 
         assertThat(events.events()).isEmpty();
     }
 
     @Test
-    void shouldKeepSystemContextOnModulePublicationEvent() {
+    void shouldKeepSystemContextOnModuleRefreshEvent() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         CollectingRuntimeEventPublisher events = new CollectingRuntimeEventPublisher();
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime(events));
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime(events));
 
         try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
-            publisher.publish(contractModule());
+            refresher.refresh(contractModule());
         }
 
         assertThat(events.events()).singleElement()
@@ -104,12 +104,12 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldNotRegisterDryRunPublication() {
+    void shouldNotRefreshRegistryForDryRun() {
         RecordingSchemaService schemaService = new RecordingSchemaService(true);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.preview(contractModule());
+        DynamicModuleRefreshResult result = refresher.previewRefresh(contractModule());
 
         assertThat(result.dryRun()).isTrue();
         assertThat(result.migrations().get("contract").isDryRun()).isTrue();
@@ -119,13 +119,13 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldKeepExistingRuntimeDefinitionWhenDryRunPublishingEvolution() {
+    void shouldKeepExistingRuntimeDefinitionWhenPreviewRefreshingEvolution() {
         RecordingSchemaService schemaService = new RecordingSchemaService(true);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
                 .register(contractModule());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.preview(evolvedContractModule());
+        DynamicModuleRefreshResult result = refresher.previewRefresh(evolvedContractModule());
 
         assertThat(result.dryRun()).isTrue();
         assertThat(result.migrations().get("contract").isDryRun()).isTrue();
@@ -140,9 +140,9 @@ class DynamicModulePublisherTest {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
                 .register(contractModule());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        publisher.publish(evolvedContractModule());
+        refresher.refresh(evolvedContractModule());
 
         assertThat(schemaService.ensuredEntities).containsExactly("contract");
         assertThat(schemaService.previousModules.get("sales.contract")).isEqualTo(contractModule());
@@ -156,9 +156,9 @@ class DynamicModulePublisherTest {
         FailingSchemaService schemaService = new FailingSchemaService();
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations())
                 .register(contractModule());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        assertThatThrownBy(() -> publisher.publish(evolvedContractModule()))
+        assertThatThrownBy(() -> refresher.refresh(evolvedContractModule()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("schema failed");
         assertThat(runtime.registry().requireEntity("sales.contract", "contract").fields())
@@ -167,12 +167,12 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldExposePublishResultSummaryWithoutTraversingMigrations() {
+    void shouldExposeRefreshResultSummaryWithoutTraversingMigrations() {
         RecordingSchemaService schemaService = new RecordingSchemaService(true, true);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.preview(contractModule());
+        DynamicModuleRefreshResult result = refresher.previewRefresh(contractModule());
 
         assertThat(result.changed()).isTrue();
         assertThat(result.dryRun()).isTrue();
@@ -191,9 +191,9 @@ class DynamicModulePublisherTest {
     void shouldKeepPreviewSideEffectFreeEvenWhenSchemaReturnsNoMigrations() {
         EmptySchemaService schemaService = new EmptySchemaService();
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.preview(emptyModule());
+        DynamicModuleRefreshResult result = refresher.previewRefresh(emptyModule());
 
         assertThat(result.dryRun()).isTrue();
         assertThat(result.changed()).isFalse();
@@ -205,7 +205,7 @@ class DynamicModulePublisherTest {
     void shouldValidateBeforeRegisteringModule() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
         ModuleDefinition invalid = new ModuleDefinition(
                 "sales.contract",
                 "Contract",
@@ -215,7 +215,7 @@ class DynamicModulePublisherTest {
                 )
         );
 
-        assertThatThrownBy(() -> publisher.publish(invalid))
+        assertThatThrownBy(() -> refresher.refresh(invalid))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("duplicate table name");
         assertThat(schemaService.ensuredEntities).isEmpty();
@@ -223,12 +223,12 @@ class DynamicModulePublisherTest {
     }
 
     @Test
-    void shouldRegisterFirstPublicationThroughPublisher() {
+    void shouldRegisterFirstRefreshThroughRefresher() {
         RecordingSchemaService schemaService = new RecordingSchemaService(false);
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        publisher.publish(contractModule());
+        refresher.refresh(contractModule());
 
         assertThat(runtime.registry().findModule("sales.contract")).isPresent();
         assertThat(schemaService.ensuredEntities).containsExactly("contract");

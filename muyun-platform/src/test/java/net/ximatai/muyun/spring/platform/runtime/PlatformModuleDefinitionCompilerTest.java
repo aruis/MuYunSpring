@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.publish;
+package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.spring.ability.reference.ReferenceCardinality;
 import net.ximatai.muyun.spring.common.exception.PlatformException;

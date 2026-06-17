@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.publish;
+package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -189,10 +189,10 @@ public class PlatformModuleDefinitionCompiler {
     private PlatformModule requireDynamicModule(String moduleAlias) {
         PlatformModule module = moduleService.select(moduleAlias);
         if (module == null) {
-            throw new PlatformException("Dynamic publish requires existing module: " + moduleAlias);
+            throw new PlatformException("Dynamic runtime refresh requires existing module: " + moduleAlias);
         }
         if (module.getModuleKind() != ModuleKind.DYNAMIC) {
-            throw new PlatformException("Dynamic publish requires DYNAMIC module: " + moduleAlias);
+            throw new PlatformException("Dynamic runtime refresh requires DYNAMIC module: " + moduleAlias);
         }
         return module;
     }

@@ -19,10 +19,10 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -134,14 +134,14 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
     @PostMapping("/{moduleAlias}/runtime/refresh")
     @CustomActionEndpoint(value = "refreshDynamicRuntime", title = "刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public DynamicModulePublishResult refreshRuntime(@PathVariable String moduleAlias) {
+    public DynamicModuleRefreshResult refreshRuntime(@PathVariable String moduleAlias) {
         return webScope(() -> runtimeRefreshService.refresh(moduleAlias));
     }
 
     @PostMapping("/{moduleAlias}/runtime/preview-refresh")
     @CustomActionEndpoint(value = "previewRefreshDynamicRuntime", title = "预览刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
-    public DynamicModulePublishResult previewRefreshRuntime(@PathVariable String moduleAlias) {
+    public DynamicModuleRefreshResult previewRefreshRuntime(@PathVariable String moduleAlias) {
         return webScope(() -> runtimeRefreshService.previewRefresh(moduleAlias));
     }
 

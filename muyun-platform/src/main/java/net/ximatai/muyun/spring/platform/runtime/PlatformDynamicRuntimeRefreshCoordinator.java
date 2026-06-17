@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.publish;
+package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
@@ -7,7 +7,7 @@ import net.ximatai.muyun.spring.ability.TransactionScopeSupport;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
@@ -70,53 +70,53 @@ public class PlatformDynamicRuntimeRefreshCoordinator {
         this(refreshService, provider(relationService), provider(moduleFieldService), provider(viewService));
     }
 
-    public List<DynamicModulePublishResult> refreshModule(String moduleAlias) {
+    public List<DynamicModuleRefreshResult> refreshModule(String moduleAlias) {
         return refreshModules(List.of(PlatformNameRules.requireModuleAlias(moduleAlias)));
     }
 
-    public List<DynamicModulePublishResult> refreshByRelation(ModuleMetadataRelation relation) {
+    public List<DynamicModuleRefreshResult> refreshByRelation(ModuleMetadataRelation relation) {
         if (relation == null) {
             return List.of();
         }
         return refreshModule(relation.getModuleAlias());
     }
 
-    public List<DynamicModulePublishResult> refreshByModuleField(ModuleMetadataField moduleField) {
+    public List<DynamicModuleRefreshResult> refreshByModuleField(ModuleMetadataField moduleField) {
         if (moduleField == null) {
             return List.of();
         }
         return refreshByRelationId(moduleField.getRelationId());
     }
 
-    public List<DynamicModulePublishResult> refreshByFieldFilter(ModuleMetadataFieldFilter filter) {
+    public List<DynamicModuleRefreshResult> refreshByFieldFilter(ModuleMetadataFieldFilter filter) {
         if (filter == null) {
             return List.of();
         }
         return refreshByModuleFieldId(filter.getModuleMetadataFieldId());
     }
 
-    public List<DynamicModulePublishResult> refreshByFieldAffect(ModuleMetadataFieldAffect affect) {
+    public List<DynamicModuleRefreshResult> refreshByFieldAffect(ModuleMetadataFieldAffect affect) {
         if (affect == null) {
             return List.of();
         }
         return refreshByModuleFieldId(affect.getModuleMetadataFieldId());
     }
 
-    public List<DynamicModulePublishResult> refreshByFormulaRule(ModuleMetadataFormulaRule rule) {
+    public List<DynamicModuleRefreshResult> refreshByFormulaRule(ModuleMetadataFormulaRule rule) {
         if (rule == null) {
             return List.of();
         }
         return refreshByRelationId(rule.getRelationId());
     }
 
-    public List<DynamicModulePublishResult> refreshByMetadataView(MetadataView view) {
+    public List<DynamicModuleRefreshResult> refreshByMetadataView(MetadataView view) {
         if (view == null) {
             return List.of();
         }
         return refreshByRelationId(view.getRelationId());
     }
 
-    public List<DynamicModulePublishResult> refreshByMetadataViewField(MetadataViewField viewField) {
+    public List<DynamicModuleRefreshResult> refreshByMetadataViewField(MetadataViewField viewField) {
         if (viewField == null) {
             return List.of();
         }
@@ -124,21 +124,21 @@ public class PlatformDynamicRuntimeRefreshCoordinator {
         return refreshByMetadataView(view);
     }
 
-    public List<DynamicModulePublishResult> refreshByModuleAction(PlatformModuleAction action) {
+    public List<DynamicModuleRefreshResult> refreshByModuleAction(PlatformModuleAction action) {
         if (action == null) {
             return List.of();
         }
         return refreshModule(action.getModuleAlias());
     }
 
-    public List<DynamicModulePublishResult> refreshByMetadataField(MetadataField field) {
+    public List<DynamicModuleRefreshResult> refreshByMetadataField(MetadataField field) {
         if (field == null) {
             return List.of();
         }
         return refreshByMetadataId(field.getMetadataId());
     }
 
-    public List<DynamicModulePublishResult> refreshByMetadataId(String metadataId) {
+    public List<DynamicModuleRefreshResult> refreshByMetadataId(String metadataId) {
         if (metadataId == null || metadataId.isBlank()) {
             return List.of();
         }
@@ -154,24 +154,24 @@ public class PlatformDynamicRuntimeRefreshCoordinator {
         return refreshModules(moduleAliases);
     }
 
-    public List<DynamicModulePublishResult> refreshByRelationId(String relationId) {
+    public List<DynamicModuleRefreshResult> refreshByRelationId(String relationId) {
         ModuleMetadataRelation relation = requireRelation(relationId);
         return refreshByRelation(relation);
     }
 
-    public List<DynamicModulePublishResult> refreshByModuleFieldId(String moduleFieldId) {
+    public List<DynamicModuleRefreshResult> refreshByModuleFieldId(String moduleFieldId) {
         ModuleMetadataField moduleField = requireModuleField(moduleFieldId);
         return refreshByModuleField(moduleField);
     }
 
-    private List<DynamicModulePublishResult> refreshModules(Iterable<String> moduleAliases) {
+    private List<DynamicModuleRefreshResult> refreshModules(Iterable<String> moduleAliases) {
         Set<String> distinctAliases = new LinkedHashSet<>();
         for (String moduleAlias : moduleAliases) {
             if (moduleAlias != null && !moduleAlias.isBlank()) {
                 distinctAliases.add(PlatformNameRules.requireModuleAlias(moduleAlias));
             }
         }
-        List<DynamicModulePublishResult> results = new ArrayList<>();
+        List<DynamicModuleRefreshResult> results = new ArrayList<>();
         TransactionScopeSupport.afterCommitOrNow(() -> {
             for (String moduleAlias : distinctAliases) {
                 results.add(refreshService().refresh(moduleAlias));

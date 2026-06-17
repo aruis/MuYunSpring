@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.publish;
+package net.ximatai.muyun.spring.dynamic.refresh;
 
 import net.ximatai.muyun.database.core.orm.MigrationChange;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
@@ -10,17 +10,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public record DynamicModulePublishResult(
+public record DynamicModuleRefreshResult(
         ModuleDefinition module,
         Map<String, MigrationResult> migrations,
         boolean dryRun
 ) {
-    public DynamicModulePublishResult(ModuleDefinition module, Map<String, MigrationResult> migrations) {
+    public DynamicModuleRefreshResult(ModuleDefinition module, Map<String, MigrationResult> migrations) {
         this(module, migrations, migrations != null && !migrations.isEmpty()
                 && migrations.values().stream().allMatch(MigrationResult::isDryRun));
     }
 
-    public DynamicModulePublishResult {
+    public DynamicModuleRefreshResult {
         migrations = migrations == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(migrations));
     }
 

@@ -32,7 +32,7 @@ public class DynamicModuleRegistry {
         modules.put(module.moduleAlias(), module);
     }
 
-    public void publish(ModuleDefinition module) {
+    public void refresh(ModuleDefinition module) {
         validator.validate(module);
         modules.put(module.moduleAlias(), module);
     }

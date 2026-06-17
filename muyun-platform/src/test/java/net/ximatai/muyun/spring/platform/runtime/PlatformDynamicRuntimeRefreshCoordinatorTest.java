@@ -1,7 +1,7 @@
-package net.ximatai.muyun.spring.platform.publish;
+package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
@@ -70,7 +70,7 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
         MetadataField field = new MetadataField();
         field.setMetadataId("metadata-customer");
 
-        List<DynamicModulePublishResult> results = coordinator.refreshByMetadataField(field);
+        List<DynamicModuleRefreshResult> results = coordinator.refreshByMetadataField(field);
 
         assertThat(results).hasSize(2);
         verify(refreshService, times(1)).refresh("crm.customer");
@@ -89,7 +89,7 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
             TransactionSynchronizationManager.initSynchronization();
             TransactionSynchronizationManager.setActualTransactionActive(true);
 
-            List<DynamicModulePublishResult> results = coordinator.refreshByMetadataField(field);
+            List<DynamicModuleRefreshResult> results = coordinator.refreshByMetadataField(field);
 
             assertThat(results).isEmpty();
             verify(refreshService, never()).refresh(anyString());
@@ -268,8 +268,8 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
         return action;
     }
 
-    private DynamicModulePublishResult result(String moduleAlias) {
-        return new DynamicModulePublishResult(new ModuleDefinition(moduleAlias, moduleAlias, List.of()), Map.of(), false);
+    private DynamicModuleRefreshResult result(String moduleAlias) {
+        return new DynamicModuleRefreshResult(new ModuleDefinition(moduleAlias, moduleAlias, List.of()), Map.of(), false);
     }
 
     private void clearTransactionState() {

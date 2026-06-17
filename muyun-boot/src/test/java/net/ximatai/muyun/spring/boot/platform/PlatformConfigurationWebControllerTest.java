@@ -8,7 +8,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
@@ -45,7 +45,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import net.ximatai.muyun.spring.platform.publish.PlatformDynamicRuntimeRefreshService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigPublishService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
@@ -945,8 +945,8 @@ class PlatformConfigurationWebControllerTest {
         verify(service).publishUiConfig("ui-config-1");
     }
 
-    private DynamicModulePublishResult runtimeRefreshResult(boolean dryRun) {
-        return new DynamicModulePublishResult(
+    private DynamicModuleRefreshResult runtimeRefreshResult(boolean dryRun) {
+        return new DynamicModuleRefreshResult(
                 new ModuleDefinition("crm.contract", "Contract", List.of()),
                 Map.of(),
                 dryRun);
