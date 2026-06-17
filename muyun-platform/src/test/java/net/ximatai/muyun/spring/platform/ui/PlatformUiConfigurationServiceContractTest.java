@@ -43,6 +43,9 @@ import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -667,6 +670,80 @@ class PlatformUiConfigurationServiceContractTest {
         assertThat(clauses.getFirst().getField()).isEqualTo("customerName");
         assertThat(clauses.getFirst().getOperator()).isEqualTo(CriteriaOperator.LIKE);
         assertThat(clauses.getFirst().getValues()).containsExactly("acme");
+    }
+
+    @Test
+    void shouldCompileQueryTemplateDateRangeByQueryItemTimeZone() {
+        seedFieldType("zoned_datetime", FieldType.ZONED_TIMESTAMP, DynamicQueryOperator.BETWEEN);
+        seedUiType("date_time_with_time_zone", "zoned_datetime");
+        String meetingAtField = seedModuleField("crm.meeting", "meeting", "meetingAt", "meeting_at",
+                "zoned_datetime");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.meeting", "date_range", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, meetingAtField,
+                DynamicQueryOperator.BETWEEN);
+        item.setDefaultValue("2026-01-01,2026-01-31");
+        item.setTimeZone("Asia/Shanghai");
+        queryItemService.insert(item);
+
+        Criteria criteria = queryItemService.compile(templateId);
+
+        List<CriteriaClause> clauses = clauses(criteria);
+        assertThat(clauses).hasSize(2);
+        assertThat(clauses.get(0).getField()).isEqualTo("meetingAt");
+        assertThat(clauses.get(0).getOperator()).isEqualTo(CriteriaOperator.GTE);
+        assertThat(clauses.get(0).getValues()).containsExactly(Instant.parse("2025-12-31T16:00:00Z"));
+        assertThat(clauses.get(1).getField()).isEqualTo("meetingAt");
+        assertThat(clauses.get(1).getOperator()).isEqualTo(CriteriaOperator.LT);
+        assertThat(clauses.get(1).getValues()).containsExactly(Instant.parse("2026-01-31T16:00:00Z"));
+    }
+
+    @Test
+    void shouldCompileQueryTemplateDateRangeByInjectedDefaultTimeZone() {
+        PlatformQueryItemService shanghaiQueryItemService = new PlatformQueryItemService(
+                queryItemDao,
+                queryTemplateService,
+                moduleFieldService,
+                fieldTypeService,
+                new net.ximatai.muyun.spring.common.time.PlatformTimeService(
+                        Clock.systemUTC(),
+                        ZoneId.of("Asia/Shanghai"),
+                        List.of()
+                )
+        );
+        seedFieldType("timestamp", FieldType.TIMESTAMP, DynamicQueryOperator.BETWEEN);
+        seedUiType("datetime", "timestamp");
+        String submittedAtField = seedModuleField("crm.case", "case", "submittedAt", "submitted_at",
+                "timestamp");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.case", "date_range", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, submittedAtField,
+                DynamicQueryOperator.BETWEEN);
+        item.setDefaultValue("2026-01-01,2026-01-01");
+        shanghaiQueryItemService.insert(item);
+
+        Criteria criteria = shanghaiQueryItemService.compile(templateId);
+
+        List<CriteriaClause> clauses = clauses(criteria);
+        assertThat(clauses).hasSize(2);
+        assertThat(clauses.get(0).getValues()).containsExactly(Instant.parse("2025-12-31T16:00:00Z"));
+        assertThat(clauses.get(1).getValues()).containsExactly(Instant.parse("2026-01-01T16:00:00Z"));
+    }
+
+    @Test
+    void shouldRejectQueryTemplateReversedDateRangeWithPlatformException() {
+        seedFieldType("timestamp", FieldType.TIMESTAMP, DynamicQueryOperator.BETWEEN);
+        seedUiType("datetime", "timestamp");
+        String submittedAtField = seedModuleField("crm.ticket", "ticket", "submittedAt", "submitted_at",
+                "timestamp");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.ticket", "date_range", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, submittedAtField,
+                DynamicQueryOperator.BETWEEN);
+        item.setDefaultValue("2026-01-02,2026-01-01");
+        item.setTimeZone("Asia/Shanghai");
+        queryItemService.insert(item);
+
+        assertThatThrownBy(() -> queryItemService.compile(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("date range");
     }
 
     @Test

@@ -28,6 +28,8 @@ import net.ximatai.muyun.spring.common.formula.FormulaRuntimeReport;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -69,6 +71,7 @@ public class DynamicEntityService implements
     private final FieldCryptoProvider fieldCryptoProvider;
     private final FieldSigner fieldSigner;
     private final FieldProtectionPlan<DynamicRecord> fieldProtectionPlan;
+    private final PlatformTimeService timeService;
 
     public DynamicEntityService(DynamicRecordDao dao, String moduleAlias) {
         this(dao, moduleAlias, DynamicRecordLifecycle.NONE);
@@ -126,7 +129,7 @@ public class DynamicEntityService implements
                     }
                     return relationServiceResolver.apply(target.entityAlias());
                 },
-                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner);
+                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner, new PlatformTimeService());
     }
 
     public DynamicEntityService(DynamicRecordDao dao,
@@ -139,6 +142,21 @@ public class DynamicEntityService implements
                                 DynamicFieldValueValidator fieldValueValidator,
                                 FieldCryptoProvider fieldCryptoProvider,
                                 FieldSigner fieldSigner) {
+        this(dao, moduleAlias, lifecycle, module, relationServiceResolver, referenceServiceResolver,
+                cacheNamespacePrefix, fieldValueValidator, fieldCryptoProvider, fieldSigner, new PlatformTimeService());
+    }
+
+    public DynamicEntityService(DynamicRecordDao dao,
+                                String moduleAlias,
+                                DynamicRecordLifecycle lifecycle,
+                                ModuleDefinition module,
+                                Function<String, DynamicEntityService> relationServiceResolver,
+                                Function<ReferenceTarget, DynamicEntityService> referenceServiceResolver,
+                                String cacheNamespacePrefix,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                FieldCryptoProvider fieldCryptoProvider,
+                                FieldSigner fieldSigner,
+                                PlatformTimeService timeService) {
         this.dao = Objects.requireNonNull(dao, "dao must not be null");
         this.moduleAlias = requireModuleAlias(moduleAlias);
         this.lifecycle = lifecycle == null ? DynamicRecordLifecycle.NONE : lifecycle;
@@ -150,6 +168,7 @@ public class DynamicEntityService implements
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
         this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
         this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
+        this.timeService = timeService == null ? new PlatformTimeService() : timeService;
         this.fieldProtectionPlan = new FieldProtectionPlan<DynamicRecord>(dao.getEntity().fields().stream()
                 .filter(field -> field.protection().enabled())
                 .map(field -> (ProtectedFieldAccessor<DynamicRecord>) new DynamicProtectedFieldAccessor(field))
@@ -357,7 +376,7 @@ public class DynamicEntityService implements
     }
 
     public Criteria queryCriteria(Collection<DynamicQueryCondition> conditions) {
-        return new DynamicQueryCriteriaBuilder(dao.getEntity()).build(conditions);
+        return new DynamicQueryCriteriaBuilder(dao.getEntity(), timeService, BusinessTimeContext.empty()).build(conditions);
     }
 
     @Override

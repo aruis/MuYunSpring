@@ -57,6 +57,8 @@ AND quickSearch
 
 汇总面板和引用候选复用这条查询语义，避免形成第二套查询协议。
 
+时间字段查询遵循动态字段语义：`DATE` 按业务日期直接查询；`TIMESTAMP` 和 `ZONED_TIMESTAMP` 如果收到 ISO 本地日期闭区间，会按查询项 `timeZone` 或平台默认业务时区转换成 UTC 半开区间执行。查询模板的 `timeZone` 使用 IANA `ZoneId`，不接受 `+08:00` 这类纯 offset。
+
 ## 保存语义
 
 页面保存请求可以直接提交动态记录，也可以提交 `uiConfigId + record` wrapper。带 `uiConfigId` 时：

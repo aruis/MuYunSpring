@@ -52,6 +52,31 @@ class PlatformTimeServiceTest {
     }
 
     @Test
+    void shouldConvertIsoLocalDateObjectsToInstantRange() {
+        PlatformTimeService service = new PlatformTimeService(
+                Clock.systemUTC(),
+                ZoneId.of("Asia/Shanghai"),
+                List.of()
+        );
+
+        BusinessTimeRange range = service.localDateClosedRangeToInstantRange(
+                "2026-01-01",
+                LocalDate.parse("2026-01-01"),
+                BusinessTimeContext.empty());
+
+        assertThat(range.startInclusive()).isEqualTo(Instant.parse("2025-12-31T16:00:00Z"));
+        assertThat(range.endExclusive()).isEqualTo(Instant.parse("2026-01-01T16:00:00Z"));
+    }
+
+    @Test
+    void shouldIdentifyIsoLocalDateValuesOnly() {
+        assertThat(PlatformTimeService.isLocalDateValue("2026-01-01")).isTrue();
+        assertThat(PlatformTimeService.isLocalDateValue(LocalDate.parse("2026-01-01"))).isTrue();
+        assertThat(PlatformTimeService.isLocalDateValue("2026-01-01T00:00:00Z")).isFalse();
+        assertThat(PlatformTimeService.isLocalDateValue("abc")).isFalse();
+    }
+
+    @Test
     void shouldUseExplicitDefaultZoneWhenResolversDoNotMatch() {
         Clock clock = Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"), ZoneOffset.UTC);
         PlatformTimeService service = new PlatformTimeService(

@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.BusinessTimeRange;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -16,11 +19,21 @@ import java.util.stream.Collectors;
 public final class DynamicQueryCriteriaBuilder {
     private final EntityDefinition entity;
     private final Map<String, FieldDefinition> fields;
+    private final PlatformTimeService timeService;
+    private final BusinessTimeContext timeContext;
 
     public DynamicQueryCriteriaBuilder(EntityDefinition entity) {
+        this(entity, new PlatformTimeService(), BusinessTimeContext.empty());
+    }
+
+    public DynamicQueryCriteriaBuilder(EntityDefinition entity,
+                                       PlatformTimeService timeService,
+                                       BusinessTimeContext timeContext) {
         this.entity = entity;
         this.fields = entity.fields().stream()
                 .collect(Collectors.toUnmodifiableMap(FieldDefinition::fieldName, Function.identity()));
+        this.timeService = timeService == null ? new PlatformTimeService() : timeService;
+        this.timeContext = timeContext == null ? BusinessTimeContext.empty() : timeContext;
     }
 
     public Criteria build(Collection<DynamicQueryCondition> conditions) {
@@ -52,7 +65,7 @@ public final class DynamicQueryCriteriaBuilder {
             case LIKE -> criteria.like(field.fieldName(), String.valueOf(singleValue(field, condition, values)));
             case IN -> criteria.in(field.fieldName(), listValues(field, condition, values));
             case NOT_IN -> criteria.notIn(field.fieldName(), listValues(field, condition, values));
-            case BETWEEN -> criteria.between(field.fieldName(), rangeValue(field, condition, values, 0), rangeValue(field, condition, values, 1));
+            case BETWEEN -> appendBetween(criteria, field, condition, values);
             case GT -> criteria.gt(field.fieldName(), singleValue(field, condition, values));
             case GTE -> criteria.gte(field.fieldName(), singleValue(field, condition, values));
             case LT -> criteria.lt(field.fieldName(), singleValue(field, condition, values));
@@ -68,6 +81,39 @@ public final class DynamicQueryCriteriaBuilder {
             throw new ModuleDefinitionException("unknown query field: " + entity.alias() + "." + fieldName);
         }
         return field;
+    }
+
+    private void appendBetween(Criteria criteria,
+                               FieldDefinition field,
+                               DynamicQueryCondition condition,
+                               List<?> values) {
+        if (values.size() != 2) {
+            throw new ModuleDefinitionException("query operator requires exactly two values: "
+                    + condition.fieldName() + "." + condition.operator());
+        }
+        if (field.type().isTemporal()
+                && !field.type().isBusinessDate()
+                && PlatformTimeService.isLocalDateValue(values.get(0))
+                && PlatformTimeService.isLocalDateValue(values.get(1))) {
+            BusinessTimeRange range;
+            BusinessTimeContext context = conditionTimeContext(condition);
+            try {
+                range = timeService.localDateClosedRangeToInstantRange(
+                        values.get(0),
+                        values.get(1),
+                        context
+                );
+            } catch (RuntimeException e) {
+                throw new ModuleDefinitionException("invalid query date range: "
+                        + condition.fieldName() + "." + condition.operator(), e);
+            }
+            criteria.gte(field.fieldName(), range.startInclusive());
+            criteria.lt(field.fieldName(), range.endExclusive());
+            return;
+        }
+        criteria.between(field.fieldName(),
+                rangeValue(field, condition, values, 0),
+                rangeValue(field, condition, values, 1));
     }
 
     private Object singleValue(FieldDefinition field, DynamicQueryCondition condition, List<?> values) {
@@ -106,6 +152,18 @@ public final class DynamicQueryCriteriaBuilder {
         } catch (RuntimeException e) {
             throw new ModuleDefinitionException("invalid query value type: "
                     + condition.fieldName() + "." + condition.operator(), e);
+        }
+    }
+
+    private BusinessTimeContext conditionTimeContext(DynamicQueryCondition condition) {
+        if (condition.timeZone() == null) {
+            return timeContext;
+        }
+        try {
+            return timeContext.withZone(PlatformTimeService.requireIanaZoneId(condition.timeZone()));
+        } catch (RuntimeException e) {
+            throw new ModuleDefinitionException("invalid query timeZone: "
+                    + condition.fieldName() + "." + condition.timeZone(), e);
         }
     }
 }

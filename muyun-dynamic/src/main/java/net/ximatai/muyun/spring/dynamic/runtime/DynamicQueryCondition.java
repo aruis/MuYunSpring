@@ -9,10 +9,16 @@ import java.util.List;
 public record DynamicQueryCondition(
         String fieldName,
         DynamicQueryOperator operator,
-        List<?> values
+        List<?> values,
+        String timeZone
 ) {
     public DynamicQueryCondition {
         values = values == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(values));
+        timeZone = timeZone == null || timeZone.isBlank() ? null : timeZone.trim();
+    }
+
+    public DynamicQueryCondition(String fieldName, DynamicQueryOperator operator, List<?> values) {
+        this(fieldName, operator, values, null);
     }
 
     public static DynamicQueryCondition of(String fieldName, Object value) {
@@ -21,5 +27,12 @@ public record DynamicQueryCondition(
 
     public static DynamicQueryCondition of(String fieldName, DynamicQueryOperator operator, Object... values) {
         return new DynamicQueryCondition(fieldName, operator, values == null ? List.of() : List.of(values));
+    }
+
+    public static DynamicQueryCondition withTimeZone(String fieldName,
+                                                     DynamicQueryOperator operator,
+                                                     String timeZone,
+                                                     Object... values) {
+        return new DynamicQueryCondition(fieldName, operator, values == null ? List.of() : List.of(values), timeZone);
     }
 }

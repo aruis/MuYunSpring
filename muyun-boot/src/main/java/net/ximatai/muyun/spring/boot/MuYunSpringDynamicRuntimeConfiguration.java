@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicySer
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
@@ -33,6 +34,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+
 @Configuration(proxyBeanMethods = false)
 public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
@@ -50,6 +53,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    PlatformTimeService platformTimeService(ObjectProvider<Clock> clockProvider) {
+        return new PlatformTimeService(clockProvider == null ? null : clockProvider.getIfAvailable());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
         return new DynamicSchemaService(operations);
     }
@@ -62,11 +71,13 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               DynamicActionExecutorRegistry actionExecutorRegistry,
                                               DynamicActionTransactionOperator actionTransactionOperator,
                                               ObjectProvider<FieldCryptoProvider> fieldCryptoProvider,
-                                              ObjectProvider<FieldSigner> fieldSigner) {
+                                              ObjectProvider<FieldSigner> fieldSigner,
+                                              PlatformTimeService platformTimeService) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
                 eventPublisher, actionExecutorRegistry, actionTransactionOperator,
                 fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
-                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE));
+                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE),
+                platformTimeService);
     }
 
     @Bean

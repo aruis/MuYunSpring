@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -89,6 +90,16 @@ public class PlatformTimeService {
         );
     }
 
+    public BusinessTimeRange localDateClosedRangeToInstantRange(Object startInclusive,
+                                                               Object endInclusive,
+                                                               BusinessTimeContext context) {
+        return localDateClosedRangeToInstantRange(
+                requireLocalDate(startInclusive, "startInclusive"),
+                requireLocalDate(endInclusive, "endInclusive"),
+                context
+        );
+    }
+
     public static ZoneId requireIanaZoneId(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("timeZone must be an IANA ZoneId");
@@ -102,5 +113,34 @@ public class PlatformTimeService {
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("timeZone must be an IANA ZoneId", e);
         }
+    }
+
+    public static boolean isLocalDateValue(Object value) {
+        if (value instanceof LocalDate) {
+            return true;
+        }
+        if (value instanceof String text) {
+            try {
+                LocalDate.parse(text.trim());
+                return true;
+            } catch (DateTimeParseException ignored) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public static LocalDate requireLocalDate(Object value, String fieldName) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof String text) {
+            try {
+                return LocalDate.parse(text.trim());
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException(fieldName + " must be an ISO local date", e);
+            }
+        }
+        throw new IllegalArgumentException(fieldName + " must be an ISO local date");
     }
 }
