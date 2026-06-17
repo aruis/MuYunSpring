@@ -196,6 +196,7 @@ public final class FieldCompanionRules {
                 null,
                 FieldBehaviorDefinition.DEFAULT,
                 null,
+                null,
                 null
         );
     }

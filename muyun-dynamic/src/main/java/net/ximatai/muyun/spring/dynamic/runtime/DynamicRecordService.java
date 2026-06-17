@@ -708,7 +708,7 @@ public class DynamicRecordService {
             childMutations.forEach(mutation -> {
                 if (mutation.kind() == RelationChildMutationKind.CREATE) {
                     mutationCoordinator.beforeRelationChildCreate(moduleAlias, entityAlias, mutation.relation().code(),
-                            mutation.relation().childEntityAlias(), record, mutation.incoming());
+                            mutation.relation().childEntityAlias(), before, mutation.incoming());
                 } else if (mutation.kind() == RelationChildMutationKind.UPDATE) {
                     mutationCoordinator.beforeRelationChildUpdate(moduleAlias, entityAlias, mutation.relation().code(),
                             mutation.relation().childEntityAlias(), before, record, mutation.before(), mutation.incoming());
@@ -1129,7 +1129,7 @@ public class DynamicRecordService {
             }
             Map<String, DynamicRecord> existingById = childrenById(moduleAlias, relation, incoming.getId());
             for (DynamicRecord child : incomingChildren) {
-                prepareRelationChild(incoming, relation, child);
+                prepareRelationChild(before == null ? incoming : before, relation, child);
                 DynamicRecord existing = existingById.remove(child.getId());
                 mutations.add(existing == null
                         ? RelationChildMutation.create(relation, child)
@@ -1186,6 +1186,9 @@ public class DynamicRecordService {
                                       DynamicRecord child) {
         ensureRecordId(child);
         child.putPlatformValue(relation.childForeignKeyField(), parent.getId());
+        if (child.getTenantId() == null && parent.getTenantId() != null) {
+            child.setTenantId(parent.getTenantId());
+        }
     }
 
     private void ensureRecordId(DynamicRecord record) {
