@@ -13,6 +13,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
@@ -117,13 +118,64 @@ class MoneyDynamicRecordServiceIntegrationTest {
                 .containsEntry(StandardEntitySchema.VERSION_COLUMN, 1);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldUsePersistedParentTenantWhenSystemUpdateCreatesMoneyRelationChild() {
+        prepareCurrenciesAndRates();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantCurrencySettingService.insert(setting("CNY"));
+        }
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenAnswer(invocation -> {
+            String sql = invocation.getArgument(0);
+            if (sql.contains("\"sales_order_line\"") && sql.contains("\"order_id\" =")) {
+                return List.of();
+            }
+            if (sql.contains("\"sales_order\"") && sql.contains("\"id\" =")) {
+                return List.of(beforeRowWithTenant());
+            }
+            return List.of();
+        });
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), eq("sales_order"), anyMap(), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn(1);
+        when(operations.insertItem(eq(SCHEMA), eq("sales_order_line"), anyMap(), eq(StandardEntitySchema.ID_COLUMN)))
+                .thenReturn("line-1");
+        DynamicRecordService service = service(operations, orderWithLineModule());
+        DynamicRecord child = service.newRecord(MODULE, "order_line")
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("currencyCode", "USD")
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+        DynamicRecord record = service.newRecord(MODULE, "order");
+        record.setId("order-1");
+        record.setVersion(1);
+        record.setChildren("lines", List.of(child));
+
+        try (TenantContext.Scope ignored = TenantContext.system("system writeback")) {
+            assertThat(service.update(MODULE, "order", record)).isEqualTo(1);
+        }
+
+        ArgumentCaptor<Map<String, Object>> childBody = ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(operations)
+                .insertItem(eq(SCHEMA), eq("sales_order_line"), childBody.capture(), eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(childBody.getValue())
+                .containsEntry("tenant_id", "tenant-a")
+                .containsEntry("currency_code", "USD")
+                .containsEntry("order_id", "order-1")
+                .containsEntry("exchange_rate", new BigDecimal("7.2345"));
+        assertThat((BigDecimal) childBody.getValue().get("base_amount")).isEqualByComparingTo("14.47");
+    }
+
     private DynamicRecordService service(IDatabaseOperations<Object> operations) {
+        return service(operations, new ModuleDefinition(MODULE, "Order", List.of(orderEntity())));
+    }
+
+    private DynamicRecordService service(IDatabaseOperations<Object> operations, ModuleDefinition module) {
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(
                 operations,
                 new DynamicModuleRegistry(),
                 DynamicFieldValueValidator.NONE,
                 null
-        ).register(new ModuleDefinition(MODULE, "Order", List.of(orderEntity())));
+        ).register(module);
         return new DynamicRecordService(
                 runtime,
                 new AllowAllActionExecutionPolicyService(),
@@ -167,10 +219,63 @@ class MoneyDynamicRecordServiceIntegrationTest {
         );
     }
 
+    private ModuleDefinition orderWithLineModule() {
+        return new ModuleDefinition(
+                MODULE,
+                "Order",
+                List.of(orderEntity(), orderLineEntity()),
+                List.of(EntityRelationDefinition.child("lines", "order", "order_line", "orderId")
+                        .withAutoPopulate()
+                        .withAutoDeleteWithParent())
+        );
+    }
+
+    private EntityDefinition orderLineEntity() {
+        return new EntityDefinition(
+                "order_line",
+                "sales_order_line",
+                "Order Line",
+                List.of(
+                        FieldDefinition.string("orderId", "Order").column("order_id").length(64).required(),
+                        FieldDefinition.decimal("amount", "Amount").money(new FieldMoneyDefinition(
+                                FieldMoneyMode.SELECTABLE,
+                                null,
+                                null,
+                                "currencyCode",
+                                "baseAmount",
+                                null,
+                                "SPOT",
+                                "orderDate",
+                                "exchangeRate",
+                                true
+                        )),
+                        FieldDefinition.string("currencyCode", "Currency").column("currency_code").length(3),
+                        FieldDefinition.decimal("baseAmount", "Base Amount").column("base_amount"),
+                        FieldDefinition.of("orderDate", FieldType.DATE, "Order Date").column("order_date"),
+                        FieldDefinition.decimal("exchangeRate", "Exchange Rate").column("exchange_rate")
+                ),
+                Set.of(EntityCapability.CRUD)
+        );
+    }
+
     private Map<String, Object> beforeRow() {
         return Map.ofEntries(
                 Map.entry(StandardEntitySchema.ID_COLUMN, "order-1"),
                 Map.entry(StandardEntitySchema.VERSION_COLUMN, 1),
+                Map.entry(StandardEntitySchema.DELETED_COLUMN, Boolean.FALSE),
+                Map.entry("amount", new BigDecimal("1")),
+                Map.entry("currency_code", "USD"),
+                Map.entry("base_amount", new BigDecimal("7.23")),
+                Map.entry("order_date", LocalDate.of(2026, 2, 16)),
+                Map.entry("exchange_rate", new BigDecimal("7.2345"))
+        );
+    }
+
+    private Map<String, Object> beforeRowWithTenant() {
+        return Map.ofEntries(
+                Map.entry(StandardEntitySchema.ID_COLUMN, "order-1"),
+                Map.entry(StandardEntitySchema.VERSION_COLUMN, 1),
+                Map.entry(StandardEntitySchema.TENANT_ID_COLUMN, "tenant-a"),
                 Map.entry(StandardEntitySchema.DELETED_COLUMN, Boolean.FALSE),
                 Map.entry("amount", new BigDecimal("1")),
                 Map.entry("currency_code", "USD"),
@@ -213,5 +318,11 @@ class MoneyDynamicRecordServiceIntegrationTest {
         rate.setRate(new BigDecimal(rateValue));
         rate.setTitle(from + "/" + to + " " + type);
         return rate;
+    }
+
+    private TenantCurrencySetting setting(String baseCurrencyCode) {
+        TenantCurrencySetting setting = new TenantCurrencySetting();
+        setting.setBaseCurrencyCode(baseCurrencyCode);
+        return setting;
     }
 }
