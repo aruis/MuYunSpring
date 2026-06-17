@@ -99,6 +99,18 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
     }
 
     @Override
+    @Transactional
+    public String insert(ModuleMetadataField moduleField) {
+        return SoftDeleteAbility.super.insert(moduleField);
+    }
+
+    @Override
+    @Transactional
+    public int update(ModuleMetadataField moduleField) {
+        return SoftDeleteAbility.super.update(moduleField);
+    }
+
+    @Override
     public void validateSortScope(ModuleMetadataField left, ModuleMetadataField right) {
         if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
             throw new PlatformException("Module metadata field sort can only move records within the same relation");
@@ -192,156 +204,6 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         );
     }
 
-    @Transactional
-    public ModuleMetadataMeasureUnitPrepareResult prepareMeasureUnitConfig(
-            String moduleMetadataFieldId,
-            ModuleMetadataMeasureUnitPrepareCommand command) {
-        ModuleMetadataField moduleField = moduleMetadataFieldId == null || moduleMetadataFieldId.isBlank()
-                ? null
-                : select(moduleMetadataFieldId);
-        if (moduleField == null) {
-            throw new PlatformException("Module metadata field requires existing config: " + moduleMetadataFieldId);
-        }
-        ModuleMetadataRelation relation = requireRelation(moduleField.getRelationId());
-        Metadata metadata = requireMetadata(relation.getMetadataId());
-        MetadataField owner = requireField(moduleField.getMetadataFieldId());
-        if (!Objects.equals(owner.getMetadataId(), metadata.getId())) {
-            throw new PlatformException("Module metadata field metadata mismatch: " + moduleMetadataFieldId);
-        }
-        if (owner.getFieldRole() == MetadataFieldRole.MEASURE_UNIT
-                || owner.getFieldRole() == MetadataFieldRole.MEASURE_BASE_VALUE) {
-            throw new PlatformException("measure unit config must be prepared on owner value field: "
-                    + owner.getFieldName());
-        }
-        ModuleMetadataMeasureUnitPrepareCommand validCommand = command == null
-                ? new ModuleMetadataMeasureUnitPrepareCommand(null, null, null, null, null, null,
-                null, null, null, null, null, null, null)
-                : command;
-        requireNumericField(owner, "measure unit value field");
-        String unitCategoryAlias = PlatformNameRules.requireIdentifier(
-                validCommand.unitCategoryAlias(), "unitCategoryAlias");
-        FieldMeasureUnitMode unitMode = validCommand.unitMode() == null
-                ? FieldMeasureUnitMode.SELECTABLE
-                : validCommand.unitMode();
-        validatePrepareCommand(metadata, owner, validCommand, unitMode);
-        MetadataField unitField = null;
-        if (unitMode == FieldMeasureUnitMode.SELECTABLE) {
-            unitField = ensureRelatedField(
-                    metadata,
-                    owner,
-                    MetadataFieldForm.COMPANION,
-                    MetadataFieldRole.MEASURE_UNIT,
-                    defaultText(validCommand.unitFieldName(), owner.getFieldName() + "Unit"),
-                    defaultText(validCommand.unitFieldTypeAlias(), "string"),
-                    "Unit"
-            );
-            ensureModuleFieldForRelation(relation, unitField);
-        }
-        MetadataField baseValueField = ensureRelatedField(
-                metadata,
-                owner,
-                MetadataFieldForm.SHADOW,
-                MetadataFieldRole.MEASURE_BASE_VALUE,
-                defaultText(validCommand.baseValueFieldName(), owner.getFieldName() + "Base"),
-                defaultText(validCommand.baseValueFieldTypeAlias(), owner.getFieldTypeAlias()),
-                "Base"
-        );
-        ensureModuleFieldForRelation(relation, baseValueField);
-        moduleField.setUnitCategoryAlias(unitCategoryAlias);
-        moduleField.setUnitMode(unitMode);
-        moduleField.setFixedUnitCode(validCommand.fixedUnitCode());
-        moduleField.setDefaultUnitCode(validCommand.defaultUnitCode());
-        moduleField.setUnitFieldId(unitField == null ? null : unitField.getId());
-        moduleField.setBaseValueFieldId(baseValueField.getId());
-        moduleField.setBaseUnitCategoryAlias(validCommand.baseUnitCategoryAlias());
-        moduleField.setBaseUnitCode(validCommand.baseUnitCode());
-        moduleField.setUnitConversionMode(validCommand.unitConversionMode());
-        moduleField.setConversionScopeFieldId(validCommand.conversionScopeFieldId());
-        moduleField.setUnitRequired(validCommand.unitRequired());
-        update(moduleField);
-        return new ModuleMetadataMeasureUnitPrepareResult(select(moduleField.getId()), unitField, baseValueField);
-    }
-
-    @Transactional
-    public ModuleMetadataMoneyPrepareResult prepareMoneyConfig(String moduleMetadataFieldId,
-                                                              ModuleMetadataMoneyPrepareCommand command) {
-        ModuleMetadataField moduleField = moduleMetadataFieldId == null || moduleMetadataFieldId.isBlank()
-                ? null
-                : select(moduleMetadataFieldId);
-        if (moduleField == null) {
-            throw new PlatformException("Module metadata field requires existing config: " + moduleMetadataFieldId);
-        }
-        ModuleMetadataRelation relation = requireRelation(moduleField.getRelationId());
-        Metadata metadata = requireMetadata(relation.getMetadataId());
-        MetadataField owner = requireField(moduleField.getMetadataFieldId());
-        if (!Objects.equals(owner.getMetadataId(), metadata.getId())) {
-            throw new PlatformException("Module metadata field metadata mismatch: " + moduleMetadataFieldId);
-        }
-        if (isMoneyRelatedRole(owner.getFieldRole())) {
-            throw new PlatformException("money config must be prepared on owner amount field: "
-                    + owner.getFieldName());
-        }
-        ModuleMetadataMoneyPrepareCommand validCommand = command == null
-                ? new ModuleMetadataMoneyPrepareCommand(null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null)
-                : command;
-        requireNumericField(owner, "money amount field");
-        FieldMoneyMode currencyMode = validCommand.currencyMode() == null
-                ? FieldMoneyMode.SELECTABLE
-                : validCommand.currencyMode();
-        validateMoneyPrepareCommand(metadata, owner, validCommand, currencyMode);
-        MetadataField currencyField = null;
-        if (currencyMode == FieldMoneyMode.SELECTABLE) {
-            currencyField = ensureRelatedField(
-                    metadata,
-                    owner,
-                    MetadataFieldForm.COMPANION,
-                    MetadataFieldRole.MONEY_CURRENCY,
-                    defaultText(validCommand.currencyFieldName(), owner.getFieldName() + "Currency"),
-                    defaultText(validCommand.currencyFieldTypeAlias(), "string"),
-                    "Currency"
-            );
-            ensureModuleFieldForRelation(relation, currencyField);
-        }
-        MetadataField baseAmountField = ensureRelatedField(
-                metadata,
-                owner,
-                MetadataFieldForm.SHADOW,
-                MetadataFieldRole.MONEY_BASE_AMOUNT,
-                defaultText(validCommand.baseAmountFieldName(), owner.getFieldName() + "Base"),
-                defaultText(validCommand.baseAmountFieldTypeAlias(), owner.getFieldTypeAlias()),
-                "Base Amount"
-        );
-        ensureModuleFieldForRelation(relation, baseAmountField);
-        MetadataField exchangeRateField = null;
-        if (Boolean.TRUE.equals(validCommand.createExchangeRateField())
-                || hasText(validCommand.exchangeRateFieldName())) {
-            exchangeRateField = ensureRelatedField(
-                    metadata,
-                    owner,
-                    MetadataFieldForm.SHADOW,
-                    MetadataFieldRole.MONEY_EXCHANGE_RATE,
-                    defaultText(validCommand.exchangeRateFieldName(), owner.getFieldName() + "ExchangeRate"),
-                    defaultText(validCommand.exchangeRateFieldTypeAlias(), "decimal"),
-                    "Exchange Rate"
-            );
-            ensureModuleFieldForRelation(relation, exchangeRateField);
-        }
-        moduleField.setMoneyCurrencyMode(currencyMode);
-        moduleField.setMoneyFixedCurrencyCode(validCommand.fixedCurrencyCode());
-        moduleField.setMoneyDefaultCurrencyCode(validCommand.defaultCurrencyCode());
-        moduleField.setMoneyCurrencyFieldId(currencyField == null ? null : currencyField.getId());
-        moduleField.setMoneyBaseAmountFieldId(baseAmountField.getId());
-        moduleField.setMoneyBaseCurrencyCode(validCommand.baseCurrencyCode());
-        moduleField.setMoneyRateTypeCode(validCommand.rateTypeCode());
-        moduleField.setMoneyRateDateFieldId(validCommand.rateDateFieldId());
-        moduleField.setMoneyExchangeRateFieldId(exchangeRateField == null ? null : exchangeRateField.getId());
-        moduleField.setMoneyCurrencyRequired(validCommand.currencyRequired());
-        update(moduleField);
-        return new ModuleMetadataMoneyPrepareResult(select(moduleField.getId()), currencyField,
-                baseAmountField, exchangeRateField);
-    }
-
     private void normalizeAndValidate(ModuleMetadataField moduleField) {
         ModuleMetadataRelation relation = requireRelation(moduleField.getRelationId());
         Metadata metadata = requireMetadata(relation.getMetadataId());
@@ -351,8 +213,8 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                     + moduleField.getMetadataFieldId());
         }
         normalizeReferenceConfig(moduleField, metadata, relation);
-        normalizeMeasureUnitConfig(moduleField, metadata, field);
-        normalizeMoneyConfig(moduleField, metadata, field);
+        normalizeMeasureUnitConfig(moduleField, metadata, relation, field);
+        normalizeMoneyConfig(moduleField, metadata, relation, field);
         rejectDuplicate(moduleField, Criteria.of()
                         .eq("relationId", relation.getId())
                         .eq("metadataFieldId", field.getId()),
@@ -408,6 +270,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
 
     private void normalizeMeasureUnitConfig(ModuleMetadataField moduleField,
                                             Metadata metadata,
+                                            ModuleMetadataRelation relation,
                                             MetadataField field) {
         if (!hasText(moduleField.getUnitCategoryAlias())) {
             clearMeasureUnitConfig(moduleField);
@@ -443,6 +306,14 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
             moduleField.setDefaultUnitCode(PlatformNameRules.requireIdentifier(
                     moduleField.getDefaultUnitCode(), "defaultUnitCode"));
         }
+        MetadataField conversionScopeField = null;
+        if (hasText(moduleField.getConversionScopeFieldId())) {
+            conversionScopeField = requireField(moduleField.getConversionScopeFieldId());
+            if (!Objects.equals(conversionScopeField.getMetadataId(), metadata.getId())) {
+                throw new PlatformException("conversionScopeFieldId must belong to same metadata: "
+                        + moduleField.getConversionScopeFieldId());
+            }
+        }
         if (moduleField.getUnitMode() == FieldMeasureUnitMode.FIXED) {
             moduleField.setFixedUnitCode(PlatformNameRules.requireIdentifier(moduleField.getFixedUnitCode(), "fixedUnitCode"));
             moduleField.setUnitFieldId(null);
@@ -451,22 +322,26 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
             }
         } else {
             moduleField.setFixedUnitCode(null);
-            MetadataField unitField = requireRelatedField(moduleField.getUnitFieldId(), metadata, field,
-                    MetadataFieldForm.COMPANION, MetadataFieldRole.MEASURE_UNIT, "unitFieldId");
+            MetadataField unitField = hasText(moduleField.getUnitFieldId())
+                    ? requireRelatedField(moduleField.getUnitFieldId(), metadata, field,
+                    MetadataFieldForm.COMPANION, MetadataFieldRole.MEASURE_UNIT, "unitFieldId")
+                    : ensureRelatedField(metadata, field, MetadataFieldForm.COMPANION,
+                    MetadataFieldRole.MEASURE_UNIT, field.getFieldName() + "Unit", "string", "Unit");
             requireFieldType(unitField, FieldType.STRING, "measure unit companion field");
+            ensureModuleFieldForRelation(relation, unitField);
             moduleField.setUnitFieldId(unitField.getId());
         }
-        MetadataField baseValueField = requireRelatedField(moduleField.getBaseValueFieldId(), metadata, field,
-                MetadataFieldForm.SHADOW, MetadataFieldRole.MEASURE_BASE_VALUE, "baseValueFieldId");
+        MetadataField baseValueField = hasText(moduleField.getBaseValueFieldId())
+                ? requireRelatedField(moduleField.getBaseValueFieldId(), metadata, field,
+                MetadataFieldForm.SHADOW, MetadataFieldRole.MEASURE_BASE_VALUE, "baseValueFieldId")
+                : ensureRelatedField(metadata, field, MetadataFieldForm.SHADOW,
+                MetadataFieldRole.MEASURE_BASE_VALUE, field.getFieldName() + "Base",
+                field.getFieldTypeAlias(), "Base");
         requireNumericField(baseValueField, "measure base value shadow field");
+        ensureModuleFieldForRelation(relation, baseValueField);
         moduleField.setBaseValueFieldId(baseValueField.getId());
-        if (hasText(moduleField.getConversionScopeFieldId())) {
-            MetadataField scopeField = requireField(moduleField.getConversionScopeFieldId());
-            if (!Objects.equals(scopeField.getMetadataId(), metadata.getId())) {
-                throw new PlatformException("conversionScopeFieldId must belong to same metadata: "
-                        + moduleField.getConversionScopeFieldId());
-            }
-            moduleField.setConversionScopeFieldId(scopeField.getId());
+        if (conversionScopeField != null) {
+            moduleField.setConversionScopeFieldId(conversionScopeField.getId());
         }
     }
 
@@ -486,6 +361,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
 
     private void normalizeMoneyConfig(ModuleMetadataField moduleField,
                                       Metadata metadata,
+                                      ModuleMetadataRelation relation,
                                       MetadataField field) {
         if (moduleField.getMoneyCurrencyMode() == null
                 && !hasText(moduleField.getMoneyBaseAmountFieldId())
@@ -515,26 +391,9 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         if (moduleField.getMoneyCurrencyRequired() == null) {
             moduleField.setMoneyCurrencyRequired(Boolean.TRUE);
         }
-        if (moduleField.getMoneyCurrencyMode() == FieldMoneyMode.FIXED) {
-            moduleField.setMoneyFixedCurrencyCode(requireCurrencyCode(
-                    moduleField.getMoneyFixedCurrencyCode(), "moneyFixedCurrencyCode"));
-            moduleField.setMoneyCurrencyFieldId(null);
-            if (!hasText(moduleField.getMoneyDefaultCurrencyCode())) {
-                moduleField.setMoneyDefaultCurrencyCode(moduleField.getMoneyFixedCurrencyCode());
-            }
-        } else {
-            moduleField.setMoneyFixedCurrencyCode(null);
-            MetadataField currencyField = requireRelatedField(moduleField.getMoneyCurrencyFieldId(), metadata, field,
-                    MetadataFieldForm.COMPANION, MetadataFieldRole.MONEY_CURRENCY, "moneyCurrencyFieldId");
-            requireTextField(currencyField, "money currency companion field");
-            moduleField.setMoneyCurrencyFieldId(currencyField.getId());
-        }
-        MetadataField baseAmountField = requireRelatedField(moduleField.getMoneyBaseAmountFieldId(), metadata, field,
-                MetadataFieldForm.SHADOW, MetadataFieldRole.MONEY_BASE_AMOUNT, "moneyBaseAmountFieldId");
-        requireNumericField(baseAmountField, "money base amount shadow field");
-        moduleField.setMoneyBaseAmountFieldId(baseAmountField.getId());
+        MetadataField rateDateField = null;
         if (hasText(moduleField.getMoneyRateDateFieldId())) {
-            MetadataField rateDateField = requireField(moduleField.getMoneyRateDateFieldId());
+            rateDateField = requireField(moduleField.getMoneyRateDateFieldId());
             if (!Objects.equals(rateDateField.getMetadataId(), metadata.getId())) {
                 throw new PlatformException("moneyRateDateFieldId must belong to same metadata: "
                         + moduleField.getMoneyRateDateFieldId());
@@ -544,12 +403,45 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 throw new PlatformException("money rate date field requires date or timestamp field: "
                         + rateDateField.getFieldName());
             }
-            moduleField.setMoneyRateDateFieldId(rateDateField.getId());
         }
+        MetadataField exchangeRateField = null;
         if (hasText(moduleField.getMoneyExchangeRateFieldId())) {
-            MetadataField exchangeRateField = requireRelatedField(moduleField.getMoneyExchangeRateFieldId(), metadata, field,
+            exchangeRateField = requireRelatedField(moduleField.getMoneyExchangeRateFieldId(), metadata, field,
                     MetadataFieldForm.SHADOW, MetadataFieldRole.MONEY_EXCHANGE_RATE, "moneyExchangeRateFieldId");
             requireNumericField(exchangeRateField, "money exchange rate shadow field");
+        }
+        if (moduleField.getMoneyCurrencyMode() == FieldMoneyMode.FIXED) {
+            moduleField.setMoneyFixedCurrencyCode(requireCurrencyCode(
+                    moduleField.getMoneyFixedCurrencyCode(), "moneyFixedCurrencyCode"));
+            moduleField.setMoneyCurrencyFieldId(null);
+            if (!hasText(moduleField.getMoneyDefaultCurrencyCode())) {
+                moduleField.setMoneyDefaultCurrencyCode(moduleField.getMoneyFixedCurrencyCode());
+            }
+        } else {
+            moduleField.setMoneyFixedCurrencyCode(null);
+            MetadataField currencyField = hasText(moduleField.getMoneyCurrencyFieldId())
+                    ? requireRelatedField(moduleField.getMoneyCurrencyFieldId(), metadata, field,
+                    MetadataFieldForm.COMPANION, MetadataFieldRole.MONEY_CURRENCY, "moneyCurrencyFieldId")
+                    : ensureRelatedField(metadata, field, MetadataFieldForm.COMPANION,
+                    MetadataFieldRole.MONEY_CURRENCY, field.getFieldName() + "Currency", "string", "Currency");
+            requireTextField(currencyField, "money currency companion field");
+            ensureModuleFieldForRelation(relation, currencyField);
+            moduleField.setMoneyCurrencyFieldId(currencyField.getId());
+        }
+        MetadataField baseAmountField = hasText(moduleField.getMoneyBaseAmountFieldId())
+                ? requireRelatedField(moduleField.getMoneyBaseAmountFieldId(), metadata, field,
+                MetadataFieldForm.SHADOW, MetadataFieldRole.MONEY_BASE_AMOUNT, "moneyBaseAmountFieldId")
+                : ensureRelatedField(metadata, field, MetadataFieldForm.SHADOW,
+                MetadataFieldRole.MONEY_BASE_AMOUNT, field.getFieldName() + "Base",
+                field.getFieldTypeAlias(), "Base Amount");
+        requireNumericField(baseAmountField, "money base amount shadow field");
+        ensureModuleFieldForRelation(relation, baseAmountField);
+        moduleField.setMoneyBaseAmountFieldId(baseAmountField.getId());
+        if (rateDateField != null) {
+            moduleField.setMoneyRateDateFieldId(rateDateField.getId());
+        }
+        if (exchangeRateField != null) {
+            ensureModuleFieldForRelation(relation, exchangeRateField);
             moduleField.setMoneyExchangeRateFieldId(exchangeRateField.getId());
         }
     }
@@ -641,112 +533,6 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         moduleField.setTitle(field.getTitle());
         moduleField.setSortOrder(field.getSortOrder());
         return moduleField;
-    }
-
-    private void validatePrepareCommand(Metadata metadata,
-                                        MetadataField owner,
-                                        ModuleMetadataMeasureUnitPrepareCommand command,
-                                        FieldMeasureUnitMode unitMode) {
-        PlatformNameRules.requireIdentifier(command.unitCategoryAlias(), "unitCategoryAlias");
-        PlatformNameRules.requireIdentifier(command.baseUnitCode(), "baseUnitCode");
-        if (hasText(command.baseUnitCategoryAlias())) {
-            PlatformNameRules.requireIdentifier(command.baseUnitCategoryAlias(), "baseUnitCategoryAlias");
-        }
-        if (hasText(command.defaultUnitCode())) {
-            PlatformNameRules.requireIdentifier(command.defaultUnitCode(), "defaultUnitCode");
-        }
-        if (unitMode == FieldMeasureUnitMode.FIXED) {
-            PlatformNameRules.requireIdentifier(command.fixedUnitCode(), "fixedUnitCode");
-        } else {
-            validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MEASURE_UNIT,
-                    defaultText(command.unitFieldName(), owner.getFieldName() + "Unit"),
-                    defaultText(command.unitFieldTypeAlias(), "string"),
-                    FieldType.STRING);
-        }
-        validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MEASURE_BASE_VALUE,
-                defaultText(command.baseValueFieldName(), owner.getFieldName() + "Base"),
-                defaultText(command.baseValueFieldTypeAlias(), owner.getFieldTypeAlias()),
-                null);
-        if (hasText(command.conversionScopeFieldId())) {
-            MetadataField scopeField = requireField(command.conversionScopeFieldId());
-            if (!Objects.equals(scopeField.getMetadataId(), metadata.getId())) {
-                throw new PlatformException("conversionScopeFieldId must belong to same metadata: "
-                        + command.conversionScopeFieldId());
-            }
-        }
-    }
-
-    private void validateMoneyPrepareCommand(Metadata metadata,
-                                             MetadataField owner,
-                                             ModuleMetadataMoneyPrepareCommand command,
-                                             FieldMoneyMode currencyMode) {
-        if (currencyMode == FieldMoneyMode.FIXED) {
-            requireCurrencyCode(command.fixedCurrencyCode(), "fixedCurrencyCode");
-        } else {
-            validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MONEY_CURRENCY,
-                    defaultText(command.currencyFieldName(), owner.getFieldName() + "Currency"),
-                    defaultText(command.currencyFieldTypeAlias(), "string"),
-                    FieldType.STRING);
-        }
-        if (hasText(command.defaultCurrencyCode())) {
-            requireCurrencyCode(command.defaultCurrencyCode(), "defaultCurrencyCode");
-        }
-        if (hasText(command.baseCurrencyCode())) {
-            requireCurrencyCode(command.baseCurrencyCode(), "baseCurrencyCode");
-        }
-        requireRateTypeCode(command.rateTypeCode(), "rateTypeCode");
-        validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MONEY_BASE_AMOUNT,
-                defaultText(command.baseAmountFieldName(), owner.getFieldName() + "Base"),
-                defaultText(command.baseAmountFieldTypeAlias(), owner.getFieldTypeAlias()),
-                null);
-        if (Boolean.TRUE.equals(command.createExchangeRateField())
-                || hasText(command.exchangeRateFieldName())) {
-            validatePreparedFieldSpec(metadata, owner, MetadataFieldRole.MONEY_EXCHANGE_RATE,
-                    defaultText(command.exchangeRateFieldName(), owner.getFieldName() + "ExchangeRate"),
-                    defaultText(command.exchangeRateFieldTypeAlias(), "decimal"),
-                    null);
-        }
-        if (hasText(command.rateDateFieldId())) {
-            MetadataField rateDateField = requireField(command.rateDateFieldId());
-            if (!Objects.equals(rateDateField.getMetadataId(), metadata.getId())) {
-                throw new PlatformException("rateDateFieldId must belong to same metadata: "
-                        + command.rateDateFieldId());
-            }
-            FieldType type = requireFieldType(rateDateField);
-            if (type != FieldType.DATE && type != FieldType.TIMESTAMP && type != FieldType.ZONED_TIMESTAMP) {
-                throw new PlatformException("money rate date field requires date or timestamp field: "
-                        + rateDateField.getFieldName());
-            }
-        }
-    }
-
-    private void validatePreparedFieldSpec(Metadata metadata,
-                                           MetadataField owner,
-                                           MetadataFieldRole role,
-                                           String fieldName,
-                                           String fieldTypeAlias,
-                                           FieldType expectedType) {
-        MetadataField existing = findOneRelatedField(metadata.getId(), owner.getId(), role);
-        if (existing != null) {
-            return;
-        }
-        String validFieldName = PlatformNameRules.requireFieldName(fieldName, "relatedFieldName");
-        rejectRelatedFieldNameCollision(metadata.getId(), validFieldName, role);
-        rejectRelatedColumnNameCollision(metadata.getId(), toColumnName(validFieldName));
-        PlatformFieldType fieldType = fieldTypeService.requireFieldType(
-                PlatformNameRules.requireIdentifier(fieldTypeAlias, "relatedFieldTypeAlias"));
-        if (expectedType != null && fieldType.getFieldType() != expectedType) {
-            throw new PlatformException("related field requires " + expectedType + " field type: "
-                    + validFieldName);
-        }
-        if ((role == MetadataFieldRole.MEASURE_BASE_VALUE
-                || role == MetadataFieldRole.MONEY_BASE_AMOUNT
-                || role == MetadataFieldRole.MONEY_EXCHANGE_RATE)
-                && fieldType.getFieldType() != FieldType.INTEGER
-                && fieldType.getFieldType() != FieldType.LONG
-                && fieldType.getFieldType() != FieldType.DECIMAL) {
-            throw new PlatformException("related numeric field requires numeric field type: " + validFieldName);
-        }
     }
 
     private MetadataField findOneRelatedField(String metadataId, String ownerFieldId, MetadataFieldRole role) {

@@ -29,10 +29,6 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareCommand;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareResult;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMoneyPrepareCommand;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMoneyPrepareResult;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
@@ -221,94 +217,6 @@ class PlatformConfigurationWebControllerTest {
         assertThatThrownBy(() -> controller.ensure(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not belong to module");
-    }
-
-    @Test
-    void shouldPrepareMeasureUnitFieldsFromModuleFieldPath() throws Exception {
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        PlatformModuleMetadataFieldWebController controller =
-                new PlatformModuleMetadataFieldWebController(relationService);
-        ReflectionTestUtils.setField(controller, "service", fieldService);
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId("rel-1");
-        relation.setModuleAlias("platform.sales.order");
-        when(relationService.select("rel-1")).thenReturn(relation);
-        ModuleMetadataField moduleField = new ModuleMetadataField();
-        moduleField.setId("field-1");
-        moduleField.setRelationId("rel-1");
-        moduleField.setMetadataFieldId("quantity-field");
-        when(fieldService.select("field-1")).thenReturn(moduleField);
-        when(fieldService.prepareMeasureUnitConfig(eq("field-1"), any(ModuleMetadataMeasureUnitPrepareCommand.class)))
-                .thenReturn(new ModuleMetadataMeasureUnitPrepareResult(moduleField, null, null));
-
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/fields/field-1/measure-unit/prepare")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"unitCategoryAlias\":\"package\",\"baseUnitCode\":\"bottle\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleField.id").value("field-1"));
-
-        verify(fieldService).prepareMeasureUnitConfig(eq("field-1"), argThat(command ->
-                "package".equals(command.unitCategoryAlias()) && "bottle".equals(command.baseUnitCode())));
-    }
-
-    @Test
-    void shouldPrepareMoneyFieldsFromModuleFieldPath() throws Exception {
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        PlatformModuleMetadataFieldWebController controller =
-                new PlatformModuleMetadataFieldWebController(relationService);
-        ReflectionTestUtils.setField(controller, "service", fieldService);
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId("rel-1");
-        relation.setModuleAlias("platform.sales.order");
-        when(relationService.select("rel-1")).thenReturn(relation);
-        ModuleMetadataField moduleField = new ModuleMetadataField();
-        moduleField.setId("field-1");
-        moduleField.setRelationId("rel-1");
-        moduleField.setMetadataFieldId("amount-field");
-        when(fieldService.select("field-1")).thenReturn(moduleField);
-        when(fieldService.prepareMoneyConfig(eq("field-1"), any(ModuleMetadataMoneyPrepareCommand.class)))
-                .thenReturn(new ModuleMetadataMoneyPrepareResult(moduleField, null, null, null));
-
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/fields/field-1/money/prepare")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"baseCurrencyCode\":\"CNY\",\"rateTypeCode\":\"SPOT\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleField.id").value("field-1"));
-
-        verify(fieldService).prepareMoneyConfig(eq("field-1"), argThat(command ->
-                "CNY".equals(command.baseCurrencyCode()) && "SPOT".equals(command.rateTypeCode())));
-    }
-
-    @Test
-    void shouldRejectPrepareMeasureUnitWhenModuleFieldBelongsToOtherRelation() {
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        PlatformModuleMetadataFieldWebController controller =
-                new PlatformModuleMetadataFieldWebController(relationService);
-        ReflectionTestUtils.setField(controller, "service", fieldService);
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId("rel-1");
-        relation.setModuleAlias("platform.sales.order");
-        when(relationService.select("rel-1")).thenReturn(relation);
-        ModuleMetadataField moduleField = new ModuleMetadataField();
-        moduleField.setId("field-1");
-        moduleField.setRelationId("other-rel");
-        when(fieldService.select("field-1")).thenReturn(moduleField);
-
-        MockHttpServletRequest request = requestVars(Map.of(
-                "moduleAlias", "platform.sales.order",
-                "relationId", "rel-1"));
-
-        assertThatThrownBy(() -> controller.prepareMeasureUnit(request, "field-1",
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package", null, null, null, null, null,
-                        null, "bottle", null, null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("does not belong to relation");
     }
 
     @Test
