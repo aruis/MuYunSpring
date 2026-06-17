@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.platform.code;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
@@ -17,6 +16,7 @@ import java.util.Objects;
 @Service
 public class CodeBusinessTimeService {
     private final PlatformTimeService platformTimeService;
+    private final List<BusinessTimeZoneResolver> organizationTimeZoneResolvers;
 
     public CodeBusinessTimeService() {
         this(Clock.systemDefaultZone(), List.of());
@@ -27,13 +27,18 @@ public class CodeBusinessTimeService {
     }
 
     public CodeBusinessTimeService(Clock clock, List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
-        this.platformTimeService = new PlatformTimeService(clock, adapters(organizationTimeZoneResolvers));
+        this(new PlatformTimeService(clock), organizationTimeZoneResolvers);
+    }
+
+    public CodeBusinessTimeService(PlatformTimeService platformTimeService) {
+        this(platformTimeService, List.of());
     }
 
     @Autowired
-    public CodeBusinessTimeService(ObjectProvider<Clock> clockProvider,
+    public CodeBusinessTimeService(PlatformTimeService platformTimeService,
                                    List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
-        this(clockProvider == null ? null : clockProvider.getIfAvailable(), organizationTimeZoneResolvers);
+        this.platformTimeService = platformTimeService == null ? new PlatformTimeService() : platformTimeService;
+        this.organizationTimeZoneResolvers = adapters(organizationTimeZoneResolvers);
     }
 
     public LocalDateTime resolveBusinessLocalDateTime(String organizationId, LocalDateTime explicitAt) {
@@ -44,8 +49,19 @@ public class CodeBusinessTimeService {
     }
 
     public LocalDateTime resolveBusinessLocalDateTime(String organizationId, Instant instant) {
+        BusinessTimeContext context = BusinessTimeContext.ofOrganization(organizationId);
+        for (BusinessTimeZoneResolver resolver : organizationTimeZoneResolvers) {
+            java.util.Optional<ZoneId> resolved = resolver.resolveZoneId(context);
+            ZoneId zoneId = (resolved == null ? java.util.Optional.<ZoneId>empty() : resolved)
+                    .filter(Objects::nonNull)
+                    .orElse(null);
+            if (zoneId != null) {
+                context = context.withZone(zoneId);
+                break;
+            }
+        }
         return platformTimeService.resolveBusinessLocalDateTime(
-                BusinessTimeContext.ofOrganization(organizationId),
+                context,
                 instant
         );
     }

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.code;
 
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -27,5 +28,21 @@ class CodeBusinessTimeServiceTest {
                 .isEqualTo(LocalDateTime.of(2027, 1, 1, 0, 30));
         assertThat(service.resolveBusinessLocalDateTime("org-unknown", clock.instant()))
                 .isEqualTo(LocalDateTime.of(2026, 12, 31, 16, 30));
+    }
+
+    @Test
+    void shouldFallbackToPlatformDefaultZoneWhenOrganizationZoneMissing() {
+        Clock clock = Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"), ZoneOffset.UTC);
+        CodeBusinessTimeService service = new CodeBusinessTimeService(
+                new PlatformTimeService(
+                        clock,
+                        ZoneId.of("Asia/Shanghai"),
+                        List.of()
+                ),
+                List.of(organizationId -> Optional.empty())
+        );
+
+        assertThat(service.resolveBusinessLocalDateTime("org-unknown", clock.instant()))
+                .isEqualTo(LocalDateTime.of(2027, 1, 1, 0, 30));
     }
 }
