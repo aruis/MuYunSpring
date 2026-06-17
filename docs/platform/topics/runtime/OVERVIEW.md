@@ -60,6 +60,18 @@ CRUD/query 链路由 `DynamicRecordService` 进入实体服务，继续复用平
 
 OpenAPI 链路以 descriptor 为输入，输出基础文档模型，用于联调和前端理解当前模块接口。它是动态模块当前运行态的描述，不替代配置治理，也不等同完整手写 OpenAPI 规范。
 
+## 时间字段语义
+
+动态字段的时间语义按字段类型稳定表达：
+
+| 字段类型 | 语义 | 存储与动态 CRUD/API 输入口径 |
+| --- | --- | --- |
+| `DATE` | 业务日期 | 表示本地业务日，不做时区换算。 |
+| `TIMESTAMP` | UTC 绝对时刻 | 表示已经确定的发生时刻，动态 CRUD/API 输入使用秒级 UTC instant。导入导出的 workbook 时区解释归属数据交换专题。 |
+| `ZONED_TIMESTAMP` | 带业务时区来源的绝对时刻 | 业务值仍存 UTC instant，同时必须声明 IANA `ZoneId` companion 字段。 |
+
+`ZONED_TIMESTAMP` 当前契约是 `instant + timeZone`，用于保留业务时区来源并支撑后续展示、导入导出和查询口径。一期不额外保存原始 `LocalDateTime`；周期性本地时间、工作日历、营业时间和跨时区调度属于后续业务时间能力。
+
 ## 边界说明
 
 1. 动态运行态只执行当前运行态快照，不负责配置态编辑、版本归档、指针切换和迁移治理。
