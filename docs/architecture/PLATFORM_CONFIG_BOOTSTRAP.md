@@ -7,7 +7,7 @@
 这条链路要证明：
 
 1. 平台配置业务本身可以复用基础能力体系。
-2. 动态模块不再只靠代码或测试构造元数据，而能从持久化配置发布到运行态。
+2. 动态模块不再只靠代码或测试构造元数据，而能从持久化配置刷新到运行态。
 3. 模块、元数据、菜单、字典使用统一命名和关系边界，避免后续业务接入时重新发明规则。
 
 ## 标识规则
@@ -25,7 +25,7 @@
 
 `applicationAlias` 使用单段小写标识；`moduleAlias` 使用至少两段点分小写标识，并与动态运行态模块别名校验保持一致。
 
-元数据 `id` 是平台稳定 ID，由平台生成；物理表定位至少包含 `schemaName + tableName`。表名是存储属性，不作为元数据身份。默认场景下 `schemaName` 和 `tableName` 可由平台生成，发布建表后不允许作为普通配置随意修改。
+元数据 `id` 是平台稳定 ID，由平台生成；物理表定位至少包含 `schemaName + tableName`。表名是存储属性，不作为元数据身份。默认场景下 `schemaName` 和 `tableName` 可由平台生成，schema ensure 建表后不允许作为普通配置随意修改。
 
 ## 核心模型
 
@@ -90,7 +90,7 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 `ModuleMetadataField` 是模块元数据关系下的字段配置聚合根，表达“某个 `ModuleMetadataRelation` 下某个 `MetadataField` 在当前模块语境中如何使用”。同一套元数据绑定到不同模块时，可以拥有不同的字段辅助配置。主表承载高频单值配置，例如默认值、校验正则、可复制、字典、引用模块、引用 key/label 字段、引用触发生单规则、引用查询模板和扩展字段集合；多值规则用 `ModuleMetadataFieldFilter` 和 `ModuleMetadataFieldAffect` 子表表达。查询模板、生单、回写、引用过滤等配置态能力应优先引用 `ModuleMetadataField.id`，再由服务解析出模块 alias、关系 alias、元数据 alias、字段名、列名和字段类型等运行所需事实。编码规则、生单字段映射、拆分数量字段和拆分分组字段已经按该口径保存配置坐标，并保留 `fieldName` 作为运行态快照。
 
-模块字段引用配置会发布为动态 `EntityReferenceDefinition` 和 descriptor 契约，输出引用目标模块、目标实体、key/label 字段、触发生单规则、查询模板和扩展字段集合。`referenceGenerateRuleId` 必须通过平台 validator 校验方向：引用模块是生单 source，当前字段所属模块是生单 target。引用过滤和带出只允许挂在完整引用字段上，当前引用目标字段限定为目标模块主关系字段；发布后形成“当前表单字段 -> 引用目标字段”的过滤契约，以及“引用目标字段 -> 当前表单字段”的带出契约。运行态 `DynamicRecordService.resolveReference` 可接收当前表单值，将过滤契约叠加为引用查询条件，并在候选项上返回带出回填 patch；引用解析支持跨动态模块目标，由 `DynamicRecordRuntime` 解析 `ReferenceTarget` 到目标实体服务。`ReferenceRecordGenerationFacade` 可按当前模块、实体、引用字段和选中的引用记录触发生单规则，并负责确认草稿落库时携带 originContext；动态 Web 提供引用字段生单和生成草稿确认入口，生成草稿可携带一级子表 `children` envelope 原样确认，供动态表单查询、选择回填、引用生单、生成关系登记和回写流程消费。如后续需要引用子关系，应先补显式目标 relation 坐标。
+模块字段引用配置会编译为动态 `EntityReferenceDefinition` 和 descriptor 契约，输出引用目标模块、目标实体、key/label 字段、触发生单规则、查询模板和扩展字段集合。`referenceGenerateRuleId` 必须通过平台 validator 校验方向：引用模块是生单 source，当前字段所属模块是生单 target。引用过滤和带出只允许挂在完整引用字段上，当前引用目标字段限定为目标模块主关系字段；运行态刷新后形成“当前表单字段 -> 引用目标字段”的过滤契约，以及“引用目标字段 -> 当前表单字段”的带出契约。运行态 `DynamicRecordService.resolveReference` 可接收当前表单值，将过滤契约叠加为引用查询条件，并在候选项上返回带出回填 patch；引用解析支持跨动态模块目标，由 `DynamicRecordRuntime` 解析 `ReferenceTarget` 到目标实体服务。`ReferenceRecordGenerationFacade` 可按当前模块、实体、引用字段和选中的引用记录触发生单规则，并负责确认草稿落库时携带 originContext；动态 Web 提供引用字段生单和生成草稿确认入口，生成草稿可携带一级子表 `children` envelope 原样确认，供动态表单查询、选择回填、引用生单、生成关系登记和回写流程消费。如后续需要引用子关系，应先补显式目标 relation 坐标。
 
 字段行为表达服务端可执行的字段规则，当前包括默认值、校验正则、可复制标记和写保护。默认值在动态记录插入前由运行态填充；校验正则只适用于字符串类字段；写保护字段拒绝外部显式写入，但平台内部能力仍可写入自己的标准字段和关系外键。可复制标记当前只作为 descriptor 契约输出，供后续复制能力或前端交互使用。关系级字段行为可以按属性覆盖默认配置，但当前不提供“显式清空继承值”的语义；如需清空默认值或正则，应调整默认配置。视图只读只影响展示和交互，不等同于服务端写保护。
 

@@ -192,7 +192,7 @@
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
 
-计量单位验收优先使用换算预览接口，不需要先发布动态模块。
+计量单位验收优先使用换算预览接口，不依赖动态模块运行态刷新。
 
 同分类线性换算请求示例：
 
@@ -224,7 +224,7 @@
 
 ## 币种与汇率
 
-币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护、基础折算和模块金额字段准备动作；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置包健康检查和导入导出金额列联动属于后续能力。
+币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护、基础折算和模块字段配置中的金额字段契约；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置包健康检查已经覆盖基础金额字段契约和依赖声明，导入导出金额列联动属于后续能力。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
@@ -327,7 +327,7 @@
 
 模块字段配置也可声明金额消费契约。主金额字段通过 `moneyCurrencyMode` 进入金额能力；`FIXED` 时使用 `moneyFixedCurrencyCode`，`SELECTABLE` 时绑定同元数据、同 owner 的币种伴生字段 `moneyCurrencyFieldId`。`moneyBaseAmountFieldId` 是动态保存时写入的本位金额影子字段；`moneyBaseCurrencyCode` 可固定本位币，未配置时运行态按租户本位币设置解析；`moneyRateTypeCode` 必填；`moneyRateDateFieldId` 可绑定业务日期字段；`moneyExchangeRateFieldId` 可选，用于保存本次折算汇率。
 
-计量单位和金额配置都通过标准 `fields/insert`、`fields/update/{id}` 保存并立即生效，不提供独立 prepare/ensure Web 入口。保存时如缺少必需的伴生/影子字段，平台会按默认命名自动创建或复用，并同步当前 relation 下的模块字段配置：可选计量单位会补单位伴生字段，计量单位始终补标准值影子字段；可选金额会补币种伴生字段，金额始终补本位金额影子字段。固定单位/固定币种不创建伴生字段。汇率影子字段是可选绑定，平台只在请求中传入已有 `moneyExchangeRateFieldId` 时校验和使用它。
+计量单位和金额配置都通过标准 `fields/insert`、`fields/update/{id}` 保存并立即生效，不提供计量单位或金额字段能力专用 prepare/ensure Web 入口。保存时如缺少必需的伴生/影子字段，平台会按默认命名自动创建或复用，并同步当前 relation 下的模块字段配置：可选计量单位会补单位伴生字段，计量单位始终补标准值影子字段；可选金额会补币种伴生字段，金额始终补本位金额影子字段。固定单位/固定币种不创建伴生字段。汇率影子字段是可选绑定，平台只在请求中传入已有 `moneyExchangeRateFieldId` 时校验和使用它。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
