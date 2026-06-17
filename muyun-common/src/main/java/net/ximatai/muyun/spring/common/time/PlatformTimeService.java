@@ -10,6 +10,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public class PlatformTimeService {
     private final Clock clock;
@@ -105,8 +106,10 @@ public class PlatformTimeService {
             throw new IllegalArgumentException("timeZone must be an IANA ZoneId");
         }
         try {
-            ZoneId zoneId = ZoneId.of(value.trim());
-            if (zoneId instanceof ZoneOffset) {
+            String zoneIdText = value.trim();
+            ZoneId zoneId = ZoneId.of(zoneIdText);
+            Set<String> availableZoneIds = ZoneId.getAvailableZoneIds();
+            if (zoneId instanceof ZoneOffset || !availableZoneIds.contains(zoneIdText)) {
                 throw new IllegalArgumentException("timeZone must be an IANA ZoneId");
             }
             return zoneId;

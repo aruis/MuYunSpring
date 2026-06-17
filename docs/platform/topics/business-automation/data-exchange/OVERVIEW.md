@@ -23,6 +23,16 @@
 
 用户级导出字段、列宽、排序等个人化设置优先由页面偏好承载；只有出现可共享、可发布的系统级导出模板时，才单独抽象模板模型。
 
+## 时间交换口径
+
+工作簿 meta 中的 `timeZone` 用于解释无时区的本地日期时间，必须是 IANA `ZoneId`，例如 `Asia/Shanghai`，不接受 `+08:00`、`GMT+08:00`、`UTC+08:00` 这类 fixed-offset 写法。
+
+动态时间字段按运行态字段语义处理：
+
+- `DATE` 按业务日期导入导出，不做时区换算。
+- `TIMESTAMP` 可导入 UTC instant，也可导入工作簿 `timeZone` 下的本地日期时间并转换为 UTC instant。
+- `ZONED_TIMESTAMP` 模板会同时输出 owner 列和 companion timeZone 列；导入时两列必须同时提供，owner 值按 companion IANA `ZoneId` 转成 UTC instant。
+
 ## 后续增强
 
 以下能力不属于当前收口范围：引用 projection、跨 sheet 辅助页、静态业务导入导出、更复杂子表层级和 dry-run 后的配置草稿应用。

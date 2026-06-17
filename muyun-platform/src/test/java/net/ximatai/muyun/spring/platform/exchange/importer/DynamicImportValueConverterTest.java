@@ -4,6 +4,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.exchange.model.ParsedColumn;
 import net.ximatai.muyun.spring.platform.exchange.model.ParsedSheet;
+import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookMeta;
+import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +48,22 @@ class DynamicImportValueConverterTest {
                 .containsEntry("timestampUtcValue", Instant.parse("2026-06-08T01:02:03Z"))
                 .containsEntry("timestampLocalValue", Instant.parse("2026-06-08T01:30:00Z"));
         assertThat(row.convertedValues()).doesNotContainKey("textValue");
+    }
+
+    @Test
+    void shouldRejectWorkbookOffsetTimeZone() {
+        assertThatThrownBy(() -> ImportTemporalContext.from(new ParsedWorkbook(
+                new ExcelWorkbookMeta("1", "sales.order", "order-import", "Order Import", "+08:00"),
+                List.of(typeSheet())
+        )))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
+        assertThatThrownBy(() -> ImportTemporalContext.from(new ParsedWorkbook(
+                new ExcelWorkbookMeta("1", "sales.order", "order-import", "Order Import", "UTC+08:00"),
+                List.of(typeSheet())
+        )))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
     }
 
     @Test

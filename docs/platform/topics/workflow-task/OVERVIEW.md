@@ -79,6 +79,8 @@
 
 超期能力只扫描活动审批节点，只更新节点超期状态并写入预警或超期事件。不自动审批，不自动流转。
 
+当前超期配置是自然时间分钟数，从节点激活时刻按绝对 elapsed time 计算；它不是工作日历 SLA，也不排除节假日或非工作时间。后续如进入工作时间 SLA，应在工作流节点定义上显式区分自然时间和业务日历时间，并接入平台业务时间服务与日历能力。
+
 ### 插件挂点
 
 工作流运行插件面向稳定动作前后切点。当前支持 `submit`、`approve`、`forceApprove`、`transfer`、`reject`、`rollback`、`revoke`、`reset`、`terminate`、`forceTerminate` 的 before/after 事件。

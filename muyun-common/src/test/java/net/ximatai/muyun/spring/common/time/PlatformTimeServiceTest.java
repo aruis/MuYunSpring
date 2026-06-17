@@ -125,5 +125,11 @@ class PlatformTimeServiceTest {
         assertThatThrownBy(() -> PlatformTimeService.requireIanaZoneId("Z"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("IANA");
+        assertThatThrownBy(() -> PlatformTimeService.requireIanaZoneId("GMT+08:00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("IANA");
+        assertThatThrownBy(() -> PlatformTimeService.requireIanaZoneId("UTC+08:00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("IANA");
     }
 }

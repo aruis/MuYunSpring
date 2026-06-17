@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.exchange.protocol;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelColumnPlan;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelSheetPlan;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookMeta;
@@ -9,7 +10,6 @@ import net.ximatai.muyun.spring.platform.exchange.model.ParsedColumn;
 import net.ximatai.muyun.spring.platform.exchange.model.ParsedSheet;
 import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 
-import java.time.ZoneId;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -64,7 +64,7 @@ public class ExcelExchangeProtocolValidator {
             return;
         }
         try {
-            ZoneId.of(meta.timeZone());
+            PlatformTimeService.requireIanaZoneId(meta.timeZone());
         } catch (Exception ex) {
             throw new PlatformException("exchange workbook timeZone is invalid: " + meta.timeZone(), ex);
         }
