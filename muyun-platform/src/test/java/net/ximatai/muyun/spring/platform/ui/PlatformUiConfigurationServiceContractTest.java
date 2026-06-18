@@ -19,6 +19,10 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
@@ -136,6 +140,43 @@ class PlatformUiConfigurationServiceContractTest {
                 .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
                 .containsExactly(customerNameField);
         assertThat(snapshot.uiFields().getFirst().getFieldUiTypeAlias()).isEqualTo("text");
+    }
+
+    @Test
+    void shouldExposeFieldUiTypeMappingsInPageBootstrap() {
+        seedFieldType("date", FieldType.DATE, DynamicQueryOperator.BETWEEN);
+        seedUiType("date_range", "date");
+        seedUiTypeFieldMapping("date_range", "end");
+        String signedDateField = seedModuleField("crm.contract", "contract", "signedDate", "signed_date", "date");
+        String uiSetId = uiSetService.insert(uiSet("crm.contract", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, signedDateField, "date_range"));
+        publishService.publishUiConfig(uiConfigId);
+        Menu menu = new Menu();
+        menu.setId("menu-1");
+        menu.setTitle("Contracts");
+        menu.setMenuType(MenuType.MODULE);
+        menu.setModuleAlias("crm.contract");
+        menu.setPageMode(MenuPageMode.LIST);
+        MenuService menuService = org.mockito.Mockito.mock(MenuService.class);
+        org.mockito.Mockito.when(menuService.currentUserVisibleMenu("menu-1")).thenReturn(menu);
+        PlatformPageBootstrapService bootstrapService = new PlatformPageBootstrapService(
+                menuService,
+                snapshotService,
+                moduleFieldService,
+                fieldUiTypeService,
+                fieldUiTypeAttributeService,
+                fieldUiTypeFieldMappingService);
+
+        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu("menu-1", PlatformUiClientType.WEB);
+
+        assertThat(bootstrap.resolvedConfig().uiFields()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldUiTypeAlias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().alias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
+                .extracting(PlatformResolvedFieldUiTypeFieldMapping::sourceKey)
+                .containsExactly("end");
     }
 
     @Test
