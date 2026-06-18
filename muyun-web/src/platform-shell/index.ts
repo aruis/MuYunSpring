@@ -8,4 +8,5 @@ export {
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
+  tryPageDescriptorFromUrl,
 } from './menuNavigation';

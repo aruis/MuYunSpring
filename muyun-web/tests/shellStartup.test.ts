@@ -60,6 +60,16 @@ const menus = [
     },
     children: [],
   },
+  {
+    record: {
+      id: 'metadata-shortcut',
+      schemeId: 'default',
+      title: 'Metadata Shortcut',
+      menuType: 'ROUTE',
+      route: '/platform/metadata',
+    },
+    children: [],
+  },
 ];
 
 test('loadShellStartupState creates the first available navigation tab', async () => {
@@ -182,7 +192,7 @@ test('activeTabUrlOf returns the active tab descriptor URL', () => {
       tabs: [tab],
       activeTabKey: tab.key,
     }),
-    '/platform/metadata',
+    '/platform/metadata?_muyunMenuId=metadata',
   );
 });
 
@@ -207,7 +217,7 @@ test('activeTabUrlOf keeps new-window external links on shell-owned URLs', () =>
       tabs: [tab],
       activeTabKey: tab.key,
     }),
-    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+    '/platform/external?_muyunMenuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
   );
 });
 
@@ -246,7 +256,41 @@ test('restoreShellStartupStateFromUrl preserves query when URL matches a menu ta
   assert.equal(restored.activeTabKey, 'menu:metadata');
   assert.equal(restored.tabs?.length, 1);
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.query?.view, 'advanced');
-  assert.equal(activeTabUrlOf(restored), '/platform/metadata?view=advanced');
+  assert.equal(
+    activeTabUrlOf(restored),
+    '/platform/metadata?_muyunMenuId=metadata&_muyunTitle=Metadata&view=advanced',
+  );
+});
+
+test('restoreShellStartupStateFromUrl prefers explicit menu id when routes are duplicated', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+  };
+
+  const restored = restoreShellStartupStateFromUrl(
+    state,
+    '/platform/metadata?_muyunMenuId=metadata-shortcut',
+  );
+
+  assert.equal(restored.activeTabKey, 'menu:metadata-shortcut');
+  assert.equal(restored.tabs?.[0]?.title, 'Metadata Shortcut');
+  assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata-shortcut');
+});
+
+test('restoreShellStartupStateFromUrl ignores explicit menu id when target does not match', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+  };
+
+  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata?_muyunMenuId=runtime');
+
+  assert.equal(restored.activeTabKey, 'menu:metadata');
+  assert.equal(restored.tabs?.[0]?.title, 'Metadata');
+  assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata');
 });
 
 test('activeTabUrlOf returns undefined when no active tab remains', () => {
@@ -273,6 +317,44 @@ test('restoreShellStartupStateFromUrl creates direct tab when URL has no menu ma
   assert.equal(restored.activeTabKey, 'platform-route:/crm/customer/list');
   assert.equal(restored.tabs?.[0]?.target, undefined);
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
+});
+
+test('restoreShellStartupStateFromUrl keeps current state for invalid shell-owned URLs', () => {
+  const metadata = menus[0].children[0].children[0].record;
+  const target = getMenuNavigationTarget(metadata);
+  assert.ok(target);
+
+  const defaultTab = openMenuTab([], metadata, target).tabs[0];
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [defaultTab],
+    activeTabKey: defaultTab.key,
+  };
+
+  for (const url of ['/platform/external', '/platform/workspace']) {
+    const restored = restoreShellStartupStateFromUrl(state, url);
+
+    assert.equal(restored.activeTabKey, 'menu:metadata');
+    assert.equal(restored.tabs?.length, 1);
+    assert.equal(restored.tabs?.[0]?.key, 'menu:metadata');
+  }
+});
+
+test('restoreShellStartupStateFromUrl keeps empty workspace for invalid shell-owned URLs', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+    activeTabKey: undefined,
+  };
+
+  for (const url of ['/platform/dynamic', '/platform/dynamic//list']) {
+    const restored = restoreShellStartupStateFromUrl(state, url);
+
+    assert.equal(restored.activeTabKey, undefined);
+    assert.deepEqual(restored.tabs, []);
+  }
 });
 
 test('restoreShellStartupStateFromUrl matches dynamic menu without title query', () => {

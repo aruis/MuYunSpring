@@ -27,6 +27,10 @@ export interface PageDescriptorUrlParseOptions {
 }
 
 const defaultBusinessRoutePrefixes: string[] = [];
+const SHELL_MENU_ID_QUERY_KEY = '_muyunMenuId';
+const SHELL_TITLE_QUERY_KEY = '_muyunTitle';
+const SHELL_ENTRY_PARAMS_QUERY_KEY = '_muyunEntryParams';
+const legacyShellQueryKeys = ['entryParamsJson', 'menuId', 'title'];
 
 export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget | undefined {
   if (menu.menuType === 'MODULE' && menu.moduleAlias) {
@@ -118,7 +122,10 @@ export function resolvePageDescriptor(
       menuId: target.menuId,
       target: { url: target.externalUrl },
       entryParamsJson: target.entryParamsJson,
-      tabPolicy: { identity: 'by-target', closable: true },
+      tabPolicy: {
+        identity: target.menuId ? 'by-menu' : 'by-target',
+        closable: true,
+      },
     };
   }
 
@@ -130,7 +137,10 @@ export function resolvePageDescriptor(
     menuId: target.menuId,
     target: { url: target.externalUrl },
     entryParamsJson: target.entryParamsJson,
-    tabPolicy: { identity: 'by-target', closable: true },
+    tabPolicy: {
+      identity: target.menuId ? 'by-menu' : 'by-target',
+      closable: true,
+    },
   };
 }
 
@@ -183,7 +193,12 @@ export function tabKeyOf(descriptor: PageDescriptor): string {
 export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
   if (descriptor.pageType === 'platform-route' || descriptor.pageType === 'business-route') {
     if (descriptor.target.route) {
-      return appendQuery(descriptor.target.route, descriptor.target.query ?? descriptor.params);
+      return appendQuery(descriptor.target.route, {
+        ...(descriptor.target.query ?? descriptor.params),
+        [SHELL_ENTRY_PARAMS_QUERY_KEY]: descriptor.entryParamsJson,
+        [SHELL_MENU_ID_QUERY_KEY]: descriptor.menuId,
+        [SHELL_TITLE_QUERY_KEY]: descriptor.title,
+      });
     }
 
     const entryQuery = descriptor.target.query ?? descriptor.params ?? {};
@@ -192,8 +207,8 @@ export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
       pageType: descriptor.pageType,
       routeName: descriptor.target.routeName,
       pageKey: descriptor.target.pageKey,
-      menuId: descriptor.menuId,
-      title: descriptor.title,
+      [SHELL_MENU_ID_QUERY_KEY]: descriptor.menuId,
+      [SHELL_TITLE_QUERY_KEY]: descriptor.title,
     };
     return appendQuery('/platform/workspace', query);
   }
@@ -202,11 +217,11 @@ export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
     const pageMode = descriptor.target.pageMode?.toLowerCase() ?? 'list';
     return appendQuery(`/platform/dynamic/${descriptor.target.moduleAlias}/${pageMode}`, {
       ...descriptor.params,
-      entryParamsJson: descriptor.entryParamsJson,
+      [SHELL_ENTRY_PARAMS_QUERY_KEY]: descriptor.entryParamsJson,
       uiConfigId: descriptor.target.defaultUiConfigId,
       queryTemplateId: descriptor.target.defaultQueryTemplateId,
-      menuId: descriptor.menuId,
-      title: descriptor.title,
+      [SHELL_MENU_ID_QUERY_KEY]: descriptor.menuId,
+      [SHELL_TITLE_QUERY_KEY]: descriptor.title,
     });
   }
 
@@ -214,8 +229,8 @@ export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
     return appendQuery('/platform/external', {
       url: descriptor.target.url,
       mode: descriptor.openMode,
-      menuId: descriptor.menuId,
-      title: descriptor.title,
+      [SHELL_MENU_ID_QUERY_KEY]: descriptor.menuId,
+      [SHELL_TITLE_QUERY_KEY]: descriptor.title,
     });
   }
 
@@ -230,21 +245,29 @@ export function pageDescriptorFromUrl(
   const path = parsedUrl.pathname;
   const query = queryRecordOf(parsedUrl.searchParams);
 
+  if (path === '/platform/dynamic') {
+    throw new Error(`Invalid dynamic module URL: ${url}`);
+  }
+
   if (path.startsWith('/platform/dynamic/')) {
     const [, , , moduleAlias, pageMode] = path.split('/');
+    if (!moduleAlias) {
+      throw new Error(`Invalid dynamic module URL: ${url}`);
+    }
     const params = withoutKeys(query, [
-      'entryParamsJson',
-      'menuId',
+      ...legacyShellQueryKeys,
+      SHELL_ENTRY_PARAMS_QUERY_KEY,
+      SHELL_MENU_ID_QUERY_KEY,
+      SHELL_TITLE_QUERY_KEY,
       'queryTemplateId',
-      'title',
       'uiConfigId',
     ]);
-    const menuId = stringValue(query.menuId);
+    const menuId = shellQueryValue(query, SHELL_MENU_ID_QUERY_KEY, 'menuId');
     return {
       pageType: 'dynamic-module',
       openMode: 'dynamic-runner',
       hostType: 'dynamic-module-host',
-      title: stringValue(query.title) ?? options.title,
+      title: shellQueryValue(query, SHELL_TITLE_QUERY_KEY, 'title') ?? options.title,
       menuId,
       target: {
         moduleAlias: decodeURIComponent(moduleAlias ?? ''),
@@ -253,7 +276,7 @@ export function pageDescriptorFromUrl(
         defaultQueryTemplateId: stringValue(query.queryTemplateId),
       },
       params,
-      entryParamsJson: stringValue(query.entryParamsJson),
+      entryParamsJson: shellQueryValue(query, SHELL_ENTRY_PARAMS_QUERY_KEY, 'entryParamsJson'),
       tabPolicy: menuId
         ? { identity: 'by-menu' as const, closable: true, cacheable: true }
         : { identity: 'by-target' as const, closable: true, cacheable: true },
@@ -262,8 +285,11 @@ export function pageDescriptorFromUrl(
 
   if (path === '/platform/external') {
     const remoteUrl = stringValue(query.url) ?? '';
+    if (!remoteUrl) {
+      throw new Error(`Invalid external page URL: ${url}`);
+    }
     const openMode = stringValue(query.mode) === 'new-window' ? 'new-window' : 'iframe';
-    const menuId = stringValue(query.menuId);
+    const menuId = shellQueryValue(query, SHELL_MENU_ID_QUERY_KEY, 'menuId');
     const tabPolicy = menuId
       ? { identity: 'by-menu' as const, closable: true }
       : { identity: 'by-target' as const, closable: true };
@@ -272,7 +298,7 @@ export function pageDescriptorFromUrl(
         pageType: 'remote-url',
         openMode,
         hostType: 'external-page-host',
-        title: stringValue(query.title) ?? options.title,
+        title: shellQueryValue(query, SHELL_TITLE_QUERY_KEY, 'title') ?? options.title,
         menuId,
         target: { url: remoteUrl },
         tabPolicy,
@@ -283,24 +309,35 @@ export function pageDescriptorFromUrl(
       pageType: 'external-link',
       openMode,
       hostType: 'external-page-host',
-      title: stringValue(query.title) ?? options.title,
+      title: shellQueryValue(query, SHELL_TITLE_QUERY_KEY, 'title') ?? options.title,
       menuId,
       target: { url: remoteUrl },
       tabPolicy,
     };
   }
 
+  if (path === '/platform/workspace' && !query.routeName && !query.pageKey) {
+    throw new Error(`Invalid workspace URL: ${url}`);
+  }
+
   if (path === '/platform/workspace' && (query.routeName || query.pageKey)) {
     const routeTarget: RoutePageTarget = {
       routeName: stringValue(query.routeName),
       pageKey: stringValue(query.pageKey),
-      query: withoutKeys(query, ['menuId', 'pageType', 'routeName', 'pageKey', 'title']),
+      query: withoutKeys(query, [
+        ...legacyShellQueryKeys,
+        SHELL_MENU_ID_QUERY_KEY,
+        SHELL_TITLE_QUERY_KEY,
+        'pageType',
+        'routeName',
+        'pageKey',
+      ]),
     };
     const pageType = stringValue(query.pageType) === 'business-route' ? 'business-route' : 'platform-route';
-    const menuId = stringValue(query.menuId);
+    const menuId = shellQueryValue(query, SHELL_MENU_ID_QUERY_KEY, 'menuId');
     const descriptorBase = {
       openMode: 'shell-route' as const,
-      title: stringValue(query.title) ?? options.title,
+      title: shellQueryValue(query, SHELL_TITLE_QUERY_KEY, 'title') ?? options.title,
       menuId,
       target: routeTarget,
       params: routeTarget.query,
@@ -325,15 +362,25 @@ export function pageDescriptorFromUrl(
   }
 
   const pageType = isBusinessRoutePath(path, options) ? 'business-route' : 'platform-route';
+  const menuId = shellQueryValue(query, SHELL_MENU_ID_QUERY_KEY);
+  const routeQuery = withoutKeys(query, [
+    SHELL_ENTRY_PARAMS_QUERY_KEY,
+    SHELL_MENU_ID_QUERY_KEY,
+    SHELL_TITLE_QUERY_KEY,
+  ]);
   const descriptorBase = {
     openMode: 'shell-route' as const,
-    title: options.title,
+    title: shellQueryValue(query, SHELL_TITLE_QUERY_KEY) ?? options.title,
+    menuId,
     target: {
       route: path,
-      query,
+      query: routeQuery,
     },
-    params: query,
-    tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+    params: routeQuery,
+    entryParamsJson: shellQueryValue(query, SHELL_ENTRY_PARAMS_QUERY_KEY),
+    tabPolicy: menuId
+      ? { identity: 'by-menu' as const, closable: true, cacheable: true }
+      : { identity: 'by-target' as const, closable: true, cacheable: true },
   };
 
   if (pageType === 'business-route') {
@@ -349,6 +396,17 @@ export function pageDescriptorFromUrl(
     pageType: 'platform-route',
     hostType: 'platform-route-host',
   };
+}
+
+export function tryPageDescriptorFromUrl(
+  url: string,
+  options: PageDescriptorUrlParseOptions = {},
+): PageDescriptor | undefined {
+  try {
+    return pageDescriptorFromUrl(url, options);
+  } catch {
+    return undefined;
+  }
 }
 
 function routeTargetOf(route: string, query?: Record<string, RouteQueryValue>): RoutePageTarget {
@@ -473,6 +531,14 @@ function stringValue(value: RouteQueryValue): string | undefined {
   }
 
   return value === null || value === undefined ? undefined : String(value);
+}
+
+function shellQueryValue(
+  query: Record<string, RouteQueryValue>,
+  key: string,
+  legacyKey?: string,
+): string | undefined {
+  return stringValue(query[key]) ?? (legacyKey ? stringValue(query[legacyKey]) : undefined);
 }
 
 const defaultPlatformRoutePrefixes = ['/platform'];

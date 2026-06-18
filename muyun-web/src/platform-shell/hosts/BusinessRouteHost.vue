@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { PlatformRoutePageDescriptor } from '@muyun/web-contracts';
+import type { BusinessRoutePageDescriptor } from '@muyun/web-contracts';
 import { computed } from 'vue';
 
-defineOptions({ name: 'PlatformRouteHost' });
+defineOptions({ name: 'BusinessRouteHost' });
 
 const props = defineProps<{
-  descriptor: PlatformRoutePageDescriptor;
+  descriptor: BusinessRoutePageDescriptor;
 }>();
 
 const title = computed(
@@ -18,9 +18,8 @@ const title = computed(
 </script>
 
 <template>
-  <RouterView v-if="props.descriptor.target.route === '/'" />
-  <section v-else class="page-host">
-    <p class="eyebrow">{{ props.descriptor.pageType }}</p>
+  <section class="page-host">
+    <p class="eyebrow">business-route</p>
     <h2>{{ title }}</h2>
   </section>
 </template>

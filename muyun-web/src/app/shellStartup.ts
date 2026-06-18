@@ -10,10 +10,10 @@ import {
   createMenuTab,
   findFirstNavigationMenu,
   getMenuNavigationTarget,
-  pageDescriptorFromUrl,
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
+  tryPageDescriptorFromUrl,
 } from '@muyun/platform-shell';
 
 export interface ShellStartupClients {
@@ -62,8 +62,16 @@ export function restoreShellStartupStateFromUrl(state: ShellStartupState, url: s
     return state;
   }
 
-  const descriptor = pageDescriptorFromUrl(url);
-  const menu = findMenuByDescriptor(state.menus, descriptor);
+  const descriptor = tryPageDescriptorFromUrl(url);
+  if (!descriptor) {
+    return state;
+  }
+
+  const explicitMenu = descriptor.menuId ? findMenuById(state.menus, descriptor.menuId) : undefined;
+  const menu =
+    explicitMenu && menuMatchesDescriptor(explicitMenu, descriptor)
+      ? explicitMenu
+      : findMenuByDescriptor(state.menus, descriptor);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
   const tab = menu && target ? createRestoredMenuTab(menu, target, descriptor) : createDirectTab(descriptor);
   const existingTabs = state.tabs ?? [];
@@ -164,9 +172,7 @@ function findMenuByDescriptor(
   descriptor: PageDescriptor,
 ): MenuRecord | undefined {
   for (const node of nodes) {
-    const target = getMenuNavigationTarget(node.record);
-    const menuDescriptor = target ? resolvePageDescriptor(target, { title: node.record.title }) : undefined;
-    if (menuDescriptor && matchesPageDescriptor(menuDescriptor, descriptor)) {
+    if (menuMatchesDescriptor(node.record, descriptor)) {
       return node.record;
     }
 
@@ -177,6 +183,12 @@ function findMenuByDescriptor(
   }
 
   return undefined;
+}
+
+function menuMatchesDescriptor(menu: MenuRecord, descriptor: PageDescriptor): boolean {
+  const target = getMenuNavigationTarget(menu);
+  const menuDescriptor = target ? resolvePageDescriptor(target, { title: menu.title }) : undefined;
+  return menuDescriptor ? matchesPageDescriptor(menuDescriptor, descriptor) : false;
 }
 
 function matchesPageDescriptor(left: PageDescriptor, right: PageDescriptor): boolean {
@@ -212,6 +224,21 @@ function matchesPageDescriptor(left: PageDescriptor, right: PageDescriptor): boo
   }
 
   return false;
+}
+
+function findMenuById(nodes: ShellStartupState['menus'], menuId: string): MenuRecord | undefined {
+  for (const node of nodes) {
+    if (node.record.id === menuId) {
+      return node.record;
+    }
+
+    const childMenu = findMenuById(node.children, menuId);
+    if (childMenu) {
+      return childMenu;
+    }
+  }
+
+  return undefined;
 }
 
 function ancestorMenuIds(
