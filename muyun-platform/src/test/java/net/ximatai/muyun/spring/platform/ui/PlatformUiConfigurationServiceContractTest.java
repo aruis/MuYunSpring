@@ -19,8 +19,15 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataField;
@@ -59,6 +66,7 @@ class PlatformUiConfigurationServiceContractTest {
     private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
     private final TestMemoryDao<Metadata> metadataDao = new TestMemoryDao<>();
     private final TestMemoryDao<MetadataField> fieldDao = new TestMemoryDao<>();
+    private final TestMemoryDao<MetadataFieldConfig> fieldConfigDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataRelation> relationDao = new TestMemoryDao<>();
     private final TestMemoryDao<ModuleMetadataField> moduleFieldDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformFieldType> fieldTypeDao = new TestMemoryDao<>();
@@ -83,6 +91,10 @@ class PlatformUiConfigurationServiceContractTest {
     private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
+    private final MetadataFieldConfigService fieldConfigService = new MetadataFieldConfigService(
+            fieldConfigDao, fieldService, metadataService, fieldTypeService, null, relationService);
+    private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
+            new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, null, fieldService);
     private final ModuleMetadataFieldService moduleFieldService =
             new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService);
     private final PlatformUiSetService uiSetService = new PlatformUiSetService(uiSetDao, moduleService);
@@ -93,7 +105,8 @@ class PlatformUiConfigurationServiceContractTest {
     private final PlatformQueryTemplateService queryTemplateService =
             new PlatformQueryTemplateService(queryTemplateDao, moduleService);
     private final PlatformQueryItemService queryItemService =
-            new PlatformQueryItemService(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService);
+            new PlatformQueryItemService(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService,
+                    fieldDefinitionCompiler, (net.ximatai.muyun.spring.common.time.PlatformTimeService) null);
     private final PlatformPageConfigPublishService publishService = new PlatformPageConfigPublishService(
             uiSetService, uiConfigService, uiConfigFieldService, queryTemplateService, queryItemService);
     private final PlatformPageConfigSnapshotService snapshotService = new PlatformPageConfigSnapshotService(
@@ -127,6 +140,43 @@ class PlatformUiConfigurationServiceContractTest {
                 .extracting(PlatformUiConfigField::getModuleMetadataFieldId)
                 .containsExactly(customerNameField);
         assertThat(snapshot.uiFields().getFirst().getFieldUiTypeAlias()).isEqualTo("text");
+    }
+
+    @Test
+    void shouldExposeFieldUiTypeMappingsInPageBootstrap() {
+        seedFieldType("date", FieldType.DATE, DynamicQueryOperator.BETWEEN);
+        seedUiType("date_range", "date");
+        seedUiTypeFieldMapping("date_range", "end");
+        String signedDateField = seedModuleField("crm.contract", "contract", "signedDate", "signed_date", "date");
+        String uiSetId = uiSetService.insert(uiSet("crm.contract", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, signedDateField, "date_range"));
+        publishService.publishUiConfig(uiConfigId);
+        Menu menu = new Menu();
+        menu.setId("menu-1");
+        menu.setTitle("Contracts");
+        menu.setMenuType(MenuType.MODULE);
+        menu.setModuleAlias("crm.contract");
+        menu.setPageMode(MenuPageMode.LIST);
+        MenuService menuService = org.mockito.Mockito.mock(MenuService.class);
+        org.mockito.Mockito.when(menuService.currentUserVisibleMenu("menu-1")).thenReturn(menu);
+        PlatformPageBootstrapService bootstrapService = new PlatformPageBootstrapService(
+                menuService,
+                snapshotService,
+                moduleFieldService,
+                fieldUiTypeService,
+                fieldUiTypeAttributeService,
+                fieldUiTypeFieldMappingService);
+
+        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu("menu-1", PlatformUiClientType.WEB);
+
+        assertThat(bootstrap.resolvedConfig().uiFields()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldUiTypeAlias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().alias()).isEqualTo("date_range");
+        assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
+                .extracting(PlatformResolvedFieldUiTypeFieldMapping::sourceKey)
+                .containsExactly("end");
     }
 
     @Test
@@ -747,6 +797,24 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldRejectQueryTemplateInvalidTimeZoneWithPlatformException() {
+        seedFieldType("timestamp", FieldType.TIMESTAMP, DynamicQueryOperator.BETWEEN);
+        seedUiType("datetime", "timestamp");
+        String submittedAtField = seedModuleField("crm.ticket", "ticket", "submittedAt", "submitted_at",
+                "timestamp");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.ticket", "date_range", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, submittedAtField,
+                DynamicQueryOperator.BETWEEN);
+        item.setDefaultValue("2026-01-01,2026-01-02");
+        item.setTimeZone("+08:00");
+        queryItemService.insert(item);
+
+        assertThatThrownBy(() -> queryItemService.compile(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
+    }
+
+    @Test
     void shouldPublishPageConfigAndKeepDraftsOutOfOnlineSnapshot() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");
@@ -1008,6 +1076,87 @@ class PlatformUiConfigurationServiceContractTest {
                 .hasMessageContaining("operator is not allowed");
     }
 
+    @Test
+    void shouldRejectQueryItemWhenFieldConfigDisablesQuery() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        ResolvedField resolved = resolvedField(customerNameField);
+        MetadataFieldConfig config = fieldConfig(resolved.metadataFieldId());
+        config.setQueryable(false);
+        fieldConfigService.insert(config);
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+
+        assertThatThrownBy(() -> queryItemService.insert(
+                queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField, DynamicQueryOperator.LIKE)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("not queryable");
+    }
+
+    @Test
+    void shouldUseRelationScopedFieldQueryConfigForQueryItem() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE, DynamicQueryOperator.EQ);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        ResolvedField resolved = resolvedField(customerNameField);
+        MetadataFieldConfig config = fieldConfig(resolved.metadataFieldId());
+        config.setRelationId(resolved.relationId());
+        config.setQueryable(true);
+        config.setDefaultQueryOperator(DynamicQueryOperator.EQ);
+        config.setQueryOperators(Set.of(DynamicQueryOperator.EQ.name()));
+        fieldConfigService.insert(config);
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+
+        String itemId = queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField, null));
+
+        assertThat(queryItemService.select(itemId).getOperator()).isEqualTo(DynamicQueryOperator.EQ);
+        assertThatThrownBy(() -> queryItemService.insert(
+                queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField, DynamicQueryOperator.LIKE)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("operator is not allowed");
+    }
+
+    @Test
+    void shouldRevalidateFieldQueryConfigWhenCompilingQueryTemplate() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE, DynamicQueryOperator.EQ);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField, DynamicQueryOperator.LIKE);
+        item.setDefaultValue(null);
+        queryItemService.insert(item);
+
+        ResolvedField resolved = resolvedField(customerNameField);
+        MetadataFieldConfig config = fieldConfig(resolved.metadataFieldId());
+        config.setRelationId(resolved.relationId());
+        config.setQueryable(true);
+        config.setDefaultQueryOperator(DynamicQueryOperator.EQ);
+        config.setQueryOperators(Set.of(DynamicQueryOperator.EQ.name()));
+        fieldConfigService.insert(config);
+
+        assertThatThrownBy(() -> queryItemService.compile(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("operator is not allowed");
+    }
+
+    @Test
+    void shouldRevalidateFieldQueryConfigWhenEmptyQueryItemIsSkipped() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String customerNameField = seedModuleField("crm.customer", "customer", "customerName", "customer_name", "string");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "default", true));
+        queryItemService.insert(queryLeaf(templateId, TreeAbility.ROOT_ID, customerNameField, DynamicQueryOperator.LIKE));
+
+        ResolvedField resolved = resolvedField(customerNameField);
+        MetadataFieldConfig config = fieldConfig(resolved.metadataFieldId());
+        config.setQueryable(false);
+        fieldConfigService.insert(config);
+
+        assertThatThrownBy(() -> queryItemService.compile(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("not queryable");
+    }
+
     private void seedFieldType(String alias, FieldType type, DynamicQueryOperator defaultOperator,
                                DynamicQueryOperator... extraOperators) {
         PlatformFieldType fieldType = new PlatformFieldType();
@@ -1098,6 +1247,20 @@ class PlatformUiConfigurationServiceContractTest {
         moduleField.setMetadataFieldId(fieldId);
         moduleField.setTitle(fieldName);
         return moduleFieldService.insert(moduleField);
+    }
+
+    private ResolvedField resolvedField(String moduleFieldId) {
+        var resolved = moduleFieldService.resolve(moduleFieldId);
+        return new ResolvedField(resolved.metadataFieldId(), resolved.relationId());
+    }
+
+    private MetadataFieldConfig fieldConfig(String fieldId) {
+        MetadataFieldConfig config = new MetadataFieldConfig();
+        config.setMetadataFieldId(fieldId);
+        return config;
+    }
+
+    private record ResolvedField(String metadataFieldId, String relationId) {
     }
 
     private String addModuleField(String moduleAlias, String fieldName, String columnName, String fieldTypeAlias) {

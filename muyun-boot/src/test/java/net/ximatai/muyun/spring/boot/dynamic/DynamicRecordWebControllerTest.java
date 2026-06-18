@@ -1272,38 +1272,33 @@ class DynamicRecordWebControllerTest {
         uiConfig.setUiSetId("set-list");
         uiConfig.setClientType(PlatformUiClientType.WEB);
         uiConfig.setPublished(true);
+        PlatformUiConfig restrictedUiConfig = new PlatformUiConfig();
+        restrictedUiConfig.setId("ui-list-restricted");
+        restrictedUiConfig.setUiSetId("set-list");
+        restrictedUiConfig.setClientType(PlatformUiClientType.WEB);
+        restrictedUiConfig.setPublished(true);
         PlatformUiConfigField codeField = uiField("ui-list", "module-field-code");
         PlatformUiConfigField amountField = uiField("ui-list", "module-field-amount");
-        PlatformUiConfigField hiddenField = uiField("ui-list", "module-field-hidden");
+        PlatformUiConfigField submittedAtField = uiField("ui-list", "module-field-submitted-at");
+        submittedAtField.setFieldUiTypeAlias("date_time_range");
+        PlatformUiConfigField hiddenField = uiField("ui-list-restricted", "module-field-hidden");
         hiddenField.setVisible(false);
-        PlatformUiConfigField lineField = uiField("ui-list", "module-field-line-code");
-        PlatformPageConfigSnapshot normalSnapshot = new PlatformPageConfigSnapshot(
+        PlatformUiConfigField lineField = uiField("ui-list-restricted", "module-field-line-code");
+        PlatformPageConfigSnapshot snapshot = new PlatformPageConfigSnapshot(
                 MODULE,
                 List.of(uiSet),
-                List.of(uiConfig),
-                List.of(codeField, amountField),
+                List.of(uiConfig, restrictedUiConfig),
+                List.of(codeField, amountField, submittedAtField, hiddenField, lineField),
                 List.of(),
                 List.of()
         );
-        PlatformPageConfigSnapshot restrictedSnapshot = new PlatformPageConfigSnapshot(
-                MODULE,
-                List.of(uiSet),
-                List.of(uiConfig),
-                List.of(codeField, amountField, hiddenField, lineField),
-                List.of(),
-                List.of()
-        );
-        when(snapshotService.snapshot(MODULE)).thenReturn(
-                normalSnapshot,
-                normalSnapshot,
-                normalSnapshot,
-                restrictedSnapshot,
-                restrictedSnapshot
-        );
+        when(snapshotService.snapshot(MODULE)).thenReturn(snapshot);
         when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
                 "module-field-code", "code"));
         when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
                 "module-field-amount", "amount", RelationRole.MAIN, "decimal"));
+        when(moduleFieldService.resolve("module-field-submitted-at")).thenReturn(resolvedModuleField(
+                "module-field-submitted-at", "submittedAt", RelationRole.MAIN, "timestamp"));
         when(moduleFieldService.resolve("module-field-line-code")).thenReturn(resolvedModuleField(
                 "module-field-line-code", "lineCode", RelationRole.CHILD));
         when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().like("code", "C-001"));
@@ -1319,7 +1314,12 @@ class DynamicRecordWebControllerTest {
                                   "uiConfigId": "ui-list",
                                   "queryForm": {
                                     "code": "C-001",
-                                    "amount": 1200
+                                    "amount": 1200,
+                                    "submittedAt": {
+                                      "start": "2026-01-01",
+                                      "end": "2026-01-31",
+                                      "timeZone": "Asia/Shanghai"
+                                    }
                                   }
                                 }
                                 """))
@@ -1330,9 +1330,36 @@ class DynamicRecordWebControllerTest {
         ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
         verify(mainEntity).queryCriteria(conditions.capture());
         assertThat(conditions.getValue()).extracting(DynamicQueryCondition::fieldName)
-                .containsExactly("code", "amount");
+                .containsExactly("code", "amount", "submittedAt");
         assertThat(conditions.getValue().getFirst().operator()).isNull();
         assertThat(conditions.getValue().getFirst().values()).isEqualTo(List.of("C-001"));
+        assertThat(conditions.getValue().get(2).operator())
+                .isEqualTo(DynamicQueryOperator.BETWEEN);
+        List<Object> rangeValues = new java.util.ArrayList<>();
+        rangeValues.addAll(conditions.getValue().get(2).values());
+        assertThat(rangeValues).containsExactly("2026-01-01", "2026-01-31");
+        assertThat(conditions.getValue().get(2).timeZone()).isEqualTo("Asia/Shanghai");
+
+        org.mockito.Mockito.clearInvocations(mainEntity);
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "queryForm": {
+                                    "submittedAt": ["2026-02-01", "2026-02-02"]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"));
+        verify(mainEntity).queryCriteria(conditions.capture());
+        assertThat(conditions.getValue()).hasSize(1);
+        assertThat(conditions.getValue().getFirst().operator())
+                .isEqualTo(DynamicQueryOperator.BETWEEN);
+        rangeValues = new java.util.ArrayList<>();
+        rangeValues.addAll(conditions.getValue().getFirst().values());
+        assertThat(rangeValues).containsExactly("2026-02-01", "2026-02-02");
 
         org.mockito.Mockito.clearInvocations(mainEntity);
         lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
@@ -1367,7 +1394,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "uiConfigId": "ui-list",
+                                  "uiConfigId": "ui-list-restricted",
                                   "queryForm": {
                                     "lineCode": "L-001"
                                   }
@@ -1380,7 +1407,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "uiConfigId": "ui-list",
+                                  "uiConfigId": "ui-list-restricted",
                                   "queryForm": {
                                     "hidden": "x"
                                   }
