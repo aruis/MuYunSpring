@@ -5,6 +5,7 @@ export interface RequestContext {
   baseUrl?: string;
   token?: string;
   traceId?: string;
+  credentials?: RequestCredentials;
   headers?: Record<string, string>;
 }
 
@@ -41,6 +42,7 @@ export function createHttpClient(context: RequestContext = {}): HttpClient {
       try {
         response = await fetch(urlOf(context.baseUrl, options), {
           method: options.method ?? 'GET',
+          credentials: context.credentials,
           headers: headersOf(context, options),
           body: options.body === undefined ? undefined : JSON.stringify(options.body),
         });

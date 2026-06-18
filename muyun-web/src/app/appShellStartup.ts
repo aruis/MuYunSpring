@@ -16,11 +16,17 @@ export async function loadAppShellStartupState(): Promise<ShellStartupState> {
 
   const httpClient = createHttpClient({
     baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
+    token: import.meta.env.VITE_MUYUN_AUTH_TOKEN,
+    credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
   });
   return loadShellStartupState({
     sessionClient: createSessionClient(httpClient),
     menuClient: createMenuClient(httpClient),
   });
+}
+
+function credentialsOf(value: string | undefined) {
+  return value === 'include' || value === 'omit' || value === 'same-origin' ? value : undefined;
 }
 
 function usesMockStartup() {
