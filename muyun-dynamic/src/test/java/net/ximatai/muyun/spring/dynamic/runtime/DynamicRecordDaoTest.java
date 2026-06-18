@@ -302,6 +302,34 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldCalculateVirtualFieldBeforeInsertWithoutPersistingIt() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual()
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition.calculation(
+                "displayCodeCalc", "displayCode", "'合同-' + {code}"));
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        DynamicRecord record = new DynamicRecord(entity).setValue("code", "C-001");
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
+        assertThat(record.getValue("displayCode")).isEqualTo("合同-C-001");
+        assertThat(body.getValue())
+                .containsEntry("code", "C-001")
+                .doesNotContainKey("display_code")
+                .doesNotContainKey("displayCode");
+    }
+
+    @Test
     void shouldPreviewDynamicFormulaRulesWithoutPersistingOrMutatingSourceRecord() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = formulaEntity();
@@ -366,6 +394,39 @@ class DynamicRecordDaoTest {
                 .containsEntry("price", BigDecimal.valueOf(15))
                 .doesNotContainKey("quantity");
         assertThat((BigDecimal) body.getValue().get("amount")).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void shouldCalculateVirtualFieldBeforeUpdateWithoutPersistingIt() {
+        IDatabaseOperations<Object> operations = operations();
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual()
+                )
+        ).withFormulaRules(EntityFormulaRuleDefinition.calculation(
+                "displayCodeCalc", "displayCode", "'合同-' + {code}"));
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", "contract-1",
+                "code", "C-001",
+                "deleted", Boolean.FALSE,
+                "version", 3
+        )));
+        DynamicRecord record = new DynamicRecord(entity).setValue("code", "C-002");
+        record.setId("contract-1");
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").update(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).patchUpdateItemWhere(eq(SCHEMA), eq(TABLE), body.capture(), anyMap(), eq("id"));
+        assertThat(record.getValue("displayCode")).isEqualTo("合同-C-002");
+        assertThat(body.getValue())
+                .containsEntry("code", "C-002")
+                .doesNotContainKey("display_code")
+                .doesNotContainKey("displayCode");
     }
 
     @Test

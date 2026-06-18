@@ -72,7 +72,7 @@ AND quickSearch
 5. `record.version` 参与乐观锁。
 6. 字段保护、动作权限、数据范围和动态事件仍由动态保存链路处理。
 
-标准 `insert` / `update` 保存入口拒绝显式写入虚拟字段，包括主表和本次提交的子表行。虚拟字段可以作为页面展示字段进入 descriptor 和 bootstrap，但在派生值计算入口定义前，不承诺由保存请求写入或落库。
+标准 `insert` / `update` 保存入口拒绝显式写入虚拟字段，包括主表和本次提交的子表行。虚拟字段可以作为页面展示字段进入 descriptor 和 bootstrap；页面如需基于当前表单值展示派生结果，应调用公式试算入口，由后端返回本次计算出的虚拟字段值。
 
 动态记录请求保留字段包括 `id`、`version`、`values`、`children`、`attachments`、`originContext`、`uiConfigId` 和 `record`，不应作为业务字段名使用。
 
