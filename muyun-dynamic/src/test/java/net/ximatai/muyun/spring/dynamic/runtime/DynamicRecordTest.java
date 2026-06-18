@@ -32,6 +32,32 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldExposeLoadedVirtualValuesOnlyForDisplay() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001");
+
+        record.putDisplayValue("displayCode", "C-001 / Customer");
+
+        assertThat(record.getValue("displayCode")).isEqualTo("C-001 / Customer");
+        assertThat(record.getValues()).containsEntry("displayCode", "C-001 / Customer");
+        assertThat(record.outputValues(net.ximatai.muyun.spring.common.security.FieldOutputContext.VIEW))
+                .containsEntry("displayCode", "C-001 / Customer");
+        assertThat(record.getPlatformValues()).doesNotContainKey("displayCode");
+    }
+
+    @Test
+    void shouldKeepDisplayValuesOutOfPlatformValuesAfterCopy() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001")
+                .putDisplayValue("displayCode", "C-001 / Customer");
+
+        DynamicRecord copied = record.copy();
+
+        assertThat(copied.getValues()).containsEntry("displayCode", "C-001 / Customer");
+        assertThat(copied.getPlatformValues()).doesNotContainKey("displayCode");
+    }
+
+    @Test
     void shouldRejectUnknownFieldAndInvalidValueType() {
         DynamicRecord record = new DynamicRecord(contractEntity());
 

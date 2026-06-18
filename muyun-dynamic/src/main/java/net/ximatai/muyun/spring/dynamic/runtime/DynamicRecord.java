@@ -82,6 +82,14 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return this;
     }
 
+    public DynamicRecord putDisplayValue(String fieldCode, Object value) {
+        if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
+            throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
+        }
+        loadedValues.put(fieldCode, value);
+        return this;
+    }
+
     public Object getValue(String fieldCode) {
         if (isInternalGeneratedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
@@ -102,12 +110,26 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
                 visible.put(fieldCode, value);
             }
         });
+        loadedValues.forEach((fieldCode, value) -> {
+            if (!isInternalGeneratedField(fieldCode)) {
+                visible.put(fieldCode, value);
+            }
+        });
         return Collections.unmodifiableMap(visible);
     }
 
     public Map<String, Object> outputValues(FieldOutputContext context) {
         Map<String, Object> output = new LinkedHashMap<>();
         values.forEach((fieldCode, value) -> {
+            if (isInternalGeneratedField(fieldCode)) {
+                return;
+            }
+            FieldDefinition field = fields.get(fieldCode);
+            output.put(fieldCode, field == null
+                    ? value
+                    : FieldOutputRenderer.renderValue(fieldCode, value, field.protection(), context, null));
+        });
+        loadedValues.forEach((fieldCode, value) -> {
             if (isInternalGeneratedField(fieldCode)) {
                 return;
             }
@@ -441,7 +463,7 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     }
 
     void putVirtualValue(String fieldCode, Object value) {
-        loadedValues.put(fieldCode, value);
+        putDisplayValue(fieldCode, value);
     }
 
     public void putGeneratedValue(String fieldCode, Object value) {
