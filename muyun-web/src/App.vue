@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { AdminShell } from '@muyun/platform-shell';
+import { AdminShell, PageHostOutlet } from '@muyun/platform-shell';
 import type { MenuNavigationTarget, MenuRecord, ShellStartupState } from '@muyun/web-contracts';
 import { loadAppShellStartupState } from './app/appShellStartup';
 import { closeMenuTab, initialOpenMenuKeys, openMenuTab } from './app/shellStartup';
@@ -65,16 +65,8 @@ function handleCloseTab(key: string) {
     @select-menu="handleSelectMenu"
     @close-tab="handleCloseTab"
   >
-    <template #default="{ target }">
-      <RouterView v-if="target?.menuType === 'ROUTE' && target.route === '/'" />
-      <section v-else class="runtime-page">
-        <header class="section-header">
-          <div>
-            <p class="eyebrow">{{ target?.menuType ?? 'SHELL' }}</p>
-            <h2>{{ target?.menuId ?? 'workspace' }}</h2>
-          </div>
-        </header>
-      </section>
+    <template #default="{ pageDescriptor }">
+      <PageHostOutlet :descriptor="pageDescriptor" />
     </template>
   </AdminShell>
 </template>

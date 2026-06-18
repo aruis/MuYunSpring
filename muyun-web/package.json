@@ -9,7 +9,7 @@
     "build:business-example": "npm ci --prefix examples/business-web && npm run build --prefix examples/business-web",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "npm run test:shell",
-    "test:shell": "node --experimental-strip-types --import ./scripts/register-shell-test-loader.mjs --test tests/shellStartup.test.ts tests/navigationDescriptor.test.ts",
+    "test:shell": "node --experimental-strip-types --import ./scripts/register-shell-test-loader.mjs --test tests/shellStartup.test.ts tests/navigationDescriptor.test.ts tests/pageHostRegistry.test.ts",
     "lint": "eslint . && npm run check:boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
