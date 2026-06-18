@@ -19,7 +19,7 @@ bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descri
 | `POST` | `/{moduleAlias}/query` | 按动态查询请求分页查询主元数据记录；可结合 `uiConfigId` 做列表投影。 |
 | `POST` | `/{moduleAlias}/query/summary` | 按同一查询上下文计算汇总项；汇总配置来自已发布 LIST UI 配置。 |
 
-查询请求可使用 `uiConfigId`、`queryTemplateId`、`externalQueryValues`、`queryForm`、`criteria`、兼容 `conditions`、`quickSearch`、分页和排序。
+查询请求可使用 `uiConfigId`、`queryTemplateId`、`externalQueryValues`、`queryForm`、`criteria`、兼容 `conditions`、`quickSearch`、分页和排序。`queryForm` 只接受已发布 LIST UI 的可见主表字段；`date_range` / `date_time_range` 字段可提交 `[start, end]`，或提交 `{ "start": "...", "end": "...", "timeZone": "Asia/Shanghai" }`。
 
 ## 表单保存
 

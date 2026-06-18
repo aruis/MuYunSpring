@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.dynamic;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
@@ -17,11 +18,10 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 
 final class DynamicWebQueryFormSupport {
@@ -49,19 +49,20 @@ final class DynamicWebQueryFormSupport {
         PlatformPageConfigSnapshot snapshot = snapshotService.snapshot(moduleAlias);
         PlatformUiConfig uiConfig = publishedUiConfig(snapshot, request.uiConfigId());
         requireListUiConfig(snapshot, uiConfig);
-        Set<String> allowedFields = visibleMainFields(snapshot, uiConfig, moduleFieldService);
+        Map<String, QueryFormField> fields = visibleMainFields(snapshot, uiConfig, moduleFieldService);
         List<DynamicQueryCondition> conditions = new ArrayList<>();
         for (Map.Entry<String, Object> entry : effectiveValues.entrySet()) {
             String fieldName = normalizeKey(entry.getKey());
             if (!hasText(fieldName)) {
                 continue;
             }
-            if (!allowedFields.contains(fieldName)) {
+            QueryFormField field = fields.get(fieldName);
+            if (field == null) {
                 throw new PlatformException("Query form field is not available in UI config: " + fieldName);
             }
-            List<?> values = values(entry.getValue());
-            if (!values.isEmpty()) {
-                conditions.add(new DynamicQueryCondition(fieldName, null, values));
+            DynamicQueryCondition condition = condition(field, entry.getValue());
+            if (condition != null) {
+                conditions.add(condition);
             }
         }
         return conditions.isEmpty() ? Criteria.of() : conditionCompiler.apply(conditions);
@@ -77,10 +78,10 @@ final class DynamicWebQueryFormSupport {
         return effective;
     }
 
-    private static Set<String> visibleMainFields(PlatformPageConfigSnapshot snapshot,
-                                                 PlatformUiConfig uiConfig,
-                                                 ModuleMetadataFieldService moduleFieldService) {
-        Set<String> fields = new LinkedHashSet<>();
+    private static Map<String, QueryFormField> visibleMainFields(PlatformPageConfigSnapshot snapshot,
+                                                                 PlatformUiConfig uiConfig,
+                                                                 ModuleMetadataFieldService moduleFieldService) {
+        Map<String, QueryFormField> fields = new LinkedHashMap<>();
         for (PlatformUiConfigField field : snapshot.uiFields()) {
             if (!Objects.equals(field.getUiConfigId(), uiConfig.getId())
                     || !Boolean.TRUE.equals(field.getVisible())) {
@@ -88,10 +89,62 @@ final class DynamicWebQueryFormSupport {
             }
             ResolvedModuleMetadataField resolved = moduleFieldService.resolve(field.getModuleMetadataFieldId());
             if (resolved.relationRole() == RelationRole.MAIN) {
-                fields.add(resolved.fieldName());
+                fields.put(resolved.fieldName(), new QueryFormField(resolved.fieldName(), field.getFieldUiTypeAlias()));
             }
         }
         return fields;
+    }
+
+    private static DynamicQueryCondition condition(QueryFormField field, Object value) {
+        if (isRangeUiType(field.fieldUiTypeAlias())) {
+            RangeQueryValue range = rangeValue(field.fieldName(), value);
+            if (range.values().isEmpty()) {
+                return null;
+            }
+            return new DynamicQueryCondition(field.fieldName(), DynamicQueryOperator.BETWEEN,
+                    range.values(), range.timeZone());
+        }
+        List<?> values = values(value);
+        if (values.isEmpty()) {
+            return null;
+        }
+        return new DynamicQueryCondition(field.fieldName(), null, values);
+    }
+
+    private static boolean isRangeUiType(String fieldUiTypeAlias) {
+        return "date_range".equals(fieldUiTypeAlias) || "date_time_range".equals(fieldUiTypeAlias);
+    }
+
+    private static RangeQueryValue rangeValue(String fieldName, Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Object start = firstPresent(map, "start", "from", "startInclusive");
+            Object end = firstPresent(map, "end", "to", "endInclusive");
+            List<?> values = values(java.util.Arrays.asList(start, end));
+            if (values.isEmpty()) {
+                return new RangeQueryValue(List.of(), textValue(map.get("timeZone")));
+            }
+            if (values.size() != 2) {
+                throw new PlatformException("Query form range requires start and end values: " + fieldName);
+            }
+            return new RangeQueryValue(values, textValue(map.get("timeZone")));
+        }
+        List<?> values = values(value);
+        if (values.isEmpty()) {
+            return new RangeQueryValue(List.of(), null);
+        }
+        if (values.size() != 2) {
+            throw new PlatformException("Query form range requires exactly two values: " + fieldName);
+        }
+        return new RangeQueryValue(values, null);
+    }
+
+    private static Object firstPresent(Map<?, ?> map, String... keys) {
+        for (String key : keys) {
+            if (map.containsKey(key)) {
+                return map.get(key);
+            }
+        }
+        return null;
     }
 
     private static PlatformUiConfig publishedUiConfig(PlatformPageConfigSnapshot snapshot, String uiConfigId) {
@@ -155,5 +208,19 @@ final class DynamicWebQueryFormSupport {
             return Array.getLength(value) == 0;
         }
         return false;
+    }
+
+    private static String textValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isBlank() ? null : text;
+    }
+
+    private record QueryFormField(String fieldName, String fieldUiTypeAlias) {
+    }
+
+    private record RangeQueryValue(List<?> values, String timeZone) {
     }
 }
