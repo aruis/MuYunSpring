@@ -9,7 +9,7 @@ import type {
   ShellStartupState,
 } from '@muyun/web-contracts';
 import type { UiDropdownItem, UiMenuItem, UiTabItem } from '@muyun/vue-ui-antdv';
-import { getMenuNavigationTarget } from './menuNavigation';
+import { getMenuNavigationTarget, resolvePageDescriptor } from './menuNavigation';
 
 defineOptions({ name: 'AdminShell' });
 
@@ -46,8 +46,14 @@ const tabs = computed<UiTabItem[]>(() => (props.startup?.tabs ?? []).map(toTabIt
 const activeTabKey = computed(
   () => props.activeTabKey ?? props.startup?.activeTabKey ?? tabs.value[0]?.key ?? '',
 );
-const selectedMenuKey = computed(() => activeTab.value?.target.menuId);
+const selectedMenuKey = computed(() => activeTab.value?.target?.menuId);
 const activeTab = computed(() => (props.startup?.tabs ?? []).find((tab) => tab.key === activeTabKey.value));
+const activePageDescriptor = computed(() => {
+  const tab = activeTab.value;
+  return (
+    tab?.pageDescriptor ?? (tab?.target ? resolvePageDescriptor(tab.target, { title: tab.title }) : undefined)
+  );
+});
 
 const userMenuItems: UiDropdownItem[] = [
   { key: 'profile', title: '个人信息' },
@@ -137,7 +143,12 @@ function handleTabChange(key: string) {
       <section class="app-content">
         <UiSpin v-if="loading" />
         <UiError v-else-if="error" :message="error" />
-        <slot v-else :active-tab="activeTab" :target="activeTab?.target" />
+        <slot
+          v-else
+          :active-tab="activeTab"
+          :target="activeTab?.target"
+          :page-descriptor="activePageDescriptor"
+        />
       </section>
     </section>
   </main>

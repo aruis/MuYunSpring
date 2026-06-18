@@ -414,71 +414,85 @@ PageDescriptor
   pageType: remote-url
   openMode: iframe
   target.url: /crm/customer/list
-  target.trust: same-origin-allowlist
   tabPolicy.identity: by-target
 ```
 
 这些示例是治理目标，不要求当前代码一次性完成所有字段。
 
-## 专项研发路线图
+## 战役路线图
 
-本路线图用于跟踪菜单、tab、URL、PageHost 专项研发。每个阶段应作为相对独立的编程单元推进，并通过测试、示例或浏览器验证证明闭环有效。
+本路线图用于跟踪菜单、tab、URL、PageHost 专项研发。每个战役应作为独立编程单元推进，并经过实现、验证、subagent review、修复和提交后再进入下一战役。
 
-### 阶段 1：前端导航协议
-
-目标：
-
-- [ ] 定义 `PageDescriptor`、`PageType`、`OpenMode`、`TabPolicy`、`PageHostType`、`TabRestoreState`。
-- [ ] 建立 `MenuNavigationTarget -> PageDescriptor` 的 resolver。
-- [ ] 建立 `PageDescriptor -> MenuTab` 的转换规则。
-- [ ] 建立 `PageDescriptor -> URL` 和 `URL -> PageDescriptor` 的最小规则。
-- [ ] ROUTE、MODULE、LINK 都能生成明确 descriptor。
-
-验收：
-
-- [ ] ROUTE 可以解析为平台内置 route descriptor。
-- [ ] MODULE 可以解析为最小 dynamic descriptor。
-- [ ] LINK 可以解析为 external descriptor。
-- [ ] `path`、`routeName`、`pageKey` 在 offline 表达中不互相排斥。
-- [ ] URL 生成结果可读，能表达业务含义。
-- [ ] resolver 有纯函数测试。
-
-### 阶段 2：Shell PageHost 骨架
+### 战役 0：治理文档合入与基线同步
 
 目标：
 
-- [ ] 增加 `PageHostOutlet` 或同等内容区承载器。
-- [ ] 增加 `PlatformRouteHost`。
-- [ ] 增加 `DynamicModuleHost` 占位。
-- [ ] 增加 `ExternalPageHost` 占位。
-- [ ] `AdminShell` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
+- [x] 专项治理文档合入 `main`。
+- [x] 本地 `main` 对齐远端 squash 后历史。
+- [x] 后续研发从干净 `origin/main` 创建分支。
 
 验收：
 
-- [ ] ROUTE 菜单能打开 PlatformRouteHost。
-- [ ] MODULE 菜单能打开 DynamicModuleHost 占位。
-- [ ] LINK 菜单能按策略进入 ExternalPageHost 或新窗口。
-- [ ] `App.vue` 不再直接散落 target 类型判断。
-- [ ] PageHost outlet 有最小浏览器验证。
+- [x] 文档在 `main` 可见。
+- [x] 本地工作树干净。
+- [x] 后续研发分支不基于临时文档分支。
 
-### 阶段 3：URL 与 active tab 联动
+### 战役 1：导航协议与解析核心
 
 目标：
 
-- [ ] active tab 变化时更新浏览器 URL。
-- [ ] 浏览器刷新时从 URL 解析 descriptor。
-- [ ] URL 对应菜单存在时恢复菜单、title、tab 关系。
-- [ ] URL 无菜单上下文时允许 direct entry，但需要有明确状态。
-- [ ] tab 关闭后 URL 切换到相邻 tab。
+- [x] 定义 `PageDescriptor`、`PageType`、`OpenMode`、`TabPolicy`、`PageHostType`、`TabRestoreState`。
+- [x] 建立 `MenuNavigationTarget -> PageDescriptor` 的 resolver。
+- [x] 建立 `PageDescriptor -> MenuTab` 的转换规则。
+- [x] 建立 `PageDescriptor -> URL` 和 `URL -> PageDescriptor` 的最小规则。
+- [x] ROUTE、MODULE、LINK 都能生成明确 descriptor。
 
 验收：
 
-- [ ] 点击菜单后 URL 跟随变化。
-- [ ] 复制 URL 到新浏览器可打开同一业务入口。
-- [ ] 刷新页面后恢复 active tab。
+- [x] ROUTE 可以解析为平台内置 route descriptor。
+- [x] MODULE 可以解析为最小 dynamic descriptor。
+- [x] LINK 可以解析为 external descriptor。
+- [x] `path` 是 offline route 的首要可读入口标识。
+- [x] `routeName` 或 `pageKey` 至少预留一种 manifest 解析能力。
+- [x] URL 生成结果可读，能表达业务含义。
+- [x] resolver 有纯函数测试。
+
+### 战役 2：PageHost Outlet 与 Shell 内容区重构
+
+目标：
+
+- [x] 增加 `PageHostOutlet` 或同等内容区承载器。
+- [x] 增加 `PlatformRouteHost`。
+- [x] 增加 `DynamicModuleHost` 占位。
+- [x] 增加 `ExternalPageHost` 占位。
+- [x] `AdminShell` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
+
+验收：
+
+- [x] ROUTE 菜单能进入 PlatformRouteHost。
+- [x] MODULE 菜单能进入 DynamicModuleHost 占位。
+- [x] LINK 菜单能进入 ExternalPageHost 占位。
+- [x] `App.vue` 不再直接散落 target 类型判断。
+- [x] PageHost outlet 有构建验证和 host 分发测试。
+
+### 战役 3：URL 与 Active Tab 联动
+
+目标：
+
+- [x] active tab 变化时更新浏览器 URL。
+- [x] 浏览器刷新时从 URL 解析 descriptor。
+- [x] URL 对应菜单存在时恢复菜单、title、tab 关系。
+- [x] URL 无菜单上下文时允许 direct entry。
+- [x] tab 关闭后 URL 切换到相邻 tab 或空工作台。
+
+验收：
+
+- [x] 点击菜单后 URL 跟随变化。
+- [x] 复制 URL 到新浏览器可打开同一业务入口。
+- [x] 刷新页面后恢复 active tab。
 - [ ] 无法解析 URL 时进入明确错误或空状态。
 
-### 阶段 4：Tab 状态保存
+### 战役 4：Tab 状态生命周期
 
 目标：
 
@@ -494,24 +508,24 @@ PageDescriptor
 - [ ] snapshot/restore 行为有测试。
 - [ ] URL 只承载入口和关键参数，不塞复杂 UI 状态。
 
-### 阶段 5：Offline route manifest
+### 战役 5：Offline Route Manifest
 
 目标：
 
 - [ ] 定义业务 route manifest 格式。
 - [ ] 提供业务 route 注册 API。
-- [ ] resolver 能通过 manifest 解析 `path`、`routeName`、`pageKey`。
+- [ ] resolver 能通过 manifest 解析 `path`。
+- [ ] `routeName` 或 `pageKey` 至少选择一种作为补充入口标识。
 - [ ] 示例业务页面通过 manifest 接入。
 
 验收：
 
 - [ ] mock 菜单配置业务 path 能打开业务页面。
-- [ ] mock 菜单配置 routeName 能打开业务页面。
-- [ ] mock 菜单配置 pageKey 能打开业务页面。
+- [ ] mock 菜单配置 `routeName` 或 `pageKey` 能打开业务页面。
 - [ ] Shell 不硬编码业务 route。
 - [ ] 刷新后能恢复对应业务页面和 tab。
 
-### 阶段 6：Online ExternalPageHost MVP
+### 战役 6：Online ExternalPageHost MVP
 
 目标：
 
@@ -519,6 +533,7 @@ PageDescriptor
 - [ ] ExternalPageHost 支持 iframe 模式。
 - [ ] iframe 支持最小消息协议：title-change、dirty-change、before-close、activate、deactivate。
 - [ ] 第一版 remote URL 只支持同源相对路径或明确配置入口。
+- [ ] 定义 remote manifest 草案和示例 JSON。
 
 验收：
 
@@ -526,31 +541,9 @@ PageDescriptor
 - [ ] iframe 页面可更新 tab title。
 - [ ] iframe 页面不接协议时可以降级显示。
 - [ ] 新窗口模式可配置。
-
-### 阶段 7：Remote manifest 探索
-
-目标：
-
-- [ ] 定义 remote manifest 草案。
-- [ ] remote manifest 包含 pageKey、path、title、paramsSchema、recommendedOpenMode。
-- [ ] 示例业务包提供 `/crm/route-manifest.json`。
-- [ ] resolver 可用 manifest 辅助菜单 target 校验和 descriptor 生成。
-
-验收：
-
-- [ ] 示例 manifest 可读取。
-- [ ] 菜单 target 可由 manifest 辅助解析。
+- [ ] 示例 remote manifest 可读取，并能辅助 descriptor 生成。
 - [ ] 不要求平台注册业务 Vue Router。
 - [ ] 不引入微前端运行时。
-
-### 阶段 8：微前端评估
-
-只有当以下问题明确出现时再评估微前端：
-
-- [ ] iframe 体验不足。
-- [ ] 业务页面需要深度共享平台组件、状态或路由。
-- [ ] 独立发布和单体体验都成为刚需。
-- [ ] 团队能承担构建、依赖、隔离和回滚复杂度。
 
 ## 当前不做
 

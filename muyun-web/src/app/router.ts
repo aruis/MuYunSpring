@@ -9,5 +9,10 @@ export const router = createRouter({
       name: 'home',
       component: HomeView,
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'workspace',
+      component: HomeView,
+    },
   ],
 });
