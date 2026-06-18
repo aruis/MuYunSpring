@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  activeTabUrlOf,
   closeMenuTab,
   initialOpenMenuKeys,
   loadShellStartupState,
   openMenuTab,
+  restoreShellStartupStateFromUrl,
 } from '../src/app/shellStartup.ts';
 import { getMenuNavigationTarget } from '../src/platform-shell/menuNavigation.ts';
 
@@ -51,8 +53,10 @@ const menus = [
       id: 'runtime',
       schemeId: 'default',
       title: 'Runtime',
-      menuType: 'ROUTE',
-      route: '/runtime',
+      menuType: 'MODULE',
+      moduleAlias: 'platform.runtime',
+      pageMode: 'LIST',
+      defaultUiConfigId: 'runtime-list-v1',
     },
     children: [],
   },
@@ -149,4 +153,116 @@ test('initialOpenMenuKeys expands ancestors of the active menu', () => {
   };
 
   assert.deepEqual(initialOpenMenuKeys(state), ['root', 'nested']);
+});
+
+test('activeTabUrlOf returns the active tab descriptor URL', () => {
+  const metadata = menus[0].children[0].children[0].record;
+  const target = getMenuNavigationTarget(metadata);
+
+  assert.ok(target);
+
+  const tab = {
+    key: 'menu:metadata',
+    title: 'Metadata',
+    target,
+    pageDescriptor: {
+      pageType: 'platform-route',
+      openMode: 'shell-route',
+      hostType: 'platform-route-host',
+      menuId: 'metadata',
+      target: { route: '/platform/metadata' },
+      tabPolicy: { identity: 'by-menu' },
+    },
+  };
+
+  assert.equal(
+    activeTabUrlOf({
+      session: { currentUser },
+      menus,
+      tabs: [tab],
+      activeTabKey: tab.key,
+    }),
+    '/platform/metadata',
+  );
+});
+
+test('restoreShellStartupStateFromUrl activates the matching menu tab', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+  };
+
+  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata');
+
+  assert.equal(restored.activeTabKey, 'menu:metadata');
+  assert.deepEqual(
+    restored.tabs?.map((tab) => tab.title),
+    ['Metadata'],
+  );
+  assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata');
+});
+
+test('restoreShellStartupStateFromUrl preserves query when URL matches a menu tab', () => {
+  const metadata = menus[0].children[0].children[0].record;
+  const target = getMenuNavigationTarget(metadata);
+  assert.ok(target);
+
+  const defaultTab = openMenuTab([], metadata, target).tabs[0];
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [defaultTab],
+    activeTabKey: defaultTab.key,
+  };
+
+  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata?view=advanced');
+
+  assert.equal(restored.activeTabKey, 'menu:metadata');
+  assert.equal(restored.tabs?.length, 1);
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.query?.view, 'advanced');
+  assert.equal(activeTabUrlOf(restored), '/platform/metadata?view=advanced');
+});
+
+test('activeTabUrlOf returns undefined when no active tab remains', () => {
+  assert.equal(
+    activeTabUrlOf({
+      session: { currentUser },
+      menus,
+      tabs: [],
+      activeTabKey: undefined,
+    }),
+    undefined,
+  );
+});
+
+test('restoreShellStartupStateFromUrl creates direct tab when URL has no menu match', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+  };
+
+  const restored = restoreShellStartupStateFromUrl(state, '/crm/customer/list?status=active');
+
+  assert.equal(restored.activeTabKey, 'platform-route:/crm/customer/list');
+  assert.equal(restored.tabs?.[0]?.target, undefined);
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
+});
+
+test('restoreShellStartupStateFromUrl matches dynamic menu without title query', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+  };
+
+  const restored = restoreShellStartupStateFromUrl(
+    state,
+    '/platform/dynamic/platform.runtime/list?uiConfigId=runtime-list-v1',
+  );
+
+  assert.equal(restored.activeTabKey, 'menu:runtime');
+  assert.equal(restored.tabs?.[0]?.title, 'Runtime');
+  assert.equal(restored.tabs?.[0]?.target?.menuId, 'runtime');
 });

@@ -3,7 +3,13 @@ import { onMounted, ref } from 'vue';
 import { AdminShell, PageHostOutlet } from '@muyun/platform-shell';
 import type { MenuNavigationTarget, MenuRecord, ShellStartupState } from '@muyun/web-contracts';
 import { loadAppShellStartupState } from './app/appShellStartup';
-import { closeMenuTab, initialOpenMenuKeys, openMenuTab } from './app/shellStartup';
+import {
+  activeTabUrlOf,
+  closeMenuTab,
+  initialOpenMenuKeys,
+  openMenuTab,
+  restoreShellStartupStateFromUrl,
+} from './app/shellStartup';
 
 const startup = ref<ShellStartupState>();
 const loading = ref(true);
@@ -13,10 +19,12 @@ const openMenuKeys = ref<string[]>([]);
 
 onMounted(async () => {
   try {
-    const state = await loadAppShellStartupState();
+    const startupState = await loadAppShellStartupState();
+    const state = restoreShellStartupStateFromUrl(startupState, currentBrowserPath());
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
     openMenuKeys.value = initialOpenMenuKeys(state);
+    syncBrowserUrl(state);
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'Shell startup failed';
   } finally {
@@ -37,6 +45,7 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     activeTabKey: result.activeTabKey,
   };
   activeTabKey.value = result.activeTabKey;
+  syncBrowserUrl(startup.value);
 }
 
 function handleCloseTab(key: string) {
@@ -52,6 +61,34 @@ function handleCloseTab(key: string) {
     activeTabKey: result.activeTabKey,
   };
   activeTabKey.value = result.activeTabKey;
+  syncBrowserUrl(startup.value);
+}
+
+function handleChangeTab(key: string) {
+  activeTabKey.value = key;
+  const current = startup.value;
+  if (!current) {
+    return;
+  }
+
+  startup.value = {
+    ...current,
+    activeTabKey: key,
+  };
+  syncBrowserUrl(startup.value);
+}
+
+function currentBrowserPath() {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function syncBrowserUrl(state: ShellStartupState) {
+  const url = activeTabUrlOf(state) ?? '/';
+  if (url === currentBrowserPath()) {
+    return;
+  }
+
+  window.history.replaceState(window.history.state, '', url);
 }
 </script>
 
@@ -63,6 +100,7 @@ function handleCloseTab(key: string) {
     :loading="loading"
     :error="error"
     @select-menu="handleSelectMenu"
+    @change-tab="handleChangeTab"
     @close-tab="handleCloseTab"
   >
     <template #default="{ pageDescriptor }">

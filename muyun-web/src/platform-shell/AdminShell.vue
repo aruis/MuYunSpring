@@ -46,7 +46,7 @@ const tabs = computed<UiTabItem[]>(() => (props.startup?.tabs ?? []).map(toTabIt
 const activeTabKey = computed(
   () => props.activeTabKey ?? props.startup?.activeTabKey ?? tabs.value[0]?.key ?? '',
 );
-const selectedMenuKey = computed(() => activeTab.value?.target.menuId);
+const selectedMenuKey = computed(() => activeTab.value?.target?.menuId);
 const activeTab = computed(() => (props.startup?.tabs ?? []).find((tab) => tab.key === activeTabKey.value));
 const activePageDescriptor = computed(() => {
   const tab = activeTab.value;

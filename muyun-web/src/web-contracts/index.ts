@@ -200,7 +200,7 @@ export type PageDescriptor =
 export interface MenuTab {
   key: string;
   title: string;
-  target: MenuNavigationTarget;
+  target?: MenuNavigationTarget;
   pageDescriptor?: PageDescriptor;
   restoreState?: TabRestoreState;
   closable?: boolean;
