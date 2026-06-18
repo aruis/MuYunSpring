@@ -10,21 +10,21 @@
 
 因此需要区分两层语义：
 
-| 层次 | 职责 |
-| --- | --- |
-| 菜单入口 | 表达用户要打开哪个业务能力，例如模块、路由、外链或子应用入口。 |
+| 层次     | 职责                                                                    |
+| -------- | ----------------------------------------------------------------------- |
+| 菜单入口 | 表达用户要打开哪个业务能力，例如模块、路由、外链或子应用入口。          |
 | 页面承载 | 决定用 Vue Router、动态模块运行器、iframe、新窗口或未来微前端承载页面。 |
 
 Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身份来源。
 
 更准确地说，这里的治理目标是解耦四件事：
 
-| 事项 | 含义 |
-| --- | --- |
-| 导航意图 | 用户从菜单想进入哪个工作入口。 |
-| 页面承载 | Shell 用哪种 host 承载这个入口。 |
+| 事项     | 含义                                                 |
+| -------- | ---------------------------------------------------- |
+| 导航意图 | 用户从菜单想进入哪个工作入口。                       |
+| 页面承载 | Shell 用哪种 host 承载这个入口。                     |
 | 页面实现 | 页面由平台内置、业务包、远程应用还是动态运行器实现。 |
-| 发布单元 | 页面是否随平台一起发布，还是业务包独立发布。 |
+| 发布单元 | 页面是否随平台一起发布，还是业务包独立发布。         |
 
 菜单体系需要从“静态前端路由目录”升级为“页面入口协议”。
 
@@ -37,6 +37,29 @@ Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身�
 5. 动态模块页面应优先走平台动态运行器。
 6. 独立业务页面应支持不重发平台包的承载方式。
 7. 微前端不是第一阶段默认方案，只有当 iframe 或 offline route 无法满足业务体验时再评估。
+
+## 当前阶段收敛口径
+
+本专项当前优先建设长期必要、返工成本高、且不强依赖具体业务页面的底座能力。不要把后续业务接入、微前端、复杂状态管理和后端配置大迁移一次性做完。
+
+当前阶段应优先完成：
+
+1. 稳定 `MenuNavigationTarget`、`PageDescriptor`、`TabPolicy` 和 `PageHost` 的前端入口协议。
+2. 保证 active tab 与浏览器 URL 有基础恢复闭环，支持刷新和复制 URL 恢复当前业务入口。
+3. 保持 `PageHostOutlet`、host registry 和各类 host 的分层边界，避免页面承载逻辑散落在 Shell 或菜单解析中。
+4. 用测试锁住 tab key、URL 序列化、URL 恢复和 host 分发，防止后续业务接入退回到 route path 拼接。
+5. 对照后端 `Menu` 模型识别必要字段缺口；只有当现有字段会造成协议歧义或明显迁移成本时，才推动后端模型调整。
+
+当前阶段应暂缓：
+
+1. 完整 tab lifecycle、snapshot、dirty check 和复杂 keep-alive 治理。
+2. iframe `postMessage` 全协议和 online 页面内部状态恢复。
+3. 微前端 host、子应用生命周期和跨应用依赖治理。
+4. business route manifest 的后端同步、版本治理和配置中心闭环。
+5. 后端菜单 target envelope 的大规模表结构迁移。
+6. 多菜单方案、跨租户、跨环境持久化恢复和配置包迁移恢复。
+
+如果某项能力需要真实业务页面、动态模块运行器或后端配置中心进一步定型，应先记录边界并暂停，不用在当前专项里提前固化完整方案。
 
 ## 目标模型
 
@@ -54,28 +77,50 @@ MenuRecord
 
 建议 `PageDescriptor` 至少表达以下信息：
 
-| 字段 | 含义 |
-| --- | --- |
-| `pageType` | 页面是什么，例如 `platform-route`、`business-route`、`dynamic-module`、`remote-url`、`micro-app`、`external-link`。 |
-| `openMode` | Shell 怎么承载，例如 `shell-route`、`dynamic-runner`、`iframe`、`micro-app`、`new-window`。 |
-| `target` | 具体目标，例如 route name/path、moduleAlias、remote url、micro app entry。 |
-| `params` | 页面入参，例如 route params/query、entryParams、动态模块配置 id。 |
-| `tabPolicy` | tab 打开策略，例如单例、多实例、是否可关闭、刷新策略。 |
-| `title` | 默认页签标题，可被页面 host 或远程页面协议更新。 |
+| 字段        | 含义                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| `pageType`  | 页面是什么，例如 `platform-route`、`business-route`、`dynamic-module`、`remote-url`、`micro-app`、`external-link`。 |
+| `openMode`  | Shell 怎么承载，例如 `shell-route`、`dynamic-runner`、`iframe`、`micro-app`、`new-window`。                         |
+| `target`    | 具体目标，例如 route name/path、moduleAlias、remote url、micro app entry。                                          |
+| `params`    | 页面入参，例如 route params/query、entryParams、动态模块配置 id。                                                   |
+| `tabPolicy` | tab 打开策略，例如单例、多实例、是否可关闭、刷新策略。                                                              |
+| `title`     | 默认页签标题，可被页面 host 或远程页面协议更新。                                                                    |
 
 新菜单配置不应继续用单一 `path` 同时表达内部路由、外部 URL、动态模块和远程应用。可以保留兼容层，但新增能力应优先走结构化 target。
+
+## 后端菜单模型对照
+
+前端 resolver 不应长期替后端模型弥补语义缺口。推进本专项时需要同步观察后端菜单模型是否能稳定表达页面入口：
+
+| 字段或语义                                     | 当前作用                                                  | 风险与观察点                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `menuType`                                     | 区分分组、模块、路由、外链等入口类型。                    | 如果继续扩展 online app 或 micro app，不宜把所有新入口都塞进 `LINK`。                                                |
+| `route`                                        | 表达平台 route、offline 业务 path、routeName 或 pageKey。 | 字段容易过载；新增能力应通过结构化 target 或 resolver 规则区分语义。                                                 |
+| `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | 需要配套 `openMode` 或推荐承载方式，否则前端只能按 URL 猜 iframe/new-window。                                        |
+| `moduleAlias`                                  | 表达动态模块入口。                                        | 动态页面如果需要稳定指向元数据、视图或页面配置，应避免只靠 loose params。                                            |
+| `pageMode`                                     | 表达动态模块列表、表单、详情等模式。                      | 应与动态运行器支持的页面模式保持枚举一致。                                                                           |
+| `defaultUiConfigId` / `defaultQueryTemplateId` | 表达默认页面配置和查询模板。                              | 如果页面入口长期由 alias 管理，后续可能需要 alias 或版本语义，避免跨环境 ID 不稳定。                                 |
+| `entryParamsJson`                              | 表达入口参数。                                            | JSON 字符串适合兼容阶段；如果参数需要校验、展示或配置治理，应收敛成结构化参数模型。                                  |
+| `id` / `schemeId`                              | 支撑菜单身份和菜单方案。                                  | `menuId` 适合当前菜单树内的 tab identity；跨菜单方案、跨租户或跨环境恢复时，应纳入菜单方案上下文或 descriptor 版本。 |
+
+第一阶段可以继续由前端把现有 `Menu` 字段编译成 `MenuNavigationTarget` 和 `PageDescriptor`。一旦出现以下情况，应优先提醒并评估后端字段或模型调整：
+
+1. 前端需要通过复杂字符串约定判断同一个字段的多种业务语义。
+2. 菜单配置需要显式选择 iframe、新窗口、动态运行器或未来 micro app，但后端没有承载方式字段。
+3. 页面入口需要参与配置校验、权限、审计或配置包迁移，但只存在不可校验的 JSON 或 URL。
+4. URL 恢复需要跨菜单方案、跨租户或跨环境稳定，但只依赖当前菜单树 `menuId`。
 
 `pageType` 和 `openMode` 由 resolver 统一裁决。同一个 `pageType` 理论上可以有多个 `openMode`，例如 `remote-url` 可以选择 iframe 或新窗口；同一个 `openMode` 也可以承载不同 `pageType`，例如 `shell-route` 可承载平台内置页面和 offline 业务页面。
 
 建议长期保留以下 host 概念：
 
-| Host | 适用场景 | 第一阶段策略 |
-| --- | --- | --- |
-| PlatformRouteHost | 平台内置页面，例如元数据、菜单、设计器。 | 使用 Vue Router。 |
-| DynamicModuleHost | 动态模块页面，例如 `moduleAlias + pageMode`。 | 进入动态运行器。 |
-| BusinessRouteHost | offline 业务页面，随平台统一构建发布。 | 通过业务 route manifest 注册。 |
-| ExternalPageHost | online 业务页面或外部系统。 | 先支持新窗口或 iframe。 |
-| MicroAppHost | online 子应用，独立发布但需要更强一体化体验。 | 只预留，不作为第一阶段默认方案。 |
+| Host              | 适用场景                                      | 第一阶段策略                     |
+| ----------------- | --------------------------------------------- | -------------------------------- |
+| PlatformRouteHost | 平台内置页面，例如元数据、菜单、设计器。      | 使用 Vue Router。                |
+| DynamicModuleHost | 动态模块页面，例如 `moduleAlias + pageMode`。 | 进入动态运行器。                 |
+| BusinessRouteHost | offline 业务页面，随平台统一构建发布。        | 通过业务 route manifest 注册。   |
+| ExternalPageHost  | online 业务页面或外部系统。                   | 先支持新窗口或 iframe。          |
+| MicroAppHost      | online 子应用，独立发布但需要更强一体化体验。 | 只预留，不作为第一阶段默认方案。 |
 
 ## Online 发布场景
 
@@ -100,11 +145,11 @@ Online 场景指平台前端和业务前端独立发布，但部署在同一个 
 
 可选承载方式：
 
-| 方式 | 优点 | 风险 |
-| --- | --- | --- |
-| 新窗口打开 | 最简单，隔离强，发布独立。 | 体验割裂，Shell tab 无法统一管理内容状态。 |
+| 方式        | 优点                                     | 风险                                                |
+| ----------- | ---------------------------------------- | --------------------------------------------------- |
+| 新窗口打开  | 最简单，隔离强，发布独立。               | 体验割裂，Shell tab 无法统一管理内容状态。          |
 | iframe 内嵌 | 平台不重发，能放入 Shell tab，成本中等。 | 需要处理通信、title、刷新、样式隔离和页面生命周期。 |
-| 微前端 | 体验接近单体应用，可共享平台能力。 | 工程复杂度高，依赖版本、回滚和隔离成本高。 |
+| 微前端      | 体验接近单体应用，可共享平台能力。       | 工程复杂度高，依赖版本、回滚和隔离成本高。          |
 
 第一阶段建议优先支持新窗口或 iframe，不急于引入微前端。
 
@@ -233,13 +278,13 @@ Shell tab 不能只是内存状态。当前 active tab 应与浏览器 URL 联�
 
 不同 host 的 URL 表达可以不同：
 
-| Host | URL 表达建议 |
-| --- | --- |
-| PlatformRouteHost | 使用平台内置 route，例如 `/platform/metadata`。 |
+| Host              | URL 表达建议                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| PlatformRouteHost | 使用平台内置 route，例如 `/platform/metadata`。                                                 |
 | BusinessRouteHost | 使用 offline 业务 route path，例如 `/crm/customer/list`，或平台 workspace route 携带业务 path。 |
-| DynamicModuleHost | 使用可读动态入口，例如 `/platform/dynamic/crm.customer/list?uiConfigId=customer-list-v1`。 |
-| ExternalPageHost | 使用平台 workspace route 携带 remote url，或在新窗口直接打开业务 url。 |
-| MicroAppHost | 使用平台 workspace route 携带 app 和 route，例如 `/platform/app/crm/customer/list`。 |
+| DynamicModuleHost | 使用可读动态入口，例如 `/platform/dynamic/crm.customer/list?uiConfigId=customer-list-v1`。      |
+| ExternalPageHost  | 使用平台 workspace route 携带 remote url，或在新窗口直接打开业务 url。                          |
+| MicroAppHost      | 使用平台 workspace route 携带 app 和 route，例如 `/platform/app/crm/customer/list`。            |
 
 URL 恢复时应重新走菜单入口解析和页面 host 初始化。URL 可表达入口，不代表绕过其他专项治理。
 
@@ -249,11 +294,11 @@ URL 恢复时应重新走菜单入口解析和页面 host 初始化。URL 可表
 
 多 tab 切换时，前一个 tab 的状态不能只有一种保存方式。应区分入口恢复、页面运行态和瞬时状态。
 
-| 状态类型 | 示例 | 建议策略 |
-| --- | --- | --- |
-| 入口状态 | 菜单、`PageDescriptor`、route path/query、moduleAlias、pageMode、recordId。 | 进入 URL 或 `MenuTab.restoreState`，用于刷新、分享和重新打开。 |
-| 页面运行态 | 表格分页、排序、筛选、滚动位置、选中行、展开节点、表单草稿。 | 由 PageHost 或页面提供 tab 级 snapshot/restore。 |
-| 瞬时状态 | loading、临时弹窗、上传中状态、临时连接。 | 默认不跨 tab 保存，由页面在失活或关闭时自行处理。 |
+| 状态类型   | 示例                                                                        | 建议策略                                                       |
+| ---------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 入口状态   | 菜单、`PageDescriptor`、route path/query、moduleAlias、pageMode、recordId。 | 进入 URL 或 `MenuTab.restoreState`，用于刷新、分享和重新打开。 |
+| 页面运行态 | 表格分页、排序、筛选、滚动位置、选中行、展开节点、表单草稿。                | 由 PageHost 或页面提供 tab 级 snapshot/restore。               |
+| 瞬时状态   | loading、临时弹窗、上传中状态、临时连接。                                   | 默认不跨 tab 保存，由页面在失活或关闭时自行处理。              |
 
 第一阶段可以优先支持平台内置页面和动态 host 的 keep-alive，但不能把 keep-alive 作为唯一策略。keep-alive 适合保留 Vue 组件实例，缺点是内存和缓存失控，因此后续需要纳入：
 
@@ -282,13 +327,13 @@ Shell 负责保存和分发 tab 生命周期，页面或 host 负责声明哪些
 
 不同 host 的状态策略不同：
 
-| Host | 状态策略 |
-| --- | --- |
-| PlatformRouteHost | 优先使用 keep-alive，后续补 snapshot/dirty 生命周期。 |
-| BusinessRouteHost | offline 业务页面可复用平台 PageHost 生命周期。 |
-| DynamicModuleHost | 查询条件、分页、表单草稿等应由动态运行器统一 snapshot。 |
-| ExternalPageHost | iframe 内部状态 Shell 无法直接读取，只能通过 postMessage 协议协作。 |
-| MicroAppHost | 由微前端生命周期和子应用协议共同管理。 |
+| Host              | 状态策略                                                            |
+| ----------------- | ------------------------------------------------------------------- |
+| PlatformRouteHost | 优先使用 keep-alive，后续补 snapshot/dirty 生命周期。               |
+| BusinessRouteHost | offline 业务页面可复用平台 PageHost 生命周期。                      |
+| DynamicModuleHost | 查询条件、分页、表单草稿等应由动态运行器统一 snapshot。             |
+| ExternalPageHost  | iframe 内部状态 Shell 无法直接读取，只能通过 postMessage 协议协作。 |
+| MicroAppHost      | 由微前端生命周期和子应用协议共同管理。                              |
 
 iframe 或 online 页面如需参与 tab 状态管理，应通过最小消息协议：
 

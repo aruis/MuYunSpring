@@ -24,7 +24,15 @@ test('resolvePageDescriptor resolves ROUTE targets as platform routes by default
   assert.equal(descriptor.title, 'Metadata');
   assert.equal(descriptor.target.route, '/platform/metadata');
   assert.equal(tabKeyOf(descriptor), 'menu:metadata');
-  assert.equal(pageDescriptorToUrl(descriptor), '/platform/metadata');
+  assert.equal(
+    pageDescriptorToUrl(descriptor),
+    '/platform/metadata?_muyunMenuId=metadata&_muyunTitle=Metadata',
+  );
+  const roundTrip = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor));
+  assert.equal(roundTrip.pageType, 'platform-route');
+  assert.equal(roundTrip.menuId, 'metadata');
+  assert.equal(roundTrip.title, 'Metadata');
+  assert.equal(roundTrip.tabPolicy.identity, 'by-menu');
 });
 
 test('resolvePageDescriptor keeps path, routeName, and pageKey available for offline business routes', () => {
@@ -82,7 +90,7 @@ test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptor
   assert.equal(descriptor.entryParamsJson, '{"source":"menu"}');
   assert.equal(
     pageDescriptorToUrl(descriptor),
-    '/platform/dynamic/crm.customer/list?entryParamsJson=%7B%22source%22%3A%22menu%22%7D&menuId=customer-module&queryTemplateId=customer-query-v1&recordId=customer-1&uiConfigId=customer-list-v1',
+    '/platform/dynamic/crm.customer/list?_muyunEntryParams=%7B%22source%22%3A%22menu%22%7D&_muyunMenuId=customer-module&queryTemplateId=customer-query-v1&recordId=customer-1&uiConfigId=customer-list-v1',
   );
   const roundTrip = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor));
   assert.equal(roundTrip.entryParamsJson, '{"source":"menu"}');
@@ -106,16 +114,18 @@ test('resolvePageDescriptor resolves LINK targets by open mode', () => {
   assert.equal(iframeDescriptor.pageType, 'remote-url');
   assert.equal(iframeDescriptor.openMode, 'iframe');
   assert.equal(iframeDescriptor.hostType, 'external-page-host');
+  assert.equal(tabKeyOf(iframeDescriptor), 'menu:crm-online');
   assert.equal(
     pageDescriptorToUrl(iframeDescriptor),
-    '/platform/external?menuId=crm-online&mode=iframe&url=%2Fcrm%2Fcustomer%2Flist',
+    '/platform/external?_muyunMenuId=crm-online&mode=iframe&url=%2Fcrm%2Fcustomer%2Flist',
   );
   assert.equal(newWindowDescriptor.pageType, 'external-link');
   assert.equal(newWindowDescriptor.openMode, 'new-window');
   assert.equal(newWindowDescriptor.hostType, 'external-page-host');
+  assert.equal(tabKeyOf(newWindowDescriptor), 'menu:external-bi');
   assert.equal(
     pageDescriptorToUrl(newWindowDescriptor),
-    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+    '/platform/external?_muyunMenuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
   );
 });
 
@@ -128,7 +138,7 @@ test('pageDescriptorToUrl keeps new-window external links on shell-owned URLs', 
 
   assert.equal(
     pageDescriptorToUrl(descriptor),
-    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+    '/platform/external?_muyunMenuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
   );
 
   const restored = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor));
@@ -180,6 +190,23 @@ test('pageDescriptorFromUrl restores dynamic module params and entry params', ()
   assert.equal(descriptor.entryParamsJson, '{"source":"menu"}');
   assert.deepEqual(descriptor.params, { recordId: 'customer-1' });
   assert.equal(descriptor.target.defaultUiConfigId, 'customer-list-v1');
+});
+
+test('pageDescriptorFromUrl keeps shell metadata separate from business route query', () => {
+  const descriptor = pageDescriptorFromUrl(
+    '/crm/customer/list?entryParamsJson=business-value&menuId=business-menu&_muyunEntryParams=%7B%22source%22%3A%22shell%22%7D&_muyunMenuId=customer-list&_muyunTitle=Customers&title=Business',
+    { businessRoutePrefixes: ['/crm'] },
+  );
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.menuId, 'customer-list');
+  assert.equal(descriptor.title, 'Customers');
+  assert.equal(descriptor.entryParamsJson, '{"source":"shell"}');
+  assert.deepEqual(descriptor.target.query, {
+    entryParamsJson: 'business-value',
+    menuId: 'business-menu',
+    title: 'Business',
+  });
 });
 
 test('pageDescriptorToUrl and pageDescriptorFromUrl preserve routeName and pageKey semantics', () => {
