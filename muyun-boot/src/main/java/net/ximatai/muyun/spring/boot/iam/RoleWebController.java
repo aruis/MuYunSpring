@@ -6,6 +6,8 @@ import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.role", title = "角色管理")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 40)
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements
         CrudWeb<Role, RoleService>,

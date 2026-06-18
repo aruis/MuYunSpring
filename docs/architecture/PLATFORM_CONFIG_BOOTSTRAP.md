@@ -184,6 +184,36 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 菜单基础能力只要求菜单方案、菜单树、排序、启停和模块挂载。权限只对已解析的菜单树做剪枝，不进入菜单模型。
 
+### 平台内置菜单自注册
+
+裸库启动时，平台静态模块可通过 `@PlatformMenu` 选择性贡献系统内置菜单。`@PlatformStaticModule` 仍表达模块事实，`@PlatformMenu` 只表达导航贡献；模块可以注册但不进入菜单。
+
+平台内置菜单注册器只维护系统菜单方案：
+
+| 字段 | 值 |
+| --- | --- |
+| `id` | `platform.menu_scheme.admin` |
+| `alias` | `platform_admin` |
+| `scopeType` | `SYSTEM` |
+| `scopeId` | `system` |
+| `title` | `平台超管` |
+
+该方案不作为租户菜单 fallback。租户和机构菜单仍由各自方案维护。
+
+注册器内置三个一级分组：
+
+| ID | 标题 |
+| --- | --- |
+| `platform.menu.group.config` | 平台配置与低代码运维 |
+| `platform.menu.group.identity` | 组织与权限 |
+| `platform.menu.group.ops` | 平台运行运维 |
+
+第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`。菜单使用 deterministic `id` 做系统托管记录的幂等更新，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+
+注册顺序是先注册静态模块和动作，再注册平台内置菜单。注册器只做同方案内幂等 upsert，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。托管菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案，应作为数据漂移显式失败，而不是启动时自动迁移。
+
+前端消费这类菜单时需要区分静态模块和动态模块。当前菜单模型只表达 `MODULE + moduleAlias`，不直接表达承载方式；后续进入前端联调时，应由菜单响应补充模块类型或由前端按 `moduleAlias` 读取模块定义后再选择 PageHost。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
+
 ## 数据字典
 
 数据字典为元数据字段、表单显示、查询条件、导入导出和规则判断提供稳定枚举来源。

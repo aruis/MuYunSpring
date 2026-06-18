@@ -5,6 +5,8 @@ import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -42,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 @PlatformStaticModule(application = "platform",
         alias = WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS,
         title = "Workflow Admin")
+@PlatformMenu(parent = PlatformMenuGroups.OPS, title = "工作流运维", order = 20)
 public class WorkflowRuntimeAdminWebController {
     private final WorkflowAdminFacade adminFacade;
 

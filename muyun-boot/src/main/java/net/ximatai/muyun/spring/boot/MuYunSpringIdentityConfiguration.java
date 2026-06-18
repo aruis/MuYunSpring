@@ -1,12 +1,15 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
+import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -51,5 +54,13 @@ public class MuYunSpringIdentityConfiguration {
                                                                           PlatformModuleActionService actionService,
                                                                           StaticModuleDefinitionScanner scanner) {
         return new StaticModuleDefinitionRegistrar(moduleService, actionService, List.of(), List.of(scanner));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(PlatformMenuRegistrar.class)
+    public PlatformMenuRegistrar platformMenuRegistrar(MenuSchemeService schemeService,
+                                                       MenuService menuService,
+                                                       ApplicationContext applicationContext) {
+        return new PlatformMenuRegistrar(schemeService, menuService, applicationContext);
     }
 }

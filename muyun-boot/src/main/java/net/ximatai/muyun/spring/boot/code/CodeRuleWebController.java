@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.boot.code;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReadOnlyWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
@@ -39,6 +41,7 @@ import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = CodeRuleService.MODULE_ALIAS, title = "编码规则")
+@PlatformMenu(parent = PlatformMenuGroups.OPS, order = 10)
 @RequestMapping({"/platform.code_rule", "/platform/code/rule"})
 public class CodeRuleWebController extends WebSupport<CodeRuleService> implements
         ReadOnlyWeb<CodeRule, CodeRuleService>,

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = "platform.low_code_governance", title = "平台低代码治理")
+@PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "低代码治理", order = 80)
 @RequestMapping({"/platform.low_code_governance", "/platform/low-code-governance"})
 public class LowCodeGovernanceWebController extends WebSupport<LowCodeModuleConfigArchiveFacade>
         implements SystemScope<LowCodeModuleConfigArchiveFacade> {

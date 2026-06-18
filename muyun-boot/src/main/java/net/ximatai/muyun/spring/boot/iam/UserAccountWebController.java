@@ -12,6 +12,8 @@ import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 30)
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,
