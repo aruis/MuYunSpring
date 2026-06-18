@@ -114,13 +114,13 @@ MenuRecord
 
 建议长期保留以下 host 概念：
 
-| Host              | 适用场景                                      | 第一阶段策略                     |
-| ----------------- | --------------------------------------------- | -------------------------------- |
-| PlatformRouteHost | 平台内置页面，例如元数据、菜单、设计器。      | 使用 Vue Router。                |
-| DynamicModuleHost | 动态模块页面，例如 `moduleAlias + pageMode`。 | 进入动态运行器。                 |
-| BusinessRouteHost | offline 业务页面，随平台统一构建发布。        | 通过业务 route manifest 注册。   |
-| ExternalPageHost  | online 业务页面或外部系统。                   | 先支持新窗口或 iframe。          |
-| MicroAppHost      | online 子应用，独立发布但需要更强一体化体验。 | 只预留，不作为第一阶段默认方案。 |
+| Host              | 适用场景                                      | 第一阶段策略                              |
+| ----------------- | --------------------------------------------- | ----------------------------------------- |
+| PlatformRouteHost | 平台内置页面，例如元数据、菜单、设计器。      | 使用 Vue Router。                         |
+| DynamicModuleHost | 动态模块页面，例如 `moduleAlias + pageMode`。 | 进入动态运行器。                          |
+| BusinessRouteHost | offline 业务页面，随平台统一构建发布。        | 先轻量占位，后续再接业务 route manifest。 |
+| ExternalPageHost  | online 业务页面或外部系统。                   | 先支持新窗口或 iframe。                   |
+| MicroAppHost      | online 子应用，独立发布但需要更强一体化体验。 | 只预留，不作为第一阶段默认方案。          |
 
 ## Online 发布场景
 
@@ -508,13 +508,15 @@ PageDescriptor
 
 - [x] 增加 `PageHostOutlet` 或同等内容区承载器。
 - [x] 增加 `PlatformRouteHost`。
+- [x] 增加 `BusinessRouteHost`。
 - [x] 增加 `DynamicModuleHost` 占位。
 - [x] 增加 `ExternalPageHost` 占位。
 - [x] `AdminShell` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
 
 验收：
 
-- [x] ROUTE 菜单能进入 PlatformRouteHost。
+- [x] 平台 ROUTE 菜单能进入 PlatformRouteHost。
+- [x] 业务 ROUTE 菜单能进入 BusinessRouteHost。
 - [x] MODULE 菜单能进入 DynamicModuleHost 占位。
 - [x] LINK 菜单能进入 ExternalPageHost 占位。
 - [x] `App.vue` 不再直接散落 target 类型判断。
