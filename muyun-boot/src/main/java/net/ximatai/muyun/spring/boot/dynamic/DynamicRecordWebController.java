@@ -1039,10 +1039,17 @@ public class DynamicRecordWebController implements
         projected.setId(source.getId());
         projected.setTenantId(source.getTenantId());
         projected.setVersion(source.getVersion());
+        Map<String, FieldDefinition> fieldDefinitions = source.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
         for (String field : fields) {
             Map<String, Object> values = source.getValues();
             if (values.containsKey(field)) {
-                projected.setValue(field, values.get(field));
+                FieldDefinition definition = fieldDefinitions.get(field);
+                if (definition != null && !definition.isPhysical()) {
+                    projected.putDisplayValue(field, values.get(field));
+                } else {
+                    projected.setValue(field, values.get(field));
+                }
             }
         }
         return projected;

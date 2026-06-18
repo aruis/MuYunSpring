@@ -32,6 +32,45 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldExposeLoadedVirtualValuesOnlyForDisplay() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001");
+
+        record.putDisplayValue("displayCode", "C-001 / Customer");
+
+        assertThat(record.getValue("displayCode")).isEqualTo("C-001 / Customer");
+        assertThat(record.getValues()).containsEntry("displayCode", "C-001 / Customer");
+        assertThat(record.outputValues(net.ximatai.muyun.spring.common.security.FieldOutputContext.VIEW))
+                .containsEntry("displayCode", "C-001 / Customer");
+        assertThat(record.getPlatformValues()).doesNotContainKey("displayCode");
+    }
+
+    @Test
+    void shouldKeepDisplayValuesOutOfPlatformValuesAfterCopy() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001")
+                .putDisplayValue("displayCode", "C-001 / Customer");
+
+        DynamicRecord copied = record.copy();
+
+        assertThat(copied.getValues()).containsEntry("displayCode", "C-001 / Customer");
+        assertThat(copied.getPlatformValues()).doesNotContainKey("displayCode");
+    }
+
+    @Test
+    void shouldRejectUnknownOrPhysicalDisplayValues() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001");
+
+        assertThatThrownBy(() -> record.putDisplayValue("unknown", "value"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown dynamic field");
+        assertThatThrownBy(() -> record.putDisplayValue("code", "override"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires non-physical field");
+    }
+
+    @Test
     void shouldRejectUnknownFieldAndInvalidValueType() {
         DynamicRecord record = new DynamicRecord(contractEntity());
 
@@ -217,6 +256,7 @@ class DynamicRecordTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual(),
                         FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
                 )
         );

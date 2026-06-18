@@ -664,8 +664,12 @@ class DynamicRelationRuntimeTest {
 
         assertThat(line.getValue("invoiceTitle")).isEqualTo("I-001");
         assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
-        assertThat(line.getValues()).doesNotContainKey("invoiceTitle");
-        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
+        assertThat(line.getValues())
+                .containsEntry("invoiceTitle", "I-001")
+                .containsEntry("invoiceDisplayTitle", "I-001");
+        assertThat(line.getPlatformValues())
+                .doesNotContainKey("invoiceTitle")
+                .doesNotContainKey("invoiceDisplayTitle");
     }
 
     @Test
@@ -679,7 +683,8 @@ class DynamicRelationRuntimeTest {
         DynamicRecord line = lineService.select("line-1");
 
         assertThat(line.getValue("invoiceDisplayTitle")).isEqualTo("I-001");
-        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
+        assertThat(line.getValues()).containsEntry("invoiceDisplayTitle", "I-001");
+        assertThat(line.getPlatformValues()).doesNotContainKey("invoiceDisplayTitle");
     }
 
     @Test
@@ -704,7 +709,8 @@ class DynamicRelationRuntimeTest {
         DynamicRecord line = lineService.select("line-1");
 
         assertThat(line.getValue("invoiceDisplayTitle")).isNull();
-        assertThat(line.getValues()).doesNotContainKey("invoiceDisplayTitle");
+        assertThat(line.getValues()).containsEntry("invoiceDisplayTitle", null);
+        assertThat(line.getPlatformValues()).doesNotContainKey("invoiceDisplayTitle");
     }
 
     @Test

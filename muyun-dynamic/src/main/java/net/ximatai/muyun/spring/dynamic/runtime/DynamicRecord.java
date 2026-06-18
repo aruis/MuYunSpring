@@ -82,15 +82,34 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         return this;
     }
 
+    public DynamicRecord putDisplayValue(String fieldCode, Object value) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field == null) {
+            throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        if (field.isPhysical()) {
+            throw new IllegalArgumentException("dynamic display value requires non-physical field: " + fieldCode);
+        }
+        if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
+            throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
+        }
+        loadedValues.put(fieldCode, value);
+        return this;
+    }
+
     public Object getValue(String fieldCode) {
         if (isInternalGeneratedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
         }
-        if (!fields.containsKey(fieldCode)) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field == null) {
             if (loadedValues.containsKey(fieldCode)) {
                 return loadedValues.get(fieldCode);
             }
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        if (!field.isPhysical() && loadedValues.containsKey(fieldCode)) {
+            return loadedValues.get(fieldCode);
         }
         return values.get(fieldCode);
     }
@@ -102,12 +121,26 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
                 visible.put(fieldCode, value);
             }
         });
+        loadedValues.forEach((fieldCode, value) -> {
+            if (!isInternalGeneratedField(fieldCode)) {
+                visible.put(fieldCode, value);
+            }
+        });
         return Collections.unmodifiableMap(visible);
     }
 
     public Map<String, Object> outputValues(FieldOutputContext context) {
         Map<String, Object> output = new LinkedHashMap<>();
         values.forEach((fieldCode, value) -> {
+            if (isInternalGeneratedField(fieldCode)) {
+                return;
+            }
+            FieldDefinition field = fields.get(fieldCode);
+            output.put(fieldCode, field == null
+                    ? value
+                    : FieldOutputRenderer.renderValue(fieldCode, value, field.protection(), context, null));
+        });
+        loadedValues.forEach((fieldCode, value) -> {
             if (isInternalGeneratedField(fieldCode)) {
                 return;
             }

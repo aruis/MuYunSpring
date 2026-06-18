@@ -1170,6 +1170,10 @@ class DynamicRecordWebControllerTest {
         codeField.setUiConfigId("ui-list");
         codeField.setModuleMetadataFieldId("module-field-code");
         codeField.setVisible(true);
+        PlatformUiConfigField displayField = new PlatformUiConfigField();
+        displayField.setUiConfigId("ui-list");
+        displayField.setModuleMetadataFieldId("module-field-display-code");
+        displayField.setVisible(true);
         PlatformQueryTemplate template = new PlatformQueryTemplate();
         template.setId("tpl-active");
         template.setModuleAlias(MODULE);
@@ -1178,16 +1182,20 @@ class DynamicRecordWebControllerTest {
                 MODULE,
                 List.of(),
                 List.of(uiConfig),
-                List.of(codeField),
+                List.of(codeField, displayField),
                 List.of(template),
                 List.of()
         ));
         when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
                 "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
+                "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
         Criteria templateCriteria = Criteria.of().eq("code", "C-001");
         when(queryItemService.compile(eq("tpl-active"), any())).thenReturn(templateCriteria);
         DynamicRecord record = new DynamicRecord(entity())
                 .setValue("code", "C-001")
+                .putDisplayValue("displayCode", "C-001 / Customer")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
         when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().eq("amount", BigDecimal.TEN));
@@ -1216,6 +1224,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("contract-1"))
                 .andExpect(jsonPath("$.records[0].values.code").value("C-001"))
+                .andExpect(jsonPath("$.records[0].values.displayCode").value("C-001 / Customer"))
                 .andExpect(jsonPath("$.records[0].values.amount").doesNotExist())
                 .andExpect(jsonPath("$.total").value(1));
 
