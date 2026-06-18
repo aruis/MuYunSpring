@@ -83,6 +83,13 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     }
 
     public DynamicRecord putDisplayValue(String fieldCode, Object value) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field == null) {
+            throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        if (field.isPhysical()) {
+            throw new IllegalArgumentException("dynamic display value requires non-physical field: " + fieldCode);
+        }
         if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
         }
@@ -94,11 +101,15 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
         if (isInternalGeneratedField(fieldCode)) {
             throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
         }
-        if (!fields.containsKey(fieldCode)) {
+        FieldDefinition field = fields.get(fieldCode);
+        if (field == null) {
             if (loadedValues.containsKey(fieldCode)) {
                 return loadedValues.get(fieldCode);
             }
             throw new IllegalArgumentException("unknown dynamic field: " + fieldCode);
+        }
+        if (!field.isPhysical() && loadedValues.containsKey(fieldCode)) {
+            return loadedValues.get(fieldCode);
         }
         return values.get(fieldCode);
     }
@@ -463,7 +474,10 @@ public class DynamicRecord implements EntityContract, TreeCapable, EnabledCapabl
     }
 
     void putVirtualValue(String fieldCode, Object value) {
-        putDisplayValue(fieldCode, value);
+        if (isInternalGeneratedField(fieldCode) || isApprovalManagedField(fieldCode)) {
+            throw new IllegalArgumentException("dynamic field is platform managed: " + fieldCode);
+        }
+        loadedValues.put(fieldCode, value);
     }
 
     public void putGeneratedValue(String fieldCode, Object value) {

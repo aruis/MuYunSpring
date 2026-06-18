@@ -58,6 +58,19 @@ class DynamicRecordTest {
     }
 
     @Test
+    void shouldRejectUnknownOrPhysicalDisplayValues() {
+        DynamicRecord record = new DynamicRecord(contractEntity())
+                .setValue("code", "C-001");
+
+        assertThatThrownBy(() -> record.putDisplayValue("unknown", "value"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown dynamic field");
+        assertThatThrownBy(() -> record.putDisplayValue("code", "override"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires non-physical field");
+    }
+
+    @Test
     void shouldRejectUnknownFieldAndInvalidValueType() {
         DynamicRecord record = new DynamicRecord(contractEntity());
 
@@ -243,6 +256,7 @@ class DynamicRecordTest {
                 List.of(
                         FieldDefinition.string("code", "Code").length(64).required(),
                         FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual(),
                         FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
                 )
         );
