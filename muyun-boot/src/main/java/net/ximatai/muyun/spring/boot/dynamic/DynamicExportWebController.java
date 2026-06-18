@@ -20,7 +20,6 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
-import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshotService;
@@ -44,7 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -135,6 +133,7 @@ public class DynamicExportWebController {
         DynamicEntityOperations operations = recordService.mainEntity(moduleAlias);
         Criteria criteria = queryCriteria(moduleAlias, operations, normalized);
         PageRequest pageRequest = DynamicWebQueryMapper.page(normalized.pageOrDefault());
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(operations, normalized.sorts());
         Sort[] sorts = DynamicWebQueryMapper.sorts(normalized.sorts());
         return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
     }
@@ -153,6 +152,7 @@ public class DynamicExportWebController {
         Criteria criteria = andCriteria(queryCriteria, selectedCriteria);
         WebQueryRequest queryOrDefault = query == null ? new WebQueryRequest(null, List.of(), List.of()) : query;
         PageRequest pageRequest = DynamicWebQueryMapper.page(queryOrDefault.pageOrDefault());
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(operations, queryOrDefault.sorts());
         Sort[] sorts = DynamicWebQueryMapper.sorts(queryOrDefault.sorts());
         return new DynamicExportCommand(descriptor, criteria, pageRequest, List.of(sorts));
     }
@@ -211,7 +211,7 @@ public class DynamicExportWebController {
                 continue;
             }
             ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
-            if (resolved.relationRole() == RelationRole.MAIN && searchableTextField(resolved)) {
+            if (DynamicWebQueryFieldSupport.searchableTextField(resolved)) {
                 visibleFields.add(resolved.fieldName());
             }
         }
@@ -229,11 +229,6 @@ public class DynamicExportWebController {
             }
         }
         return requestedFields;
-    }
-
-    private boolean searchableTextField(ResolvedModuleMetadataField field) {
-        String alias = field.fieldTypeAlias();
-        return alias != null && Set.of("string", "text").contains(alias.trim().toLowerCase(Locale.ROOT));
     }
 
     private Criteria andCriteria(Criteria... criteriaList) {

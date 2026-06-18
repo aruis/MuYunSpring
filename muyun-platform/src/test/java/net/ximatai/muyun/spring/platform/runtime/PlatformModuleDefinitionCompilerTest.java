@@ -799,6 +799,32 @@ class PlatformModuleDefinitionCompilerTest {
     }
 
     @Test
+    void shouldCompileFormulaRuleTargetingVirtualField() {
+        moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "invoice"));
+        fieldService.insert(field(metadataId, "amount", "amount", FieldType.INTEGER));
+        MetadataField displayAmount = field(metadataId, "displayAmount", "display_amount", FieldType.STRING);
+        displayAmount.setFieldForm(MetadataFieldForm.VIRTUAL);
+        fieldService.insert(displayAmount);
+        String relationId = relationService.insert(mainRelation("sales.invoice", metadataId));
+        ModuleMetadataFormulaRule rule = formulaRule(relationId, "displayAmountCalc",
+                "'Amount ' + {amount}");
+        rule.setRuleKind(FormulaRuleKind.CALCULATION);
+        rule.setTargetField("displayAmount");
+        formulaRuleService.insert(rule);
+
+        ModuleDefinition definition = compiler.compile("sales.invoice");
+
+        assertThat(definition.entities().getFirst().formulaRules())
+                .singleElement()
+                .satisfies(formula -> {
+                    assertThat(formula.code()).isEqualTo("displayAmountCalc");
+                    assertThat(formula.targetField()).isEqualTo("displayAmount");
+                });
+        assertThat(field(definition, "displayAmount").isPhysical()).isFalse();
+    }
+
+    @Test
     void shouldRejectFormulaRuleWithUnknownField() {
         moduleService.insert(module("sales.invoice", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "invoice"));

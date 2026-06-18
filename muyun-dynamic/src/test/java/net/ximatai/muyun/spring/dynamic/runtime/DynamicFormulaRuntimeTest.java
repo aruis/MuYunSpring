@@ -52,6 +52,24 @@ class DynamicFormulaRuntimeTest {
         assertThat(record.getValues()).doesNotContainKey("normalizedOrderNo");
     }
 
+    @Test
+    void shouldPreviewCalculatedVirtualField() {
+        EntityDefinition entity = new EntityDefinition("order", "sales_order", "Order", List.of(
+                FieldDefinition.string("orderNo", "Order No").column("order_no"),
+                FieldDefinition.string("displayName", "Display Name").column("display_name").virtual()
+        )).withFormulaRules(EntityFormulaRuleDefinition.calculation(
+                "displayNameCalc", "displayName", "'Order ' + {orderNo}"));
+        ModuleDefinition module = new ModuleDefinition("sales.order", "Order", List.of(entity));
+        DynamicFormulaRuntime runtime = new DynamicFormulaRuntime(module.moduleAlias(), entity, module);
+        DynamicRecord record = new DynamicRecord(entity).setValue("orderNo", "A-001");
+
+        DynamicFormulaPreviewResult result = runtime.preview(record, null);
+
+        assertThat(result.record().getValue("displayName")).isEqualTo("Order A-001");
+        assertThat(result.changedFields()).containsExactly("displayName");
+        assertThat(result.report().hasErrors()).isFalse();
+    }
+
     private EntityDefinition orderEntity() {
         return new EntityDefinition("order", "sales_order", "Order", List.of(
                 FieldDefinition.string("orderNo", "Order No").column("order_no"),

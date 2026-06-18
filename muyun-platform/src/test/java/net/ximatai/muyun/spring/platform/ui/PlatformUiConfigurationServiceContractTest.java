@@ -27,6 +27,7 @@ import net.ximatai.muyun.spring.platform.metadata.Metadata;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldConfigService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldDefinitionCompiler;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.MetadataService;
@@ -177,6 +178,39 @@ class PlatformUiConfigurationServiceContractTest {
         assertThat(bootstrap.resolvedConfig().fieldUiTypes().getFirst().fieldMappings())
                 .extracting(PlatformResolvedFieldUiTypeFieldMapping::sourceKey)
                 .containsExactly("end");
+    }
+
+    @Test
+    void shouldExposeVirtualFieldFormInPageBootstrap() {
+        seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
+        seedUiType("text", "string");
+        String displayNameField = seedModuleField("crm.customer", "customer", "displayName",
+                "display_name", "string", false, MetadataFieldForm.VIRTUAL);
+        String uiSetId = uiSetService.insert(uiSet("crm.customer", "list", PlatformUiSetType.LIST, true));
+        String uiConfigId = uiConfigService.insert(uiConfig(uiSetId, PlatformUiClientType.WEB, false));
+        uiConfigFieldService.insert(uiField(uiConfigId, displayNameField, "text"));
+        publishService.publishUiConfig(uiConfigId);
+        Menu menu = new Menu();
+        menu.setId("menu-virtual");
+        menu.setTitle("Customers");
+        menu.setMenuType(MenuType.MODULE);
+        menu.setModuleAlias("crm.customer");
+        menu.setPageMode(MenuPageMode.LIST);
+        MenuService menuService = org.mockito.Mockito.mock(MenuService.class);
+        org.mockito.Mockito.when(menuService.currentUserVisibleMenu("menu-virtual")).thenReturn(menu);
+        PlatformPageBootstrapService bootstrapService = new PlatformPageBootstrapService(
+                menuService,
+                snapshotService,
+                moduleFieldService,
+                fieldUiTypeService,
+                fieldUiTypeAttributeService,
+                fieldUiTypeFieldMappingService);
+
+        PlatformPageBootstrap bootstrap = bootstrapService.bootstrapByMenu("menu-virtual", PlatformUiClientType.WEB);
+
+        assertThat(bootstrap.resolvedConfig().uiFields()).hasSize(1);
+        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldName()).isEqualTo("displayName");
+        assertThat(bootstrap.resolvedConfig().uiFields().getFirst().fieldForm()).isEqualTo("VIRTUAL");
     }
 
     @Test
@@ -1212,6 +1246,17 @@ class PlatformUiConfigurationServiceContractTest {
                                    String columnName,
                                    String fieldTypeAlias,
                                    boolean required) {
+        return seedModuleField(moduleAlias, metadataAlias, fieldName, columnName, fieldTypeAlias, required,
+                MetadataFieldForm.PHYSICAL);
+    }
+
+    private String seedModuleField(String moduleAlias,
+                                   String metadataAlias,
+                                   String fieldName,
+                                   String columnName,
+                                   String fieldTypeAlias,
+                                   boolean required,
+                                   MetadataFieldForm fieldForm) {
         String applicationAlias = moduleAlias.substring(0, moduleAlias.indexOf('.'));
         PlatformModule module = new PlatformModule();
         module.setApplicationAlias(applicationAlias);
@@ -1234,6 +1279,7 @@ class PlatformUiConfigurationServiceContractTest {
         field.setFieldTypeAlias(fieldTypeAlias);
         field.setTitle(fieldName);
         field.setRequired(required);
+        field.setFieldForm(fieldForm);
         String fieldId = fieldService.insert(field);
 
         ModuleMetadataRelation relation = new ModuleMetadataRelation();

@@ -21,6 +21,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportCommand;
 import net.ximatai.muyun.spring.platform.exchange.exporter.DynamicExportFacade;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
@@ -84,6 +85,7 @@ class DynamicExportWebControllerTest {
         Criteria criteria = Criteria.of().eq("status", "active");
         when(recordService.describe(MODULE)).thenReturn(descriptor);
         when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(operations.newRecord()).thenReturn(new net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord(entity()));
         when(operations.queryCriteria(org.mockito.ArgumentMatchers.anyList())).thenReturn(criteria);
         when(exportFacade.exportWorkbook(org.mockito.ArgumentMatchers.any(DynamicExportCommand.class)))
                 .thenReturn(new byte[]{7, 8, 9});
@@ -271,6 +273,90 @@ class DynamicExportWebControllerTest {
     }
 
     @Test
+    void shouldRejectVirtualFieldInExportSorts() throws Exception {
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(operations.newRecord()).thenReturn(new net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord(entity()));
+
+        mvc.perform(post("/{moduleAlias}/export/data", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "displayCode", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
+    }
+
+    @Test
+    void shouldRejectVirtualFieldInSelectedExportSorts() throws Exception {
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(operations.newRecord()).thenReturn(new net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord(entity()));
+
+        mvc.perform(post("/{moduleAlias}/export/selected", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": ["order-1"],
+                                  "query": {
+                                    "sorts": [
+                                      {"field": "displayCode", "desc": true}
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
+    }
+
+    @Test
+    void shouldRejectVirtualFieldInExportQuickSearch() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc exportMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicExportWebController(
+                        recordService, activeTenantVerifier, exportFacade,
+                        snapshotService, null, moduleFieldService))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        DynamicModuleDescriptor descriptor = descriptor();
+        DynamicEntityOperations operations = mock(DynamicEntityOperations.class);
+        PlatformUiSet uiSet = uiSet("set-list");
+        PlatformUiConfig uiConfig = uiConfig("ui-list", uiSet.getId());
+        PlatformUiConfigField displayField = uiField(uiConfig.getId(), "field-display-code");
+        when(recordService.describe(MODULE)).thenReturn(descriptor);
+        when(recordService.mainEntity(MODULE)).thenReturn(operations);
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE, List.of(uiSet), List.of(uiConfig), List.of(displayField), List.of(), List.of()));
+        when(moduleFieldService.resolve("field-display-code")).thenReturn(resolvedField(
+                "field-display-code", "displayCode", "string", MetadataFieldForm.VIRTUAL));
+
+        exportMvc.perform(post("/{moduleAlias}/export/data", MODULE)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["displayCode"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verify(exportFacade, org.mockito.Mockito.never()).exportWorkbook(any(DynamicExportCommand.class));
+    }
+
+    @Test
     void shouldRejectDataExportWhenModuleDoesNotSupportExchange() throws Exception {
         when(recordService.describe(MODULE)).thenReturn(descriptorWithoutExchange());
 
@@ -292,9 +378,7 @@ class DynamicExportWebControllerTest {
         return DynamicModuleDescriptor.from(new ModuleDefinition(
                 MODULE,
                 "Order",
-                List.of(new EntityDefinition("order", "sales_order", "Order", List.of(
-                        FieldDefinition.string("orderNo", "Order No")
-                ), java.util.Set.of(EntityCapability.EXCHANGE)))
+                List.of(entity().withCapabilities(EntityCapability.EXCHANGE))
         ));
     }
 
@@ -302,9 +386,14 @@ class DynamicExportWebControllerTest {
         return DynamicModuleDescriptor.from(new ModuleDefinition(
                 MODULE,
                 "Order",
-                List.of(new EntityDefinition("order", "sales_order", "Order", List.of(
-                        FieldDefinition.string("orderNo", "Order No")
-                )))
+                List.of(entity())
+        ));
+    }
+
+    private EntityDefinition entity() {
+        return new EntityDefinition("order", "sales_order", "Order", List.of(
+                FieldDefinition.string("orderNo", "Order No").column("order_no"),
+                FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual()
         ));
     }
 
@@ -335,6 +424,13 @@ class DynamicExportWebControllerTest {
     }
 
     private ResolvedModuleMetadataField resolvedField(String id, String fieldName, String fieldTypeAlias) {
+        return resolvedField(id, fieldName, fieldTypeAlias, MetadataFieldForm.PHYSICAL);
+    }
+
+    private ResolvedModuleMetadataField resolvedField(String id,
+                                                     String fieldName,
+                                                     String fieldTypeAlias,
+                                                     MetadataFieldForm fieldForm) {
         return new ResolvedModuleMetadataField(
                 id,
                 MODULE,
@@ -348,7 +444,8 @@ class DynamicExportWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                fieldTypeAlias
+                fieldTypeAlias,
+                fieldForm
         );
     }
 

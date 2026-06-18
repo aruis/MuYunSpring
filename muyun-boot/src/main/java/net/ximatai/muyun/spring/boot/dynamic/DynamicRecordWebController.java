@@ -108,7 +108,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -323,6 +322,7 @@ public class DynamicRecordWebController implements
         if (request == null || request.sorts().isEmpty()) {
             return new Sort[0];
         }
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(service(), request.sorts());
         return DynamicWebQueryMapper.sorts(request.sorts());
     }
 
@@ -411,10 +411,11 @@ public class DynamicRecordWebController implements
             DynamicAssociationViewDescriptor view = recordService.associationView(moduleAlias, entityAlias, viewCode);
             Criteria criteria = targetQueryCriteria(view.targetModuleAlias(), view.targetEntityAlias(), request);
             WebQueryRequest normalized = request == null ? new WebQueryRequest(null, List.of(), List.of()) : request;
+            DynamicEntityOperations targetOperations = recordService.entity(view.targetModuleAlias(), view.targetEntityAlias());
+            DynamicWebQueryFieldSupport.validatePhysicalSorts(targetOperations, normalized.sorts());
             PageResult<DynamicRecord> page = recordService.associationViewPage(moduleAlias, entityAlias, id,
                     viewCode, criteria, DynamicWebQueryMapper.page(normalized.pageOrDefault()),
                     DynamicWebQueryMapper.sorts(normalized.sorts()));
-            DynamicEntityOperations targetOperations = recordService.entity(view.targetModuleAlias(), view.targetEntityAlias());
             return WebPageResponse.from(WebOutputSupport.page(targetOperations, page, FieldOutputContext.LIST));
         });
     }
@@ -427,6 +428,7 @@ public class DynamicRecordWebController implements
     public DynamicRecord insert(@RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
+            validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             String id = service().insert(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
@@ -442,6 +444,7 @@ public class DynamicRecordWebController implements
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             normalized.setId(id);
+            validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(normalized);
@@ -810,7 +813,7 @@ public class DynamicRecordWebController implements
                 continue;
             }
             ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
-            if (resolved.relationRole() == RelationRole.MAIN && searchableTextField(resolved)) {
+            if (DynamicWebQueryFieldSupport.searchableTextField(resolved)) {
                 visibleFields.add(resolved.fieldName());
             }
         }
@@ -828,11 +831,6 @@ public class DynamicRecordWebController implements
             }
         }
         return requestedFields;
-    }
-
-    private boolean searchableTextField(ResolvedModuleMetadataField field) {
-        String alias = field.fieldTypeAlias();
-        return alias != null && Set.of("string", "text").contains(alias.trim().toLowerCase(Locale.ROOT));
     }
 
     private void requireDataScopeRecord(PlatformAction action, String id) {
@@ -1041,10 +1039,17 @@ public class DynamicRecordWebController implements
         projected.setId(source.getId());
         projected.setTenantId(source.getTenantId());
         projected.setVersion(source.getVersion());
+        Map<String, FieldDefinition> fieldDefinitions = source.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
         for (String field : fields) {
             Map<String, Object> values = source.getValues();
             if (values.containsKey(field)) {
-                projected.setValue(field, values.get(field));
+                FieldDefinition definition = fieldDefinitions.get(field);
+                if (definition != null && !definition.isPhysical()) {
+                    projected.putDisplayValue(field, values.get(field));
+                } else {
+                    projected.setValue(field, values.get(field));
+                }
             }
         }
         return projected;
@@ -1448,7 +1453,8 @@ public class DynamicRecordWebController implements
 
     private DynamicWebError badRequest(String message) {
         if (message != null && (message.startsWith("UI required field ")
-                || message.startsWith("UI read-only field "))) {
+                || message.startsWith("UI read-only field ")
+                || message.startsWith("Virtual field "))) {
             return DynamicWebError.uiValidation(message);
         }
         if (message != null && (message.startsWith("record attachment ")
@@ -1485,6 +1491,25 @@ public class DynamicRecordWebController implements
             );
         });
         return record;
+    }
+
+    private void validateWritableSaveFields(DynamicRecord record, String pathPrefix) {
+        Map<String, FieldDefinition> fields = record.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
+        for (String fieldCode : record.explicitFieldCodes()) {
+            FieldDefinition field = fields.get(fieldCode);
+            if (field != null && !field.isPhysical()) {
+                throw new PlatformException("Virtual field cannot be saved: " + pathPrefix + fieldCode);
+            }
+        }
+        record.getChildren().forEach((relationCode, rows) -> {
+            if (rows == null) {
+                return;
+            }
+            for (DynamicRecord row : rows) {
+                validateWritableSaveFields(row, pathPrefix + relationCode + ".");
+            }
+        });
     }
 
     private String childEntityAlias(String moduleAlias, String parentEntityAlias, String relationCode) {
@@ -1609,6 +1634,10 @@ public class DynamicRecordWebController implements
             actionRequest = actionRequest.withPageRequest(DynamicWebQueryMapper.page(normalized.page()));
         }
         if (!normalized.sorts().isEmpty()) {
+            if (entityAlias != null) {
+                DynamicWebQueryFieldSupport.validatePhysicalSorts(recordService.entity(moduleAlias, entityAlias),
+                        normalized.sorts());
+            }
             actionRequest = actionRequest.withSorts(List.of(DynamicWebQueryMapper.sorts(normalized.sorts())));
         }
         return actionRequest;

@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttributeService;
@@ -601,7 +602,8 @@ class MenuEntryBootstrapContractTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                "text"
+                "text",
+                MetadataFieldForm.PHYSICAL
         );
     }
 }

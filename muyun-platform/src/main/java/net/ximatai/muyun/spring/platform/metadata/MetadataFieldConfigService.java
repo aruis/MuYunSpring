@@ -115,9 +115,11 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         normalizeFieldShape(config, fieldType);
         normalizeDictionaryBinding(config, field, fieldType);
+        validateVirtualQueryBoundary(config, field);
         normalizeQueryDefinition(config, fieldType);
         validateProtectionQueryBoundary(config, fieldType);
         normalizeBehavior(config, fieldType);
+        validateVirtualBehaviorBoundary(config, field);
         rejectDuplicate(config, scopeCriteria(config.getMetadataFieldId(), config.getRelationId()),
                 "metadata field config must be unique in scope: " + config.getMetadataFieldId());
     }
@@ -223,6 +225,16 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         config.queryDefinition(fieldType);
     }
 
+    private void validateVirtualQueryBoundary(MetadataFieldConfig config, MetadataField field) {
+        if (field.getFieldForm() != MetadataFieldForm.VIRTUAL) {
+            return;
+        }
+        if (Boolean.TRUE.equals(config.getQueryable())) {
+            throw new PlatformException("Virtual metadata field cannot be queryable: "
+                    + config.getMetadataFieldId());
+        }
+    }
+
     private void validateProtectionQueryBoundary(MetadataFieldConfig config, PlatformFieldType fieldType) {
         if (protectionConfigService == null) {
             return;
@@ -251,6 +263,16 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                         Boolean.TRUE.equals(config.getWriteProtected())),
                 config.getMetadataFieldId()
         );
+    }
+
+    private void validateVirtualBehaviorBoundary(MetadataFieldConfig config, MetadataField field) {
+        if (field.getFieldForm() != MetadataFieldForm.VIRTUAL) {
+            return;
+        }
+        if (config.getDefaultValue() != null || config.getValidationRegex() != null) {
+            throw new PlatformException("Virtual metadata field cannot define default value or validation regex: "
+                    + config.getMetadataFieldId());
+        }
     }
 
     private MetadataField requireField(String metadataFieldId) {

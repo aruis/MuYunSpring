@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldTemporalSemantics;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 
@@ -15,6 +16,7 @@ public record DynamicFieldDescriptor(
         FieldType type,
         FieldTemporalSemantics temporalSemantics,
         String title,
+        FieldStorageForm storageForm,
         boolean required,
         boolean unique,
         boolean indexed,
@@ -50,6 +52,7 @@ public record DynamicFieldDescriptor(
                 field.type(),
                 field.type().temporalSemantics(),
                 field.name(),
+                field.storageForm(),
                 field.isRequired(),
                 field.isUnique(),
                 field.isIndexed(),
@@ -81,6 +84,7 @@ public record DynamicFieldDescriptor(
                 descriptor.type(),
                 descriptor.temporalSemantics(),
                 descriptor.title(),
+                descriptor.storageForm(),
                 descriptor.required(),
                 descriptor.unique(),
                 descriptor.indexed(),

@@ -200,7 +200,8 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 field.getFieldName(),
                 field.getColumnName(),
                 field.getTitle(),
-                field.getFieldTypeAlias()
+                field.getFieldTypeAlias(),
+                field.getFieldForm()
         );
     }
 
@@ -212,6 +213,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
             throw new PlatformException("Module metadata field requires field in relation metadata: "
                     + moduleField.getMetadataFieldId());
         }
+        validateVirtualFieldBoundary(moduleField, field);
         normalizeReferenceConfig(moduleField, metadata, relation);
         normalizeMeasureUnitConfig(moduleField, metadata, relation, field);
         normalizeMoneyConfig(moduleField, metadata, relation, field);
@@ -221,6 +223,49 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 "module metadata field must be unique: " + relation.getId() + "." + field.getId());
         moduleField.setRelationId(relation.getId());
         moduleField.setMetadataFieldId(field.getId());
+    }
+
+    private void validateVirtualFieldBoundary(ModuleMetadataField moduleField, MetadataField field) {
+        if (field.getFieldForm() != MetadataFieldForm.VIRTUAL) {
+            return;
+        }
+        if (hasText(moduleField.getDefaultValue()) || hasText(moduleField.getValidationRegex())) {
+            throw new PlatformException("Virtual module metadata field cannot define default value or validation regex: "
+                    + field.getFieldName());
+        }
+        if (hasMeasureConfig(moduleField)) {
+            throw new PlatformException("Virtual module metadata field cannot define measure unit config: "
+                    + field.getFieldName());
+        }
+        if (hasMoneyConfig(moduleField)) {
+            throw new PlatformException("Virtual module metadata field cannot define money config: "
+                    + field.getFieldName());
+        }
+    }
+
+    private boolean hasMeasureConfig(ModuleMetadataField moduleField) {
+        return hasText(moduleField.getUnitCategoryAlias())
+                || moduleField.getUnitMode() != null
+                || hasText(moduleField.getFixedUnitCode())
+                || hasText(moduleField.getDefaultUnitCode())
+                || hasText(moduleField.getUnitFieldId())
+                || hasText(moduleField.getBaseValueFieldId())
+                || hasText(moduleField.getBaseUnitCategoryAlias())
+                || hasText(moduleField.getBaseUnitCode())
+                || moduleField.getUnitConversionMode() != null
+                || hasText(moduleField.getConversionScopeFieldId());
+    }
+
+    private boolean hasMoneyConfig(ModuleMetadataField moduleField) {
+        return moduleField.getMoneyCurrencyMode() != null
+                || hasText(moduleField.getMoneyFixedCurrencyCode())
+                || hasText(moduleField.getMoneyDefaultCurrencyCode())
+                || hasText(moduleField.getMoneyCurrencyFieldId())
+                || hasText(moduleField.getMoneyBaseAmountFieldId())
+                || hasText(moduleField.getMoneyBaseCurrencyCode())
+                || hasText(moduleField.getMoneyRateTypeCode())
+                || hasText(moduleField.getMoneyRateDateFieldId())
+                || hasText(moduleField.getMoneyExchangeRateFieldId());
     }
 
     private void normalizeReferenceConfig(ModuleMetadataField moduleField,

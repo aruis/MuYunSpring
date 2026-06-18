@@ -159,7 +159,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         body.put(StandardEntitySchema.CREATED_AT_COLUMN, record.getCreatedAt());
         body.put(StandardEntitySchema.UPDATED_BY_COLUMN, record.getUpdatedBy());
         body.put(StandardEntitySchema.UPDATED_AT_COLUMN, record.getUpdatedAt());
-        for (FieldDefinition field : recordFields()) {
+        for (FieldDefinition field : persistentFields()) {
             if (record.getPlatformValues().containsKey(field.code())) {
                 body.put(field.columnName(), record.getPlatformValues().get(field.code()));
             }
@@ -180,7 +180,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         if (record.getDeleted() != null) {
             body.put(StandardEntitySchema.DELETED_COLUMN, record.getDeleted());
         }
-        for (FieldDefinition field : recordFields()) {
+        for (FieldDefinition field : persistentFields()) {
             if (record.getPlatformValues().containsKey(field.code())) {
                 body.put(field.columnName(), record.getPlatformValues().get(field.code()));
             }
@@ -220,7 +220,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         record.setCreatedAt(instantValue(row.get(StandardEntitySchema.CREATED_AT_COLUMN)));
         record.setUpdatedBy(stringValue(row.get(StandardEntitySchema.UPDATED_BY_COLUMN)));
         record.setUpdatedAt(instantValue(row.get(StandardEntitySchema.UPDATED_AT_COLUMN)));
-        for (FieldDefinition field : recordFields()) {
+        for (FieldDefinition field : persistentFields()) {
             record.putLoadedValue(field.code(), row.get(field.columnName()));
         }
         return record;
@@ -236,6 +236,12 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         }
         fields.addAll(FieldCompanionRules.recordFields(entity));
         return fields;
+    }
+
+    private List<FieldDefinition> persistentFields() {
+        return recordFields().stream()
+                .filter(FieldDefinition::isPhysical)
+                .toList();
     }
 
     private Integer numberValue(Object value) {

@@ -385,6 +385,8 @@
 | 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/enable/{id}`、`/disable/{id}` | 启用或停用公式规则 |
 | 模块公式规则 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/formula-rules/sort/{id}` | 在关系内调整公式规则顺序 |
 
+模块公式规则可以引用当前关系字段或子关系字段。`CALCULATION` 规则允许把目标字段配置为虚拟字段，运行态试算会返回计算后的虚拟字段值；标准保存入口不接受外部显式写入虚拟字段，公式内部计算出的虚拟字段也不参与动态表持久化。`IMPORT_VALIDATE` 阶段不允许计算写字段，只用于校验。
+
 ## 页面配置与查询模板
 
 页面配置维护面仍按配置归属聚合。UI 配置集和查询模板挂在模块下；具体 UI 配置挂在 UI 配置集下；UI 字段配置挂在 UI 配置下；查询项挂在查询模板下。请求体中的归属字段以后端 URL 为准。

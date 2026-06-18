@@ -78,6 +78,7 @@ import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFac
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
@@ -175,7 +176,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.mainEntityAlias").value(ENTITY))
-                .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY));
+                .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY))
+                .andExpect(jsonPath("$.entities[0].fields[?(@.fieldName == 'displayCode')].storageForm")
+                        .value(org.hamcrest.Matchers.contains("VIRTUAL")));
         verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
     }
 
@@ -400,6 +403,57 @@ class DynamicRecordWebControllerTest {
         assertThat(updateRecord.getValue().getId()).isEqualTo("contract-1");
         assertThat(updateRecord.getValue().getVersion()).isEqualTo(3);
         assertThat(updateRecord.getValue().getValue("amount")).isEqualTo(10);
+    }
+
+    @Test
+    void shouldRejectVirtualFieldWhenSavingDynamicRecord() throws Exception {
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        when(service.newRecord(MODULE, "contract_line")).thenAnswer(invocation -> new DynamicRecord(lineEntity()));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of("values", Map.of(
+                                "code", "C-001",
+                                "displayCode", "C-001 / 12"
+                        )))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
+
+        mvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of("values", Map.of("displayCode", "C-001 / 12")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "values": {
+                                    "code": "C-001"
+                                  },
+                                  "children": {
+                                    "lines": [
+                                      {
+                                        "values": {
+                                          "lineNo": "L-001",
+                                          "lineDisplay": "L-001 / 7"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: lines.lineDisplay"));
+
+        verify(mainEntity, never()).insert(any(DynamicRecord.class));
+        verify(mainEntity, never()).update(any(DynamicRecord.class));
     }
 
     @Test
@@ -1116,6 +1170,10 @@ class DynamicRecordWebControllerTest {
         codeField.setUiConfigId("ui-list");
         codeField.setModuleMetadataFieldId("module-field-code");
         codeField.setVisible(true);
+        PlatformUiConfigField displayField = new PlatformUiConfigField();
+        displayField.setUiConfigId("ui-list");
+        displayField.setModuleMetadataFieldId("module-field-display-code");
+        displayField.setVisible(true);
         PlatformQueryTemplate template = new PlatformQueryTemplate();
         template.setId("tpl-active");
         template.setModuleAlias(MODULE);
@@ -1124,16 +1182,20 @@ class DynamicRecordWebControllerTest {
                 MODULE,
                 List.of(),
                 List.of(uiConfig),
-                List.of(codeField),
+                List.of(codeField, displayField),
                 List.of(template),
                 List.of()
         ));
         when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
                 "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
+                "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
         Criteria templateCriteria = Criteria.of().eq("code", "C-001");
         when(queryItemService.compile(eq("tpl-active"), any())).thenReturn(templateCriteria);
         DynamicRecord record = new DynamicRecord(entity())
                 .setValue("code", "C-001")
+                .putDisplayValue("displayCode", "C-001 / Customer")
                 .setValue("amount", BigDecimal.TEN);
         record.setId("contract-1");
         when(mainEntity.queryCriteria(any())).thenReturn(Criteria.of().eq("amount", BigDecimal.TEN));
@@ -1162,6 +1224,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].id").value("contract-1"))
                 .andExpect(jsonPath("$.records[0].values.code").value("C-001"))
+                .andExpect(jsonPath("$.records[0].values.displayCode").value("C-001 / Customer"))
                 .andExpect(jsonPath("$.records[0].values.amount").doesNotExist())
                 .andExpect(jsonPath("$.total").value(1));
 
@@ -1248,6 +1311,75 @@ class DynamicRecordWebControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Quick search field is not searchable in UI config: amount"));
+    }
+
+    @Test
+    void shouldRejectVirtualFieldInQuickSearch() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField displayField = uiField("ui-list", "module-field-display-code");
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(displayField),
+                List.of(),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
+                "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["displayCode"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Quick search field is not searchable in UI config: displayCode"));
+
+        verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
+    void shouldRejectVirtualFieldInQuerySorts() throws Exception {
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "displayCode", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: displayCode"));
+
+        verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
     }
 
     @Test
@@ -1462,6 +1594,42 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldRejectVirtualFieldInAssociationViewSorts() throws Exception {
+        DynamicEntityOperations lineOperations = mock(DynamicEntityOperations.class);
+        DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
+                "lines",
+                ENTITY,
+                MODULE,
+                "line",
+                net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                net.ximatai.muyun.spring.dynamic.metadata.EntityViewType.LIST,
+                true
+        );
+        when(service.associationView(MODULE, ENTITY, "lines")).thenReturn(association);
+        when(service.entity(MODULE, "line")).thenReturn(lineOperations);
+        when(lineOperations.newRecord()).thenReturn(new DynamicRecord(lineEntity()));
+
+        mvc.perform(post("/{moduleAlias}/view/{id}/associations/{viewCode}/query", MODULE, "contract-1", "lines")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "lineDisplay", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: lineDisplay"));
+
+        verify(service, never()).associationViewPage(anyString(), anyString(), anyString(), anyString(),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+
+    @Test
     void shouldExposeAssociationDesignEndpoints() throws Exception {
         DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
                 "lines",
@@ -1618,7 +1786,8 @@ class DynamicRecordWebControllerTest {
                 "lineAmount",
                 "line_amount",
                 "Line Amount",
-                "decimal"
+                "decimal",
+                MetadataFieldForm.PHYSICAL
         ));
         Criteria templateCriteria = Criteria.of().eq("status", "active");
         Criteria manualCriteria = Criteria.of().eq("code", "C-001");
@@ -2131,6 +2300,31 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().queryConditions().iterator().next().fieldName()).isEqualTo("code");
         assertThat(request.getValue().payload()).containsEntry("comment", "submit");
     }
+
+    @Test
+    void shouldRejectVirtualFieldInActionSorts() throws Exception {
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.LIST);
+        when(service.action(MODULE, "submit")).thenReturn(submit);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.actionEntityAlias(MODULE, "submit")).thenReturn(ENTITY);
+        when(service.entity(MODULE, ENTITY)).thenReturn(mainEntity);
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "submit")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "displayCode", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: displayCode"));
+
+        verify(service, never()).executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class));
+    }
+
 
     @Test
     void shouldExecuteContributedWorkflowActionThroughRecordActionPath() throws Exception {
@@ -2976,6 +3170,7 @@ class DynamicRecordWebControllerTest {
         return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").length(64).required(),
                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual(),
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
         ));
@@ -3010,6 +3205,16 @@ class DynamicRecordWebControllerTest {
                                                            RelationRole relationRole,
                                                            String relationAlias,
                                                            String fieldTypeAlias) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, relationAlias, fieldTypeAlias,
+                MetadataFieldForm.PHYSICAL);
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
+                                                           String fieldName,
+                                                           RelationRole relationRole,
+                                                           String relationAlias,
+                                                           String fieldTypeAlias,
+                                                           MetadataFieldForm fieldForm) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
                 MODULE,
@@ -3023,7 +3228,8 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                fieldTypeAlias
+                fieldTypeAlias,
+                fieldForm
         );
     }
 
@@ -3086,7 +3292,8 @@ class DynamicRecordWebControllerTest {
     private EntityDefinition lineEntity() {
         return new EntityDefinition("contract_line", "sales_contract_line", "Contract Line", List.of(
                 FieldDefinition.string("lineNo", "Line No").column("line_no").length(64).required(),
-                FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2),
+                FieldDefinition.string("lineDisplay", "Line Display").column("line_display").virtual()
         ));
     }
 

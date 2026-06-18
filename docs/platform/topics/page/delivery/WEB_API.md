@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `GET` | `/platform.menu/{menuId}/entry` | 按菜单节点读取页面 bootstrap；`clientType` 默认 `WEB`。 |
 
-bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descriptor、主实体别名、resolved 页面配置、字段 UI 类型定义、字段 UI 类型属性和字段映射，以及 `/{moduleAlias}/openapi` 文档入口。
+bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descriptor、主实体别名、resolved 页面配置、字段 UI 类型定义、字段 UI 类型属性和字段映射，以及 `/{moduleAlias}/openapi` 文档入口。动态 descriptor 的字段包含 `storageForm`，resolved 页面字段包含 `fieldForm`，前端可据此识别物理字段和虚拟展示字段。
 
 页面配置本身由配置专题维护：菜单方案、菜单树、字段 UI 类型配置、UI 配置集、UI 配置、UI 字段配置、查询模板和查询项的配置 URL 见 `configuration/WEB_API.md`。页面交付只消费已发布配置和当前用户可见菜单。
 
@@ -19,7 +19,7 @@ bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descri
 | `POST` | `/{moduleAlias}/query` | 按动态查询请求分页查询主元数据记录；可结合 `uiConfigId` 做列表投影。 |
 | `POST` | `/{moduleAlias}/query/summary` | 按同一查询上下文计算汇总项；汇总配置来自已发布 LIST UI 配置。 |
 
-查询请求可使用 `uiConfigId`、`queryTemplateId`、`externalQueryValues`、`queryForm`、`criteria`、兼容 `conditions`、`quickSearch`、分页和排序。`queryForm` 只接受已发布 LIST UI 的可见主表字段；`date_range` / `date_time_range` 字段可提交 `[start, end]`，或提交 `{ "start": "...", "end": "...", "timeZone": "Asia/Shanghai" }`。
+查询请求可使用 `uiConfigId`、`queryTemplateId`、`externalQueryValues`、`queryForm`、`criteria`、兼容 `conditions`、`quickSearch`、分页和排序。`queryForm` 只接受已发布 LIST UI 的可见主表字段；`quickSearch` 只在可见主表非虚拟文本字段内执行；排序字段必须是动态 SQL mapper 可识别的标准字段、能力字段或物理业务字段。`date_range` / `date_time_range` 字段可提交 `[start, end]`，或提交 `{ "start": "...", "end": "...", "timeZone": "Asia/Shanghai" }`。
 
 ## 表单保存
 
@@ -31,6 +31,8 @@ bootstrap 返回模块入口、客户端类型、权限裁剪后的动态 descri
 | `POST` | `/{moduleAlias}/delete/{id}` | 删除记录，动态侧按平台软删语义执行。 |
 
 页面保存仍走动态记录保存链路，不直接写配置表，也不绕过动作权限、数据权限、字段保护和动态事件。
+
+标准保存入口拒绝请求显式写入虚拟字段。虚拟字段可随页面配置展示，但不作为表单输入值保存；读取记录时已经由引用标题、引用投影等平台读链路注入的虚拟值会随列表、详情和 LIST UI 投影输出。页面需要展示当前表单公式派生结果时，使用 `/{moduleAlias}/formula/preview` 获取后端计算值。
 
 ## 列表排序
 

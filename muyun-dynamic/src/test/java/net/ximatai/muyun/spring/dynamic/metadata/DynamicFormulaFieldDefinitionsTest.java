@@ -14,19 +14,21 @@ class DynamicFormulaFieldDefinitionsTest {
         EntityDefinition entity = new EntityDefinition("contract", "contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").required(),
                 FieldDefinition.decimal("amount", "Amount"),
-                FieldDefinition.timestamp("signedAt", "Signed At").writeProtected()
+                FieldDefinition.timestamp("signedAt", "Signed At").writeProtected(),
+                FieldDefinition.string("displayCode", "Display Code").virtual()
         ));
 
         List<FormulaFieldDefinition> fields = DynamicFormulaFieldDefinitions.mainFields(entity);
 
         assertThat(fields).extracting(field -> field.fieldPath().dataIndex())
-                .containsExactly("code", "amount", "signedAt");
+                .containsExactly("code", "amount", "signedAt", "displayCode");
         assertThat(fields).extracting(FormulaFieldDefinition::type)
-                .containsExactly(FormulaValueType.STRING, FormulaValueType.DECIMAL, FormulaValueType.TIMESTAMP);
+                .containsExactly(FormulaValueType.STRING, FormulaValueType.DECIMAL, FormulaValueType.TIMESTAMP,
+                        FormulaValueType.STRING);
         assertThat(fields).extracting(FormulaFieldDefinition::required)
-                .containsExactly(true, false, false);
+                .containsExactly(true, false, false, false);
         assertThat(fields).extracting(FormulaFieldDefinition::writable)
-                .containsExactly(true, true, true);
+                .containsExactly(true, true, true, true);
     }
 
     @Test

@@ -251,6 +251,7 @@ public class ModuleDefinitionValidator {
         if (field.type() == null) {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
+        validateStorageForm(field);
         if (field.defaultUiTypeAlias() != null && !field.defaultUiTypeAlias().isBlank()) {
             requireIdentifier(field.defaultUiTypeAlias(), "field default UI type alias");
         }
@@ -309,6 +310,36 @@ public class ModuleDefinitionValidator {
             FieldBehaviorSupport.validateBehavior(field.type(), field.behavior(), field.code());
         } catch (RuntimeException e) {
             throw new ModuleDefinitionException(e.getMessage());
+        }
+    }
+
+    private void validateStorageForm(FieldDefinition field) {
+        if (field.storageForm() == null) {
+            return;
+        }
+        if (field.storageForm() != FieldStorageForm.PHYSICAL && field.storageForm() != FieldStorageForm.VIRTUAL) {
+            throw new ModuleDefinitionException("unsupported field storage form: " + field.code());
+        }
+        if (field.isPhysical()) {
+            return;
+        }
+        if (field.isRequired() || field.isUnique() || field.isIndexed() || field.isSortable() || field.isTitle()) {
+            throw new ModuleDefinitionException("virtual field cannot be required, unique, indexed, sortable or title field: "
+                    + field.code());
+        }
+        if (field.queryDefinition().queryable()) {
+            throw new ModuleDefinitionException("virtual field cannot be queryable: " + field.code());
+        }
+        if (field.behavior().defaultValue() != null || field.behavior().validationRegex() != null) {
+            throw new ModuleDefinitionException("virtual field cannot define default value or validation regex: "
+                    + field.code());
+        }
+        if (field.protection().hasStorageProtection()) {
+            throw new ModuleDefinitionException("virtual field cannot use storage protection: " + field.code());
+        }
+        if (field.measureUnit().enabled() || field.money().enabled()) {
+            throw new ModuleDefinitionException("virtual field cannot define measure unit or money storage behavior: "
+                    + field.code());
         }
     }
 

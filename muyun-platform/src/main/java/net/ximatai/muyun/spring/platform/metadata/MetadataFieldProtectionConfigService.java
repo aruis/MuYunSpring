@@ -114,6 +114,9 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
     }
 
     private void validateFieldShape(MetadataField field, FieldProtectionDefinition definition) {
+        if (definition.hasStorageProtection() && field.getFieldForm() == MetadataFieldForm.VIRTUAL) {
+            throw new PlatformException("Virtual metadata field cannot use storage protection: " + field.getId());
+        }
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         if (definition.hasStorageProtection()
                 && fieldType.getFieldType() != FieldType.STRING

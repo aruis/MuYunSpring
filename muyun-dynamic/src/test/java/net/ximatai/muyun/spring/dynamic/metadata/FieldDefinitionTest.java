@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -60,6 +61,23 @@ class FieldDefinitionTest {
     }
 
     @Test
+    void shouldExposeVirtualFieldStorageFormAndPreserveAcrossFluentMethods() {
+        FieldDefinition field = FieldDefinition.string("displayCode", "Display Code")
+                .virtual()
+                .column("display_code")
+                .defaultUiType("text")
+                .notCopyable()
+                .writeProtected();
+
+        assertThat(field.storageForm()).isEqualTo(FieldStorageForm.VIRTUAL);
+        assertThat(field.isPhysical()).isFalse();
+        assertThat(field.columnName()).isEqualTo("display_code");
+        assertThat(field.defaultUiTypeAlias()).isEqualTo("text");
+        assertThat(field.behavior().copyable()).isFalse();
+        assertThat(field.behavior().writeProtected()).isTrue();
+    }
+
+    @Test
     void shouldRejectQueryOperatorUnsupportedByFieldType() {
         assertThatThrownBy(() -> FieldDefinition.decimal("amount", "Amount")
                 .queryable(DynamicQueryOperator.LIKE, Set.of(DynamicQueryOperator.LIKE)))
@@ -89,6 +107,57 @@ class FieldDefinitionTest {
         )))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("boolean defaultValue");
+    }
+
+    @Test
+    void shouldRejectVirtualFieldStorageDependentBehavior() {
+        ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                java.util.List.of(FieldDefinition.string("displayCode", "Display Code").column("display_code")
+                        .virtual().queryable())
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("virtual field cannot be queryable");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                java.util.List.of(FieldDefinition.string("displayCode", "Display Code").column("display_code")
+                        .virtual().indexed())
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("virtual field cannot be required, unique, indexed, sortable or title field");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                java.util.List.of(FieldDefinition.string("displayCode", "Display Code").column("display_code")
+                        .virtual().defaultValue("AUTO"))
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("virtual field cannot define default value or validation regex");
+    }
+
+    @Test
+    void shouldExcludeVirtualFieldsFromDynamicTableMapping() {
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                "app_contract",
+                "Contract",
+                java.util.List.of(
+                        FieldDefinition.string("code", "Code").column("code"),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual()
+                )
+        );
+
+        assertThat(new DynamicTableMapper().toTable(entity).getColumns())
+                .extracting(net.ximatai.muyun.database.core.builder.Column::getName)
+                .contains("code")
+                .doesNotContain("display_code");
     }
 
     @Test

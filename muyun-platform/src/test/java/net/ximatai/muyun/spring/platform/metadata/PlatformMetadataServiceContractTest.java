@@ -28,6 +28,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
@@ -287,6 +288,81 @@ class PlatformMetadataServiceContractTest {
         FieldDefinition definition = fieldDefinitionCompiler.compile(field);
         assertThat(definition.queryDefinition().queryable()).isTrue();
         assertThat(definition.queryDefinition().defaultOperator()).isEqualTo(DynamicQueryOperator.LIKE);
+    }
+
+    @Test
+    void shouldCompileVirtualMetadataFieldAsNonPhysicalAndNotQueryable() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "displayCode", "display_code", FieldType.STRING);
+        field.setFieldForm(MetadataFieldForm.VIRTUAL);
+
+        fieldService.insert(field);
+
+        FieldDefinition definition = fieldDefinitionCompiler.compile(field);
+        assertThat(definition.storageForm()).isEqualTo(FieldStorageForm.VIRTUAL);
+        assertThat(definition.isPhysical()).isFalse();
+        assertThat(definition.queryDefinition().queryable()).isFalse();
+        assertThat(fieldDefinitionCompiler.compileQueryDefinition(field.getId(), null).queryable()).isFalse();
+    }
+
+    @Test
+    void shouldRejectStorageDependentVirtualMetadataFieldBehavior() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField required = field(metadataId, "displayCode", "display_code", FieldType.STRING);
+        required.setFieldForm(MetadataFieldForm.VIRTUAL);
+        required.setRequired(true);
+        assertThatThrownBy(() -> fieldService.insert(required))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual metadata field cannot be required");
+
+        MetadataField queryField = field(metadataId, "displayName", "display_name", FieldType.STRING);
+        queryField.setFieldForm(MetadataFieldForm.VIRTUAL);
+        fieldService.insert(queryField);
+        MetadataFieldConfig queryConfig = fieldConfig(queryField.getId());
+        queryConfig.setQueryable(true);
+        assertThatThrownBy(() -> fieldConfigService.insert(queryConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual metadata field cannot be queryable");
+
+        MetadataFieldConfig behaviorConfig = fieldConfig(queryField.getId());
+        behaviorConfig.setDefaultValue("AUTO");
+        assertThatThrownBy(() -> fieldConfigService.insert(behaviorConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual metadata field cannot define default value or validation regex");
+
+        MetadataFieldProtectionConfig protectionConfig = protectionConfig(queryField.getId());
+        protectionConfig.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        assertThatThrownBy(() -> protectionConfigService.insert(protectionConfig))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual metadata field cannot use storage protection");
+    }
+
+    @Test
+    void shouldRejectModuleScopedStorageBehaviorOnVirtualMetadataField() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "displayName", "display_name", FieldType.STRING);
+        field.setFieldForm(MetadataFieldForm.VIRTUAL);
+        fieldService.insert(field);
+        String relationId = relationService.insert(mainRelation("crm.customer", metadataId));
+
+        ModuleMetadataField behavior = moduleField(relationId, field.getId());
+        behavior.setDefaultValue("AUTO");
+        assertThatThrownBy(() -> moduleFieldService.insert(behavior))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual module metadata field cannot define default value or validation regex");
+
+        ModuleMetadataField measure = moduleField(relationId, field.getId());
+        measure.setUnitCategoryAlias("length");
+        assertThatThrownBy(() -> moduleFieldService.insert(measure))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual module metadata field cannot define measure unit config");
+
+        ModuleMetadataField money = moduleField(relationId, field.getId());
+        money.setMoneyRateTypeCode("SPOT");
+        assertThatThrownBy(() -> moduleFieldService.insert(money))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("Virtual module metadata field cannot define money config");
     }
 
     @Test
@@ -1810,6 +1886,13 @@ class PlatformMetadataServiceContractTest {
                 .filter(field -> field.getMetadataFieldId().equals(metadataFieldId))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private ModuleMetadataField moduleField(String relationId, String metadataFieldId) {
+        ModuleMetadataField field = new ModuleMetadataField();
+        field.setRelationId(relationId);
+        field.setMetadataFieldId(metadataFieldId);
+        return field;
     }
 
     private Metadata metadata(String applicationAlias, String alias) {

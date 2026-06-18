@@ -45,6 +45,18 @@ class DynamicRecordMappingTest {
     }
 
     @Test
+    void shouldKeepVirtualFieldsOutOfSqlMapping() {
+        DynamicRecordMapping mapping = new DynamicRecordMapping(contractEntity());
+        RuntimeColumnMapper mapper = mapping;
+
+        assertThat(mapper.resolveColumnName("displayCode")).isNull();
+        assertThat(mapper.resolveColumnName("display_code")).isNull();
+        assertThatThrownBy(() -> mapping.resolveQueryableColumn("displayCode"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown dynamic field or column");
+    }
+
+    @Test
     void shouldMapDynamicApprovalAbilityFields() {
         DynamicRecordMapping mapping = new DynamicRecordMapping(contractEntity().withCapabilities(EntityCapability.APPROVAL));
         RuntimeColumnMapper mapper = mapping;
@@ -64,6 +76,7 @@ class DynamicRecordMappingTest {
                 "Contract",
                 List.of(
                         FieldDefinition.string("customerName", "Customer Name").column("customer_name"),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual(),
                         FieldDefinition.string("secret", "Secret")
                                 .protection(new FieldProtectionDefinition(
                                         FieldEncryptionMode.ENCRYPTED,
