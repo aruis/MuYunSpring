@@ -63,7 +63,9 @@ public class DynamicTableMapper {
         if (entity.supports(EntityCapability.APPROVAL)) {
             fields.addAll(DynamicAbilityFields.approvalFields());
         }
-        fields.addAll(entity.fields());
+        fields.addAll(entity.fields().stream()
+                .filter(FieldDefinition::isPhysical)
+                .toList());
         fields.addAll(FieldCompanionRules.generatedFields(entity));
         return List.copyOf(fields);
     }

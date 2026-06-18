@@ -85,6 +85,33 @@ class DynamicRecordDaoTest {
     }
 
     @Test
+    void shouldNotPersistVirtualFieldValues() {
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq(TABLE), anyMap(), eq("id")))
+                .thenAnswer(invocation -> invocation.<Map<String, Object>>getArgument(2).get("id"));
+        EntityDefinition entity = new EntityDefinition(
+                "contract",
+                TABLE,
+                "Contract",
+                List.of(
+                        FieldDefinition.string("code", "Code").length(64).required(),
+                        FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual()
+                )
+        );
+        DynamicRecord record = new DynamicRecord(entity)
+                .setValue("code", "C-001")
+                .setValue("displayCode", "C-001 / Customer");
+
+        new DynamicEntityService(new DynamicRecordDao(operations, entity), "sales.contract").insert(record);
+
+        ArgumentCaptor<Map<String, Object>> body = mapCaptor();
+        verify(operations).insertItem(eq(SCHEMA), eq(TABLE), body.capture(), eq("id"));
+        assertThat(body.getValue())
+                .containsEntry("code", "C-001")
+                .doesNotContainKey("display_code");
+    }
+
+    @Test
     void shouldUseEntitySchemaWhenWritingDynamicRecords() {
         IDatabaseOperations<Object> operations = operations();
         EntityDefinition entity = new EntityDefinition(

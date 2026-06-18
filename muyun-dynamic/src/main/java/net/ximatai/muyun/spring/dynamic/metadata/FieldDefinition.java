@@ -26,7 +26,8 @@ public record FieldDefinition(
         FieldBehaviorDefinition behavior,
         FieldProtectionDefinition protection,
         FieldMeasureUnitDefinition measureUnit,
-        FieldMoneyDefinition money
+        FieldMoneyDefinition money,
+        FieldStorageForm storageForm
 ) {
     public FieldDefinition(String fieldName, String columnName, FieldType type, String name) {
         this(fieldName, columnName, type, name, false, false, false, false, false,
@@ -51,12 +52,37 @@ public record FieldDefinition(
                 length, precision, scale, dictionaryBinding, queryDefinition, null, null, null, null, null);
     }
 
+    public FieldDefinition(String fieldName,
+                           String columnName,
+                           FieldType type,
+                           String name,
+                           boolean isRequired,
+                           boolean isUnique,
+                           boolean isIndexed,
+                           boolean isSortable,
+                           boolean isTitle,
+                           Integer length,
+                           Integer precision,
+                           Integer scale,
+                           FieldDictionaryBinding dictionaryBinding,
+                           FieldQueryDefinition queryDefinition,
+                           String defaultUiTypeAlias,
+                           FieldBehaviorDefinition behavior,
+                           FieldProtectionDefinition protection,
+                           FieldMeasureUnitDefinition measureUnit,
+                           FieldMoneyDefinition money) {
+        this(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
+                measureUnit, money, FieldStorageForm.PHYSICAL);
+    }
+
     public FieldDefinition {
         queryDefinition = queryDefinition == null ? FieldQueryDefinition.disabled() : queryDefinition;
         behavior = behavior == null ? FieldBehaviorDefinition.DEFAULT : behavior;
         protection = protection == null ? FieldProtectionDefinition.NONE : protection;
         measureUnit = measureUnit == null ? FieldMeasureUnitDefinition.NONE : measureUnit;
         money = money == null ? FieldMoneyDefinition.NONE : money;
+        storageForm = storageForm == null ? FieldStorageForm.PHYSICAL : storageForm;
     }
 
     public static FieldDefinition of(String fieldName, FieldType type, String name) {
@@ -133,49 +159,49 @@ public record FieldDefinition(
     public FieldDefinition column(String value) {
         return new FieldDefinition(fieldName, value, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition required() {
         return new FieldDefinition(fieldName, columnName, type, name, true, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition unique() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, true, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition indexed() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, true, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition sortable() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, true, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition title() {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, true,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition length(int value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 value, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition precision(int value, int scaleValue) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, value, scaleValue, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias) {
@@ -185,7 +211,7 @@ public record FieldDefinition(
     public FieldDefinition dictionary(String applicationAlias, String categoryAlias, OptionSelectionMode selectionMode) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, new FieldDictionaryBinding(applicationAlias, categoryAlias, selectionMode),
-                queryDefinition, defaultUiTypeAlias, behavior, protection, measureUnit, money);
+                queryDefinition, defaultUiTypeAlias, behavior, protection, measureUnit, money, storageForm);
     }
 
     public FieldDefinition queryable() {
@@ -199,13 +225,13 @@ public record FieldDefinition(
     public FieldDefinition queryable(FieldQueryDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, value, defaultUiTypeAlias, behavior, protection, measureUnit,
-                money);
+                money, storageForm);
     }
 
     public FieldDefinition defaultUiType(String value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, value, behavior, protection, measureUnit,
-                money);
+                money, storageForm);
     }
 
     public FieldDefinition defaultValue(String value) {
@@ -227,28 +253,46 @@ public record FieldDefinition(
     public FieldDefinition behavior(FieldBehaviorDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, value, protection,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition protection(FieldProtectionDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, value,
-                measureUnit, money);
+                measureUnit, money, storageForm);
     }
 
     public FieldDefinition measureUnit(FieldMeasureUnitDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                value, money);
+                value, money, storageForm);
     }
 
     public FieldDefinition money(FieldMoneyDefinition value) {
         return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
                 length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
-                measureUnit, value);
+                measureUnit, value, storageForm);
     }
 
     public OptionBinding optionBinding() {
         return dictionaryBinding == null ? null : dictionaryBinding.toOptionBinding();
+    }
+
+    public boolean isPhysical() {
+        return storageForm == FieldStorageForm.PHYSICAL;
+    }
+
+    public FieldDefinition physical() {
+        return storageForm(FieldStorageForm.PHYSICAL);
+    }
+
+    public FieldDefinition virtual() {
+        return storageForm(FieldStorageForm.VIRTUAL);
+    }
+
+    public FieldDefinition storageForm(FieldStorageForm value) {
+        return new FieldDefinition(fieldName, columnName, type, name, isRequired, isUnique, isIndexed, isSortable, isTitle,
+                length, precision, scale, dictionaryBinding, queryDefinition, defaultUiTypeAlias, behavior, protection,
+                measureUnit, money, value);
     }
 }

@@ -144,6 +144,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         if (field.getTitleField() == null) {
             field.setTitleField(Boolean.FALSE);
         }
+        validateFieldFormBoundary(field);
         rejectDuplicateField(field);
         rejectDuplicateSingleFlag(field);
     }
@@ -182,6 +183,20 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                 throw new PlatformException("MEASURE_BASE_VALUE field role requires shadow field: " + field.getFieldName());
             }
             field.setSystemManaged(Boolean.TRUE);
+        }
+    }
+
+    private void validateFieldFormBoundary(MetadataField field) {
+        if (field.getFieldForm() != MetadataFieldForm.VIRTUAL) {
+            return;
+        }
+        if (Boolean.TRUE.equals(field.getRequired())
+                || Boolean.TRUE.equals(field.getUniqueField())
+                || Boolean.TRUE.equals(field.getIndexed())
+                || Boolean.TRUE.equals(field.getSortableField())
+                || Boolean.TRUE.equals(field.getTitleField())) {
+            throw new PlatformException("Virtual metadata field cannot be required, unique, indexed, sortable or title field: "
+                    + field.getFieldName());
         }
     }
 

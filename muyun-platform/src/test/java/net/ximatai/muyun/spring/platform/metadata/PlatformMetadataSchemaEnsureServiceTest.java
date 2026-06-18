@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
@@ -87,6 +88,30 @@ class PlatformMetadataSchemaEnsureServiceTest {
                 EntityCapability.ENABLE,
                 EntityCapability.DATA_SCOPE
         );
+    }
+
+    @Test
+    void shouldKeepVirtualMetadataFieldOutOfSchemaTableMapping() {
+        TestContext context = testContext();
+        String metadataId = context.metadataService.insert(metadata("crm", "customer"));
+        context.fieldService.insert(field(metadataId, "customerName", "customer_name", "string"));
+        MetadataField virtualField = field(metadataId, "displayName", "display_name", "string");
+        virtualField.setFieldForm(MetadataFieldForm.VIRTUAL);
+        context.fieldService.insert(virtualField);
+
+        EntityDefinition entity = context.compiler.compile(metadataId);
+
+        assertThat(entity.fields())
+                .extracting(FieldDefinition::fieldName)
+                .containsExactly("customerName", "displayName");
+        assertThat(entity.fields())
+                .filteredOn(field -> field.fieldName().equals("displayName"))
+                .singleElement()
+                .satisfies(field -> assertThat(field.isPhysical()).isFalse());
+        assertThat(new DynamicTableMapper().toTable(entity).getColumns())
+                .extracting(net.ximatai.muyun.database.core.builder.Column::getName)
+                .contains("customer_name")
+                .doesNotContain("display_name");
     }
 
     @Test

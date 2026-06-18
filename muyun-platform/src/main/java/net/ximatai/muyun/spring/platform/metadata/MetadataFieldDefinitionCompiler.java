@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldQueryDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldStorageForm;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,9 @@ public class MetadataFieldDefinitionCompiler {
         boolean hasModuleDictionary = moduleField != null
                 && moduleField.getDictionaryCategoryAlias() != null
                 && !moduleField.getDictionaryCategoryAlias().isBlank();
-        FieldQueryDefinition queryDefinition = queryDefinition(fieldType, defaultConfig, relationConfig);
+        FieldQueryDefinition queryDefinition = field.getFieldForm() == MetadataFieldForm.VIRTUAL
+                ? FieldQueryDefinition.disabled()
+                : queryDefinition(fieldType, defaultConfig, relationConfig);
         Integer length = shapeConfig == null ? fieldType.getDefaultLength() : shapeConfig.effectiveLength(fieldType);
         Integer precision = shapeConfig == null ? fieldType.getDefaultPrecision() : shapeConfig.effectivePrecision(fieldType);
         Integer scale = shapeConfig == null ? fieldType.getDefaultScale() : shapeConfig.effectiveScale(fieldType);
@@ -82,7 +85,8 @@ public class MetadataFieldDefinitionCompiler {
                         ? net.ximatai.muyun.spring.common.security.FieldProtectionDefinition.NONE
                         : protectionConfigService.definition(field.getId()),
                 measureUnit(moduleField),
-                money(moduleField)
+                money(moduleField),
+                storageForm(field)
         );
         if (hasModuleDictionary) {
             validateModuleDictionary(fieldType, moduleField, field.getId());
@@ -104,6 +108,9 @@ public class MetadataFieldDefinitionCompiler {
         if (field == null) {
             throw new IllegalArgumentException("field query definition points to missing field: " + metadataFieldId);
         }
+        if (field.getFieldForm() == MetadataFieldForm.VIRTUAL) {
+            return FieldQueryDefinition.disabled();
+        }
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
         MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
@@ -119,6 +126,12 @@ public class MetadataFieldDefinitionCompiler {
         return queryConfig == null
                 ? fieldType.queryDefinition()
                 : queryConfig.queryDefinition(fieldType);
+    }
+
+    private FieldStorageForm storageForm(MetadataField field) {
+        return field.getFieldForm() == MetadataFieldForm.VIRTUAL
+                ? FieldStorageForm.VIRTUAL
+                : FieldStorageForm.PHYSICAL;
     }
 
     private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,

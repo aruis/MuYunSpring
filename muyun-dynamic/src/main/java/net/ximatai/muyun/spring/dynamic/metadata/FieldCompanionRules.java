@@ -46,6 +46,9 @@ public final class FieldCompanionRules {
     }
 
     public static List<FieldCompanionGroup> group(FieldDefinition owner) {
+        if (!owner.isPhysical()) {
+            return List.of();
+        }
         java.util.ArrayList<FieldCompanionGroup> groups = new java.util.ArrayList<>();
         if (owner.type() == FieldType.ZONED_TIMESTAMP) {
             groups.add(new FieldCompanionGroup(
