@@ -245,8 +245,15 @@ export function pageDescriptorFromUrl(
   const path = parsedUrl.pathname;
   const query = queryRecordOf(parsedUrl.searchParams);
 
+  if (path === '/platform/dynamic') {
+    throw new Error(`Invalid dynamic module URL: ${url}`);
+  }
+
   if (path.startsWith('/platform/dynamic/')) {
     const [, , , moduleAlias, pageMode] = path.split('/');
+    if (!moduleAlias) {
+      throw new Error(`Invalid dynamic module URL: ${url}`);
+    }
     const params = withoutKeys(query, [
       ...legacyShellQueryKeys,
       SHELL_ENTRY_PARAMS_QUERY_KEY,
@@ -278,6 +285,9 @@ export function pageDescriptorFromUrl(
 
   if (path === '/platform/external') {
     const remoteUrl = stringValue(query.url) ?? '';
+    if (!remoteUrl) {
+      throw new Error(`Invalid external page URL: ${url}`);
+    }
     const openMode = stringValue(query.mode) === 'new-window' ? 'new-window' : 'iframe';
     const menuId = shellQueryValue(query, SHELL_MENU_ID_QUERY_KEY, 'menuId');
     const tabPolicy = menuId
@@ -304,6 +314,10 @@ export function pageDescriptorFromUrl(
       target: { url: remoteUrl },
       tabPolicy,
     };
+  }
+
+  if (path === '/platform/workspace' && !query.routeName && !query.pageKey) {
+    throw new Error(`Invalid workspace URL: ${url}`);
   }
 
   if (path === '/platform/workspace' && (query.routeName || query.pageKey)) {
@@ -382,6 +396,17 @@ export function pageDescriptorFromUrl(
     pageType: 'platform-route',
     hostType: 'platform-route-host',
   };
+}
+
+export function tryPageDescriptorFromUrl(
+  url: string,
+  options: PageDescriptorUrlParseOptions = {},
+): PageDescriptor | undefined {
+  try {
+    return pageDescriptorFromUrl(url, options);
+  } catch {
+    return undefined;
+  }
 }
 
 function routeTargetOf(route: string, query?: Record<string, RouteQueryValue>): RoutePageTarget {

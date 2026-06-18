@@ -10,10 +10,10 @@ import {
   createMenuTab,
   findFirstNavigationMenu,
   getMenuNavigationTarget,
-  pageDescriptorFromUrl,
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
+  tryPageDescriptorFromUrl,
 } from '@muyun/platform-shell';
 
 export interface ShellStartupClients {
@@ -62,7 +62,11 @@ export function restoreShellStartupStateFromUrl(state: ShellStartupState, url: s
     return state;
   }
 
-  const descriptor = pageDescriptorFromUrl(url);
+  const descriptor = tryPageDescriptorFromUrl(url);
+  if (!descriptor) {
+    return state;
+  }
+
   const explicitMenu = descriptor.menuId ? findMenuById(state.menus, descriptor.menuId) : undefined;
   const menu =
     explicitMenu && menuMatchesDescriptor(explicitMenu, descriptor)

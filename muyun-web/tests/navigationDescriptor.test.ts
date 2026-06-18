@@ -5,6 +5,7 @@ import {
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
+  tryPageDescriptorFromUrl,
 } from '../src/platform-shell/menuNavigation.ts';
 import type { PageDescriptor } from '../src/web-contracts/index.ts';
 
@@ -190,6 +191,14 @@ test('pageDescriptorFromUrl restores dynamic module params and entry params', ()
   assert.equal(descriptor.entryParamsJson, '{"source":"menu"}');
   assert.deepEqual(descriptor.params, { recordId: 'customer-1' });
   assert.equal(descriptor.target.defaultUiConfigId, 'customer-list-v1');
+});
+
+test('tryPageDescriptorFromUrl rejects invalid shell-owned URLs', () => {
+  assert.equal(tryPageDescriptorFromUrl('/platform/external'), undefined);
+  assert.equal(tryPageDescriptorFromUrl('/platform/dynamic'), undefined);
+  assert.equal(tryPageDescriptorFromUrl('/platform/dynamic//list'), undefined);
+  assert.equal(tryPageDescriptorFromUrl('/platform/workspace'), undefined);
+  assert.equal(tryPageDescriptorFromUrl('http://['), undefined);
 });
 
 test('pageDescriptorFromUrl keeps shell metadata separate from business route query', () => {

@@ -319,6 +319,44 @@ test('restoreShellStartupStateFromUrl creates direct tab when URL has no menu ma
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
 });
 
+test('restoreShellStartupStateFromUrl keeps current state for invalid shell-owned URLs', () => {
+  const metadata = menus[0].children[0].children[0].record;
+  const target = getMenuNavigationTarget(metadata);
+  assert.ok(target);
+
+  const defaultTab = openMenuTab([], metadata, target).tabs[0];
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [defaultTab],
+    activeTabKey: defaultTab.key,
+  };
+
+  for (const url of ['/platform/external', '/platform/workspace']) {
+    const restored = restoreShellStartupStateFromUrl(state, url);
+
+    assert.equal(restored.activeTabKey, 'menu:metadata');
+    assert.equal(restored.tabs?.length, 1);
+    assert.equal(restored.tabs?.[0]?.key, 'menu:metadata');
+  }
+});
+
+test('restoreShellStartupStateFromUrl keeps empty workspace for invalid shell-owned URLs', () => {
+  const state = {
+    session: { currentUser },
+    menus,
+    tabs: [],
+    activeTabKey: undefined,
+  };
+
+  for (const url of ['/platform/dynamic', '/platform/dynamic//list']) {
+    const restored = restoreShellStartupStateFromUrl(state, url);
+
+    assert.equal(restored.activeTabKey, undefined);
+    assert.deepEqual(restored.tabs, []);
+  }
+});
+
 test('restoreShellStartupStateFromUrl matches dynamic menu without title query', () => {
   const state = {
     session: { currentUser },

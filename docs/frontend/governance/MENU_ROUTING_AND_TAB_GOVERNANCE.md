@@ -537,7 +537,7 @@ PageDescriptor
 - [x] 点击菜单后 URL 跟随变化。
 - [x] 复制 URL 到新浏览器可打开同一业务入口。
 - [x] 刷新页面后恢复 active tab。
-- [ ] 无法解析 URL 时进入明确错误或空状态。
+- [x] 无效 shell-owned URL 不生成坏 tab，回到当前 tab 或空工作台。
 
 ### 战役 4：Tab 状态生命周期
 
