@@ -2,6 +2,8 @@
 
 本文记录 MuYun 前端后续推进步骤和路线目标。稳定设计哲学见 [MuYun 前端设计原则](DESIGN_PRINCIPLES.md)。
 
+菜单、路由和页签的专项治理见 [菜单、路由与页签专项治理](governance/MENU_ROUTING_AND_TAB_GOVERNANCE.md)。
+
 ## 第一草案目标
 
 第一阶段先定主 UI 框架和菜单承载闭环，再推进具体业务线。

@@ -1,0 +1,567 @@
+# 菜单、路由与页签专项治理
+
+本文记录 MuYun 前端菜单入口、Shell 页签、Vue Router 和业务页面发布形态之间的专项治理规划。
+
+## 问题定位
+
+平台菜单体系是业务入口，不应退化为平台前端静态 Vue Router 表的展示层。
+
+业务开发常见场景是：业务页面由业务包提供，菜单由平台配置。业务包上线或菜单配置变化时，平台 Shell 应尽量通过菜单体系识别业务入口并打开页面，而不是要求平台前端每次都重新发包。
+
+因此需要区分两层语义：
+
+| 层次 | 职责 |
+| --- | --- |
+| 菜单入口 | 表达用户要打开哪个业务能力，例如模块、路由、外链或子应用入口。 |
+| 页面承载 | 决定用 Vue Router、动态模块运行器、iframe、新窗口或未来微前端承载页面。 |
+
+Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身份来源。
+
+更准确地说，这里的治理目标是解耦四件事：
+
+| 事项 | 含义 |
+| --- | --- |
+| 导航意图 | 用户从菜单想进入哪个工作入口。 |
+| 页面承载 | Shell 用哪种 host 承载这个入口。 |
+| 页面实现 | 页面由平台内置、业务包、远程应用还是动态运行器实现。 |
+| 发布单元 | 页面是否随平台一起发布，还是业务包独立发布。 |
+
+菜单体系需要从“静态前端路由目录”升级为“页面入口协议”。
+
+## 核心原则
+
+1. 菜单 target 不等同于 Vue route。
+2. Tab identity 应来自业务入口，而不是单纯来自 `route.fullPath`。
+3. Shell 负责菜单、tab 和页面 host 的编排；具体页面由对应 host 承载。
+4. 平台内置页面可以走静态 Vue Router。
+5. 动态模块页面应优先走平台动态运行器。
+6. 独立业务页面应支持不重发平台包的承载方式。
+7. 微前端不是第一阶段默认方案，只有当 iframe 或 offline route 无法满足业务体验时再评估。
+
+## 目标模型
+
+菜单点击后不直接等价于 `router.push()`，而是先生成统一导航目标。
+
+```text
+MenuRecord
+  -> MenuNavigationTarget
+  -> PageDescriptor
+  -> MenuTab
+  -> PageHost
+```
+
+`MenuNavigationTarget` 保持贴近后端菜单模型，负责表达菜单配置中的业务入口。`PageDescriptor` 是 Shell 消费层的归一结果，负责把入口解释成可打开页面。
+
+建议 `PageDescriptor` 至少表达以下信息：
+
+| 字段 | 含义 |
+| --- | --- |
+| `pageType` | 页面是什么，例如 `platform-route`、`business-route`、`dynamic-module`、`remote-url`、`micro-app`、`external-link`。 |
+| `openMode` | Shell 怎么承载，例如 `shell-route`、`dynamic-runner`、`iframe`、`micro-app`、`new-window`。 |
+| `target` | 具体目标，例如 route name/path、moduleAlias、remote url、micro app entry。 |
+| `params` | 页面入参，例如 route params/query、entryParams、动态模块配置 id。 |
+| `tabPolicy` | tab 打开策略，例如单例、多实例、是否可关闭、刷新策略。 |
+| `title` | 默认页签标题，可被页面 host 或远程页面协议更新。 |
+
+新菜单配置不应继续用单一 `path` 同时表达内部路由、外部 URL、动态模块和远程应用。可以保留兼容层，但新增能力应优先走结构化 target。
+
+`pageType` 和 `openMode` 由 resolver 统一裁决。同一个 `pageType` 理论上可以有多个 `openMode`，例如 `remote-url` 可以选择 iframe 或新窗口；同一个 `openMode` 也可以承载不同 `pageType`，例如 `shell-route` 可承载平台内置页面和 offline 业务页面。
+
+建议长期保留以下 host 概念：
+
+| Host | 适用场景 | 第一阶段策略 |
+| --- | --- | --- |
+| PlatformRouteHost | 平台内置页面，例如元数据、菜单、设计器。 | 使用 Vue Router。 |
+| DynamicModuleHost | 动态模块页面，例如 `moduleAlias + pageMode`。 | 进入动态运行器。 |
+| BusinessRouteHost | offline 业务页面，随平台统一构建发布。 | 通过业务 route manifest 注册。 |
+| ExternalPageHost | online 业务页面或外部系统。 | 先支持新窗口或 iframe。 |
+| MicroAppHost | online 子应用，独立发布但需要更强一体化体验。 | 只预留，不作为第一阶段默认方案。 |
+
+## Online 发布场景
+
+Online 场景指平台前端和业务前端独立发布，但部署在同一个 nginx 入口下。
+
+示例：
+
+```text
+/platform/     平台 Shell
+/crm/          CRM 业务前端
+/wms/          仓储业务前端
+```
+
+菜单可以配置业务入口，例如：
+
+```text
+/crm/customer/list
+/wms/stock/inbound
+```
+
+理想目标是业务包单独发布后，平台不重发，也能通过菜单打开新页面。
+
+可选承载方式：
+
+| 方式 | 优点 | 风险 |
+| --- | --- | --- |
+| 新窗口打开 | 最简单，隔离强，发布独立。 | 体验割裂，Shell tab 无法统一管理内容状态。 |
+| iframe 内嵌 | 平台不重发，能放入 Shell tab，成本中等。 | 需要处理通信、title、刷新、样式隔离和页面生命周期。 |
+| 微前端 | 体验接近单体应用，可共享平台能力。 | 工程复杂度高，依赖版本、回滚和隔离成本高。 |
+
+第一阶段建议优先支持新窗口或 iframe，不急于引入微前端。
+
+Online 场景可以进一步引入 remote manifest，但它的职责不是把业务 Vue Router 注册进平台，而是让平台和后端知道业务包有哪些可打开入口。
+
+示例：
+
+```text
+/crm/route-manifest.json
+```
+
+remote manifest 可用于：
+
+1. 校验菜单 target 是否存在。
+2. 提供标题、图标和参数 schema。
+3. 声明推荐 `openMode`，例如 iframe 或 micro-app。
+4. 支持后端菜单配置时选择业务入口。
+
+remote manifest 的治理要求：
+
+1. manifest 应有版本或更新时间，用于菜单入口刷新和配置校验。
+2. 后端可同步 manifest 形成可配置入口资产，前端只消费已确认的菜单 target。
+3. manifest 只描述可打开入口和推荐承载方式，不承接业务动作治理。
+
+remote manifest 不应承担：
+
+1. 替代业务应用内部路由。
+2. 替代微前端生命周期管理。
+3. 要求平台构建期感知所有 online 业务页面。
+
+## Offline 发布场景
+
+Offline 场景指业务页面和平台 Shell 统一构建、统一发布。
+
+这种方式适合早期开发、核心业务线、或与平台组件和运行态强耦合的页面。
+
+建议业务包提供 route manifest，由平台构建时汇总：
+
+```text
+业务页面代码
+  -> route manifest
+  -> 平台构建集成
+  -> 菜单配置 path / routeName / pageKey
+  -> Shell 打开 BusinessRouteHost
+```
+
+Offline route manifest 可以包含：
+
+```text
+pageKey
+routeName
+path
+component
+title
+paramsSchema
+```
+
+菜单可以直接引用 `path`。对业务开发来说，path 可读性强，看到菜单配置通常就能定位页面代码；只要 route manifest 和业务发布约定稳定，path 本身并不必然比 `pageKey` 或 `routeName` 更脆弱。
+
+`pageKey`、`routeName` 和 `path` 都可以作为 offline 业务页面入口标识。治理重点不是否定 path，而是避免一个裸 path 字符串同时表达页面类型、承载方式、tab 策略和发布单元。path 应位于结构化 target 中，由 resolver 判断它指向平台内置 route、offline 业务 route，还是需要按兼容规则处理。
+
+优点：
+
+1. 实现简单。
+2. 类型、组件、状态和平台能力共享成本低。
+3. 页面体验接近单体应用。
+
+缺点：
+
+1. 平台和业务发布耦合。
+2. 新业务上线可能要求平台重新构建。
+3. 长期可能导致平台包膨胀。
+
+## Tab 身份
+
+Tab 不应只用 Vue route 作为 key。Tab key 应由 `tabPolicy` 根据 descriptor 和菜单上下文生成，而不是由页面自行拼接。
+
+```text
+tabPolicy.identity = by-menu
+tabKey = "menu:" + menuId
+```
+
+后续如同一菜单支持多实例打开，可再引入业务参数：
+
+```text
+tabPolicy.identity = by-params
+tabKey = "menu:" + menuId + ":" + stableEntryParams
+```
+
+不依赖菜单上下文的入口可以使用 `by-target`：
+
+```text
+tabPolicy.identity = by-target
+tabKey = pageDescriptor.pageType + ":" + stableTarget
+```
+
+Tab 保存的是业务入口目标：
+
+```text
+MenuTab
+  key
+  title
+  target
+  pageDescriptor
+  restoreState
+```
+
+Router 只是某些 target 的实现细节。
+
+`menuId` 适合作为当前菜单树运行态入口身份，不等同于跨租户、跨菜单方案或配置包迁移后的长期业务 alias。需要刷新恢复或跨环境持久化时，应由 `tabPolicy` 明确 `by-menu`、`by-target`、`by-params` 等策略，并纳入菜单方案上下文或 descriptor 版本。
+
+后续需要多实例 tab 时，也应由 `tabPolicy` 明确，而不是让各页面自行拼接随机 key。
+
+## 浏览器 URL 与分享恢复
+
+Shell tab 不能只是内存状态。当前 active tab 应与浏览器 URL 联动，URL 应尽量表达当前页面的业务含义。
+
+理想目标：
+
+1. 点击菜单打开或切换 tab 时，浏览器 URL 跟随 active tab 变化。
+2. 浏览器刷新后，Shell 能从 URL 恢复当前 active tab 和页面 host。
+3. 用户复制 URL 给另一个用户，对方在另一个浏览器打开后，应进入同一个业务页面。
+4. URL 应可读，能看出页面业务含义，不应只是一段不可理解的随机 tab id。
+
+这不意味着所有页面都必须注册为平台静态 Vue Router route。URL 是 active tab 的可恢复表达，仍应经过 `PageDescriptor` resolver 还原业务入口。
+
+不同 host 的 URL 表达可以不同：
+
+| Host | URL 表达建议 |
+| --- | --- |
+| PlatformRouteHost | 使用平台内置 route，例如 `/platform/metadata`。 |
+| BusinessRouteHost | 使用 offline 业务 route path，例如 `/crm/customer/list`，或平台 workspace route 携带业务 path。 |
+| DynamicModuleHost | 使用可读动态入口，例如 `/platform/dynamic/crm.customer/list?uiConfigId=customer-list-v1`。 |
+| ExternalPageHost | 使用平台 workspace route 携带 remote url，或在新窗口直接打开业务 url。 |
+| MicroAppHost | 使用平台 workspace route 携带 app 和 route，例如 `/platform/app/crm/customer/list`。 |
+
+URL 恢复时应重新走菜单入口解析和页面 host 初始化。URL 可表达入口，不代表绕过其他专项治理。
+
+多 tab 工作区和 URL 的关系建议第一阶段先采用“URL 表达当前 active tab”。其他已打开 tab 可以作为内存状态或后续持久化状态，不要求一次性完整进入 URL。
+
+## Tab 状态保存策略
+
+多 tab 切换时，前一个 tab 的状态不能只有一种保存方式。应区分入口恢复、页面运行态和瞬时状态。
+
+| 状态类型 | 示例 | 建议策略 |
+| --- | --- | --- |
+| 入口状态 | 菜单、`PageDescriptor`、route path/query、moduleAlias、pageMode、recordId。 | 进入 URL 或 `MenuTab.restoreState`，用于刷新、分享和重新打开。 |
+| 页面运行态 | 表格分页、排序、筛选、滚动位置、选中行、展开节点、表单草稿。 | 由 PageHost 或页面提供 tab 级 snapshot/restore。 |
+| 瞬时状态 | loading、临时弹窗、上传中状态、临时连接。 | 默认不跨 tab 保存，由页面在失活或关闭时自行处理。 |
+
+第一阶段可以优先支持平台内置页面和动态 host 的 keep-alive，但不能把 keep-alive 作为唯一策略。keep-alive 适合保留 Vue 组件实例，缺点是内存和缓存失控，因此后续需要纳入：
+
+```text
+maxAliveTabs
+cacheable
+dirty
+lastActiveAt
+closable
+```
+
+更稳定的长期方向是 PageHost 生命周期协议：
+
+```text
+onTabActivate(snapshot)
+onTabDeactivate(): snapshot
+onTabClose()
+onTabBeforeClose(): allow | block
+onTabSnapshot(): snapshot
+onTabRestore(snapshot)
+```
+
+Shell 负责保存和分发 tab 生命周期，页面或 host 负责声明哪些状态可保存、如何恢复。
+
+未保存内容必须显式进入 dirty check。切换 tab 可以保留 dirty 状态；关闭 tab 或刷新页面时，如果存在未保存内容，应由 `onTabBeforeClose` 或同等协议阻止静默丢失。
+
+不同 host 的状态策略不同：
+
+| Host | 状态策略 |
+| --- | --- |
+| PlatformRouteHost | 优先使用 keep-alive，后续补 snapshot/dirty 生命周期。 |
+| BusinessRouteHost | offline 业务页面可复用平台 PageHost 生命周期。 |
+| DynamicModuleHost | 查询条件、分页、表单草稿等应由动态运行器统一 snapshot。 |
+| ExternalPageHost | iframe 内部状态 Shell 无法直接读取，只能通过 postMessage 协议协作。 |
+| MicroAppHost | 由微前端生命周期和子应用协议共同管理。 |
+
+iframe 或 online 页面如需参与 tab 状态管理，应通过最小消息协议：
+
+```text
+tab:activate
+tab:deactivate
+tab:close
+tab:before-close
+tab:snapshot
+tab:restore
+tab:dirty-change
+tab:title-change
+```
+
+如果 iframe 页面不接入协议，Shell 只能保存 iframe URL 和 tab 元信息，不能承诺恢复页面内部状态。
+
+URL 与 tab 状态的边界应保持清楚：URL 保存可分享、可恢复的业务入口和关键参数；复杂 UI 状态和未保存草稿不默认塞进 URL。
+
+## 与 Vue Router 的关系
+
+Vue Router 主要承担以下职责：
+
+1. 平台内置页面导航。
+2. Offline 业务页面导航。
+3. 浏览器地址栏和刷新恢复。
+4. 动态模块运行器的固定入口，例如 `/platform/dynamic/:moduleAlias`。
+
+Vue Router 不承担以下职责：
+
+1. 解释所有菜单类型。
+2. 决定 tab 的业务身份。
+3. 加载 online 独立业务包。
+4. 替代动态模块运行器。
+
+Shell 在处理菜单点击时，应先根据 `MenuNavigationTarget` 选择 host：
+
+```text
+ROUTE  -> PlatformRouteHost 或 BusinessRouteHost
+MODULE -> DynamicModuleHost
+LINK   -> ExternalPageHost
+APP    -> MicroAppHost
+```
+
+当前 `web-contracts` 已有 `ROUTE / MODULE / LINK`。是否增加 `APP` 或更明确的 external app target，应在 online 承载方案定型后再进入契约。
+
+动态模块不应被设计成大量伪静态业务路由。动态模块只需要少量固定 route 进入运行器，页面变化由元数据驱动。
+
+MODULE 的最小 descriptor 应稳定包含：
+
+```text
+pageType: dynamic-module
+openMode: dynamic-runner
+target:
+  moduleAlias
+  pageMode
+  defaultUiConfigId?
+  defaultQueryTemplateId?
+params:
+  recordId?
+  query?
+  entryParamsJson?
+```
+
+第一阶段可以不实现完整动态页面运行器，但不能让 MODULE target 在各处自由拼字段。
+
+## 解析示例
+
+ROUTE 指向平台内置页面时：
+
+```text
+MenuNavigationTarget
+  menuType: ROUTE
+  route: /platform/metadata
+
+PageDescriptor
+  pageType: platform-route
+  openMode: shell-route
+  target.route: /platform/metadata
+  tabPolicy.identity: by-menu
+```
+
+ROUTE 指向 offline 业务页面时：
+
+```text
+MenuNavigationTarget
+  menuType: ROUTE
+  route: crm.customer.list
+
+PageDescriptor
+  pageType: business-route
+  openMode: shell-route
+  target.routeName: crm.customer.list
+  target.resolvedBy: offline-route-manifest
+  tabPolicy.identity: by-target
+```
+
+MODULE 指向动态模块时：
+
+```text
+MenuNavigationTarget
+  menuType: MODULE
+  moduleAlias: crm.customer
+  pageMode: LIST
+  defaultUiConfigId: customer-list-v1
+
+PageDescriptor
+  pageType: dynamic-module
+  openMode: dynamic-runner
+  target.moduleAlias: crm.customer
+  target.pageMode: LIST
+  target.uiConfigId: customer-list-v1
+  tabPolicy.identity: by-menu
+```
+
+LINK 指向 online 业务页面时：
+
+```text
+MenuNavigationTarget
+  menuType: LINK
+  externalUrl: /crm/customer/list
+
+PageDescriptor
+  pageType: remote-url
+  openMode: iframe
+  target.url: /crm/customer/list
+  target.trust: same-origin-allowlist
+  tabPolicy.identity: by-target
+```
+
+这些示例是治理目标，不要求当前代码一次性完成所有字段。
+
+## 专项研发路线图
+
+本路线图用于跟踪菜单、tab、URL、PageHost 专项研发。每个阶段应作为相对独立的编程单元推进，并通过测试、示例或浏览器验证证明闭环有效。
+
+### 阶段 1：前端导航协议
+
+目标：
+
+- [ ] 定义 `PageDescriptor`、`PageType`、`OpenMode`、`TabPolicy`、`PageHostType`、`TabRestoreState`。
+- [ ] 建立 `MenuNavigationTarget -> PageDescriptor` 的 resolver。
+- [ ] 建立 `PageDescriptor -> MenuTab` 的转换规则。
+- [ ] 建立 `PageDescriptor -> URL` 和 `URL -> PageDescriptor` 的最小规则。
+- [ ] ROUTE、MODULE、LINK 都能生成明确 descriptor。
+
+验收：
+
+- [ ] ROUTE 可以解析为平台内置 route descriptor。
+- [ ] MODULE 可以解析为最小 dynamic descriptor。
+- [ ] LINK 可以解析为 external descriptor。
+- [ ] `path`、`routeName`、`pageKey` 在 offline 表达中不互相排斥。
+- [ ] URL 生成结果可读，能表达业务含义。
+- [ ] resolver 有纯函数测试。
+
+### 阶段 2：Shell PageHost 骨架
+
+目标：
+
+- [ ] 增加 `PageHostOutlet` 或同等内容区承载器。
+- [ ] 增加 `PlatformRouteHost`。
+- [ ] 增加 `DynamicModuleHost` 占位。
+- [ ] 增加 `ExternalPageHost` 占位。
+- [ ] `AdminShell` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
+
+验收：
+
+- [ ] ROUTE 菜单能打开 PlatformRouteHost。
+- [ ] MODULE 菜单能打开 DynamicModuleHost 占位。
+- [ ] LINK 菜单能按策略进入 ExternalPageHost 或新窗口。
+- [ ] `App.vue` 不再直接散落 target 类型判断。
+- [ ] PageHost outlet 有最小浏览器验证。
+
+### 阶段 3：URL 与 active tab 联动
+
+目标：
+
+- [ ] active tab 变化时更新浏览器 URL。
+- [ ] 浏览器刷新时从 URL 解析 descriptor。
+- [ ] URL 对应菜单存在时恢复菜单、title、tab 关系。
+- [ ] URL 无菜单上下文时允许 direct entry，但需要有明确状态。
+- [ ] tab 关闭后 URL 切换到相邻 tab。
+
+验收：
+
+- [ ] 点击菜单后 URL 跟随变化。
+- [ ] 复制 URL 到新浏览器可打开同一业务入口。
+- [ ] 刷新页面后恢复 active tab。
+- [ ] 无法解析 URL 时进入明确错误或空状态。
+
+### 阶段 4：Tab 状态保存
+
+目标：
+
+- [ ] 定义 PageHost 生命周期：activate、deactivate、snapshot、restore、beforeClose、close。
+- [ ] 平台内置 route 支持基本 keep-alive。
+- [ ] DynamicModuleHost 预留查询、分页、表单草稿 snapshot 结构。
+- [ ] dirty tab 关闭有拦截出口。
+
+验收：
+
+- [ ] 切换 tab 后平台内置页面状态保留。
+- [ ] 关闭 dirty tab 不静默丢失。
+- [ ] snapshot/restore 行为有测试。
+- [ ] URL 只承载入口和关键参数，不塞复杂 UI 状态。
+
+### 阶段 5：Offline route manifest
+
+目标：
+
+- [ ] 定义业务 route manifest 格式。
+- [ ] 提供业务 route 注册 API。
+- [ ] resolver 能通过 manifest 解析 `path`、`routeName`、`pageKey`。
+- [ ] 示例业务页面通过 manifest 接入。
+
+验收：
+
+- [ ] mock 菜单配置业务 path 能打开业务页面。
+- [ ] mock 菜单配置 routeName 能打开业务页面。
+- [ ] mock 菜单配置 pageKey 能打开业务页面。
+- [ ] Shell 不硬编码业务 route。
+- [ ] 刷新后能恢复对应业务页面和 tab。
+
+### 阶段 6：Online ExternalPageHost MVP
+
+目标：
+
+- [ ] ExternalPageHost 支持 new-window 模式。
+- [ ] ExternalPageHost 支持 iframe 模式。
+- [ ] iframe 支持最小消息协议：title-change、dirty-change、before-close、activate、deactivate。
+- [ ] 第一版 remote URL 只支持同源相对路径或明确配置入口。
+
+验收：
+
+- [ ] 菜单通过 `LINK.externalUrl=/crm/customer/list` 或结构化 `target.url=/crm/customer/list` 可打开 online 页面。
+- [ ] iframe 页面可更新 tab title。
+- [ ] iframe 页面不接协议时可以降级显示。
+- [ ] 新窗口模式可配置。
+
+### 阶段 7：Remote manifest 探索
+
+目标：
+
+- [ ] 定义 remote manifest 草案。
+- [ ] remote manifest 包含 pageKey、path、title、paramsSchema、recommendedOpenMode。
+- [ ] 示例业务包提供 `/crm/route-manifest.json`。
+- [ ] resolver 可用 manifest 辅助菜单 target 校验和 descriptor 生成。
+
+验收：
+
+- [ ] 示例 manifest 可读取。
+- [ ] 菜单 target 可由 manifest 辅助解析。
+- [ ] 不要求平台注册业务 Vue Router。
+- [ ] 不引入微前端运行时。
+
+### 阶段 8：微前端评估
+
+只有当以下问题明确出现时再评估微前端：
+
+- [ ] iframe 体验不足。
+- [ ] 业务页面需要深度共享平台组件、状态或路由。
+- [ ] 独立发布和单体体验都成为刚需。
+- [ ] 团队能承担构建、依赖、隔离和回滚复杂度。
+
+## 当前不做
+
+第一阶段不做以下事项：
+
+1. 完整微前端框架选型。
+2. 所有业务包动态发现。
+3. iframe 与 Shell 的完整通信协议。
+4. 复杂 tab 多实例策略。
+5. 把所有菜单强行注册成平台 Vue Router route。
+6. 用单一 path 字段承载所有页面类型和打开策略。
+7. iframe 与微前端页面内部状态的完整恢复协议。
+
+这些能力在 online/offline 场景验证后再逐步上升。
