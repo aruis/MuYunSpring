@@ -69,10 +69,10 @@ test('loadShellStartupState creates the first available navigation tab', async (
   });
 
   assert.equal(state.session.currentUser.userId, 'user-1');
-  assert.equal(state.activeTabKey, 'ROUTE:metadata');
+  assert.equal(state.activeTabKey, 'menu:metadata');
   assert.deepEqual(
     state.tabs?.map((tab) => tab.key),
-    ['ROUTE:metadata'],
+    ['menu:metadata'],
   );
 });
 
@@ -90,10 +90,10 @@ test('openMenuTab reuses an existing tab instead of duplicating it', () => {
   const second = openMenuTab(duplicate.tabs, runtime, runtimeTarget);
 
   assert.equal(duplicate.tabs.length, 1);
-  assert.equal(duplicate.activeTabKey, 'ROUTE:metadata');
+  assert.equal(duplicate.activeTabKey, 'menu:metadata');
   assert.deepEqual(
     second.tabs.map((tab) => tab.key),
-    ['ROUTE:metadata', 'ROUTE:runtime'],
+    ['menu:metadata', 'menu:runtime'],
   );
 });
 
@@ -136,7 +136,7 @@ test('initialOpenMenuKeys expands ancestors of the active menu', () => {
     menus,
     tabs: [
       {
-        key: 'ROUTE:metadata',
+        key: 'menu:metadata',
         title: 'Metadata',
         target: {
           menuId: 'metadata',
@@ -145,7 +145,7 @@ test('initialOpenMenuKeys expands ancestors of the active menu', () => {
         },
       },
     ],
-    activeTabKey: 'ROUTE:metadata',
+    activeTabKey: 'menu:metadata',
   };
 
   assert.deepEqual(initialOpenMenuKeys(state), ['root', 'nested']);

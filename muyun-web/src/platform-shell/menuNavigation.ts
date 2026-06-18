@@ -1,4 +1,32 @@
-import type { MenuNavigationTarget, MenuRecord, MenuTab, MenuTreeNode } from '@muyun/web-contracts';
+import type {
+  MenuNavigationTarget,
+  MenuRecord,
+  MenuPageMode,
+  MenuTab,
+  MenuTreeNode,
+  OpenMode,
+  PageDescriptor,
+  RoutePageTarget,
+  RouteQueryPrimitive,
+  RouteQueryValue,
+} from '@muyun/web-contracts';
+
+export interface PageDescriptorResolveOptions {
+  title?: string;
+  platformRoutePrefixes?: string[];
+  businessRoutePrefixes?: string[];
+  businessRouteNames?: string[];
+  businessPageKeys?: string[];
+  defaultLinkOpenMode?: Extract<OpenMode, 'iframe' | 'new-window'>;
+}
+
+export interface PageDescriptorUrlParseOptions {
+  title?: string;
+  platformRoutePrefixes?: string[];
+  businessRoutePrefixes?: string[];
+}
+
+const defaultBusinessRoutePrefixes: string[] = [];
 
 export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget | undefined {
   if (menu.menuType === 'MODULE' && menu.moduleAlias) {
@@ -34,11 +62,90 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
   return undefined;
 }
 
-export function createMenuTab(menu: MenuRecord, target: MenuNavigationTarget): MenuTab {
+export function resolvePageDescriptor(
+  target: MenuNavigationTarget,
+  options: PageDescriptorResolveOptions = {},
+): PageDescriptor {
+  if (target.menuType === 'MODULE') {
+    return {
+      pageType: 'dynamic-module',
+      openMode: 'dynamic-runner',
+      hostType: 'dynamic-module-host',
+      title: options.title,
+      menuId: target.menuId,
+      target: {
+        moduleAlias: target.moduleAlias,
+        pageMode: target.pageMode,
+        defaultUiConfigId: target.defaultUiConfigId,
+        defaultQueryTemplateId: target.defaultQueryTemplateId,
+      },
+      params: target.query,
+      entryParamsJson: target.entryParamsJson,
+      tabPolicy: { identity: 'by-menu', closable: true, cacheable: true },
+    };
+  }
+
+  if (target.menuType === 'ROUTE') {
+    const routeTarget = routeTargetOf(target.route, target.query);
+    const pageType = isBusinessRouteTarget(routeTarget, options) ? 'business-route' : 'platform-route';
+    const descriptorBase = {
+      openMode: 'shell-route' as const,
+      title: options.title,
+      menuId: target.menuId,
+      target: routeTarget,
+      params: target.query,
+      entryParamsJson: target.entryParamsJson,
+      tabPolicy: {
+        identity: target.menuId ? ('by-menu' as const) : ('by-target' as const),
+        closable: true,
+        cacheable: true,
+      },
+    };
+
+    return pageType === 'business-route'
+      ? { ...descriptorBase, pageType, hostType: 'business-route-host' }
+      : { ...descriptorBase, pageType, hostType: 'platform-route-host' };
+  }
+
+  const openMode =
+    options.defaultLinkOpenMode ?? (isSameOriginPath(target.externalUrl) ? 'iframe' : 'new-window');
+  if (openMode === 'iframe') {
+    return {
+      pageType: 'remote-url',
+      openMode,
+      hostType: 'external-page-host',
+      title: options.title,
+      menuId: target.menuId,
+      target: { url: target.externalUrl },
+      entryParamsJson: target.entryParamsJson,
+      tabPolicy: { identity: 'by-target', closable: true },
+    };
+  }
+
   return {
-    key: tabKeyOf(target),
+    pageType: 'external-link',
+    openMode,
+    hostType: 'external-page-host',
+    title: options.title,
+    menuId: target.menuId,
+    target: { url: target.externalUrl },
+    entryParamsJson: target.entryParamsJson,
+    tabPolicy: { identity: 'by-target', closable: true },
+  };
+}
+
+export function createMenuTab(
+  menu: MenuRecord,
+  target: MenuNavigationTarget,
+  options: PageDescriptorResolveOptions = {},
+): MenuTab {
+  const pageDescriptor = resolvePageDescriptor(target, { ...options, title: options.title ?? menu.title });
+  return {
+    key: tabKeyOf(pageDescriptor),
     title: menu.title,
     target,
+    pageDescriptor,
+    restoreState: pageDescriptor.restoreState,
     closable: true,
   };
 }
@@ -58,6 +165,296 @@ export function findFirstNavigationMenu(nodes: MenuTreeNode[]): MenuRecord | und
   return undefined;
 }
 
-export function tabKeyOf(target: MenuNavigationTarget) {
-  return `${target.menuType}:${target.menuId}`;
+export function tabKeyOf(descriptor: PageDescriptor): string {
+  if (descriptor.tabPolicy.identity === 'by-menu' && descriptor.menuId) {
+    return `menu:${descriptor.menuId}`;
+  }
+
+  if (descriptor.tabPolicy.identity === 'by-params' && descriptor.params) {
+    const baseKey = descriptor.menuId
+      ? `menu:${descriptor.menuId}`
+      : `${descriptor.pageType}:${stableTargetKeyOf(descriptor)}`;
+    return `${baseKey}:${stableQueryString(descriptor.params)}`;
+  }
+
+  return `${descriptor.pageType}:${stableTargetKeyOf(descriptor)}`;
+}
+
+export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
+  if (descriptor.pageType === 'platform-route' || descriptor.pageType === 'business-route') {
+    if (descriptor.target.route) {
+      return appendQuery(descriptor.target.route, descriptor.target.query ?? descriptor.params);
+    }
+
+    const entryQuery = descriptor.target.query ?? descriptor.params ?? {};
+    const query: Record<string, RouteQueryValue> = {
+      ...entryQuery,
+      pageType: descriptor.pageType,
+      routeName: descriptor.target.routeName,
+      pageKey: descriptor.target.pageKey,
+      title: descriptor.title,
+    };
+    return appendQuery('/platform/workspace', query);
+  }
+
+  if (descriptor.pageType === 'dynamic-module') {
+    const pageMode = descriptor.target.pageMode?.toLowerCase() ?? 'list';
+    return appendQuery(`/platform/dynamic/${descriptor.target.moduleAlias}/${pageMode}`, {
+      ...descriptor.params,
+      entryParamsJson: descriptor.entryParamsJson,
+      uiConfigId: descriptor.target.defaultUiConfigId,
+      queryTemplateId: descriptor.target.defaultQueryTemplateId,
+      title: descriptor.title,
+    });
+  }
+
+  if (descriptor.pageType === 'remote-url') {
+    return appendQuery('/platform/external', {
+      url: descriptor.target.url,
+      mode: descriptor.openMode,
+      title: descriptor.title,
+    });
+  }
+
+  return descriptor.target.url;
+}
+
+export function pageDescriptorFromUrl(
+  url: string,
+  options: PageDescriptorUrlParseOptions = {},
+): PageDescriptor {
+  const parsedUrl = parseUrl(url);
+  const path = parsedUrl.pathname;
+  const query = queryRecordOf(parsedUrl.searchParams);
+
+  if (path.startsWith('/platform/dynamic/')) {
+    const [, , , moduleAlias, pageMode] = path.split('/');
+    const params = withoutKeys(query, ['entryParamsJson', 'queryTemplateId', 'title', 'uiConfigId']);
+    return {
+      pageType: 'dynamic-module',
+      openMode: 'dynamic-runner',
+      hostType: 'dynamic-module-host',
+      title: stringValue(query.title) ?? options.title,
+      target: {
+        moduleAlias: decodeURIComponent(moduleAlias ?? ''),
+        pageMode: pageModeOf(pageMode),
+        defaultUiConfigId: stringValue(query.uiConfigId),
+        defaultQueryTemplateId: stringValue(query.queryTemplateId),
+      },
+      params,
+      entryParamsJson: stringValue(query.entryParamsJson),
+      tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+    };
+  }
+
+  if (path === '/platform/external') {
+    const remoteUrl = stringValue(query.url) ?? '';
+    const openMode = stringValue(query.mode) === 'new-window' ? 'new-window' : 'iframe';
+    if (openMode === 'iframe') {
+      return {
+        pageType: 'remote-url',
+        openMode,
+        hostType: 'external-page-host',
+        title: stringValue(query.title) ?? options.title,
+        target: { url: remoteUrl },
+        tabPolicy: { identity: 'by-target', closable: true },
+      };
+    }
+
+    return {
+      pageType: 'external-link',
+      openMode,
+      hostType: 'external-page-host',
+      title: stringValue(query.title) ?? options.title,
+      target: { url: remoteUrl },
+      tabPolicy: { identity: 'by-target', closable: true },
+    };
+  }
+
+  if (path === '/platform/workspace' && (query.routeName || query.pageKey)) {
+    const routeTarget: RoutePageTarget = {
+      routeName: stringValue(query.routeName),
+      pageKey: stringValue(query.pageKey),
+      query: withoutKeys(query, ['pageType', 'routeName', 'pageKey', 'title']),
+    };
+    const pageType = stringValue(query.pageType) === 'business-route' ? 'business-route' : 'platform-route';
+    const descriptorBase = {
+      openMode: 'shell-route' as const,
+      title: stringValue(query.title) ?? options.title,
+      target: routeTarget,
+      params: routeTarget.query,
+      tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+    };
+
+    if (pageType === 'business-route') {
+      return {
+        ...descriptorBase,
+        pageType: 'business-route',
+        hostType: 'business-route-host',
+      };
+    }
+
+    return {
+      ...descriptorBase,
+      pageType: 'platform-route',
+      hostType: 'platform-route-host',
+    };
+  }
+
+  const pageType = isBusinessRoutePath(path, options) ? 'business-route' : 'platform-route';
+  const descriptorBase = {
+    openMode: 'shell-route' as const,
+    title: options.title,
+    target: {
+      route: path,
+      query,
+    },
+    params: query,
+    tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+  };
+
+  if (pageType === 'business-route') {
+    return {
+      ...descriptorBase,
+      pageType: 'business-route',
+      hostType: 'business-route-host',
+    };
+  }
+
+  return {
+    ...descriptorBase,
+    pageType: 'platform-route',
+    hostType: 'platform-route-host',
+  };
+}
+
+function routeTargetOf(route: string, query?: Record<string, RouteQueryValue>): RoutePageTarget {
+  if (route.startsWith('/')) {
+    return { route, query };
+  }
+
+  if (route.includes('.')) {
+    return { routeName: route, query };
+  }
+
+  return { pageKey: route, query };
+}
+
+function isBusinessRouteTarget(target: RoutePageTarget, options: PageDescriptorResolveOptions): boolean {
+  return (
+    (target.route ? isBusinessRoutePath(target.route, options) : false) ||
+    (target.routeName ? options.businessRouteNames?.includes(target.routeName) === true : false) ||
+    (target.pageKey ? options.businessPageKeys?.includes(target.pageKey) === true : false)
+  );
+}
+
+function isBusinessRoutePath(path: string, options: PageDescriptorUrlParseOptions): boolean {
+  const businessPrefixes = options.businessRoutePrefixes ?? defaultBusinessRoutePrefixes;
+  if (businessPrefixes.length === 0) {
+    return false;
+  }
+
+  const platformPrefixes = options.platformRoutePrefixes ?? defaultPlatformRoutePrefixes;
+  return (
+    businessPrefixes.some((prefix) => matchesRoutePrefix(path, prefix)) &&
+    !platformPrefixes.some((prefix) => matchesRoutePrefix(path, prefix))
+  );
+}
+
+function isSameOriginPath(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//');
+}
+
+function stableTargetKeyOf(descriptor: PageDescriptor): string {
+  if (descriptor.pageType === 'platform-route' || descriptor.pageType === 'business-route') {
+    return descriptor.target.route ?? descriptor.target.routeName ?? descriptor.target.pageKey ?? 'route';
+  }
+
+  if (descriptor.pageType === 'dynamic-module') {
+    return [descriptor.target.moduleAlias, descriptor.target.pageMode ?? 'LIST'].join(':');
+  }
+
+  return descriptor.target.url;
+}
+
+function appendQuery(path: string, query?: Record<string, RouteQueryValue>): string {
+  const search = query ? stableQueryString(query) : '';
+  if (!search) {
+    return path;
+  }
+
+  return `${path}${path.includes('?') ? '&' : '?'}${search}`;
+}
+
+function stableQueryString(query: Record<string, RouteQueryValue>): string {
+  const params = new URLSearchParams();
+  for (const key of Object.keys(query).sort()) {
+    const value = query[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        appendParam(params, key, item);
+      }
+      continue;
+    }
+
+    appendParam(params, key, value);
+  }
+
+  return params.toString();
+}
+
+function appendParam(params: URLSearchParams, key: string, value: RouteQueryPrimitive) {
+  if (value === null || value === undefined) {
+    return;
+  }
+
+  params.append(key, String(value));
+}
+
+function matchesRoutePrefix(path: string, prefix: string): boolean {
+  const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  return path === normalizedPrefix || path.startsWith(`${normalizedPrefix}/`);
+}
+
+function parseUrl(url: string): URL {
+  return new URL(url, 'http://muyun.local');
+}
+
+function withoutKeys(
+  query: Record<string, RouteQueryValue>,
+  keys: string[],
+): Record<string, RouteQueryValue> | undefined {
+  const result: Record<string, RouteQueryValue> = {};
+  for (const key of Object.keys(query)) {
+    if (!keys.includes(key)) {
+      result[key] = query[key];
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function queryRecordOf(searchParams: URLSearchParams): Record<string, RouteQueryValue> {
+  const result: Record<string, RouteQueryValue> = {};
+  for (const key of searchParams.keys()) {
+    const values = searchParams.getAll(key);
+    result[key] = values.length > 1 ? values : values[0];
+  }
+
+  return result;
+}
+
+function stringValue(value: RouteQueryValue): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0] === null || value[0] === undefined ? undefined : String(value[0]);
+  }
+
+  return value === null || value === undefined ? undefined : String(value);
+}
+
+const defaultPlatformRoutePrefixes = ['/platform'];
+
+function pageModeOf(value: string | undefined): MenuPageMode | undefined {
+  const normalized = value?.toUpperCase();
+  return normalized === 'LIST' || normalized === 'FORM' || normalized === 'DETAIL' ? normalized : undefined;
 }

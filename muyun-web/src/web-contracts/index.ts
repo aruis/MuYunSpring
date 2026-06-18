@@ -91,10 +91,118 @@ export type MenuNavigationTarget = ModuleMenuTarget | RouteMenuTarget | External
 
 export type MenuNavigationType = MenuNavigationTarget['menuType'];
 
+export type PageType =
+  | 'platform-route'
+  | 'business-route'
+  | 'dynamic-module'
+  | 'remote-url'
+  | 'external-link';
+
+export type OpenMode = 'shell-route' | 'dynamic-runner' | 'iframe' | 'new-window';
+
+export type PageHostType =
+  | 'platform-route-host'
+  | 'business-route-host'
+  | 'dynamic-module-host'
+  | 'external-page-host';
+
+export type TabIdentityStrategy = 'by-menu' | 'by-target' | 'by-params';
+
+export interface TabPolicy {
+  identity: TabIdentityStrategy;
+  closable?: boolean;
+  cacheable?: boolean;
+}
+
+export interface TabRestoreState {
+  url?: string;
+  snapshot?: unknown;
+}
+
+export interface PageDescriptorBase<
+  TPageType extends PageType,
+  TOpenMode extends OpenMode,
+  THostType extends PageHostType,
+  TTarget,
+> {
+  pageType: TPageType;
+  openMode: TOpenMode;
+  hostType: THostType;
+  title?: string;
+  menuId?: string;
+  target: TTarget;
+  params?: Record<string, RouteQueryValue>;
+  entryParamsJson?: string;
+  tabPolicy: TabPolicy;
+  restoreState?: TabRestoreState;
+}
+
+export interface RoutePageTarget {
+  route?: string;
+  routeName?: string;
+  pageKey?: string;
+  query?: Record<string, RouteQueryValue>;
+}
+
+export type PlatformRoutePageDescriptor = PageDescriptorBase<
+  'platform-route',
+  'shell-route',
+  'platform-route-host',
+  RoutePageTarget
+>;
+
+export type BusinessRoutePageDescriptor = PageDescriptorBase<
+  'business-route',
+  'shell-route',
+  'business-route-host',
+  RoutePageTarget
+>;
+
+export interface DynamicModulePageTarget {
+  moduleAlias: string;
+  pageMode?: MenuPageMode;
+  defaultUiConfigId?: string;
+  defaultQueryTemplateId?: string;
+}
+
+export type DynamicModulePageDescriptor = PageDescriptorBase<
+  'dynamic-module',
+  'dynamic-runner',
+  'dynamic-module-host',
+  DynamicModulePageTarget
+>;
+
+export interface UrlPageTarget {
+  url: string;
+}
+
+export type RemoteUrlPageDescriptor = PageDescriptorBase<
+  'remote-url',
+  'iframe' | 'new-window',
+  'external-page-host',
+  UrlPageTarget
+>;
+
+export type ExternalLinkPageDescriptor = PageDescriptorBase<
+  'external-link',
+  'new-window',
+  'external-page-host',
+  UrlPageTarget
+>;
+
+export type PageDescriptor =
+  | PlatformRoutePageDescriptor
+  | BusinessRoutePageDescriptor
+  | DynamicModulePageDescriptor
+  | RemoteUrlPageDescriptor
+  | ExternalLinkPageDescriptor;
+
 export interface MenuTab {
   key: string;
   title: string;
   target: MenuNavigationTarget;
+  pageDescriptor?: PageDescriptor;
+  restoreState?: TabRestoreState;
   closable?: boolean;
 }
 
