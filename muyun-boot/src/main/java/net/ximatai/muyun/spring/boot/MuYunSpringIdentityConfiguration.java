@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
+import net.ximatai.muyun.spring.boot.platform.InitialDataApplicationRunner;
+import net.ximatai.muyun.spring.boot.platform.PlatformAdminMenuInitialDataContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
@@ -8,6 +10,8 @@ import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -57,10 +61,29 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(InitialDataAbility.class)
+    public InitialDataAbility initialDataAbility(List<InitialDataContribution> contributions) {
+        return new InitialDataAbility(contributions);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(InitialDataApplicationRunner.class)
+    public InitialDataApplicationRunner initialDataApplicationRunner(InitialDataAbility initialDataAbility) {
+        return new InitialDataApplicationRunner(initialDataAbility);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(PlatformAdminMenuInitialDataContribution.class)
+    public PlatformAdminMenuInitialDataContribution platformAdminMenuInitialDataContribution(
+            MenuSchemeService schemeService,
+            MenuService menuService) {
+        return new PlatformAdminMenuInitialDataContribution(schemeService, menuService);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(PlatformMenuRegistrar.class)
-    public PlatformMenuRegistrar platformMenuRegistrar(MenuSchemeService schemeService,
-                                                       MenuService menuService,
+    public PlatformMenuRegistrar platformMenuRegistrar(MenuService menuService,
                                                        ApplicationContext applicationContext) {
-        return new PlatformMenuRegistrar(schemeService, menuService, applicationContext);
+        return new PlatformMenuRegistrar(menuService, applicationContext);
     }
 }

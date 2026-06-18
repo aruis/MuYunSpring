@@ -184,11 +184,30 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 菜单基础能力只要求菜单方案、菜单树、排序、启停和模块挂载。权限只对已解析的菜单树做剪枝，不进入菜单模型。
 
+### 初始化数据能力
+
+平台内置业务数据通过初始化数据能力治理，而不是分散在各个启动 runner 中直接写库。该能力面向平台中期建设，承接默认菜单方案、默认分组、后续默认角色、权限模板、编码规则模板和系统配置等托管数据。
+
+初始化数据能力提供统一执行语义：
+
+1. 贡献项实现 `InitialDataContribution`，声明 `name`、`order` 并在 `contribute` 中贡献数据。
+2. `InitialDataAbility` 统一排序执行，并进入 `TenantContext.system("initialize platform data")` 和系统操作者上下文。
+3. 每条记录声明治理策略：`ENSURE_ABSENT`、`RECONCILE_MANAGED` 或 `LOCKED`。
+4. 每条记录按字段角色治理：`identity` 字段漂移失败，`managed` 字段可持续校准，`operator` 字段只在创建时写入，重启不覆盖运维修改。即使使用 `ENSURE_ABSENT`，已有记录也必须通过 `identity` 检查。
+5. 能力只负责生命周期、字段治理、冲突语义和执行报告；实际插入/更新必须由贡献项传入领域 service，不提供跨表裸 DAO 初始化框架。
+
+该能力不做自动删除，也不做版本化迁移。托管记录如果已被软删，应作为数据漂移显式失败，不在启动时自动恢复或重新插入。历史数据修复、跨 scope 迁移、整树迁移应由明确的领域能力或运维任务承接。
+
 ### 平台内置菜单自注册
 
 裸库启动时，平台静态模块可通过 `@PlatformMenu` 选择性贡献系统内置菜单。`@PlatformStaticModule` 仍表达模块事实，`@PlatformMenu` 只表达导航贡献；模块可以注册但不进入菜单。
 
-平台内置菜单注册器只维护系统菜单方案：
+平台内置菜单由初始化数据能力承载，包含两个贡献：
+
+1. `platform.admin-menu`：维护系统菜单方案和默认一级分组。
+2. `platform.menu-contributions`：扫描 `@PlatformMenu` 并注册模块菜单项。
+
+平台只维护一个系统菜单方案：
 
 | 字段 | 值 |
 | --- | --- |
@@ -200,7 +219,7 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 该方案不作为租户菜单 fallback。租户和机构菜单仍由各自方案维护。
 
-注册器内置三个一级分组：
+平台内置三个一级分组：
 
 | ID | 标题 |
 | --- | --- |
@@ -208,9 +227,11 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | `platform.menu.group.identity` | 组织与权限 |
 | `platform.menu.group.ops` | 平台运行运维 |
 
-第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`。菜单使用 deterministic `id` 做系统托管记录的幂等更新，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
 
-注册顺序是先注册静态模块和动作，再注册平台内置菜单。注册器只做同方案内幂等 upsert，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。托管菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案，应作为数据漂移显式失败，而不是启动时自动迁移。
+注册顺序是先注册静态模块和动作，再执行初始化数据能力。平台菜单只做同方案内治理，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。菜单方案的 `alias/scope/tenantId` 和菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案或身份字段漂移，应显式失败，而不是启动时自动迁移。
+
+菜单方案、默认分组和模块菜单的结构字段由平台持续校准；标题、排序、启停属于运维字段，创建后重启不覆盖运维调整。需要强锁定的系统数据应显式使用 `LOCKED` 策略，不作为默认行为。
 
 前端消费这类菜单时需要区分静态模块和动态模块。当前菜单模型只表达 `MODULE + moduleAlias`，不直接表达承载方式；后续进入前端联调时，应由菜单响应补充模块类型或由前端按 `moduleAlias` 读取模块定义后再选择 PageHost。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
 

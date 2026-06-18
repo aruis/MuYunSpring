@@ -4,11 +4,14 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictException;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -48,11 +51,11 @@ class PlatformMenuRegistrarTest {
     void shouldRegisterPlatformAdminSchemeGroupsAndModuleMenus() {
         try (GenericApplicationContext context = context(PlatformModuleWeb.class, IamRoleWeb.class, HiddenModuleWeb.class)) {
             registerStaticModules(context);
-            new PlatformMenuRegistrar(schemeService, menuService, context).registerAll();
+            initializePlatformMenus(context);
 
-            MenuScheme scheme = schemeService.select(PlatformMenuRegistrar.ADMIN_SCHEME_ID);
+            MenuScheme scheme = schemeService.select(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
             assertThat(scheme).satisfies(value -> {
-                assertThat(value.getAlias()).isEqualTo(PlatformMenuRegistrar.ADMIN_SCHEME_ALIAS);
+                assertThat(value.getAlias()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ALIAS);
                 assertThat(value.getScopeType()).isEqualTo(MenuScopeType.SYSTEM);
                 assertThat(value.getScopeId()).isEqualTo(MenuSchemeService.SYSTEM_SCOPE_ID);
                 assertThat(value.getTitle()).isEqualTo("平台超管");
@@ -70,6 +73,7 @@ class PlatformMenuRegistrarTest {
             assertThat(menuService.select("platform.menu.module.platform.module")).satisfies(menu -> {
                 assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(menu.getModuleAlias()).isEqualTo("platform.module");
+                assertThat(menu.getPageMode()).isEqualTo(MenuPageMode.LIST);
                 assertThat(menu.getTitle()).isEqualTo("模块管理");
                 assertThat(menu.getSortOrder()).isEqualTo(20);
             });
@@ -81,25 +85,41 @@ class PlatformMenuRegistrarTest {
     }
 
     @Test
-    void shouldUpdateRegisteredMenusIdempotently() {
+    void shouldKeepModuleMenuUnchangedWhenReinitializing() {
         try (GenericApplicationContext context = context(PlatformModuleWeb.class)) {
             registerStaticModules(context);
-            PlatformMenuRegistrar registrar = new PlatformMenuRegistrar(schemeService, menuService, context);
-            registrar.registerAll();
+            initializePlatformMenus(context);
+            Menu existing = menuService.select("platform.menu.module.platform.module");
+            Integer version = existing.getVersion();
+
+            initializePlatformMenus(context);
+
+            assertThat(menuService.select("platform.menu.module.platform.module")).satisfies(menu -> {
+                assertThat(menu.getPageMode()).isEqualTo(MenuPageMode.LIST);
+                assertThat(menu.getVersion()).isEqualTo(version);
+            });
+        }
+    }
+
+    @Test
+    void shouldPreserveOperatorFieldsWhenRegisteredMenusExist() {
+        try (GenericApplicationContext context = context(PlatformModuleWeb.class)) {
+            registerStaticModules(context);
+            initializePlatformMenus(context);
 
             Menu existing = menuService.select("platform.menu.module.platform.module");
             existing.setTitle("旧标题");
             existing.setSortOrder(999);
             menuService.update(existing);
 
-            registrar.registerAll();
+            initializePlatformMenus(context);
 
-            assertThat(menuService.rootMenus(PlatformMenuRegistrar.ADMIN_SCHEME_ID)).hasSize(3);
-            assertThat(menuService.children(PlatformMenuRegistrar.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
+            assertThat(menuService.rootMenus(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID)).hasSize(3);
+            assertThat(menuService.children(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
                     .singleElement()
                     .satisfies(menu -> {
-                        assertThat(menu.getTitle()).isEqualTo("模块管理");
-                        assertThat(menu.getSortOrder()).isEqualTo(20);
+                        assertThat(menu.getTitle()).isEqualTo("旧标题");
+                        assertThat(menu.getSortOrder()).isEqualTo(999);
                     });
         }
     }
@@ -108,8 +128,7 @@ class PlatformMenuRegistrarTest {
     void shouldRepairManagedMenuStructureDrift() {
         try (GenericApplicationContext context = context(PlatformModuleWeb.class)) {
             registerStaticModules(context);
-            PlatformMenuRegistrar registrar = new PlatformMenuRegistrar(schemeService, menuService, context);
-            registrar.registerAll();
+            initializePlatformMenus(context);
 
             Menu group = menuDao.findById(PlatformMenuGroups.CONFIG);
             group.setParentId("wrong-parent");
@@ -119,16 +138,16 @@ class PlatformMenuRegistrarTest {
             moduleMenu.setMenuType(MenuType.LINK);
             moduleMenu.setExternalUrl("https://example.com");
 
-            registrar.registerAll();
+            initializePlatformMenus(context);
 
             assertThat(menuService.select(PlatformMenuGroups.CONFIG)).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformMenuRegistrar.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(net.ximatai.muyun.spring.ability.TreeAbility.ROOT_ID);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
                 assertThat(repaired.getRoute()).isNull();
             });
             assertThat(menuService.select("platform.menu.module.platform.module")).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformMenuRegistrar.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.CONFIG);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(repaired.getModuleAlias()).isEqualTo("platform.module");
@@ -141,15 +160,29 @@ class PlatformMenuRegistrarTest {
     void shouldRejectManagedMenuSchemeDrift() {
         try (GenericApplicationContext context = context(PlatformModuleWeb.class)) {
             registerStaticModules(context);
-            PlatformMenuRegistrar registrar = new PlatformMenuRegistrar(schemeService, menuService, context);
-            registrar.registerAll();
+            initializePlatformMenus(context);
 
             Menu moduleMenu = menuDao.findById("platform.menu.module.platform.module");
             moduleMenu.setSchemeId("wrong-scheme");
 
-            assertThatThrownBy(registrar::registerAll)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("Managed platform menu belongs to another scheme");
+            assertThatThrownBy(() -> initializePlatformMenus(context))
+                    .isInstanceOf(InitialDataConflictException.class)
+                    .hasMessageContaining("platform.menu.module.platform.module.schemeId");
+        }
+    }
+
+    @Test
+    void shouldRejectSoftDeletedManagedMenu() {
+        try (GenericApplicationContext context = context(PlatformModuleWeb.class)) {
+            registerStaticModules(context);
+            initializePlatformMenus(context);
+
+            Menu moduleMenu = menuDao.findById("platform.menu.module.platform.module");
+            moduleMenu.setDeleted(Boolean.TRUE);
+
+            assertThatThrownBy(() -> initializePlatformMenus(context))
+                    .isInstanceOf(InitialDataConflictException.class)
+                    .hasMessageContaining("soft-deleted: platform.menu.module.platform.module");
         }
     }
 
@@ -157,7 +190,7 @@ class PlatformMenuRegistrarTest {
     void shouldExposeRegisteredPlatformAdminMenusToSystemUser() {
         try (GenericApplicationContext context = context(PlatformModuleWeb.class, IamRoleWeb.class)) {
             registerStaticModules(context);
-            new PlatformMenuRegistrar(schemeService, menuService, context).registerAll();
+            initializePlatformMenus(context);
 
             try (CurrentUserContext.Scope ignored = CurrentUserContext.use(
                     CurrentUser.systemUser("system-user", "System"))) {
@@ -172,10 +205,17 @@ class PlatformMenuRegistrarTest {
     @Test
     void shouldRejectPlatformMenuWithoutStaticModule() {
         try (GenericApplicationContext context = context(InvalidMenuWeb.class)) {
-            assertThatThrownBy(() -> new PlatformMenuRegistrar(schemeService, menuService, context).registerAll())
+            assertThatThrownBy(() -> initializePlatformMenus(context))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("@PlatformMenu requires @PlatformStaticModule");
         }
+    }
+
+    private void initializePlatformMenus(GenericApplicationContext context) {
+        new InitialDataAbility(List.of(
+                new PlatformAdminMenuInitialDataContribution(schemeService, menuService),
+                new PlatformMenuRegistrar(menuService, context)
+        )).initializeAll();
     }
 
     private void registerStaticModules(GenericApplicationContext context) {
