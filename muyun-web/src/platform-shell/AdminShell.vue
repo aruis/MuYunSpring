@@ -9,6 +9,7 @@ import type {
   ShellStartupState,
 } from '@muyun/web-contracts';
 import type { UiDropdownItem, UiMenuItem, UiTabItem } from '@muyun/vue-ui-antdv';
+import { getMenuNavigationTarget } from './menuNavigation';
 
 defineOptions({ name: 'AdminShell' });
 
@@ -58,7 +59,7 @@ function toMenuItem(node: MenuTreeNode): UiMenuItem {
   return {
     key: node.record.id,
     title: node.record.title,
-    disabled: node.record.enabled === false || (!hasChildren && !navigationTargetOf(node.record)),
+    disabled: node.record.enabled === false || (!hasChildren && !getMenuNavigationTarget(node.record)),
     children: node.children.map(toMenuItem),
   };
 }
@@ -83,7 +84,7 @@ function mapMenuRecords(nodes: MenuTreeNode[]) {
 
 function handleMenuSelect(menuId: string) {
   const menu = menuRecords.value.get(menuId);
-  const target = menu ? navigationTargetOf(menu) : undefined;
+  const target = menu ? getMenuNavigationTarget(menu) : undefined;
   if (menu && target) {
     emit('selectMenu', menu, target);
   } else if (menu) {
@@ -94,37 +95,6 @@ function handleMenuSelect(menuId: string) {
 function handleTabChange(key: string) {
   emit('update:activeTabKey', key);
   emit('changeTab', key);
-}
-
-function navigationTargetOf(menu: MenuRecord): MenuNavigationTarget | undefined {
-  if (menu.menuType === 'MODULE' && menu.moduleAlias) {
-    return {
-      menuId: menu.id,
-      menuType: 'MODULE',
-      moduleAlias: menu.moduleAlias,
-      pageMode: menu.pageMode,
-      defaultUiConfigId: menu.defaultUiConfigId,
-      defaultQueryTemplateId: menu.defaultQueryTemplateId,
-      entryParamsJson: menu.entryParamsJson,
-    };
-  }
-  if (menu.menuType === 'ROUTE' && menu.route) {
-    return {
-      menuId: menu.id,
-      menuType: 'ROUTE',
-      route: menu.route,
-      entryParamsJson: menu.entryParamsJson,
-    };
-  }
-  if (menu.menuType === 'LINK' && menu.externalUrl) {
-    return {
-      menuId: menu.id,
-      menuType: 'LINK',
-      externalUrl: menu.externalUrl,
-      entryParamsJson: menu.entryParamsJson,
-    };
-  }
-  return undefined;
 }
 </script>
 

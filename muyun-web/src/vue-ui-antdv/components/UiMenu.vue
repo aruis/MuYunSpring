@@ -29,11 +29,12 @@ const selectedKeys = computed(() => (props.selectedKey ? [props.selectedKey] : [
 const menuItems = computed<ItemType[]>(() => props.items.map(toMenuItem));
 
 function toMenuItem(item: UiMenuItem): ItemType {
+  const children = item.children?.map(toMenuItem);
   return {
     key: item.key,
     label: item.title,
     disabled: item.disabled,
-    children: item.children?.map(toMenuItem),
+    children: children && children.length > 0 ? children : undefined,
   } as ItemType;
 }
 

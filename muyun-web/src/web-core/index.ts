@@ -169,4 +169,3 @@ function objectField(value: unknown, key: string) {
 }
 
 export { VueQueryPlugin };
-export { createMockMenuClient, createMockSessionClient, mockCurrentUser, mockMenuTree } from './mock';

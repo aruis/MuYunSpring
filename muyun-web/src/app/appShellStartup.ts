@@ -1,0 +1,32 @@
+import { createHttpClient, createMenuClient, createSessionClient } from '@muyun/web-core';
+import type { ShellStartupState } from '@muyun/web-contracts';
+import { loadShellStartupState } from './shellStartup';
+
+export async function loadAppShellStartupState(): Promise<ShellStartupState> {
+  if (usesMockStartup()) {
+    if (!import.meta.env.DEV) {
+      throw new Error('Mock shell startup is only available in dev mode.');
+    }
+
+    const { loadDevShellStartupState } = await import(
+      /* @vite-ignore */ `/src/app/devShellStartup.ts?t=${Date.now()}`
+    );
+    return loadDevShellStartupState();
+  }
+
+  const httpClient = createHttpClient({
+    baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
+  });
+  return loadShellStartupState({
+    sessionClient: createSessionClient(httpClient),
+    menuClient: createMenuClient(httpClient),
+  });
+}
+
+function usesMockStartup() {
+  if (import.meta.env.VITE_MUYUN_USE_MOCK === 'false') {
+    return false;
+  }
+
+  return import.meta.env.DEV || import.meta.env.VITE_MUYUN_USE_MOCK === 'true';
+}
