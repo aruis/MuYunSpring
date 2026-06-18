@@ -108,7 +108,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -323,6 +322,7 @@ public class DynamicRecordWebController implements
         if (request == null || request.sorts().isEmpty()) {
             return new Sort[0];
         }
+        DynamicWebQueryFieldSupport.validatePhysicalSorts(service(), request.sorts());
         return DynamicWebQueryMapper.sorts(request.sorts());
     }
 
@@ -411,10 +411,11 @@ public class DynamicRecordWebController implements
             DynamicAssociationViewDescriptor view = recordService.associationView(moduleAlias, entityAlias, viewCode);
             Criteria criteria = targetQueryCriteria(view.targetModuleAlias(), view.targetEntityAlias(), request);
             WebQueryRequest normalized = request == null ? new WebQueryRequest(null, List.of(), List.of()) : request;
+            DynamicEntityOperations targetOperations = recordService.entity(view.targetModuleAlias(), view.targetEntityAlias());
+            DynamicWebQueryFieldSupport.validatePhysicalSorts(targetOperations, normalized.sorts());
             PageResult<DynamicRecord> page = recordService.associationViewPage(moduleAlias, entityAlias, id,
                     viewCode, criteria, DynamicWebQueryMapper.page(normalized.pageOrDefault()),
                     DynamicWebQueryMapper.sorts(normalized.sorts()));
-            DynamicEntityOperations targetOperations = recordService.entity(view.targetModuleAlias(), view.targetEntityAlias());
             return WebPageResponse.from(WebOutputSupport.page(targetOperations, page, FieldOutputContext.LIST));
         });
     }
@@ -812,7 +813,7 @@ public class DynamicRecordWebController implements
                 continue;
             }
             ResolvedModuleMetadataField resolved = moduleMetadataFieldService.resolve(field.getModuleMetadataFieldId());
-            if (resolved.relationRole() == RelationRole.MAIN && searchableTextField(resolved)) {
+            if (DynamicWebQueryFieldSupport.searchableTextField(resolved)) {
                 visibleFields.add(resolved.fieldName());
             }
         }
@@ -830,11 +831,6 @@ public class DynamicRecordWebController implements
             }
         }
         return requestedFields;
-    }
-
-    private boolean searchableTextField(ResolvedModuleMetadataField field) {
-        String alias = field.fieldTypeAlias();
-        return alias != null && Set.of("string", "text").contains(alias.trim().toLowerCase(Locale.ROOT));
     }
 
     private void requireDataScopeRecord(PlatformAction action, String id) {
@@ -1631,6 +1627,10 @@ public class DynamicRecordWebController implements
             actionRequest = actionRequest.withPageRequest(DynamicWebQueryMapper.page(normalized.page()));
         }
         if (!normalized.sorts().isEmpty()) {
+            if (entityAlias != null) {
+                DynamicWebQueryFieldSupport.validatePhysicalSorts(recordService.entity(moduleAlias, entityAlias),
+                        normalized.sorts());
+            }
             actionRequest = actionRequest.withSorts(List.of(DynamicWebQueryMapper.sorts(normalized.sorts())));
         }
         return actionRequest;

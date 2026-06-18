@@ -1305,6 +1305,75 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldRejectVirtualFieldInQuickSearch() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField displayField = uiField("ui-list", "module-field-display-code");
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(displayField),
+                List.of(),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-display-code")).thenReturn(resolvedModuleField(
+                "module-field-display-code", "displayCode", RelationRole.MAIN, "main", "string",
+                MetadataFieldForm.VIRTUAL));
+
+        lowCodeMvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "uiConfigId": "ui-list",
+                                  "quickSearch": "C-001",
+                                  "quickSearchFields": ["displayCode"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Quick search field is not searchable in UI config: displayCode"));
+
+        verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
+    void shouldRejectVirtualFieldInQuerySorts() throws Exception {
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "displayCode", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: displayCode"));
+
+        verify(mainEntity, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
     void shouldApplyQueryFormWithinPublishedListUiConfig() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
@@ -1514,6 +1583,42 @@ class DynamicRecordWebControllerTest {
                 criteria.capture(), any(PageRequest.class), any(Sort[].class));
         assertThat(criteria.getValue()).isSameAs(targetCriteria);
     }
+
+    @Test
+    void shouldRejectVirtualFieldInAssociationViewSorts() throws Exception {
+        DynamicEntityOperations lineOperations = mock(DynamicEntityOperations.class);
+        DynamicAssociationViewDescriptor association = new DynamicAssociationViewDescriptor(
+                "lines",
+                ENTITY,
+                MODULE,
+                "line",
+                net.ximatai.muyun.spring.dynamic.metadata.AssociationViewDisplayMode.INLINE_LIST,
+                "lines",
+                null,
+                net.ximatai.muyun.spring.dynamic.metadata.EntityViewType.LIST,
+                true
+        );
+        when(service.associationView(MODULE, ENTITY, "lines")).thenReturn(association);
+        when(service.entity(MODULE, "line")).thenReturn(lineOperations);
+        when(lineOperations.newRecord()).thenReturn(new DynamicRecord(lineEntity()));
+
+        mvc.perform(post("/{moduleAlias}/view/{id}/associations/{viewCode}/query", MODULE, "contract-1", "lines")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "lineDisplay", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: lineDisplay"));
+
+        verify(service, never()).associationViewPage(anyString(), anyString(), anyString(), anyString(),
+                any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+    }
+
 
     @Test
     void shouldExposeAssociationDesignEndpoints() throws Exception {
@@ -2186,6 +2291,31 @@ class DynamicRecordWebControllerTest {
         assertThat(request.getValue().queryConditions().iterator().next().fieldName()).isEqualTo("code");
         assertThat(request.getValue().payload()).containsEntry("comment", "submit");
     }
+
+    @Test
+    void shouldRejectVirtualFieldInActionSorts() throws Exception {
+        DynamicActionDescriptor submit = action("submit", EntityActionLevel.LIST);
+        when(service.action(MODULE, "submit")).thenReturn(submit);
+        when(service.mainEntityAlias(MODULE)).thenReturn(ENTITY);
+        when(service.actionEntityAlias(MODULE, "submit")).thenReturn(ENTITY);
+        when(service.entity(MODULE, ENTITY)).thenReturn(mainEntity);
+
+        mvc.perform(post("/{moduleAlias}/{actionCode}", MODULE, "submit")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "sorts": [
+                                    {"field": "displayCode", "desc": true}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Sort field is not a physical dynamic field: displayCode"));
+
+        verify(service, never()).executeAction(eq(MODULE), eq("submit"), any(DynamicActionExecutionRequest.class));
+    }
+
 
     @Test
     void shouldExecuteContributedWorkflowActionThroughRecordActionPath() throws Exception {
@@ -3066,6 +3196,16 @@ class DynamicRecordWebControllerTest {
                                                            RelationRole relationRole,
                                                            String relationAlias,
                                                            String fieldTypeAlias) {
+        return resolvedModuleField(moduleFieldId, fieldName, relationRole, relationAlias, fieldTypeAlias,
+                MetadataFieldForm.PHYSICAL);
+    }
+
+    private ResolvedModuleMetadataField resolvedModuleField(String moduleFieldId,
+                                                           String fieldName,
+                                                           RelationRole relationRole,
+                                                           String relationAlias,
+                                                           String fieldTypeAlias,
+                                                           MetadataFieldForm fieldForm) {
         return new ResolvedModuleMetadataField(
                 moduleFieldId,
                 MODULE,
@@ -3080,7 +3220,7 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldTypeAlias,
-                MetadataFieldForm.PHYSICAL
+                fieldForm
         );
     }
 

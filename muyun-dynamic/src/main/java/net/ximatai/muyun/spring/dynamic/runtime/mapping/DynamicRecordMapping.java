@@ -37,7 +37,9 @@ public final class DynamicRecordMapping implements RuntimeColumnMapper {
                     .forEach(field -> put(field.code(), field.columnName()));
         }
         for (FieldDefinition field : entity.fields()) {
-            put(field.code(), field.columnName());
+            if (field.isPhysical()) {
+                put(field.code(), field.columnName());
+            }
             if (field.protection().hasStorageProtection()) {
                 protectedStorageFields.add(field.code());
                 protectedStorageFields.add(field.columnName());
