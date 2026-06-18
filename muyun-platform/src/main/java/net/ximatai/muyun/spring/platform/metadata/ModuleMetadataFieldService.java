@@ -200,7 +200,8 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 field.getFieldName(),
                 field.getColumnName(),
                 field.getTitle(),
-                field.getFieldTypeAlias()
+                field.getFieldTypeAlias(),
+                field.getFieldForm()
         );
     }
 

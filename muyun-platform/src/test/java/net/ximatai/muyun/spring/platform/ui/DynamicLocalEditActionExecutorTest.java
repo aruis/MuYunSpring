@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionResultBody;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import org.junit.jupiter.api.Test;
@@ -205,6 +206,7 @@ class DynamicLocalEditActionExecutorTest {
                                              String relationAlias,
                                              String fieldName) {
         return new ResolvedModuleMetadataField(fieldId, "crm.contract", null, relationAlias, role,
-                "contract", "contract", "Contract", fieldId, fieldName, fieldName, fieldName, "string");
+                "contract", "contract", "Contract", fieldId, fieldName, fieldName, fieldName, "string",
+                MetadataFieldForm.PHYSICAL);
     }
 }

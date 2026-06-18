@@ -13,6 +13,7 @@ public record ResolvedModuleMetadataField(
         String fieldName,
         String columnName,
         String fieldTitle,
-        String fieldTypeAlias
+        String fieldTypeAlias,
+        MetadataFieldForm fieldForm
 ) {
 }

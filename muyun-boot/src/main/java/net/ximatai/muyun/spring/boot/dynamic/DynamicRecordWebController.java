@@ -427,6 +427,7 @@ public class DynamicRecordWebController implements
     public DynamicRecord insert(@RequestBody DynamicRecord record) {
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
+            validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             String id = service().insert(normalized);
             syncAttachmentsIfPresent(DynamicWebRequest.moduleAlias(), id, normalized);
@@ -442,6 +443,7 @@ public class DynamicRecordWebController implements
         return webScope(() -> {
             DynamicRecord normalized = record == null ? service().newRecord() : record;
             normalized.setId(id);
+            validateWritableSaveFields(normalized, "");
             validateUiSave(DynamicWebRequest.moduleAlias(), normalized);
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(normalized);
@@ -1448,7 +1450,8 @@ public class DynamicRecordWebController implements
 
     private DynamicWebError badRequest(String message) {
         if (message != null && (message.startsWith("UI required field ")
-                || message.startsWith("UI read-only field "))) {
+                || message.startsWith("UI read-only field ")
+                || message.startsWith("Virtual field "))) {
             return DynamicWebError.uiValidation(message);
         }
         if (message != null && (message.startsWith("record attachment ")
@@ -1485,6 +1488,25 @@ public class DynamicRecordWebController implements
             );
         });
         return record;
+    }
+
+    private void validateWritableSaveFields(DynamicRecord record, String pathPrefix) {
+        Map<String, FieldDefinition> fields = record.getEntity().fields().stream()
+                .collect(java.util.stream.Collectors.toMap(FieldDefinition::fieldName, field -> field));
+        for (String fieldCode : record.explicitFieldCodes()) {
+            FieldDefinition field = fields.get(fieldCode);
+            if (field != null && !field.isPhysical()) {
+                throw new PlatformException("Virtual field cannot be saved: " + pathPrefix + fieldCode);
+            }
+        }
+        record.getChildren().forEach((relationCode, rows) -> {
+            if (rows == null) {
+                return;
+            }
+            for (DynamicRecord row : rows) {
+                validateWritableSaveFields(row, pathPrefix + relationCode + ".");
+            }
+        });
     }
 
     private String childEntityAlias(String moduleAlias, String parentEntityAlias, String relationCode) {

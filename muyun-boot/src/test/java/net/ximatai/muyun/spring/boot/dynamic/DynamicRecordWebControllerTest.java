@@ -78,6 +78,7 @@ import net.ximatai.muyun.spring.platform.generation.ReferenceRecordGenerationFac
 import net.ximatai.muyun.spring.platform.impact.RecordImpactType;
 import net.ximatai.muyun.spring.platform.impact.RecordOriginContext;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
+import net.ximatai.muyun.spring.platform.metadata.MetadataFieldForm;
 import net.ximatai.muyun.spring.platform.metadata.RelationRole;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigSnapshot;
@@ -175,7 +176,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.mainEntityAlias").value(ENTITY))
-                .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY));
+                .andExpect(jsonPath("$.entities[0].entityAlias").value(ENTITY))
+                .andExpect(jsonPath("$.entities[0].fields[?(@.fieldName == 'displayCode')].storageForm")
+                        .value(org.hamcrest.Matchers.contains("VIRTUAL")));
         verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
     }
 
@@ -400,6 +403,57 @@ class DynamicRecordWebControllerTest {
         assertThat(updateRecord.getValue().getId()).isEqualTo("contract-1");
         assertThat(updateRecord.getValue().getVersion()).isEqualTo(3);
         assertThat(updateRecord.getValue().getValue("amount")).isEqualTo(10);
+    }
+
+    @Test
+    void shouldRejectVirtualFieldWhenSavingDynamicRecord() throws Exception {
+        when(service.relations(MODULE)).thenReturn(List.of(
+                new DynamicRelationDescriptor("lines", ENTITY, "contract_line", "contractId", false, false)
+        ));
+        when(service.newRecord(MODULE, "contract_line")).thenAnswer(invocation -> new DynamicRecord(lineEntity()));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content(json(Map.of("values", Map.of(
+                                "code", "C-001",
+                                "displayCode", "C-001 / 12"
+                        )))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
+
+        mvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
+                        .contentType("application/json")
+                        .content(json(Map.of("values", Map.of("displayCode", "C-001 / 12")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
+
+        mvc.perform(post("/{moduleAlias}/insert", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "values": {
+                                    "code": "C-001"
+                                  },
+                                  "children": {
+                                    "lines": [
+                                      {
+                                        "values": {
+                                          "lineNo": "L-001",
+                                          "lineDisplay": "L-001 / 7"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: lines.lineDisplay"));
+
+        verify(mainEntity, never()).insert(any(DynamicRecord.class));
+        verify(mainEntity, never()).update(any(DynamicRecord.class));
     }
 
     @Test
@@ -1618,7 +1672,8 @@ class DynamicRecordWebControllerTest {
                 "lineAmount",
                 "line_amount",
                 "Line Amount",
-                "decimal"
+                "decimal",
+                MetadataFieldForm.PHYSICAL
         ));
         Criteria templateCriteria = Criteria.of().eq("status", "active");
         Criteria manualCriteria = Criteria.of().eq("code", "C-001");
@@ -2976,6 +3031,7 @@ class DynamicRecordWebControllerTest {
         return new EntityDefinition(ENTITY, "sales_contract", "Contract", List.of(
                 FieldDefinition.string("code", "Code").length(64).required(),
                 FieldDefinition.decimal("amount", "Amount").precision(18, 2),
+                FieldDefinition.string("displayCode", "Display Code").column("display_code").virtual(),
                 FieldDefinition.of("signedDate", FieldType.DATE, "Signed Date").column("signed_date"),
                 FieldDefinition.timestamp("signedAt", "Signed At").column("signed_at")
         ));
@@ -3023,7 +3079,8 @@ class DynamicRecordWebControllerTest {
                 fieldName,
                 fieldName,
                 fieldName,
-                fieldTypeAlias
+                fieldTypeAlias,
+                MetadataFieldForm.PHYSICAL
         );
     }
 
@@ -3086,7 +3143,8 @@ class DynamicRecordWebControllerTest {
     private EntityDefinition lineEntity() {
         return new EntityDefinition("contract_line", "sales_contract_line", "Contract Line", List.of(
                 FieldDefinition.string("lineNo", "Line No").column("line_no").length(64).required(),
-                FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2)
+                FieldDefinition.decimal("lineAmount", "Line Amount").column("line_amount").precision(18, 2),
+                FieldDefinition.string("lineDisplay", "Line Display").column("line_display").virtual()
         ));
     }
 

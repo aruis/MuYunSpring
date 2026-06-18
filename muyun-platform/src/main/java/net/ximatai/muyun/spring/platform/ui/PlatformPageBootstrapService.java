@@ -401,6 +401,7 @@ public class PlatformPageBootstrapService {
                 resolved.columnName(),
                 resolved.fieldTitle(),
                 resolved.fieldTypeAlias(),
+                resolved.fieldForm() == null ? null : resolved.fieldForm().name(),
                 field.getFieldUiTypeAlias(),
                 field.getVisible(),
                 field.getReadOnly(),

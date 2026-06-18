@@ -9,6 +9,7 @@ public record PlatformResolvedUiField(
         String columnName,
         String fieldTitle,
         String fieldTypeAlias,
+        String fieldForm,
         String fieldUiTypeAlias,
         Boolean visible,
         Boolean readOnly,
