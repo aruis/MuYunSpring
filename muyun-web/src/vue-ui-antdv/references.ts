@@ -1,13 +1,13 @@
-import type { MuyunPrimitive } from '@muyun/web-contracts';
+import type { Primitive } from '@muyun/web-contracts';
 
-export interface MuyunReferenceRecord {
+export interface ReferenceRecord {
   key: string | number;
   title: string;
   subtitle?: string;
-  fields: Record<string, MuyunPrimitive>;
+  fields: Record<string, Primitive>;
 }
 
-const references: Record<string, MuyunReferenceRecord[]> = {
+const references: Record<string, ReferenceRecord[]> = {
   'crm.customer': [
     {
       key: 'cust-001',

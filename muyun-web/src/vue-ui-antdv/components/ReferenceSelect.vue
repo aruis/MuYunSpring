@@ -2,20 +2,20 @@
 import { computed, ref, watch } from 'vue';
 import { Select as ASelect } from 'ant-design-vue';
 import { searchReferenceRecords } from '../references';
-import type { MuyunOptionValue, MuyunPrimitive, MuyunReferenceContract } from '@muyun/web-contracts';
+import type { OptionValue, Primitive, ReferenceContract } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunReferenceSelect' });
+defineOptions({ name: 'ReferenceSelect' });
 
 const props = defineProps<{
-  value?: MuyunOptionValue | null;
-  reference?: MuyunReferenceContract;
+  value?: OptionValue | null;
+  reference?: ReferenceContract;
   placeholder?: string;
   disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
-  'update:value': [value: MuyunOptionValue | null];
-  'fill-back': [patch: Record<string, MuyunPrimitive>];
+  'update:value': [value: OptionValue | null];
+  'fill-back': [patch: Record<string, Primitive>];
 }>();
 
 const loading = ref(false);
@@ -53,7 +53,7 @@ function handleUpdate(value: unknown) {
     return;
   }
 
-  const patch: Record<string, MuyunPrimitive> = {};
+  const patch: Record<string, Primitive> = {};
   Object.entries(props.reference?.fillBack ?? {}).forEach(([targetField, sourceField]) => {
     patch[targetField] = selected.fields[sourceField];
   });

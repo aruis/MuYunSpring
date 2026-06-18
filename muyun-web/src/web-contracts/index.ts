@@ -1,61 +1,61 @@
-export type MuyunPrimitive = string | number | boolean | null | undefined;
+export type Primitive = string | number | boolean | null | undefined;
 
-export type MuyunOptionValue = string | number;
+export type OptionValue = string | number;
 
-export interface MuyunOption {
+export interface Option {
   label: string;
-  value: MuyunOptionValue;
+  value: OptionValue;
   disabled?: boolean;
 }
 
-export type MuyunFieldKind = 'input' | 'select' | 'dictionary-select' | 'reference-select';
+export type FieldKind = 'input' | 'select' | 'dictionary-select' | 'reference-select';
 
-export interface MuyunFieldCondition {
+export interface FieldCondition {
   field: string;
-  equals?: MuyunPrimitive;
-  notEquals?: MuyunPrimitive;
+  equals?: Primitive;
+  notEquals?: Primitive;
 }
 
-export interface MuyunReferenceContract {
+export interface ReferenceContract {
   targetModuleAlias: string;
   keyField: string;
   labelField: string;
   fillBack?: Record<string, string>;
 }
 
-export interface MuyunFieldContract {
+export interface FieldContract {
   name: string;
   label: string;
-  kind: MuyunFieldKind;
+  kind: FieldKind;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
-  options?: MuyunOption[];
+  options?: Option[];
   dictionaryAlias?: string;
-  reference?: MuyunReferenceContract;
-  visibleWhen?: MuyunFieldCondition;
-  readonlyWhen?: MuyunFieldCondition;
-  requiredWhen?: MuyunFieldCondition;
+  reference?: ReferenceContract;
+  visibleWhen?: FieldCondition;
+  readonlyWhen?: FieldCondition;
+  requiredWhen?: FieldCondition;
 }
 
-export interface MuyunFormContract {
+export interface FormContract {
   title?: string;
-  fields: MuyunFieldContract[];
+  fields: FieldContract[];
 }
 
-export interface MuyunTableColumn {
+export interface TableColumn {
   key: string;
   title: string;
   width?: number;
   dictionaryAlias?: string;
 }
 
-export interface MuyunTableContract {
+export interface TableContract {
   rowKey?: string;
-  columns: MuyunTableColumn[];
+  columns: TableColumn[];
 }
 
-export interface MuyunActionContract {
+export interface ActionContract {
   actionCode: string;
   title: string;
   level?: 'primary' | 'default' | 'danger';
@@ -64,14 +64,14 @@ export interface MuyunActionContract {
   refresh?: 'none' | 'record' | 'list' | 'all';
 }
 
-export type MuyunRecord = Record<string, MuyunPrimitive>;
+export type RecordData = Record<string, Primitive>;
 
-export interface MuyunDynamicPageDescriptor {
+export interface DynamicPageDescriptor {
   moduleAlias: string;
   title: string;
-  form: MuyunFormContract;
-  list: MuyunTableContract;
-  actions: MuyunActionContract[];
-  initialRecord: MuyunRecord;
-  records: MuyunRecord[];
+  form: FormContract;
+  list: TableContract;
+  actions: ActionContract[];
+  initialRecord: RecordData;
+  records: RecordData[];
 }

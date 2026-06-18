@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { MuyunActionBar, MuyunForm, MuyunTable } from '@muyun/vue-ui-antdv';
-import type { MuyunActionContract, MuyunDynamicPageDescriptor, MuyunRecord } from '@muyun/web-contracts';
+import { ActionBar, UiForm, UiTable } from '@muyun/vue-ui-antdv';
+import type { ActionContract, DynamicPageDescriptor, RecordData } from '@muyun/web-contracts';
 
 defineOptions({ name: 'DynamicModulePage' });
 
 const props = defineProps<{
-  descriptor: MuyunDynamicPageDescriptor;
+  descriptor: DynamicPageDescriptor;
 }>();
 
-const record = ref<MuyunRecord>({ ...props.descriptor.initialRecord });
+const record = ref<RecordData>({ ...props.descriptor.initialRecord });
 const lastAction = ref<string>('none');
 
 const saveEnvelope = computed(() => ({
@@ -21,7 +21,7 @@ const saveEnvelope = computed(() => ({
   },
 }));
 
-function executeAction(action: MuyunActionContract) {
+function executeAction(action: ActionContract) {
   lastAction.value = `${action.actionCode}:${action.refresh ?? 'none'}`;
 }
 </script>
@@ -33,17 +33,17 @@ function executeAction(action: MuyunActionContract) {
         <h2>{{ descriptor.title }}</h2>
         <p>{{ descriptor.moduleAlias }}</p>
       </div>
-      <MuyunActionBar :actions="descriptor.actions" @execute="executeAction" />
+      <ActionBar :actions="descriptor.actions" @execute="executeAction" />
     </header>
 
     <div class="runtime-grid">
       <article class="panel">
         <h3>动态表单</h3>
-        <MuyunForm v-model="record" :contract="descriptor.form" submit-text="动态保存" />
+        <UiForm v-model="record" :contract="descriptor.form" submit-text="动态保存" />
       </article>
       <article class="panel">
         <h3>动态列表</h3>
-        <MuyunTable :contract="descriptor.list" :rows="descriptor.records" />
+        <UiTable :contract="descriptor.list" :rows="descriptor.records" />
       </article>
     </div>
 

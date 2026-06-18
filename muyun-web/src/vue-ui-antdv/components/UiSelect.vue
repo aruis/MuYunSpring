@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { Select as ASelect } from 'ant-design-vue';
-import type { MuyunOption, MuyunOptionValue } from '@muyun/web-contracts';
+import type { Option, OptionValue } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunSelect' });
+defineOptions({ name: 'UiSelect' });
 
 defineProps<{
-  value?: MuyunOptionValue | null;
-  options: MuyunOption[];
+  value?: OptionValue | null;
+  options: Option[];
   placeholder?: string;
   disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
-  'update:value': [value: MuyunOptionValue | null];
+  'update:value': [value: OptionValue | null];
 }>();
 
 function normalize(value: unknown) {

@@ -1,8 +1,8 @@
-export { default as MuyunActionBar } from './components/MuyunActionBar.vue';
-export { default as MuyunForm } from './components/MuyunForm.vue';
-export { default as MuyunInput } from './components/MuyunInput.vue';
-export { default as MuyunSelect } from './components/MuyunSelect.vue';
-export { default as MuyunDictionarySelect } from './components/MuyunDictionarySelect.vue';
-export { default as MuyunReferenceSelect } from './components/MuyunReferenceSelect.vue';
-export { default as MuyunTable } from './components/MuyunTable.vue';
-export { resolveMuyunFieldComponent } from './registry';
+export { default as ActionBar } from './components/ActionBar.vue';
+export { default as UiForm } from './components/UiForm.vue';
+export { default as UiInput } from './components/UiInput.vue';
+export { default as UiSelect } from './components/UiSelect.vue';
+export { default as DictionarySelect } from './components/DictionarySelect.vue';
+export { default as ReferenceSelect } from './components/ReferenceSelect.vue';
+export { default as UiTable } from './components/UiTable.vue';
+export { resolveFieldComponent } from './registry';

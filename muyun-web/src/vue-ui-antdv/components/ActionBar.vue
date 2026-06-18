@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { Button as AButton, Space as ASpace, Tooltip as ATooltip } from 'ant-design-vue';
-import type { MuyunActionContract } from '@muyun/web-contracts';
+import type { ActionContract } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunActionBar' });
+defineOptions({ name: 'ActionBar' });
 
 defineProps<{
-  actions: MuyunActionContract[];
+  actions: ActionContract[];
 }>();
 
 const emit = defineEmits<{
-  execute: [action: MuyunActionContract];
+  execute: [action: ActionContract];
 }>();
 </script>
 

@@ -1,6 +1,6 @@
-import type { MuyunOption } from '@muyun/web-contracts';
+import type { Option } from '@muyun/web-contracts';
 
-const dictionaries: Record<string, MuyunOption[]> = {
+const dictionaries: Record<string, Option[]> = {
   'crm.customer.level': [
     { label: '战略客户', value: 'strategic' },
     { label: '重点客户', value: 'key' },
@@ -13,6 +13,6 @@ const dictionaries: Record<string, MuyunOption[]> = {
   ],
 };
 
-export function resolveDictionaryOptions(dictionaryAlias: string): MuyunOption[] {
+export function resolveDictionaryOptions(dictionaryAlias: string): Option[] {
   return dictionaries[dictionaryAlias] ?? [];
 }

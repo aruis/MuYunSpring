@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { Input as AInput } from 'ant-design-vue';
-import type { MuyunPrimitive } from '@muyun/web-contracts';
+import type { Primitive } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunInput' });
+defineOptions({ name: 'UiInput' });
 
 defineProps<{
-  value?: MuyunPrimitive;
+  value?: Primitive;
   placeholder?: string;
   disabled?: boolean;
 }>();
