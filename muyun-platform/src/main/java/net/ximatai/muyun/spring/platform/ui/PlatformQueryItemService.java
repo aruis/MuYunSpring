@@ -12,10 +12,10 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
-import net.ximatai.muyun.spring.common.time.BusinessTimeRange;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicTemporalRangeCriteriaSupport;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
@@ -328,24 +328,28 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
                 if (values.size() != 2) {
                     throw new PlatformException("BETWEEN query item requires exactly two values: " + fieldName);
                 }
-                if (fieldType.getFieldType().isTemporal()
-                        && !fieldType.getFieldType().isBusinessDate()
-                        && PlatformTimeService.isLocalDateValue(values.get(0))
-                        && PlatformTimeService.isLocalDateValue(values.get(1))) {
-                    BusinessTimeRange range;
-                    BusinessTimeContext context = queryTimeContext(item);
-                    try {
-                        range = timeService.localDateClosedRangeToInstantRange(
-                                values.get(0),
-                                values.get(1),
-                                context
-                        );
-                    } catch (RuntimeException ex) {
-                        throw new PlatformException("Query item date range is invalid: " + fieldName, ex);
+                try {
+                    if (DynamicTemporalRangeCriteriaSupport.appendInstantLocalDateRange(
+                            criteria,
+                            fieldName,
+                            fieldType.getFieldType(),
+                            values.get(0),
+                            values.get(1),
+                            item.getTimeZone(),
+                            timeService,
+                            BusinessTimeContext.empty()
+                    )) {
+                        return;
                     }
-                    criteria.gte(fieldName, range.startInclusive());
-                    criteria.lt(fieldName, range.endExclusive());
-                    return;
+                } catch (RuntimeException ex) {
+                    if (hasText(item.getTimeZone())) {
+                        try {
+                            PlatformTimeService.requireIanaZoneId(item.getTimeZone());
+                        } catch (RuntimeException ignored) {
+                            throw new PlatformException("Query item timeZone is invalid: " + item.getTimeZone(), ex);
+                        }
+                    }
+                    throw new PlatformException("Query item date range is invalid: " + fieldName, ex);
                 }
                 criteria.between(fieldName, values.get(0), values.get(1));
             }
@@ -398,17 +402,6 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
                     .toList();
         }
         return List.of(value);
-    }
-
-    private BusinessTimeContext queryTimeContext(PlatformQueryItem item) {
-        if (!hasText(item.getTimeZone())) {
-            return BusinessTimeContext.empty();
-        }
-        try {
-            return BusinessTimeContext.ofZone(PlatformTimeService.requireIanaZoneId(item.getTimeZone()));
-        } catch (RuntimeException ex) {
-            throw new PlatformException("Query item timeZone is invalid: " + item.getTimeZone(), ex);
-        }
     }
 
     private boolean isGroup(PlatformQueryItem item) {

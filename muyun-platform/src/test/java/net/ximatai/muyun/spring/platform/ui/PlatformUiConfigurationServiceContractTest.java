@@ -747,6 +747,24 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldRejectQueryTemplateInvalidTimeZoneWithPlatformException() {
+        seedFieldType("timestamp", FieldType.TIMESTAMP, DynamicQueryOperator.BETWEEN);
+        seedUiType("datetime", "timestamp");
+        String submittedAtField = seedModuleField("crm.ticket", "ticket", "submittedAt", "submitted_at",
+                "timestamp");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.ticket", "date_range", true));
+        PlatformQueryItem item = queryLeaf(templateId, TreeAbility.ROOT_ID, submittedAtField,
+                DynamicQueryOperator.BETWEEN);
+        item.setDefaultValue("2026-01-01,2026-01-02");
+        item.setTimeZone("+08:00");
+        queryItemService.insert(item);
+
+        assertThatThrownBy(() -> queryItemService.compile(templateId))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
+    }
+
+    @Test
     void shouldPublishPageConfigAndKeepDraftsOutOfOnlineSnapshot() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");

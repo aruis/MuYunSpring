@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
-import net.ximatai.muyun.spring.common.time.BusinessTimeRange;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
@@ -91,25 +90,37 @@ public final class DynamicQueryCriteriaBuilder {
             throw new ModuleDefinitionException("query operator requires exactly two values: "
                     + condition.fieldName() + "." + condition.operator());
         }
-        if (field.type().isTemporal()
-                && !field.type().isBusinessDate()
-                && PlatformTimeService.isLocalDateValue(values.get(0))
-                && PlatformTimeService.isLocalDateValue(values.get(1))) {
-            BusinessTimeRange range;
-            BusinessTimeContext context = conditionTimeContext(condition);
+        try {
+            if (DynamicTemporalRangeCriteriaSupport.appendInstantLocalDateRange(
+                    criteria,
+                    field.fieldName(),
+                    field.type(),
+                    values.get(0),
+                    values.get(1),
+                    condition.timeZone(),
+                    timeService,
+                    timeContext
+            )) {
+                return;
+            }
+        } catch (RuntimeException e) {
+            if (condition.timeZone() != null && !condition.timeZone().isBlank()) {
+                try {
+                    PlatformTimeService.requireIanaZoneId(condition.timeZone());
+                } catch (RuntimeException ignored) {
+                    throw new ModuleDefinitionException("invalid query timeZone: "
+                            + condition.fieldName() + "." + condition.timeZone(), e);
+                }
+            }
             try {
-                range = timeService.localDateClosedRangeToInstantRange(
-                        values.get(0),
-                        values.get(1),
-                        context
-                );
-            } catch (RuntimeException e) {
-                throw new ModuleDefinitionException("invalid query date range: "
+                PlatformTimeService.requireLocalDate(values.get(0), "startInclusive");
+                PlatformTimeService.requireLocalDate(values.get(1), "endInclusive");
+            } catch (RuntimeException ignored) {
+                throw new ModuleDefinitionException("invalid query value type: "
                         + condition.fieldName() + "." + condition.operator(), e);
             }
-            criteria.gte(field.fieldName(), range.startInclusive());
-            criteria.lt(field.fieldName(), range.endExclusive());
-            return;
+            throw new ModuleDefinitionException("invalid query date range: "
+                    + condition.fieldName() + "." + condition.operator(), e);
         }
         criteria.between(field.fieldName(),
                 rangeValue(field, condition, values, 0),
@@ -155,15 +166,4 @@ public final class DynamicQueryCriteriaBuilder {
         }
     }
 
-    private BusinessTimeContext conditionTimeContext(DynamicQueryCondition condition) {
-        if (condition.timeZone() == null) {
-            return timeContext;
-        }
-        try {
-            return timeContext.withZone(PlatformTimeService.requireIanaZoneId(condition.timeZone()));
-        } catch (RuntimeException e) {
-            throw new ModuleDefinitionException("invalid query timeZone: "
-                    + condition.fieldName() + "." + condition.timeZone(), e);
-        }
-    }
 }
