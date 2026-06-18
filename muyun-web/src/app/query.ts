@@ -1,12 +1,5 @@
-import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
+import { VueQueryPlugin, createQueryClient } from '@muyun/web-core';
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+export const queryClient = createQueryClient();
 
 export { VueQueryPlugin };

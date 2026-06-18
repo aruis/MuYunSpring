@@ -1,34 +1,34 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Button as AButton, Form as AForm, FormItem as AFormItem } from 'ant-design-vue';
-import { resolveMuyunFieldComponent } from '../registry';
+import { resolveFieldComponent } from '../registry';
 import type {
-  MuyunFieldCondition,
-  MuyunFieldContract,
-  MuyunFormContract,
-  MuyunPrimitive,
-  MuyunRecord,
+  FieldCondition,
+  FieldContract,
+  FormContract,
+  Primitive,
+  RecordData,
 } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunForm' });
+defineOptions({ name: 'UiForm' });
 
 const props = defineProps<{
-  contract: MuyunFormContract;
-  modelValue: MuyunRecord;
+  contract: FormContract;
+  modelValue: RecordData;
   submitText?: string;
 }>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: MuyunRecord];
-  submit: [value: MuyunRecord];
+  'update:modelValue': [value: RecordData];
+  submit: [value: RecordData];
 }>();
 
 const formModel = computed({
   get: () => props.modelValue,
-  set: (value: MuyunRecord) => emit('update:modelValue', value),
+  set: (value: RecordData) => emit('update:modelValue', value),
 });
 
-function matchCondition(condition: MuyunFieldCondition | undefined) {
+function matchCondition(condition: FieldCondition | undefined) {
   if (!condition) {
     return false;
   }
@@ -43,26 +43,26 @@ function matchCondition(condition: MuyunFieldCondition | undefined) {
   return false;
 }
 
-function isVisible(field: MuyunFieldContract) {
+function isVisible(field: FieldContract) {
   return field.visibleWhen ? matchCondition(field.visibleWhen) : true;
 }
 
-function isReadonly(field: MuyunFieldContract) {
+function isReadonly(field: FieldContract) {
   return Boolean(field.disabled || matchCondition(field.readonlyWhen));
 }
 
-function isRequired(field: MuyunFieldContract) {
+function isRequired(field: FieldContract) {
   return Boolean(field.required || matchCondition(field.requiredWhen));
 }
 
-function updateField(name: string, value: MuyunPrimitive) {
+function updateField(name: string, value: Primitive) {
   emit('update:modelValue', {
     ...props.modelValue,
     [name]: value,
   });
 }
 
-function mergePatch(patch: Record<string, MuyunPrimitive>) {
+function mergePatch(patch: Record<string, Primitive>) {
   emit('update:modelValue', {
     ...props.modelValue,
     ...patch,
@@ -82,7 +82,7 @@ const visibleFields = computed(() => props.contract.fields.filter(isVisible));
       :rules="isRequired(field) ? [{ required: true, message: `请填写${field.label}` }] : undefined"
     >
       <component
-        :is="resolveMuyunFieldComponent(field.kind)"
+        :is="resolveFieldComponent(field.kind)"
         :value="modelValue[field.name]"
         :placeholder="field.placeholder"
         :disabled="isReadonly(field)"

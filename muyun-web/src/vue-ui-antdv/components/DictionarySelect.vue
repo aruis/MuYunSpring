@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import MuyunSelect from './MuyunSelect.vue';
+import UiSelect from './UiSelect.vue';
 import { resolveDictionaryOptions } from '../dictionaries';
-import type { MuyunOptionValue } from '@muyun/web-contracts';
+import type { OptionValue } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunDictionarySelect' });
+defineOptions({ name: 'DictionarySelect' });
 
 defineProps<{
-  value?: MuyunOptionValue | null;
+  value?: OptionValue | null;
   dictionaryAlias?: string;
   placeholder?: string;
   disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
-  'update:value': [value: MuyunOptionValue | null];
+  'update:value': [value: OptionValue | null];
 }>();
 </script>
 
 <template>
-  <MuyunSelect
+  <UiSelect
     :value="value"
     :options="resolveDictionaryOptions(dictionaryAlias ?? '')"
     :placeholder="placeholder"

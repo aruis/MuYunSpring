@@ -17,12 +17,12 @@
 基础 UI 组件提供统一外观、交互和受控值语义，例如：
 
 ```text
-MuyunInput
-MuyunSelect
-MuyunDatePicker
-MuyunModal
-MuyunTable
-MuyunForm
+UiInput
+UiSelect
+UiDatePicker
+UiModal
+UiTable
+UiForm
 ```
 
 这类组件可以比较薄，但不能退化成 Ant Design Vue props 的完整透传。
@@ -32,12 +32,12 @@ MuyunForm
 平台语义组件承接 MuYun 平台能力，例如：
 
 ```text
-MuyunDictionarySelect
-MuyunReferenceSelect
-MuyunActionBar
-MuyunAttachmentPanel
-MuyunUserSelect
-MuyunOrganizationSelect
+DictionarySelect
+ReferenceSelect
+ActionBar
+AttachmentPanel
+UserSelect
+OrganizationSelect
 ```
 
 这类组件通常会组合 UI、web-core client、权限、错误态和平台上下文。它们应优先沉淀在 `platform-components` 或 `dynamic-page-runtime` 中，而不是散落到业务项目。
@@ -47,9 +47,9 @@ MuyunOrganizationSelect
 页面级运行组件负责把平台契约组合成可用页面能力，例如：
 
 ```text
-MuyunDynamicForm
-MuyunQueryTable
-MuyunChildTable
+DynamicForm
+QueryTable
+ChildTable
 ```
 
 这些组件是动态页面运行器和静态业务页面之间的重要交汇点。它们应优先复用 `web-contracts` 和 `web-core`，并由平台团队维护。
@@ -88,13 +88,13 @@ MuyunChildTable
 当前骨架只提供最小组件集合，目的是固定方向和示例：
 
 ```text
-MuyunInput
-MuyunSelect
-MuyunDictionarySelect
-MuyunReferenceSelect
-MuyunForm
-MuyunTable
-MuyunActionBar
+UiInput
+UiSelect
+DictionarySelect
+ReferenceSelect
+UiForm
+UiTable
+ActionBar
 ```
 
 这些组件不是最终形态。真实平台业务进入建设后，应根据后端能力和前端使用反馈继续调整契约。

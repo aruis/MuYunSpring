@@ -2,16 +2,16 @@
 import { computed } from 'vue';
 import { Table as ATable } from 'ant-design-vue';
 import { resolveDictionaryOptions } from '../dictionaries';
-import type { MuyunRecord, MuyunTableColumn, MuyunTableContract } from '@muyun/web-contracts';
+import type { RecordData, TableColumn, TableContract } from '@muyun/web-contracts';
 
-defineOptions({ name: 'MuyunTable' });
+defineOptions({ name: 'UiTable' });
 
 const props = defineProps<{
-  contract: MuyunTableContract;
-  rows: MuyunRecord[];
+  contract: TableContract;
+  rows: RecordData[];
 }>();
 
-function renderCell(column: MuyunTableColumn, value: unknown) {
+function renderCell(column: TableColumn, value: unknown) {
   if (!column.dictionaryAlias) {
     return String(value ?? '');
   }

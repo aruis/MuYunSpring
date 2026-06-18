@@ -1,6 +1,6 @@
-import type { MuyunDynamicPageDescriptor } from '@muyun/web-contracts';
+import type { DynamicPageDescriptor } from '@muyun/web-contracts';
 
-export const customerDescriptor: MuyunDynamicPageDescriptor = {
+export const customerDescriptor: DynamicPageDescriptor = {
   moduleAlias: 'crm.customer',
   title: '客户档案',
   form: {

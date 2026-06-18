@@ -2,17 +2,7 @@
 
 本文记录 MuYunSpring 前端的阶段性架构方向。它强调设计哲学、团队协作方式和可演进边界，不把尚未进入建设阶段的平台业务细节提前定死。
 
-## 设计哲学
-
-MuYun 前端不是单个业务后台，也不是 Ant Design Vue 的简单二次封装。它应逐步形成一组可被平台项目和业务项目共同消费的前端平台能力。
-
-核心原则：
-
-1. **平台语义优先**：业务页面优先使用 MuYun 组件、MuYun client 和 MuYun runtime，不直接依赖底层 UI 库或裸 HTTP URL。
-2. **动静共用**：静态业务页面和动态页面运行器共享组件、字段语义、动作语义、错误处理和请求上下文。
-3. **能力可上升**：业务项目中反复出现、语义稳定、跨项目可复用的能力，应上升为平台包；一次性业务特殊组件留在业务项目内。
-4. **上游可闭源，下游可顺畅开发**：平台团队维护源码，业务团队通过私有 npm 包、类型声明、文档、示例和 playground 使用平台成果。
-5. **边界服务于演进**：目录和包名先表达职责方向，不把未来接口细节一次性锁死。
+前端稳定设计共识见 [MuYun 前端设计原则](DESIGN_PRINCIPLES.md)。后续推进步骤和路线目标见 [MuYun 前端路线草案](DEVELOPMENT_APPROACH.md)。
 
 ## 技术路线
 
@@ -85,7 +75,7 @@ traceId 和前端异常追踪
 
 ### vue-ui-antdv
 
-承载 MuYun UI 组件到 Ant Design Vue 的适配。业务项目使用 `MuyunInput`、`MuyunSelect`、`MuyunForm`、`MuyunTable` 等平台组件，不直接使用 Ant Design Vue 组件。
+承载 MuYun UI 组件到 Ant Design Vue 的适配。业务项目使用 `UiInput`、`UiSelect`、`UiForm`、`UiTable` 等平台组件，不直接使用 Ant Design Vue 组件。组件由 `@muyun/vue-ui-antdv` 包名表达 MuYun 归属，导出名表达组件职责。
 
 基础组件可以保持轻量，但不能把 Ant Design Vue 的完整 props 原样暴露成 MuYun 公共 API。
 

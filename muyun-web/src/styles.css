@@ -35,47 +35,6 @@ select {
   min-height: 100vh;
 }
 
-.app-shell {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  min-height: 100vh;
-}
-
-.app-sidebar {
-  padding: 24px 18px;
-  border-right: 1px solid #dde5ef;
-  background: #102033;
-  color: #f8fafc;
-}
-
-.brand {
-  margin-bottom: 28px;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.app-sidebar nav {
-  display: grid;
-  gap: 8px;
-}
-
-.app-sidebar a {
-  padding: 10px 12px;
-  border-radius: 6px;
-  color: #c9d6e5;
-  text-decoration: none;
-}
-
-.app-sidebar a:first-child {
-  background: rgb(255 255 255 / 0.1);
-  color: #fff;
-}
-
-.app-content {
-  min-width: 0;
-  padding: 28px;
-}
-
 .home-view,
 .runtime-page {
   display: grid;
@@ -156,14 +115,6 @@ select {
 }
 
 @media (max-width: 980px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .app-sidebar {
-    border-right: 0;
-  }
-
   .runtime-grid,
   .section-header {
     display: grid;
