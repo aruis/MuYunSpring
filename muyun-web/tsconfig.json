@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@muyun/web-contracts": ["./src/web-contracts/index.ts"],
+      "@muyun/web-core": ["./src/web-core/index.ts"],
+      "@muyun/vue-ui-antdv": ["./src/vue-ui-antdv/index.ts"],
+      "@muyun/vue-ui-antdv/styles.css": ["./src/vue-ui-antdv/styles.css"],
+      "@muyun/dynamic-page-runtime": ["./src/dynamic-page-runtime/index.ts"],
+      "@muyun/platform-components": ["./src/platform-components/index.ts"],
+      "@muyun/platform-shell": ["./src/platform-shell/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue"]
+}

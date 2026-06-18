@@ -6,3 +6,16 @@ out/
 *.iml
 *.log
 LOCAL_ENVIRONMENT.md
+
+# Frontend artifacts
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.tsbuildinfo
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store

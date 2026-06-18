@@ -49,5 +49,6 @@ muyun-boot      Spring Boot 启动与装配入口
 - [命名与边界](docs/architecture/NAMING_AND_BOUNDARIES.md)：Gradle 子项目、Java 包、平台模块别名和动态边界。
 - [平台配置与元数据自举](docs/architecture/PLATFORM_CONFIG_BOOTSTRAP.md)：应用、模块、元数据、字段、菜单和字典的配置闭环。
 - [平台业务专题](docs/platform/README.md)：按业务专题整理的平台能力和 Web 接口交接入口。
+- [前端技术架构](docs/frontend/TECHNICAL_ARCHITECTURE.md)：Vue 前端技术路线、组件契约、运行器边界和闭源协作方式。
 - [技术债记录](docs/TECHNICAL_DEBT.md)：已确认但暂缓处理的平台级技术债。
 - [Agent Guide](AGENTS.md)：面向协作 Agent 的仓库工作规则。
