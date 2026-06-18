@@ -8,6 +8,103 @@ export interface Option {
   disabled?: boolean;
 }
 
+export type RouteQueryPrimitive = string | number | boolean | null | undefined;
+
+export type RouteQueryValue = RouteQueryPrimitive | RouteQueryPrimitive[];
+
+export interface WebListResponse<T> {
+  records: T[];
+}
+
+export interface WebTreeNode<T> {
+  record: T;
+  children: WebTreeNode<T>[];
+}
+
+export interface CurrentUser {
+  userId: string;
+  username?: string;
+  tenantId?: string;
+  organizationId?: string;
+  system: boolean;
+}
+
+export interface SessionContext {
+  currentUser: CurrentUser;
+}
+
+// Matches current Spring/Jackson enum-name output from /platform.menu/mine.
+export type MenuType = 'GROUP' | 'MODULE' | 'ROUTE' | 'LINK';
+
+// Matches current Spring/Jackson enum-name output from menu page mode fields.
+export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
+
+export interface MenuRecord {
+  id: string;
+  tenantId?: string;
+  schemeId: string;
+  parentId?: string;
+  title: string;
+  menuType: MenuType;
+  moduleAlias?: string;
+  route?: string;
+  externalUrl?: string;
+  pageMode?: MenuPageMode;
+  defaultUiConfigId?: string;
+  defaultQueryTemplateId?: string;
+  entryParamsJson?: string;
+  enabled?: boolean;
+  sortOrder?: number;
+}
+
+export type MenuTreeNode = WebTreeNode<MenuRecord>;
+
+export type MenuMineResponse = WebListResponse<MenuTreeNode>;
+
+export interface ModuleMenuTarget {
+  menuId: string;
+  menuType: 'MODULE';
+  moduleAlias: string;
+  pageMode?: MenuPageMode;
+  defaultUiConfigId?: string;
+  defaultQueryTemplateId?: string;
+  entryParamsJson?: string;
+  query?: Record<string, RouteQueryValue>;
+}
+
+export interface RouteMenuTarget {
+  menuId: string;
+  menuType: 'ROUTE';
+  route: string;
+  entryParamsJson?: string;
+  query?: Record<string, RouteQueryValue>;
+}
+
+export interface ExternalLinkMenuTarget {
+  menuId: string;
+  menuType: 'LINK';
+  externalUrl: string;
+  entryParamsJson?: string;
+}
+
+export type MenuNavigationTarget = ModuleMenuTarget | RouteMenuTarget | ExternalLinkMenuTarget;
+
+export type MenuNavigationType = MenuNavigationTarget['menuType'];
+
+export interface MenuTab {
+  key: string;
+  title: string;
+  target: MenuNavigationTarget;
+  closable?: boolean;
+}
+
+export interface ShellStartupState {
+  session: SessionContext;
+  menus: MenuTreeNode[];
+  tabs?: MenuTab[];
+  activeTabKey?: string;
+}
+
 export type FieldKind = 'input' | 'select' | 'dictionary-select' | 'reference-select';
 
 export interface FieldCondition {
