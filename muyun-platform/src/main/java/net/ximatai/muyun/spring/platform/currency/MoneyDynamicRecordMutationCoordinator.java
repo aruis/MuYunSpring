@@ -41,7 +41,7 @@ public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutat
 
     @Override
     public void beforeCreate(String moduleAlias, String entityAlias, DynamicRecord record) {
-        normalizeMoneyFields(record, null, null, true);
+        normalizeMoneyFields(moduleAlias, entityAlias, record, null, null, true);
     }
 
     @Override
@@ -51,12 +51,12 @@ public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutat
                                           String childEntityAlias,
                                           DynamicRecord parent,
                                           DynamicRecord child) {
-        normalizeMoneyFields(child, null, parent, true);
+        normalizeMoneyFields(moduleAlias, childEntityAlias, child, null, parent, true);
     }
 
     @Override
     public void beforeUpdate(String moduleAlias, String entityAlias, DynamicRecord before, DynamicRecord incoming) {
-        normalizeMoneyFields(incoming, before, null, false);
+        normalizeMoneyFields(moduleAlias, entityAlias, incoming, before, null, false);
     }
 
     @Override
@@ -68,10 +68,12 @@ public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutat
                                           DynamicRecord parentIncoming,
                                           DynamicRecord childBefore,
                                           DynamicRecord childIncoming) {
-        normalizeMoneyFields(childIncoming, childBefore, parentBefore, false);
+        normalizeMoneyFields(moduleAlias, childEntityAlias, childIncoming, childBefore, parentBefore, false);
     }
 
-    private void normalizeMoneyFields(DynamicRecord incoming,
+    private void normalizeMoneyFields(String moduleAlias,
+                                      String entityAlias,
+                                      DynamicRecord incoming,
                                       DynamicRecord before,
                                       DynamicRecord parent,
                                       boolean create) {
@@ -83,7 +85,14 @@ public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutat
             if (money == null || !money.enabled()) {
                 continue;
             }
-            normalizeMoneyField(incoming, before, parent, create, field, money);
+            try {
+                normalizeMoneyField(incoming, before, parent, create, field, money);
+            } catch (PlatformException ex) {
+                throw new PlatformException("money normalization failed: module=" + moduleAlias
+                        + ", entity=" + entityAlias
+                        + ", field=" + field.fieldName()
+                        + "; " + ex.getMessage(), ex);
+            }
         }
     }
 

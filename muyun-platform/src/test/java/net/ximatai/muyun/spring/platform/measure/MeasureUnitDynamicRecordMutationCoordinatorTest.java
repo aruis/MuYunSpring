@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.measure;
 
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -225,6 +226,41 @@ class MeasureUnitDynamicRecordMutationCoordinatorTest {
         coordinator.beforeUpdate("sales.order", "line", before, incoming);
 
         assertThat(baseValue(incoming)).isEqualByComparingTo("90");
+    }
+
+    @Test
+    void shouldReportMeasureFieldContextWhenConversionFails() {
+        packageUnits();
+        DynamicRecord record = new DynamicRecord(packageEntity())
+                .setValue("quantity", new BigDecimal("2"))
+                .setValue("quantityUnit", "pallet");
+
+        assertThatThrownBy(() -> coordinator.beforeCreate("sales.order", "line", record))
+                .hasMessageContaining("measure unit normalization failed")
+                .hasMessageContaining("module=sales.order")
+                .hasMessageContaining("entity=line")
+                .hasMessageContaining("field=quantity")
+                .hasMessageContaining("Measure unit requires enabled unit")
+                .cause()
+                .isInstanceOf(PlatformException.class);
+    }
+
+    @Test
+    void shouldReportMeasureChildEntityContextWhenRelationChildConversionFails() {
+        packageUnits();
+        DynamicRecord parent = new DynamicRecord(packageEntity());
+        DynamicRecord child = new DynamicRecord(packageEntity())
+                .setValue("quantity", new BigDecimal("2"))
+                .setValue("quantityUnit", "pallet");
+
+        assertThatThrownBy(() -> coordinator.beforeRelationChildCreate("sales.order", "order", "lines", "line",
+                parent, child))
+                .hasMessageContaining("measure unit normalization failed")
+                .hasMessageContaining("module=sales.order")
+                .hasMessageContaining("entity=line")
+                .hasMessageContaining("field=quantity")
+                .cause()
+                .isInstanceOf(PlatformException.class);
     }
 
     private EntityDefinition packageEntity() {

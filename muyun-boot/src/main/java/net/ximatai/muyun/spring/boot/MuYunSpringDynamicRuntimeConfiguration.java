@@ -11,11 +11,15 @@ import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicySer
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
+import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicReferenceDependencyScopeResolver;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -28,12 +32,17 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.ZoneId;
+
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(MuYunSpringPlatformTimeProperties.class)
 public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
     @ConditionalOnBean(DictionaryItemService.class)
@@ -50,6 +59,34 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    PlatformTimeService platformTimeService(ObjectProvider<Clock> clockProvider,
+                                            ObjectProvider<BusinessTimeZoneResolver> zoneResolvers,
+                                            MuYunSpringPlatformTimeProperties timeProperties) {
+        Clock clock = clockProvider == null ? null : clockProvider.getIfAvailable();
+        ZoneId defaultZoneId = defaultZoneId(timeProperties);
+        return new PlatformTimeService(
+                clock,
+                defaultZoneId,
+                zoneResolvers == null ? null : zoneResolvers.orderedStream().toList()
+        );
+    }
+
+    private ZoneId defaultZoneId(MuYunSpringPlatformTimeProperties timeProperties) {
+        String configured = timeProperties == null ? null : timeProperties.getDefaultZoneId();
+        if (configured == null || configured.isBlank()) {
+            return null;
+        }
+        return PlatformTimeService.requireIanaZoneId(configured);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    BusinessCalendarService businessCalendarService(PlatformTimeService platformTimeService) {
+        return new NaturalBusinessCalendarService(platformTimeService);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
         return new DynamicSchemaService(operations);
     }
@@ -62,11 +99,13 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               DynamicActionExecutorRegistry actionExecutorRegistry,
                                               DynamicActionTransactionOperator actionTransactionOperator,
                                               ObjectProvider<FieldCryptoProvider> fieldCryptoProvider,
-                                              ObjectProvider<FieldSigner> fieldSigner) {
+                                              ObjectProvider<FieldSigner> fieldSigner,
+                                              PlatformTimeService platformTimeService) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
                 eventPublisher, actionExecutorRegistry, actionTransactionOperator,
                 fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
-                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE));
+                fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE),
+                platformTimeService);
     }
 
     @Bean
@@ -113,8 +152,8 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    DynamicModulePublisher dynamicModulePublisher(DynamicSchemaService schemaService,
+    DynamicModuleRuntimeRefresher dynamicModuleRuntimeRefresher(DynamicSchemaService schemaService,
                                                   DynamicRecordRuntime runtime) {
-        return new DynamicModulePublisher(schemaService, runtime);
+        return new DynamicModuleRuntimeRefresher(schemaService, runtime);
     }
 }

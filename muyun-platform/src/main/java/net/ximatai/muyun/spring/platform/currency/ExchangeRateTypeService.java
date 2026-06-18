@@ -144,8 +144,8 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
         if (value == null || value.isBlank()) {
             throw new PlatformException("exchangeRateTypeCode must not be blank");
         }
-        String code = value.trim().toUpperCase();
-        if (!code.matches("[A-Z][A-Z0-9_]{0,63}")) {
+        String code = CurrencyCodeRules.normalizeRateTypeCode(value);
+        if (!CurrencyCodeRules.isRateTypeCode(code)) {
             throw new PlatformException("exchangeRateTypeCode must use upper snake code: " + value);
         }
         return code;

@@ -1,6 +1,6 @@
 package net.ximatai.muyun.spring.platform.config;
 
-public record LowCodeModuleConfigPublishResult(
+public record LowCodeModuleConfigArchiveResult(
         LowCodeModuleConfigVersion version,
         LowCodeConfigHealthReport healthReport
 ) {

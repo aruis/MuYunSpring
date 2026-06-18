@@ -14,23 +14,26 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 
 @Service
-public class LowCodeModuleConfigPublishFacade {
+public class LowCodeModuleConfigArchiveFacade {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
     private final LowCodeModuleConfigVersionService versionService;
     private final LowCodeModuleHealthService healthService;
 
-    public LowCodeModuleConfigPublishFacade(LowCodeModuleConfigVersionService versionService,
+    public LowCodeModuleConfigArchiveFacade(LowCodeModuleConfigVersionService versionService,
                                             LowCodeModuleHealthService healthService) {
         this.versionService = versionService;
         this.healthService = healthService;
     }
 
     @Transactional
-    public LowCodeModuleConfigPublishResult publish(LowCodeModulePackage modulePackage,
+    public LowCodeModuleConfigArchiveResult archive(LowCodeModulePackage modulePackage,
                                                     String operatorId,
                                                     String remark) {
+        if (modulePackage.mode() != LowCodePackageMode.MODULE_FULL) {
+            throw new PlatformException("only MODULE_FULL package can be archived: " + modulePackage.moduleAlias());
+        }
         LowCodeConfigHealthReport healthReport = healthService.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
         if (healthReport.status() == LowCodeConfigHealthStatus.FAIL) {
             throw new PlatformException("low code module config health check failed: " + modulePackage.moduleAlias());
@@ -39,22 +42,22 @@ public class LowCodeModuleConfigPublishFacade {
         LowCodeModuleConfigVersion version = new LowCodeModuleConfigVersion();
         version.setModuleAlias(modulePackage.moduleAlias());
         version.setVersionNo(versionService.nextVersionNo(modulePackage.moduleAlias()));
-        version.setVersionStatus(LowCodeConfigVersionStatus.PUBLISHED);
+        version.setVersionStatus(LowCodeConfigVersionStatus.ARCHIVED);
         version.setCurrentVersion(Boolean.FALSE);
         version.setPackageSnapshotText(snapshot);
         version.setPackageHash(sha256(snapshot));
         version.setSummaryJson(summary(modulePackage, healthReport));
-        version.setSourceVersionId(modulePackage.publishManifest().sourceVersionId());
-        version.setPublishedBy(normalize(operatorId));
-        version.setPublishedAt(Instant.now());
+        version.setSourceVersionId(modulePackage.exchangeManifest().sourceVersionId());
+        version.setArchivedBy(normalize(operatorId));
+        version.setArchivedAt(Instant.now());
         version.setRemark(normalize(remark));
         versionService.insert(version);
         versionService.markOnlyCurrent(modulePackage.moduleAlias(), version.getId());
-        return new LowCodeModuleConfigPublishResult(version, healthReport);
+        return new LowCodeModuleConfigArchiveResult(version, healthReport);
     }
 
     @Transactional
-    public LowCodeModuleConfigVersion rollback(String moduleAlias, String versionId) {
+    public LowCodeModuleConfigVersion switchCurrentVersion(String moduleAlias, String versionId) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         versionService.markOnlyCurrent(validModuleAlias, versionId);
         return versionService.select(versionId);

@@ -1,12 +1,13 @@
 package net.ximatai.muyun.spring.dynamic.metadata;
 
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -71,15 +72,7 @@ public final class DynamicFieldValueSupport {
         if (!(value instanceof String text) || text.isBlank()) {
             throw new IllegalArgumentException("timeZone must be an IANA ZoneId");
         }
-        try {
-            ZoneId zoneId = ZoneId.of(text.trim());
-            if (zoneId instanceof ZoneOffset) {
-                throw new IllegalArgumentException("timeZone must be an IANA ZoneId");
-            }
-            return zoneId.getId();
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException("timeZone must be an IANA ZoneId", e);
-        }
+        return PlatformTimeService.requireIanaZoneId(text).getId();
     }
 
     public static String formatUtcInstant(Instant value) {

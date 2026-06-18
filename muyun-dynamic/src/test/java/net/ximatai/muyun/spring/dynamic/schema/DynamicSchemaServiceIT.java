@@ -17,8 +17,8 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublishResult;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordDao;
@@ -115,8 +115,8 @@ class DynamicSchemaServiceIT {
     void shouldRunDynamicAbilitiesOnRealDatabase() {
         ModuleDefinition module = invoiceModule();
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
-        publisher.publish(module);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
+        refresher.refresh(module);
 
         DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
         DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
@@ -244,7 +244,7 @@ class DynamicSchemaServiceIT {
 
     @Test
     void shouldRollbackDynamicParentChildInsertWhenTransactionFails() {
-        DynamicRecordRuntime runtime = publishedInvoiceRuntime();
+        DynamicRecordRuntime runtime = refreshedInvoiceRuntime();
         DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
         DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
         String code = "INV-TX-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -272,7 +272,7 @@ class DynamicSchemaServiceIT {
 
     @Test
     void shouldRollbackDynamicParentChildReplaceWhenTransactionFails() {
-        DynamicRecordRuntime runtime = publishedInvoiceRuntime();
+        DynamicRecordRuntime runtime = refreshedInvoiceRuntime();
         DynamicEntityService invoiceService = runtime.entityService("sales.invoice", "invoice");
         DynamicEntityService lineService = runtime.entityService("sales.invoice", "invoice_line");
         String code = "INV-TX-REPLACE-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -420,28 +420,28 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
-    void shouldPublishModuleThenRunDynamicRecordOnRealDatabase() {
+    void shouldRefreshModuleThenRunDynamicRecordOnRealDatabase() {
         ModuleDefinition module = new ModuleDefinition(
                 "sales.contract",
                 "Contract",
-                List.of(entity("app_contract_publish_it"))
+                List.of(entity("app_contract_refresh_it"))
         );
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
 
-        DynamicModulePublishResult result = publisher.publish(module);
+        DynamicModuleRefreshResult result = refresher.refresh(module);
         DynamicRecordService recordService = new DynamicRecordService(runtime);
         DynamicRecord record = recordService.newRecord("sales.contract", "contract")
-                .setValue("code", "C-PUBLISH-001")
-                .setValue("name", "Published Contract")
+                .setValue("code", "C-REFRESH-001")
+                .setValue("name", "Refreshed Contract")
                 .setValue("amount", BigDecimal.valueOf(5678, 2));
 
         String id = recordService.create("sales.contract", "contract", record);
 
         assertThat(result.changed()).isTrue();
         assertThat(result.migrations()).containsKey("contract");
-        assertThat(recordService.select("sales.contract", "contract", id).getValue("code")).isEqualTo("C-PUBLISH-001");
-        assertThat(recordService.count("sales.contract", "contract", Criteria.of().eq("code", "C-PUBLISH-001"))).isEqualTo(1);
+        assertThat(recordService.select("sales.contract", "contract", id).getValue("code")).isEqualTo("C-REFRESH-001");
+        assertThat(recordService.count("sales.contract", "contract", Criteria.of().eq("code", "C-REFRESH-001"))).isEqualTo(1);
     }
 
     @Test
@@ -454,7 +454,7 @@ class DynamicSchemaServiceIT {
                 List.of(facadeContractEntity("app_contract_facade_" + suffix))
         );
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
-        new DynamicModulePublisher(schemaService, runtime).publish(module);
+        new DynamicModuleRuntimeRefresher(schemaService, runtime).refresh(module);
         DynamicRecordService recordService = new DynamicRecordService(runtime);
 
         String activeId;
@@ -515,7 +515,7 @@ class DynamicSchemaServiceIT {
     }
 
     @Test
-    void shouldPreviewAndPublishDynamicModuleSchemaEvolutionOnRealDatabase() throws Exception {
+    void shouldPreviewAndRefreshDynamicModuleSchemaEvolutionOnRealDatabase() throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String tableName = "app_contract_evolve_" + suffix;
         String moduleAlias = "sales.evolve_" + suffix;
@@ -544,14 +544,14 @@ class DynamicSchemaServiceIT {
                 ))
         );
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
-        DynamicModulePublisher publisher = new DynamicModulePublisher(schemaService, runtime);
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
         DynamicRecordService recordService = new DynamicRecordService(runtime);
 
-        publisher.publish(initialModule);
+        refresher.refresh(initialModule);
         String firstId = recordService.create(moduleAlias, "contract", runtime.newRecord(moduleAlias, "contract")
                 .setValue("code", "C-EVOLVE-001"));
 
-        DynamicModulePublishResult dryRun = publisher.preview(evolvedModule);
+        DynamicModuleRefreshResult dryRun = refresher.previewRefresh(evolvedModule);
 
         assertThat(dryRun.changed()).isTrue();
         assertThat(dryRun.dryRun()).isTrue();
@@ -565,9 +565,9 @@ class DynamicSchemaServiceIT {
             assertThat(columns(connection, tableName)).doesNotContain("name", "amount");
         }
 
-        DynamicModulePublishResult published = publisher.publish(evolvedModule);
+        DynamicModuleRefreshResult refreshed = refresher.refresh(evolvedModule);
 
-        assertThat(published.changed()).isTrue();
+        assertThat(refreshed.changed()).isTrue();
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "name", "amount");
@@ -596,7 +596,7 @@ class DynamicSchemaServiceIT {
                 ))
         );
 
-        DynamicModulePublishResult dropDryRun = publisher.preview(removedFieldModule);
+        DynamicModuleRefreshResult dropDryRun = refresher.previewRefresh(removedFieldModule);
 
         assertThat(dropDryRun.dryRun()).isTrue();
         assertThat(dropDryRun.hasNonAdditiveChanges()).isTrue();
@@ -605,7 +605,7 @@ class DynamicSchemaServiceIT {
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "name", "amount");
-        assertThatThrownBy(() -> publisher.publish(removedFieldModule, MigrationOptions.strict()))
+        assertThatThrownBy(() -> refresher.refresh(removedFieldModule, MigrationOptions.strict()))
                 .isInstanceOfSatisfying(DynamicSchemaMigrationException.class, exception -> {
                     assertThat(exception.failedEntityAlias()).isEqualTo("contract");
                     assertThat(exception.completedMigrations()).isEmpty();
@@ -616,9 +616,9 @@ class DynamicSchemaServiceIT {
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "name", "amount");
 
-        DynamicModulePublishResult dropPublished = publisher.publish(removedFieldModule);
+        DynamicModuleRefreshResult dropRefreshed = refresher.refresh(removedFieldModule);
 
-        assertThat(dropPublished.migrations().get("contract").hasNonAdditiveChanges()).isTrue();
+        assertThat(dropRefreshed.migrations().get("contract").hasNonAdditiveChanges()).isTrue();
         assertThat(runtime.registry().requireEntity(moduleAlias, "contract").fields())
                 .extracting(FieldDefinition::fieldName)
                 .containsExactly("code", "amount");
@@ -687,10 +687,10 @@ class DynamicSchemaServiceIT {
         return service.insert(record);
     }
 
-    private DynamicRecordRuntime publishedInvoiceRuntime() {
+    private DynamicRecordRuntime refreshedInvoiceRuntime() {
         ModuleDefinition module = invoiceModule();
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
-        new DynamicModulePublisher(schemaService, runtime).publish(module);
+        new DynamicModuleRuntimeRefresher(schemaService, runtime).refresh(module);
         return runtime;
     }
 

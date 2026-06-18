@@ -13,8 +13,12 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldBehaviorSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataFieldConfigService extends AbstractAbilityService<MetadataFieldConfig> implements
@@ -27,6 +31,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     private final DictionaryCategoryService categoryService;
     private final ModuleMetadataRelationService relationService;
     private final MetadataFieldProtectionConfigService protectionConfigService;
+    private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
 
     public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
                                       MetadataFieldService fieldService,
@@ -34,7 +39,19 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                                       PlatformFieldTypeService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService) {
-        this(configDao, fieldService, metadataService, fieldTypeService, categoryService, relationService, null);
+        this(configDao, fieldService, metadataService, fieldTypeService, categoryService, relationService, null,
+                Optional.empty());
+    }
+
+    public MetadataFieldConfigService(BaseDao<MetadataFieldConfig, String> configDao,
+                                      MetadataFieldService fieldService,
+                                      MetadataService metadataService,
+                                      PlatformFieldTypeService fieldTypeService,
+                                      DictionaryCategoryService categoryService,
+                                      ModuleMetadataRelationService relationService,
+                                      MetadataFieldProtectionConfigService protectionConfigService) {
+        this(configDao, fieldService, metadataService, fieldTypeService, categoryService, relationService,
+                protectionConfigService, Optional.empty());
     }
 
     @Autowired
@@ -44,7 +61,8 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
                                       PlatformFieldTypeService fieldTypeService,
                                       DictionaryCategoryService categoryService,
                                       ModuleMetadataRelationService relationService,
-                                      MetadataFieldProtectionConfigService protectionConfigService) {
+                                      MetadataFieldProtectionConfigService protectionConfigService,
+                                      Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataFieldConfig.class, configDao);
         this.fieldService = fieldService;
         this.metadataService = metadataService;
@@ -52,6 +70,7 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
         this.categoryService = categoryService;
         this.relationService = relationService;
         this.protectionConfigService = protectionConfigService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator == null ? Optional.empty() : runtimeRefreshCoordinator;
     }
 
     @Override
@@ -62,6 +81,11 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
     @Override
     public void beforeUpdate(MetadataFieldConfig config) {
         normalizeAndValidate(config);
+    }
+
+    @Override
+    public void afterChanged(MetadataFieldConfig config) {
+        refreshByMetadataFieldId(config.getMetadataFieldId());
     }
 
     public MetadataFieldConfig findByMetadataFieldId(String metadataFieldId) {
@@ -104,6 +128,16 @@ public class MetadataFieldConfigService extends AbstractAbilityService<MetadataF
             return criteria.isNull("relationId");
         }
         return criteria.eq("relationId", relationId);
+    }
+
+    private void refreshByMetadataFieldId(String metadataFieldId) {
+        if (runtimeRefreshCoordinator.isEmpty() || metadataFieldId == null || metadataFieldId.isBlank()) {
+            return;
+        }
+        MetadataField field = fieldService.select(metadataFieldId);
+        if (field != null) {
+            runtimeRefreshCoordinator.get().refreshByMetadataField(field);
+        }
     }
 
     private void normalizeRelation(MetadataFieldConfig config, MetadataField field) {

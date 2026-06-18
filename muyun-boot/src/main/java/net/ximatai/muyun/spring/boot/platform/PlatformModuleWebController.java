@@ -14,11 +14,16 @@ import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +46,16 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "parentId", "applicationAlias", "moduleKind", "systemManaged",
             "title", "enabled", "sortOrder", "createdAt", "updatedAt");
+
+    private PlatformDynamicRuntimeRefreshService runtimeRefreshService;
+
+    @Autowired
+    public PlatformModuleWebController(PlatformDynamicRuntimeRefreshService runtimeRefreshService) {
+        this.runtimeRefreshService = runtimeRefreshService;
+    }
+
+    public PlatformModuleWebController() {
+    }
 
     @Override
     public Criteria queryCriteria(WebQueryRequest request) {
@@ -114,6 +129,20 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
                     .map(child -> treeNode(validApplicationAlias, child))
                     .toList());
         });
+    }
+
+    @PostMapping("/{moduleAlias}/runtime/refresh")
+    @CustomActionEndpoint(value = "refreshDynamicRuntime", title = "刷新动态运行态",
+            level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
+    public DynamicModuleRefreshResult refreshRuntime(@PathVariable String moduleAlias) {
+        return webScope(() -> runtimeRefreshService.refresh(moduleAlias));
+    }
+
+    @PostMapping("/{moduleAlias}/runtime/preview-refresh")
+    @CustomActionEndpoint(value = "previewRefreshDynamicRuntime", title = "预览刷新动态运行态",
+            level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
+    public DynamicModuleRefreshResult previewRefreshRuntime(@PathVariable String moduleAlias) {
+        return webScope(() -> runtimeRefreshService.previewRefresh(moduleAlias));
     }
 
     private void appendDescendants(String applicationAlias, String parentId, List<PlatformModule> rows) {

@@ -49,7 +49,8 @@ final class DynamicViewDescriptors {
                 type,
                 entity.name(),
                 entity.fields().stream()
-                        .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(), true,
+                        .map(field -> new DynamicViewFieldDescriptor(field.fieldName(), field.name(),
+                                field.type().temporalSemantics(), true,
                                 controlType(field), field.defaultUiTypeAlias(), companions(field), false, field.isRequired()))
                         .toList()
         );
@@ -69,6 +70,7 @@ final class DynamicViewDescriptors {
         return new DynamicViewFieldDescriptor(
                 viewField.fieldName(),
                 viewField.title() == null || viewField.title().isBlank() ? field.name() : viewField.title(),
+                field.type().temporalSemantics(),
                 viewField.visible(),
                 effectiveControlType(viewField, field),
                 effectiveFieldUiTypeAlias(viewField, field),

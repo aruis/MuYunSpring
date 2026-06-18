@@ -90,6 +90,61 @@ class MoneyDynamicRecordServiceIntegrationTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void shouldPersistDefaultSelectableCurrencyThroughDynamicCreateService() {
+        prepareCurrenciesAndRates();
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("sales_order"), anyMap(), eq(StandardEntitySchema.ID_COLUMN)))
+                .thenReturn("order-1");
+        DynamicRecordService service = service(operations, orderEntityWithDefaultCurrency());
+        DynamicRecord record = service.newRecord(MODULE, "order")
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+
+        service.create(MODULE, "order", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(operations)
+                .insertItem(eq(SCHEMA), eq("sales_order"), body.capture(), eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("currency_code", "USD")
+                .containsEntry("exchange_rate", new BigDecimal("7.2345"));
+        assertThat((BigDecimal) body.getValue().get("base_amount")).isEqualByComparingTo("14.47");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistTenantScopedBaseCurrencyThroughDynamicCreateService() {
+        prepareCurrenciesAndRates();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            tenantCurrencySettingService.insert(setting("CNY"));
+            rateService.insert(rate("USD", "CNY", "SPOT", "2026-02-01", "8.0000"));
+        }
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.insertItem(eq(SCHEMA), eq("sales_order"), anyMap(), eq(StandardEntitySchema.ID_COLUMN)))
+                .thenReturn("order-1");
+        DynamicRecordService service = service(operations, tenantBaseCurrencyEntity());
+        DynamicRecord record = service.newRecord(MODULE, "order")
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("currencyCode", "USD")
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+        record.setTenantId("tenant-a");
+
+        try (TenantContext.Scope ignored = TenantContext.system("system create")) {
+            service.create(MODULE, "order", record);
+        }
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(operations)
+                .insertItem(eq(SCHEMA), eq("sales_order"), body.capture(), eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("tenant_id", "tenant-a")
+                .containsEntry("currency_code", "USD")
+                .containsEntry("exchange_rate", new BigDecimal("8.0000"));
+        assertThat((BigDecimal) body.getValue().get("base_amount")).isEqualByComparingTo("16.00");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void shouldPersistNormalizedMoneyFieldsThroughDynamicUpdateService() {
         prepareCurrenciesAndRates();
         IDatabaseOperations<Object> operations = operations();
@@ -165,8 +220,38 @@ class MoneyDynamicRecordServiceIntegrationTest {
         assertThat((BigDecimal) childBody.getValue().get("base_amount")).isEqualByComparingTo("14.47");
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistRecalculatedMoneyFieldsWhenOnlyRateDateChangesThroughDynamicUpdateService() {
+        prepareCurrenciesAndRates();
+        rateService.insert(rate("USD", "CNY", "SPOT", "2026-03-01", "7.3000"));
+        IDatabaseOperations<Object> operations = operations();
+        when(operations.query(anyString(), anyMap())).thenReturn(List.of(beforeRow()));
+        when(operations.patchUpdateItemWhere(eq(SCHEMA), eq("sales_order"), anyMap(), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn(1);
+        DynamicRecordService service = service(operations);
+        DynamicRecord record = service.newRecord(MODULE, "order")
+                .setValue("orderDate", LocalDate.of(2026, 3, 16));
+        record.setId("order-1");
+
+        service.update(MODULE, "order", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(operations)
+                .patchUpdateItemWhere(eq(SCHEMA), eq("sales_order"), body.capture(), anyMap(),
+                        eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("order_date", LocalDate.of(2026, 3, 16))
+                .containsEntry("exchange_rate", new BigDecimal("7.3000"));
+        assertThat((BigDecimal) body.getValue().get("base_amount")).isEqualByComparingTo("7.30");
+    }
+
     private DynamicRecordService service(IDatabaseOperations<Object> operations) {
         return service(operations, new ModuleDefinition(MODULE, "Order", List.of(orderEntity())));
+    }
+
+    private DynamicRecordService service(IDatabaseOperations<Object> operations, EntityDefinition entity) {
+        return service(operations, new ModuleDefinition(MODULE, "Order", List.of(entity)));
     }
 
     private DynamicRecordService service(IDatabaseOperations<Object> operations, ModuleDefinition module) {
@@ -193,6 +278,18 @@ class MoneyDynamicRecordServiceIntegrationTest {
     }
 
     private EntityDefinition orderEntity() {
+        return orderEntity(null, "CNY");
+    }
+
+    private EntityDefinition orderEntityWithDefaultCurrency() {
+        return orderEntity("USD", "CNY");
+    }
+
+    private EntityDefinition tenantBaseCurrencyEntity() {
+        return orderEntity(null, null);
+    }
+
+    private EntityDefinition orderEntity(String defaultCurrencyCode, String baseCurrencyCode) {
         return new EntityDefinition(
                 "order",
                 "sales_order",
@@ -201,10 +298,10 @@ class MoneyDynamicRecordServiceIntegrationTest {
                         FieldDefinition.decimal("amount", "Amount").money(new FieldMoneyDefinition(
                                 FieldMoneyMode.SELECTABLE,
                                 null,
-                                null,
+                                defaultCurrencyCode,
                                 "currencyCode",
                                 "baseAmount",
-                                "CNY",
+                                baseCurrencyCode,
                                 "SPOT",
                                 "orderDate",
                                 "exchangeRate",
@@ -323,6 +420,7 @@ class MoneyDynamicRecordServiceIntegrationTest {
     private TenantCurrencySetting setting(String baseCurrencyCode) {
         TenantCurrencySetting setting = new TenantCurrencySetting();
         setting.setBaseCurrencyCode(baseCurrencyCode);
+        setting.setTitle("Tenant base currency");
         return setting;
     }
 }

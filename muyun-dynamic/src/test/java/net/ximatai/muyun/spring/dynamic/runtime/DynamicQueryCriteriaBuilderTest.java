@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
@@ -9,8 +11,11 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Collections;
 import java.util.Set;
@@ -80,6 +85,45 @@ class DynamicQueryCriteriaBuilderTest {
     }
 
     @Test
+    void shouldConvertLocalDateRangeToUtcHalfOpenRangeForInstantFields() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(
+                timeEntity(),
+                new PlatformTimeService(Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+                        ZoneId.of("Asia/Shanghai"),
+                        List.of()),
+                BusinessTimeContext.empty()
+        );
+
+        Criteria criteria = builder.build(List.of(
+                DynamicQueryCondition.of("submittedAt", DynamicQueryOperator.BETWEEN, "2026-01-01", "2026-01-31")
+        ));
+
+        assertThat(criteria.getClauses()).hasSize(2);
+        assertThat(criteria.getClauses().get(0).getOperator()).isEqualTo(CriteriaOperator.GTE);
+        assertThat(criteria.getClauses().get(0).getValues())
+                .containsExactly(Instant.parse("2025-12-31T16:00:00Z"));
+        assertThat(criteria.getClauses().get(1).getOperator()).isEqualTo(CriteriaOperator.LT);
+        assertThat(criteria.getClauses().get(1).getValues())
+                .containsExactly(Instant.parse("2026-01-31T16:00:00Z"));
+    }
+
+    @Test
+    void shouldUseConditionTimeZoneWhenConvertingLocalDateRange() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(timeEntity());
+
+        Criteria criteria = builder.build(List.of(
+                DynamicQueryCondition.withTimeZone("meetingAt", DynamicQueryOperator.BETWEEN,
+                        "Asia/Shanghai", "2026-01-01", "2026-01-01")
+        ));
+
+        assertThat(criteria.getClauses()).hasSize(2);
+        assertThat(criteria.getClauses().get(0).getValues())
+                .containsExactly(Instant.parse("2025-12-31T16:00:00Z"));
+        assertThat(criteria.getClauses().get(1).getValues())
+                .containsExactly(Instant.parse("2026-01-01T16:00:00Z"));
+    }
+
+    @Test
     void shouldBuildNegativeAndNullCriteriaOperators() {
         DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(entity());
 
@@ -110,6 +154,14 @@ class DynamicQueryCriteriaBuilderTest {
         assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.of("meetingAt", "2026-01-01T00:00:00+08:00"))))
                 .isInstanceOf(ModuleDefinitionException.class)
                 .hasMessageContaining("invalid query value type");
+        assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.withTimeZone(
+                "meetingAt", DynamicQueryOperator.BETWEEN, "+08:00", "2026-01-01", "2026-01-02"))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid query timeZone");
+        assertThatThrownBy(() -> builder.build(List.of(DynamicQueryCondition.withTimeZone(
+                "meetingAt", DynamicQueryOperator.BETWEEN, "Asia/Shanghai", "2026-01-02", "2026-01-01"))))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("invalid query date range");
     }
 
     private EntityDefinition entity() {

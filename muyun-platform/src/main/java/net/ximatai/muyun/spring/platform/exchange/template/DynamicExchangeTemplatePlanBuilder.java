@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.dynamic.descriptor.DynamicFieldDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicReferenceDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelColumnPlan;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelSheetPlan;
@@ -133,7 +134,7 @@ public class DynamicExchangeTemplatePlanBuilder {
     }
 
     private List<ExcelColumnPlan> buildColumns(DynamicEntityDescriptor entity, DynamicExchangeTemplateOptions options) {
-        Set<String> companionFieldNames = companionFieldNames(entity);
+        Set<String> hiddenCompanionFieldNames = hiddenCompanionFieldNames(entity);
         List<ExcelColumnPlan> columns = new ArrayList<>();
         columns.add(new ExcelColumnPlan(
                 ExcelExchangeProtocol.RELATE_ID_FIELD,
@@ -143,7 +144,7 @@ public class DynamicExchangeTemplatePlanBuilder {
                 List.of()
         ));
         for (DynamicFieldDescriptor field : entity.fields()) {
-            if (field == null || isBlank(field.fieldName()) || companionFieldNames.contains(field.fieldName())) {
+            if (field == null || isBlank(field.fieldName()) || hiddenCompanionFieldNames.contains(field.fieldName())) {
                 continue;
             }
             columns.add(new ExcelColumnPlan(
@@ -157,7 +158,7 @@ public class DynamicExchangeTemplatePlanBuilder {
         return columns;
     }
 
-    private Set<String> companionFieldNames(DynamicEntityDescriptor entity) {
+    private Set<String> hiddenCompanionFieldNames(DynamicEntityDescriptor entity) {
         Set<String> fieldNames = new LinkedHashSet<>();
         for (DynamicFieldDescriptor field : entity.fields()) {
             if (field == null || field.companions() == null) {
@@ -165,6 +166,11 @@ public class DynamicExchangeTemplatePlanBuilder {
             }
             for (DynamicFieldCompanionDescriptor companion : field.companions()) {
                 if (companion != null && !isBlank(companion.fieldName())) {
+                    if (field.type() == FieldType.ZONED_TIMESTAMP
+                            && FieldCompanionRules.zonedTimestampTimeZoneFieldName(field.fieldName())
+                            .equals(companion.fieldName())) {
+                        continue;
+                    }
                     fieldNames.add(companion.fieldName());
                 }
             }

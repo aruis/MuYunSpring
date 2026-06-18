@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.exchange.importer;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.platform.exchange.model.ExcelWorkbookMeta;
 import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 
@@ -22,7 +23,7 @@ public record ImportTemporalContext(ZoneId workbookZoneId) {
             return UTC;
         }
         try {
-            return new ImportTemporalContext(ZoneId.of(meta.timeZone().trim()));
+            return new ImportTemporalContext(PlatformTimeService.requireIanaZoneId(meta.timeZone()));
         } catch (RuntimeException ex) {
             throw new PlatformException("exchange workbook timeZone is invalid: " + meta.timeZone(), ex);
         }

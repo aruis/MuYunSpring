@@ -18,8 +18,8 @@ class M10LowCodeDemoBusinessAcceptanceTest {
             new LowCodeModuleConfigVersionService(new TestMemoryDao<>());
     private final LowCodeModuleHealthService healthService =
             new LowCodeModuleHealthService(List.of(new LowCodeModulePackageHealthChecker()));
-    private final LowCodeModuleConfigPublishFacade publishFacade =
-            new LowCodeModuleConfigPublishFacade(sourceVersionService, healthService);
+    private final LowCodeModuleConfigArchiveFacade archiveFacade =
+            new LowCodeModuleConfigArchiveFacade(sourceVersionService, healthService);
     private final LowCodeModulePackageExchangeService sourceExchangeService =
             exchangeService(sourceVersionService);
     private final LowCodeModuleTemplateService templateService =
@@ -32,13 +32,13 @@ class M10LowCodeDemoBusinessAcceptanceTest {
                 exchangeService(new LowCodeModuleConfigVersionService(new TestMemoryDao<>()), dependencyResolver);
         LowCodeModulePackage baseline = salesContractPackage("合同管理", "sales_contract", "draft");
 
-        LowCodeModuleConfigPublishResult firstPublish = publishFacade.publish(baseline, "demo-admin", "demo baseline");
+        LowCodeModuleConfigArchiveResult firstArchive = archiveFacade.archive(baseline, "demo-admin", "demo baseline");
 
-        assertThat(firstPublish.healthReport().status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
-        assertThat(firstPublish.version().getVersionNo()).isEqualTo(1);
-        assertThat(firstPublish.version().getCurrentVersion()).isTrue();
-        assertThat(firstPublish.version().getPackageHash()).hasSize(64);
-        assertThat(firstPublish.version().getSummaryJson())
+        assertThat(firstArchive.healthReport().status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
+        assertThat(firstArchive.version().getVersionNo()).isEqualTo(1);
+        assertThat(firstArchive.version().getCurrentVersion()).isTrue();
+        assertThat(firstArchive.version().getPackageHash()).hasSize(64);
+        assertThat(firstArchive.version().getSummaryJson())
                 .contains("\"mode\":\"MODULE_FULL\"")
                 .contains("\"healthStatus\":\"PASS\"");
 
@@ -70,8 +70,8 @@ class M10LowCodeDemoBusinessAcceptanceTest {
         assertThat(targetExchangeService.dryRunImport(exported).status()).isEqualTo(LowCodePackageDryRunStatus.READY);
         assertThat(dependencyResolver.resolvedKeys()).containsExactlyInAnyOrderElementsOf(dependencyKeys());
 
-        LowCodeModuleConfigVersion secondVersion = publishFacade
-                .publish(salesContractPackage("合同归档", "sales_contract_v2", "archived"), "demo-admin", "demo v2")
+        LowCodeModuleConfigVersion secondVersion = archiveFacade
+                .archive(salesContractPackage("合同归档", "sales_contract_v2", "archived"), "demo-admin", "demo v2")
                 .version();
         assertThat(secondVersion.getVersionNo()).isEqualTo(2);
         assertThat(sourceVersionService.currentVersion("sales.contract").getId()).isEqualTo(secondVersion.getId());
@@ -79,13 +79,13 @@ class M10LowCodeDemoBusinessAcceptanceTest {
                 .contains("sales_contract_v2")
                 .isNotEqualTo(exported);
 
-        LowCodeModuleConfigVersion rolledBack = publishFacade.rollback("sales.contract", firstPublish.version().getId());
-        assertThat(rolledBack.getId()).isEqualTo(firstPublish.version().getId());
-        assertThat(sourceVersionService.currentVersion("sales.contract").getId()).isEqualTo(firstPublish.version().getId());
+        LowCodeModuleConfigVersion switchedCurrent = archiveFacade.switchCurrentVersion("sales.contract", firstArchive.version().getId());
+        assertThat(switchedCurrent.getId()).isEqualTo(firstArchive.version().getId());
+        assertThat(sourceVersionService.currentVersion("sales.contract").getId()).isEqualTo(firstArchive.version().getId());
         assertThat(sourceExchangeService.exportCurrentPackage("sales.contract")).isEqualTo(exported);
 
         LowCodeModuleTemplate template = templateService.createTemplateFromVersion(
-                "sales_contract_template", "合同模块样板", firstPublish.version().getId());
+                "sales_contract_template", "合同模块样板", firstArchive.version().getId());
         LowCodeModulePackage renewalPackage = templateService.instantiate(template,
                 new LowCodeModuleTemplateInstantiationRequest(
                         "sales",

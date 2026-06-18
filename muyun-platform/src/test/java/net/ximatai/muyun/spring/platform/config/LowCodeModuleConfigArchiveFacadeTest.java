@@ -4,77 +4,89 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.fullPackage;
+import static net.ximatai.muyun.spring.platform.config.LowCodeConfigTestFixtures.pageOnlyPackage;
 
-class LowCodeModuleConfigPublishFacadeTest {
+class LowCodeModuleConfigArchiveFacadeTest {
     private final LowCodeModuleConfigVersionService versionService =
             new LowCodeModuleConfigVersionService(new TestMemoryDao<>());
     private final LowCodeModuleHealthService healthService =
             new LowCodeModuleHealthService(List.of(new LowCodeModulePackageHealthChecker()));
-    private final LowCodeModuleConfigPublishFacade facade =
-            new LowCodeModuleConfigPublishFacade(versionService, healthService);
+    private final LowCodeModuleConfigArchiveFacade facade =
+            new LowCodeModuleConfigArchiveFacade(versionService, healthService);
 
     @Test
-    void shouldPublishModulePackageAsCurrentVersion() {
-        LowCodeModuleConfigPublishResult result = facade.publish(fullPackage("crm.contract"), "tester", "baseline");
+    void shouldArchiveModulePackageAsCurrentVersion() {
+        LowCodeModuleConfigArchiveResult result = facade.archive(fullPackage("crm.contract"), "tester", "baseline");
 
         LowCodeModuleConfigVersion version = result.version();
         assertThat(version.getVersionNo()).isEqualTo(1);
         assertThat(version.getCurrentVersion()).isTrue();
-        assertThat(version.getVersionStatus()).isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
+        assertThat(version.getVersionStatus()).isEqualTo(LowCodeConfigVersionStatus.ARCHIVED);
         assertThat(version.getPackageSnapshotText()).contains("\"moduleAlias\":\"crm.contract\"");
         assertThat(version.getPackageHash()).hasSize(64);
-        assertThat(version.getPublishedBy()).isEqualTo("tester");
+        assertThat(version.getArchivedBy()).isEqualTo("tester");
         assertThat(result.healthReport().status()).isEqualTo(LowCodeConfigHealthStatus.PASS);
         assertThat(versionService.currentVersion("crm.contract").getId()).isEqualTo(version.getId());
     }
 
     @Test
-    void shouldPublishNextVersionAndRollbackToHistoricalPublishedVersion() {
-        LowCodeModuleConfigVersion first = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
-        LowCodeModuleConfigVersion second = facade.publish(fullPackage("crm.contract"), "tester", "v2").version();
+    void shouldArchiveNextVersionAndSwitchToHistoricalArchivedVersion() {
+        LowCodeModuleConfigVersion first = facade.archive(fullPackage("crm.contract"), "tester", "v1").version();
+        LowCodeModuleConfigVersion second = facade.archive(fullPackage("crm.contract"), "tester", "v2").version();
 
         assertThat(second.getVersionNo()).isEqualTo(2);
         assertThat(versionService.select(first.getId()).getCurrentVersion()).isFalse();
-        assertThat(versionService.select(first.getId()).getVersionStatus()).isEqualTo(LowCodeConfigVersionStatus.PUBLISHED);
+        assertThat(versionService.select(first.getId()).getVersionStatus()).isEqualTo(LowCodeConfigVersionStatus.ARCHIVED);
         assertThat(versionService.currentVersion("crm.contract").getId()).isEqualTo(second.getId());
 
-        LowCodeModuleConfigVersion rolledBack = facade.rollback("crm.contract", first.getId());
+        LowCodeModuleConfigVersion switched = facade.switchCurrentVersion("crm.contract", first.getId());
 
-        assertThat(rolledBack.getCurrentVersion()).isTrue();
+        assertThat(switched.getCurrentVersion()).isTrue();
         assertThat(versionService.select(second.getId()).getCurrentVersion()).isFalse();
         assertThat(versionService.currentVersion("crm.contract").getId()).isEqualTo(first.getId());
     }
 
     @Test
-    void shouldRejectPublishWhenHealthCheckFails() {
+    void shouldRejectArchiveWhenPackageIsNotModuleFull() {
+        assertThatThrownBy(() -> facade.archive(pageOnlyPackage("crm.contract"), "tester", null))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("only MODULE_FULL package can be archived: crm.contract");
+        assertThat(versionService.listByModule("crm.contract")).isEmpty();
+    }
+
+    @Test
+    void shouldRejectArchiveWhenHealthCheckFails() {
         LowCodeModulePackage invalid = new LowCodeModulePackage(
                 "m10.v1",
-                LowCodePackageMode.PAGE_ONLY,
+                LowCodePackageMode.MODULE_FULL,
                 "crm",
                 "crm.contract",
-                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
-                        Map.of("module", "crm.contract"))),
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.PAGE,
+                        Map.of("moduleAlias", "crm.contract"))),
                 null,
                 null
         );
 
-        assertThatThrownBy(() -> facade.publish(invalid, "tester", null))
+        assertThatThrownBy(() -> facade.archive(invalid, "tester", null))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("low code module config health check failed: crm.contract");
         assertThat(versionService.listByModule("crm.contract")).isEmpty();
     }
 
     @Test
-    void shouldRejectRollbackToVersionInAnotherModule() {
-        LowCodeModuleConfigVersion version = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
+    void shouldRejectSwitchingToVersionInAnotherModule() {
+        LowCodeModuleConfigVersion version = facade.archive(fullPackage("crm.contract"), "tester", "v1").version();
 
-        assertThatThrownBy(() -> facade.rollback("crm.customer", version.getId()))
+        assertThatThrownBy(() -> facade.switchCurrentVersion("crm.customer", version.getId()))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("low code config version not found in module");
     }
@@ -86,13 +98,13 @@ class LowCodeModuleConfigPublishFacadeTest {
 
         assertThatThrownBy(() -> versionService.insert(version))
                 .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("current version can only be switched by publish facade");
+                .hasMessageContaining("current version can only be switched by archive facade");
     }
 
     @Test
-    void serviceShouldRejectPublishedSnapshotMutation() {
-        LowCodeModuleConfigVersion published = facade.publish(fullPackage("crm.contract"), "tester", "v1").version();
-        LowCodeModuleConfigVersion mutated = copyVersion(published);
+    void serviceShouldRejectArchivedSnapshotMutation() {
+        LowCodeModuleConfigVersion archived = facade.archive(fullPackage("crm.contract"), "tester", "v1").version();
+        LowCodeModuleConfigVersion mutated = copyVersion(archived);
         mutated.setPackageHash("changed");
 
         assertThatThrownBy(() -> versionService.update(mutated))
@@ -100,11 +112,28 @@ class LowCodeModuleConfigPublishFacadeTest {
                 .hasMessageContaining("packageHash cannot be changed");
     }
 
+    @Test
+    void governanceArchiveShouldNotDependOnDynamicRuntimeRefresh() throws IOException {
+        Path configSourceRoot = Path.of("src/main/java/net/ximatai/muyun/spring/platform/config");
+
+        try (var files = Files.walk(configSourceRoot)) {
+            assertThat(files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> source(path).contains("platform.runtime")
+                            || source(path).contains("DynamicModuleRefresh")
+                            || source(path).contains("DynamicModuleRuntimeRefresher"))
+                    .map(configSourceRoot::relativize)
+                    .map(Path::toString)
+                    .toList())
+                    .isEmpty();
+        }
+    }
+
     private LowCodeModuleConfigVersion rawVersion(String moduleAlias, int versionNo) {
         LowCodeModuleConfigVersion version = new LowCodeModuleConfigVersion();
         version.setModuleAlias(moduleAlias);
         version.setVersionNo(versionNo);
-        version.setVersionStatus(LowCodeConfigVersionStatus.PUBLISHED);
+        version.setVersionStatus(LowCodeConfigVersionStatus.ARCHIVED);
         version.setCurrentVersion(Boolean.FALSE);
         version.setPackageSnapshotText("{}");
         version.setPackageHash("hash");
@@ -128,9 +157,17 @@ class LowCodeModuleConfigPublishFacadeTest {
         copy.setPackageHash(source.getPackageHash());
         copy.setSummaryJson(source.getSummaryJson());
         copy.setSourceVersionId(source.getSourceVersionId());
-        copy.setPublishedBy(source.getPublishedBy());
-        copy.setPublishedAt(source.getPublishedAt());
+        copy.setArchivedBy(source.getArchivedBy());
+        copy.setArchivedAt(source.getArchivedAt());
         copy.setRemark(source.getRemark());
         return copy;
+    }
+
+    private String source(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException("cannot read source: " + path, exception);
+        }
     }
 }

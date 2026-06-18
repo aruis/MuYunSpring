@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.publish;
+package net.ximatai.muyun.spring.platform.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
@@ -8,7 +8,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
 import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicFormulaException;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
@@ -76,8 +76,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest(classes = PlatformDynamicModulePublisherIT.TestApplication.class)
-class PlatformDynamicModulePublisherIT {
+@SpringBootTest(classes = PlatformDynamicRuntimeRefresherIT.TestApplication.class)
+class PlatformDynamicRuntimeRefresherIT {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
@@ -90,21 +90,21 @@ class PlatformDynamicModulePublisherIT {
     private final DynamicSchemaService schemaService;
 
     @Autowired
-    PlatformDynamicModulePublisherIT(IDatabaseOperations<?> operations, DynamicSchemaService schemaService) {
+    PlatformDynamicRuntimeRefresherIT(IDatabaseOperations<?> operations, DynamicSchemaService schemaService) {
         this.operations = operations;
         this.schemaService = schemaService;
     }
 
     @Test
-    void shouldPublishM2PlatformConfigAndRunDynamicCrudByModuleAndMetadataAlias() {
+    void shouldRefreshM2PlatformConfigAndRunDynamicCrudByModuleAndMetadataAlias() {
         PlatformServices services = platformServices();
         services.applicationService.insert(application("crm"));
         services.moduleService.insert(module("crm.customer"));
         String categoryId = services.categoryService.insert(
                 category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
         services.itemService.insert(item("crm", "customer_status", "active"));
-        String customerMetadataId = services.metadataService.insert(metadata("crm", "customer", "platform_publish_customer_it"));
-        String contactMetadataId = services.metadataService.insert(metadata("crm", "customer_contact", "platform_publish_contact_it"));
+        String customerMetadataId = services.metadataService.insert(metadata("crm", "customer", "platform_refresh_customer_it"));
+        String contactMetadataId = services.metadataService.insert(metadata("crm", "customer_contact", "platform_refresh_contact_it"));
         services.fieldService.insert(titleField(customerMetadataId));
         services.fieldService.insert(field(customerMetadataId, "code", "code", FieldType.STRING));
         MetadataField status = field(customerMetadataId, "status", "status", FieldType.STRING);
@@ -158,7 +158,7 @@ class PlatformDynamicModulePublisherIT {
                     .containsExactly("crm.customer");
         }
         DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations, new DictionaryFieldValueValidator(services.itemService));
-        PlatformDynamicModulePublisher publisher = new PlatformDynamicModulePublisher(
+        PlatformDynamicRuntimeRefresher refresher = new PlatformDynamicRuntimeRefresher(
                 new PlatformModuleDefinitionCompiler(
                         services.moduleService,
                         services.metadataService,
@@ -171,10 +171,10 @@ class PlatformDynamicModulePublisherIT {
                         services.actionService,
                         services.formulaRuleService
                 ),
-                new DynamicModulePublisher(schemaService, runtime)
+                new DynamicModuleRuntimeRefresher(schemaService, runtime)
         );
 
-        publisher.publish("crm.customer");
+        refresher.refresh("crm.customer");
         DynamicRecordService runtimeService = new DynamicRecordService(runtime);
         DynamicEntityOperations customer = runtimeService.entity("crm.customer", "customer");
         DynamicRecord contact = runtime.newRecord("crm.customer", "customer_contact")

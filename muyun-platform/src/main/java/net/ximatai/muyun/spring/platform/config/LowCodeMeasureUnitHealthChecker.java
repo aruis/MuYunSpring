@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -13,6 +12,10 @@ import java.util.stream.Collectors;
 
 @Component
 public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthChecker {
+    private static final Set<String> NUMERIC_TYPES = Set.of("DECIMAL", "NUMERIC", "NUMBER", "INTEGER", "INT",
+            "LONG", "BIGINT");
+    private static final Set<String> TEXT_TYPES = Set.of("STRING", "TEXT", "VARCHAR", "CHAR");
+
     @Override
     public List<LowCodeConfigHealthItem> check(LowCodeModuleHealthContext context) {
         LowCodeModulePackage modulePackage = context == null ? null : context.modulePackage();
@@ -23,8 +26,9 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         if (bundle == null || bundle.content().isEmpty()) {
             return List.of();
         }
-        List<Map<String, Object>> rawFields = fields(bundle.content());
-        List<FieldContract> fields = contracts(rawFields);
+        List<FieldContract> fields = LowCodeMetadataFieldProjection.from(bundle).stream()
+                .map(this::contract)
+                .toList();
         if (fields.isEmpty()) {
             return List.of();
         }
@@ -32,6 +36,10 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 .map(FieldContract::fieldName)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Map<String, String> fieldTypes = fields.stream()
+                .filter(field -> field.fieldName() != null)
+                .filter(field -> field.fieldType() != null)
+                .collect(Collectors.toMap(FieldContract::fieldName, FieldContract::fieldType, (left, right) -> left));
         Set<String> measureDependencies = modulePackage.dependencyManifest().dependencies().stream()
                 .filter(dependency -> dependency != null && dependency.type() == LowCodePackageDependencyType.MEASURE_UNIT)
                 .map(dependency -> dependency.applicationAlias() + ":" + dependency.alias())
@@ -42,6 +50,8 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 continue;
             }
             String targetId = field.fieldName() == null ? field.unitCategoryAlias() : field.fieldName();
+            requireType(items, field.fieldType(), NUMERIC_TYPES, "MEASURE_UNIT_OWNER_NOT_NUMERIC",
+                    "measure unit field requires numeric owner", targetId);
             requireDependency(items, modulePackage.applicationAlias(), field.unitCategoryAlias(), measureDependencies, targetId);
             String baseUnitCategoryAlias = field.baseUnitCategoryAlias() == null
                     ? field.unitCategoryAlias()
@@ -51,7 +61,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
             }
             requireText(items, field.baseUnitCode(), "MEASURE_UNIT_BASE_UNIT_MISSING",
                     "measure unit field requires baseUnitCode", targetId);
-            requireBaseValueField(items, field, fieldNames, targetId);
+            requireBaseValueField(items, field, fieldNames, fieldTypes, targetId);
             if (field.unitMode() == null) {
                 items.add(error("MEASURE_UNIT_MODE_MISSING", "measure unit field requires unitMode", targetId,
                         "Set unitMode to FIXED or SELECTABLE"));
@@ -62,6 +72,9 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 requireRelatedField(items, field.unitFieldName(), fieldNames,
                         "MEASURE_UNIT_COMPANION_MISSING", "selectable measure unit field requires unit companion field",
                         targetId);
+                requireRelatedType(items, field.unitFieldName(), fieldTypes, TEXT_TYPES,
+                        "MEASURE_UNIT_COMPANION_NOT_TEXT",
+                        "measure unit companion field must be text", targetId);
             }
             requireOptionalRelatedField(items, field.conversionScopeFieldName(), fieldNames,
                     "MEASURE_UNIT_SCOPE_FIELD_MISSING", "measure unit conversion scope field is missing", targetId);
@@ -92,6 +105,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
     private void requireBaseValueField(List<LowCodeConfigHealthItem> items,
                                        FieldContract field,
                                        Set<String> fieldNames,
+                                       Map<String, String> fieldTypes,
                                        String targetId) {
         String baseValueFieldName = field.baseValueFieldName();
         String ownerFieldName = field.fieldName();
@@ -113,7 +127,11 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
             items.add(error("MEASURE_UNIT_BASE_VALUE_MISSING",
                     "measure base value field is missing from metadata fields", targetId,
                     "Include the shadow base value field in the metadata bundle"));
+            return;
         }
+        requireRelatedType(items, baseValueFieldName, fieldTypes, NUMERIC_TYPES,
+                "MEASURE_UNIT_BASE_VALUE_NOT_NUMERIC",
+                "measure base value field must be numeric", targetId);
     }
 
     private void requireRelatedField(List<LowCodeConfigHealthItem> items,
@@ -138,6 +156,30 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         }
     }
 
+    private void requireRelatedType(List<LowCodeConfigHealthItem> items,
+                                    String fieldName,
+                                    Map<String, String> fieldTypes,
+                                    Set<String> expectedTypes,
+                                    String code,
+                                    String message,
+                                    String targetId) {
+        if (fieldName == null) {
+            return;
+        }
+        requireType(items, fieldTypes.get(fieldName), expectedTypes, code, message, targetId);
+    }
+
+    private void requireType(List<LowCodeConfigHealthItem> items,
+                             String fieldType,
+                             Set<String> expectedTypes,
+                             String code,
+                             String message,
+                             String targetId) {
+        if (fieldType != null && !expectedTypes.contains(fieldType)) {
+            items.add(error(code, message, targetId, "Use a compatible metadata field type"));
+        }
+    }
+
     private void requireText(List<LowCodeConfigHealthItem> items,
                              String value,
                              String code,
@@ -159,114 +201,28 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         );
     }
 
-    private List<Map<String, Object>> fields(Map<String, Object> content) {
-        List<Map<String, Object>> fields = new ArrayList<>();
-        addFields(fields, content.get("fields"));
-        addFields(fields, content.get("metadataFields"));
-        addFields(fields, content.get("moduleFields"));
-        return List.copyOf(fields);
-    }
-
-    private List<FieldContract> contracts(List<Map<String, Object>> rawFields) {
-        Map<String, String> fieldNameById = rawFields.stream()
-                .filter(field -> text(field, "id") != null || text(field, "metadataFieldId") != null)
-                .filter(field -> text(field, "fieldName") != null)
-                .collect(Collectors.toMap(
-                        this::fieldIdentity,
-                        field -> text(field, "fieldName"),
-                        (left, right) -> left
-                ));
-        return rawFields.stream()
-                .map(field -> contract(field, fieldNameById))
-                .toList();
-    }
-
-    @SuppressWarnings("unchecked")
-    private FieldContract contract(Map<String, Object> field, Map<String, String> fieldNameById) {
-        Map<String, Object> measureUnit = field.get("measureUnit") instanceof Map<?, ?> map
-                ? normalizeMap(map)
-                : Map.of();
-        String ownerFieldId = firstText(field, measureUnit, "metadataFieldId", "id");
+    private FieldContract contract(LowCodeMetadataFieldProjection field) {
+        Map<String, Object> measureUnit = field.nested("measureUnit");
         return new FieldContract(
-                firstNonBlank(text(field, "fieldName"), fieldNameById.get(ownerFieldId)),
-                ownerFieldId,
-                firstText(field, measureUnit, "unitCategoryAlias", "categoryAlias"),
-                firstText(field, measureUnit, "unitMode", "mode"),
-                firstText(field, measureUnit, "fixedUnitCode"),
-                firstText(field, measureUnit, "baseUnitCategoryAlias"),
-                firstText(field, measureUnit, "baseUnitCode"),
-                relatedFieldName(field, measureUnit, fieldNameById, "unitFieldName", "unitFieldId"),
-                relatedFieldName(field, measureUnit, fieldNameById, "baseValueFieldName", "baseValueFieldId"),
-                firstText(field, measureUnit, "baseValueFieldId"),
-                relatedFieldName(field, measureUnit, fieldNameById, "conversionScopeFieldName", "conversionScopeFieldId")
+                field.fieldName(),
+                field.ownerFieldId(),
+                field.runtimeFieldType(),
+                field.firstText(measureUnit, "unitCategoryAlias", "categoryAlias"),
+                field.firstText(measureUnit, "unitMode", "mode"),
+                field.firstText(measureUnit, "fixedUnitCode"),
+                field.firstText(measureUnit, "baseUnitCategoryAlias"),
+                field.firstText(measureUnit, "baseUnitCode"),
+                field.relatedFieldName(measureUnit, "unitFieldName", "unitFieldId"),
+                field.relatedFieldName(measureUnit, "baseValueFieldName", "baseValueFieldId"),
+                field.firstText(measureUnit, "baseValueFieldId"),
+                field.relatedFieldName(measureUnit, "conversionScopeFieldName", "conversionScopeFieldId")
         );
-    }
-
-    private String fieldIdentity(Map<String, Object> field) {
-        String id = text(field, "id");
-        return id == null ? text(field, "metadataFieldId") : id;
-    }
-
-    private String relatedFieldName(Map<String, Object> field,
-                                    Map<String, Object> measureUnit,
-                                    Map<String, String> fieldNameById,
-                                    String nameKey,
-                                    String idKey) {
-        String fieldName = firstText(field, measureUnit, nameKey);
-        if (fieldName != null) {
-            return fieldName;
-        }
-        String fieldId = firstText(field, measureUnit, idKey);
-        return fieldId == null ? null : fieldNameById.get(fieldId);
-    }
-
-    private String firstText(Map<String, Object> field, Map<String, Object> measureUnit, String... keys) {
-        for (String key : keys) {
-            String value = text(field, key);
-            if (value != null) {
-                return value;
-            }
-            value = text(measureUnit, key);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String firstNonBlank(String first, String second) {
-        return first != null ? first : second;
-    }
-
-    private void addFields(List<Map<String, Object>> fields, Object value) {
-        if (!(value instanceof List<?> list)) {
-            return;
-        }
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> map) {
-                fields.add(normalizeMap(map));
-            }
-        }
-    }
-
-    private Map<String, Object> normalizeMap(Map<?, ?> map) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            if (entry.getKey() instanceof String key) {
-                normalized.put(key, entry.getValue());
-            }
-        }
-        return normalized;
-    }
-
-    private String text(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value == null || value.toString().isBlank() ? null : value.toString().trim();
     }
 
     private record FieldContract(
             String fieldName,
             String ownerFieldId,
+            String fieldType,
             String unitCategoryAlias,
             String unitMode,
             String fixedUnitCode,

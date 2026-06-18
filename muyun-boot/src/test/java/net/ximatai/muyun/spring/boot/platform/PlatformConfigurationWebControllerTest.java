@@ -6,6 +6,9 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
@@ -26,8 +29,6 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilter;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldFilterService;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRule;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleService;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareCommand;
-import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataMeasureUnitPrepareResult;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeAttribute;
@@ -44,6 +45,7 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshService;
 import net.ximatai.muyun.spring.platform.ui.PlatformPageConfigPublishService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
@@ -59,8 +61,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.HandlerMapping;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -95,6 +102,40 @@ class PlatformConfigurationWebControllerTest {
                 .andExpect(jsonPath("$.records[0].children[0].record.id").value("platform.sales.order"));
 
         verify(service).rootModules("platform");
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeThroughModuleConfigurationEndpoint() throws Exception {
+        PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
+        when(refreshService.refresh("crm.contract")).thenReturn(runtimeRefreshResult(false));
+        PlatformModuleWebController controller = new PlatformModuleWebController(refreshService);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(post("/platform.module/crm.contract/runtime/refresh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.module.moduleAlias").value("crm.contract"))
+                    .andExpect(jsonPath("$.dryRun").value(false));
+        }
+
+        verify(refreshService).refresh("crm.contract");
+    }
+
+    @Test
+    void shouldPreviewRefreshDynamicRuntimeThroughDryRunEndpoint() throws Exception {
+        PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
+        when(refreshService.previewRefresh("crm.contract")).thenReturn(runtimeRefreshResult(true));
+        PlatformModuleWebController controller = new PlatformModuleWebController(refreshService);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(post("/platform.module/crm.contract/runtime/preview-refresh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.module.moduleAlias").value("crm.contract"))
+                    .andExpect(jsonPath("$.dryRun").value(true));
+        }
+
+        verify(refreshService).previewRefresh("crm.contract");
     }
 
     @Test
@@ -184,61 +225,21 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
-    void shouldPrepareMeasureUnitFieldsFromModuleFieldPath() throws Exception {
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        PlatformModuleMetadataFieldWebController controller =
-                new PlatformModuleMetadataFieldWebController(relationService);
-        ReflectionTestUtils.setField(controller, "service", fieldService);
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId("rel-1");
-        relation.setModuleAlias("platform.sales.order");
-        when(relationService.select("rel-1")).thenReturn(relation);
-        ModuleMetadataField moduleField = new ModuleMetadataField();
-        moduleField.setId("field-1");
-        moduleField.setRelationId("rel-1");
-        moduleField.setMetadataFieldId("quantity-field");
-        when(fieldService.select("field-1")).thenReturn(moduleField);
-        when(fieldService.prepareMeasureUnitConfig(eq("field-1"), any(ModuleMetadataMeasureUnitPrepareCommand.class)))
-                .thenReturn(new ModuleMetadataMeasureUnitPrepareResult(moduleField, null, null));
+    void shouldNotExposeFieldCapabilityPrepareEndpoints() {
+        List<String> paths = Stream.concat(
+                        Stream.of(PlatformModuleMetadataFieldWebController.class.getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class))
+                                .filter(Objects::nonNull)
+                                .flatMap(this::mappingValues),
+                        Stream.of(PlatformModuleMetadataFieldWebController.class.getMethods())
+                                .flatMap(this::mappingValues)
+                )
+                .toList();
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-        mvc.perform(post("/platform.module/platform.sales.order/metadata-relations/rel-1/fields/field-1/measure-unit/prepare")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"unitCategoryAlias\":\"package\",\"baseUnitCode\":\"bottle\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.moduleField.id").value("field-1"));
-
-        verify(fieldService).prepareMeasureUnitConfig(eq("field-1"), argThat(command ->
-                "package".equals(command.unitCategoryAlias()) && "bottle".equals(command.baseUnitCode())));
-    }
-
-    @Test
-    void shouldRejectPrepareMeasureUnitWhenModuleFieldBelongsToOtherRelation() {
-        ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        PlatformModuleMetadataFieldWebController controller =
-                new PlatformModuleMetadataFieldWebController(relationService);
-        ReflectionTestUtils.setField(controller, "service", fieldService);
-        ModuleMetadataRelation relation = new ModuleMetadataRelation();
-        relation.setId("rel-1");
-        relation.setModuleAlias("platform.sales.order");
-        when(relationService.select("rel-1")).thenReturn(relation);
-        ModuleMetadataField moduleField = new ModuleMetadataField();
-        moduleField.setId("field-1");
-        moduleField.setRelationId("other-rel");
-        when(fieldService.select("field-1")).thenReturn(moduleField);
-
-        MockHttpServletRequest request = requestVars(Map.of(
-                "moduleAlias", "platform.sales.order",
-                "relationId", "rel-1"));
-
-        assertThatThrownBy(() -> controller.prepareMeasureUnit(request, "field-1",
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package", null, null, null, null, null,
-                        null, "bottle", null, null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("does not belong to relation");
+        assertThat(paths)
+                .noneMatch(path -> path.contains("measure-unit/prepare")
+                        || path.contains("money/prepare")
+                        || path.contains("/capabilities/")
+                        || path.contains("{capability}"));
     }
 
     @Test
@@ -944,6 +945,13 @@ class PlatformConfigurationWebControllerTest {
         verify(service).publishUiConfig("ui-config-1");
     }
 
+    private DynamicModuleRefreshResult runtimeRefreshResult(boolean dryRun) {
+        return new DynamicModuleRefreshResult(
+                new ModuleDefinition("crm.contract", "Contract", List.of()),
+                Map.of(),
+                dryRun);
+    }
+
     private PlatformModule module(String id, String applicationAlias, String parentId) {
         PlatformModule module = new PlatformModule();
         module.setId(id);
@@ -1072,5 +1080,30 @@ class PlatformConfigurationWebControllerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, variables);
         return request;
+    }
+
+    private Stream<String> mappingValues(Method method) {
+        return Stream.of(
+                        method.getAnnotation(org.springframework.web.bind.annotation.GetMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.PostMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.PutMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.DeleteMapping.class),
+                        method.getAnnotation(org.springframework.web.bind.annotation.RequestMapping.class)
+                )
+                .filter(Objects::nonNull)
+                .flatMap(this::mappingValues);
+    }
+
+    private Stream<String> mappingValues(Annotation annotation) {
+        return Stream.concat(annotationStringArray(annotation, "value"), annotationStringArray(annotation, "path"));
+    }
+
+    private Stream<String> annotationStringArray(Annotation annotation, String methodName) {
+        try {
+            Method method = annotation.annotationType().getMethod(methodName);
+            return Arrays.stream((String[]) method.invoke(annotation));
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Unable to read mapping annotation " + methodName, ex);
+        }
     }
 }

@@ -8,9 +8,13 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
@@ -21,13 +25,47 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     private final MetadataService metadataService;
     private final PlatformFieldTypeService fieldTypeService;
+    private final ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider;
+    private final ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider;
 
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService) {
+        this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null));
+    }
+
+    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
+                                MetadataService metadataService,
+                                PlatformFieldTypeService fieldTypeService,
+                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
+        this(fieldDao, metadataService, fieldTypeService, provider(runtimeRefreshCoordinator == null
+                ? null
+                : runtimeRefreshCoordinator.orElse(null)), provider(null));
+    }
+
+    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
+                                MetadataService metadataService,
+                                PlatformFieldTypeService fieldTypeService,
+                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator,
+                                Optional<PlatformMetadataSchemaEnsureService> schemaEnsureService) {
+        this(fieldDao, metadataService, fieldTypeService,
+                provider(runtimeRefreshCoordinator == null ? null : runtimeRefreshCoordinator.orElse(null)),
+                provider(schemaEnsureService == null ? null : schemaEnsureService.orElse(null)));
+    }
+
+    @Autowired
+    public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
+                                MetadataService metadataService,
+                                PlatformFieldTypeService fieldTypeService,
+                                ObjectProvider<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinatorProvider,
+                                ObjectProvider<PlatformMetadataSchemaEnsureService> schemaEnsureServiceProvider) {
         super(MODULE_ALIAS, MetadataField.class, fieldDao);
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
+        this.runtimeRefreshCoordinatorProvider = Objects.requireNonNull(runtimeRefreshCoordinatorProvider,
+                "runtimeRefreshCoordinatorProvider must not be null");
+        this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
+                "schemaEnsureServiceProvider must not be null");
     }
 
     @Override
@@ -50,6 +88,38 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         if (!java.util.Objects.equals(left.getMetadataId(), right.getMetadataId())) {
             throw new PlatformException("Metadata field sort can only move records within the same metadata");
         }
+    }
+
+    @Override
+    public void afterInsert(String id, MetadataField field) {
+        PlatformMetadataSchemaEnsureService schemaEnsureService = schemaEnsureService();
+        if (schemaEnsureService != null) {
+            schemaEnsureService.ensure(field.getMetadataId());
+        }
+    }
+
+    @Override
+    public void afterUpdate(MetadataField field, int updated) {
+        PlatformMetadataSchemaEnsureService schemaEnsureService = schemaEnsureService();
+        if (updated > 0 && schemaEnsureService != null) {
+            schemaEnsureService.ensure(field.getMetadataId());
+        }
+    }
+
+    @Override
+    public void afterChanged(MetadataField field) {
+        PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator = runtimeRefreshCoordinator();
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByMetadataField(field);
+        }
+    }
+
+    private PlatformMetadataSchemaEnsureService schemaEnsureService() {
+        return schemaEnsureServiceProvider.getIfAvailable();
+    }
+
+    private PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator() {
+        return runtimeRefreshCoordinatorProvider.getIfAvailable();
     }
 
     private void normalizeAndValidate(MetadataField field) {
@@ -158,5 +228,29 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
             throw new PlatformException("Metadata field requires existing metadata: " + metadataId);
         }
         return metadata;
+    }
+
+    private static <T> ObjectProvider<T> provider(T value) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject(Object... args) {
+                return value;
+            }
+
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+
+            @Override
+            public T getIfUnique() {
+                return value;
+            }
+
+            @Override
+            public T getObject() {
+                return value;
+            }
+        };
     }
 }

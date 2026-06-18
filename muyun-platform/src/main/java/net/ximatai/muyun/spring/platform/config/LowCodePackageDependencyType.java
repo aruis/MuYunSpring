@@ -4,6 +4,8 @@ public enum LowCodePackageDependencyType {
     MODULE,
     DICTIONARY,
     MEASURE_UNIT,
+    CURRENCY,
+    EXCHANGE_RATE_TYPE,
     ACTION,
     WORKFLOW,
     FILE_SERVICE,
@@ -11,7 +13,7 @@ public enum LowCodePackageDependencyType {
 
     public boolean platformResolvedByDefault() {
         return switch (this) {
-            case MODULE, DICTIONARY, MEASURE_UNIT, ACTION -> true;
+            case MODULE, DICTIONARY, MEASURE_UNIT, CURRENCY, EXCHANGE_RATE_TYPE, ACTION -> true;
             case WORKFLOW, FILE_SERVICE, EXTERNAL -> false;
         };
     }

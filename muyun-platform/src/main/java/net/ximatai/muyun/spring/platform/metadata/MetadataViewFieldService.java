@@ -11,11 +11,13 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataViewFieldService extends AbstractAbilityService<MetadataViewField> implements
@@ -31,6 +33,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
     private final ModuleMetadataRelationService relationService;
     private final PlatformFieldUiTypeService fieldUiTypeService;
     private final PlatformFieldTypeService fieldTypeService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
                                     MetadataViewService viewService,
@@ -46,12 +49,25 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
                                     ModuleMetadataRelationService relationService,
                                     PlatformFieldUiTypeService fieldUiTypeService,
                                     PlatformFieldTypeService fieldTypeService) {
+        this(viewFieldDao, viewService, fieldService, relationService, fieldUiTypeService, fieldTypeService,
+                Optional.empty());
+    }
+
+    @Autowired
+    public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
+                                    MetadataViewService viewService,
+                                    MetadataFieldService fieldService,
+                                    ModuleMetadataRelationService relationService,
+                                    PlatformFieldUiTypeService fieldUiTypeService,
+                                    PlatformFieldTypeService fieldTypeService,
+                                    Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataViewField.class, viewFieldDao);
         this.viewService = viewService;
         this.fieldService = fieldService;
         this.relationService = relationService;
         this.fieldUiTypeService = fieldUiTypeService;
         this.fieldTypeService = fieldTypeService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -73,6 +89,13 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
     public void validateSortScope(MetadataViewField left, MetadataViewField right) {
         if (!Objects.equals(left.getViewId(), right.getViewId())) {
             throw new PlatformException("Metadata view field sort can only move records within the same view");
+        }
+    }
+
+    @Override
+    public void afterChanged(MetadataViewField viewField) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByMetadataViewField(viewField);
         }
     }
 

@@ -2,7 +2,9 @@ package net.ximatai.muyun.spring.platform.code;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.ObjectProvider;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -13,8 +15,8 @@ import java.util.Objects;
 
 @Service
 public class CodeBusinessTimeService {
-    private final Clock clock;
-    private final List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers;
+    private final PlatformTimeService platformTimeService;
+    private final List<BusinessTimeZoneResolver> organizationTimeZoneResolvers;
 
     public CodeBusinessTimeService() {
         this(Clock.systemDefaultZone(), List.of());
@@ -25,42 +27,63 @@ public class CodeBusinessTimeService {
     }
 
     public CodeBusinessTimeService(Clock clock, List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
-        this.clock = clock == null ? Clock.systemDefaultZone() : clock;
-        this.organizationTimeZoneResolvers = organizationTimeZoneResolvers == null
-                ? List.of()
-                : List.copyOf(organizationTimeZoneResolvers);
+        this(new PlatformTimeService(clock), organizationTimeZoneResolvers);
+    }
+
+    public CodeBusinessTimeService(PlatformTimeService platformTimeService) {
+        this(platformTimeService, List.of());
     }
 
     @Autowired
-    public CodeBusinessTimeService(ObjectProvider<Clock> clockProvider,
+    public CodeBusinessTimeService(PlatformTimeService platformTimeService,
                                    List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
-        this(clockProvider == null ? null : clockProvider.getIfAvailable(), organizationTimeZoneResolvers);
+        this.platformTimeService = platformTimeService == null ? new PlatformTimeService() : platformTimeService;
+        this.organizationTimeZoneResolvers = adapters(organizationTimeZoneResolvers);
     }
 
     public LocalDateTime resolveBusinessLocalDateTime(String organizationId, LocalDateTime explicitAt) {
         if (explicitAt != null) {
             return explicitAt;
         }
-        return resolveBusinessLocalDateTime(organizationId, clock.instant());
+        return resolveBusinessLocalDateTime(organizationId, platformTimeService.now());
     }
 
     public LocalDateTime resolveBusinessLocalDateTime(String organizationId, Instant instant) {
-        Instant effectiveInstant = instant == null ? clock.instant() : instant;
-        return LocalDateTime.ofInstant(effectiveInstant, resolveZoneId(organizationId));
-    }
-
-    private ZoneId resolveZoneId(String organizationId) {
-        if (organizationId != null && !organizationId.isBlank()) {
-            for (CodeOrganizationTimeZoneResolver resolver : organizationTimeZoneResolvers) {
-                java.util.Optional<ZoneId> candidate = resolver.resolveZoneId(organizationId);
-                ZoneId resolved = (candidate == null ? java.util.Optional.<ZoneId>empty() : candidate)
-                        .filter(Objects::nonNull)
-                        .orElse(null);
-                if (resolved != null) {
-                    return resolved;
-                }
+        BusinessTimeContext context = BusinessTimeContext.ofOrganization(organizationId);
+        for (BusinessTimeZoneResolver resolver : organizationTimeZoneResolvers) {
+            java.util.Optional<ZoneId> resolved = resolver.resolveZoneId(context);
+            ZoneId zoneId = (resolved == null ? java.util.Optional.<ZoneId>empty() : resolved)
+                    .filter(Objects::nonNull)
+                    .orElse(null);
+            if (zoneId != null) {
+                context = context.withZone(zoneId);
+                break;
             }
         }
-        return clock.getZone();
+        return platformTimeService.resolveBusinessLocalDateTime(
+                context,
+                instant
+        );
+    }
+
+    private static List<BusinessTimeZoneResolver> adapters(
+            List<CodeOrganizationTimeZoneResolver> organizationTimeZoneResolvers) {
+        if (organizationTimeZoneResolvers == null || organizationTimeZoneResolvers.isEmpty()) {
+            return List.of();
+        }
+        return List.copyOf(organizationTimeZoneResolvers).stream()
+                .map(CodeBusinessTimeService::adapter)
+                .toList();
+    }
+
+    private static BusinessTimeZoneResolver adapter(CodeOrganizationTimeZoneResolver resolver) {
+        return context -> {
+            if (context == null || context.organizationId() == null || context.organizationId().isBlank()) {
+                return java.util.Optional.empty();
+            }
+            java.util.Optional<ZoneId> candidate = resolver.resolveZoneId(context.organizationId());
+            return (candidate == null ? java.util.Optional.<ZoneId>empty() : candidate)
+                    .filter(Objects::nonNull);
+        };
     }
 }

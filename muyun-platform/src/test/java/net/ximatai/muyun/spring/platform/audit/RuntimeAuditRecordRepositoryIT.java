@@ -61,7 +61,7 @@ class RuntimeAuditRecordRepositoryIT {
                         PageRequest.of(1, 10))
                 .getFirst();
         assertThat(record.getTenantId()).isEqualTo("tenant-it");
-        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.MODULE_REFRESHED);
         assertThat(record.getModuleAlias()).isEqualTo("sales.contract");
         assertThat(record.getEntityAlias()).isNull();
         assertThat(record.getPayloadText()).contains("changed=true");
@@ -121,7 +121,7 @@ class RuntimeAuditRecordRepositoryIT {
         return new RuntimeEvent(
                 eventId,
                 "audit-it-trace",
-                RuntimeEventType.MODULE_PUBLISHED,
+                RuntimeEventType.MODULE_REFRESHED,
                 "sales.contract",
                 null,
                 null,

@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.dynamic.publish;
+package net.ximatai.muyun.spring.dynamic.refresh;
 
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
@@ -15,39 +15,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class DynamicModulePublisher {
+public class DynamicModuleRuntimeRefresher {
     private final DynamicSchemaService schemaService;
     private final DynamicRecordRuntime runtime;
 
-    public DynamicModulePublisher(DynamicSchemaService schemaService, DynamicRecordRuntime runtime) {
+    public DynamicModuleRuntimeRefresher(DynamicSchemaService schemaService, DynamicRecordRuntime runtime) {
         this.schemaService = Objects.requireNonNull(schemaService, "schemaService must not be null");
         this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
     }
 
-    public DynamicModulePublishResult publish(ModuleDefinition module) {
-        return publish(module, MigrationOptions.execute());
+    public DynamicModuleRefreshResult refresh(ModuleDefinition module) {
+        return refresh(module, MigrationOptions.execute());
     }
 
-    public DynamicModulePublishResult preview(ModuleDefinition module) {
-        return publish(module, MigrationOptions.dryRun());
+    public DynamicModuleRefreshResult previewRefresh(ModuleDefinition module) {
+        return refresh(module, MigrationOptions.dryRun());
     }
 
-    public DynamicModulePublishResult publish(ModuleDefinition module, MigrationOptions options) {
+    public DynamicModuleRefreshResult refresh(ModuleDefinition module, MigrationOptions options) {
         MigrationOptions safeOptions = options == null ? MigrationOptions.execute() : options;
         ModuleDefinition previousModule = runtime.registry().findModule(module.moduleAlias()).orElse(null);
         Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, safeOptions);
         if (!safeOptions.isDryRun()) {
-            runtime.publish(module);
+            runtime.refresh(module);
             publishModuleEvent(module, migrations);
         }
-        return new DynamicModulePublishResult(module, migrations, safeOptions.isDryRun());
+        return new DynamicModuleRefreshResult(module, migrations, safeOptions.isDryRun());
     }
 
     private void publishModuleEvent(ModuleDefinition module, Map<String, MigrationResult> migrations) {
-        DynamicModulePublishResult result = new DynamicModulePublishResult(module, migrations, false);
-        String systemReason = TenantContext.systemReason().orElse("dynamic module publication");
+        DynamicModuleRefreshResult result = new DynamicModuleRefreshResult(module, migrations, false);
+        String systemReason = TenantContext.systemReason().orElse("dynamic module refresh");
         runtime.eventPublisher().publishAfterCommit(RuntimeEvent.of(
-                RuntimeEventType.MODULE_PUBLISHED,
+                RuntimeEventType.MODULE_REFRESHED,
                 module.moduleAlias(),
                 null,
                 null,

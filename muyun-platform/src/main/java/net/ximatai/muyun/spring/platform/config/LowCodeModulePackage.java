@@ -13,7 +13,7 @@ public record LowCodeModulePackage(
         String moduleAlias,
         List<LowCodeConfigBundle> bundles,
         LowCodePackageDependencyManifest dependencyManifest,
-        LowCodePackagePublishManifest publishManifest
+        LowCodePackageExchangeManifest exchangeManifest
 ) {
     public LowCodeModulePackage {
         protocolVersion = requireText(protocolVersion, "protocolVersion");
@@ -24,9 +24,9 @@ public record LowCodeModulePackage(
         dependencyManifest = dependencyManifest == null
                 ? LowCodePackageDependencyManifest.empty()
                 : dependencyManifest;
-        publishManifest = publishManifest == null
-                ? LowCodePackagePublishManifest.draft(protocolVersion)
-                : publishManifest;
+        exchangeManifest = exchangeManifest == null
+                ? LowCodePackageExchangeManifest.draft(protocolVersion)
+                : exchangeManifest;
     }
 
     public Map<LowCodePackageBundleType, LowCodeConfigBundle> bundleMap() {

@@ -20,6 +20,7 @@
 | UI 字段配置 | `PlatformUiConfigFieldService` | `/platform.ui-config/{uiConfigId}/fields` |
 | 查询模板 | `PlatformQueryTemplateService` | `/platform.module/{moduleAlias}/query-templates` |
 | 查询项 | `PlatformQueryItemService` | `/platform.query-template/{queryTemplateId}/items` |
+| 动态运行态刷新 | `PlatformDynamicRuntimeRefreshService` | `/platform.module/{moduleAlias}/runtime` |
 | 页面配置发布 | `PlatformPageConfigPublishService` | `/platform.page_config_publish` |
 | 字段引用配置 | `MetadataFieldReferenceConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/reference-configs` |
 | 字段保护配置 | `MetadataFieldProtectionConfigService` | `/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs` |
@@ -64,6 +65,8 @@
 | 模块 | `POST` | `/platform.module/sort/{id}` | 在应用内调整模块树位置 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}` | 获取指定应用下的模块树 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}/{parentId}` | 获取指定父模块下的子树或扁平列表 |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/preview-refresh` | 预览把当前模块配置编译并同步到动态运行态的 schema 变更；dry-run，不更新运行态 registry |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/refresh` | 把当前模块配置编译为 `ModuleDefinition`，必要时执行 schema ensure，并刷新 `DynamicRecordRuntime` registry |
 | 元数据 | `POST` | `/platform.metadata/query` | 查询元数据列表，支持按应用、别名、物理表等字段过滤 |
 | 元数据 | `GET` | `/platform.metadata/view/{id}` | 查看元数据 |
 | 元数据 | `POST` | `/platform.metadata/insert` | 新增元数据 |
@@ -189,7 +192,7 @@
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/sort/{id}` | 在同一规则作用域内调整规则顺序 |
 | 换算规则 | `POST` | `/platform.application/{applicationAlias}/measure-unit-conversion-rules/convert` | 按应用、模块和记录上下文预览业务硬换算 |
 
-计量单位验收优先使用换算预览接口，不需要先发布动态模块。
+计量单位验收优先使用换算预览接口，不依赖动态模块运行态刷新。
 
 同分类线性换算请求示例：
 
@@ -221,7 +224,7 @@
 
 ## 币种与汇率
 
-币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护和基础折算；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置维护 API 暂不提供金额字段一键配置、配置包健康检查和导入导出金额列联动。
+币种与汇率是平台金额口径的基础维护面。当前阶段提供币种目录、租户本位币、汇率类型、汇率维护、基础折算和模块字段配置中的金额字段契约；金额字段运行态可通过 `FieldDefinition.money` 接入动态记录保存归一。配置包健康检查已经覆盖基础金额字段契约和依赖声明，导入导出金额列联动属于后续能力。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
@@ -320,56 +323,11 @@
 
 模块聚合接口只处理天然归属模块的配置。请求体里即使传入 `moduleAlias` 或 `relationId`，后端也以 URL 路径为准，并校验存量记录不能跨模块操作。
 
-模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时必须绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 必须绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
+模块字段配置可声明计量单位消费契约。主数值字段通过 `unitCategoryAlias` 进入单位能力；`unitMode=FIXED` 时使用 `fixedUnitCode`，`unitMode=SELECTABLE` 时绑定同元数据、同 owner 的伴生单位字段 `unitFieldId`。`baseValueFieldId` 绑定同 owner 的影子标准值字段，`baseUnitCategoryAlias` 和 `baseUnitCode` 是归一基准单位，未配置基准分类时默认等于 `unitCategoryAlias`；`unitConversionMode` 表达线性目录换算或业务规则换算，`conversionScopeFieldId` 用于后续记录上下文换算。
 
-模块字段配置提供单位字段准备动作。该动作以模块字段配置记录 `id` 为入口，自动准备可选单位伴生字段和标准值影子字段，并回填模块字段上的单位消费配置。固定单位模式不强制创建伴生单位字段；标准值影子字段始终会被准备。
+模块字段配置也可声明金额消费契约。主金额字段通过 `moneyCurrencyMode` 进入金额能力；`FIXED` 时使用 `moneyFixedCurrencyCode`，`SELECTABLE` 时绑定同元数据、同 owner 的币种伴生字段 `moneyCurrencyFieldId`。`moneyBaseAmountFieldId` 是动态保存时写入的本位金额影子字段；`moneyBaseCurrencyCode` 可固定本位币，未配置时运行态按租户本位币设置解析；`moneyRateTypeCode` 必填；`moneyRateDateFieldId` 可绑定业务日期字段；`moneyExchangeRateFieldId` 可选，用于保存本次折算汇率。
 
-管理端可以按两种方式配置计量单位字段：
-
-1. 使用 `fields/{id}/measure-unit/prepare`，由平台按主数值字段自动创建或复用单位伴生字段、标准值影子字段，并回填当前模块字段配置。
-2. 使用 `fields/update/{id}`，保存已存在的 `unitFieldId`、`baseValueFieldId`、`conversionScopeFieldId` 等绑定关系。标准更新不是局部 patch，管理端应先读取 `view/{id}`，合并计量单位字段后提交完整模块字段配置。
-
-`measure-unit/prepare` 请求体为 `ModuleMetadataMeasureUnitPrepareCommand`：
-
-| 字段 | 说明 |
-| --- | --- |
-| `unitCategoryAlias` | 必填，主业务值使用的单位分类 alias |
-| `unitMode` | `SELECTABLE` 或 `FIXED`，为空时默认 `SELECTABLE` |
-| `fixedUnitCode` | 固定单位模式必填 |
-| `defaultUnitCode` | 可选单位模式的默认单位；固定单位模式未传时默认等于 `fixedUnitCode` |
-| `unitFieldName` | 可选单位模式下准备的伴生字段名，默认 `<ownerFieldName>Unit` |
-| `baseValueFieldName` | 准备的标准值影子字段名，默认 `<ownerFieldName>Base` |
-| `baseUnitCategoryAlias` | 标准值单位分类，空时默认等于 `unitCategoryAlias` |
-| `baseUnitCode` | 必填，标准值使用的基准单位 code |
-| `unitConversionMode` | `LINEAR` 或 `BUSINESS_RULE`，为空时默认 `LINEAR` |
-| `conversionScopeFieldId` | 可选，业务硬换算的记录上下文字段 |
-| `unitRequired` | 可选，单位是否必填；为空时按后端默认值处理 |
-| `unitFieldTypeAlias` | 伴生单位字段类型，默认 `string` |
-| `baseValueFieldTypeAlias` | 标准值影子字段类型，默认等于主数值字段类型 |
-
-返回体为 `ModuleMetadataMeasureUnitPrepareResult`：
-
-| 字段 | 说明 |
-| --- | --- |
-| `moduleField` | 已回填计量单位契约的模块字段配置 |
-| `unitField` | 可选单位模式下创建或复用的单位伴生元数据字段；固定单位模式为空 |
-| `baseValueField` | 创建或复用的标准值影子元数据字段 |
-
-典型请求：
-
-```json
-{
-  "unitCategoryAlias": "package",
-  "unitMode": "SELECTABLE",
-  "defaultUnitCode": "box",
-  "unitFieldName": "quantityUnit",
-  "baseValueFieldName": "quantityBase",
-  "baseUnitCategoryAlias": "package",
-  "baseUnitCode": "bottle",
-  "unitConversionMode": "BUSINESS_RULE",
-  "unitRequired": true
-}
-```
+计量单位和金额配置都通过标准 `fields/insert`、`fields/update/{id}` 保存并立即生效，不提供计量单位或金额字段能力专用 prepare/ensure Web 入口。保存时如缺少必需的伴生/影子字段，平台会按默认命名自动创建或复用，并同步当前 relation 下的模块字段配置：可选计量单位会补单位伴生字段，计量单位始终补标准值影子字段；可选金额会补币种伴生字段，金额始终补本位金额影子字段。固定单位/固定币种不创建伴生字段。汇率影子字段是可选绑定，平台只在请求中传入已有 `moneyExchangeRateFieldId` 时校验和使用它。
 
 | 对象 | 方法 | URL | 功能点 |
 | --- | --- | --- | --- |
@@ -402,7 +360,6 @@
 | 元数据视图字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields/sort/{id}` | 在视图内调整字段顺序 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/query` | 查询关系下的模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/ensure` | 按元数据字段同步生成模块字段配置 |
-| 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/{id}/measure-unit/prepare` | 为主数值字段准备单位伴生字段、标准值影子字段并回填计量单位配置 |
 | 模块字段 | `GET` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/view/{id}` | 查看模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/insert` | 新增模块字段配置 |
 | 模块字段 | `POST` | `/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields/update/{id}` | 更新模块字段配置 |
@@ -483,15 +440,15 @@
 
 上述两个 URL 是已存在的菜单消费/页面入口：`MenuWebController` 提供 `/mine`，`DynamicPageBootstrapWebController` 提供 `/{menuId}/entry`。它们不等同于菜单方案或菜单节点的配置维护接口。
 
-## 发布后的消费入口
+## 刷新后的消费入口
 
-动态模块发布后，运行态 Web 入口使用业务根路径 `/{moduleAlias}`。这里是配置发布后的消费面，不是配置维护面；完整接口清单归属运行态专题。
+动态模块刷新到运行态后，运行态 Web 入口使用业务根路径 `/{moduleAlias}`。这里是配置刷新后的消费面，不是配置维护面；完整接口清单归属运行态专题。
 
 | 方法 | URL | 功能点 |
 | --- | --- | --- |
 | `GET` | `/{moduleAlias}/describe` | 读取动态模块运行态描述 |
 
-页面配置和查询模板发布通过 `/platform.page_config_publish` 完成；动态模块定义发布和配置包治理仍归属配置治理专题。
+动态运行态刷新通过 `/platform.module/{moduleAlias}/runtime/refresh` 完成，返回 `DynamicModuleRefreshResult`。它表达“当前配置同步到运行态”，不是配置包定稿、归档或跨环境迁移版本；配置包版本归档、指针切换、导入 dry-run 仍归属配置治理专题。影响 `ModuleDefinition` 编译结果的配置保存后会自动刷新受影响动态模块，事务提交后执行，无事务时立即执行：模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变化后引用该 metadata 的所有动态模块。页面配置和查询模板发布通过 `/platform.page_config_publish` 完成，保留“用户可见生效/取消生效”的发布语义，UI/query 普通保存不触发 runtime refresh。
 
 ## 关联专题入口
 
@@ -499,7 +456,7 @@
 | --- | --- |
 | 运行态 | `/{moduleAlias}` 下的查询、保存、动作、引用和 OpenAPI |
 | 页面交付 | 菜单 entry bootstrap、页面偏好、查询模板、表单保存和附件关系 |
-| 配置治理 | 配置包、健康检查、版本发布、回滚、导入 dry-run 和模板复用 |
+| 配置治理 | 配置包、健康检查、版本归档、指针切换、导入 dry-run 和模板复用 |
 
 ## 命名提醒
 

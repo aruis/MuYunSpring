@@ -116,7 +116,7 @@ class DynamicExchangeTemplatePlanBuilderTest {
     }
 
     @Test
-    void shouldSkipZonedTimestampCompanionAndMapOwnerAsDateTimeWithTimeZone() {
+    void shouldExposeZonedTimestampCompanionAndMapOwnerAsDateTimeWithTimeZone() {
         DynamicModuleDescriptor descriptor = DynamicModuleDescriptor.from(new ModuleDefinition(
                 "sales.meeting",
                 "Meeting",
@@ -131,8 +131,9 @@ class DynamicExchangeTemplatePlanBuilderTest {
 
         assertThat(sheet.columns())
                 .extracting(ExcelColumnPlan::fieldName)
-                .containsExactly("relateId", "meetingAt", "subject");
+                .containsExactly("relateId", "meetingAt", "meetingAtTimeZone", "subject");
         assertThat(sheet.columns().get(1).valueType()).isEqualTo(ExcelValueType.DATE_TIME_WITH_TIME_ZONE);
+        assertThat(sheet.columns().get(2).valueType()).isEqualTo(ExcelValueType.TEXT);
     }
 
     @Test

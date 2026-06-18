@@ -66,7 +66,7 @@ public class LowCodePackageDependencyDiagnostics {
             case MODULE -> dependency.moduleAlias();
             case ACTION -> dependency.moduleAlias() + ":" + dependency.alias();
             case DICTIONARY, MEASURE_UNIT -> dependency.applicationAlias() + ":" + dependency.alias();
-            case WORKFLOW, FILE_SERVICE, EXTERNAL -> dependency.alias();
+            case CURRENCY, EXCHANGE_RATE_TYPE, WORKFLOW, FILE_SERVICE, EXTERNAL -> dependency.alias();
         };
     }
 

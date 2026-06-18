@@ -292,7 +292,7 @@ class RuntimeAuditRecordServiceContractTest {
         String id = service.record(moduleEventWithActionLikePayload());
 
         RuntimeAuditRecord record = service.select(id);
-        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.MODULE_PUBLISHED);
+        assertThat(record.getEventType()).isEqualTo(RuntimeEventType.MODULE_REFRESHED);
         assertThat(record.getResultType()).isNull();
         assertThat(record.getResultMessage()).isNull();
         assertThat(record.getResultText()).isNull();
@@ -372,7 +372,7 @@ class RuntimeAuditRecordServiceContractTest {
         return new RuntimeEvent(
                 "event-without-tenant",
                 "trace-without-tenant",
-                RuntimeEventType.MODULE_PUBLISHED,
+                RuntimeEventType.MODULE_REFRESHED,
                 "sales.contract",
                 null,
                 null,
@@ -390,7 +390,7 @@ class RuntimeAuditRecordServiceContractTest {
         return new RuntimeEvent(
                 "module-event-with-action-like-payload",
                 "module-trace",
-                RuntimeEventType.MODULE_PUBLISHED,
+                RuntimeEventType.MODULE_REFRESHED,
                 "sales.contract",
                 null,
                 null,

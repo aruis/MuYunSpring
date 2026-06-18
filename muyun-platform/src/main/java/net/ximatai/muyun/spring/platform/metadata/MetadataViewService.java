@@ -9,10 +9,13 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataViewService extends AbstractAbilityService<MetadataView> implements
@@ -24,11 +27,20 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final ModuleMetadataRelationService relationService;
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator;
 
     public MetadataViewService(BaseDao<MetadataView, String> viewDao,
                                ModuleMetadataRelationService relationService) {
+        this(viewDao, relationService, Optional.empty());
+    }
+
+    @Autowired
+    public MetadataViewService(BaseDao<MetadataView, String> viewDao,
+                               ModuleMetadataRelationService relationService,
+                               Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataView.class, viewDao);
         this.relationService = relationService;
+        this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
     }
 
     @Override
@@ -50,6 +62,13 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
     public void validateSortScope(MetadataView left, MetadataView right) {
         if (!Objects.equals(left.getRelationId(), right.getRelationId())) {
             throw new PlatformException("Metadata view sort can only move records within the same relation");
+        }
+    }
+
+    @Override
+    public void afterChanged(MetadataView view) {
+        if (runtimeRefreshCoordinator != null) {
+            runtimeRefreshCoordinator.refreshByMetadataView(view);
         }
     }
 

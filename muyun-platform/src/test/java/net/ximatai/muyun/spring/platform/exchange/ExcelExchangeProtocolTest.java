@@ -229,6 +229,18 @@ class ExcelExchangeProtocolTest {
         )))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("timeZone");
+        assertThatThrownBy(() -> validator.validateParsedWorkbook(new ParsedWorkbook(
+                new ExcelWorkbookMeta("1", "crm.order", "view-1", "订单导入", "+08:00"),
+                List.of(sheet)
+        )))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
+        assertThatThrownBy(() -> validator.validateParsedWorkbook(new ParsedWorkbook(
+                new ExcelWorkbookMeta("1", "crm.order", "view-1", "订单导入", "GMT+08:00"),
+                List.of(sheet)
+        )))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("timeZone");
 
         ParsedSheet missingRelateId = headerParser.parse(
                 "订单",

@@ -18,7 +18,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
-import net.ximatai.muyun.spring.dynamic.publish.DynamicModulePublisher;
+import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordActionGateway;
@@ -81,7 +81,7 @@ class DynamicCodeCoordinatorRepositoryIT {
         registry.add("muyun.database.repository-schema-mode", () -> "ENSURE");
     }
 
-    private final DynamicModulePublisher publisher;
+    private final DynamicModuleRuntimeRefresher refresher;
     private final DynamicRecordService recordService;
     private final CodeRuleService ruleService;
     private final CodeSequenceStateService stateService;
@@ -90,14 +90,14 @@ class DynamicCodeCoordinatorRepositoryIT {
     private final TransactionTemplate transactionTemplate;
 
     @Autowired
-    DynamicCodeCoordinatorRepositoryIT(DynamicModulePublisher publisher,
+    DynamicCodeCoordinatorRepositoryIT(DynamicModuleRuntimeRefresher refresher,
                                        DynamicRecordService recordService,
                                        CodeRuleService ruleService,
                                        CodeSequenceStateService stateService,
                                        CodeLedgerEntryService ledgerService,
                                        CodeRecycleEntryService recycleService,
                                        PlatformTransactionManager transactionManager) {
-        this.publisher = publisher;
+        this.refresher = refresher;
         this.recordService = recordService;
         this.ruleService = ruleService;
         this.stateService = stateService;
@@ -108,7 +108,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldAssignCodeAndLedgerThroughDynamicCreateOnRealRuntime() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
 
         DynamicRecord record = create(scenario, "first");
@@ -125,7 +125,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldRejectManualValueForAutoAndKeepManualValueForEditableAutoRule() {
-        Scenario autoScenario = publishScenario();
+        Scenario autoScenario = refreshScenario();
         CodeRule autoRule = saveRule(autoScenario, CodeMode.AUTO, true);
 
         assertThatThrownBy(() -> create(autoScenario, "invalid", "MANUAL-1"))
@@ -136,7 +136,7 @@ class DynamicCodeCoordinatorRepositoryIT {
                 CodeSequenceState.DEFAULT_BUCKET)).isNull();
         assertThat(ledgerEntries(autoRule)).isEmpty();
 
-        Scenario editableScenario = publishScenario();
+        Scenario editableScenario = refreshScenario();
         CodeRule editableRule = saveRule(editableScenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
         DynamicRecord manual = create(editableScenario, "manual", "KEEP-1");
 
@@ -150,9 +150,9 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldIgnoreDisabledAndUnmatchedRules() {
-        Scenario disabledScenario = publishScenario();
+        Scenario disabledScenario = refreshScenario();
         CodeRule disabledRule = saveRule(disabledScenario, CodeMode.AUTO, false);
-        Scenario unmatchedScenario = publishScenario();
+        Scenario unmatchedScenario = refreshScenario();
 
         DynamicRecord disabled = create(disabledScenario, "disabled");
         DynamicRecord unmatched = create(unmatchedScenario, "unmatched");
@@ -166,7 +166,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldGenerateMissingCodeDuringDynamicUpdate() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         DynamicRecord record = create(scenario, "draft");
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
 
@@ -186,7 +186,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldRollbackDynamicCreateSequenceStateAndLedgerWithOuterTransaction() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         AtomicReference<String> recordId = new AtomicReference<>();
 
@@ -215,7 +215,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldReleaseDeletedDynamicCodeToAvailableOrDiscardedLedgerFact() {
-        Scenario reusableScenario = publishScenario();
+        Scenario reusableScenario = refreshScenario();
         CodeRule reusableRule = saveRule(reusableScenario, CodeMode.AUTO, true);
         DynamicRecord reusable = create(reusableScenario, "reusable");
 
@@ -230,7 +230,7 @@ class DynamicCodeCoordinatorRepositoryIT {
         CodeRecycleEntry reusableRecycle = recycleEntry(reusableRule, "SO-0001");
         assertThat(reusableRecycle.getStatus()).isEqualTo(CodeRecycleStatus.AVAILABLE);
 
-        Scenario discardScenario = publishScenario();
+        Scenario discardScenario = refreshScenario();
         CodeRule discardRule = saveRule(discardScenario, CodeMode.AUTO, true, false);
         DynamicRecord discarded = create(discardScenario, "discarded");
 
@@ -246,7 +246,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldReleaseCodesWhenDynamicRecordsAreDeletedInBatch() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         DynamicRecord first = create(scenario, "first");
         DynamicRecord second = create(scenario, "second");
@@ -270,7 +270,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldReleaseOldCodeAndBindManualCodeWhenEditableAutoIsManuallyChanged() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
         DynamicRecord record = create(scenario, "editable");
 
@@ -294,7 +294,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldReleaseOldCodeAndBindRegeneratedCodeWhenLinkedFieldChanges() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveLinkedRule(scenario, true);
         DynamicRecord record = create(scenario, "alpha");
 
@@ -318,7 +318,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldReuseAvailableRecycleOnceAndNeverConsumeDiscardedCode() {
-        Scenario reusableScenario = publishScenario();
+        Scenario reusableScenario = refreshScenario();
         CodeRule reusableRule = saveRule(reusableScenario, CodeMode.AUTO, true);
         DynamicRecord first = create(reusableScenario, "first");
         try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
@@ -334,7 +334,7 @@ class DynamicCodeCoordinatorRepositoryIT {
         assertThat(ledgerService.findByRuleAndValue(reusableRule.getId(), "SO-0001").getStatus())
                 .isEqualTo(CodeLedgerStatus.ACTIVE);
 
-        Scenario discardedScenario = publishScenario();
+        Scenario discardedScenario = refreshScenario();
         CodeRule discardedRule = saveRule(discardedScenario, CodeMode.AUTO, true, false);
         DynamicRecord discarded = create(discardedScenario, "discarded");
         try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
@@ -348,7 +348,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldRejectDuplicateManualBindingAsSingleCurrentLedgerFact() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
         DynamicRecord first = create(scenario, "first", "DUP-1");
 
@@ -361,7 +361,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldContinueSequenceAfterAcceptedEditableAutoCode() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
 
         DynamicRecord imported = create(scenario, "imported", "SO-0010");
@@ -379,7 +379,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldContinueSequenceAfterAcceptedEditableAutoCodeThroughImportGateway() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO_WITH_MANUAL_EDIT, true);
         AtomicReference<String> importedId = new AtomicReference<>();
 
@@ -406,7 +406,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldRollbackRecycleConsumptionWhenDynamicCreateFailsInOuterTransaction() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         DynamicRecord first = create(scenario, "first");
         try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
@@ -432,7 +432,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldConsumeSingleRecycleCodeOnlyOnceUnderConcurrentDynamicCreates() throws Exception {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveRule(scenario, CodeMode.AUTO, true);
         DynamicRecord first = create(scenario, "first");
         try (TenantContext.Scope ignored = TenantContext.use(TENANT_ID)) {
@@ -483,7 +483,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldAssignCodeToDynamicRelationChildOnParentCreate() {
-        Scenario scenario = publishChildScenario();
+        Scenario scenario = refreshChildScenario();
         CodeRule childRule = saveChildRule(scenario);
 
         DynamicRecord invoice;
@@ -512,7 +512,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldAllowRelationChildCodeToUseParentContext() {
-        Scenario scenario = publishChildScenario();
+        Scenario scenario = refreshChildScenario();
         CodeRule childRule = saveChildRuleUsingParentTitle(scenario);
 
         DynamicRecord invoice;
@@ -534,7 +534,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldRegenerateRelationChildCodeWhenParentContextDependencyChangesInSameSave() {
-        Scenario scenario = publishChildScenario();
+        Scenario scenario = refreshChildScenario();
         CodeRule childRule = saveChildRuleUsingParentTitle(scenario);
 
         DynamicRecord invoice;
@@ -572,7 +572,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void dynamicCodeShouldUseInjectedOrganizationTimeZoneResolver() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveDateRule(scenario);
 
         DynamicRecord record;
@@ -591,7 +591,7 @@ class DynamicCodeCoordinatorRepositoryIT {
 
     @Test
     void shouldFallbackDefaultBucketWhenOldCodeReleaseContextCannotRender() {
-        Scenario scenario = publishScenario();
+        Scenario scenario = refreshScenario();
         CodeRule rule = saveLinkedRule(scenario, true);
         DynamicRecord record = create(scenario, "alpha");
         CodeRule changedRule = ruleService.viewRuleTree(rule.getId());
@@ -653,11 +653,11 @@ class DynamicCodeCoordinatorRepositoryIT {
         }
     }
 
-    private Scenario publishScenario() {
+    private Scenario refreshScenario() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String moduleAlias = "crm.code_it_" + suffix;
         String tableName = "crm_code_it_" + suffix;
-        publisher.publish(new ModuleDefinition(moduleAlias, "Code IT", List.of(new EntityDefinition(
+        refresher.refresh(new ModuleDefinition(moduleAlias, "Code IT", List.of(new EntityDefinition(
                 "main",
                 tableName,
                 "Code IT",
@@ -670,12 +670,12 @@ class DynamicCodeCoordinatorRepositoryIT {
         return new Scenario(moduleAlias);
     }
 
-    private Scenario publishChildScenario() {
+    private Scenario refreshChildScenario() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String moduleAlias = "crm.code_child_it_" + suffix;
         String mainTableName = "crm_code_child_main_" + suffix;
         String lineTableName = "crm_code_child_line_" + suffix;
-        publisher.publish(new ModuleDefinition(
+        refresher.refresh(new ModuleDefinition(
                 moduleAlias,
                 "Code Child IT",
                 List.of(
@@ -909,9 +909,9 @@ class DynamicCodeCoordinatorRepositoryIT {
         }
 
         @Bean
-        DynamicModulePublisher dynamicModulePublisher(DynamicSchemaService schemaService,
+        DynamicModuleRuntimeRefresher dynamicModuleRuntimeRefresher(DynamicSchemaService schemaService,
                                                       DynamicRecordRuntime runtime) {
-            return new DynamicModulePublisher(schemaService, runtime);
+            return new DynamicModuleRuntimeRefresher(schemaService, runtime);
         }
 
         @Bean

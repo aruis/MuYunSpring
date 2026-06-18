@@ -182,7 +182,7 @@ public record RuntimeEventHandlerDescriptor(
     private static boolean isAfterEvent(RuntimeEventType eventType) {
         return eventType.name().startsWith("AFTER_")
                 || eventType == RuntimeEventType.ACTION_EXECUTED
-                || eventType == RuntimeEventType.MODULE_PUBLISHED;
+                || eventType == RuntimeEventType.MODULE_REFRESHED;
     }
 
     private static void requireText(String value, String fieldName) {

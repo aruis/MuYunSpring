@@ -26,7 +26,7 @@ public class LowCodeModuleTemplateService {
                 source.moduleAlias(),
                 source.bundles(),
                 source.dependencyManifest(),
-                source.publishManifest()
+                source.exchangeManifest()
         );
         return new LowCodeModuleTemplate(templateAlias, title, templatePackage);
     }
@@ -47,7 +47,7 @@ public class LowCodeModuleTemplateService {
                 request.moduleAlias(),
                 rewriteBundles(base, request),
                 base.dependencyManifest(),
-                LowCodePackagePublishManifest.draft(base.protocolVersion())
+                LowCodePackageExchangeManifest.draft(base.protocolVersion())
         );
     }
 

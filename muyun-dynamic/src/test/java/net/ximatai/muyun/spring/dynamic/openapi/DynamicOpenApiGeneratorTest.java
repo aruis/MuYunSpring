@@ -459,6 +459,7 @@ class DynamicOpenApiGeneratorTest {
                 .satisfies(property -> {
                     assertThat(property.type()).isEqualTo("string");
                     assertThat(property.format()).isEqualTo("date-time");
+                    assertThat(property.temporalSemantics()).isEqualTo("ZONED_INSTANT");
                     assertThat(property.companionFields()).containsExactly("signedAtTimeZone");
                 });
     }
@@ -550,6 +551,8 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("WebSort");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("conditions").itemType())
                 .isEqualTo("WebQueryCondition");
+        assertThat(document.schemas().get("WebQueryCondition").properties())
+                .containsKeys("fieldName", "operator", "values", "timeZone");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("page").type())
                 .isEqualTo("WebPageRequest");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties())
@@ -590,7 +593,7 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("DynamicOpenApiProperty").properties())
                 .containsKeys("type", "format", "required", "nullable", "multiple",
                         "optionSourceType", "optionSource", "referenceModuleAlias",
-                        "referenceEntityAlias", "itemType", "companionFields");
+                        "referenceEntityAlias", "itemType", "temporalSemantics", "companionFields");
         assertThat(document.schemas().get("DynamicOpenApiSchema").properties())
                 .containsKey("valueShapeByResultType");
         assertThat(document.schemas().get("DynamicOpenApiErrorResponse").required())

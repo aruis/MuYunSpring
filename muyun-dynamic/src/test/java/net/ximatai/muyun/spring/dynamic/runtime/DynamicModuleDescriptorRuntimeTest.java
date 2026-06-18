@@ -35,7 +35,7 @@ class DynamicModuleDescriptorRuntimeTest {
                         List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE))
         ));
         DynamicModuleRegistry registry = new DynamicModuleRegistry();
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations(), registry).publish(module);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations(), registry).refresh(module);
 
         DynamicModuleDescriptor fromRegistry = registry.describe("sales.contract");
         DynamicModuleDescriptor fromRuntime = runtime.describe("sales.contract");
@@ -73,7 +73,7 @@ class DynamicModuleDescriptorRuntimeTest {
                         new EntityActionDefinition("line", "exportLine", "Export line", true, null)
                 )
         );
-        DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations()).publish(module);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(nullOperations()).refresh(module);
         DynamicRecordService service = new DynamicRecordService(runtime);
 
         DynamicRecordService.ModuleOperations moduleApi = service.module("sales.contract");
@@ -130,7 +130,7 @@ class DynamicModuleDescriptorRuntimeTest {
                         .withProjection("code", "contractCode"))
         );
         DynamicEntityOperations lineApi = new DynamicRecordService(
-                new DynamicRecordRuntime(operations).publish(module)).entity("sales.contract", "line");
+                new DynamicRecordRuntime(operations).refresh(module)).entity("sales.contract", "line");
 
         DynamicReferenceResolveResponse response = lineApi.resolveFieldReference("contractId",
                 DynamicReferenceResolveRequest.query("Contract").withPage(PageRequest.of(1, 10)));
@@ -149,7 +149,7 @@ class DynamicModuleDescriptorRuntimeTest {
                 new EntityDefinition("contract", "sales_contract", "Contract",
                         List.of(FieldDefinition.titleField()), Set.of(EntityCapability.REFERENCE))
         ));
-        DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(nullOperations()).publish(module));
+        DynamicRecordService service = new DynamicRecordService(new DynamicRecordRuntime(nullOperations()).refresh(module));
 
         assertThatThrownBy(() -> service.entityDescriptor("sales.contract", "missing"))
                 .isInstanceOf(ModuleDefinitionException.class)

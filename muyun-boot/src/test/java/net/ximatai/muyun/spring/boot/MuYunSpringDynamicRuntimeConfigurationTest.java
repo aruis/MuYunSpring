@@ -1,6 +1,8 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
@@ -8,6 +10,11 @@ import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
+import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
@@ -15,9 +22,12 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.platform.code.CodeBusinessTimeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -26,9 +36,15 @@ import org.springframework.core.annotation.Order;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -207,6 +223,98 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 });
     }
 
+    @Test
+    void shouldConfigurePlatformTimeServiceDefaultZone() {
+        contextRunner
+                .withBean(Clock.class, () -> Clock.fixed(Instant.parse("2026-06-17T00:00:00Z"), ZoneOffset.UTC))
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .run(context -> {
+                    PlatformTimeService timeService = context.getBean(PlatformTimeService.class);
+
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.empty()))
+                            .isEqualTo(ZoneId.of("Asia/Shanghai"));
+                });
+    }
+
+    @Test
+    void shouldRejectInvalidPlatformDefaultZone() {
+        contextRunner
+                .withPropertyValues("muyun.platform.time.default-zone-id=+08:00")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void shouldPreferBusinessTimeZoneResolverBeforeConfiguredDefaultZone() {
+        contextRunner
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .withBean("newYorkResolver", BusinessTimeZoneResolver.class,
+                        () -> context -> "org-new-york".equals(context.organizationId())
+                                ? Optional.of(ZoneId.of("America/New_York"))
+                                : Optional.empty())
+                .run(context -> {
+                    PlatformTimeService timeService = context.getBean(PlatformTimeService.class);
+
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.ofOrganization("org-new-york")))
+                            .isEqualTo(ZoneId.of("America/New_York"));
+                    assertThat(timeService.resolveZoneId(BusinessTimeContext.ofOrganization("org-shanghai")))
+                            .isEqualTo(ZoneId.of("Asia/Shanghai"));
+                });
+    }
+
+    @Test
+    void shouldConfigureNaturalBusinessCalendarServiceByDefault() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(BusinessCalendarService.class);
+            assertThat(context.getBean(BusinessCalendarService.class))
+                    .isInstanceOf(NaturalBusinessCalendarService.class);
+        });
+    }
+
+    @Test
+    void shouldApplyConfiguredDefaultZoneToDynamicRuntimeQueries() {
+        contextRunner
+                .withBean(Clock.class, () -> Clock.fixed(Instant.parse("2026-06-17T00:00:00Z"), ZoneOffset.UTC))
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .run(context -> {
+                    DynamicRecordRuntime runtime = context.getBean(DynamicRecordRuntime.class);
+                    runtime.register(new ModuleDefinition("sales.contract", "Contract", List.of(timeContractEntity())));
+
+                    Criteria criteria = runtime.entityService("sales.contract", "contract")
+                            .queryCriteria(List.of(DynamicQueryCondition.of(
+                                    "submittedAt",
+                                    DynamicQueryOperator.BETWEEN,
+                                    "2026-01-01",
+                                    "2026-01-01"
+                            )));
+
+                    assertThat(criteria.getClauses()).hasSize(2);
+                    assertThat(criteria.getClauses().get(0).getOperator()).isEqualTo(CriteriaOperator.GTE);
+                    assertThat(criteria.getClauses().get(0).getValues())
+                            .containsExactly(Instant.parse("2025-12-31T16:00:00Z"));
+                    assertThat(criteria.getClauses().get(1).getOperator()).isEqualTo(CriteriaOperator.LT);
+                    assertThat(criteria.getClauses().get(1).getValues())
+                            .containsExactly(Instant.parse("2026-01-01T16:00:00Z"));
+                });
+    }
+
+    @Test
+    void shouldApplyConfiguredDefaultZoneToNaturalCalendarAndCodeTime() {
+        contextRunner
+                .withUserConfiguration(CodeBusinessTimeConfig.class)
+                .withBean(Clock.class, () -> Clock.fixed(Instant.parse("2026-12-31T16:30:00Z"), ZoneOffset.UTC))
+                .withPropertyValues("muyun.platform.time.default-zone-id=Asia/Shanghai")
+                .run(context -> {
+                    BusinessCalendarService calendarService = context.getBean(BusinessCalendarService.class);
+                    CodeBusinessTimeService codeTimeService = context.getBean(CodeBusinessTimeService.class);
+
+                    assertThat(calendarService.resolveCalendar(BusinessTimeContext.empty()).zoneId())
+                            .isEqualTo(ZoneId.of("Asia/Shanghai"));
+                    assertThat(codeTimeService.resolveBusinessLocalDateTime("org-unknown",
+                            Instant.parse("2026-12-31T16:30:00Z")))
+                            .isEqualTo(LocalDateTime.of(2027, 1, 1, 0, 30));
+                });
+    }
+
     private RuntimeEvent event() {
         return RuntimeEvent.of(RuntimeEventType.AFTER_CREATE, "sales.contract", "contract", "contract-1",
                 null, "tenant-1", false, RuntimeMutationSource.BUSINESS, Map.of());
@@ -215,6 +323,14 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
     private EntityDefinition contractEntity() {
         return new EntityDefinition("contract", "app_contract", "Contract",
                 List.of(FieldDefinition.string("code", "Code").length(64)));
+    }
+
+    private EntityDefinition timeContractEntity() {
+        return new EntityDefinition("contract", "app_contract", "Contract",
+                List.of(FieldDefinition.timestamp("submittedAt", "Submitted At").column("submitted_at").queryable(
+                        DynamicQueryOperator.BETWEEN,
+                        java.util.Set.of(DynamicQueryOperator.BETWEEN)
+                )));
     }
 
     private Map<String, Object> contractRow(String id) {
@@ -267,6 +383,14 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
 
         List<String> received() {
             return received;
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class CodeBusinessTimeConfig {
+        @Bean
+        CodeBusinessTimeService codeBusinessTimeService(PlatformTimeService platformTimeService) {
+            return new CodeBusinessTimeService(platformTimeService, List.of());
         }
     }
 

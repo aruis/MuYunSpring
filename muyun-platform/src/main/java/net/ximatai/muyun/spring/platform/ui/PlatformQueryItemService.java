@@ -11,12 +11,17 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
+import net.ximatai.muyun.spring.common.time.BusinessTimeRange;
+import net.ximatai.muyun.spring.common.time.PlatformTimeService;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Array;
@@ -40,15 +45,36 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
     private final PlatformQueryTemplateService queryTemplateService;
     private final ModuleMetadataFieldService moduleFieldService;
     private final PlatformFieldTypeService fieldTypeService;
+    private final PlatformTimeService timeService;
 
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,
                                     ModuleMetadataFieldService moduleFieldService,
                                     PlatformFieldTypeService fieldTypeService) {
+        this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, new PlatformTimeService());
+    }
+
+    @Autowired
+    public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
+                                    PlatformQueryTemplateService queryTemplateService,
+                                    ModuleMetadataFieldService moduleFieldService,
+                                    PlatformFieldTypeService fieldTypeService,
+                                    ObjectProvider<PlatformTimeService> timeServiceProvider) {
+        this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService,
+                timeServiceProvider == null ? new PlatformTimeService()
+                        : timeServiceProvider.getIfAvailable(PlatformTimeService::new));
+    }
+
+    public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
+                                    PlatformQueryTemplateService queryTemplateService,
+                                    ModuleMetadataFieldService moduleFieldService,
+                                    PlatformFieldTypeService fieldTypeService,
+                                    PlatformTimeService timeService) {
         super(MODULE_ALIAS, PlatformQueryItem.class, queryItemDao);
         this.queryTemplateService = queryTemplateService;
         this.moduleFieldService = moduleFieldService;
         this.fieldTypeService = fieldTypeService;
+        this.timeService = timeService == null ? new PlatformTimeService() : timeService;
     }
 
     @Override
@@ -246,7 +272,8 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             visiting.remove(item.getId());
             return criteria;
         }
-        appendLeaf(criteria, moduleField.fieldName(), item.getOperator(), value);
+        PlatformFieldType fieldType = fieldTypeService.requireFieldType(moduleField.fieldTypeAlias());
+        appendLeaf(criteria, moduleField.fieldName(), fieldType, item, value);
         visiting.remove(item.getId());
         return criteria;
     }
@@ -284,7 +311,12 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         visitingParents.remove(parentId);
     }
 
-    private void appendLeaf(Criteria criteria, String fieldName, DynamicQueryOperator operator, Object value) {
+    private void appendLeaf(Criteria criteria,
+                            String fieldName,
+                            PlatformFieldType fieldType,
+                            PlatformQueryItem item,
+                            Object value) {
+        DynamicQueryOperator operator = item.getOperator();
         switch (operator) {
             case EQ -> criteria.eq(fieldName, singleValue(operator, value));
             case NOT_EQUAL -> criteria.ne(fieldName, singleValue(operator, value));
@@ -295,6 +327,25 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
                 List<?> values = listValues(operator, value);
                 if (values.size() != 2) {
                     throw new PlatformException("BETWEEN query item requires exactly two values: " + fieldName);
+                }
+                if (fieldType.getFieldType().isTemporal()
+                        && !fieldType.getFieldType().isBusinessDate()
+                        && PlatformTimeService.isLocalDateValue(values.get(0))
+                        && PlatformTimeService.isLocalDateValue(values.get(1))) {
+                    BusinessTimeRange range;
+                    BusinessTimeContext context = queryTimeContext(item);
+                    try {
+                        range = timeService.localDateClosedRangeToInstantRange(
+                                values.get(0),
+                                values.get(1),
+                                context
+                        );
+                    } catch (RuntimeException ex) {
+                        throw new PlatformException("Query item date range is invalid: " + fieldName, ex);
+                    }
+                    criteria.gte(fieldName, range.startInclusive());
+                    criteria.lt(fieldName, range.endExclusive());
+                    return;
                 }
                 criteria.between(fieldName, values.get(0), values.get(1));
             }
@@ -347,6 +398,17 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
                     .toList();
         }
         return List.of(value);
+    }
+
+    private BusinessTimeContext queryTimeContext(PlatformQueryItem item) {
+        if (!hasText(item.getTimeZone())) {
+            return BusinessTimeContext.empty();
+        }
+        try {
+            return BusinessTimeContext.ofZone(PlatformTimeService.requireIanaZoneId(item.getTimeZone()));
+        } catch (RuntimeException ex) {
+            throw new PlatformException("Query item timeZone is invalid: " + item.getTimeZone(), ex);
+        }
     }
 
     private boolean isGroup(PlatformQueryItem item) {

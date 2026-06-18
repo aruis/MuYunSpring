@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
+import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
 import net.ximatai.muyun.database.core.orm.CriteriaGroup;
@@ -7,31 +9,72 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
+import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicyService;
+import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.security.FieldEncryptionMode;
 import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitConversionMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
-import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.dynamic.metadata.ViewControlType;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicFieldValueValidator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicModuleRegistry;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
+import net.ximatai.muyun.spring.platform.currency.Currency;
+import net.ximatai.muyun.spring.platform.currency.CurrencyConversionService;
+import net.ximatai.muyun.spring.platform.currency.CurrencyService;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRate;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateService;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateType;
+import net.ximatai.muyun.spring.platform.currency.ExchangeRateTypeService;
+import net.ximatai.muyun.spring.platform.currency.MoneyDynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.platform.currency.TenantCurrencySettingService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryKind;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.measure.MeasureDimension;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnit;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversionService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategory;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitCategoryService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionRuleService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionService;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitDynamicRecordMutationCoordinator;
+import net.ximatai.muyun.spring.platform.measure.MeasureUnitService;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.platform.runtime.PlatformModuleDefinitionCompiler;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.lang.reflect.Method;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -41,6 +84,15 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class PlatformMetadataServiceContractTest {
     private final MemoryDao<PlatformModule> moduleDao = new MemoryDao<>();
@@ -70,26 +122,33 @@ class PlatformMetadataServiceContractTest {
             new PlatformFieldUiTypeAttributeService(fieldUiTypeAttributeDao, fieldUiTypeService, fieldTypeService);
     private final PlatformFieldUiTypeFieldMappingService fieldUiTypeFieldMappingService =
             new PlatformFieldUiTypeFieldMappingService(fieldUiTypeFieldMappingDao, fieldUiTypeService);
-    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService);
+    private final PlatformMetadataSchemaEnsureService schemaEnsureService = mock(PlatformMetadataSchemaEnsureService.class);
+    private final PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator =
+            mock(PlatformDynamicRuntimeRefreshCoordinator.class);
+    private final MetadataFieldService fieldService = new MetadataFieldService(fieldDao, metadataService, fieldTypeService,
+            Optional.of(runtimeRefreshCoordinator), Optional.of(schemaEnsureService));
     private final ModuleMetadataRelationService relationService =
             new ModuleMetadataRelationService(relationDao, moduleService, metadataService);
     private final ModuleMetadataFieldService moduleFieldService =
             new ModuleMetadataFieldService(moduleFieldDao, relationService, metadataService, fieldService,
-                    fieldTypeService, Optional.empty());
+                    fieldTypeService, Optional.empty(), Optional.of(runtimeRefreshCoordinator));
     private final ModuleMetadataFieldFilterService moduleFieldFilterService =
             new ModuleMetadataFieldFilterService(moduleFieldFilterDao, moduleFieldService);
     private final ModuleMetadataFieldAffectService moduleFieldAffectService =
             new ModuleMetadataFieldAffectService(moduleFieldAffectDao, moduleFieldService);
     private final MetadataFieldProtectionConfigService protectionConfigService =
-            new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao);
+            new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao,
+                    Optional.of(runtimeRefreshCoordinator));
     private final MetadataFieldConfigService fieldConfigService =
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
-                    categoryService, relationService, protectionConfigService);
+                    categoryService, relationService, protectionConfigService, Optional.of(runtimeRefreshCoordinator));
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, protectionConfigService, fieldService);
+    private final PlatformMetadataEntityDefinitionCompiler metadataEntityDefinitionCompiler =
+            new PlatformMetadataEntityDefinitionCompiler(metadataService, fieldService, fieldDefinitionCompiler);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
-                    fieldTypeService, moduleService, relationService);
+                    fieldTypeService, moduleService, relationService, Optional.of(runtimeRefreshCoordinator));
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService,
@@ -119,6 +178,24 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getSchemaName()).isEqualTo(MetadataService.DEFAULT_SCHEMA);
         assertThat(saved.getTableName()).isEqualTo("crm_customer");
         assertThat(saved.getEnabled()).isTrue();
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenMetadataItselfChanges() {
+        PlatformDynamicRuntimeRefreshCoordinator coordinator = mock(PlatformDynamicRuntimeRefreshCoordinator.class);
+        MetadataService service = new MetadataService(new MemoryDao<>(), Optional.empty(), Optional.of(coordinator));
+        Metadata metadata = metadata("crm", "customer");
+
+        String id = service.insert(metadata);
+
+        verify(coordinator).refreshByMetadataId(id);
+        clearInvocations(coordinator);
+
+        metadata.setId(id);
+        metadata.setTitle("Customer V2");
+        service.update(metadata);
+
+        verify(coordinator).refreshByMetadataId(id);
     }
 
     @Test
@@ -231,6 +308,39 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.protection().encryptionMode()).isEqualTo(FieldEncryptionMode.ENCRYPTED);
         assertThat(definition.protection().signatureMode()).isEqualTo(FieldSignatureMode.SIGNED);
         assertThat(definition.protection().maskingPolicy()).isEqualTo(FieldMaskingPolicy.PHONE);
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldConfigChanges() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+        fieldService.insert(field);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setQueryable(false);
+        fieldConfigService.insert(config);
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && field.getId().equals(refreshed.getId())));
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldProtectionChanges() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "mobile", "mobile", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig fieldConfig = fieldConfig(field.getId());
+        fieldConfig.setQueryable(false);
+        fieldConfigService.insert(fieldConfig);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        MetadataFieldProtectionConfig config = protectionConfig(field.getId());
+        config.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        protectionConfigService.insert(config);
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && field.getId().equals(refreshed.getId())));
     }
 
     @Test
@@ -680,6 +790,22 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getCardinality()).isEqualTo(net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE);
         assertThat(saved.getTitleOutputField()).isEqualTo("customerIdTitle");
         assertThat(saved.projections()).hasSize(1);
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldReferenceConfigChanges() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(titleField(customerId));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        referenceConfigService.insert(referenceConfig(customerField.getId(), customerId));
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && customerField.getId().equals(refreshed.getId())));
     }
 
     @Test
@@ -1141,111 +1267,118 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
-    void shouldPrepareMeasureUnitCompanionAndShadowFieldsForModuleField() {
+    void shouldSaveMeasureUnitConfigAndEnsureCompanionAndShadowFields() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
         fieldService.insert(quantity);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitConversionMode(FieldMeasureUnitConversionMode.LINEAR);
+        moduleField.setUnitRequired(true);
+        clearInvocations(schemaEnsureService, runtimeRefreshCoordinator);
 
-        ModuleMetadataMeasureUnitPrepareResult result = moduleFieldService.prepareMeasureUnitConfig(
-                moduleField.getId(),
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package",
-                        FieldMeasureUnitMode.SELECTABLE,
-                        null,
-                        "box",
-                        null,
-                        null,
-                        null,
-                        "bottle",
-                        FieldMeasureUnitConversionMode.LINEAR,
-                        null,
-                        true,
-                        null,
-                        null
-                ));
+        moduleFieldService.update(moduleField);
 
-        assertThat(result.unitField().getFieldName()).isEqualTo("quantityUnit");
-        assertThat(result.unitField().getColumnName()).isEqualTo("quantity_unit");
-        assertThat(result.unitField().getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
-        assertThat(result.unitField().getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_UNIT);
-        assertThat(result.unitField().getOwnerFieldId()).isEqualTo(quantity.getId());
-        assertThat(result.baseValueField().getFieldName()).isEqualTo("quantityBase");
-        assertThat(result.baseValueField().getColumnName()).isEqualTo("quantity_base");
-        assertThat(result.baseValueField().getFieldForm()).isEqualTo(MetadataFieldForm.SHADOW);
-        assertThat(result.baseValueField().getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_BASE_VALUE);
-        assertThat(result.baseValueField().getSystemManaged()).isTrue();
-        assertThat(result.moduleField().getUnitCategoryAlias()).isEqualTo("package");
-        assertThat(result.moduleField().getUnitFieldId()).isEqualTo(result.unitField().getId());
-        assertThat(result.moduleField().getBaseValueFieldId()).isEqualTo(result.baseValueField().getId());
-        assertThat(result.moduleField().getBaseUnitCategoryAlias()).isEqualTo("package");
-        assertThat(result.moduleField().getBaseUnitCode()).isEqualTo("bottle");
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        MetadataField unitField = fieldService.select(saved.getUnitFieldId());
+        MetadataField baseValueField = fieldService.select(saved.getBaseValueFieldId());
+        assertThat(unitField.getFieldName()).isEqualTo("quantityUnit");
+        assertThat(unitField.getColumnName()).isEqualTo("quantity_unit");
+        assertThat(unitField.getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
+        assertThat(unitField.getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_UNIT);
+        assertThat(unitField.getOwnerFieldId()).isEqualTo(quantity.getId());
+        assertThat(baseValueField.getFieldName()).isEqualTo("quantityBase");
+        assertThat(baseValueField.getColumnName()).isEqualTo("quantity_base");
+        assertThat(baseValueField.getFieldForm()).isEqualTo(MetadataFieldForm.SHADOW);
+        assertThat(baseValueField.getFieldRole()).isEqualTo(MetadataFieldRole.MEASURE_BASE_VALUE);
+        assertThat(baseValueField.getSystemManaged()).isTrue();
+        assertThat(saved.getUnitCategoryAlias()).isEqualTo("package");
+        assertThat(saved.getBaseUnitCategoryAlias()).isEqualTo("package");
+        assertThat(saved.getBaseUnitCode()).isEqualTo("bottle");
+        assertThat(moduleFieldService.listByRelationId(relationId))
+                .extracting(ModuleMetadataField::getMetadataFieldId)
+                .contains(quantity.getId(), unitField.getId(), baseValueField.getId());
+        EntityDefinition schemaEntity = metadataEntityDefinitionCompiler.compile(metadataId);
+        assertThat(schemaEntity.fields()).extracting(FieldDefinition::fieldName)
+                .contains("quantity", "quantityUnit", "quantityBase");
+        FieldDefinition runtimeField = fieldDefinitionCompiler.compile(quantity, relationId, saved);
+        assertThat(runtimeField.measureUnit().enabled()).isTrue();
+        assertThat(runtimeField.measureUnit().categoryAlias()).isEqualTo("package");
+        assertThat(runtimeField.measureUnit().mode()).isEqualTo(FieldMeasureUnitMode.SELECTABLE);
+        assertThat(runtimeField.measureUnit().defaultUnitCode()).isEqualTo("box");
+        assertThat(runtimeField.measureUnit().unitFieldName()).isEqualTo("quantityUnit");
+        assertThat(runtimeField.measureUnit().baseValueFieldName()).isEqualTo("quantityBase");
+        assertThat(runtimeField.measureUnit().baseUnitCategoryAlias()).isEqualTo("package");
+        assertThat(runtimeField.measureUnit().baseUnitCode()).isEqualTo("bottle");
+        assertThat(runtimeField.measureUnit().conversionMode()).isEqualTo(FieldMeasureUnitConversionMode.LINEAR);
+        assertThat(runtimeField.measureUnit().unitRequired()).isTrue();
+        verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
+        verify(runtimeRefreshCoordinator, atLeastOnce()).refreshByModuleField(argThat(
+                refreshed -> refreshed != null && moduleField.getId().equals(refreshed.getId())));
     }
 
     @Test
-    void shouldReusePreparedMeasureUnitFieldsWithoutDuplicatingMetadataFields() {
+    void shouldReuseEnsuredMeasureUnitFieldsWithoutDuplicatingMetadataFields() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
         fieldService.insert(quantity);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
-        ModuleMetadataMeasureUnitPrepareCommand command = new ModuleMetadataMeasureUnitPrepareCommand(
-                "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
-                null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null);
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
 
-        ModuleMetadataMeasureUnitPrepareResult first =
-                moduleFieldService.prepareMeasureUnitConfig(moduleField.getId(), command);
-        ModuleMetadataMeasureUnitPrepareResult second =
-                moduleFieldService.prepareMeasureUnitConfig(moduleField.getId(), command);
+        moduleFieldService.update(moduleField);
+        ModuleMetadataField first = moduleFieldService.select(moduleField.getId());
+        moduleFieldService.update(first);
+        ModuleMetadataField second = moduleFieldService.select(moduleField.getId());
 
-        assertThat(second.unitField().getId()).isEqualTo(first.unitField().getId());
-        assertThat(second.baseValueField().getId()).isEqualTo(first.baseValueField().getId());
+        assertThat(second.getUnitFieldId()).isEqualTo(first.getUnitFieldId());
+        assertThat(second.getBaseValueFieldId()).isEqualTo(first.getBaseValueFieldId());
         assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
                 .extracting(MetadataField::getFieldName)
                 .containsExactly("quantity", "quantityUnit", "quantityBase");
     }
 
     @Test
-    void shouldPrepareFixedMeasureUnitWithoutCompanionUnitField() {
+    void shouldSaveFixedMeasureUnitWithoutCompanionUnitField() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
         fieldService.insert(quantity);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setUnitMode(FieldMeasureUnitMode.FIXED);
+        moduleField.setFixedUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
 
-        ModuleMetadataMeasureUnitPrepareResult result = moduleFieldService.prepareMeasureUnitConfig(
-                moduleField.getId(),
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package", FieldMeasureUnitMode.FIXED, "box", null, null, null,
-                        null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
-                ));
+        moduleFieldService.update(moduleField);
 
-        assertThat(result.unitField()).isNull();
-        assertThat(result.baseValueField().getFieldName()).isEqualTo("quantityBase");
-        assertThat(result.moduleField().getUnitMode()).isEqualTo(FieldMeasureUnitMode.FIXED);
-        assertThat(result.moduleField().getFixedUnitCode()).isEqualTo("box");
-        assertThat(result.moduleField().getUnitFieldId()).isNull();
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        assertThat(saved.getUnitMode()).isEqualTo(FieldMeasureUnitMode.FIXED);
+        assertThat(saved.getFixedUnitCode()).isEqualTo("box");
+        assertThat(saved.getUnitFieldId()).isNull();
+        assertThat(fieldService.select(saved.getBaseValueFieldId()).getFieldName()).isEqualTo("quantityBase");
     }
 
     @Test
-    void shouldRejectPrepareMeasureUnitBeforeCreatingFieldsWhenConfigIsInvalid() {
+    void shouldRejectMeasureUnitSaveBeforeCreatingFieldsWhenConfigIsInvalid() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
         fieldService.insert(quantity);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
 
-        assertThatThrownBy(() -> moduleFieldService.prepareMeasureUnitConfig(
-                moduleField.getId(),
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
-                        null, null, FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
-                )))
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
                 .hasMessageContaining("baseUnitCode");
         assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
                 .extracting(MetadataField::getFieldName)
@@ -1253,7 +1386,7 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
-    void shouldRejectPrepareMeasureUnitWhenRelatedFieldsAreDuplicated() {
+    void shouldRejectMeasureUnitSaveWhenRelatedFieldsAreDuplicated() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
@@ -1270,15 +1403,36 @@ class PlatformMetadataServiceContractTest {
         fieldService.insert(secondUnit);
         String relationId = relationService.insert(mainRelation("sales.order", metadataId));
         ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
 
-        assertThatThrownBy(() -> moduleFieldService.prepareMeasureUnitConfig(
-                moduleField.getId(),
-                new ModuleMetadataMeasureUnitPrepareCommand(
-                        "package", FieldMeasureUnitMode.SELECTABLE, null, "box", null, null,
-                        null, "bottle", FieldMeasureUnitConversionMode.LINEAR, null, true, null, null
-                )))
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("must be unique");
+    }
+
+    @Test
+    void shouldRejectMeasureUnitSaveBeforeCreatingFieldsWhenConversionScopeIsInvalid() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        String otherMetadataId = metadataService.insert(metadata("sales", "sku"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        MetadataField skuCode = field(otherMetadataId, "skuCode", "sku_code", FieldType.STRING);
+        fieldService.insert(skuCode);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setConversionScopeFieldId(skuCode.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
+                .hasMessageContaining("conversionScopeFieldId must belong to same metadata");
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("quantity");
     }
 
     @Test
@@ -1301,7 +1455,7 @@ class PlatformMetadataServiceContractTest {
     }
 
     @Test
-    void shouldRejectMeasureUnitConfigWithoutBaseValueShadowField() {
+    void shouldEnsureMeasureUnitBaseValueShadowFieldWhenMissing() {
         moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
         String metadataId = metadataService.insert(metadata("sales", "order_line"));
         MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
@@ -1317,9 +1471,301 @@ class PlatformMetadataServiceContractTest {
         moduleField.setBaseUnitCode("bottle");
         moduleField.setUnitFieldId(quantityUnit.getId());
 
+        moduleFieldService.update(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        assertThat(fieldService.select(saved.getBaseValueFieldId()).getFieldName()).isEqualTo("quantityBase");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistMeasureUnitValuesThroughRuntimeEntityCompiledFromSavedMetadata() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order_line"));
+        MetadataField quantity = field(metadataId, "quantity", "quantity", FieldType.DECIMAL);
+        fieldService.insert(quantity);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), quantity.getId());
+        moduleField.setUnitCategoryAlias("package");
+        moduleField.setDefaultUnitCode("box");
+        moduleField.setBaseUnitCode("bottle");
+        moduleField.setUnitConversionMode(FieldMeasureUnitConversionMode.LINEAR);
+        moduleField.setUnitRequired(true);
+        moduleFieldService.update(moduleField);
+
+        IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+        when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+        when(operations.getDefaultSchemaName()).thenReturn(MetadataService.DEFAULT_SCHEMA);
+        when(operations.insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order_line"), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn("line-1");
+        DynamicRecordService recordService = dynamicRecordService(
+                operations,
+                moduleDefinitionCompiler().compile("sales.order"),
+                measureUnitCoordinator()
+        );
+
+        DynamicRecord record = recordService.newRecord("sales.order", "order_line")
+                .setValue("quantity", new BigDecimal("2"));
+        recordService.create("sales.order", "order_line", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(operations).insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order_line"), body.capture(),
+                eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("quantity", new BigDecimal("2"))
+                .containsEntry("quantity_unit", "box");
+        assertThat((BigDecimal) body.getValue().get("quantity_base")).isEqualByComparingTo("24");
+    }
+
+    @Test
+    void shouldSaveMoneyConfigAndEnsureCompanionAndShadowFields() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField orderDate = field(metadataId, "orderDate", "order_date", FieldType.DATE);
+        fieldService.insert(orderDate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        clearInvocations(schemaEnsureService, runtimeRefreshCoordinator);
+
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyDefaultCurrencyCode("usd");
+        moduleField.setMoneyBaseCurrencyCode("cny");
+        moduleField.setMoneyRateTypeCode("spot");
+        moduleField.setMoneyRateDateFieldId(orderDate.getId());
+        moduleField.setMoneyCurrencyRequired(true);
+
+        moduleFieldService.update(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        MetadataField currencyField = fieldService.select(saved.getMoneyCurrencyFieldId());
+        MetadataField baseAmountField = fieldService.select(saved.getMoneyBaseAmountFieldId());
+        assertThat(currencyField.getFieldName()).isEqualTo("amountCurrency");
+        assertThat(currencyField.getColumnName()).isEqualTo("amount_currency");
+        assertThat(currencyField.getFieldForm()).isEqualTo(MetadataFieldForm.COMPANION);
+        assertThat(currencyField.getFieldRole()).isEqualTo(MetadataFieldRole.MONEY_CURRENCY);
+        assertThat(currencyField.getOwnerFieldId()).isEqualTo(amount.getId());
+        assertThat(baseAmountField.getFieldName()).isEqualTo("amountBase");
+        assertThat(baseAmountField.getFieldRole()).isEqualTo(MetadataFieldRole.MONEY_BASE_AMOUNT);
+        assertThat(baseAmountField.getSystemManaged()).isTrue();
+        assertThat(saved.getMoneyCurrencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(saved.getMoneyDefaultCurrencyCode()).isEqualTo("USD");
+        assertThat(saved.getMoneyBaseCurrencyCode()).isEqualTo("CNY");
+        assertThat(saved.getMoneyRateTypeCode()).isEqualTo("SPOT");
+        assertThat(saved.getMoneyRateDateFieldId()).isEqualTo(orderDate.getId());
+        assertThat(saved.getMoneyCurrencyFieldId()).isEqualTo(currencyField.getId());
+        assertThat(saved.getMoneyBaseAmountFieldId()).isEqualTo(baseAmountField.getId());
+        assertThat(saved.getMoneyExchangeRateFieldId()).isNull();
+        assertThat(moduleFieldService.listByRelationId(relationId))
+                .extracting(ModuleMetadataField::getMetadataFieldId)
+                .contains(amount.getId(), orderDate.getId(), currencyField.getId(), baseAmountField.getId());
+        EntityDefinition schemaEntity = metadataEntityDefinitionCompiler.compile(metadataId);
+        assertThat(schemaEntity.fields()).extracting(FieldDefinition::fieldName)
+                .contains("amount", "orderDate", "amountCurrency", "amountBase");
+        FieldDefinition runtimeField = fieldDefinitionCompiler.compile(amount, relationId, saved);
+        assertThat(runtimeField.money().enabled()).isTrue();
+        assertThat(runtimeField.money().currencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(runtimeField.money().defaultCurrencyCode()).isEqualTo("USD");
+        assertThat(runtimeField.money().currencyFieldName()).isEqualTo("amountCurrency");
+        assertThat(runtimeField.money().baseAmountFieldName()).isEqualTo("amountBase");
+        assertThat(runtimeField.money().baseCurrencyCode()).isEqualTo("CNY");
+        assertThat(runtimeField.money().rateTypeCode()).isEqualTo("SPOT");
+        assertThat(runtimeField.money().rateDateFieldName()).isEqualTo("orderDate");
+        assertThat(runtimeField.money().exchangeRateFieldName()).isNull();
+        assertThat(runtimeField.money().currencyRequired()).isTrue();
+        verify(schemaEnsureService, atLeastOnce()).ensure(metadataId);
+        verify(runtimeRefreshCoordinator, atLeastOnce()).refreshByModuleField(argThat(
+                refreshed -> refreshed != null && moduleField.getId().equals(refreshed.getId())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldPersistMoneyValuesThroughRuntimeEntityCompiledFromSavedMetadata() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField orderDate = field(metadataId, "orderDate", "order_date", FieldType.DATE);
+        fieldService.insert(orderDate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyDefaultCurrencyCode("USD");
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleField.setMoneyRateDateFieldId(orderDate.getId());
+        moduleFieldService.update(moduleField);
+
+        IDatabaseOperations<Object> operations = mock(IDatabaseOperations.class);
+        when(operations.getDBInfo()).thenReturn(new DBInfo("POSTGRESQL").setName("muyun_test"));
+        when(operations.getDefaultSchemaName()).thenReturn(MetadataService.DEFAULT_SCHEMA);
+        when(operations.insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order"), anyMap(),
+                eq(StandardEntitySchema.ID_COLUMN))).thenReturn("order-1");
+        DynamicRecordService recordService = dynamicRecordService(
+                operations,
+                moduleDefinitionCompiler().compile("sales.order"),
+                moneyCoordinator()
+        );
+
+        DynamicRecord record = recordService.newRecord("sales.order", "order")
+                .setValue("amount", new BigDecimal("2"))
+                .setValue("orderDate", LocalDate.of(2026, 2, 16));
+        recordService.create("sales.order", "order", record);
+
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(operations).insertItem(eq(MetadataService.DEFAULT_SCHEMA), eq("sales_order"), body.capture(),
+                eq(StandardEntitySchema.ID_COLUMN));
+        assertThat(body.getValue())
+                .containsEntry("amount", new BigDecimal("2"))
+                .containsEntry("amount_currency", "USD")
+                .containsEntry("order_date", LocalDate.of(2026, 2, 16));
+        assertThat((BigDecimal) body.getValue().get("amount_base")).isEqualByComparingTo("14.47");
+    }
+
+    @Test
+    void shouldSaveMoneyConfigWithExplicitExchangeRateShadowField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField exchangeRate = field(metadataId, "amountExchangeRate", "amount_exchange_rate", FieldType.DECIMAL);
+        exchangeRate.setFieldForm(MetadataFieldForm.SHADOW);
+        exchangeRate.setFieldRole(MetadataFieldRole.MONEY_EXCHANGE_RATE);
+        exchangeRate.setOwnerFieldId(amount.getId());
+        fieldService.insert(exchangeRate);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleField.setMoneyExchangeRateFieldId(exchangeRate.getId());
+
+        moduleFieldService.update(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        assertThat(saved.getMoneyExchangeRateFieldId()).isEqualTo(exchangeRate.getId());
+        assertThat(moduleFieldService.listByRelationId(relationId))
+                .extracting(ModuleMetadataField::getMetadataFieldId)
+                .contains(exchangeRate.getId());
+        FieldDefinition compiled = fieldDefinitionCompiler.compile(amount, relationId, saved);
+        assertThat(compiled.money().exchangeRateFieldName()).isEqualTo("amountExchangeRate");
+    }
+
+    @Test
+    void shouldReuseEnsuredMoneyFieldsWithoutDuplicatingMetadataFields() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+
+        moduleFieldService.update(moduleField);
+        ModuleMetadataField first = moduleFieldService.select(moduleField.getId());
+        moduleFieldService.update(first);
+        ModuleMetadataField second = moduleFieldService.select(moduleField.getId());
+
+        assertThat(second.getMoneyCurrencyFieldId()).isEqualTo(first.getMoneyCurrencyFieldId());
+        assertThat(second.getMoneyBaseAmountFieldId()).isEqualTo(first.getMoneyBaseAmountFieldId());
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("amount", "amountCurrency", "amountBase");
+    }
+
+    @Test
+    void shouldSaveFixedMoneyWithoutCompanionCurrencyField() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.FIXED);
+        moduleField.setMoneyFixedCurrencyCode("usd");
+        moduleField.setMoneyBaseCurrencyCode("cny");
+        moduleField.setMoneyRateTypeCode("spot");
+
+        moduleFieldService.update(moduleField);
+
+        ModuleMetadataField saved = moduleFieldService.select(moduleField.getId());
+        assertThat(saved.getMoneyCurrencyFieldId()).isNull();
+        assertThat(saved.getMoneyExchangeRateFieldId()).isNull();
+        assertThat(fieldService.select(saved.getMoneyBaseAmountFieldId()).getFieldName()).isEqualTo("amountBase");
+        assertThat(saved.getMoneyCurrencyMode()).isEqualTo(FieldMoneyMode.FIXED);
+        assertThat(saved.getMoneyFixedCurrencyCode()).isEqualTo("USD");
+        assertThat(saved.getMoneyDefaultCurrencyCode()).isEqualTo("USD");
+    }
+
+    @Test
+    void shouldCompileSavedMoneyConfigIntoFieldDefinition() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyDefaultCurrencyCode("USD");
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleFieldService.update(moduleField);
+
+        FieldDefinition compiled = fieldDefinitionCompiler.compile(amount, relationId,
+                moduleFieldService.select(moduleField.getId()));
+
+        assertThat(compiled.money().enabled()).isTrue();
+        assertThat(compiled.money().currencyMode()).isEqualTo(FieldMoneyMode.SELECTABLE);
+        assertThat(compiled.money().currencyFieldName()).isEqualTo("amountCurrency");
+        assertThat(compiled.money().baseAmountFieldName()).isEqualTo("amountBase");
+        assertThat(compiled.money().baseCurrencyCode()).isEqualTo("CNY");
+        assertThat(compiled.money().rateTypeCode()).isEqualTo("SPOT");
+        assertThat(compiled.money().exchangeRateFieldName()).isNull();
+    }
+
+    @Test
+    void shouldRejectMoneySaveBeforeCreatingFieldsWhenConfigIsInvalid() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+
         assertThatThrownBy(() -> moduleFieldService.update(moduleField))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("baseValueFieldId");
+                .hasMessageContaining("moneyRateTypeCode");
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("amount");
+    }
+
+    @Test
+    void shouldRejectMoneySaveBeforeCreatingFieldsWhenRateDateFieldIsInvalid() {
+        moduleService.insert(module("sales.order", "sales", ModuleKind.DYNAMIC));
+        String metadataId = metadataService.insert(metadata("sales", "order"));
+        MetadataField amount = field(metadataId, "amount", "amount", FieldType.DECIMAL);
+        fieldService.insert(amount);
+        MetadataField description = field(metadataId, "description", "description", FieldType.STRING);
+        fieldService.insert(description);
+        String relationId = relationService.insert(mainRelation("sales.order", metadataId));
+        ModuleMetadataField moduleField = moduleField(moduleFieldService.ensureForRelation(relationId), amount.getId());
+        moduleField.setMoneyCurrencyMode(FieldMoneyMode.SELECTABLE);
+        moduleField.setMoneyBaseCurrencyCode("CNY");
+        moduleField.setMoneyRateTypeCode("SPOT");
+        moduleField.setMoneyRateDateFieldId(description.getId());
+
+        assertThatThrownBy(() -> moduleFieldService.update(moduleField))
+                .hasMessageContaining("money rate date field requires date or timestamp field");
+        assertThat(fieldService.list(Criteria.of().eq("metadataId", metadataId), PageRequest.of(1, 20)))
+                .extracting(MetadataField::getFieldName)
+                .containsExactly("amount", "description");
     }
 
     @Test
@@ -1475,6 +1921,144 @@ class PlatformMetadataServiceContractTest {
         category.setCategoryKind(kind);
         category.setTitle(alias);
         return category;
+    }
+
+    private Currency currency(String code, String numericCode, String title, String symbol, int scale) {
+        Currency currency = new Currency();
+        currency.setCode(code);
+        currency.setNumericCode(numericCode);
+        currency.setTitle(title);
+        currency.setSymbol(symbol);
+        currency.setDecimalScale(scale);
+        return currency;
+    }
+
+    private ExchangeRateType exchangeRateType(String code, String title) {
+        ExchangeRateType rateType = new ExchangeRateType();
+        rateType.setCode(code);
+        rateType.setTitle(title);
+        return rateType;
+    }
+
+    private ExchangeRate exchangeRate(String from, String to, String type, String effectiveDate, String rateValue) {
+        ExchangeRate rate = new ExchangeRate();
+        rate.setFromCurrencyCode(from);
+        rate.setToCurrencyCode(to);
+        rate.setRateTypeCode(type);
+        rate.setEffectiveDate(LocalDate.parse(effectiveDate));
+        rate.setRate(new BigDecimal(rateValue));
+        rate.setTitle(from + "/" + to + " " + type);
+        return rate;
+    }
+
+    private MoneyDynamicRecordMutationCoordinator moneyCoordinator() {
+        CurrencyService currencyService = new CurrencyService(new MemoryDao<>());
+        ExchangeRateTypeService rateTypeService = new ExchangeRateTypeService(new MemoryDao<>());
+        ExchangeRateService rateService = new ExchangeRateService(new MemoryDao<>(), currencyService, rateTypeService);
+        TenantCurrencySettingService tenantCurrencySettingService =
+                new TenantCurrencySettingService(new MemoryDao<>(), currencyService);
+        currencyService.insert(currency("USD", "840", "US Dollar", "$", 2));
+        currencyService.insert(currency("CNY", "156", "人民币", "¥", 2));
+        rateTypeService.insert(exchangeRateType("SPOT", "Spot"));
+        rateService.insert(exchangeRate("USD", "CNY", "SPOT", "2026-02-01", "7.2345"));
+        return new MoneyDynamicRecordMutationCoordinator(
+                new CurrencyConversionService(currencyService, rateService),
+                tenantCurrencySettingService,
+                Clock.fixed(Instant.parse("2026-06-16T00:00:00Z"), ZoneOffset.UTC)
+        );
+    }
+
+    private MeasureUnitDynamicRecordMutationCoordinator measureUnitCoordinator() {
+        MeasureUnitCategoryService categoryService = new MeasureUnitCategoryService(new MemoryDao<>());
+        MeasureUnitService unitService = new MeasureUnitService(new MemoryDao<>(), categoryService);
+        MeasureUnitConversionRuleService ruleService = new MeasureUnitConversionRuleService(new MemoryDao<>(), unitService);
+        categoryService.insert(measureUnitCategory("sales", "package", MeasureDimension.COUNT, "bottle"));
+        unitService.insert(measureUnit("sales", "package", "bottle", BigDecimal.ONE));
+        unitService.insert(measureUnit("sales", "package", "box", new BigDecimal("12")));
+        return new MeasureUnitDynamicRecordMutationCoordinator(
+                new MeasureUnitConversionService(categoryService, unitService),
+                new MeasureUnitBusinessConversionService(unitService, ruleService),
+                Clock.fixed(Instant.parse("2026-06-16T00:00:00Z"), ZoneOffset.UTC)
+        );
+    }
+
+    private MeasureUnitCategory measureUnitCategory(String applicationAlias,
+                                                    String alias,
+                                                    MeasureDimension dimension,
+                                                    String baseUnitCode) {
+        MeasureUnitCategory category = new MeasureUnitCategory();
+        category.setApplicationAlias(applicationAlias);
+        category.setAlias(alias);
+        category.setDimension(dimension);
+        category.setBaseUnitCode(baseUnitCode);
+        category.setTitle(alias);
+        return category;
+    }
+
+    private MeasureUnit measureUnit(String applicationAlias,
+                                    String categoryAlias,
+                                    String code,
+                                    BigDecimal factorToBase) {
+        MeasureUnit unit = new MeasureUnit();
+        unit.setApplicationAlias(applicationAlias);
+        unit.setCategoryAlias(categoryAlias);
+        unit.setCode(code);
+        unit.setTitle(code);
+        unit.setFactorToBase(factorToBase);
+        return unit;
+    }
+
+    private PlatformModuleDefinitionCompiler moduleDefinitionCompiler() {
+        PlatformModuleActionService actionService =
+                new PlatformModuleActionService(new MemoryDao<PlatformModuleAction>(), moduleService);
+        ModuleMetadataFormulaRuleService formulaRuleService =
+                new ModuleMetadataFormulaRuleService(new MemoryDao<>(), relationService, fieldService);
+        return new PlatformModuleDefinitionCompiler(
+                moduleService,
+                metadataService,
+                fieldService,
+                fieldDefinitionCompiler,
+                referenceConfigService,
+                relationService,
+                viewService,
+                viewFieldService,
+                actionService,
+                formulaRuleService,
+                moduleFieldService,
+                moduleFieldFilterService,
+                moduleFieldAffectService,
+                new ModuleDefinitionValidator()
+        );
+    }
+
+    private DynamicRecordService dynamicRecordService(IDatabaseOperations<Object> operations,
+                                                      ModuleDefinition definition,
+                                                      MoneyDynamicRecordMutationCoordinator mutationCoordinator) {
+        return dynamicRecordService(operations, definition, (DynamicRecordMutationCoordinator) mutationCoordinator);
+    }
+
+    private DynamicRecordService dynamicRecordService(IDatabaseOperations<Object> operations,
+                                                      ModuleDefinition definition,
+                                                      MeasureUnitDynamicRecordMutationCoordinator mutationCoordinator) {
+        return dynamicRecordService(operations, definition, (DynamicRecordMutationCoordinator) mutationCoordinator);
+    }
+
+    private DynamicRecordService dynamicRecordService(
+            IDatabaseOperations<Object> operations,
+            ModuleDefinition definition,
+            DynamicRecordMutationCoordinator mutationCoordinator) {
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(
+                operations,
+                new DynamicModuleRegistry(),
+                DynamicFieldValueValidator.NONE,
+                null
+        ).register(definition);
+        return new DynamicRecordService(
+                runtime,
+                new AllowAllActionExecutionPolicyService(),
+                new AllowAllDataScopeCriteriaService(),
+                mutationCoordinator
+        );
     }
 
     private PlatformModule module(String alias, String applicationAlias, ModuleKind kind) {
