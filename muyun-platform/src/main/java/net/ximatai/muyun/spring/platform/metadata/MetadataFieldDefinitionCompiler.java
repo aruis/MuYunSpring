@@ -50,9 +50,6 @@ public class MetadataFieldDefinitionCompiler {
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
         MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
         MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
-        MetadataFieldConfig queryConfig = relationConfig != null && relationConfig.getQueryable() != null
-                ? relationConfig
-                : defaultConfig;
         MetadataFieldConfig shapeConfig = defaultConfig;
         MetadataFieldConfig dictionaryConfig = relationConfig != null && relationConfig.hasDictionaryBinding()
                 ? relationConfig
@@ -60,9 +57,7 @@ public class MetadataFieldDefinitionCompiler {
         boolean hasModuleDictionary = moduleField != null
                 && moduleField.getDictionaryCategoryAlias() != null
                 && !moduleField.getDictionaryCategoryAlias().isBlank();
-        FieldQueryDefinition queryDefinition = queryConfig == null
-                ? fieldType.queryDefinition()
-                : queryConfig.queryDefinition(fieldType);
+        FieldQueryDefinition queryDefinition = queryDefinition(fieldType, defaultConfig, relationConfig);
         Integer length = shapeConfig == null ? fieldType.getDefaultLength() : shapeConfig.effectiveLength(fieldType);
         Integer precision = shapeConfig == null ? fieldType.getDefaultPrecision() : shapeConfig.effectivePrecision(fieldType);
         Integer scale = shapeConfig == null ? fieldType.getDefaultScale() : shapeConfig.effectiveScale(fieldType);
@@ -99,6 +94,31 @@ public class MetadataFieldDefinitionCompiler {
                     dictionaryConfig.getSelectionMode());
         }
         return definition;
+    }
+
+    public FieldQueryDefinition compileQueryDefinition(String metadataFieldId, String relationId) {
+        if (fieldService == null) {
+            throw new IllegalArgumentException("field query definition compilation requires MetadataFieldService");
+        }
+        MetadataField field = fieldService.select(metadataFieldId);
+        if (field == null) {
+            throw new IllegalArgumentException("field query definition points to missing field: " + metadataFieldId);
+        }
+        PlatformFieldType fieldType = fieldTypeService.requireFieldType(field.getFieldTypeAlias());
+        MetadataFieldConfig defaultConfig = configService.findByMetadataFieldId(field.getId());
+        MetadataFieldConfig relationConfig = configService.findRelationOverride(field.getId(), relationId);
+        return queryDefinition(fieldType, defaultConfig, relationConfig);
+    }
+
+    private FieldQueryDefinition queryDefinition(PlatformFieldType fieldType,
+                                                 MetadataFieldConfig defaultConfig,
+                                                 MetadataFieldConfig relationConfig) {
+        MetadataFieldConfig queryConfig = relationConfig != null && relationConfig.getQueryable() != null
+                ? relationConfig
+                : defaultConfig;
+        return queryConfig == null
+                ? fieldType.queryDefinition()
+                : queryConfig.queryDefinition(fieldType);
     }
 
     private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,
