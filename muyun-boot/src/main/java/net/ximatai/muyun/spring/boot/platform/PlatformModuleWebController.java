@@ -47,10 +47,10 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
             "id", "parentId", "applicationAlias", "moduleKind", "systemManaged",
             "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
-    @Autowired
     private PlatformDynamicRuntimeRefreshService runtimeRefreshService;
 
-    PlatformModuleWebController(PlatformDynamicRuntimeRefreshService runtimeRefreshService) {
+    @Autowired
+    public PlatformModuleWebController(PlatformDynamicRuntimeRefreshService runtimeRefreshService) {
         this.runtimeRefreshService = runtimeRefreshService;
     }
 

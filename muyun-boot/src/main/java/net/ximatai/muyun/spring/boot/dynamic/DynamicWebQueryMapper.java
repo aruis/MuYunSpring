@@ -74,6 +74,6 @@ final class DynamicWebQueryMapper {
         DynamicQueryOperator operator = condition.operator() == null || condition.operator().isBlank()
                 ? null
                 : DynamicQueryOperator.valueOf(condition.operator());
-        return new DynamicQueryCondition(condition.fieldName(), operator, condition.values());
+        return new DynamicQueryCondition(condition.fieldName(), operator, condition.values(), condition.timeZone());
     }
 }

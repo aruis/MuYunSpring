@@ -137,17 +137,18 @@ class PlatformMetadataServiceContractTest {
     private final ModuleMetadataFieldAffectService moduleFieldAffectService =
             new ModuleMetadataFieldAffectService(moduleFieldAffectDao, moduleFieldService);
     private final MetadataFieldProtectionConfigService protectionConfigService =
-            new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao);
+            new MetadataFieldProtectionConfigService(protectionConfigDao, fieldService, fieldTypeService, fieldConfigDao,
+                    Optional.of(runtimeRefreshCoordinator));
     private final MetadataFieldConfigService fieldConfigService =
             new MetadataFieldConfigService(fieldConfigDao, fieldService, metadataService, fieldTypeService,
-                    categoryService, relationService, protectionConfigService);
+                    categoryService, relationService, protectionConfigService, Optional.of(runtimeRefreshCoordinator));
     private final MetadataFieldDefinitionCompiler fieldDefinitionCompiler =
             new MetadataFieldDefinitionCompiler(fieldTypeService, fieldConfigService, protectionConfigService, fieldService);
     private final PlatformMetadataEntityDefinitionCompiler metadataEntityDefinitionCompiler =
             new PlatformMetadataEntityDefinitionCompiler(metadataService, fieldService, fieldDefinitionCompiler);
     private final MetadataFieldReferenceConfigService referenceConfigService =
             new MetadataFieldReferenceConfigService(referenceConfigDao, fieldService, metadataService,
-                    fieldTypeService, moduleService, relationService);
+                    fieldTypeService, moduleService, relationService, Optional.of(runtimeRefreshCoordinator));
     private final MetadataViewService viewService = new MetadataViewService(viewDao, relationService);
     private final MetadataViewFieldService viewFieldService =
             new MetadataViewFieldService(viewFieldDao, viewService, fieldService, relationService,
@@ -177,6 +178,24 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getSchemaName()).isEqualTo(MetadataService.DEFAULT_SCHEMA);
         assertThat(saved.getTableName()).isEqualTo("crm_customer");
         assertThat(saved.getEnabled()).isTrue();
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenMetadataItselfChanges() {
+        PlatformDynamicRuntimeRefreshCoordinator coordinator = mock(PlatformDynamicRuntimeRefreshCoordinator.class);
+        MetadataService service = new MetadataService(new MemoryDao<>(), Optional.empty(), Optional.of(coordinator));
+        Metadata metadata = metadata("crm", "customer");
+
+        String id = service.insert(metadata);
+
+        verify(coordinator).refreshByMetadataId(id);
+        clearInvocations(coordinator);
+
+        metadata.setId(id);
+        metadata.setTitle("Customer V2");
+        service.update(metadata);
+
+        verify(coordinator).refreshByMetadataId(id);
     }
 
     @Test
@@ -289,6 +308,39 @@ class PlatformMetadataServiceContractTest {
         assertThat(definition.protection().encryptionMode()).isEqualTo(FieldEncryptionMode.ENCRYPTED);
         assertThat(definition.protection().signatureMode()).isEqualTo(FieldSignatureMode.SIGNED);
         assertThat(definition.protection().maskingPolicy()).isEqualTo(FieldMaskingPolicy.PHONE);
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldConfigChanges() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+        fieldService.insert(field);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        MetadataFieldConfig config = fieldConfig(field.getId());
+        config.setQueryable(false);
+        fieldConfigService.insert(config);
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && field.getId().equals(refreshed.getId())));
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldProtectionChanges() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField field = field(metadataId, "mobile", "mobile", FieldType.STRING);
+        fieldService.insert(field);
+        MetadataFieldConfig fieldConfig = fieldConfig(field.getId());
+        fieldConfig.setQueryable(false);
+        fieldConfigService.insert(fieldConfig);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        MetadataFieldProtectionConfig config = protectionConfig(field.getId());
+        config.setEncryptionMode(FieldEncryptionMode.ENCRYPTED);
+        protectionConfigService.insert(config);
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && field.getId().equals(refreshed.getId())));
     }
 
     @Test
@@ -738,6 +790,22 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getCardinality()).isEqualTo(net.ximatai.muyun.spring.ability.reference.ReferenceCardinality.ONE);
         assertThat(saved.getTitleOutputField()).isEqualTo("customerIdTitle");
         assertThat(saved.projections()).hasSize(1);
+    }
+
+    @Test
+    void shouldRefreshDynamicRuntimeWhenFieldReferenceConfigChanges() {
+        moduleService.insert(module("crm.customer", "crm", ModuleKind.DYNAMIC));
+        String customerId = metadataService.insert(metadata("crm", "customer"));
+        String contactId = metadataService.insert(metadata("crm", "contact"));
+        fieldService.insert(titleField(customerId));
+        MetadataField customerField = field(contactId, "customerId", "customer_id", FieldType.STRING);
+        fieldService.insert(customerField);
+        clearInvocations(runtimeRefreshCoordinator);
+
+        referenceConfigService.insert(referenceConfig(customerField.getId(), customerId));
+
+        verify(runtimeRefreshCoordinator).refreshByMetadataField(argThat(refreshed ->
+                refreshed != null && customerField.getId().equals(refreshed.getId())));
     }
 
     @Test

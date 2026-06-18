@@ -11,9 +11,13 @@ import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -27,6 +31,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     private final PlatformFieldTypeService fieldTypeService;
     private final PlatformModuleService moduleService;
     private final ModuleMetadataRelationService relationService;
+    private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
 
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,
@@ -34,12 +39,26 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
                                                PlatformFieldTypeService fieldTypeService,
                                                PlatformModuleService moduleService,
                                                ModuleMetadataRelationService relationService) {
+        this(referenceConfigDao, fieldService, metadataService, fieldTypeService, moduleService, relationService,
+                Optional.empty());
+    }
+
+    @Autowired
+    public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
+                                               MetadataFieldService fieldService,
+                                               MetadataService metadataService,
+                                               PlatformFieldTypeService fieldTypeService,
+                                               PlatformModuleService moduleService,
+                                               ModuleMetadataRelationService relationService,
+                                               Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataFieldReferenceConfig.class, referenceConfigDao);
         this.fieldService = fieldService;
         this.metadataService = metadataService;
         this.fieldTypeService = fieldTypeService;
         this.moduleService = moduleService;
         this.relationService = relationService;
+        this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
+                "runtimeRefreshCoordinator must not be null");
     }
 
     @Override
@@ -50,6 +69,11 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
     @Override
     public void beforeUpdate(MetadataFieldReferenceConfig config) {
         normalizeAndValidate(config);
+    }
+
+    @Override
+    public void afterChanged(MetadataFieldReferenceConfig config) {
+        refreshByMetadataFieldId(config.getMetadataFieldId());
     }
 
     public MetadataFieldReferenceConfig findByMetadataFieldId(String metadataFieldId) {
@@ -115,6 +139,16 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
             return criteria.isNull("relationId");
         }
         return criteria.eq("relationId", relationId);
+    }
+
+    private void refreshByMetadataFieldId(String metadataFieldId) {
+        if (runtimeRefreshCoordinator.isEmpty() || metadataFieldId == null || metadataFieldId.isBlank()) {
+            return;
+        }
+        MetadataField field = fieldService.select(metadataFieldId);
+        if (field != null) {
+            runtimeRefreshCoordinator.get().refreshByMetadataField(field);
+        }
     }
 
     private void normalizeRelation(MetadataFieldReferenceConfig config, MetadataField field) {

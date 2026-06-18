@@ -10,8 +10,12 @@ import net.ximatai.muyun.spring.common.security.FieldMaskingPolicy;
 import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class MetadataFieldProtectionConfigService extends AbstractAbilityService<MetadataFieldProtectionConfig> implements
@@ -21,22 +25,33 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
     private final MetadataFieldService fieldService;
     private final PlatformFieldTypeService fieldTypeService;
     private final BaseDao<MetadataFieldConfig, String> fieldConfigDao;
+    private final Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator;
 
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
                                                 PlatformFieldTypeService fieldTypeService) {
-        this(configDao, fieldService, fieldTypeService, null);
+        this(configDao, fieldService, fieldTypeService, null, Optional.empty());
+    }
+
+    public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
+                                                MetadataFieldService fieldService,
+                                                PlatformFieldTypeService fieldTypeService,
+                                                BaseDao<MetadataFieldConfig, String> fieldConfigDao) {
+        this(configDao, fieldService, fieldTypeService, fieldConfigDao, Optional.empty());
     }
 
     @Autowired
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
                                                 PlatformFieldTypeService fieldTypeService,
-                                                BaseDao<MetadataFieldConfig, String> fieldConfigDao) {
+                                                BaseDao<MetadataFieldConfig, String> fieldConfigDao,
+                                                Optional<PlatformDynamicRuntimeRefreshCoordinator> runtimeRefreshCoordinator) {
         super(MODULE_ALIAS, MetadataFieldProtectionConfig.class, configDao);
         this.fieldService = fieldService;
         this.fieldTypeService = fieldTypeService;
         this.fieldConfigDao = fieldConfigDao;
+        this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
+                "runtimeRefreshCoordinator must not be null");
     }
 
     @Override
@@ -47,6 +62,20 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
     @Override
     public void beforeUpdate(MetadataFieldProtectionConfig config) {
         normalizeAndValidate(config);
+    }
+
+    @Override
+    public void afterChanged(MetadataFieldProtectionConfig config) {
+        PlatformDynamicRuntimeRefreshCoordinator runtimeRefreshCoordinator =
+                this.runtimeRefreshCoordinator.orElse(null);
+        if (runtimeRefreshCoordinator == null || config.getMetadataFieldId() == null
+                || config.getMetadataFieldId().isBlank()) {
+            return;
+        }
+        MetadataField field = fieldService.select(config.getMetadataFieldId());
+        if (field != null) {
+            runtimeRefreshCoordinator.refreshByMetadataField(field);
+        }
     }
 
     public MetadataFieldProtectionConfig findByMetadataFieldId(String metadataFieldId) {

@@ -598,6 +598,7 @@ final class DynamicOpenApiSchemaFactory {
         properties.put("fieldName", stringProperty(false));
         properties.put("operator", stringProperty(true));
         properties.put("values", arrayProperty("object"));
+        properties.put("timeZone", stringProperty(true));
         return new DynamicOpenApiDocument.Schema(name, "object", null, List.of(), properties, null);
     }
 

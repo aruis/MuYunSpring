@@ -22,14 +22,17 @@ class DynamicWebQueryMapperTest {
     void shouldMapCommonWebQueryConditionAndKeepDefaultOperatorWhenOmitted() {
         var conditions = DynamicWebQueryMapper.queryConditions(List.of(
                 new WebQueryCondition("code", null, List.of("C-001")),
-                new WebQueryCondition("amount", "GT", List.of(10))
+                new WebQueryCondition("amount", "GT", List.of(10)),
+                new WebQueryCondition("occurredAt", "BETWEEN", List.of("2026-06-17", "2026-06-18"),
+                        " Asia/Shanghai ")
         ));
 
-        assertThat(conditions).hasSize(2);
+        assertThat(conditions).hasSize(3);
         assertThat(conditions.get(0).fieldName()).isEqualTo("code");
         assertThat(conditions.get(0).operator()).isNull();
         assertThat(conditions.get(0).values()).isEqualTo(List.of("C-001"));
         assertThat(conditions.get(1).operator()).isEqualTo(DynamicQueryOperator.GT);
+        assertThat(conditions.get(2).timeZone()).isEqualTo("Asia/Shanghai");
     }
 
     @Test

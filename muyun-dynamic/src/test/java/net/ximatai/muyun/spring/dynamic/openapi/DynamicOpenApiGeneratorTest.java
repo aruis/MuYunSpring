@@ -551,6 +551,8 @@ class DynamicOpenApiGeneratorTest {
                 .isEqualTo("WebSort");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("conditions").itemType())
                 .isEqualTo("WebQueryCondition");
+        assertThat(document.schemas().get("WebQueryCondition").properties())
+                .containsKeys("fieldName", "operator", "values", "timeZone");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties().get("page").type())
                 .isEqualTo("WebPageRequest");
         assertThat(document.schemas().get("DynamicWebReferenceRequest").properties())

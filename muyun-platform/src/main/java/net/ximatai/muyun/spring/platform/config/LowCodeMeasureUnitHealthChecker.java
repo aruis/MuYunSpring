@@ -12,6 +12,10 @@ import java.util.stream.Collectors;
 
 @Component
 public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthChecker {
+    private static final Set<String> NUMERIC_TYPES = Set.of("DECIMAL", "NUMERIC", "NUMBER", "INTEGER", "INT",
+            "LONG", "BIGINT");
+    private static final Set<String> TEXT_TYPES = Set.of("STRING", "TEXT", "VARCHAR", "CHAR");
+
     @Override
     public List<LowCodeConfigHealthItem> check(LowCodeModuleHealthContext context) {
         LowCodeModulePackage modulePackage = context == null ? null : context.modulePackage();
@@ -32,6 +36,10 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 .map(FieldContract::fieldName)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Map<String, String> fieldTypes = fields.stream()
+                .filter(field -> field.fieldName() != null)
+                .filter(field -> field.fieldType() != null)
+                .collect(Collectors.toMap(FieldContract::fieldName, FieldContract::fieldType, (left, right) -> left));
         Set<String> measureDependencies = modulePackage.dependencyManifest().dependencies().stream()
                 .filter(dependency -> dependency != null && dependency.type() == LowCodePackageDependencyType.MEASURE_UNIT)
                 .map(dependency -> dependency.applicationAlias() + ":" + dependency.alias())
@@ -42,6 +50,8 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 continue;
             }
             String targetId = field.fieldName() == null ? field.unitCategoryAlias() : field.fieldName();
+            requireType(items, field.fieldType(), NUMERIC_TYPES, "MEASURE_UNIT_OWNER_NOT_NUMERIC",
+                    "measure unit field requires numeric owner", targetId);
             requireDependency(items, modulePackage.applicationAlias(), field.unitCategoryAlias(), measureDependencies, targetId);
             String baseUnitCategoryAlias = field.baseUnitCategoryAlias() == null
                     ? field.unitCategoryAlias()
@@ -51,7 +61,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
             }
             requireText(items, field.baseUnitCode(), "MEASURE_UNIT_BASE_UNIT_MISSING",
                     "measure unit field requires baseUnitCode", targetId);
-            requireBaseValueField(items, field, fieldNames, targetId);
+            requireBaseValueField(items, field, fieldNames, fieldTypes, targetId);
             if (field.unitMode() == null) {
                 items.add(error("MEASURE_UNIT_MODE_MISSING", "measure unit field requires unitMode", targetId,
                         "Set unitMode to FIXED or SELECTABLE"));
@@ -62,6 +72,9 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                 requireRelatedField(items, field.unitFieldName(), fieldNames,
                         "MEASURE_UNIT_COMPANION_MISSING", "selectable measure unit field requires unit companion field",
                         targetId);
+                requireRelatedType(items, field.unitFieldName(), fieldTypes, TEXT_TYPES,
+                        "MEASURE_UNIT_COMPANION_NOT_TEXT",
+                        "measure unit companion field must be text", targetId);
             }
             requireOptionalRelatedField(items, field.conversionScopeFieldName(), fieldNames,
                     "MEASURE_UNIT_SCOPE_FIELD_MISSING", "measure unit conversion scope field is missing", targetId);
@@ -92,6 +105,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
     private void requireBaseValueField(List<LowCodeConfigHealthItem> items,
                                        FieldContract field,
                                        Set<String> fieldNames,
+                                       Map<String, String> fieldTypes,
                                        String targetId) {
         String baseValueFieldName = field.baseValueFieldName();
         String ownerFieldName = field.fieldName();
@@ -113,7 +127,11 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
             items.add(error("MEASURE_UNIT_BASE_VALUE_MISSING",
                     "measure base value field is missing from metadata fields", targetId,
                     "Include the shadow base value field in the metadata bundle"));
+            return;
         }
+        requireRelatedType(items, baseValueFieldName, fieldTypes, NUMERIC_TYPES,
+                "MEASURE_UNIT_BASE_VALUE_NOT_NUMERIC",
+                "measure base value field must be numeric", targetId);
     }
 
     private void requireRelatedField(List<LowCodeConfigHealthItem> items,
@@ -135,6 +153,30 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
                                              String targetId) {
         if (fieldName != null && !fieldNames.contains(fieldName)) {
             items.add(error(code, message, targetId, "Include or remove related field"));
+        }
+    }
+
+    private void requireRelatedType(List<LowCodeConfigHealthItem> items,
+                                    String fieldName,
+                                    Map<String, String> fieldTypes,
+                                    Set<String> expectedTypes,
+                                    String code,
+                                    String message,
+                                    String targetId) {
+        if (fieldName == null) {
+            return;
+        }
+        requireType(items, fieldTypes.get(fieldName), expectedTypes, code, message, targetId);
+    }
+
+    private void requireType(List<LowCodeConfigHealthItem> items,
+                             String fieldType,
+                             Set<String> expectedTypes,
+                             String code,
+                             String message,
+                             String targetId) {
+        if (fieldType != null && !expectedTypes.contains(fieldType)) {
+            items.add(error(code, message, targetId, "Use a compatible metadata field type"));
         }
     }
 
@@ -164,6 +206,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
         return new FieldContract(
                 field.fieldName(),
                 field.ownerFieldId(),
+                field.runtimeFieldType(),
                 field.firstText(measureUnit, "unitCategoryAlias", "categoryAlias"),
                 field.firstText(measureUnit, "unitMode", "mode"),
                 field.firstText(measureUnit, "fixedUnitCode"),
@@ -179,6 +222,7 @@ public class LowCodeMeasureUnitHealthChecker implements LowCodeModuleHealthCheck
     private record FieldContract(
             String fieldName,
             String ownerFieldId,
+            String fieldType,
             String unitCategoryAlias,
             String unitMode,
             String fixedUnitCode,

@@ -703,6 +703,47 @@ class LowCodeModuleHealthServiceTest {
     }
 
     @Test
+    void measureUnitCheckerShouldRejectIncompatibleFieldTypes() {
+        LowCodeModulePackage modulePackage = new LowCodeModulePackage(
+                "m10.v1",
+                LowCodePackageMode.MODULE_FULL,
+                "crm",
+                "crm.contract",
+                List.of(LowCodeConfigBundle.included(LowCodePackageBundleType.METADATA,
+                        Map.of(
+                                "module", "crm.contract",
+                                "fields", List.of(
+                                        Map.of(
+                                                "fieldName", "quantity",
+                                                "fieldType", "STRING",
+                                                "unitCategoryAlias", "quantity",
+                                                "unitMode", "SELECTABLE",
+                                                "baseUnitCode", "bottle",
+                                                "baseValueFieldName", "quantityBase",
+                                                "unitFieldName", "quantityUnit"
+                                        ),
+                                        Map.of("fieldName", "quantityUnit", "fieldType", "DECIMAL"),
+                                        Map.of("fieldName", "quantityBase", "fieldType", "STRING")
+                                )
+                        ))),
+                new LowCodePackageDependencyManifest(List.of(LowCodePackageDependency.measureUnit("crm", "quantity"))),
+                null
+        );
+        LowCodeModuleHealthService service = new LowCodeModuleHealthService(
+                List.of(new LowCodeMeasureUnitHealthChecker()));
+
+        LowCodeConfigHealthReport report = service.check(LowCodeModuleHealthContext.ofPackage(modulePackage));
+
+        assertThat(report.status()).isEqualTo(LowCodeConfigHealthStatus.FAIL);
+        assertThat(report.items()).extracting(LowCodeConfigHealthItem::code)
+                .containsExactlyInAnyOrder(
+                        "MEASURE_UNIT_OWNER_NOT_NUMERIC",
+                        "MEASURE_UNIT_COMPANION_NOT_TEXT",
+                        "MEASURE_UNIT_BASE_VALUE_NOT_NUMERIC"
+                );
+    }
+
+    @Test
     void dependencyCheckerShouldResolveMeasureUnitCategoryDependency() {
         LowCodeModulePackage modulePackage = measureUnitPackage(
                 List.of(LowCodePackageDependency.measureUnit("crm", "quantity")));
