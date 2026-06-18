@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "@muyun/web-contracts": ["../../src/web-contracts/index.ts"],
+      "@muyun/web-core": ["../../src/web-core/index.ts"],
+      "@muyun/vue-ui-antdv": ["../../src/vue-ui-antdv/index.ts"],
+      "@muyun/vue-ui-antdv/styles.css": ["../../src/vue-ui-antdv/styles.css"],
+      "@muyun/dynamic-page-runtime": ["../../src/dynamic-page-runtime/index.ts"],
+      "@muyun/platform-components": ["../../src/platform-components/index.ts"],
+      "@muyun/platform-shell": ["../../src/platform-shell/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "../../src/web-contracts/**/*.ts",
+    "../../src/web-core/**/*.ts",
+    "../../src/vue-ui-antdv/**/*.ts",
+    "../../src/vue-ui-antdv/**/*.vue",
+    "../../src/dynamic-page-runtime/**/*.ts",
+    "../../src/dynamic-page-runtime/**/*.vue",
+    "../../src/platform-components/**/*.ts",
+    "../../src/platform-shell/**/*.ts",
+    "../../src/platform-shell/**/*.vue"
+  ]
+}

@@ -1,0 +1,172 @@
+:root {
+  color: #1f2933;
+  background: #f4f7fb;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  padding: 24px 18px;
+  border-right: 1px solid #dde5ef;
+  background: #102033;
+  color: #f8fafc;
+}
+
+.brand {
+  margin-bottom: 28px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.app-sidebar nav {
+  display: grid;
+  gap: 8px;
+}
+
+.app-sidebar a {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #c9d6e5;
+  text-decoration: none;
+}
+
+.app-sidebar a:first-child {
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+
+.app-content {
+  min-width: 0;
+  padding: 28px;
+}
+
+.home-view,
+.runtime-page {
+  display: grid;
+  gap: 20px;
+}
+
+.hero,
+.panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgb(31 41 51 / 0.05);
+}
+
+.hero {
+  padding: 24px;
+}
+
+.hero h1,
+.section-header h2,
+.panel h3 {
+  margin: 0;
+}
+
+.hero p {
+  max-width: 840px;
+  margin: 10px 0 0;
+  color: #5f6f83;
+  line-height: 1.65;
+}
+
+.eyebrow {
+  margin: 0 0 8px !important;
+  color: #1677ff !important;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.section-header p {
+  margin: 6px 0 0;
+  color: #6b7788;
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 20px;
+}
+
+.panel h3 {
+  margin-bottom: 14px;
+  font-size: 16px;
+}
+
+.panel pre {
+  max-height: 360px;
+  overflow: auto;
+  color: #314256;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    border-right: 0;
+  }
+
+  .runtime-grid,
+  .section-header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
