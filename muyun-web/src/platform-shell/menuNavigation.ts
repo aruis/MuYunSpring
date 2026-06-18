@@ -192,6 +192,7 @@ export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
       pageType: descriptor.pageType,
       routeName: descriptor.target.routeName,
       pageKey: descriptor.target.pageKey,
+      menuId: descriptor.menuId,
       title: descriptor.title,
     };
     return appendQuery('/platform/workspace', query);
@@ -204,19 +205,21 @@ export function pageDescriptorToUrl(descriptor: PageDescriptor): string {
       entryParamsJson: descriptor.entryParamsJson,
       uiConfigId: descriptor.target.defaultUiConfigId,
       queryTemplateId: descriptor.target.defaultQueryTemplateId,
+      menuId: descriptor.menuId,
       title: descriptor.title,
     });
   }
 
-  if (descriptor.pageType === 'remote-url') {
+  if (descriptor.pageType === 'remote-url' || descriptor.pageType === 'external-link') {
     return appendQuery('/platform/external', {
       url: descriptor.target.url,
       mode: descriptor.openMode,
+      menuId: descriptor.menuId,
       title: descriptor.title,
     });
   }
 
-  return descriptor.target.url;
+  return exhaustivePageDescriptor(descriptor);
 }
 
 export function pageDescriptorFromUrl(
@@ -229,12 +232,20 @@ export function pageDescriptorFromUrl(
 
   if (path.startsWith('/platform/dynamic/')) {
     const [, , , moduleAlias, pageMode] = path.split('/');
-    const params = withoutKeys(query, ['entryParamsJson', 'queryTemplateId', 'title', 'uiConfigId']);
+    const params = withoutKeys(query, [
+      'entryParamsJson',
+      'menuId',
+      'queryTemplateId',
+      'title',
+      'uiConfigId',
+    ]);
+    const menuId = stringValue(query.menuId);
     return {
       pageType: 'dynamic-module',
       openMode: 'dynamic-runner',
       hostType: 'dynamic-module-host',
       title: stringValue(query.title) ?? options.title,
+      menuId,
       target: {
         moduleAlias: decodeURIComponent(moduleAlias ?? ''),
         pageMode: pageModeOf(pageMode),
@@ -243,21 +254,28 @@ export function pageDescriptorFromUrl(
       },
       params,
       entryParamsJson: stringValue(query.entryParamsJson),
-      tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+      tabPolicy: menuId
+        ? { identity: 'by-menu' as const, closable: true, cacheable: true }
+        : { identity: 'by-target' as const, closable: true, cacheable: true },
     };
   }
 
   if (path === '/platform/external') {
     const remoteUrl = stringValue(query.url) ?? '';
     const openMode = stringValue(query.mode) === 'new-window' ? 'new-window' : 'iframe';
+    const menuId = stringValue(query.menuId);
+    const tabPolicy = menuId
+      ? { identity: 'by-menu' as const, closable: true }
+      : { identity: 'by-target' as const, closable: true };
     if (openMode === 'iframe') {
       return {
         pageType: 'remote-url',
         openMode,
         hostType: 'external-page-host',
         title: stringValue(query.title) ?? options.title,
+        menuId,
         target: { url: remoteUrl },
-        tabPolicy: { identity: 'by-target', closable: true },
+        tabPolicy,
       };
     }
 
@@ -266,8 +284,9 @@ export function pageDescriptorFromUrl(
       openMode,
       hostType: 'external-page-host',
       title: stringValue(query.title) ?? options.title,
+      menuId,
       target: { url: remoteUrl },
-      tabPolicy: { identity: 'by-target', closable: true },
+      tabPolicy,
     };
   }
 
@@ -275,15 +294,19 @@ export function pageDescriptorFromUrl(
     const routeTarget: RoutePageTarget = {
       routeName: stringValue(query.routeName),
       pageKey: stringValue(query.pageKey),
-      query: withoutKeys(query, ['pageType', 'routeName', 'pageKey', 'title']),
+      query: withoutKeys(query, ['menuId', 'pageType', 'routeName', 'pageKey', 'title']),
     };
     const pageType = stringValue(query.pageType) === 'business-route' ? 'business-route' : 'platform-route';
+    const menuId = stringValue(query.menuId);
     const descriptorBase = {
       openMode: 'shell-route' as const,
       title: stringValue(query.title) ?? options.title,
+      menuId,
       target: routeTarget,
       params: routeTarget.query,
-      tabPolicy: { identity: 'by-target' as const, closable: true, cacheable: true },
+      tabPolicy: menuId
+        ? { identity: 'by-menu' as const, closable: true, cacheable: true }
+        : { identity: 'by-target' as const, closable: true, cacheable: true },
     };
 
     if (pageType === 'business-route') {
@@ -457,4 +480,8 @@ const defaultPlatformRoutePrefixes = ['/platform'];
 function pageModeOf(value: string | undefined): MenuPageMode | undefined {
   const normalized = value?.toUpperCase();
   return normalized === 'LIST' || normalized === 'FORM' || normalized === 'DETAIL' ? normalized : undefined;
+}
+
+function exhaustivePageDescriptor(descriptor: never): never {
+  throw new Error(`Unsupported page descriptor: ${JSON.stringify(descriptor)}`);
 }

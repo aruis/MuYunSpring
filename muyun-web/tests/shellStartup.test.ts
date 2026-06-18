@@ -186,6 +186,31 @@ test('activeTabUrlOf returns the active tab descriptor URL', () => {
   );
 });
 
+test('activeTabUrlOf keeps new-window external links on shell-owned URLs', () => {
+  const tab = {
+    key: 'menu:external-bi',
+    title: 'BI',
+    pageDescriptor: {
+      pageType: 'external-link',
+      openMode: 'new-window',
+      hostType: 'external-page-host',
+      menuId: 'external-bi',
+      target: { url: 'https://bi.example.com/report' },
+      tabPolicy: { identity: 'by-menu' },
+    },
+  };
+
+  assert.equal(
+    activeTabUrlOf({
+      session: { currentUser },
+      menus,
+      tabs: [tab],
+      activeTabKey: tab.key,
+    }),
+    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+  );
+});
+
 test('restoreShellStartupStateFromUrl activates the matching menu tab', () => {
   const state = {
     session: { currentUser },

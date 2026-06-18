@@ -82,11 +82,13 @@ test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptor
   assert.equal(descriptor.entryParamsJson, '{"source":"menu"}');
   assert.equal(
     pageDescriptorToUrl(descriptor),
-    '/platform/dynamic/crm.customer/list?entryParamsJson=%7B%22source%22%3A%22menu%22%7D&queryTemplateId=customer-query-v1&recordId=customer-1&uiConfigId=customer-list-v1',
+    '/platform/dynamic/crm.customer/list?entryParamsJson=%7B%22source%22%3A%22menu%22%7D&menuId=customer-module&queryTemplateId=customer-query-v1&recordId=customer-1&uiConfigId=customer-list-v1',
   );
   const roundTrip = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor));
   assert.equal(roundTrip.entryParamsJson, '{"source":"menu"}');
   assert.equal(roundTrip.params?.recordId, 'customer-1');
+  assert.equal(roundTrip.menuId, 'customer-module');
+  assert.equal(roundTrip.tabPolicy.identity, 'by-menu');
 });
 
 test('resolvePageDescriptor resolves LINK targets by open mode', () => {
@@ -106,12 +108,35 @@ test('resolvePageDescriptor resolves LINK targets by open mode', () => {
   assert.equal(iframeDescriptor.hostType, 'external-page-host');
   assert.equal(
     pageDescriptorToUrl(iframeDescriptor),
-    '/platform/external?mode=iframe&url=%2Fcrm%2Fcustomer%2Flist',
+    '/platform/external?menuId=crm-online&mode=iframe&url=%2Fcrm%2Fcustomer%2Flist',
   );
   assert.equal(newWindowDescriptor.pageType, 'external-link');
   assert.equal(newWindowDescriptor.openMode, 'new-window');
   assert.equal(newWindowDescriptor.hostType, 'external-page-host');
-  assert.equal(pageDescriptorToUrl(newWindowDescriptor), 'https://bi.example.com/report');
+  assert.equal(
+    pageDescriptorToUrl(newWindowDescriptor),
+    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+  );
+});
+
+test('pageDescriptorToUrl keeps new-window external links on shell-owned URLs', () => {
+  const descriptor = resolvePageDescriptor({
+    menuId: 'external-bi',
+    menuType: 'LINK',
+    externalUrl: 'https://bi.example.com/report',
+  });
+
+  assert.equal(
+    pageDescriptorToUrl(descriptor),
+    '/platform/external?menuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+  );
+
+  const restored = pageDescriptorFromUrl(pageDescriptorToUrl(descriptor));
+  assert.equal(restored.pageType, 'external-link');
+  assert.equal(restored.openMode, 'new-window');
+  assert.equal(restored.target.url, 'https://bi.example.com/report');
+  assert.equal(restored.menuId, 'external-bi');
+  assert.equal(restored.tabPolicy.identity, 'by-menu');
 });
 
 test('resolvePageDescriptor does not treat protocol-relative LINK targets as same-origin paths', () => {
@@ -182,8 +207,12 @@ test('pageDescriptorToUrl and pageDescriptorFromUrl preserve routeName and pageK
   assert.equal(routeNameRoundTrip.pageType, 'business-route');
   assert.equal(routeNameRoundTrip.target.routeName, 'crm.customer.list');
   assert.equal(routeNameRoundTrip.target.query?.status, 'active');
+  assert.equal(routeNameRoundTrip.menuId, 'customer-name');
+  assert.equal(routeNameRoundTrip.tabPolicy.identity, 'by-menu');
   assert.equal(pageKeyRoundTrip.pageType, 'business-route');
   assert.equal(pageKeyRoundTrip.target.pageKey, 'customerList');
+  assert.equal(pageKeyRoundTrip.menuId, 'customer-page');
+  assert.equal(pageKeyRoundTrip.tabPolicy.identity, 'by-menu');
 });
 
 test('business route prefix matching uses path segment boundaries', () => {
