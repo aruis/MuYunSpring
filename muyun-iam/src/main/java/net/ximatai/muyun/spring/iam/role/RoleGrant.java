@@ -9,11 +9,17 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "iam_role_grant", comment = "Role grant")
 @CompositeIndex(columns = {"tenant_id", "role_id", "subject_type", "subject_id"}, unique = true)
+@InitialDataFields(
+        includeId = false,
+        identity = {"roleId", "subjectType", "subjectId"},
+        managed = {"enabled"}
+)
 public class RoleGrant extends StandardEntity {
     @Column(name = "role_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role id")
     private String roleId;

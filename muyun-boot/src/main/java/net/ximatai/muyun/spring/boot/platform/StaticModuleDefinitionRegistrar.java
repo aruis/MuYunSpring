@@ -9,13 +9,14 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.Ordered;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class StaticModuleDefinitionRegistrar implements ApplicationRunner {
+public class StaticModuleDefinitionRegistrar implements ApplicationRunner, Ordered {
     private final PlatformModuleService moduleService;
     private final PlatformModuleActionService actionService;
     private final List<StaticModuleDefinition> definitions;
@@ -40,6 +41,11 @@ public class StaticModuleDefinitionRegistrar implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         registerAll();
+    }
+
+    @Override
+    public int getOrder() {
+        return 0;
     }
 
     public void registerAll() {

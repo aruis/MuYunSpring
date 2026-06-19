@@ -7,10 +7,15 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "platform_menu_scheme", comment = "Platform menu scheme")
+@InitialDataFields(
+        identity = {"alias", "scopeType", "scopeId", "tenantId"},
+        operator = {"title", "enabled", "sortOrder"}
+)
 public class MenuScheme extends StandardEnabledSortableEntity {
     @Column(name = "alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Menu scheme alias")
     private String alias;

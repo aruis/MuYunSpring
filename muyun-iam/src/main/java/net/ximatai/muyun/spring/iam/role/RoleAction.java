@@ -9,11 +9,18 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEntity;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "iam_role_action", comment = "Role action permission")
 @CompositeIndex(columns = {"tenant_id", "role_id", "module_alias", "action_code"}, unique = true)
+@InitialDataFields(
+        includeId = false,
+        identity = {"roleId", "moduleAlias", "actionCode"},
+        managed = {"dataScopePolicy", "tenantScopePolicy", "scopeCondition", "referenceFieldId",
+                "referenceActionCode", "enabled"}
+)
 public class RoleAction extends StandardEntity {
     @Column(name = "role_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role id")
     private String roleId;

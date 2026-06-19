@@ -7,7 +7,11 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.SystemManagedAbility;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class TenantService extends AbstractAbilityService<Tenant> implements
@@ -15,12 +19,30 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
         GlobalScopedAbility<Tenant>,
         EnableAbility<Tenant>,
         SortAbility<Tenant>,
-        ActiveTenantVerifier {
+        ActiveTenantVerifier,
+        InitialDataAbility<Tenant> {
 
     public static final String MODULE_ALIAS = "iam.tenant";
+    public static final String PLATFORM_TENANT_ID = "platform";
+    public static final String PLATFORM_TENANT_TITLE = "平台租户";
 
     public TenantService(TenantDao tenantDao) {
         super(MODULE_ALIAS, Tenant.class, tenantDao);
+    }
+
+    @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.defaults().order(30);
+    }
+
+    @Override
+    public List<Tenant> initialData() {
+        Tenant tenant = new Tenant();
+        tenant.setId(PLATFORM_TENANT_ID);
+        tenant.setTitle(PLATFORM_TENANT_TITLE);
+        tenant.setEnabled(Boolean.TRUE);
+        tenant.setSortOrder(1);
+        return List.of(tenant);
     }
 
     @Override

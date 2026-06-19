@@ -9,11 +9,17 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "iam_role", comment = "Role")
 @CompositeIndex(columns = {"tenant_id", "role_kind", "title"}, unique = true)
+@InitialDataFields(
+        managed = {"roleKind", "memberRoleIds", "grantSubjectTypes", "publicRole", "builtIn", "systemManaged",
+                "description"},
+        operator = {"title", "enabled", "sortOrder"}
+)
 public class Role extends StandardEnabledSortableEntity {
     @Column(name = "role_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role kind",
             defaultVal = @Default(varchar = "standard"))

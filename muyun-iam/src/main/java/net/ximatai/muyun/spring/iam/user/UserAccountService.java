@@ -17,6 +17,11 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
+import net.ximatai.muyun.spring.iam.initialdata.PlatformInitialAdminSettings;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,11 +34,16 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         EnableAbility<UserAccount>,
         SortAbility<UserAccount>,
         ReferenceAbility<UserAccount>,
-        DataScopeAbility<UserAccount> {
+        DataScopeAbility<UserAccount>,
+        InitialDataAbility<UserAccount> {
     public static final String MODULE_ALIAS = "iam.user";
+    public static final String PLATFORM_SUPER_ADMIN_USER_ID = "platform.user.super_admin";
+    public static final String PLATFORM_SUPER_ADMIN_USERNAME = "admin";
+    public static final String PLATFORM_SUPER_ADMIN_USER_TITLE = "平台超级管理员";
 
     private final PasswordHashingService passwordHashingService;
     private final DataScopeCriteriaService dataScopeCriteriaService;
+    private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
             "changePassword",
             PlatformActionLevel.RECORD,
@@ -60,6 +70,33 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         this.dataScopeCriteriaService = dataScopeCriteriaService
                 .<DataScopeCriteriaService>map(service -> service)
                 .orElseGet(AllowAllDataScopeCriteriaService::new);
+    }
+
+    @Autowired
+    public void setInitialAdminSettings(Optional<PlatformInitialAdminSettings> settings) {
+        this.initialAdminSettings = settings.orElseGet(PlatformInitialAdminSettings::defaults);
+    }
+
+    @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.defaults()
+                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
+                .order(50)
+                .tenant(TenantService.PLATFORM_TENANT_ID);
+    }
+
+    @Override
+    public List<UserAccount> initialData() {
+        UserAccount user = new UserAccount();
+        user.setId(PLATFORM_SUPER_ADMIN_USER_ID);
+        user.setUsername(PLATFORM_SUPER_ADMIN_USERNAME);
+        user.setPassword(initialAdminSettings.initialPassword());
+        user.setTitle(PLATFORM_SUPER_ADMIN_USER_TITLE);
+        user.setAuthUserId(user.getId());
+        user.setAuthModuleAlias(MODULE_ALIAS);
+        user.setEnabled(Boolean.TRUE);
+        user.setSortOrder(1);
+        return List.of(user);
     }
 
     @Override

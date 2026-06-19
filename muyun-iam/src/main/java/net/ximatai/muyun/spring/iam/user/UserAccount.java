@@ -9,11 +9,17 @@ import net.ximatai.muyun.database.core.annotation.CompositeIndex;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardDataScopedEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "iam_user", comment = "User account")
 @CompositeIndex(columns = {"tenant_id", "username"}, unique = true)
+@InitialDataFields(
+        identity = {"username"},
+        managed = {"organizationId", "authUserId", "authOrganizationId", "authModuleAlias"},
+        operator = {"title", "mobile", "email", "enabled", "sortOrder"}
+)
 public class UserAccount extends StandardDataScopedEnabledSortableEntity {
     @Column(name = "username", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Username")
     private String username;
