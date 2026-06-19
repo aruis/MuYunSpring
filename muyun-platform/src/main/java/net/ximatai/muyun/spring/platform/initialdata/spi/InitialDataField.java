@@ -1,9 +1,13 @@
-package net.ximatai.muyun.spring.platform.initialdata;
+package net.ximatai.muyun.spring.platform.initialdata.spi;
 
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+/**
+ * Low-level field role descriptor used by initial data SPI factories.
+ * Regular business contributions should use domain-level declaration factories instead.
+ */
 public final class InitialDataField<T> {
     private final String name;
     private final Function<T, ?> reader;

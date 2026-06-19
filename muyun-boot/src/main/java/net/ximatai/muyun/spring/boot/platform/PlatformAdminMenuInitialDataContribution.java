@@ -1,15 +1,16 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataContext;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
 import net.ximatai.muyun.spring.platform.menu.Menu;
-import net.ximatai.muyun.spring.platform.menu.MenuInitialDataRecords;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
+
+import java.util.List;
 
 public class PlatformAdminMenuInitialDataContribution implements InitialDataContribution {
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
@@ -34,14 +35,16 @@ public class PlatformAdminMenuInitialDataContribution implements InitialDataCont
     }
 
     @Override
-    public void contribute(InitialDataContext context) {
-        ensureAdminScheme(context);
-        ensureGroup(context, PlatformMenuGroups.CONFIG, "平台配置与低代码运维", 10);
-        ensureGroup(context, PlatformMenuGroups.IDENTITY, "组织与权限", 20);
-        ensureGroup(context, PlatformMenuGroups.OPS, "平台运行运维", 30);
+    public List<InitialDataDeclaration<?>> declarations() {
+        return List.of(
+                adminScheme(),
+                group(PlatformMenuGroups.CONFIG, "平台配置与低代码运维", 10),
+                group(PlatformMenuGroups.IDENTITY, "组织与权限", 20),
+                group(PlatformMenuGroups.OPS, "平台运行运维", 30)
+        );
     }
 
-    private void ensureAdminScheme(InitialDataContext context) {
+    private InitialDataDeclaration<MenuScheme> adminScheme() {
         MenuScheme desired = new MenuScheme();
         desired.setId(ADMIN_SCHEME_ID);
         desired.setAlias(ADMIN_SCHEME_ALIAS);
@@ -50,14 +53,10 @@ public class PlatformAdminMenuInitialDataContribution implements InitialDataCont
         desired.setTitle("平台超管");
         desired.setEnabled(Boolean.TRUE);
         desired.setSortOrder(1);
-
-        context.apply(MenuInitialDataRecords.systemScheme(
-                        schemeService.selectIgnoreSoftDelete(ADMIN_SCHEME_ID), desired),
-                scheme -> schemeService.insert(scheme),
-                scheme -> schemeService.update(scheme));
+        return InitialDataDeclaration.reconcileManaged(schemeService, desired);
     }
 
-    private void ensureGroup(InitialDataContext context, String id, String title, int sortOrder) {
+    private InitialDataDeclaration<Menu> group(String id, String title, int sortOrder) {
         Menu desired = new Menu();
         desired.setId(id);
         desired.setSchemeId(ADMIN_SCHEME_ID);
@@ -66,9 +65,6 @@ public class PlatformAdminMenuInitialDataContribution implements InitialDataCont
         desired.setTitle(title);
         desired.setEnabled(Boolean.TRUE);
         desired.setSortOrder(sortOrder);
-
-        context.apply(MenuInitialDataRecords.group(menuService.selectIgnoreSoftDelete(id), desired),
-                menu -> menuService.insert(menu),
-                menu -> menuService.update(menu));
+        return InitialDataDeclaration.reconcileManaged(menuService, desired);
     }
 }

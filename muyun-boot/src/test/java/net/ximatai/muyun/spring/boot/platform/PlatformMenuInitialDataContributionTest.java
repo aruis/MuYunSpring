@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -11,6 +12,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictException;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -211,6 +213,51 @@ class PlatformMenuInitialDataContributionTest {
         }
     }
 
+    @Test
+    void shouldDelayMenuDeclarationExistingLookupUntilExecution() {
+        MenuScheme scheme = new MenuScheme();
+        scheme.setId(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+        scheme.setAlias(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ALIAS);
+        scheme.setScopeType(MenuScopeType.SYSTEM);
+        scheme.setScopeId(MenuSchemeService.SYSTEM_SCOPE_ID);
+        schemeDao.insert(scheme);
+        Menu parent = menu(
+                PlatformMenuGroups.CONFIG,
+                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                TreeAbility.ROOT_ID,
+                MenuType.GROUP
+        );
+        menuDao.insert(parent);
+        PlatformModule module = new PlatformModule();
+        module.setAlias("platform.module");
+        module.setApplicationAlias("platform");
+        module.setTitle("平台模块");
+        moduleDao.insert(module);
+        Menu existing = menu(
+                "platform.menu.module.platform.module",
+                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                PlatformMenuGroups.CONFIG,
+                MenuType.MODULE
+        );
+        existing.setModuleAlias("old.module");
+        menuDao.insert(existing);
+        Menu desired = menu(
+                "platform.menu.module.platform.module",
+                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                PlatformMenuGroups.CONFIG,
+                MenuType.MODULE
+        );
+        desired.setModuleAlias("platform.module");
+
+        InitialDataDeclaration<Menu> declaration = InitialDataDeclaration.reconcileManaged(menuService, desired);
+
+        assertThat(existing.getModuleAlias()).isEqualTo("old.module");
+
+        new InitialDataAbility(List.of(() -> List.of(declaration))).initializeAll();
+
+        assertThat(existing.getModuleAlias()).isEqualTo("platform.module");
+    }
+
     private void initializePlatformMenus(GenericApplicationContext context) {
         new InitialDataAbility(List.of(
                 new PlatformAdminMenuInitialDataContribution(schemeService, menuService),
@@ -235,6 +282,18 @@ class PlatformMenuInitialDataContributionTest {
         }
         context.refresh();
         return context;
+    }
+
+    private Menu menu(String id, String schemeId, String parentId, MenuType type) {
+        Menu menu = new Menu();
+        menu.setId(id);
+        menu.setSchemeId(schemeId);
+        menu.setParentId(parentId);
+        menu.setMenuType(type);
+        menu.setTitle("模块管理");
+        menu.setEnabled(Boolean.TRUE);
+        menu.setSortOrder(20);
+        return menu;
     }
 
     @RestController

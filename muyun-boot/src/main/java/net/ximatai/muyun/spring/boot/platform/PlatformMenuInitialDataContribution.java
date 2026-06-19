@@ -1,15 +1,17 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataContext;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
 import net.ximatai.muyun.spring.platform.menu.Menu;
-import net.ximatai.muyun.spring.platform.menu.MenuInitialDataRecords;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class PlatformMenuInitialDataContribution implements InitialDataContribution {
     private final MenuService menuService;
@@ -32,11 +34,12 @@ public class PlatformMenuInitialDataContribution implements InitialDataContribut
     }
 
     @Override
-    public void contribute(InitialDataContext context) {
-        registerContributedMenus(context, PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+    public List<InitialDataDeclaration<?>> declarations() {
+        return contributedMenus(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
     }
 
-    private void registerContributedMenus(InitialDataContext context, String schemeId) {
+    private List<InitialDataDeclaration<?>> contributedMenus(String schemeId) {
+        List<InitialDataDeclaration<?>> declarations = new ArrayList<>();
         for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformMenu.class)) {
             Object bean = applicationContext.getBean(beanName);
             Class<?> beanClass = AopUtils.getTargetClass(bean);
@@ -48,14 +51,12 @@ public class PlatformMenuInitialDataContribution implements InitialDataContribut
             if (module == null) {
                 throw new IllegalStateException("@PlatformMenu requires @PlatformStaticModule: " + beanClass.getName());
             }
-            ensureModuleMenu(context, schemeId, module, menu);
+            declarations.add(moduleMenu(schemeId, module, menu));
         }
+        return declarations;
     }
 
-    private void ensureModuleMenu(InitialDataContext context,
-                                  String schemeId,
-                                  PlatformStaticModule module,
-                                  PlatformMenu menu) {
+    private InitialDataDeclaration<Menu> moduleMenu(String schemeId, PlatformStaticModule module, PlatformMenu menu) {
         String menuId = menu.id().isBlank() ? moduleMenuId(module.alias()) : menu.id();
         Menu desired = new Menu();
         desired.setId(menuId);
@@ -67,10 +68,7 @@ public class PlatformMenuInitialDataContribution implements InitialDataContribut
         desired.setPageMode(MenuPageMode.LIST);
         desired.setEnabled(menu.enabled());
         desired.setSortOrder(menu.order());
-
-        context.apply(MenuInitialDataRecords.module(menuService.selectIgnoreSoftDelete(menuId), desired),
-                item -> menuService.insert(item),
-                item -> menuService.update(item));
+        return InitialDataDeclaration.reconcileManaged(menuService, desired);
     }
 
     private String moduleMenuId(String moduleAlias) {

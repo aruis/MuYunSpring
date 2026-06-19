@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.initialdata;
 
+import java.util.List;
+
 public interface InitialDataContribution {
     default String name() {
         return getClass().getName();
@@ -9,5 +11,5 @@ public interface InitialDataContribution {
         return 100;
     }
 
-    void contribute(InitialDataContext context);
+    List<InitialDataDeclaration<?>> declarations();
 }

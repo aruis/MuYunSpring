@@ -7,10 +7,17 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataFields;
 
 @Getter
 @Setter
 @Table(name = "platform_menu", comment = "Platform menu")
+@InitialDataFields(
+        identity = {"schemeId"},
+        managed = {"parentId", "menuType", "moduleAlias", "route", "externalUrl", "pageMode",
+                "defaultUiConfigId", "defaultQueryTemplateId", "entryParamsJson"},
+        operator = {"title", "enabled", "sortOrder"}
+)
 public class Menu extends StandardEnabledTreeEntity {
     @Column(name = "scheme_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Menu scheme id")
     private String schemeId;

@@ -1,30 +1,33 @@
-package net.ximatai.muyun.spring.platform.initialdata;
+package net.ximatai.muyun.spring.platform.initialdata.spi;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataPolicy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Low-level record template for building domain-specific initial data declaration factories.
+ * Regular business contributions should not depend on this type directly.
+ */
 public final class InitialDataRecord<T extends EntityContract> {
     private final String key;
     private final InitialDataPolicy policy;
-    private final T existing;
     private final T desired;
     private final List<InitialDataField<T>> identityFields = new ArrayList<>();
     private final List<InitialDataField<T>> managedFields = new ArrayList<>();
     private final List<InitialDataField<T>> operatorFields = new ArrayList<>();
 
-    private InitialDataRecord(String key, InitialDataPolicy policy, T existing, T desired) {
+    private InitialDataRecord(String key, InitialDataPolicy policy, T desired) {
         this.key = requireText(key, "initialDataKey");
         this.policy = Objects.requireNonNull(policy, "policy must not be null");
-        this.existing = existing;
         this.desired = Objects.requireNonNull(desired, "desired must not be null");
     }
 
-    public static <T extends EntityContract> InitialDataRecord<T> of(String key, InitialDataPolicy policy, T existing, T desired) {
-        return new InitialDataRecord<>(key, policy, existing, desired);
+    public static <T extends EntityContract> InitialDataRecord<T> of(String key, InitialDataPolicy policy, T desired) {
+        return new InitialDataRecord<>(key, policy, desired);
     }
 
     @SafeVarargs
@@ -53,23 +56,19 @@ public final class InitialDataRecord<T extends EntityContract> {
         return policy;
     }
 
-    public T existing() {
-        return existing;
-    }
-
     public T desired() {
         return desired;
     }
 
-    List<InitialDataField<T>> identityFields() {
+    public List<InitialDataField<T>> identityFields() {
         return List.copyOf(identityFields);
     }
 
-    List<InitialDataField<T>> managedFields() {
+    public List<InitialDataField<T>> managedFields() {
         return List.copyOf(managedFields);
     }
 
-    List<InitialDataField<T>> operatorFields() {
+    public List<InitialDataField<T>> operatorFields() {
         return List.copyOf(operatorFields);
     }
 
