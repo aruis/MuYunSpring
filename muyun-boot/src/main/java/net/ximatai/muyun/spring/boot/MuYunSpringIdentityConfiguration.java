@@ -4,7 +4,6 @@ import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminAuthorizationInitialD
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
-import net.ximatai.muyun.spring.boot.platform.PlatformAdminMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
@@ -19,7 +18,6 @@ import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
-import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -97,14 +95,6 @@ public class MuYunSpringIdentityConfiguration {
             PlatformModuleActionService moduleActionService) {
         return new PlatformSuperAdminAuthorizationInitialDataDeclarationProvider(
                 roleService, roleGrantDao, roleActionDao, moduleActionService);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(PlatformAdminMenuInitialDataDeclarationProvider.class)
-    public PlatformAdminMenuInitialDataDeclarationProvider platformAdminMenuInitialDataDeclarationProvider(
-            MenuSchemeService schemeService,
-            MenuService menuService) {
-        return new PlatformAdminMenuInitialDataDeclarationProvider(schemeService, menuService);
     }
 
     @Bean

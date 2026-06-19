@@ -8,6 +8,8 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
@@ -25,9 +27,12 @@ import java.util.Optional;
 public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implements
         SoftDeleteAbility<MenuScheme>,
         EnableAbility<MenuScheme>,
-        SortAbility<MenuScheme> {
+        SortAbility<MenuScheme>,
+        InitialDataAbility<MenuScheme> {
     public static final String MODULE_ALIAS = "platform.menu_scheme";
     public static final String SYSTEM_SCOPE_ID = "system";
+    public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
+    public static final String ADMIN_SCHEME_ALIAS = "platform_admin";
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao) {
@@ -52,6 +57,24 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     public void beforeUpdate(MenuScheme scheme) {
         validateImmutableIdentity(scheme);
         normalizeAndValidate(scheme);
+    }
+
+    @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.system("platform.admin-menu-scheme", 10);
+    }
+
+    @Override
+    public List<MenuScheme> initialData() {
+        MenuScheme scheme = new MenuScheme();
+        scheme.setId(ADMIN_SCHEME_ID);
+        scheme.setAlias(ADMIN_SCHEME_ALIAS);
+        scheme.setScopeType(MenuScopeType.SYSTEM);
+        scheme.setScopeId(SYSTEM_SCOPE_ID);
+        scheme.setTitle("平台超管");
+        scheme.setEnabled(Boolean.TRUE);
+        scheme.setSortOrder(1);
+        return List.of(scheme);
     }
 
     @Override

@@ -12,6 +12,10 @@ public record InitialDataOptions(
                 InitialDataPolicy.RECONCILE_MANAGED, null);
     }
 
+    public static InitialDataOptions system(String name, int order) {
+        return defaults().name(name).order(order);
+    }
+
     public InitialDataOptions {
         if (phase == null) {
             phase = InitialDataPhase.SYSTEM_INITIAL_DATA;

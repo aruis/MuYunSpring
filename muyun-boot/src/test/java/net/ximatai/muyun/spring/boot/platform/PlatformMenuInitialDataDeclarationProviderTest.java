@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -55,9 +56,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             registerStaticModules(context);
             initializePlatformMenus(context);
 
-            MenuScheme scheme = schemeService.select(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
+            MenuScheme scheme = schemeService.select(MenuSchemeService.ADMIN_SCHEME_ID);
             assertThat(scheme).satisfies(value -> {
-                assertThat(value.getAlias()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ALIAS);
+                assertThat(value.getAlias()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ALIAS);
                 assertThat(value.getScopeType()).isEqualTo(MenuScopeType.SYSTEM);
                 assertThat(value.getScopeId()).isEqualTo(MenuSchemeService.SYSTEM_SCOPE_ID);
                 assertThat(value.getTitle()).isEqualTo("平台超管");
@@ -116,8 +117,8 @@ class PlatformMenuInitialDataDeclarationProviderTest {
 
             initializePlatformMenus(context);
 
-            assertThat(menuService.rootMenus(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID)).hasSize(3);
-            assertThat(menuService.children(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
+            assertThat(menuService.rootMenus(MenuSchemeService.ADMIN_SCHEME_ID)).hasSize(3);
+            assertThat(menuService.children(MenuSchemeService.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
                     .singleElement()
                     .satisfies(menu -> {
                         assertThat(menu.getTitle()).isEqualTo("旧标题");
@@ -143,13 +144,13 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             initializePlatformMenus(context);
 
             assertThat(menuService.select(PlatformMenuGroups.CONFIG)).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(net.ximatai.muyun.spring.ability.TreeAbility.ROOT_ID);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
                 assertThat(repaired.getRoute()).isNull();
             });
             assertThat(menuService.select("platform.menu.module.platform.module")).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.CONFIG);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(repaired.getModuleAlias()).isEqualTo("platform.module");
@@ -216,14 +217,14 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     @Test
     void shouldDelayMenuDeclarationExistingLookupUntilExecution() {
         MenuScheme scheme = new MenuScheme();
-        scheme.setId(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
-        scheme.setAlias(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ALIAS);
+        scheme.setId(MenuSchemeService.ADMIN_SCHEME_ID);
+        scheme.setAlias(MenuSchemeService.ADMIN_SCHEME_ALIAS);
         scheme.setScopeType(MenuScopeType.SYSTEM);
         scheme.setScopeId(MenuSchemeService.SYSTEM_SCOPE_ID);
         schemeDao.insert(scheme);
         Menu parent = menu(
                 PlatformMenuGroups.CONFIG,
-                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
+                MenuSchemeService.ADMIN_SCHEME_ID,
                 TreeAbility.ROOT_ID,
                 MenuType.GROUP
         );
@@ -235,7 +236,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         moduleDao.insert(module);
         Menu existing = menu(
                 "platform.menu.module.platform.module",
-                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
+                MenuSchemeService.ADMIN_SCHEME_ID,
                 PlatformMenuGroups.CONFIG,
                 MenuType.MODULE
         );
@@ -243,7 +244,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         menuDao.insert(existing);
         Menu desired = menu(
                 "platform.menu.module.platform.module",
-                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
+                MenuSchemeService.ADMIN_SCHEME_ID,
                 PlatformMenuGroups.CONFIG,
                 MenuType.MODULE
         );
@@ -259,8 +260,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     }
 
     private void initializePlatformMenus(GenericApplicationContext context) {
-        new InitialDataExecutor(List.of(), List.of(
-                new PlatformAdminMenuInitialDataDeclarationProvider(schemeService, menuService),
+        new InitialDataExecutor(List.<InitialDataAbility<?>>of(schemeService, menuService), List.of(
                 new PlatformMenuInitialDataDeclarationProvider(menuService, context)
         )).initializeAll();
     }
