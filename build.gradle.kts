@@ -28,11 +28,25 @@ subprojects {
         forkEvery = 0
         systemProperty("junit.jupiter.execution.parallel.enabled", "false")
 
+        if (name == "test") {
+            exclude("**/*IT.class")
+        }
+
         if (project.name == "muyun-platform") {
             reports.html.required.set(false)
             reports.junitXml.includeSystemOutLog.set(false)
             reports.junitXml.includeSystemErrLog.set(false)
         }
+    }
+
+    val testSourceSet = extensions.getByType<SourceSetContainer>().named("test")
+    tasks.register<Test>("integrationTest") {
+        description = "Runs integration tests against real external resources such as Testcontainers."
+        group = LifecycleBasePlugin.VERIFICATION_GROUP
+        testClassesDirs = testSourceSet.get().output.classesDirs
+        classpath = testSourceSet.get().runtimeClasspath
+        shouldRunAfter(tasks.named("test"))
+        include("**/*IT.class")
     }
 
     dependencies {
