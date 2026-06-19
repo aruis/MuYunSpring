@@ -2,7 +2,10 @@ package net.ximatai.muyun.spring.platform.initialdata;
 
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPolicy;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.initialdata.spi.InitialDataRecord;
 
 import java.util.Objects;
@@ -10,10 +13,11 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Declarative initial data item executed by {@link InitialDataAbility}.
+ * Declarative initial data item executed by {@link InitialDataExecutor}.
  * <p>
- * Application contributions should prefer domain-level declaration factories, such as menu declarations,
- * instead of assembling low-level SPI records and fields directly.
+ * Regular service-owned initial data should implement {@link InitialDataAbility} and let the executor build
+ * declarations from service and model contracts. This type remains available for platform providers that
+ * need composite identity or scanned declarations.
  */
 public final class InitialDataDeclaration<T extends EntityContract> {
     private final InitialDataRecord<T> record;
@@ -38,10 +42,20 @@ public final class InitialDataDeclaration<T extends EntityContract> {
         return new InitialDataDeclaration<>(record, existingReader, inserter, updater);
     }
 
-    public static <T extends EntityContract> InitialDataDeclaration<T> ensureAbsent(
+    public static <T extends EntityContract> InitialDataDeclaration<T> createIfMissing(
             CrudAbility<T> service,
             T desired) {
-        return fromService(service, InitialDataPolicy.ENSURE_ABSENT, desired);
+        return fromService(service, InitialDataPolicy.CREATE_IF_MISSING, desired);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> createIfMissing(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        return fromFunctions(modelClass, InitialDataPolicy.CREATE_IF_MISSING, desired, existingReader, inserter,
+                updater);
     }
 
     public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
@@ -50,13 +64,33 @@ public final class InitialDataDeclaration<T extends EntityContract> {
         return fromService(service, InitialDataPolicy.RECONCILE_MANAGED, desired);
     }
 
+    public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        return fromFunctions(modelClass, InitialDataPolicy.RECONCILE_MANAGED, desired, existingReader, inserter, updater);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
+            String key,
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        return fromFunctions(key, modelClass, InitialDataPolicy.RECONCILE_MANAGED, desired, existingReader, inserter,
+                updater);
+    }
+
     public static <T extends EntityContract> InitialDataDeclaration<T> locked(
             CrudAbility<T> service,
             T desired) {
         return fromService(service, InitialDataPolicy.LOCKED, desired);
     }
 
-    private static <T extends EntityContract> InitialDataDeclaration<T> fromService(CrudAbility<T> service,
+    public static <T extends EntityContract> InitialDataDeclaration<T> fromService(CrudAbility<T> service,
                                                                                    InitialDataPolicy policy,
                                                                                    T desired) {
         Objects.requireNonNull(service, "service must not be null");
@@ -67,6 +101,59 @@ public final class InitialDataDeclaration<T extends EntityContract> {
                 "service modelClass must not be null");
         InitialDataRecord<T> record = InitialDataModelDescriptor.of(modelClass).record(id, policy, desired);
         return of(record, () -> selectExisting(service, id), service::insert, service::update);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> locked(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        return fromFunctions(modelClass, InitialDataPolicy.LOCKED, desired, existingReader, inserter, updater);
+    }
+
+    public InitialDataDeclaration<T> inTenant(String tenantId) {
+        String validTenantId = requireText(tenantId, "tenantId");
+        return new InitialDataDeclaration<>(
+                record,
+                () -> inTenant(validTenantId, existingReader),
+                entity -> inTenant(validTenantId, () -> {
+                    inserter.accept(entity);
+                    return null;
+                }),
+                entity -> inTenant(validTenantId, () -> {
+                    updater.accept(entity);
+                    return null;
+                })
+        );
+    }
+
+    private static <T extends EntityContract> InitialDataDeclaration<T> fromFunctions(
+            Class<T> modelClass,
+            InitialDataPolicy policy,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        Objects.requireNonNull(modelClass, "modelClass must not be null");
+        Objects.requireNonNull(desired, "desired must not be null");
+        String id = requireText(desired.getId(), "initialDataId");
+        return fromFunctions(id, modelClass, policy, desired, existingReader, inserter, updater);
+    }
+
+    private static <T extends EntityContract> InitialDataDeclaration<T> fromFunctions(
+            String key,
+            Class<T> modelClass,
+            InitialDataPolicy policy,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> inserter,
+            Consumer<T> updater) {
+        Objects.requireNonNull(modelClass, "modelClass must not be null");
+        Objects.requireNonNull(desired, "desired must not be null");
+        InitialDataRecord<T> record = InitialDataModelDescriptor.of(modelClass)
+                .record(requireText(key, "initialDataKey"), policy, desired);
+        return of(record, existingReader, inserter, updater);
     }
 
     InitialDataRecord<T> record() {
@@ -92,6 +179,12 @@ public final class InitialDataDeclaration<T extends EntityContract> {
             return typed.selectIgnoreSoftDelete(id);
         }
         return service.select(id);
+    }
+
+    private static <R> R inTenant(String tenantId, Supplier<R> action) {
+        try (TenantContext.Scope ignored = TenantContext.use(tenantId)) {
+            return action.get();
+        }
     }
 
     private static String requireText(String value, String name) {

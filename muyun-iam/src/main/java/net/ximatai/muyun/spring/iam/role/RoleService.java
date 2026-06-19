@@ -21,7 +21,11 @@ import net.ximatai.muyun.spring.iam.employee.EmployeeAccountService;
 import net.ximatai.muyun.spring.iam.employee.EmployeePosition;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionService;
 import net.ximatai.muyun.spring.iam.employee.EmployeeService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -39,9 +43,12 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         SoftDeleteAbility<Role>,
         EnableAbility<Role>,
         SortAbility<Role>,
-        ReferenceAbility<Role> {
+        ReferenceAbility<Role>,
+        InitialDataAbility<Role> {
     public static final String MODULE_ALIAS = "iam.role";
     public static final String WILDCARD_DATA_SCOPE_MODULE_ALIAS = "iam.data_scope";
+    public static final String PLATFORM_SUPER_ADMIN_ROLE_ID = "platform.role.super_admin";
+    public static final String PLATFORM_SUPER_ADMIN_ROLE_TITLE = "平台超级管理员";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -113,6 +120,30 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+    }
+
+    @Override
+    public InitialDataOptions initialDataOptions() {
+        return InitialDataOptions.defaults()
+                .phase(InitialDataPhase.TENANT_INITIAL_DATA)
+                .order(40)
+                .tenant(TenantService.PLATFORM_TENANT_ID);
+    }
+
+    @Override
+    public List<Role> initialData() {
+        Role role = new Role();
+        role.setId(PLATFORM_SUPER_ADMIN_ROLE_ID);
+        role.setRoleKind(RoleKind.SYSTEM);
+        role.setGrantSubjectTypes(RoleGrantSubjectType.USER_ACCOUNT.getCode());
+        role.setPublicRole(Boolean.FALSE);
+        role.setBuiltIn(Boolean.TRUE);
+        role.setSystemManaged(Boolean.TRUE);
+        role.setTitle(PLATFORM_SUPER_ADMIN_ROLE_TITLE);
+        role.setDescription("Platform built-in super administrator role");
+        role.setEnabled(Boolean.TRUE);
+        role.setSortOrder(1);
+        return List.of(role);
     }
 
     @Override
@@ -741,6 +772,11 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         ensureDataScopeRoleBindingValid(role.getId(), validSubjectType, validSubjectId);
         RoleGrant existing = findRoleGrant(role.getId(), validSubjectType, validSubjectId);
         if (existing != null) {
+            if (!Boolean.TRUE.equals(existing.getEnabled())) {
+                existing.setEnabled(true);
+                prepareChildUpdate(existing);
+                roleGrantDao.updateById(existing);
+            }
             return new GrantResult(existing.getId(), false);
         }
 

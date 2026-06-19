@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.platform.initialdata;
 
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPolicy;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataRole;
 import net.ximatai.muyun.spring.platform.initialdata.spi.InitialDataRecord;
 
 import java.lang.reflect.Field;
@@ -51,10 +54,12 @@ final class InitialDataModelDescriptor<T extends EntityContract> {
         List<net.ximatai.muyun.spring.platform.initialdata.spi.InitialDataField<EntityContract>> operatorFields =
                 new ArrayList<>();
 
-        identityFields.add(net.ximatai.muyun.spring.platform.initialdata.spi.InitialDataField.of(
-                "id", EntityContract::getId, EntityContract::setId));
         Map<String, Field> fields = fields(modelClass);
         InitialDataFields classAnnotation = modelClass.getAnnotation(InitialDataFields.class);
+        if (classAnnotation == null || classAnnotation.includeId()) {
+            identityFields.add(net.ximatai.muyun.spring.platform.initialdata.spi.InitialDataField.of(
+                    "id", EntityContract::getId, EntityContract::setId));
+        }
         if (classAnnotation != null) {
             addDeclaredFields(identityFields, fields, classAnnotation.identity(), modelClass);
             addDeclaredFields(managedFields, fields, classAnnotation.managed(), modelClass);

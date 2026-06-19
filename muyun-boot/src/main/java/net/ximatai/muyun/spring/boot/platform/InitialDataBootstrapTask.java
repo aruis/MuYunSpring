@@ -1,12 +1,12 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 
 public class InitialDataBootstrapTask implements PlatformBootstrapTask {
-    private final InitialDataAbility initialDataAbility;
+    private final InitialDataExecutor initialDataExecutor;
 
-    public InitialDataBootstrapTask(InitialDataAbility initialDataAbility) {
-        this.initialDataAbility = initialDataAbility;
+    public InitialDataBootstrapTask(InitialDataExecutor initialDataExecutor) {
+        this.initialDataExecutor = initialDataExecutor;
     }
 
     @Override
@@ -21,6 +21,6 @@ public class InitialDataBootstrapTask implements PlatformBootstrapTask {
 
     @Override
     public void run() {
-        initialDataAbility.initializeAll();
+        initialDataExecutor.initializeAll();
     }
 }

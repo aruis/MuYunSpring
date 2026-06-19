@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.initialdata;
+package net.ximatai.muyun.spring.common.initialdata;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

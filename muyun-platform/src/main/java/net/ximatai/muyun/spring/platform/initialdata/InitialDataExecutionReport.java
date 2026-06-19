@@ -2,14 +2,14 @@ package net.ximatai.muyun.spring.platform.initialdata;
 
 import java.util.List;
 
-public record InitialDataExecutionReport(List<InitialDataContributionReport> contributions) {
+public record InitialDataExecutionReport(List<InitialDataTaskReport> tasks) {
     public InitialDataExecutionReport {
-        contributions = contributions == null ? List.of() : List.copyOf(contributions);
+        tasks = tasks == null ? List.of() : List.copyOf(tasks);
     }
 
     public List<InitialDataResult> results() {
-        return contributions.stream()
-                .flatMap(contribution -> contribution.results().stream())
+        return tasks.stream()
+                .flatMap(task -> task.results().stream())
                 .toList();
     }
 }

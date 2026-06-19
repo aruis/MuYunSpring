@@ -1,4 +1,4 @@
-package net.ximatai.muyun.spring.platform.initialdata;
+package net.ximatai.muyun.spring.common.initialdata;
 
 /**
  * Field governance role used by declarative initial data descriptors.

@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
@@ -12,14 +12,14 @@ import net.ximatai.muyun.spring.platform.menu.MenuType;
 
 import java.util.List;
 
-public class PlatformAdminMenuInitialDataContribution implements InitialDataContribution {
+public class PlatformAdminMenuInitialDataDeclarationProvider implements InitialDataDeclarationProvider {
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
     public static final String ADMIN_SCHEME_ALIAS = "platform_admin";
 
     private final MenuSchemeService schemeService;
     private final MenuService menuService;
 
-    public PlatformAdminMenuInitialDataContribution(MenuSchemeService schemeService, MenuService menuService) {
+    public PlatformAdminMenuInitialDataDeclarationProvider(MenuSchemeService schemeService, MenuService menuService) {
         this.schemeService = schemeService;
         this.menuService = menuService;
     }

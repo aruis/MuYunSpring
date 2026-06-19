@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.initialdata;
 
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPolicy;
+
 import java.util.List;
 
 public record InitialDataResult(

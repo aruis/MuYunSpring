@@ -11,8 +11,8 @@ import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictException;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-class PlatformMenuInitialDataContributionTest {
+class PlatformMenuInitialDataDeclarationProviderTest {
     private final TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
     private final TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
@@ -55,9 +55,9 @@ class PlatformMenuInitialDataContributionTest {
             registerStaticModules(context);
             initializePlatformMenus(context);
 
-            MenuScheme scheme = schemeService.select(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+            MenuScheme scheme = schemeService.select(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
             assertThat(scheme).satisfies(value -> {
-                assertThat(value.getAlias()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ALIAS);
+                assertThat(value.getAlias()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ALIAS);
                 assertThat(value.getScopeType()).isEqualTo(MenuScopeType.SYSTEM);
                 assertThat(value.getScopeId()).isEqualTo(MenuSchemeService.SYSTEM_SCOPE_ID);
                 assertThat(value.getTitle()).isEqualTo("平台超管");
@@ -116,8 +116,8 @@ class PlatformMenuInitialDataContributionTest {
 
             initializePlatformMenus(context);
 
-            assertThat(menuService.rootMenus(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID)).hasSize(3);
-            assertThat(menuService.children(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
+            assertThat(menuService.rootMenus(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID)).hasSize(3);
+            assertThat(menuService.children(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
                     .singleElement()
                     .satisfies(menu -> {
                         assertThat(menu.getTitle()).isEqualTo("旧标题");
@@ -143,13 +143,13 @@ class PlatformMenuInitialDataContributionTest {
             initializePlatformMenus(context);
 
             assertThat(menuService.select(PlatformMenuGroups.CONFIG)).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(net.ximatai.muyun.spring.ability.TreeAbility.ROOT_ID);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
                 assertThat(repaired.getRoute()).isNull();
             });
             assertThat(menuService.select("platform.menu.module.platform.module")).satisfies(repaired -> {
-                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+                assertThat(repaired.getSchemeId()).isEqualTo(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.CONFIG);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.MODULE);
                 assertThat(repaired.getModuleAlias()).isEqualTo("platform.module");
@@ -216,14 +216,14 @@ class PlatformMenuInitialDataContributionTest {
     @Test
     void shouldDelayMenuDeclarationExistingLookupUntilExecution() {
         MenuScheme scheme = new MenuScheme();
-        scheme.setId(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
-        scheme.setAlias(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ALIAS);
+        scheme.setId(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
+        scheme.setAlias(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ALIAS);
         scheme.setScopeType(MenuScopeType.SYSTEM);
         scheme.setScopeId(MenuSchemeService.SYSTEM_SCOPE_ID);
         schemeDao.insert(scheme);
         Menu parent = menu(
                 PlatformMenuGroups.CONFIG,
-                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
                 TreeAbility.ROOT_ID,
                 MenuType.GROUP
         );
@@ -235,7 +235,7 @@ class PlatformMenuInitialDataContributionTest {
         moduleDao.insert(module);
         Menu existing = menu(
                 "platform.menu.module.platform.module",
-                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
                 PlatformMenuGroups.CONFIG,
                 MenuType.MODULE
         );
@@ -243,7 +243,7 @@ class PlatformMenuInitialDataContributionTest {
         menuDao.insert(existing);
         Menu desired = menu(
                 "platform.menu.module.platform.module",
-                PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID,
+                PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID,
                 PlatformMenuGroups.CONFIG,
                 MenuType.MODULE
         );
@@ -253,15 +253,15 @@ class PlatformMenuInitialDataContributionTest {
 
         assertThat(existing.getModuleAlias()).isEqualTo("old.module");
 
-        new InitialDataAbility(List.of(() -> List.of(declaration))).initializeAll();
+        new InitialDataExecutor(List.of(), List.of(() -> List.of(declaration))).initializeAll();
 
         assertThat(existing.getModuleAlias()).isEqualTo("platform.module");
     }
 
     private void initializePlatformMenus(GenericApplicationContext context) {
-        new InitialDataAbility(List.of(
-                new PlatformAdminMenuInitialDataContribution(schemeService, menuService),
-                new PlatformMenuInitialDataContribution(menuService, context)
+        new InitialDataExecutor(List.of(), List.of(
+                new PlatformAdminMenuInitialDataDeclarationProvider(schemeService, menuService),
+                new PlatformMenuInitialDataDeclarationProvider(menuService, context)
         )).initializeAll();
     }
 

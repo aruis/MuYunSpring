@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-final class TestMemoryDao<T extends EntityContract> implements BaseDao<T, String> {
+class TestMemoryDao<T extends EntityContract> implements BaseDao<T, String> {
     private final Map<String, T> rows = new LinkedHashMap<>();
 
     @Override

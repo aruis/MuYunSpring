@@ -7,7 +7,7 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 
 @Getter
 @Setter

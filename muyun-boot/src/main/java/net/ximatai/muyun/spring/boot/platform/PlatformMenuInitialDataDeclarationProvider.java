@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
@@ -13,12 +13,12 @@ import org.springframework.core.annotation.AnnotationUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PlatformMenuInitialDataContribution implements InitialDataContribution {
+public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDeclarationProvider {
     private final MenuService menuService;
     private final ApplicationContext applicationContext;
 
-    public PlatformMenuInitialDataContribution(MenuService menuService,
-                                               ApplicationContext applicationContext) {
+    public PlatformMenuInitialDataDeclarationProvider(MenuService menuService,
+                                                      ApplicationContext applicationContext) {
         this.menuService = menuService;
         this.applicationContext = applicationContext;
     }
@@ -35,7 +35,7 @@ public class PlatformMenuInitialDataContribution implements InitialDataContribut
 
     @Override
     public List<InitialDataDeclaration<?>> declarations() {
-        return contributedMenus(PlatformAdminMenuInitialDataContribution.ADMIN_SCHEME_ID);
+        return contributedMenus(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
     }
 
     private List<InitialDataDeclaration<?>> contributedMenus(String schemeId) {

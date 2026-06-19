@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.platform.initialdata.spi;
 
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataPolicy;
+import net.ximatai.muyun.spring.ability.initialdata.InitialDataPolicy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
