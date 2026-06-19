@@ -196,6 +196,8 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 4. 每条记录按字段角色治理：`identity` 字段漂移失败，`managed` 字段可持续校准，`operator` 字段只在创建时写入，重启不覆盖运维修改。即使使用 `ENSURE_ABSENT`，已有记录也必须通过 `identity` 检查。
 5. 能力只负责生命周期、字段治理、冲突语义和执行报告；实际插入/更新必须由贡献项传入领域 service，不提供跨表裸 DAO 初始化框架。
 
+启动阶段由平台 bootstrap 编排器按 `PlatformBootstrapTask` 列表接管平台启动任务，不为每一种能力单独维护专属 runner，也不把具体能力硬编码进 runner。具体 contribution 应保持薄，只声明要初始化的数据；字段角色和治理策略优先沉到领域级 record 模板，避免业务方复制底层字段清单。
+
 该能力不做自动删除，也不做版本化迁移。托管记录如果已被软删，应作为数据漂移显式失败，不在启动时自动恢复或重新插入。历史数据修复、跨 scope 迁移、整树迁移应由明确的领域能力或运维任务承接。
 
 ### 平台内置菜单自注册
@@ -205,7 +207,9 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 平台内置菜单由初始化数据能力承载，包含两个贡献：
 
 1. `platform.admin-menu`：维护系统菜单方案和默认一级分组。
-2. `platform.menu-contributions`：扫描 `@PlatformMenu` 并注册模块菜单项。
+2. `platform.menu-contributions`：由 `PlatformMenuInitialDataContribution` 扫描 `@PlatformMenu` 并注册模块菜单项。
+
+菜单领域的字段角色由 `muyun-platform` 中的 `MenuInitialDataRecords` 统一封装，贡献类不直接维护字段清单。
 
 平台只维护一个系统菜单方案：
 

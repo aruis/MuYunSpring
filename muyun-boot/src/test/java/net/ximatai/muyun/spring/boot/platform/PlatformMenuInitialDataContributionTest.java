@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-class PlatformMenuRegistrarTest {
+class PlatformMenuInitialDataContributionTest {
     private final TestMemoryDao<MenuScheme> schemeDao = new TestMemoryDao<>();
     private final TestMemoryDao<Menu> menuDao = new TestMemoryDao<>();
     private final TestMemoryDao<PlatformModule> moduleDao = new TestMemoryDao<>();
@@ -214,7 +214,7 @@ class PlatformMenuRegistrarTest {
     private void initializePlatformMenus(GenericApplicationContext context) {
         new InitialDataAbility(List.of(
                 new PlatformAdminMenuInitialDataContribution(schemeService, menuService),
-                new PlatformMenuRegistrar(menuService, context)
+                new PlatformMenuInitialDataContribution(menuService, context)
         )).initializeAll();
     }
 

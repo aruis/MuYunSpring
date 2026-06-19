@@ -2,9 +2,8 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataContext;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataContribution;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataPolicy;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataRecord;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuInitialDataRecords;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
@@ -12,12 +11,12 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 
-public class PlatformMenuRegistrar implements InitialDataContribution {
+public class PlatformMenuInitialDataContribution implements InitialDataContribution {
     private final MenuService menuService;
     private final ApplicationContext applicationContext;
 
-    public PlatformMenuRegistrar(MenuService menuService,
-                                 ApplicationContext applicationContext) {
+    public PlatformMenuInitialDataContribution(MenuService menuService,
+                                               ApplicationContext applicationContext) {
         this.menuService = menuService;
         this.applicationContext = applicationContext;
     }
@@ -53,7 +52,10 @@ public class PlatformMenuRegistrar implements InitialDataContribution {
         }
     }
 
-    private void ensureModuleMenu(InitialDataContext context, String schemeId, PlatformStaticModule module, PlatformMenu menu) {
+    private void ensureModuleMenu(InitialDataContext context,
+                                  String schemeId,
+                                  PlatformStaticModule module,
+                                  PlatformMenu menu) {
         String menuId = menu.id().isBlank() ? moduleMenuId(module.alias()) : menu.id();
         Menu desired = new Menu();
         desired.setId(menuId);
@@ -66,23 +68,7 @@ public class PlatformMenuRegistrar implements InitialDataContribution {
         desired.setEnabled(menu.enabled());
         desired.setSortOrder(menu.order());
 
-        context.apply(InitialDataRecord
-                        .of(menuId, InitialDataPolicy.RECONCILE_MANAGED,
-                                menuService.selectIgnoreSoftDelete(menuId), desired)
-                        .identity(PlatformAdminMenuInitialDataContribution.menuIdField(),
-                                PlatformAdminMenuInitialDataContribution.menuSchemeIdField())
-                        .managed(PlatformAdminMenuInitialDataContribution.menuParentIdField(),
-                                PlatformAdminMenuInitialDataContribution.menuTypeField(),
-                                PlatformAdminMenuInitialDataContribution.menuModuleAliasField(),
-                                PlatformAdminMenuInitialDataContribution.menuRouteField(),
-                                PlatformAdminMenuInitialDataContribution.menuExternalUrlField(),
-                                PlatformAdminMenuInitialDataContribution.menuPageModeField(),
-                                PlatformAdminMenuInitialDataContribution.menuDefaultUiConfigIdField(),
-                                PlatformAdminMenuInitialDataContribution.menuDefaultQueryTemplateIdField(),
-                                PlatformAdminMenuInitialDataContribution.menuEntryParamsJsonField())
-                        .operator(PlatformAdminMenuInitialDataContribution.menuTitleField(),
-                                PlatformAdminMenuInitialDataContribution.menuEnabledField(),
-                                PlatformAdminMenuInitialDataContribution.menuSortOrderField()),
+        context.apply(MenuInitialDataRecords.module(menuService.selectIgnoreSoftDelete(menuId), desired),
                 item -> menuService.insert(item),
                 item -> menuService.update(item));
     }
