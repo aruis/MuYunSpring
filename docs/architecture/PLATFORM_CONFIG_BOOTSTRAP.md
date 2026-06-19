@@ -210,12 +210,12 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 裸库启动时，平台静态模块可通过 `@PlatformMenu` 选择性贡献系统内置菜单。`@PlatformStaticModule` 仍表达模块事实，`@PlatformMenu` 只表达导航贡献；模块可以注册但不进入菜单。
 
-平台内置菜单由初始化数据能力承载，包含两个 declaration provider：
+平台内置菜单由初始化数据能力承载，按数据来源分层：
 
-1. `platform.admin-menu`：维护系统菜单方案和默认一级分组。
-2. `platform.menu-contributions`：由 `PlatformMenuInitialDataDeclarationProvider` 扫描 `@PlatformMenu` 并注册模块菜单项。
+1. `MenuSchemeService` 和 `MenuService` 通过 service-owned `InitialDataAbility` 维护系统菜单方案和默认一级分组。
+2. `platform.menu-contributions`：由薄 `PlatformMenuInitialDataDeclarationProvider` 扫描 `@PlatformMenu` 并注册模块菜单项。
 
-菜单领域的字段角色由 `Menu` 和 `MenuScheme` 模型上的初始化字段声明表达，贡献类只构造期望菜单对象并调用通用初始化声明门面，不直接维护字段清单，也不直接执行插入/更新。
+菜单领域的字段角色由 `Menu` 和 `MenuScheme` 模型上的初始化字段声明表达。固定领域数据由菜单 service 自己声明；扫描型菜单项由 provider 只构造期望菜单对象并调用通用初始化声明门面，不直接维护字段清单，也不直接执行插入/更新。
 
 平台只维护一个系统菜单方案：
 

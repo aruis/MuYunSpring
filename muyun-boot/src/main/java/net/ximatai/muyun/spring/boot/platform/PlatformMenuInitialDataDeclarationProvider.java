@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
+import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.springframework.aop.support.AopUtils;
@@ -35,7 +36,7 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
 
     @Override
     public List<InitialDataDeclaration<?>> declarations() {
-        return contributedMenus(PlatformAdminMenuInitialDataDeclarationProvider.ADMIN_SCHEME_ID);
+        return contributedMenus(MenuSchemeService.ADMIN_SCHEME_ID);
     }
 
     private List<InitialDataDeclaration<?>> contributedMenus(String schemeId) {
