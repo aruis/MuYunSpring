@@ -77,6 +77,28 @@ class UserSessionServiceTest {
     }
 
     @Test
+    void shouldNormalizeSessionTimesToDatabasePrecision() {
+        Instant preciseNow = Instant.parse("2026-06-20T00:00:00.123456789Z");
+        Clock preciseClock = Clock.fixed(preciseNow, ZoneOffset.UTC);
+        UserAccountDao dao = mock(UserAccountDao.class);
+        when(dao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(activeUser()));
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        AtomicReference<UserSession> persistedSession = captureInsertedSession(sessionDao);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, preciseClock);
+
+        LoginResult login = sessionService.login("tenant-a", "alice", "secret1");
+
+        Instant databaseNow = Instant.parse("2026-06-20T00:00:00.123456Z");
+        assertThat(login.issuedAt()).isEqualTo(databaseNow);
+        assertThat(persistedSession.get().getIssuedAt()).isEqualTo(databaseNow);
+        assertThat(persistedSession.get().getLastSeenAt()).isEqualTo(databaseNow);
+        assertThat(persistedSession.get().getExpiresAt()).isEqualTo(databaseNow.plusSeconds(43_200));
+        assertThat(persistedSession.get().getMaxExpiresAt()).isEqualTo(databaseNow.plusSeconds(604_800));
+    }
+
+    @Test
     void shouldDropSessionWhenUserIsNoLongerActive() {
         UserAccountDao dao = mock(UserAccountDao.class);
         UserAccount enabled = activeUser();

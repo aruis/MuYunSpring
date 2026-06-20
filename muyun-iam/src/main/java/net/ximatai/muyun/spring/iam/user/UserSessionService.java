@@ -14,6 +14,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -58,7 +59,7 @@ public class UserSessionService {
             CurrentUser currentUser = CurrentUser.tenantUser(
                     user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
             String token = newToken();
-            Instant issuedAt = clock.instant();
+            Instant issuedAt = now();
             Instant maxExpiresAt = issuedAt.plus(SESSION_ABSOLUTE_TTL);
             UserSession session = new UserSession();
             session.setTenantId(currentUser.tenantId());
@@ -83,7 +84,7 @@ public class UserSessionService {
         if (session == null || session.getRevokedAt() != null) {
             return Optional.empty();
         }
-        Instant now = clock.instant();
+        Instant now = now();
         if (isExpired(session, now)) {
             return Optional.empty();
         }
@@ -105,7 +106,7 @@ public class UserSessionService {
     public void logout(String token) {
         UserSession session = sessionByToken(token);
         if (session != null) {
-            revoke(session, clock.instant(), "logout");
+            revoke(session, now(), "logout");
         }
     }
 
@@ -119,7 +120,7 @@ public class UserSessionService {
         if (userId == null || userId.isBlank()) {
             return;
         }
-        Instant now = clock.instant();
+        Instant now = now();
         List<UserSession> sessions = userSessionRecordService.listByUserId(userId);
         for (UserSession session : sessions) {
             if (session.getRevokedAt() == null) {
@@ -200,6 +201,10 @@ public class UserSessionService {
     private Instant nextIdleExpiresAt(Instant now, Instant maxExpiresAt) {
         Instant idleExpiresAt = now.plus(SESSION_IDLE_TIMEOUT);
         return idleExpiresAt.isBefore(maxExpiresAt) ? idleExpiresAt : maxExpiresAt;
+    }
+
+    private Instant now() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
     private UserSession sessionById(String id) {
