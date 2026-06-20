@@ -9,8 +9,12 @@ allprojects {
     version = "0.1.0-SNAPSHOT"
 }
 
+val testcontainersVersion = libs.versions.testcontainers.get()
+
 subprojects {
     apply(plugin = "java-library")
+
+    extra["testcontainers.version"] = testcontainersVersion
 
     java {
         toolchain {
@@ -20,6 +24,7 @@ subprojects {
 
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
+        options.compilerArgs.add("-parameters")
     }
 
     tasks.withType<Test>().configureEach {

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
 import net.ximatai.muyun.database.spring.boot.JdbiConfigurer;
@@ -17,11 +18,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
 import java.math.BigInteger;
 import java.sql.Types;
 
 @Configuration(proxyBeanMethods = false)
+@Import(MuYunSpringDatabaseValueConversionConfiguration.class)
 public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnMissingBean
@@ -31,8 +34,10 @@ public class MuYunSpringDatabaseConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations, EntityMetaResolver entityMetaResolver) {
-        return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver);
+    SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
+                                            EntityMetaResolver entityMetaResolver,
+                                            DatabaseValueConverter databaseValueConverter) {
+        return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver, databaseValueConverter);
     }
 
     @Bean

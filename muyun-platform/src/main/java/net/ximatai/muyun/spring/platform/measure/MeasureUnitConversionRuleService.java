@@ -51,7 +51,7 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
     @Override
     public Criteria sortScope(MeasureUnitConversionRule rule) {
         return Criteria.of()
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
+                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
                 .eq("applicationAlias", rule.getApplicationAlias())
                 .eq("scopeType", rule.getScopeType())
                 .eq("moduleAlias", rule.getModuleAlias())
@@ -217,7 +217,7 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
 
     private void validateNoOverlappingRule(MeasureUnitConversionRule rule) {
         for (MeasureUnitConversionRule existing : list(Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rule.getTenantId())
                         .eq("applicationAlias", rule.getApplicationAlias()),
                 new PageRequest(0, Integer.MAX_VALUE))) {
             if (Objects.equals(existing.getId(), rule.getId())) {

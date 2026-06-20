@@ -47,7 +47,7 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
 
     @Override
     public Criteria sortScope(ExchangeRateType rateType) {
-        return Criteria.of().eq(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId());
+        return Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId());
     }
 
     @Override
@@ -130,7 +130,7 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
             rateType.setSystemManaged(Boolean.FALSE);
         }
         rejectDuplicate(rateType, Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rateType.getTenantId())
                         .eq("code", rateType.getCode()),
                 "exchange rate type code must be unique within tenant scope: " + rateType.getCode());
     }

@@ -1,5 +1,5 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
-import type { CurrentUser, MenuMineResponse, RouteQueryValue } from '@muyun/web-contracts';
+import type { CurrentUser, LoginRequest, LoginResult, MenuMineResponse, RouteQueryValue } from '@muyun/web-contracts';
 
 export interface RequestContext {
   baseUrl?: string;
@@ -87,6 +87,10 @@ export interface MenuClient {
   mine(): Promise<MenuMineResponse>;
 }
 
+export interface AuthClient {
+  login(request: LoginRequest): Promise<LoginResult>;
+}
+
 export function createSessionClient(http: HttpClient): SessionClient {
   return {
     current: () => http.request<CurrentUser>({ path: '/iam.auth/context' }),
@@ -96,6 +100,12 @@ export function createSessionClient(http: HttpClient): SessionClient {
 export function createMenuClient(http: HttpClient): MenuClient {
   return {
     mine: () => http.request<MenuMineResponse>({ path: '/platform.menu/mine' }),
+  };
+}
+
+export function createAuthClient(http: HttpClient): AuthClient {
+  return {
+    login: (request) => http.request<LoginResult>({ method: 'POST', path: '/iam.auth/login', body: request }),
   };
 }
 

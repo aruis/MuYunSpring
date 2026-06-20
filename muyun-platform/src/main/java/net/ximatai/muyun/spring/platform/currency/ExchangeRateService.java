@@ -52,7 +52,7 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
     @Override
     public Criteria sortScope(ExchangeRate rate) {
         return Criteria.of()
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
+                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
                 .eq("fromCurrencyCode", rate.getFromCurrencyCode())
                 .eq("toCurrencyCode", rate.getToCurrencyCode())
                 .eq("rateTypeCode", rate.getRateTypeCode());
@@ -117,7 +117,7 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
             rate.setSource(null);
         }
         rejectDuplicate(rate, Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, rate.getTenantId())
                         .eq("fromCurrencyCode", rate.getFromCurrencyCode())
                         .eq("toCurrencyCode", rate.getToCurrencyCode())
                         .eq("rateTypeCode", rate.getRateTypeCode())

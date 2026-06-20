@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SortDirection;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.lang.reflect.Method;
@@ -165,14 +166,30 @@ public class TestMemoryDao<T extends EntityContract> implements BaseDao<T, Strin
         }
         if (clause.getOperator() == CriteriaOperator.EQ) {
             Object expected = clause.getValues().getFirst();
-            return expected == null ? actual == null : expected.equals(actual);
+            return sameValue(expected, actual);
         }
         if (clause.getOperator() == CriteriaOperator.IN) {
             return clause.getValues().stream()
                     .flatMap(value -> value instanceof Collection<?> collection ? collection.stream() : java.util.stream.Stream.of(value))
-                    .anyMatch(expected -> expected == null ? actual == null : expected.equals(actual));
+                    .anyMatch(expected -> sameValue(expected, actual));
         }
         return true;
+    }
+
+    private boolean sameValue(Object expected, Object actual) {
+        if (expected == null) {
+            return actual == null;
+        }
+        if (expected.equals(actual)) {
+            return true;
+        }
+        if (actual instanceof CodeTitleEnum codeTitleEnum) {
+            return expected.equals(codeTitleEnum.getCode());
+        }
+        if (expected instanceof CodeTitleEnum codeTitleEnum) {
+            return codeTitleEnum.getCode().equals(actual);
+        }
+        return false;
     }
 
     private Object value(T row, String field) {

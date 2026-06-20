@@ -1,30 +1,52 @@
 package net.ximatai.muyun.spring.iam.user;
 
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
-import java.util.Map;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class UserSessionService {
     private static final int TOKEN_BYTES = 32;
-    private static final Duration SESSION_TTL = Duration.ofHours(12);
+    private static final Duration SESSION_IDLE_TIMEOUT = Duration.ofHours(12);
+    private static final Duration SESSION_ABSOLUTE_TTL = Duration.ofDays(7);
+    private static final Duration LAST_SEEN_WRITE_INTERVAL = Duration.ofSeconds(60);
 
     private final UserAccountService userAccountService;
+    private final UserSessionRecordService userSessionRecordService;
+    private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
-    private final Map<String, SessionState> sessions = new ConcurrentHashMap<>();
 
-    public UserSessionService(UserAccountService userAccountService) {
+    @Autowired
+    public UserSessionService(UserAccountService userAccountService, UserSessionRecordService userSessionRecordService) {
+        this(userAccountService, userSessionRecordService, Clock.systemUTC());
+    }
+
+    UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
+        this(userAccountService, new UserSessionRecordService(userSessionDao), clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       Clock clock) {
         this.userAccountService = userAccountService;
+        this.userSessionRecordService = userSessionRecordService;
+        this.clock = clock;
     }
 
     public LoginResult login(String tenantId, String username, String password) {
@@ -32,13 +54,24 @@ public class UserSessionService {
         try (TenantContext.Scope ignored = TenantContext.use(validTenantId)) {
             UserAccount user = userAccountService.requireActiveUser(username);
             if (!userAccountService.passwordMatches(user, password)) {
-                throw new PlatformException("invalid username or password");
+                throw new AuthenticationFailedException("invalid username or password");
             }
             CurrentUser currentUser = CurrentUser.tenantUser(
                     user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
             String token = newToken();
-            Instant issuedAt = Instant.now();
-            sessions.put(token, new SessionState(currentUser, issuedAt.plus(SESSION_TTL)));
+            Instant issuedAt = now();
+            Instant maxExpiresAt = issuedAt.plus(SESSION_ABSOLUTE_TTL);
+            UserSession session = new UserSession();
+            session.setTenantId(currentUser.tenantId());
+            session.setUserId(currentUser.userId());
+            session.setUsername(currentUser.username());
+            session.setOrganizationId(currentUser.organizationId());
+            session.setTokenHash(tokenHash(token));
+            session.setIssuedAt(issuedAt);
+            session.setExpiresAt(nextIdleExpiresAt(issuedAt, maxExpiresAt));
+            session.setMaxExpiresAt(maxExpiresAt);
+            session.setLastSeenAt(issuedAt);
+            userSessionRecordService.issue(session);
             return LoginResult.bearer(token, issuedAt, currentUser);
         }
     }
@@ -47,30 +80,33 @@ public class UserSessionService {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
-        String normalized = token.trim();
-        SessionState state = sessions.get(normalized);
-        if (state == null) {
+        UserSession session = sessionByToken(token);
+        if (session == null || session.getRevokedAt() != null) {
             return Optional.empty();
         }
-        if (Instant.now().isAfter(state.expiresAt())) {
-            sessions.remove(normalized);
+        Instant now = now();
+        if (isExpired(session, now)) {
             return Optional.empty();
         }
-        CurrentUser currentUser = state.currentUser();
-        try (TenantContext.Scope ignored = TenantContext.use(currentUser.tenantId())) {
-            UserAccount user = userAccountService.select(currentUser.userId());
+        try (TenantContext.Scope ignored = TenantContext.use(session.getTenantId())) {
+            UserAccount user = userAccountService.select(session.getUserId());
             if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
-                sessions.remove(normalized);
+                revoke(session, now, "user inactive");
                 return Optional.empty();
             }
-            return Optional.of(CurrentUser.tenantUser(
-                    user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId()));
+            if (!updateLastSeenIfDue(session, now)) {
+                return Optional.empty();
+            }
+            CurrentUser currentUser = CurrentUser.tenantUser(
+                    user.getId(), user.getUsername(), user.getTenantId(), user.getOrganizationId());
+            return Optional.of(currentUser);
         }
     }
 
     public void logout(String token) {
-        if (token != null && !token.isBlank()) {
-            sessions.remove(token.trim());
+        UserSession session = sessionByToken(token);
+        if (session != null) {
+            revoke(session, now(), "logout");
         }
     }
 
@@ -84,9 +120,97 @@ public class UserSessionService {
         if (userId == null || userId.isBlank()) {
             return;
         }
-        sessions.entrySet().removeIf(entry -> userId.equals(entry.getValue().currentUser().userId()));
+        Instant now = now();
+        List<UserSession> sessions = userSessionRecordService.listByUserId(userId);
+        for (UserSession session : sessions) {
+            if (session.getRevokedAt() == null) {
+                revoke(session, now, "user sessions revoked");
+            }
+        }
     }
 
-    private record SessionState(CurrentUser currentUser, Instant expiresAt) {
+    private UserSession sessionByToken(String token) {
+        String normalized = normalizeToken(token);
+        if (normalized == null) {
+            return null;
+        }
+        return userSessionRecordService.findByTokenHash(tokenHash(normalized));
+    }
+
+    private String normalizeToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return token.trim();
+    }
+
+    private String tokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
+    }
+
+    private void revoke(UserSession session, Instant now, String reason) {
+        UserSession current = session;
+        for (int attempt = 0; attempt < 2 && current != null && current.getRevokedAt() == null; attempt++) {
+            Integer expectedVersion = current.getVersion();
+            current.setRevokedAt(now);
+            current.setRevokedReason(reason);
+            int updated = userSessionRecordService.updateSession(current, expectedVersion, now);
+            if (updated > 0) {
+                return;
+            }
+            current = sessionById(current.getId());
+        }
+    }
+
+    private boolean updateLastSeenIfDue(UserSession session, Instant now) {
+        Instant lastSeenAt = session.getLastSeenAt();
+        if (lastSeenAt != null && lastSeenAt.plus(LAST_SEEN_WRITE_INTERVAL).isAfter(now)) {
+            return true;
+        }
+        Integer expectedVersion = session.getVersion();
+        session.setLastSeenAt(now);
+        session.setMaxExpiresAt(effectiveMaxExpiresAt(session));
+        session.setExpiresAt(nextIdleExpiresAt(now, session.getMaxExpiresAt()));
+        int updated = userSessionRecordService.updateSession(session, expectedVersion, now);
+        if (updated > 0) {
+            return true;
+        }
+        UserSession latest = sessionById(session.getId());
+        return latest != null && latest.getRevokedAt() == null && !isExpired(latest, now);
+    }
+
+    private boolean isExpired(UserSession session, Instant now) {
+        return !now.isBefore(session.getExpiresAt()) || !now.isBefore(effectiveMaxExpiresAt(session));
+    }
+
+    private Instant effectiveMaxExpiresAt(UserSession session) {
+        if (session.getMaxExpiresAt() != null) {
+            return session.getMaxExpiresAt();
+        }
+        if (session.getIssuedAt() != null) {
+            return session.getIssuedAt().plus(SESSION_ABSOLUTE_TTL);
+        }
+        return session.getExpiresAt();
+    }
+
+    private Instant nextIdleExpiresAt(Instant now, Instant maxExpiresAt) {
+        Instant idleExpiresAt = now.plus(SESSION_IDLE_TIMEOUT);
+        return idleExpiresAt.isBefore(maxExpiresAt) ? idleExpiresAt : maxExpiresAt;
+    }
+
+    private Instant now() {
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private UserSession sessionById(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        return userSessionRecordService.findById(id);
     }
 }

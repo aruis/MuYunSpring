@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 @RestController
 @PlatformStaticModule(application = "platform", alias = TenantCurrencySettingService.MODULE_ALIAS,
         title = "平台租户币种设置")
-@RequestMapping("/platform.tenant-currency-settings")
+@RequestMapping({"/platform.tenant_currency_setting", "/platform.tenant-currency-settings"})
 public class TenantCurrencySettingWebController
         extends NestedCrudWebSupport<TenantCurrencySetting, TenantCurrencySettingService> {
     private static final Set<String> QUERY_FIELDS = Set.of(

@@ -42,9 +42,11 @@
 ### 登录与上下文
 
 1. 用户调用登录入口提交 `tenantId + username + password`。
-2. 登录服务在租户上下文内校验用户状态和密码，生成 Bearer token。
-3. 后续请求由 Bearer token 解析当前用户。
+2. 登录服务在租户上下文内校验用户状态和密码，生成 Bearer token，并把 token hash、用户、租户、签发时间、空闲过期时间、绝对过期时间和最近访问时间写入 `iam_user_session`。
+3. 后续请求由 Bearer token 解析当前用户；服务端只按 token hash 查询 session，不持久化明文 token。
 4. `CurrentUserWebFilter` 将当前用户写入 `CurrentUserContext`；普通租户用户同步写入 `TenantContext`，系统用户进入系统态租户上下文。
+5. session 使用滑动过期：有效访问会在节流窗口后刷新最近访问时间并延长空闲过期时间，但不会超过本次登录的绝对过期时间。
+6. 同一用户允许多端登录，对应多条未撤销 session；登出、修改密码、禁用用户或用户失效时撤销对应 session。
 
 ### 组织、部门、职员与用户
 

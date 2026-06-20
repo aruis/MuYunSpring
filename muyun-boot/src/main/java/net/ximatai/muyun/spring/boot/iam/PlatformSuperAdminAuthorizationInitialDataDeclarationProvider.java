@@ -76,7 +76,6 @@ public class PlatformSuperAdminAuthorizationInitialDataDeclarationProvider imple
                 RoleGrant.class,
                 desired,
                 () -> existingRoleGrant(desired),
-                grant -> roleService.grantRole(grant.getRoleId(), grant.getSubjectType(), grant.getSubjectId()),
                 grant -> roleService.grantRole(grant.getRoleId(), grant.getSubjectType(), grant.getSubjectId())
         ).inTenant(TenantService.PLATFORM_TENANT_ID);
     }
@@ -96,7 +95,6 @@ public class PlatformSuperAdminAuthorizationInitialDataDeclarationProvider imple
                 RoleAction.class,
                 desired,
                 () -> existingRoleAction(desired),
-                ignored -> grantAction(moduleAction),
                 ignored -> grantAction(moduleAction)
         ).inTenant(TenantService.PLATFORM_TENANT_ID);
     }

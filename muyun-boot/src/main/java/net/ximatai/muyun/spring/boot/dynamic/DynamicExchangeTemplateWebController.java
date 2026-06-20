@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTempla
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicExchangeTemplatePlanBuilder;
 import net.ximatai.muyun.spring.platform.exchange.template.DynamicRecordReferenceDropdownResolver;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +37,7 @@ public class DynamicExchangeTemplateWebController {
     private final DynamicExchangeTemplatePlanBuilder templatePlanBuilder;
     private final ExcelWorkbookPlanWriter workbookWriter;
 
+    @Autowired
     public DynamicExchangeTemplateWebController(DynamicRecordService recordService,
                                                 ActiveTenantVerifier activeTenantVerifier,
                                                 OptionSourceRegistry optionSourceRegistry) {

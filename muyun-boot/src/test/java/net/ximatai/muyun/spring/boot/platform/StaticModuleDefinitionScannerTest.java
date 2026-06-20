@@ -335,6 +335,20 @@ class StaticModuleDefinitionScannerTest {
     }
 
     @Test
+    void shouldUseLastModuleSegmentAsStaticEntityAlias() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(MultiSegmentModuleWeb.class, () -> new MultiSegmentModuleWeb(new MultiSegmentModuleService()));
+            context.refresh();
+
+            StaticModuleDefinition definition = new StaticModuleDefinitionScanner(context).scan().getFirst();
+
+            assertThat(definition.moduleAlias()).isEqualTo("platform.workflow.definition");
+            assertThat(definition.entities()).singleElement()
+                    .satisfies(entity -> assertThat(entity.alias()).isEqualTo("definition"));
+        }
+    }
+
+    @Test
     void shouldScanSnakeCaseWebScopeForCamelCaseStaticAlias() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(PlatformFieldTypeWebController.class);
@@ -538,6 +552,22 @@ class StaticModuleDefinitionScannerTest {
         @SuppressWarnings("unchecked")
         StaticMeasureOrderService() {
             super("sales.order_line", StaticMeasureOrderLine.class, mock(BaseDao.class));
+        }
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "platform", alias = "platform.workflow.definition", title = "流程定义")
+    @RequestMapping("/platform.workflow.definition")
+    static class MultiSegmentModuleWeb extends net.ximatai.muyun.spring.boot.web.WebSupport<MultiSegmentModuleService> {
+        MultiSegmentModuleWeb(MultiSegmentModuleService service) {
+            this.service = service;
+        }
+    }
+
+    private static class MultiSegmentModuleService extends AbstractAbilityService<StaticMeasureOrderLine> {
+        @SuppressWarnings("unchecked")
+        MultiSegmentModuleService() {
+            super("platform.workflow.definition", StaticMeasureOrderLine.class, mock(BaseDao.class));
         }
     }
 

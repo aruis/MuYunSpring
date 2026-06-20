@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class MeasureUnitDynamicRecordMutationCoordinator implements DynamicRecor
     private final MeasureUnitBusinessConversionService businessConversionService;
     private final Clock clock;
 
+    @Autowired
     public MeasureUnitDynamicRecordMutationCoordinator(MeasureUnitConversionService linearConversionService,
                                                        MeasureUnitBusinessConversionService businessConversionService) {
         this(linearConversionService, businessConversionService, Clock.systemDefaultZone());

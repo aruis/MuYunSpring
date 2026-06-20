@@ -52,6 +52,25 @@ public final class InitialDataDeclaration<T extends EntityContract> {
             Class<T> modelClass,
             T desired,
             Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(modelClass, InitialDataPolicy.CREATE_IF_MISSING, desired, existingReader, applier,
+                applier);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> createIfMissing(
+            String key,
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(key, modelClass, InitialDataPolicy.CREATE_IF_MISSING, desired, existingReader, applier,
+                applier);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> createIfMissing(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
             Consumer<T> inserter,
             Consumer<T> updater) {
         return fromFunctions(modelClass, InitialDataPolicy.CREATE_IF_MISSING, desired, existingReader, inserter,
@@ -62,6 +81,24 @@ public final class InitialDataDeclaration<T extends EntityContract> {
             CrudAbility<T> service,
             T desired) {
         return fromService(service, InitialDataPolicy.RECONCILE_MANAGED, desired);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(modelClass, InitialDataPolicy.RECONCILE_MANAGED, desired, existingReader, applier, applier);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
+            String key,
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(key, modelClass, InitialDataPolicy.RECONCILE_MANAGED, desired, existingReader, applier,
+                applier);
     }
 
     public static <T extends EntityContract> InitialDataDeclaration<T> reconcileManaged(
@@ -101,6 +138,23 @@ public final class InitialDataDeclaration<T extends EntityContract> {
                 "service modelClass must not be null");
         InitialDataRecord<T> record = InitialDataModelDescriptor.of(modelClass).record(id, policy, desired);
         return of(record, () -> selectExisting(service, id), service::insert, service::update);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> locked(
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(modelClass, InitialDataPolicy.LOCKED, desired, existingReader, applier, applier);
+    }
+
+    public static <T extends EntityContract> InitialDataDeclaration<T> locked(
+            String key,
+            Class<T> modelClass,
+            T desired,
+            Supplier<T> existingReader,
+            Consumer<T> applier) {
+        return fromFunctions(key, modelClass, InitialDataPolicy.LOCKED, desired, existingReader, applier, applier);
     }
 
     public static <T extends EntityContract> InitialDataDeclaration<T> locked(

@@ -6,6 +6,8 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -92,6 +94,23 @@ class MenuWebControllerTest {
                 .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
 
         verify(sessionService).currentUser("token-1");
+    }
+
+    @Test
+    void shouldReturnConfigurationErrorWhenCurrentUserHasNoMenuScheme() throws Exception {
+        MenuService menuService = mock(MenuService.class);
+        MenuWebController controller = new MenuWebController(menuService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .build();
+        when(menuService.currentUserVisibleRootMenus())
+                .thenThrow(new PlatformConfigurationException("menu scheme is not configured for current user"));
+
+        mvc.perform(get("/platform.menu/mine"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PLATFORM_CONFIGURATION"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("menu scheme is not configured for current user"));
     }
 
     @Test

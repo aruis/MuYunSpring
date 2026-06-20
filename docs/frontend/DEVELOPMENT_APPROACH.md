@@ -85,6 +85,22 @@ AdminShell / PlatformShell
 
 菜单数据可以先使用 mock client，但数据结构应贴近后端菜单剪枝后的消费结果。当前只做菜单消费和页面承载，不做菜单设计器、权限配置或复杂权限治理。
 
+## 临时后端联调
+
+菜单初始化数据可用后，前端第一轮后端联调只验证登录上下文、`/platform.menu/mine` 菜单树和 shell menu+tab 消费链路，不立即扩大到动态页面 entry/bootstrap。
+
+联调方式：
+
+1. 后端启动裸库或可重置测试库，确认初始化数据已创建平台超级管理员、系统菜单方案、默认一级分组和 `@PlatformMenu` 模块菜单。
+2. 前端执行 `npm run dev:backend --prefix muyun-web`，该模式使用 `muyun-web/.env.backend`，关闭 mock 并请求本地后端。
+3. 浏览器打开前端后使用简易登录页登录；本地可通过 `VITE_MUYUN_LOGIN_TENANT_ID`、`VITE_MUYUN_LOGIN_USERNAME`、`VITE_MUYUN_LOGIN_PASSWORD` 预填联调账号。
+4. 登录成功后前端将 token 存入浏览器本地 storage，后续请求自动携带 `Authorization: Bearer <token>`。
+5. 验证 shell 能加载 `/iam.auth/context` 和 `/platform.menu/mine`，菜单分组能展开，点击菜单能打开稳定的 `menu:<menuId>` tab。
+
+`muyun-web/.env.backend.local` 仍可写入 `VITE_MUYUN_AUTH_TOKEN=<token>` 作为自动化或特殊调试兜底，也可写入登录页本地预填项；这些值只应保留在本机配置中。
+
+这轮联调暂不把 `MODULE` 菜单接到 `/platform.menu/{menuId}/entry`。该接口需要明确系统用户、租户上下文、动态模块 UI 配置和 PageHost 语义后再进入下一轮。
+
 ## 每轮推进步骤
 
 一轮迭代应尽量包含：

@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class WorkflowArchiveService {
     private final WorkflowHistoryInstanceDao historyDao;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public WorkflowArchiveService(WorkflowInstanceDao instanceDao,
                                   WorkflowNodeInstanceDao nodeDao,
                                   WorkflowRouteInstanceDao routeDao,

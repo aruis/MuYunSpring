@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -19,6 +20,7 @@ public class CodeBusinessPreviewService {
     private final CodePreviewService previewService;
     private final Clock clock;
 
+    @Autowired
     public CodeBusinessPreviewService(CodeRuleService ruleService, CodePreviewService previewService) {
         this(ruleService, previewService, Clock.systemDefaultZone());
     }

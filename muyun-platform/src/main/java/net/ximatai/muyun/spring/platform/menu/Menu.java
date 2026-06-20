@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import net.ximatai.muyun.database.core.annotation.Column;
 import net.ximatai.muyun.database.core.annotation.Default;
+import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
@@ -19,6 +20,10 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
         operator = {"title", "enabled", "sortOrder"}
 )
 public class Menu extends StandardEnabledTreeEntity {
+    @Id
+    @Column(name = "id", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Menu id")
+    private String id;
+
     @Column(name = "scheme_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Menu scheme id")
     private String schemeId;
 

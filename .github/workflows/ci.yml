@@ -28,7 +28,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run tests
-        run: ./gradlew test --no-daemon --stacktrace
+        run: ./gradlew test :muyun-boot:integrationTest --no-daemon --stacktrace
 
       - name: Upload test results on failure
         if: failure()

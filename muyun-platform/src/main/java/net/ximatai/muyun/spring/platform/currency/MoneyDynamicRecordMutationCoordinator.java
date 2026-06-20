@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ public class MoneyDynamicRecordMutationCoordinator implements DynamicRecordMutat
     private final TenantCurrencySettingService tenantCurrencySettingService;
     private final Clock clock;
 
+    @Autowired
     public MoneyDynamicRecordMutationCoordinator(CurrencyConversionService conversionService,
                                                  TenantCurrencySettingService tenantCurrencySettingService) {
         this(conversionService, tenantCurrencySettingService, Clock.systemDefaultZone());

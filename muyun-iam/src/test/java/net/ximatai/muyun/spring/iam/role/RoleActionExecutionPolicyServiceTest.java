@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.role;
 
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
@@ -113,7 +114,7 @@ class RoleActionExecutionPolicyServiceTest {
                 "query"))) {
             assertThatThrownBy(() -> policy.authorize(context(
                     CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOf(PlatformAccessDeniedException.class)
                     .hasMessageContaining("sales.contract:view");
         }
 
@@ -134,7 +135,7 @@ class RoleActionExecutionPolicyServiceTest {
                 "query"))) {
             assertThatThrownBy(() -> policy.authorize(context(
                     CurrentUser.tenantUser("assistant-user", "Assistant", "tenant_a"))))
-                    .isInstanceOf(PlatformException.class)
+                    .isInstanceOf(PlatformAccessDeniedException.class)
                     .hasMessageContaining("operator does not match");
         }
 
@@ -147,7 +148,7 @@ class RoleActionExecutionPolicyServiceTest {
         RoleActionExecutionPolicyService policy = new RoleActionExecutionPolicyService(roleService);
 
         assertThatThrownBy(() -> policy.requireAuthorized(context(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))))
-                .isInstanceOf(PlatformException.class)
+                .isInstanceOf(PlatformAccessDeniedException.class)
                 .hasMessageContaining("sales.contract:view");
     }
 
@@ -160,7 +161,7 @@ class RoleActionExecutionPolicyServiceTest {
                 "query",
                 Set.of(),
                 Optional.empty()
-        ))).isInstanceOf(PlatformException.class)
+        ))).isInstanceOf(AuthenticationRequiredException.class)
                 .hasMessageContaining("current user");
     }
 

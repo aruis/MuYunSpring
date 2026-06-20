@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.RuntimeTableGateway;
@@ -34,13 +35,20 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @SuppressWarnings("unchecked")
     public DynamicRecordDao(IDatabaseOperations<?> operations, EntityDefinition entity) {
+        this(operations, entity, DatabaseValueConverter.DEFAULT);
+    }
+
+    @SuppressWarnings("unchecked")
+    public DynamicRecordDao(IDatabaseOperations<?> operations,
+                            EntityDefinition entity,
+                            DatabaseValueConverter valueConverter) {
         this.operations = (IDatabaseOperations<Object>) Objects.requireNonNull(operations, "operations must not be null");
         new ModuleDefinitionValidator().validateEntity(entity);
         this.entity = entity;
         this.schema = entity.schemaName();
         this.mapping = new DynamicRecordMapping(entity);
         this.tableGateway = new RuntimeTableGateway(this.operations, this.schema, entity.tableName(),
-                mapping::resolveQueryableColumn);
+                mapping::resolveQueryableColumn, valueConverter);
     }
 
     @Override

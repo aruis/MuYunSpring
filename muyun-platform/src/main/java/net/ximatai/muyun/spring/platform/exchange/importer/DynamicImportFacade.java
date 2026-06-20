@@ -10,6 +10,7 @@ import net.ximatai.muyun.spring.platform.exchange.model.ParsedWorkbook;
 import net.ximatai.muyun.spring.platform.exchange.reader.ExcelWorkbookParser;
 import net.ximatai.muyun.spring.platform.exchange.protocol.ExcelExchangeProtocol;
 import net.ximatai.muyun.spring.platform.exchange.writer.ExcelWorkbookPlanWriter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class DynamicImportFacade {
     private final DynamicImportErrorWorkbookBuilder errorWorkbookBuilder;
     private final ExcelWorkbookPlanWriter workbookWriter;
 
+    @Autowired
     public DynamicImportFacade(DynamicRecordService recordService) {
         this(new ExcelWorkbookParser(),
                 new DynamicImportPlanBuilder(),

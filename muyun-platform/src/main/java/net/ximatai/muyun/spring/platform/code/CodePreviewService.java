@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.code;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.formula.FormulaEngine;
 import net.ximatai.muyun.spring.common.formula.FormulaRuntimeData;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -20,6 +21,7 @@ public class CodePreviewService {
     private final FormulaEngine formulaEngine;
     private final Clock clock;
 
+    @Autowired
     public CodePreviewService() {
         this(new FormulaEngine(), Clock.systemDefaultZone());
     }

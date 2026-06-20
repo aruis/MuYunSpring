@@ -50,7 +50,7 @@ class CurrencyWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(get("/platform.currencies/options"))
+            mvc.perform(get("/platform.currency/options"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.records[0].code").value("USD"));
         }
@@ -71,7 +71,7 @@ class CurrencyWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(post("/platform.exchange-rates/convert")
+            mvc.perform(post("/platform.exchange_rate/convert")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"amount":12.34,"fromCurrencyCode":"USD","toCurrencyCode":"CNY",
@@ -93,7 +93,7 @@ class CurrencyWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(post("/platform.tenant-currency-settings/query")
+            mvc.perform(post("/platform.tenant_currency_setting/query")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(status().isOk())
@@ -118,7 +118,7 @@ class CurrencyWebControllerTest {
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
-            mvc.perform(post("/platform.tenant-currency-settings/insert")
+            mvc.perform(post("/platform.tenant_currency_setting/insert")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"baseCurrencyCode\":\"CNY\",\"title\":\"Base\"}"))
                     .andExpect(status().isCreated())

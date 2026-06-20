@@ -17,6 +17,7 @@ import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContextHolder;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class RuntimeAuditRecordService extends AbstractAbilityService<RuntimeAud
     public static final String MODULE_ALIAS = "platform.runtime_audit_record";
     private final RuntimeAuditPayloadSanitizer payloadSanitizer;
 
+    @Autowired
     public RuntimeAuditRecordService(BaseDao<RuntimeAuditRecord, String> auditRecordDao) {
         this(auditRecordDao, new RuntimeAuditPayloadSanitizer());
     }

@@ -33,6 +33,19 @@ export interface SessionContext {
   currentUser: CurrentUser;
 }
 
+export interface LoginRequest {
+  tenantId: string;
+  username: string;
+  password: string;
+}
+
+export interface LoginResult {
+  token: string;
+  tokenType: 'Bearer' | string;
+  issuedAt: string;
+  currentUser: CurrentUser;
+}
+
 // Matches current Spring/Jackson enum-name output from /platform.menu/mine.
 export type MenuType = 'GROUP' | 'MODULE' | 'ROUTE' | 'LINK';
 

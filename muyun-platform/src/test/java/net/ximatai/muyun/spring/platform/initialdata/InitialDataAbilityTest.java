@@ -241,6 +241,33 @@ class InitialDataAbilityTest {
     }
 
     @Test
+    void shouldBuildDeclarationWithCompositeIdentityAndSingleApplier() {
+        CompositeAnnotatedRecord existing = compositeAnnotatedRecord("generated-id", "same-code", "old-managed",
+                "custom-operator");
+        CompositeAnnotatedRecord desired = compositeAnnotatedRecord(null, "same-code", "new-managed",
+                "default-operator");
+        AtomicInteger applied = new AtomicInteger();
+
+        InitialDataDeclarationProvider provider = () -> List.of(
+                InitialDataDeclaration.reconcileManaged(
+                        "composite-key",
+                        CompositeAnnotatedRecord.class,
+                        desired,
+                        () -> existing,
+                        record -> applied.incrementAndGet()));
+
+        InitialDataResult result = new InitialDataExecutor(List.of(), List.of(provider)).initializeAll().results().getFirst();
+
+        assertThat(result.status()).isEqualTo(InitialDataStatus.UPDATED);
+        assertThat(result.changedFields()).containsExactly("managedValue");
+        assertThat(existing.getId()).isEqualTo("generated-id");
+        assertThat(existing.getCode()).isEqualTo("same-code");
+        assertThat(existing.getManagedValue()).isEqualTo("new-managed");
+        assertThat(existing.getOperatorTitle()).isEqualTo("custom-operator");
+        assertThat(applied).hasValue(1);
+    }
+
+    @Test
     void shouldBuildDeclarationsFromServiceAbility() {
         AnnotatedRecord existing = annotatedRecord("demo", "code", "old-managed", "custom-operator");
         AnnotatedRecord desired = annotatedRecord("demo", "code", "new-managed", "default-operator");
@@ -375,6 +402,27 @@ class InitialDataAbilityTest {
 
     private static AnnotatedRecord annotatedRecord(String id, String code, String managedValue, String operatorTitle) {
         AnnotatedRecord record = new AnnotatedRecord();
+        record.setId(id);
+        record.setCode(code);
+        record.setManagedValue(managedValue);
+        record.setOperatorTitle(operatorTitle);
+        return record;
+    }
+
+    @InitialDataFields(
+            includeId = false,
+            identity = "code",
+            managed = "managedValue",
+            operator = "operatorTitle"
+    )
+    private static class CompositeAnnotatedRecord extends AnnotatedRecord {
+    }
+
+    private static CompositeAnnotatedRecord compositeAnnotatedRecord(String id,
+                                                                     String code,
+                                                                     String managedValue,
+                                                                     String operatorTitle) {
+        CompositeAnnotatedRecord record = new CompositeAnnotatedRecord();
         record.setId(id);
         record.setCode(code);
         record.setManagedValue(managedValue);

@@ -20,6 +20,8 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFormulaRuleServi
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelation;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataRelationService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -144,8 +146,13 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
         MetadataViewFieldService viewFieldHook = new MetadataViewFieldService(
                 new TestMemoryDao<>(), mock(MetadataViewService.class), mock(MetadataFieldService.class),
                 mock(ModuleMetadataRelationService.class), null, null, Optional.of(refreshCoordinator));
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModule dynamicModule = new PlatformModule();
+        dynamicModule.setAlias("crm.customer");
+        dynamicModule.setModuleKind(ModuleKind.DYNAMIC);
+        when(moduleService.select("crm.customer")).thenReturn(dynamicModule);
         PlatformModuleActionService actionHook = new PlatformModuleActionService(
-                new TestMemoryDao<>(), mock(PlatformModuleService.class), Optional.of(refreshCoordinator));
+                new TestMemoryDao<>(), moduleService, Optional.of(refreshCoordinator));
 
         ModuleMetadataRelation relation = relation("rel-customer-main", "crm.customer", "metadata-customer");
         MetadataField metadataField = new MetadataField();
@@ -176,6 +183,24 @@ class PlatformDynamicRuntimeRefreshCoordinatorTest {
         verify(refreshCoordinator).refreshByMetadataView(view);
         verify(refreshCoordinator).refreshByMetadataViewField(viewField);
         verify(refreshCoordinator).refreshByModuleAction(action);
+    }
+
+    @Test
+    void staticModuleActionChangeShouldNotTriggerDynamicRuntimeRefresh() {
+        PlatformDynamicRuntimeRefreshCoordinator refreshCoordinator =
+                mock(PlatformDynamicRuntimeRefreshCoordinator.class);
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModule staticModule = new PlatformModule();
+        staticModule.setAlias("platform.code_issue_log");
+        staticModule.setModuleKind(ModuleKind.STATIC);
+        when(moduleService.select("platform.code_issue_log")).thenReturn(staticModule);
+        PlatformModuleActionService actionHook = new PlatformModuleActionService(
+                new TestMemoryDao<>(), moduleService, Optional.of(refreshCoordinator));
+
+        PlatformModuleAction action = action("platform.code_issue_log");
+        actionHook.afterChanged(action);
+
+        verify(refreshCoordinator, never()).refreshByModuleAction(action);
     }
 
     @Test

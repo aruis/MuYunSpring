@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.ActionAccessMode;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
@@ -23,10 +24,12 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Service
 public class UserAccountService extends TenantActiveScopedService<UserAccount> implements
@@ -42,7 +45,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public static final String PLATFORM_SUPER_ADMIN_USER_TITLE = "平台超级管理员";
 
     private final PasswordHashingService passwordHashingService;
-    private final DataScopeCriteriaService dataScopeCriteriaService;
+    private final Supplier<DataScopeCriteriaService> dataScopeCriteriaService;
     private PlatformInitialAdminSettings initialAdminSettings = PlatformInitialAdminSettings.defaults();
     private static final ActionExecutionPolicy CHANGE_PASSWORD_POLICY = new ActionExecutionPolicy(
             "changePassword",
@@ -64,10 +67,22 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
     public UserAccountService(UserAccountDao userAccountDao,
                               ActiveTenantVerifier activeTenantVerifier,
                               PasswordHashingService passwordHashingService,
+                              ObjectProvider<DataScopeCriteriaService> dataScopeCriteriaService) {
+        super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
+        this.passwordHashingService = passwordHashingService;
+        this.dataScopeCriteriaService = () -> dataScopeCriteriaService.getIfAvailable(AllowAllDataScopeCriteriaService::new);
+    }
+
+    public UserAccountService(UserAccountDao userAccountDao,
+                              ActiveTenantVerifier activeTenantVerifier,
+                              PasswordHashingService passwordHashingService,
                               Optional<DataScopeCriteriaService> dataScopeCriteriaService) {
         super(MODULE_ALIAS, UserAccount.class, userAccountDao, activeTenantVerifier);
         this.passwordHashingService = passwordHashingService;
-        this.dataScopeCriteriaService = dataScopeCriteriaService
+        Optional<DataScopeCriteriaService> criteriaService = dataScopeCriteriaService == null
+                ? Optional.empty()
+                : dataScopeCriteriaService;
+        this.dataScopeCriteriaService = () -> criteriaService
                 .<DataScopeCriteriaService>map(service -> service)
                 .orElseGet(AllowAllDataScopeCriteriaService::new);
     }
@@ -101,7 +116,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
 
     @Override
     public DataScopeCriteriaService getDataScopeCriteriaService() {
-        return dataScopeCriteriaService;
+        return dataScopeCriteriaService.get();
     }
 
     @Override
@@ -149,7 +164,7 @@ public class UserAccountService extends TenantActiveScopedService<UserAccount> i
         String validUsername = requireUsername(username);
         UserAccount user = findOne(Criteria.of().eq("username", validUsername));
         if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
-            throw new PlatformException("invalid username or password");
+            throw new AuthenticationFailedException("invalid username or password");
         }
         return user;
     }
