@@ -3,15 +3,19 @@ package net.ximatai.muyun.spring.boot;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.junit.jupiter.api.Test;
@@ -39,6 +43,49 @@ class MuYunSpringIdentityConfigurationTest {
                     .anyMatch(MenuService.class::isInstance);
             assertThat(context).hasSingleBean(InitialDataExecutor.class);
             assertThat(context).hasSingleBean(PlatformMenuInitialDataDeclarationProvider.class);
+        });
+    }
+
+    @Test
+    void shouldUseTenantServiceAsActiveTenantVerifierWithoutExtraPrimaryAdapter() {
+        contextRunner.run(context -> {
+            Map<String, ActiveTenantVerifier> verifiers = context.getBeansOfType(ActiveTenantVerifier.class);
+
+            assertThat(verifiers).containsKey("tenantService");
+            assertThat(verifiers).containsKey("activeTenantVerifier");
+            assertThat(context.getBean(ActiveTenantVerifier.class)).isSameAs(verifiers.get("activeTenantVerifier"));
+        });
+    }
+
+    @Test
+    void shouldBackOffDefaultActiveTenantVerifierWhenApplicationProvidesOne() {
+        ActiveTenantVerifier customVerifier = tenantId -> {
+        };
+
+        contextRunner.withBean("customActiveTenantVerifier", ActiveTenantVerifier.class, () -> customVerifier,
+                        beanDefinition -> beanDefinition.setPrimary(true))
+                .run(context -> {
+                    Map<String, ActiveTenantVerifier> verifiers = context.getBeansOfType(ActiveTenantVerifier.class);
+
+                    assertThat(verifiers).containsEntry("customActiveTenantVerifier", customVerifier);
+                    assertThat(verifiers).doesNotContainKey("activeTenantVerifier");
+                    assertThat(context.getBean(ActiveTenantVerifier.class)).isSameAs(customVerifier);
+                });
+    }
+
+    @Test
+    void shouldLimitSystemMenuFallbackToPlatformSuperAdminTenant() {
+        contextRunner.run(context -> {
+            SystemMenuSchemeAccessPolicy policy = context.getBean(SystemMenuSchemeAccessPolicy.class);
+
+            assertThat(policy.canUseSystemMenuScheme(CurrentUser.tenantUser(
+                    UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
+                    UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
+                    TenantService.PLATFORM_TENANT_ID))).isTrue();
+            assertThat(policy.canUseSystemMenuScheme(CurrentUser.tenantUser(
+                    UserAccountService.PLATFORM_SUPER_ADMIN_USER_ID,
+                    UserAccountService.PLATFORM_SUPER_ADMIN_USERNAME,
+                    "tenant-a"))).isFalse();
         });
     }
 

@@ -19,6 +19,7 @@ import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
@@ -41,6 +42,8 @@ import java.util.Optional;
 public class MuYunSpringIdentityConfiguration {
     @Bean
     @Primary
+    @ConditionalOnMissingBean(value = ActiveTenantVerifier.class,
+            ignored = {TenantService.class, TenantActiveScopedAbility.class})
     public ActiveTenantVerifier activeTenantVerifier(TenantService tenantService) {
         return tenantService;
     }

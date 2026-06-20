@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.role;
 
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.PlatformAccessDeniedException;
 import net.ximatai.muyun.spring.common.identity.ActingContext;
 import net.ximatai.muyun.spring.common.identity.ActingContextHolder;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
@@ -40,7 +41,7 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
             return ActionAuthorizationResult.allowed(context, DECISION_ANONYMOUS_ALLOWED);
         }
         CurrentUser currentUser = context.currentUser()
-                .orElseThrow(() -> new PlatformException("action requires current user"));
+                .orElseThrow(() -> new AuthenticationRequiredException("action requires current user"));
         if (currentUser.system()) {
             return ActionAuthorizationResult.allowed(context, DECISION_SYSTEM_USER);
         }
@@ -59,17 +60,17 @@ public class RoleActionExecutionPolicyService implements ActionExecutionPolicySe
                 .orElse(null);
         if (actingContext != null) {
             if (!currentUser.userId().equals(actingContext.operator().userId())) {
-                throw new PlatformException("acting context operator does not match current user");
+                throw new PlatformAccessDeniedException("acting context operator does not match current user");
             }
             if (roleService.hasActionPermission(actingContext.principal(), context.moduleAlias(), permissionActionCode)) {
                 return ActionAuthorizationResult.allowed(context, DECISION_ROLE_GRANTED);
             }
-            throw new PlatformException("action permission denied: " + context.permissionCode());
+            throw new PlatformAccessDeniedException("action permission denied: " + context.permissionCode());
         }
         if (roleService.hasActionPermission(currentUser.userId(), context.moduleAlias(), permissionActionCode)) {
             return ActionAuthorizationResult.allowed(context, DECISION_ROLE_GRANTED);
         }
-        throw new PlatformException("action permission denied: " + context.permissionCode());
+        throw new PlatformAccessDeniedException("action permission denied: " + context.permissionCode());
     }
 
     private boolean grantsAuthenticatedUser(ActionDefaultGrantPolicy policy) {
