@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclaration
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
@@ -76,6 +77,11 @@ class MuYunSpringIdentityConfigurationTest {
         @Bean
         RoleActionDao roleActionDao() {
             return mock(RoleActionDao.class);
+        }
+
+        @Bean
+        TenantService tenantService() {
+            return mock(TenantService.class);
         }
 
         @SuppressWarnings("unchecked")
