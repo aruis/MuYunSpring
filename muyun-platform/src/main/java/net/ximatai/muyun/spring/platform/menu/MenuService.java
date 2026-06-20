@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -12,6 +13,7 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
@@ -158,6 +160,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         if (schemeId == null || schemeId.isBlank() || parentId == null || parentId.isBlank()) {
             return List.of();
         }
+        if (isSystemScheme(schemeId)) {
+            try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("read system menu scheme")) {
+                return TreeAbility.super.children(schemeScope(schemeId), parentId);
+            }
+        }
         return TreeAbility.super.children(schemeScope(schemeId), parentId);
     }
 
@@ -167,7 +174,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     public List<Menu> currentUserVisibleRootMenus() {
         CurrentUser user = CurrentUserContext.currentUser()
-                .orElseThrow(() -> new PlatformException("current user is required"));
+                .orElseThrow(() -> new AuthenticationRequiredException("current user is required"));
         MenuScheme scheme = schemeService.resolveCurrentUserScheme(user);
         return visibleRootMenus(scheme.getId());
     }
@@ -177,7 +184,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             throw new PlatformException("menuId is required");
         }
         CurrentUser user = CurrentUserContext.currentUser()
-                .orElseThrow(() -> new PlatformException("current user is required"));
+                .orElseThrow(() -> new AuthenticationRequiredException("current user is required"));
         MenuScheme scheme = schemeService.resolveCurrentUserScheme(user);
         return findVisibleMenu(scheme.getId(), TreeAbility.ROOT_ID, menuId, new LinkedHashSet<>());
     }
@@ -185,7 +192,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     public Menu currentUserVisibleModuleMenu(String moduleAlias) {
         String validAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         CurrentUser user = CurrentUserContext.currentUser()
-                .orElseThrow(() -> new PlatformException("current user is required"));
+                .orElseThrow(() -> new AuthenticationRequiredException("current user is required"));
         MenuScheme scheme = schemeService.resolveCurrentUserScheme(user);
         return findVisibleModuleMenu(scheme.getId(), TreeAbility.ROOT_ID, validAlias, new LinkedHashSet<>());
     }
@@ -402,5 +409,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private Criteria schemeScope(String schemeId) {
         return Criteria.of().eq("schemeId", schemeId);
+    }
+
+    private boolean isSystemScheme(String schemeId) {
+        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("resolve menu scheme scope")) {
+            MenuScheme scheme = schemeService.select(schemeId);
+            return scheme != null && scheme.getScopeType() == MenuScopeType.SYSTEM;
+        }
     }
 }

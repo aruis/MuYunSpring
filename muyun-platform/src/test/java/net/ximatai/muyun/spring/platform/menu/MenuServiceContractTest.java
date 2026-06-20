@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.menu;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -413,6 +414,47 @@ class MenuServiceContractTest {
             assertThat(scopedMenuService.currentUserVisibleRootMenus())
                     .extracting(Menu::getId)
                     .containsExactly(tenantMenuId);
+        }
+    }
+
+    @Test
+    void shouldAllowPlatformSuperAdminTransitionUserToUseSystemMenuScheme() {
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService,
+                Optional.of((moduleAlias, currentUser) -> true));
+        String systemMenuId;
+        try (TenantContext.Scope ignored = TenantContext.system("test system menu scheme")) {
+            String systemSchemeId = schemeService.insert(scheme(
+                    "platform_admin", MenuScopeType.SYSTEM, MenuSchemeService.SYSTEM_SCOPE_ID));
+            systemMenuId = scopedMenuService.insert(moduleMenu(
+                    systemSchemeId, "平台客户", TreeAbility.ROOT_ID, "crm.customer"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("platform.user.super_admin", "admin", "platform"))) {
+            assertThat(scopedMenuService.currentUserVisibleRootMenus())
+                    .extracting(Menu::getId)
+                    .containsExactly(systemMenuId);
+        }
+    }
+
+    @Test
+    void shouldRejectTenantUserWhenTenantHasNoMenuScheme() {
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService,
+                Optional.of((moduleAlias, currentUser) -> true));
+        try (TenantContext.Scope ignored = TenantContext.system("test system menu scheme")) {
+            String systemSchemeId = schemeService.insert(scheme(
+                    "platform_admin", MenuScopeType.SYSTEM, MenuSchemeService.SYSTEM_SCOPE_ID));
+            scopedMenuService.insert(moduleMenu(
+                    systemSchemeId, "平台客户", TreeAbility.ROOT_ID, "crm.customer"));
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+            CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(
+                     CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            assertThatThrownBy(scopedMenuService::currentUserVisibleRootMenus)
+                    .isInstanceOf(PlatformConfigurationException.class)
+                    .hasMessageContaining("menu scheme is not configured for current user");
         }
     }
 

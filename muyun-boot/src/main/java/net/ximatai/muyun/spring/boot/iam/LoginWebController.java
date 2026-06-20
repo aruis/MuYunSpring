@@ -1,7 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
 import jakarta.servlet.http.HttpServletRequest;
-import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.iam.user.LoginResult;
@@ -34,7 +34,7 @@ public class LoginWebController {
     @GetMapping("/context")
     public CurrentUser context() {
         return CurrentUserContext.currentUser()
-                .orElseThrow(() -> new PlatformException("current user context is not available"));
+                .orElseThrow(() -> new AuthenticationRequiredException("current user context is not available"));
     }
 
     private String bearerToken(HttpServletRequest request) {

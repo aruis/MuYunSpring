@@ -72,6 +72,75 @@ const menus = [
   },
 ];
 
+const platformAdminMenus = [
+  {
+    record: {
+      id: 'platform.menu.group.config',
+      schemeId: 'platform.menu_scheme.admin',
+      parentId: 'ROOT',
+      title: '平台配置与低代码运维',
+      menuType: 'GROUP',
+      enabled: true,
+      sortOrder: 10,
+    },
+    children: [
+      {
+        record: {
+          id: 'platform.menu.module.platform.module',
+          schemeId: 'platform.menu_scheme.admin',
+          parentId: 'platform.menu.group.config',
+          title: '模块管理',
+          menuType: 'MODULE',
+          moduleAlias: 'platform.module',
+          pageMode: 'LIST',
+          enabled: true,
+          sortOrder: 20,
+        },
+        children: [],
+      },
+    ],
+  },
+  {
+    record: {
+      id: 'platform.menu.group.identity',
+      schemeId: 'platform.menu_scheme.admin',
+      parentId: 'ROOT',
+      title: '组织与权限',
+      menuType: 'GROUP',
+      enabled: true,
+      sortOrder: 20,
+    },
+    children: [
+      {
+        record: {
+          id: 'platform.menu.module.iam.role',
+          schemeId: 'platform.menu_scheme.admin',
+          parentId: 'platform.menu.group.identity',
+          title: '角色管理',
+          menuType: 'MODULE',
+          moduleAlias: 'iam.role',
+          pageMode: 'LIST',
+          enabled: true,
+          sortOrder: 40,
+        },
+        children: [],
+      },
+    ],
+  },
+  {
+    record: {
+      id: 'platform.menu.group.ops',
+      schemeId: 'platform.menu_scheme.admin',
+      parentId: 'ROOT',
+      title: '平台运行运维',
+      menuType: 'GROUP',
+      enabled: true,
+      sortOrder: 30,
+    },
+    children: [],
+  },
+];
+
 test('loadShellStartupState creates the first available navigation tab', async () => {
   const state = await loadShellStartupState({
     sessionClient: {
@@ -88,6 +157,34 @@ test('loadShellStartupState creates the first available navigation tab', async (
     state.tabs?.map((tab) => tab.key),
     ['menu:metadata'],
   );
+});
+
+test('loadShellStartupState accepts backend initialized platform admin menus', async () => {
+  const state = await loadShellStartupState({
+    sessionClient: {
+      current: async () => ({
+        userId: 'platform.user.super_admin',
+        username: 'admin',
+        system: true,
+      }),
+    },
+    menuClient: {
+      mine: async () => ({ records: platformAdminMenus }),
+    },
+  });
+
+  assert.equal(state.activeTabKey, 'menu:platform.menu.module.platform.module');
+  assert.deepEqual(initialOpenMenuKeys(state), ['platform.menu.group.config']);
+  assert.equal(state.tabs?.[0]?.title, '模块管理');
+  assert.deepEqual(state.tabs?.[0]?.target, {
+    menuId: 'platform.menu.module.platform.module',
+    menuType: 'MODULE',
+    moduleAlias: 'platform.module',
+    pageMode: 'LIST',
+    defaultUiConfigId: undefined,
+    defaultQueryTemplateId: undefined,
+    entryParamsJson: undefined,
+  });
 });
 
 test('openMenuTab reuses an existing tab instead of duplicating it', () => {

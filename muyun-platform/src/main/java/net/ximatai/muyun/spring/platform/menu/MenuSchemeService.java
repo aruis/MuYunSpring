@@ -10,6 +10,8 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
+import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
@@ -33,6 +35,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     public static final String SYSTEM_SCOPE_ID = "system";
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
     public static final String ADMIN_SCHEME_ALIAS = "platform_admin";
+    private static final String PLATFORM_SUPER_ADMIN_TRANSITION_USER_ID = "platform.user.super_admin";
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao) {
@@ -80,7 +83,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     @Override
     public Criteria sortScope(MenuScheme scheme) {
         return Criteria.of()
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
+                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
                 .eq("scopeType", scheme.getScopeType())
                 .eq("scopeId", scheme.getScopeId());
     }
@@ -137,7 +140,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
 
     private void rejectDuplicateAlias(MenuScheme scheme) {
         rejectDuplicate(scheme, Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, scheme.getTenantId())
                         .eq("scopeType", scheme.getScopeType())
                         .eq("scopeId", scheme.getScopeId())
                         .eq("alias", scheme.getAlias()),
@@ -171,10 +174,13 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
 
     public MenuScheme resolveCurrentUserScheme(CurrentUser user) {
         if (user == null) {
-            throw new PlatformException("current user is required");
+            throw new AuthenticationRequiredException("current user is required");
         }
         if (user.system()) {
             return requireFirstEnabledScheme(MenuScopeType.SYSTEM, null, SYSTEM_SCOPE_ID);
+        }
+        if (isPlatformSuperAdminTransitionUser(user)) {
+            return requireFirstEnabledSystemScheme();
         }
         if (user.tenantId() == null || user.tenantId().isBlank()) {
             throw new PlatformException("current user tenant is required");
@@ -186,6 +192,10 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
             }
         }
         return requireFirstEnabledScheme(MenuScopeType.TENANT, user.tenantId(), user.tenantId());
+    }
+
+    private boolean isPlatformSuperAdminTransitionUser(CurrentUser user) {
+        return Objects.equals(user.userId(), PLATFORM_SUPER_ADMIN_TRANSITION_USER_ID);
     }
 
     private MenuScheme firstOrganizationScheme(String tenantId, String organizationId) {
@@ -211,14 +221,20 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     private MenuScheme requireFirstEnabledScheme(MenuScopeType scopeType, String tenantId, String scopeId) {
         MenuScheme scheme = firstEnabledScheme(scopeType, tenantId, scopeId);
         if (scheme == null) {
-            throw new PlatformException("menu scheme is not configured for current user");
+            throw new PlatformConfigurationException("menu scheme is not configured for current user");
         }
         return scheme;
     }
 
+    private MenuScheme requireFirstEnabledSystemScheme() {
+        try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter("resolve system default menu scheme")) {
+            return requireFirstEnabledScheme(MenuScopeType.SYSTEM, null, SYSTEM_SCOPE_ID);
+        }
+    }
+
     private MenuScheme firstEnabledScheme(MenuScopeType scopeType, String tenantId, String scopeId) {
         List<MenuScheme> schemes = list(Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
                         .eq("scopeType", scopeType)
                         .eq("scopeId", scopeId)
                         .eq("enabled", Boolean.TRUE),

@@ -11,9 +11,11 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
 import net.ximatai.muyun.spring.iam.role.RoleGrantDao;
 import net.ximatai.muyun.spring.iam.role.RoleService;
+import net.ximatai.muyun.spring.iam.tenant.TenantService;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
@@ -27,6 +29,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +37,12 @@ import java.util.Optional;
 @Configuration
 @EnableConfigurationProperties(MuYunSpringInitialAdminProperties.class)
 public class MuYunSpringIdentityConfiguration {
+    @Bean
+    @Primary
+    public ActiveTenantVerifier activeTenantVerifier(TenantService tenantService) {
+        return tenantService;
+    }
+
     @Bean
     @ConditionalOnMissingBean(CurrentUserProvider.class)
     public CurrentUserProvider currentUserProvider(ObjectProvider<UserSessionService> userSessionService) {
