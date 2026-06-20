@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
     private final Optional<GenerationModuleActionContributor> actionContributor;
     private final Optional<ModuleMetadataFieldService> moduleFieldService;
 
+    @Autowired
     public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
                                        RecordGenerationObjectMappingService objectMappingService,
                                        RecordGenerationFieldMappingService fieldMappingService,

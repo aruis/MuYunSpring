@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminAuthorizationInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminSystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
@@ -21,6 +22,7 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
+import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -54,6 +56,12 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(CurrentUserWebFilter.class)
     public CurrentUserWebFilter currentUserWebFilter(CurrentUserProvider currentUserProvider) {
         return new CurrentUserWebFilter(currentUserProvider);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(SystemMenuSchemeAccessPolicy.class)
+    public SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy() {
+        return new PlatformSuperAdminSystemMenuSchemeAccessPolicy();
     }
 
     @Bean

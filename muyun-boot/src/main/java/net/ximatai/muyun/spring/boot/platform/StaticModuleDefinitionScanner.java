@@ -70,10 +70,19 @@ public class StaticModuleDefinitionScanner {
             return List.of();
         }
         return List.of(new StaticEntityDefinitionCompiler().compile(
-                module.alias().substring(module.application().length() + 1),
+                entityAlias(module),
                 module.title(),
                 modelClass
         ));
+    }
+
+    private String entityAlias(PlatformStaticModule module) {
+        String moduleName = module.alias().substring(module.application().length() + 1);
+        int lastSeparator = moduleName.lastIndexOf('.');
+        if (lastSeparator < 0) {
+            return moduleName;
+        }
+        return moduleName.substring(lastSeparator + 1);
     }
 
     private Object service(Class<?> beanClass) {

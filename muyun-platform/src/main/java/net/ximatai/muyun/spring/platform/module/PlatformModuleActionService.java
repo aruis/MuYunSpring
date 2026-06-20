@@ -71,7 +71,10 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
 
     @Override
     public void afterChanged(PlatformModuleAction action) {
-        if (runtimeRefreshCoordinator != null) {
+        PlatformModule module = action == null || action.getModuleAlias() == null
+                ? null
+                : moduleService.select(action.getModuleAlias());
+        if (runtimeRefreshCoordinator != null && module != null && module.getModuleKind() == ModuleKind.DYNAMIC) {
             runtimeRefreshCoordinator.refreshByModuleAction(action);
         }
     }

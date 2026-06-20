@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.common.schema;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.database.core.orm.DefaultSimpleEntityManager;
 import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
@@ -16,6 +17,12 @@ public final class PlatformEntityManagers {
 
     public static SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
                                                           EntityMetaResolver entityMetaResolver) {
-        return new DefaultSimpleEntityManager(operations, entityMetaResolver);
+        return simpleEntityManager(operations, entityMetaResolver, new PlatformDatabaseValueConverter());
+    }
+
+    public static SimpleEntityManager simpleEntityManager(IDatabaseOperations<?> operations,
+                                                          EntityMetaResolver entityMetaResolver,
+                                                          DatabaseValueConverter valueConverter) {
+        return new DefaultSimpleEntityManager(operations, entityMetaResolver, valueConverter);
     }
 }

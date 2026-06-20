@@ -42,7 +42,6 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         this(viewFieldDao, viewService, fieldService, relationService, null, null);
     }
 
-    @Autowired
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,

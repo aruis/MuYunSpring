@@ -62,6 +62,7 @@ async function loadShell() {
 
 async function handleAuthenticated(token: string) {
   saveAuthToken(token);
+  loginRequired.value = false;
   loginLoading.value = true;
   try {
     await loadShell();

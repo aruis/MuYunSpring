@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelation;
 import net.ximatai.muyun.spring.platform.impact.RecordImpactRelationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -29,6 +30,7 @@ public class PlatformModuleTaskCheckService {
     private final Optional<RecordImpactRelationService> impactRelationService;
     private final PlatformModuleTaskDefinitionRegistry taskDefinitionRegistry;
 
+    @Autowired
     public PlatformModuleTaskCheckService(PlatformPageConfigSnapshotService snapshotService,
                                           PlatformQueryItemService queryItemService,
                                           DynamicRecordService recordService,

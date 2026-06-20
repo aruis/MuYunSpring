@@ -53,7 +53,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
     @Override
     public Criteria sortScope(MeasureUnit unit) {
         return categoryScope(unit.getApplicationAlias(), unit.getCategoryAlias())
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId());
+                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId());
     }
 
     @Override
@@ -184,7 +184,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
             unit.setRoundingMode(RoundingMode.HALF_UP);
         }
         rejectDuplicate(unit, categoryScope(unit.getApplicationAlias(), unit.getCategoryAlias())
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, unit.getTenantId())
                         .eq("code", unit.getCode()),
                 "measure unit code must be unique within category: " + unit.getCode());
     }
@@ -219,7 +219,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
                         .toList();
             }
         }
-        return list(criteria.eq(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId()),
+        return list(criteria.eqNullable(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId()),
                 new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD))
                 .stream()
                 .filter(unit -> Objects.equals(unit.getTenantId(), category.getTenantId()))

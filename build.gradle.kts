@@ -24,6 +24,7 @@ subprojects {
 
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
+        options.compilerArgs.add("-parameters")
     }
 
     tasks.withType<Test>().configureEach {

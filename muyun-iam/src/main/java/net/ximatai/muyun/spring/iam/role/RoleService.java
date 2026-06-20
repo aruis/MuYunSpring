@@ -77,20 +77,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 grantVerifier, null, null, null);
     }
 
-    @Autowired
-    public RoleService(RoleDao roleDao,
-                       RoleGrantDao roleGrantDao,
-                       RoleActionDao roleActionDao,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       UserAccountService userAccountService,
-                       EmployeeService employeeService,
-                       EmployeePositionService employeePositionService,
-                       EmployeeAccountService employeeAccountService) {
-        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
-                RoleActionGrantVerifier.platformActionsOnly(),
-                userAccountService, employeeService, employeePositionService, employeeAccountService);
-    }
-
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
                        RoleActionDao roleActionDao,
@@ -103,6 +89,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 grantVerifier, userAccountService, employeeService, employeePositionService, null);
     }
 
+    @Autowired
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
                        RoleActionDao roleActionDao,

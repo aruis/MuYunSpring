@@ -16,4 +16,12 @@ public record PlatformWebError(String code, int status, String message) {
     public static PlatformWebError platformConfiguration(String message) {
         return new PlatformWebError("PLATFORM_CONFIGURATION", 409, message);
     }
+
+    public static PlatformWebError badRequest(String message) {
+        return new PlatformWebError("BAD_REQUEST", 400, message);
+    }
+
+    public static PlatformWebError platformError(String message) {
+        return new PlatformWebError("PLATFORM_ERROR", 400, message);
+    }
 }

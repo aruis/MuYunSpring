@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = ExchangeRateService.MODULE_ALIAS, title = "平台汇率")
-@RequestMapping("/platform.exchange-rates")
+@RequestMapping({"/platform.exchange_rate", "/platform.exchange-rates"})
 public class ExchangeRateWebController extends NestedEnabledSortableCrudWebSupport<ExchangeRate, ExchangeRateService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate",

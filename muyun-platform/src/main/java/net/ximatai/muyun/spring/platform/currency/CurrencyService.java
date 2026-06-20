@@ -48,7 +48,7 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
 
     @Override
     public Criteria sortScope(Currency currency) {
-        return Criteria.of().eq(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId());
+        return Criteria.of().eqNullable(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId());
     }
 
     @Override
@@ -141,7 +141,7 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
             currency.setRoundingMode(RoundingMode.HALF_UP);
         }
         rejectDuplicate(currency, Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, currency.getTenantId())
                         .eq("code", currency.getCode()),
                 "currency code must be unique within tenant scope: " + currency.getCode());
     }

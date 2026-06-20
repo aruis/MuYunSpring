@@ -1,10 +1,7 @@
 package net.ximatai.muyun.spring.iam.user;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
-import net.ximatai.muyun.spring.common.model.EntityLifecycle;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,21 +25,26 @@ public class UserSessionService {
     private static final Duration SESSION_IDLE_TIMEOUT = Duration.ofHours(12);
     private static final Duration SESSION_ABSOLUTE_TTL = Duration.ofDays(7);
     private static final Duration LAST_SEEN_WRITE_INTERVAL = Duration.ofSeconds(60);
-    private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
     private final UserAccountService userAccountService;
-    private final UserSessionDao userSessionDao;
+    private final UserSessionRecordService userSessionRecordService;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
-    public UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao) {
-        this(userAccountService, userSessionDao, Clock.systemUTC());
+    public UserSessionService(UserAccountService userAccountService, UserSessionRecordService userSessionRecordService) {
+        this(userAccountService, userSessionRecordService, Clock.systemUTC());
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
+        this(userAccountService, new UserSessionRecordService(userSessionDao), clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       Clock clock) {
         this.userAccountService = userAccountService;
-        this.userSessionDao = userSessionDao;
+        this.userSessionRecordService = userSessionRecordService;
         this.clock = clock;
     }
 
@@ -68,8 +70,7 @@ public class UserSessionService {
             session.setExpiresAt(nextIdleExpiresAt(issuedAt, maxExpiresAt));
             session.setMaxExpiresAt(maxExpiresAt);
             session.setLastSeenAt(issuedAt);
-            EntityLifecycle.prepareInsert(session, issuedAt);
-            userSessionDao.insert(session);
+            userSessionRecordService.issue(session);
             return LoginResult.bearer(token, issuedAt, currentUser);
         }
     }
@@ -119,7 +120,7 @@ public class UserSessionService {
             return;
         }
         Instant now = clock.instant();
-        List<UserSession> sessions = userSessionDao.query(Criteria.of().eq("userId", userId), ALL);
+        List<UserSession> sessions = userSessionRecordService.listByUserId(userId);
         for (UserSession session : sessions) {
             if (session.getRevokedAt() == null) {
                 revoke(session, now, "user sessions revoked");
@@ -132,10 +133,7 @@ public class UserSessionService {
         if (normalized == null) {
             return null;
         }
-        return userSessionDao.query(Criteria.of().eq("tokenHash", tokenHash(normalized)), new PageRequest(0, 1))
-                .stream()
-                .findFirst()
-                .orElse(null);
+        return userSessionRecordService.findByTokenHash(tokenHash(normalized));
     }
 
     private String normalizeToken(String token) {
@@ -160,8 +158,7 @@ public class UserSessionService {
             Integer expectedVersion = current.getVersion();
             current.setRevokedAt(now);
             current.setRevokedReason(reason);
-            EntityLifecycle.prepareUpdate(current, now);
-            int updated = userSessionDao.updateByIdAndVersion(current, expectedVersion);
+            int updated = userSessionRecordService.updateSession(current, expectedVersion, now);
             if (updated > 0) {
                 return;
             }
@@ -178,8 +175,7 @@ public class UserSessionService {
         session.setLastSeenAt(now);
         session.setMaxExpiresAt(effectiveMaxExpiresAt(session));
         session.setExpiresAt(nextIdleExpiresAt(now, session.getMaxExpiresAt()));
-        EntityLifecycle.prepareUpdate(session, now);
-        int updated = userSessionDao.updateByIdAndVersion(session, expectedVersion);
+        int updated = userSessionRecordService.updateSession(session, expectedVersion, now);
         if (updated > 0) {
             return true;
         }
@@ -210,9 +206,6 @@ public class UserSessionService {
         if (id == null || id.isBlank()) {
             return null;
         }
-        return userSessionDao.query(Criteria.of().eq("id", id), new PageRequest(0, 1))
-                .stream()
-                .findFirst()
-                .orElse(null);
+        return userSessionRecordService.findById(id);
     }
 }

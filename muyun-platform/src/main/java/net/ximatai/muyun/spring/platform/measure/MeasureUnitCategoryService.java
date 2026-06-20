@@ -50,7 +50,7 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
     @Override
     public Criteria sortScope(MeasureUnitCategory category) {
         return Criteria.of()
-                .eq(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
+                .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
                 .eq("applicationAlias", category.getApplicationAlias());
     }
 
@@ -195,7 +195,7 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
             category.setBaseUnitCode(null);
         }
         rejectDuplicate(category, Criteria.of()
-                        .eq(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
+                        .eqNullable(StandardEntitySchema.TENANT_ID_FIELD, category.getTenantId())
                         .eq("applicationAlias", category.getApplicationAlias())
                         .eq("alias", category.getAlias()),
                 "measureUnitCategoryAlias must be unique within application: " + category.getAlias());

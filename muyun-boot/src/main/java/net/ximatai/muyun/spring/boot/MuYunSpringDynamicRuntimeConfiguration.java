@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
@@ -15,6 +16,7 @@ import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
 import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.PlatformTimeService;
+import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutor;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionExecutorRegistry;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicActionTransactionOperator;
@@ -27,6 +29,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinators;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicTableMapper;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidator;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -35,6 +38,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -43,6 +47,7 @@ import java.time.ZoneId;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(MuYunSpringPlatformTimeProperties.class)
+@Import(MuYunSpringDatabaseValueConversionConfiguration.class)
 public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
     @ConditionalOnBean(DictionaryItemService.class)
@@ -55,6 +60,12 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     @ConditionalOnMissingBean
     DynamicFieldValueValidator dynamicFieldValueValidator() {
         return DynamicFieldValueValidator.NONE;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    Clock clock() {
+        return Clock.systemDefaultZone();
     }
 
     @Bean
@@ -87,8 +98,15 @@ public class MuYunSpringDynamicRuntimeConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations) {
-        return new DynamicSchemaService(operations);
+    ModuleDefinitionValidator moduleDefinitionValidator() {
+        return new ModuleDefinitionValidator();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations,
+                                              ModuleDefinitionValidator moduleDefinitionValidator) {
+        return new DynamicSchemaService(operations, new DynamicTableMapper(), moduleDefinitionValidator);
     }
 
     @Bean
@@ -100,12 +118,14 @@ public class MuYunSpringDynamicRuntimeConfiguration {
                                               DynamicActionTransactionOperator actionTransactionOperator,
                                               ObjectProvider<FieldCryptoProvider> fieldCryptoProvider,
                                               ObjectProvider<FieldSigner> fieldSigner,
-                                              PlatformTimeService platformTimeService) {
+                                              PlatformTimeService platformTimeService,
+                                              DatabaseValueConverter databaseValueConverter) {
         return new DynamicRecordRuntime(operations, new DynamicModuleRegistry(), fieldValueValidator,
                 eventPublisher, actionExecutorRegistry, actionTransactionOperator,
                 fieldCryptoProvider.getIfAvailable(() -> FieldCryptoProvider.UNAVAILABLE),
                 fieldSigner.getIfAvailable(() -> FieldSigner.UNAVAILABLE),
-                platformTimeService);
+                platformTimeService,
+                databaseValueConverter);
     }
 
     @Bean

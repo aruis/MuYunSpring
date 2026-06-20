@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = CurrencyService.MODULE_ALIAS, title = "平台币种")
-@RequestMapping("/platform.currencies")
+@RequestMapping({"/platform.currency", "/platform.currencies"})
 public class CurrencyWebController extends NestedEnabledSortableCrudWebSupport<Currency, CurrencyService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
             "id", "code", "numericCode", "symbol", "decimalScale", "roundingMode",

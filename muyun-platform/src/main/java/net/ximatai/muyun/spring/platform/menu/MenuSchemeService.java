@@ -35,20 +35,36 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     public static final String SYSTEM_SCOPE_ID = "system";
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
     public static final String ADMIN_SCHEME_ALIAS = "platform_admin";
-    private static final String PLATFORM_SUPER_ADMIN_TRANSITION_USER_ID = "platform.user.super_admin";
     private final Optional<OrganizationHierarchyService> organizationHierarchyService;
+    private final SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy;
 
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao) {
-        this(schemeDao, Optional.empty());
+        this(schemeDao, Optional.empty(), SystemMenuSchemeAccessPolicy.DENY_ALL);
+    }
+
+    public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
+                             Optional<OrganizationHierarchyService> organizationHierarchyService) {
+        this(schemeDao, organizationHierarchyService, SystemMenuSchemeAccessPolicy.DENY_ALL);
     }
 
     @Autowired
     public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
-                             Optional<OrganizationHierarchyService> organizationHierarchyService) {
+                             Optional<OrganizationHierarchyService> organizationHierarchyService,
+                             Optional<SystemMenuSchemeAccessPolicy> systemMenuSchemeAccessPolicy) {
+        this(schemeDao, organizationHierarchyService,
+                systemMenuSchemeAccessPolicy.orElse(SystemMenuSchemeAccessPolicy.DENY_ALL));
+    }
+
+    public MenuSchemeService(BaseDao<MenuScheme, String> schemeDao,
+                             Optional<OrganizationHierarchyService> organizationHierarchyService,
+                             SystemMenuSchemeAccessPolicy systemMenuSchemeAccessPolicy) {
         super(MODULE_ALIAS, MenuScheme.class, schemeDao);
         this.organizationHierarchyService = organizationHierarchyService == null
                 ? Optional.empty()
                 : organizationHierarchyService;
+        this.systemMenuSchemeAccessPolicy = systemMenuSchemeAccessPolicy == null
+                ? SystemMenuSchemeAccessPolicy.DENY_ALL
+                : systemMenuSchemeAccessPolicy;
     }
 
     @Override
@@ -179,7 +195,7 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         if (user.system()) {
             return requireFirstEnabledScheme(MenuScopeType.SYSTEM, null, SYSTEM_SCOPE_ID);
         }
-        if (isPlatformSuperAdminTransitionUser(user)) {
+        if (systemMenuSchemeAccessPolicy.canUseSystemMenuScheme(user)) {
             return requireFirstEnabledSystemScheme();
         }
         if (user.tenantId() == null || user.tenantId().isBlank()) {
@@ -192,10 +208,6 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
             }
         }
         return requireFirstEnabledScheme(MenuScopeType.TENANT, user.tenantId(), user.tenantId());
-    }
-
-    private boolean isPlatformSuperAdminTransitionUser(CurrentUser user) {
-        return Objects.equals(user.userId(), PLATFORM_SUPER_ADMIN_TRANSITION_USER_ID);
     }
 
     private MenuScheme firstOrganizationScheme(String tenantId, String organizationId) {

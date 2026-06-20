@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.reference.ReferenceDependencyRegistry;
@@ -28,6 +29,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
     private final FieldCryptoProvider fieldCryptoProvider;
     private final FieldSigner fieldSigner;
     private final PlatformTimeService timeService;
+    private final DatabaseValueConverter valueConverter;
 
     public DynamicRecordRuntime(IDatabaseOperations<?> operations) {
         this(operations, new DynamicModuleRegistry());
@@ -94,6 +96,20 @@ public class DynamicRecordRuntime implements AutoCloseable {
                                 FieldCryptoProvider fieldCryptoProvider,
                                 FieldSigner fieldSigner,
                                 PlatformTimeService timeService) {
+        this(operations, registry, fieldValueValidator, eventPublisher, actionExecutorRegistry, actionTransactionOperator,
+                fieldCryptoProvider, fieldSigner, timeService, DatabaseValueConverter.DEFAULT);
+    }
+
+    public DynamicRecordRuntime(IDatabaseOperations<?> operations,
+                                DynamicModuleRegistry registry,
+                                DynamicFieldValueValidator fieldValueValidator,
+                                RuntimeEventPublisher eventPublisher,
+                                DynamicActionExecutorRegistry actionExecutorRegistry,
+                                DynamicActionTransactionOperator actionTransactionOperator,
+                                FieldCryptoProvider fieldCryptoProvider,
+                                FieldSigner fieldSigner,
+                                PlatformTimeService timeService,
+                                DatabaseValueConverter valueConverter) {
         this.operations = Objects.requireNonNull(operations, "operations must not be null");
         this.registry = Objects.requireNonNull(registry, "registry must not be null");
         this.fieldValueValidator = Objects.requireNonNull(fieldValueValidator, "fieldValueValidator must not be null");
@@ -107,6 +123,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         this.fieldCryptoProvider = fieldCryptoProvider == null ? FieldCryptoProvider.UNAVAILABLE : fieldCryptoProvider;
         this.fieldSigner = fieldSigner == null ? FieldSigner.UNAVAILABLE : fieldSigner;
         this.timeService = timeService == null ? new PlatformTimeService() : timeService;
+        this.valueConverter = valueConverter == null ? DatabaseValueConverter.DEFAULT : valueConverter;
         this.cacheNamespacePrefix = "dynamic-runtime-" + CACHE_NAMESPACE_SEQUENCE.incrementAndGet();
     }
 
@@ -162,7 +179,7 @@ public class DynamicRecordRuntime implements AutoCloseable {
         ModuleDefinition module = registry.requireModule(moduleAlias);
         EntityDefinition entity = registry.requireEntity(moduleAlias, entityAlias);
         return new DynamicEntityService(
-                new DynamicRecordDao(operations, entity),
+                new DynamicRecordDao(operations, entity, valueConverter),
                 moduleAlias,
                 lifecycle,
                 module,

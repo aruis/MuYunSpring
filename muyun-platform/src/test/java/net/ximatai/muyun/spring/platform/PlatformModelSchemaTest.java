@@ -436,6 +436,7 @@ class PlatformModelSchemaTest {
 
     @Test
     void shouldMapStablePlatformDefaults() {
+        assertThat(mapper.toTable(Menu.class).getPrimaryKey().getLength()).isEqualTo(128);
         assertThat(columnDefault(mapper.toTable(PlatformModule.class), "module_kind")).isEqualTo("'static'");
         assertThat(columnDefault(mapper.toTable(PlatformModule.class), "system_managed")).isEqualTo("FALSE");
         assertThat(columnDefault(mapper.toTable(PlatformModuleAction.class), "access_mode")).isEqualTo("'AUTH_REQUIRED'");
