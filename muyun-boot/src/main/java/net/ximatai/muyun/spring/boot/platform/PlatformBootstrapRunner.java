@@ -16,7 +16,7 @@ public class PlatformBootstrapRunner implements ApplicationRunner, Ordered {
 
     @Override
     public int getOrder() {
-        return 50;
+        return 0;
     }
 
     @Override

@@ -2,7 +2,10 @@ package net.ximatai.muyun.spring.boot;
 
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
+import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
@@ -37,12 +40,16 @@ class MuYunSpringIdentityConfigurationTest {
     void shouldCollectMenuServicesAsInitialDataAbilities() {
         contextRunner.run(context -> {
             Map<String, InitialDataAbility> abilities = context.getBeansOfType(InitialDataAbility.class);
+            Map<String, PlatformBootstrapTask> bootstrapTasks = context.getBeansOfType(PlatformBootstrapTask.class);
 
             assertThat(abilities.values())
                     .anyMatch(MenuSchemeService.class::isInstance)
                     .anyMatch(MenuService.class::isInstance);
             assertThat(context).hasSingleBean(InitialDataExecutor.class);
             assertThat(context).hasSingleBean(PlatformMenuInitialDataDeclarationProvider.class);
+            assertThat(bootstrapTasks.values())
+                    .anyMatch(StaticModuleDefinitionRegistrar.class::isInstance)
+                    .anyMatch(InitialDataBootstrapTask.class::isInstance);
         });
     }
 
