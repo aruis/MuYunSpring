@@ -21,6 +21,7 @@ const activeTabKey = ref<string>();
 const openMenuKeys = ref<string[]>([]);
 const loginRequired = ref(false);
 const loginLoading = ref(false);
+const logoutLoading = ref(false);
 
 const authClient = createAuthClient(
   createHttpClient({
@@ -68,6 +69,37 @@ async function handleAuthenticated(token: string) {
     await loadShell();
   } finally {
     loginLoading.value = false;
+  }
+}
+
+async function handleUserCommand(command: string) {
+  if (command === 'logout') {
+    await handleLogout();
+  }
+}
+
+async function handleLogout() {
+  if (logoutLoading.value) {
+    return;
+  }
+  logoutLoading.value = true;
+  const token = effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN);
+  try {
+    await authClient.logout(token);
+  } catch {
+    // Local logout should still be possible if the token is already expired or the backend is unavailable.
+  } finally {
+    clearAuthToken();
+    startup.value = undefined;
+    activeTabKey.value = undefined;
+    openMenuKeys.value = [];
+    error.value = undefined;
+    loginRequired.value = true;
+    loading.value = false;
+    logoutLoading.value = false;
+    if (currentBrowserPath() !== '/') {
+      window.history.replaceState(window.history.state, '', '/');
+    }
   }
 }
 
@@ -160,6 +192,7 @@ function credentialsOf(value: string | undefined) {
     @select-menu="handleSelectMenu"
     @change-tab="handleChangeTab"
     @close-tab="handleCloseTab"
+    @user-command="handleUserCommand"
   >
     <template #default="{ pageDescriptor }">
       <PageHostOutlet :descriptor="pageDescriptor" />

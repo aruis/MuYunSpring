@@ -54,7 +54,6 @@ const activePageDescriptor = computed(() => {
     tab?.pageDescriptor ?? (tab?.target ? resolvePageDescriptor(tab.target, { title: tab.title }) : undefined)
   );
 });
-
 const userMenuItems: UiDropdownItem[] = [
   { key: 'profile', title: '个人信息' },
   { key: 'logout', title: '退出登录', danger: true },
@@ -102,6 +101,10 @@ function handleTabChange(key: string) {
   emit('update:activeTabKey', key);
   emit('changeTab', key);
 }
+
+function handleUserCommand(key: string) {
+  emit('userCommand', key);
+}
 </script>
 
 <template>
@@ -125,8 +128,8 @@ function handleTabChange(key: string) {
           <p class="shell-eyebrow">Workspace</p>
           <h1>{{ activeTab?.title ?? '控制台' }}</h1>
         </div>
-        <UiDropdown :items="userMenuItems" @select="emit('userCommand', $event)">
-          <button class="user-button" type="button">
+        <UiDropdown v-slot="{ toggle }" :items="userMenuItems" @select="handleUserCommand">
+          <button class="user-button" type="button" @click.stop="toggle">
             {{ startup?.session.currentUser.username ?? startup?.session.currentUser.userId ?? '未登录' }}
           </button>
         </UiDropdown>
