@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.user;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
@@ -120,6 +121,42 @@ class UserSessionServiceTest {
         assertThat(sessionService.currentUser(login.token())).isEmpty();
         assertThat(persistedSession.get().getRevokedAt()).isEqualTo(clock.instant());
         assertThat(persistedSession.get().getRevokedReason()).isEqualTo("user inactive");
+    }
+
+    @Test
+    void shouldRejectLoginWhenTenantIsNoLongerActive() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+            throw new PlatformException("Tenant is not active: " + tenantId);
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThatThrownBy(() -> sessionService.login("tenant-a", "alice", "secret1"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessageContaining("invalid username or password");
+        verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
+        verify(sessionDao, never()).insert(any());
+    }
+
+    @Test
+    void shouldRevokeSessionWhenTenantIsNoLongerActive() {
+        UserAccountDao dao = mock(UserAccountDao.class);
+        UserAccountService userService = new UserAccountService(dao, tenantId -> {
+            throw new PlatformException("Tenant is not active: " + tenantId);
+        }, passwordHashingService);
+        UserSessionDao sessionDao = mock(UserSessionDao.class);
+        UserSession session = activeSession("session-1", "user-1");
+        when(sessionDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(session));
+        when(sessionDao.updateByIdAndVersion(any(UserSession.class), any())).thenReturn(1);
+        UserSessionService sessionService = new UserSessionService(userService, sessionDao, clock);
+
+        assertThat(sessionService.currentUser("token-1")).isEmpty();
+
+        assertThat(session.getRevokedAt()).isEqualTo(clock.instant());
+        assertThat(session.getRevokedReason()).isEqualTo("tenant inactive");
+        verify(dao, never()).query(any(Criteria.class), any(PageRequest.class));
+        verify(sessionDao).updateByIdAndVersion(session, 0);
     }
 
     @Test
