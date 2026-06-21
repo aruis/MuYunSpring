@@ -9,9 +9,11 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.ApplicationRunner;
 
 import java.util.List;
 
@@ -26,6 +28,20 @@ class StaticModuleDefinitionRegistrarTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+    }
+
+    @Test
+    void shouldBePlatformBootstrapTaskBeforeInitialData() {
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                mock(PlatformModuleService.class),
+                mock(PlatformModuleActionService.class),
+                List.of()
+        );
+
+        assertThat(registrar).isInstanceOf(PlatformBootstrapTask.class);
+        assertThat(registrar).isNotInstanceOf(ApplicationRunner.class);
+        assertThat(registrar.order()).isLessThan(new InitialDataBootstrapTask(mock(InitialDataExecutor.class)).order());
+        assertThat(new PlatformBootstrapRunner(List.of(registrar)).getOrder()).isEqualTo(0);
     }
 
     @Test

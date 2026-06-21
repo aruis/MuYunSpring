@@ -7,16 +7,13 @@ import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.Ordered;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class StaticModuleDefinitionRegistrar implements ApplicationRunner, Ordered {
+public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     private final PlatformModuleService moduleService;
     private final PlatformModuleActionService actionService;
     private final List<StaticModuleDefinition> definitions;
@@ -39,12 +36,12 @@ public class StaticModuleDefinitionRegistrar implements ApplicationRunner, Order
     }
 
     @Override
-    public void run(ApplicationArguments args) {
+    public void run() {
         registerAll();
     }
 
     @Override
-    public int getOrder() {
+    public int order() {
         return 0;
     }
 
