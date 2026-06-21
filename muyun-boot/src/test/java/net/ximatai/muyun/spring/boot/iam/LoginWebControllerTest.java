@@ -83,6 +83,28 @@ class LoginWebControllerTest {
     }
 
     @Test
+    void shouldReturnAuthenticationFailedWithoutLeakingInactiveTenantReason() throws Exception {
+        UserSessionService userSessionService = mock(UserSessionService.class);
+        when(userSessionService.login(anyString(), anyString(), anyString()))
+                .thenThrow(new AuthenticationFailedException("invalid username or password",
+                        new RuntimeException("Tenant is not active: tenant-a")));
+        LoginWebController controller = new LoginWebController(userSessionService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .build();
+
+        mvc.perform(post("/iam.auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"tenantId":"tenant-a","username":"alice","password":"secret1"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("invalid username or password"));
+    }
+
+    @Test
     void shouldReturnBadRequestWhenLoginRequestIsMalformed() throws Exception {
         UserSessionService userSessionService = mock(UserSessionService.class);
         when(userSessionService.login(isNull(), anyString(), anyString()))

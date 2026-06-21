@@ -1,7 +1,9 @@
 package net.ximatai.muyun.spring.iam.user;
 
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
+import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,29 +31,41 @@ public class UserSessionService {
 
     private final UserAccountService userAccountService;
     private final UserSessionRecordService userSessionRecordService;
+    private final ActiveTenantVerifier activeTenantVerifier;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
-    public UserSessionService(UserAccountService userAccountService, UserSessionRecordService userSessionRecordService) {
-        this(userAccountService, userSessionRecordService, Clock.systemUTC());
+    public UserSessionService(UserAccountService userAccountService,
+                              UserSessionRecordService userSessionRecordService,
+                              ActiveTenantVerifier activeTenantVerifier) {
+        this(userAccountService, userSessionRecordService, activeTenantVerifier, Clock.systemUTC());
     }
 
     UserSessionService(UserAccountService userAccountService, UserSessionDao userSessionDao, Clock clock) {
-        this(userAccountService, new UserSessionRecordService(userSessionDao), clock);
+        this(userAccountService, new UserSessionRecordService(userSessionDao), userAccountService, clock);
     }
 
     UserSessionService(UserAccountService userAccountService,
                        UserSessionRecordService userSessionRecordService,
                        Clock clock) {
+        this(userAccountService, userSessionRecordService, userAccountService, clock);
+    }
+
+    UserSessionService(UserAccountService userAccountService,
+                       UserSessionRecordService userSessionRecordService,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       Clock clock) {
         this.userAccountService = userAccountService;
         this.userSessionRecordService = userSessionRecordService;
+        this.activeTenantVerifier = activeTenantVerifier;
         this.clock = clock;
     }
 
     public LoginResult login(String tenantId, String username, String password) {
         String validTenantId = Preconditions.requireText(tenantId, "tenantId");
         try (TenantContext.Scope ignored = TenantContext.use(validTenantId)) {
+            verifyActiveTenantForLogin(validTenantId);
             UserAccount user = userAccountService.requireActiveUser(username);
             if (!userAccountService.passwordMatches(user, password)) {
                 throw new AuthenticationFailedException("invalid username or password");
@@ -89,6 +103,9 @@ public class UserSessionService {
             return Optional.empty();
         }
         try (TenantContext.Scope ignored = TenantContext.use(session.getTenantId())) {
+            if (!verifyActiveTenantForSession(session, now)) {
+                return Optional.empty();
+            }
             UserAccount user = userAccountService.select(session.getUserId());
             if (user == null || !Boolean.TRUE.equals(user.getEnabled())) {
                 revoke(session, now, "user inactive");
@@ -107,6 +124,24 @@ public class UserSessionService {
         UserSession session = sessionByToken(token);
         if (session != null) {
             revoke(session, now(), "logout");
+        }
+    }
+
+    private void verifyActiveTenantForLogin(String tenantId) {
+        try {
+            activeTenantVerifier.verifyActiveTenant(tenantId);
+        } catch (PlatformException exception) {
+            throw new AuthenticationFailedException("invalid username or password", exception);
+        }
+    }
+
+    private boolean verifyActiveTenantForSession(UserSession session, Instant now) {
+        try {
+            activeTenantVerifier.verifyActiveTenant(session.getTenantId());
+            return true;
+        } catch (PlatformException exception) {
+            revoke(session, now, "tenant inactive");
+            return false;
         }
     }
 
