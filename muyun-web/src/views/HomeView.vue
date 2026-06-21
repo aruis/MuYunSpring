@@ -1,20 +1,39 @@
-<script setup lang="ts">
-import { DynamicModulePage, customerDescriptor } from '@muyun/dynamic-page-runtime';
-</script>
-
 <template>
   <section class="home-view">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">MuYun frontend skeleton</p>
-        <h1>平台前端基础架构</h1>
-        <p>
-          当前骨架先固定 Vue 技术栈、MuYun 组件契约、Ant Design Vue 适配层和动态运行器边界。
-          后续平台业务页面应优先复用这些组件，不直接依赖底层 UI 库。
-        </p>
-      </div>
-    </header>
-
-    <DynamicModulePage :descriptor="customerDescriptor" />
+    <p class="home-eyebrow">Workspace</p>
+    <h2>请选择左侧菜单</h2>
+    <p>当前工作区已接入真实登录和菜单加载，业务页面将从后端菜单入口进入。</p>
   </section>
 </template>
+
+<style scoped>
+.home-view {
+  display: grid;
+  gap: 8px;
+  min-height: 240px;
+  align-content: center;
+  justify-items: center;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6f83;
+  text-align: center;
+}
+
+.home-eyebrow,
+h2,
+p {
+  margin: 0;
+}
+
+.home-eyebrow {
+  color: #6b7788;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+h2 {
+  color: #1f2933;
+  font-size: 18px;
+}
+</style>

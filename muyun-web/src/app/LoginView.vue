@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { AuthClient } from '@muyun/web-core';
+import { normalizeInitialValue, resolveLoginTenantDefaults } from './loginTenant';
 
 defineOptions({ name: 'LoginView' });
 
@@ -14,7 +15,9 @@ const emit = defineEmits<{
   authenticated: [token: string];
 }>();
 
-const tenantId = ref(normalizeInitialValue(import.meta.env.VITE_MUYUN_LOGIN_TENANT_ID));
+const loginTenantDefaults = resolveLoginTenantDefaults(import.meta.env.VITE_MUYUN_LOGIN_TENANT_ID);
+const tenantId = ref(loginTenantDefaults.tenantId);
+const tenantLocked = loginTenantDefaults.tenantLocked;
 const username = ref(normalizeInitialValue(import.meta.env.VITE_MUYUN_LOGIN_USERNAME));
 const password = ref(normalizeInitialValue(import.meta.env.VITE_MUYUN_LOGIN_PASSWORD));
 const submitting = ref(false);
@@ -37,9 +40,6 @@ async function submit() {
   }
 }
 
-function normalizeInitialValue(value: string | undefined) {
-  return value?.trim() ?? '';
-}
 </script>
 
 <template>
@@ -58,7 +58,8 @@ function normalizeInitialValue(value: string | undefined) {
       </p>
 
       <form class="login-form" @submit.prevent="submit">
-        <label>
+        <p v-if="tenantLocked" class="login-context">租户：{{ tenantId }}</p>
+        <label v-else>
           <span>租户 ID</span>
           <input v-model="tenantId" autocomplete="organization" required />
         </label>
@@ -127,6 +128,17 @@ header h1 {
 .login-form {
   display: grid;
   gap: 14px;
+}
+
+.login-context {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #d8e2ee;
+  border-radius: 6px;
+  color: #334155;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 label {

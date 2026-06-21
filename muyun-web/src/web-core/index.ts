@@ -89,6 +89,7 @@ export interface MenuClient {
 
 export interface AuthClient {
   login(request: LoginRequest): Promise<LoginResult>;
+  logout(token?: string): Promise<void>;
 }
 
 export function createSessionClient(http: HttpClient): SessionClient {
@@ -106,13 +107,20 @@ export function createMenuClient(http: HttpClient): MenuClient {
 export function createAuthClient(http: HttpClient): AuthClient {
   return {
     login: (request) => http.request<LoginResult>({ method: 'POST', path: '/iam.auth/login', body: request }),
+    logout: (token) =>
+      http.request<void>({
+        method: 'POST',
+        path: '/iam.auth/logout',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }),
   };
 }
 
 function urlOf(baseUrl: string | undefined, options: HttpRequestOptions) {
   const base = baseUrl?.replace(/\/$/, '') ?? '';
   const path = options.path.startsWith('/') ? options.path : `/${options.path}`;
-  const url = new URL(`${base}${path}`, window.location.origin);
+  const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin;
+  const url = new URL(`${base}${path}`, origin);
   Object.entries(options.query ?? {}).forEach(([key, value]) => {
     const values = Array.isArray(value) ? value : [value];
     for (const item of values) {
