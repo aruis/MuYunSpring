@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.iam;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.AuthenticationFailedException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -56,7 +57,8 @@ class LoginWebControllerTest {
 
         mvc.perform(get("/iam.auth/context"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.AUTH_REQUIRED))
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("current user context is not available"));
     }
@@ -75,9 +77,10 @@ class LoginWebControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {"tenantId":"tenant-a","username":"alice","password":"wrong-password"}
-                                """))
+                """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.LOGIN_BAD_CREDENTIALS))
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("invalid username or password"));
     }
@@ -97,9 +100,10 @@ class LoginWebControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {"tenantId":"tenant-a","username":"alice","password":"secret1"}
-                                """))
+                """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_FAILED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.LOGIN_BAD_CREDENTIALS))
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("invalid username or password"));
     }
@@ -118,9 +122,10 @@ class LoginWebControllerTest {
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {"username":"alice","password":"secret1"}
-                                """))
+                """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("tenantId must not be null"));
     }

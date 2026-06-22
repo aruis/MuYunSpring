@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.boot.iam;
 
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
@@ -57,7 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
         CurrentUserWebFilter.class,
-        IamWebExceptionHandler.class
+        PlatformWebExceptionHandler.class
 })
 class IamWebControllerIT {
     @Autowired
@@ -399,7 +401,7 @@ class IamWebControllerIT {
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));
     }
 
@@ -522,9 +524,9 @@ class IamWebControllerIT {
                                   "tenantScopePolicy":"CURRENT_TENANT",
                                   "scopeCondition":"authUserId = ${userId}"
                                 }
-                                """))
+                """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("custom data scope policy is not supported yet"));
     }
 

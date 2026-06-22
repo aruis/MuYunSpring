@@ -348,11 +348,6 @@ public class DynamicExportWebController {
         return action.get();
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public DynamicWebError handleBadRequest(RuntimeException exception) {
-        return DynamicWebError.badRequest(exception.getMessage());
-    }
 }
 
 record DynamicSelectedExportRequest(List<String> ids, WebQueryRequest query) {

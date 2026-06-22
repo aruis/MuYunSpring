@@ -1427,47 +1427,6 @@ public class DynamicRecordWebController implements
         }
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, ModuleDefinitionException.class, PlatformException.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public DynamicWebError handleBadRequest(RuntimeException exception) {
-        return badRequest(exception.getMessage());
-    }
-
-    @ExceptionHandler(HttpMessageConversionException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public DynamicWebError handleMessageConversion(HttpMessageConversionException exception) {
-        return badRequest(rootMessage(exception));
-    }
-
-    @ExceptionHandler(DynamicActionExecutionException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public DynamicWebActionError handleActionFailure(DynamicActionExecutionException exception) {
-        return DynamicWebActionError.from(exception);
-    }
-
-    @ExceptionHandler(OptimisticLockException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public DynamicWebError handleOptimisticLock(OptimisticLockException exception) {
-        return DynamicWebError.conflict(exception.getMessage());
-    }
-
-    private DynamicWebError badRequest(String message) {
-        if (message != null && (message.startsWith("UI required field ")
-                || message.startsWith("UI read-only field ")
-                || message.startsWith("Virtual field "))) {
-            return DynamicWebError.uiValidation(message);
-        }
-        if (message != null && (message.startsWith("record attachment ")
-                || message.startsWith("dynamic record attachment")
-                || message.startsWith("attachment "))) {
-            return DynamicWebError.attachment(message);
-        }
-        if (message != null && message.startsWith("duplicate ")) {
-            return DynamicWebError.duplicateCheck(message);
-        }
-        return DynamicWebError.badRequest(message);
-    }
-
     private DynamicRecord record(String moduleAlias, String entityAlias, DynamicRecordPayload payload) {
         DynamicRecord record = recordService.newRecord(moduleAlias, entityAlias);
         DynamicRecordPayload normalized = payload == null ? DynamicRecordPayload.empty() : payload;

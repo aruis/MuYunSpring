@@ -60,6 +60,8 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccess;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccessService;
@@ -163,6 +165,7 @@ class DynamicRecordWebControllerTest {
                 .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
                         codeBusinessPreviewService, referenceGenerationFacade))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -324,6 +327,7 @@ class DynamicRecordWebControllerTest {
                 .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier),
                         new StaticContractController())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -419,14 +423,14 @@ class DynamicRecordWebControllerTest {
                                 "displayCode", "C-001 / 12"
                         )))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
 
         mvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
                         .contentType("application/json")
                         .content(json(Map.of("values", Map.of("displayCode", "C-001 / 12")))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: displayCode"));
 
         mvc.perform(post("/{moduleAlias}/insert", MODULE)
@@ -449,7 +453,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("Virtual field cannot be saved: lines.lineDisplay"));
 
         verify(mainEntity, never()).insert(any(DynamicRecord.class));
@@ -466,6 +470,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -574,7 +579,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("UI required field is missing: lines.lineNo"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
@@ -600,7 +605,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: lines.lineAmount"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
@@ -614,7 +619,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("UI required field is missing: code"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/update/{recordId}", MODULE, "contract-1")
@@ -632,7 +637,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_UI_VALIDATION"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("UI read-only field cannot be saved: amount"));
 
         lowCodeMvc.perform(post("/{moduleAlias}/insert", MODULE)
@@ -648,7 +653,7 @@ class DynamicRecordWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("UI config is not published in module snapshot: missing-ui"));
     }
 
@@ -660,6 +665,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -712,6 +718,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -770,6 +777,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService, accessService, null, null))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -820,13 +828,14 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, attachmentService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
 
         attachmentMvc.perform(post("/{moduleAlias}/view/{recordId}/attachments/upload-ticket", MODULE, "contract-1"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_ATTACHMENT_ERROR"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("record attachment access service is not configured"));
     }
 
@@ -838,6 +847,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, duplicateCheckService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -880,6 +890,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, duplicateCheckService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1061,6 +1072,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1102,6 +1114,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1132,6 +1145,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         null, null, null, null, null, navigationService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1158,6 +1172,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1246,6 +1261,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1322,6 +1338,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1391,6 +1408,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1719,6 +1737,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -1859,6 +1878,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, null, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -2183,7 +2203,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(get("/{moduleAlias}/tree", MODULE))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: TREE"));
     }
 
@@ -2210,7 +2230,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/enable/{recordId}", MODULE, "contract-1"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("dynamic entity does not support capability: ENABLE"));
     }
 
@@ -2286,8 +2306,8 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
                 .andExpect(jsonPath("$.context.recordId").value("contract-1"))
                 .andExpect(jsonPath("$.context.traceId").value("trace-1"))
-                .andExpect(jsonPath("$.context.entityAlias").doesNotExist())
-                .andExpect(jsonPath("$.context.action").doesNotExist())
+                .andExpect(jsonPath("$.details.context.entityAlias").doesNotExist())
+                .andExpect(jsonPath("$.details.context.action").doesNotExist())
                 .andExpect(jsonPath("$.body.type").value("VALUE"))
                 .andExpect(jsonPath("$.body.value").value("ok"))
                 .andExpect(jsonPath("$.body.message").value("已提交"))
@@ -2410,7 +2430,7 @@ class DynamicRecordWebControllerTest {
                                 "record", Map.of("id", "contract-2", "values", Map.of("code", "C-001"))
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("action request recordId must match record.id"));
     }
@@ -2434,14 +2454,14 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("只有草稿合同可以提交"))
-                .andExpect(jsonPath("$.failureStage").value("availability"))
-                .andExpect(jsonPath("$.traceId").value("trace-1"))
-                .andExpect(jsonPath("$.context.moduleAlias").value(MODULE))
-                .andExpect(jsonPath("$.context.actionCode").value("submit"))
-                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
-                .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
-                .andExpect(jsonPath("$.context.recordId").value("contract-1"))
-                .andExpect(jsonPath("$.context.traceId").value("trace-1"));
+                .andExpect(jsonPath("$.details.failureStage").value("availability"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.details.context.moduleAlias").value(MODULE))
+                .andExpect(jsonPath("$.details.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.details.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.details.context.executorType").value("SERVICE"))
+                .andExpect(jsonPath("$.details.context.recordId").value("contract-1"))
+                .andExpect(jsonPath("$.details.context.traceId").value("trace-1"));
     }
 
     @Test
@@ -2463,11 +2483,11 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("submit failed"))
-                .andExpect(jsonPath("$.failureStage").value("execute"))
-                .andExpect(jsonPath("$.traceId").value("trace-2"))
-                .andExpect(jsonPath("$.context.actionCode").value("submit"))
-                .andExpect(jsonPath("$.context.actionLevel").value("RECORD"))
-                .andExpect(jsonPath("$.context.executorType").value("SERVICE"));
+                .andExpect(jsonPath("$.details.failureStage").value("execute"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.details.context.actionCode").value("submit"))
+                .andExpect(jsonPath("$.details.context.actionLevel").value("RECORD"))
+                .andExpect(jsonPath("$.details.context.executorType").value("SERVICE"));
     }
 
     @Test
@@ -2484,9 +2504,9 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.code").value("DYNAMIC_ACTION_FAILED"))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("submit failed"))
-                .andExpect(jsonPath("$.failureStage").value("execute"))
-                .andExpect(jsonPath("$.traceId").doesNotExist())
-                .andExpect(jsonPath("$.context").doesNotExist());
+                .andExpect(jsonPath("$.details.failureStage").value("execute"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.details.context").doesNotExist());
     }
 
     @Test
@@ -2577,7 +2597,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "archive")
                         .contentType("application/json")
-                        .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
+                .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.context.actionLevel").value("BATCH"))
                 .andExpect(jsonPath("$.context.executorType").value("SERVICE"))
@@ -2590,7 +2610,7 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/batch", MODULE, "batchDelete")
                         .contentType("application/json")
-                        .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
+                .content(json(Map.of("ids", List.of("contract-1", "contract-2")))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.context.actionLevel").value("BATCH"))
                 .andExpect(jsonPath("$.body.type").value("COUNT"))
@@ -2718,6 +2738,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, moduleFieldService))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -2806,6 +2827,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade,
                         snapshotService, queryItemService, null))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -3064,9 +3086,9 @@ class DynamicRecordWebControllerTest {
 
         mvc.perform(get("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.traceId").doesNotExist())
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.message").value("unknown module alias: " + MODULE));
     }
 
@@ -3075,12 +3097,13 @@ class DynamicRecordWebControllerTest {
         MockMvc noTenantMvc = MockMvcBuilders
                 .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(java.util.Optional::empty))
                 .build();
 
         noTenantMvc.perform(get("/{moduleAlias}/describe", MODULE))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value(MODULE + " requires tenant context"));
 
@@ -3096,7 +3119,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("values", Map.of("code", "C-001")))))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_CONFLICT"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFLICT_VERSION))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("record version conflict: contract-1"));
     }
@@ -3107,7 +3130,7 @@ class DynamicRecordWebControllerTest {
                         .contentType("application/json")
                         .content(json(Map.of("values", Map.of("unknown", "C-001")))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DYNAMIC_BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("unknown dynamic field: unknown"));
     }

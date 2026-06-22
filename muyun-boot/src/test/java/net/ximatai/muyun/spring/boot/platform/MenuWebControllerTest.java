@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -108,7 +109,8 @@ class MenuWebControllerTest {
 
         mvc.perform(get("/platform.menu/mine"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("PLATFORM_CONFIGURATION"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.CONFIG_MISSING))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("menu scheme is not configured for current user"));
     }
