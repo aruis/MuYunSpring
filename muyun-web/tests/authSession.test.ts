@@ -12,14 +12,9 @@ test('effectiveAuthToken ignores blank env token', () => {
 });
 
 test('isAuthenticationRequiredError uses backend auth-required code for login recovery', () => {
-  assert.equal(
-    isAuthenticationRequiredError(new AppError('login required', { code: 'AUTHENTICATION_REQUIRED', status: 401 })),
-    true,
-  );
-  assert.equal(
-    isAuthenticationRequiredError(new AppError('bad credentials', { code: 'AUTHENTICATION_FAILED', status: 401 })),
-    false,
-  );
+  assert.equal(isAuthenticationRequiredError(new AppError('login required', { code: 'AUTH_REQUIRED', status: 401 })), true);
+  assert.equal(isAuthenticationRequiredError(new AppError('token expired', { code: 'AUTH_EXPIRED', status: 401 })), true);
+  assert.equal(isAuthenticationRequiredError(new AppError('bad credentials', { code: 'LOGIN_BAD_CREDENTIALS', status: 401 })), false);
   assert.equal(
     isAuthenticationRequiredError(new AppError('legacy login required', { code: 'HTTP_ERROR', status: 401 })),
     true,

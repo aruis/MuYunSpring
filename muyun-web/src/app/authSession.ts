@@ -31,7 +31,11 @@ export function isAuthenticationRequiredError(cause: unknown) {
   if (!(cause instanceof AppError)) {
     return false;
   }
-  return cause.code === 'AUTHENTICATION_REQUIRED' || (cause.status === 401 && cause.code === 'HTTP_ERROR');
+  return (
+    cause.code === 'AUTH_REQUIRED' ||
+    cause.code === 'AUTH_EXPIRED' ||
+    (cause.status === 401 && cause.code === 'HTTP_ERROR')
+  );
 }
 
 function normalizeToken(token?: string | null) {
