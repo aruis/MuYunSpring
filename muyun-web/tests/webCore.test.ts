@@ -5,6 +5,7 @@ import {
   createAuthClient,
   createHttpClient,
   normalizeError,
+  platformErrorCodes,
   resolveGlobalErrorPresentation,
 } from '../src/web-core/index.ts';
 
@@ -93,7 +94,7 @@ test('http client falls back to response trace header for AppError traceId', asy
   globalThis.fetch = async () =>
     Response.json(
       {
-        code: 'CONFIG_MISSING',
+        code: platformErrorCodes.configMissing,
         status: 409,
         message: '菜单方案未配置',
       },
@@ -132,7 +133,7 @@ test('http client wraps invalid json error response as AppError', async () => {
       (error) => {
         assert.equal(error instanceof AppError, true);
         const appError = error as AppError;
-        assert.equal(appError.code, 'HTTP_ERROR');
+        assert.equal(appError.code, platformErrorCodes.httpError);
         assert.equal(appError.status, 500);
         assert.equal(appError.traceId, 'trace-invalid-json');
         assert.match(String(appError.details?.cause), /JSON/);
@@ -145,10 +146,10 @@ test('http client wraps invalid json error response as AppError', async () => {
 });
 
 test('normalizeError keeps AppError and wraps unknown errors', () => {
-  const appError = new AppError('conflict', { code: 'OPTIMISTIC_LOCK_CONFLICT', status: 409 });
+  const appError = new AppError('conflict', { code: platformErrorCodes.conflictVersion, status: 409 });
 
   assert.equal(normalizeError(appError), appError);
-  assert.deepEqual(normalizeError(new Error('boom')), new AppError('boom', { code: 'APP_ERROR' }));
+  assert.deepEqual(normalizeError(new Error('boom')), new AppError('boom', { code: platformErrorCodes.appError }));
   assert.deepEqual(normalizeError('boom').details, { cause: 'boom' });
 });
 
@@ -161,7 +162,7 @@ test('resolveGlobalErrorPresentation maps common failures to fixed global slots'
     'redirect-login',
   );
   assert.equal(
-    resolveGlobalErrorPresentation(new AppError('bad credentials', { code: 'LOGIN_BAD_CREDENTIALS', status: 401 }), {
+    resolveGlobalErrorPresentation(new AppError('bad credentials', { code: platformErrorCodes.loginBadCredentials, status: 401 }), {
       phase: 'action',
       surface: 'form',
     }).slot,

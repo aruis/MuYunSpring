@@ -42,8 +42,25 @@ export interface GlobalErrorPresentation {
   traceId?: string;
 }
 
+export const platformErrorCodes = {
+  appError: 'APP_ERROR',
+  networkError: 'NETWORK_ERROR',
+  httpError: 'HTTP_ERROR',
+  authRequired: 'AUTH_REQUIRED',
+  authExpired: 'AUTH_EXPIRED',
+  loginBadCredentials: 'LOGIN_BAD_CREDENTIALS',
+  accessDenied: 'ACCESS_DENIED',
+  validationFailed: 'VALIDATION_FAILED',
+  conflictVersion: 'CONFLICT_VERSION',
+  resourceNotFound: 'RESOURCE_NOT_FOUND',
+  configMissing: 'CONFIG_MISSING',
+  internalError: 'INTERNAL_ERROR',
+} as const;
+
+export type PlatformErrorCode = (typeof platformErrorCodes)[keyof typeof platformErrorCodes] | (string & {});
+
 export class AppError extends Error {
-  readonly code: string;
+  readonly code: PlatformErrorCode;
   readonly status?: number;
   readonly traceId?: string;
   readonly scope?: Record<string, unknown>;
@@ -53,7 +70,7 @@ export class AppError extends Error {
   constructor(
     message: string,
     options: {
-      code?: string;
+      code?: PlatformErrorCode;
       status?: number;
       traceId?: string;
       scope?: Record<string, unknown>;
@@ -63,7 +80,7 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = 'AppError';
-    this.code = options.code ?? 'APP_ERROR';
+    this.code = options.code ?? platformErrorCodes.appError;
     this.status = options.status;
     this.traceId = options.traceId;
     this.scope = options.scope;
@@ -89,7 +106,7 @@ export function createHttpClient(context: RequestContext = {}): HttpClient {
         });
       } catch (error) {
         throw new AppError('Network request failed', {
-          code: 'NETWORK_ERROR',
+          code: platformErrorCodes.networkError,
           details: { cause: error instanceof Error ? error.message : String(error) },
         });
       }
@@ -102,7 +119,7 @@ export function createHttpClient(context: RequestContext = {}): HttpClient {
             throw error;
           }
           throw new AppError(`Request failed with status ${response.status}`, {
-            code: 'HTTP_ERROR',
+            code: platformErrorCodes.httpError,
             status: response.status,
             traceId: response.headers.get('X-MuYun-Trace-Id') ?? undefined,
             details: { cause: error instanceof Error ? error.message : String(error) },
@@ -131,9 +148,9 @@ export function normalizeError(error: unknown): AppError {
     return error;
   }
   if (error instanceof Error) {
-    return new AppError(error.message, { code: 'APP_ERROR' });
+    return new AppError(error.message, { code: platformErrorCodes.appError });
   }
-  return new AppError('Unknown error', { code: 'APP_ERROR', details: { cause: error } });
+  return new AppError('Unknown error', { code: platformErrorCodes.appError, details: { cause: error } });
 }
 
 export function resolveGlobalErrorPresentation(
@@ -141,7 +158,7 @@ export function resolveGlobalErrorPresentation(
   context: ErrorUiContext = { phase: 'action', surface: 'unknown' },
 ): GlobalErrorPresentation {
   if (error.status === 401) {
-    if (error.code === 'LOGIN_BAD_CREDENTIALS') {
+    if (error.code === platformErrorCodes.loginBadCredentials) {
       return presentation('global-toast', error);
     }
     return presentation('redirect-login', error);
@@ -244,7 +261,7 @@ function headersOf(context: RequestContext, options: HttpRequestOptions) {
 async function appErrorFromResponse(response: Response) {
   const details = await responseBody(response);
   const message = messageOf(details) ?? `Request failed with status ${response.status}`;
-  const code = codeOf(details) ?? 'HTTP_ERROR';
+  const code = codeOf(details) ?? platformErrorCodes.httpError;
   return new AppError(message, {
     code,
     status: response.status,

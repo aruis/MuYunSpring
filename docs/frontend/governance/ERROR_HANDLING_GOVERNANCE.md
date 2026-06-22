@@ -22,6 +22,18 @@
 5. 全局兜底主要根据 HTTP 状态码和当前 UI 上下文决定展示方式，不维护庞大的业务错误码映射。
 6. 后端只暴露前端必要事实；严重级别、审计策略、异常类型和内部分类优先留在后端日志、审计和运行事件中。
 
+## 阶段落地状态
+
+当前前端还处于平台 shell 和登录链路阶段，尚未进入真实动态表单、查重、导入面板或工作流动作区的业务 UI 开发。因此本专项第一阶段只落地已经具备条件的基础能力：
+
+1. 后端统一输出错误 envelope 和 `traceId`。
+2. 前端 `web-core` 将 HTTP 失败归一为 `AppError`。
+3. 前端提供少量通用展示槽位判定，不建设复杂错误展示中心。
+4. 登录链路作为已存在特殊链路，消费登录相关 code。
+5. 前端收口当前已确认稳定的平台错误码常量，避免平台代码继续散落魔法字符串。
+
+动态表单字段定位、查重命中、导入行级错误和工作流动作提示属于后续业务触发的技术债。只有对应页面或运行器进入真实开发时，才补特殊 handler 和局部 UI，不提前构造空抽象。
+
 ## 后端事实协议
 
 后端对外错误响应保持克制。建议第一阶段稳定以下结构：
@@ -142,7 +154,7 @@ HTTP 状态码用于全局兜底和传输层语义，不承载完整业务含义
   -> 根据 HTTP 状态和 UI 上下文兜底展示
 ```
 
-调用形态：
+未来业务链路接入形态：
 
 ```ts
 try {
@@ -154,14 +166,15 @@ try {
     return;
   }
 
-  handleGlobalError(error, {
+  const presentation = resolveGlobalErrorPresentation(error, {
     phase: 'action',
     surface: 'form',
   });
+  renderGlobalError(presentation);
 }
 ```
 
-特殊 handler 必须返回是否已处理：
+特殊 handler 必须返回是否已处理。当前动态表单等业务 handler 尚未建设，等对应 UI 进入真实开发时再补：
 
 ```ts
 type ErrorHandled = boolean;
@@ -226,11 +239,11 @@ interface ErrorUiContext {
 
 同一个 HTTP 状态在不同上下文下展示不同，这是前端职责，不应由后端 envelope 指挥。
 
-## 典型特殊链路
+## 特殊链路边界
 
 ### 登录
 
-登录失败属于特殊链路。登录页优先消费登录相关 code：
+登录失败属于当前已具备条件的特殊链路。登录页优先消费登录相关 code：
 
 ```text
 LOGIN_BAD_CREDENTIALS
@@ -242,7 +255,7 @@ AUTH_REQUIRED
 
 ### 动态表单保存
 
-动态表单保存优先消费字段和子表定位：
+动态表单保存属于后续业务触发项，当前不建设真实 handler。进入动态表单运行器开发后，再优先消费字段和子表定位：
 
 ```text
 targets.kind = field
@@ -255,7 +268,7 @@ targets.rowIndex
 
 ### 查重命中
 
-查重命中不是普通失败 toast。专题 code 示例：
+查重命中属于后续业务触发项，当前不建设真实 handler。它不是普通失败 toast。专题 code 示例：
 
 ```text
 DUPLICATE_RECORD_MATCHED
@@ -273,11 +286,11 @@ targets.rowIndex
 targets.fieldName
 ```
 
-全局 handler 不负责解释导入明细。
+全局 handler 不负责解释导入明细。当前导入结果面板尚未进入前端真实开发，先记录为技术债。
 
 ### 工作流动作
 
-工作流任务已处理、任务状态变化、审批动作不可用等错误，应优先展示在动作区或任务提示区。全局 handler 只兜底未被动作区接管的错误。
+工作流任务已处理、任务状态变化、审批动作不可用等错误，应优先展示在动作区或任务提示区。全局 handler 只兜底未被动作区接管的错误。当前工作流动作区前端尚未进入真实开发，先记录为技术债。
 
 ## 后端抛错建议
 
@@ -308,25 +321,30 @@ throw PlatformErrors.config(
 
 ## web-core 建设口径
 
-前端 `web-core` 第一阶段只需要提供：
+前端 `web-core` 第一阶段只提供轻量基础契约：
 
 ```ts
 interface AppError {
-  httpStatus?: number;
+  status?: number;
   traceId?: string;
-  code?: string;
+  code: string;
   message: string;
   scope?: Record<string, unknown>;
-  targets?: ErrorTarget[];
+  targets: ErrorTarget[];
   details?: Record<string, unknown>;
 }
 
 function normalizeError(error: unknown): AppError;
 
-function handleGlobalError(error: AppError, context: ErrorUiContext): void;
+function resolveGlobalErrorPresentation(
+  error: AppError,
+  context: ErrorUiContext
+): GlobalErrorPresentation;
 ```
 
-专题或页面自行提供特殊 handler：
+当前不建设全局 UI store 或复杂 adapter。等 shell UI 需要真实 toast、modal、page-error 编排时，再基于 `GlobalErrorPresentation` 接入具体 UI 组件。
+
+后续专题或页面自行提供特殊 handler：
 
 ```ts
 function tryHandleDynamicFormError(error: AppError, context: DynamicFormContext): boolean;
@@ -350,15 +368,21 @@ function tryHandleImportError(error: AppError, context: ImportPanelContext): boo
 
 运行器不认识或不适合局部展示的错误，应回落到全局 handler。
 
+当前动态页面运行器还没有进入真实业务表单开发，上述内容是技术债触发条件，不是当前阶段验收项。
+
 ## 后续触发点
 
-下列能力暂不在第一阶段完整建设：
+下列能力暂不在第一阶段完整建设，按业务条件触发：
 
-1. 多语言错误文案和 `i18nKey`。
-2. 面向前端的完整错误码目录和在线文档。
-3. 前端错误展示策略配置化。
-4. iframe 或 online 子应用错误协议。
-5. 后端审计级别和前端展示级别联动。
+1. 动态表单字段级、子表行级和表单顶部错误展示。
+2. 查重命中确认弹窗和候选记录交互。
+3. 导入行级错误面板和错误文件下载入口。
+4. 工作流动作区错误提示和任务状态刷新。
+5. 多语言错误文案和 `i18nKey`。
+6. 面向前端的完整错误码目录和在线文档。
+7. 前端错误展示策略配置化。
+8. iframe 或 online 子应用错误协议。
+9. 后端审计级别和前端展示级别联动。
 
 进入国际化、online 子应用、统一运维告警或复杂配置治理时，再按实际场景扩展。
 
@@ -367,8 +391,8 @@ function tryHandleImportError(error: AppError, context: ImportPanelContext): boo
 第一阶段完成时，应能证明：
 
 1. 后端所有平台异常都能输出统一 envelope 和 `traceId`。
-2. 登录、动态表单保存、查重命中至少各有一个特殊 handler 示例。
-3. 未被特殊 handler 接管的错误会进入全局兜底。
-4. 全局兜底不依赖庞大的业务 code 映射。
-5. 前端测试覆盖 `normalizeError`、特殊 handler 返回值和全局兜底分流。
+2. 前端 HTTP client 能把统一 envelope 转成 `AppError`，并保留 `code`、`traceId`、`scope`、`targets` 和 `details`。
+3. 登录特殊链路能区分 `AUTH_REQUIRED`、`AUTH_EXPIRED` 和 `LOGIN_BAD_CREDENTIALS`。
+4. 全局兜底不依赖庞大的业务 code 映射，只返回少量展示槽位。
+5. 前端测试覆盖 `normalizeError`、统一 envelope 解析和全局兜底分流。
 6. 后端测试覆盖典型异常到 envelope 的转换。
