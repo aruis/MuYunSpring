@@ -16,7 +16,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -53,6 +55,12 @@ public class PlatformWebExceptionHandler {
                 .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 400, exception.getMessage()));
     }
 
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<PlatformWebError> handleMethodNotSupported(HttpRequestMethodNotSupportedException exception) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(PlatformWebError.of(PlatformErrorCodes.VALIDATION_FAILED, 405, exception.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageConversionException.class)
     public ResponseEntity<PlatformWebError> handleMessageConversion(HttpMessageConversionException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -67,6 +75,12 @@ public class PlatformWebExceptionHandler {
 
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<PlatformWebError> handleNoHandler(NoHandlerFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(PlatformWebError.of(PlatformErrorCodes.RESOURCE_NOT_FOUND, 404, exception.getMessage()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<PlatformWebError> handleNoResource(NoResourceFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(PlatformWebError.of(PlatformErrorCodes.RESOURCE_NOT_FOUND, 404, exception.getMessage()));
     }
