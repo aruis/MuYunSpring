@@ -216,13 +216,15 @@ class StaticModuleDefinitionScannerTest {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(MenuSchemeWebController.class);
             context.registerBean(MenuManagementWebController.class);
+            context.registerBean(DictionaryCategoryWebController.class);
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
             Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
-            assertThat(byAlias.keySet()).containsExactlyInAnyOrder("platform.menu_scheme", "platform.menu");
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "platform.menu_scheme", "platform.menu", "platform.dictionary_category");
             assertThat(byAlias.get("platform.menu_scheme").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
@@ -231,6 +233,9 @@ class StaticModuleDefinitionScannerTest {
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("create", "view", "update", "delete", "query",
                             "tree", "sort", "enable", "disable");
+            assertThat(byAlias.get("platform.dictionary_category").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .contains("menu");
         }
     }
 
@@ -294,6 +299,7 @@ class StaticModuleDefinitionScannerTest {
             assertThat(definition.moduleAlias()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS);
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder(
+                            "menu",
                             WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
@@ -449,7 +455,8 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.low_code_governance");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                    .containsExactlyInAnyOrder("checkPackageHealth", "archivePackage", "switchCurrentPackageVersion",
+                    .containsExactlyInAnyOrder("menu",
+                            "checkPackageHealth", "archivePackage", "switchCurrentPackageVersion",
                             "exportCurrentPackage", "exportVersionPackage", "dryRunImportPackage",
                             "prepareImportDraft", "archiveImportDraft",
                             "createTemplateFromVersion", "instantiateTemplate");

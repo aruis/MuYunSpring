@@ -26,6 +26,7 @@ import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
+@PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "字典管理", order = 50)
 @RequestMapping("/platform.application/{applicationAlias}/dictionary-categories")
 public class DictionaryCategoryWebController
         extends NestedEnabledTreeCrudWebSupport<DictionaryCategory, DictionaryCategoryService> {
