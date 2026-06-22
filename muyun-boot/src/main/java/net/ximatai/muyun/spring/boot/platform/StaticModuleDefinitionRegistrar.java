@@ -47,10 +47,12 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
 
     public void registerAll() {
         try (TenantContext.Scope ignored = TenantContext.system("register static modules")) {
-            for (StaticModuleDefinition definition : allDefinitions()) {
+            List<StaticModuleDefinition> allDefinitions = allDefinitions();
+            for (StaticModuleDefinition definition : allDefinitions) {
                 registerModule(definition);
                 registerActions(definition);
             }
+            disableStaleSystemManagedModules(allDefinitions);
         }
     }
 
@@ -136,6 +138,25 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
             } else {
                 actionService.update(action);
             }
+        }
+    }
+
+    private void disableStaleSystemManagedModules(List<StaticModuleDefinition> definitions) {
+        if (scanners.isEmpty()) {
+            return;
+        }
+        Set<String> currentModuleAliases = new HashSet<>();
+        for (StaticModuleDefinition definition : definitions) {
+            currentModuleAliases.add(definition.moduleAlias());
+        }
+        for (PlatformModule module : moduleService.listSystemManagedStaticModules()) {
+            if (currentModuleAliases.contains(module.getAlias())) {
+                continue;
+            }
+            for (PlatformModuleAction action : actionService.listSystemManagedActions(module.getAlias())) {
+                actionService.disable(action.getId());
+            }
+            moduleService.disable(module.getAlias());
         }
     }
 }
