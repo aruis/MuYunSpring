@@ -102,7 +102,7 @@ class PlatformDynamicRuntimeRefresherIT {
         services.moduleService.insert(module("crm.customer"));
         String categoryId = services.categoryService.insert(
                 category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
-        services.itemService.insert(item("crm", "customer_status", "active"));
+        services.itemService.insert(item(categoryId, "customer_status", "active"));
         String customerMetadataId = services.metadataService.insert(metadata("crm", "customer", "platform_refresh_customer_it"));
         String contactMetadataId = services.metadataService.insert(metadata("crm", "customer_contact", "platform_refresh_contact_it"));
         services.fieldService.insert(titleField(customerMetadataId));
@@ -470,9 +470,9 @@ class PlatformDynamicRuntimeRefresherIT {
         return category;
     }
 
-    private DictionaryItem item(String applicationAlias, String categoryAlias, String code) {
+    private DictionaryItem item(String categoryId, String categoryAlias, String code) {
         DictionaryItem item = new DictionaryItem();
-        item.setApplicationAlias(applicationAlias);
+        item.setCategoryId(categoryId);
         item.setCategoryAlias(categoryAlias);
         item.setCode(code);
         item.setTitle(code);

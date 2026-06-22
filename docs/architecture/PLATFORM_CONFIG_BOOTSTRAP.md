@@ -261,9 +261,11 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 数据字典拆成：
 
 1. `DictionaryCategory`：字典类目，应用内唯一 `dictionaryCategoryAlias`，支持树。类目可作为目录，也可作为可绑定字典。
-2. `DictionaryItem`：字典项目，归属具体字典类目，支持树、排序、启停和标题。
+2. `DictionaryItem`：字典项目，归属具体字典类目，实体以 `categoryId` 绑定类目并保留 `categoryAlias` 作为可读冗余，支持树、排序、启停和标题。
 
-业务字段绑定字典类目，不绑定单个字典项目。业务数据默认存字典项目 `code`，不存内部项目 ID；展示和校验时通过 `applicationAlias + dictionaryCategoryAlias + code` 解析字典项目。同一类目内项目 `code` 必须唯一，即使项目本身是树，也不能只按同父级唯一，否则业务数据只存 code 时会产生解析歧义。
+业务字段绑定字典类目，不绑定单个字典项目。业务数据默认存字典项目 `code`，不存内部项目 ID；展示和校验时通过 `applicationAlias + dictionaryCategoryAlias + code` 解析到类目，再按 `categoryId + code` 解析字典项目。同一类目内项目 `code` 必须唯一，即使项目本身是树，也不能只按同父级唯一，否则业务数据只存 code 时会产生解析歧义。
+
+字典管理是单一可见模块入口，静态模块别名为 `platform.dictionary_category`。字典项目维护不单独注册可见模块，它的动作作为类目模块的子资源动作贡献，动作码采用 `item_create`、`item_query`、`item_update` 等 `resource_operation` 命名，并可通过权限码继承到 `item_view` 等更粗粒度能力。
 
 字典基础能力只建设字典类目和字典项目的基础维护；字段如何引用字典进入元数据字段行为配置，不塞进最小元数据字段模型。
 

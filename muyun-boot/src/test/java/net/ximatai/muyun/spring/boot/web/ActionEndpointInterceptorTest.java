@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicyService;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.boot.iam.RoleWebController;
 import net.ximatai.muyun.spring.boot.iam.UserAccountWebController;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -313,6 +314,24 @@ class ActionEndpointInterceptorTest {
     }
 
     @Test
+    void shouldResolveContributedActionContextOnTargetModule() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST", "/platform.dictionary_category/categories/category-1/items/query");
+        ContributedItemActionController controller = new ContributedItemActionController();
+
+        interceptor.preHandle(request, new MockHttpServletResponse(),
+                handler(controller, ContributedItemActionController.class.getMethod("query", WebQueryRequest.class)));
+
+        assertThat(policyService.context).satisfies(context -> {
+            assertThat(context.moduleAlias()).isEqualTo("platform.dictionary_category");
+            assertThat(context.actionCode()).isEqualTo("item_query");
+            assertThat(context.permissionCode()).isEqualTo("platform.dictionary_category:item_view");
+            assertThat(context.platformAction()).isNull();
+            assertThat(context.actionPolicy().requiresDataScope()).isTrue();
+        });
+    }
+
+    @Test
     void shouldUseRegisteredCustomActionPolicyWhenResolvingWebEndpoint() throws Exception {
         PlatformModuleActionService moduleActionService = mock(PlatformModuleActionService.class);
         PlatformModuleAction action = new PlatformModuleAction();
@@ -457,6 +476,17 @@ class ActionEndpointInterceptorTest {
 
         @ActionEndpoint(PlatformAction.QUERY)
         public void standardQuery(WebQueryRequest request) {
+        }
+    }
+
+    @PlatformStaticActionContribution(
+            targetModule = "platform.dictionary_category",
+            resource = "item",
+            resourceTitle = "字典项"
+    )
+    private static final class ContributedItemActionController {
+        @ActionEndpoint(PlatformAction.QUERY)
+        public void query(WebQueryRequest request) {
         }
     }
 }

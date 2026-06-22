@@ -241,7 +241,9 @@ class DictionaryServiceContractTest {
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant-b")) {
             assertThat(categoryService.rootCategories("crm")).isEmpty();
-            assertThat(itemService.resolveItem("crm", "customer_status", "active")).isNull();
+            assertThatThrownBy(() -> itemService.resolveItem("crm", "customer_status", "active"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("existing category");
         }
     }
 
@@ -272,9 +274,10 @@ class DictionaryServiceContractTest {
     }
 
     private DictionaryItem item(String applicationAlias, String categoryAlias, String code, String parentId) {
+        DictionaryCategory category = categoryService.requireDictionaryCategory(applicationAlias, categoryAlias);
         DictionaryItem item = new DictionaryItem();
-        item.setApplicationAlias(applicationAlias);
-        item.setCategoryAlias(categoryAlias);
+        item.setCategoryId(category.getId());
+        item.setCategoryAlias(category.getAlias());
         item.setCode(code);
         item.setParentId(parentId);
         item.setTitle(code);

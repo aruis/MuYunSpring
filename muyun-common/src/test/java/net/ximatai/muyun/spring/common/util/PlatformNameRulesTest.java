@@ -27,6 +27,7 @@ class PlatformNameRulesTest {
     void shouldValidateIdentifierCodeAndDatabaseName() {
         assertThat(PlatformNameRules.requireIdentifier("customer_status", "metadataAlias")).isEqualTo("customer_status");
         assertThat(PlatformNameRules.requireCode("active", "dictionaryItemCode")).isEqualTo("active");
+        assertThat(PlatformNameRules.requireActionCode("item_create", "actionCode")).isEqualTo("item_create");
         assertThat(PlatformNameRules.requireDatabaseName("crm_customer", "tableName")).isEqualTo("crm_customer");
 
         assertThatThrownBy(() -> PlatformNameRules.requireIdentifier("Customer", "metadataAlias"))

@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,12 +27,19 @@ import java.util.Objects;
 import java.util.Set;
 
 @RestController
-@PlatformStaticModule(application = "platform", alias = DictionaryItemService.MODULE_ALIAS, title = "平台数据字典项目")
-@RequestMapping("/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items")
+@PlatformStaticActionContribution(
+        targetModule = DictionaryCategoryService.MODULE_ALIAS,
+        resource = "item",
+        resourceTitle = "字典项"
+)
+@RequestMapping({
+        "/platform.dictionary_category/categories/{categoryId}/items",
+        "/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items"
+})
 public class DictionaryItemWebController
         extends NestedEnabledTreeCrudWebSupport<DictionaryItem, DictionaryItemService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "categoryAlias", "code", "parentId", "title",
+            "id", "categoryId", "categoryAlias", "code", "parentId", "title",
             "enabled", "sortOrder", "createdAt", "updatedAt");
 
     @Override
@@ -45,33 +54,29 @@ public class DictionaryItemWebController
 
     @Override
     protected Criteria treeScopeCriteria(HttpServletRequest request) {
-        return Criteria.of()
-                .eq("applicationAlias", applicationAlias(request))
-                .eq("categoryAlias", categoryAlias(request));
+        return Criteria.of().eq("categoryId", category(request).getId());
     }
 
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
-        criteria.eq("applicationAlias", applicationAlias(request));
-        criteria.eq("categoryAlias", categoryAlias(request));
+        criteria.eq("categoryId", category(request).getId());
     }
 
     @Override
     protected void bindScope(DictionaryItem record, HttpServletRequest request) {
-        record.setApplicationAlias(applicationAlias(request));
-        record.setCategoryAlias(categoryAlias(request));
+        DictionaryCategory category = category(request);
+        record.setCategoryId(category.getId());
+        record.setCategoryAlias(category.getAlias());
     }
 
     @Override
     protected boolean inScope(DictionaryItem record, HttpServletRequest request) {
-        return Objects.equals(record.getApplicationAlias(), applicationAlias(request))
-                && Objects.equals(record.getCategoryAlias(), categoryAlias(request));
+        return Objects.equals(record.getCategoryId(), category(request).getId());
     }
 
     @Override
     protected String scopedRecordNotFoundMessage(HttpServletRequest request, String id) {
-        return "dictionary item does not belong to category: "
-                + applicationAlias(request) + "." + categoryAlias(request) + "." + id;
+        return "dictionary item does not belong to category: " + category(request).getId() + "." + id;
     }
 
     @GetMapping("/tree")
@@ -79,12 +84,13 @@ public class DictionaryItemWebController
     public WebListResponse<?> tree(HttpServletRequest request,
                                    @RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
-            List<DictionaryItem> roots = service().rootItems(applicationAlias(request), categoryAlias(request));
+            DictionaryCategory category = category(request);
+            List<DictionaryItem> roots = service().rootItems(category.getId());
             if (flat) {
                 List<DictionaryItem> rows = new ArrayList<>();
                 for (DictionaryItem root : roots) {
                     rows.add(root);
-                    appendDescendants(root.getApplicationAlias(), root.getCategoryAlias(), root.getId(), rows);
+                    appendDescendants(root.getCategoryId(), root.getId(), rows);
                 }
                 return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
             }
@@ -105,7 +111,7 @@ public class DictionaryItemWebController
                     return new WebListResponse<>(List.of(node(root)));
                 }
                 return new WebListResponse<>(service()
-                        .children(applicationAlias(request), categoryAlias(request), root.getId()).stream()
+                        .children(root.getCategoryId(), root.getId()).stream()
                         .map(this::node)
                         .toList());
             }
@@ -113,7 +119,7 @@ public class DictionaryItemWebController
             if (includeSelf) {
                 rows.add(root);
             }
-            appendDescendants(root.getApplicationAlias(), root.getCategoryAlias(), root.getId(), rows);
+            appendDescendants(root.getCategoryId(), root.getId(), rows);
             return new WebListResponse<>(WebOutputSupport.records(service(), rows, FieldOutputContext.VIEW));
         });
     }
@@ -121,32 +127,25 @@ public class DictionaryItemWebController
     private WebTreeNode<DictionaryItem> node(DictionaryItem item) {
         return new WebTreeNode<>(
                 WebOutputSupport.record(service(), item, FieldOutputContext.VIEW),
-                service().children(item.getApplicationAlias(), item.getCategoryAlias(), item.getId()).stream()
+                service().children(item.getCategoryId(), item.getId()).stream()
                         .map(this::node)
                         .toList());
     }
 
-    private void appendDescendants(String applicationAlias, String categoryAlias, String parentId,
-                                   List<DictionaryItem> rows) {
-        for (DictionaryItem child : service().children(applicationAlias, categoryAlias, parentId)) {
+    private void appendDescendants(String categoryId, String parentId, List<DictionaryItem> rows) {
+        for (DictionaryItem child : service().children(categoryId, parentId)) {
             rows.add(child);
-            appendDescendants(applicationAlias, categoryAlias, child.getId(), rows);
+            appendDescendants(categoryId, child.getId(), rows);
         }
     }
 
-    private String applicationAlias(HttpServletRequest request) {
-        String value = pathVariable(request, "applicationAlias");
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("applicationAlias is required");
+    private DictionaryCategory category(HttpServletRequest request) {
+        String categoryId = pathVariable(request, "categoryId");
+        if (categoryId != null && !categoryId.isBlank()) {
+            return service().category(categoryId);
         }
-        return value;
-    }
-
-    private String categoryAlias(HttpServletRequest request) {
-        String value = pathVariable(request, "categoryAlias");
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("categoryAlias is required");
-        }
-        return value;
+        String applicationAlias = pathVariable(request, "applicationAlias");
+        String categoryAlias = pathVariable(request, "categoryAlias");
+        return service().category(applicationAlias, categoryAlias);
     }
 }

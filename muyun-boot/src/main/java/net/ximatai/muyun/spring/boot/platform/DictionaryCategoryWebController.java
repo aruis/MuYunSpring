@@ -26,7 +26,8 @@ import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
-@RequestMapping("/platform.application/{applicationAlias}/dictionary-categories")
+@PlatformMenu(parent = PlatformMenuGroups.CONFIG, title = "字典管理", order = 50)
+@RequestMapping({"/platform.dictionary_category", "/platform.application/{applicationAlias}/dictionary-categories"})
 public class DictionaryCategoryWebController
         extends NestedEnabledTreeCrudWebSupport<DictionaryCategory, DictionaryCategoryService> {
     private static final Set<String> QUERY_FIELDS = Set.of(
@@ -45,22 +46,30 @@ public class DictionaryCategoryWebController
 
     @Override
     protected Criteria treeScopeCriteria(HttpServletRequest request) {
-        return Criteria.of().eq("applicationAlias", applicationAlias(request));
+        String applicationAlias = applicationAlias(request);
+        return applicationAlias == null ? Criteria.of() : Criteria.of().eq("applicationAlias", applicationAlias);
     }
 
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
-        criteria.eq("applicationAlias", applicationAlias(request));
+        String applicationAlias = applicationAlias(request);
+        if (applicationAlias != null) {
+            criteria.eq("applicationAlias", applicationAlias);
+        }
     }
 
     @Override
     protected void bindScope(DictionaryCategory record, HttpServletRequest request) {
-        record.setApplicationAlias(applicationAlias(request));
+        String applicationAlias = applicationAlias(request);
+        if (applicationAlias != null) {
+            record.setApplicationAlias(applicationAlias);
+        }
     }
 
     @Override
     protected boolean inScope(DictionaryCategory record, HttpServletRequest request) {
-        return Objects.equals(record.getApplicationAlias(), applicationAlias(request));
+        String applicationAlias = applicationAlias(request);
+        return applicationAlias == null || Objects.equals(record.getApplicationAlias(), applicationAlias);
     }
 
     @Override
@@ -73,7 +82,9 @@ public class DictionaryCategoryWebController
     public WebListResponse<?> tree(HttpServletRequest request,
                                    @RequestParam(defaultValue = "false") boolean flat) {
         return webScope(() -> {
-            List<DictionaryCategory> roots = service().rootCategories(applicationAlias(request));
+            List<DictionaryCategory> roots = applicationAlias(request) == null
+                    ? service().rootCategories()
+                    : service().rootCategories(applicationAlias(request));
             if (flat) {
                 List<DictionaryCategory> rows = new ArrayList<>();
                 for (DictionaryCategory root : roots) {
@@ -98,7 +109,7 @@ public class DictionaryCategoryWebController
                 if (includeSelf) {
                     return new WebListResponse<>(List.of(node(root)));
                 }
-                return new WebListResponse<>(service().children(applicationAlias(request), root.getId()).stream()
+                return new WebListResponse<>(service().children(root.getApplicationAlias(), root.getId()).stream()
                         .map(this::node)
                         .toList());
             }
@@ -126,9 +137,6 @@ public class DictionaryCategoryWebController
 
     private String applicationAlias(HttpServletRequest request) {
         String value = pathVariable(request, "applicationAlias");
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("applicationAlias is required");
-        }
-        return value;
+        return value == null || value.isBlank() ? null : value;
     }
 }

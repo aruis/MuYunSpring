@@ -223,12 +223,13 @@ class PlatformModelSchemaTest {
                 .contains("id", "tenant_id", "application_alias", "alias", "category_kind",
                         "parent_id", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(DictionaryItem.class)))
-                .contains("id", "tenant_id", "application_alias", "category_alias", "code",
-                        "parent_id", "title", "enabled", "sort_order");
+                .contains("id", "tenant_id", "category_id", "category_alias", "code",
+                        "parent_id", "title", "enabled", "sort_order")
+                .doesNotContain("application_alias");
         assertThat(uniqueIndexes(mapper.toTable(DictionaryCategory.class)))
                 .contains(List.of("tenant_id", "application_alias", "alias"));
         assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
-                .contains(List.of("tenant_id", "application_alias", "category_alias", "code"));
+                .contains(List.of("tenant_id", "category_id", "code"));
     }
 
     @Test
