@@ -264,12 +264,6 @@ public class WorkflowRuntimeWebController {
                 request == null ? null : request.selectedReason());
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public WorkflowWebError handleBadRequest(RuntimeException exception) {
-        return new WorkflowWebError("bad_request", exception.getMessage());
-    }
-
     private WorkflowWorkbenchWebRequest normalizeWorkbenchRequest(WorkflowWorkbenchWebRequest request) {
         return request == null ? WorkflowWorkbenchWebRequest.empty() : request;
     }
@@ -416,7 +410,4 @@ record WorkflowModuleTaskContinueWebRequest(String operatorId,
     String selectedRouteKeyOrDirectLinkKey() {
         return selectedRouteKey == null || selectedRouteKey.isBlank() ? selectedDirectLinkKey : selectedRouteKey;
     }
-}
-
-record WorkflowWebError(String code, String message) {
 }

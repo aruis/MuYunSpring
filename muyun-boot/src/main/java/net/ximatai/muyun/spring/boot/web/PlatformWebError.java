@@ -1,27 +1,47 @@
 package net.ximatai.muyun.spring.boot.web;
 
-public record PlatformWebError(String code, int status, String message) {
-    public static PlatformWebError authenticationRequired(String message) {
-        return new PlatformWebError("AUTHENTICATION_REQUIRED", 401, message);
+import net.ximatai.muyun.spring.common.exception.ErrorScope;
+import net.ximatai.muyun.spring.common.exception.ErrorTarget;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.id.Ids;
+import net.ximatai.muyun.spring.common.web.RequestTraceContext;
+
+import java.util.List;
+import java.util.Map;
+
+public record PlatformWebError(String traceId,
+                               String code,
+                               int status,
+                               String message,
+                               ErrorScope scope,
+                               List<ErrorTarget> targets,
+                               Map<String, Object> details) {
+    public static PlatformWebError of(PlatformException exception) {
+        return new PlatformWebError(
+                responseTraceId(),
+                exception.code(),
+                exception.httpStatus(),
+                exception.getMessage(),
+                emptyScopeAsNull(exception.scope()),
+                exception.targets().isEmpty() ? List.of() : exception.targets(),
+                exception.details().isEmpty() ? Map.of() : exception.details());
     }
 
-    public static PlatformWebError authenticationFailed(String message) {
-        return new PlatformWebError("AUTHENTICATION_FAILED", 401, message);
+    public static PlatformWebError of(String code, int status, String message) {
+        return new PlatformWebError(responseTraceId(), code, status, message, null, List.of(),
+                Map.of());
     }
 
-    public static PlatformWebError accessDenied(String message) {
-        return new PlatformWebError("ACCESS_DENIED", 403, message);
+    public static PlatformWebError of(String code, int status, String message, Map<String, Object> details) {
+        return new PlatformWebError(responseTraceId(), code, status, message, null, List.of(),
+                details == null ? Map.of() : Map.copyOf(details));
     }
 
-    public static PlatformWebError platformConfiguration(String message) {
-        return new PlatformWebError("PLATFORM_CONFIGURATION", 409, message);
+    private static ErrorScope emptyScopeAsNull(ErrorScope scope) {
+        return scope == null || scope.isEmpty() ? null : scope;
     }
 
-    public static PlatformWebError badRequest(String message) {
-        return new PlatformWebError("BAD_REQUEST", 400, message);
-    }
-
-    public static PlatformWebError platformError(String message) {
-        return new PlatformWebError("PLATFORM_ERROR", 400, message);
+    private static String responseTraceId() {
+        return RequestTraceContext.currentTraceId().orElseGet(Ids::newId);
     }
 }

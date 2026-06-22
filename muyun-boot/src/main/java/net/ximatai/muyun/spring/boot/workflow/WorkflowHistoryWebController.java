@@ -64,12 +64,6 @@ public class WorkflowHistoryWebController {
         return new WebListResponse<>(historyQueryService.eventViews(historyInstanceId));
     }
 
-    @ExceptionHandler(PlatformException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public WorkflowWebError handlePlatformException(PlatformException ex) {
-        return new WorkflowWebError("bad_request", ex.getMessage());
-    }
-
     private PageRequest page(WebPageRequest request) {
         WebPageRequest normalized = request == null ? WebPageRequest.DEFAULT : request;
         return PageRequest.of(normalized.pageNum(), normalized.pageSize());
