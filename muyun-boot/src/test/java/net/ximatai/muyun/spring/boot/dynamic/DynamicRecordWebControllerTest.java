@@ -61,7 +61,9 @@ import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachment;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccess;
 import net.ximatai.muyun.spring.platform.attachment.RecordAttachmentAccessService;
@@ -166,7 +168,7 @@ class DynamicRecordWebControllerTest {
                         codeBusinessPreviewService, referenceGenerationFacade))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new PlatformWebExceptionHandler())
-                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                .addFilters(new RequestTraceWebFilter(), new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
     }
@@ -2448,6 +2450,7 @@ class DynamicRecordWebControllerTest {
                         DynamicActionExecutionException.STAGE_AVAILABILITY, null));
 
         mvc.perform(post("/{moduleAlias}/{actionCode}/{recordId}", MODULE, "submit", "contract-1")
+                        .header(RequestTraceContext.TRACE_ID_HEADER, "trace-1")
                         .contentType("application/json")
                         .content(json(Map.of())))
                 .andExpect(status().isBadRequest())
@@ -2455,7 +2458,7 @@ class DynamicRecordWebControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("只有草稿合同可以提交"))
                 .andExpect(jsonPath("$.details.failureStage").value("availability"))
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.traceId").value("trace-1"))
                 .andExpect(jsonPath("$.details.context.moduleAlias").value(MODULE))
                 .andExpect(jsonPath("$.details.context.actionCode").value("submit"))
                 .andExpect(jsonPath("$.details.context.actionLevel").value("RECORD"))

@@ -26,6 +26,7 @@ import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
+import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.metadata.AssociationViewQueryMappingGroupOperator;
@@ -463,7 +464,8 @@ class DynamicRecordServiceTest {
                 .setValue("status", "draft");
         record.setId("contract-1");
 
-        try (CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))) {
+        try (RequestTraceContext.Scope trace = RequestTraceContext.use("request-trace-1");
+             CurrentUserContext.Scope ignored = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "Alice", "tenant_a"))) {
             service.module(MODULE).executeAction("create", DynamicActionExecutionRequest.record(record));
         }
 
@@ -471,6 +473,7 @@ class DynamicRecordServiceTest {
                 .containsExactly(RuntimeEventType.AFTER_CREATE, RuntimeEventType.ACTION_EXECUTED);
         assertThat(events.events().getFirst().mutationSource()).isEqualTo(RuntimeMutationSource.ACTION);
         RuntimeEvent action = events.events().getLast();
+        assertThat(action.traceId()).isEqualTo("request-trace-1");
         assertThat(events.events().getFirst().traceId()).isEqualTo(action.traceId());
         assertThat(action.moduleAlias()).isEqualTo(MODULE);
         assertThat(action.entityAlias()).isEqualTo("contract");
