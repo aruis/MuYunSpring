@@ -398,3 +398,15 @@ function tryHandleImportError(error: AppError, context: ImportPanelContext): boo
 4. 全局兜底不依赖庞大的业务 code 映射，只返回少量展示槽位。
 5. 前端测试覆盖 `normalizeError`、统一 envelope 解析和全局兜底分流。
 6. 后端测试覆盖典型异常到 envelope 的转换。
+
+## 专项收尾结论
+
+当前错误治理专项先暂停在基础契约层，不继续扩展业务 UI：
+
+1. 已完成：后端统一 envelope、`traceId` 响应头、平台错误码基础集合、`PlatformErrors` 工厂契约、前端 `AppError`、HTTP 失败归一、全局展示槽位判定和登录特殊链路。
+2. 不继续提前建设：全局错误 store、toast/modal/page-error adapter、动态表单字段错误 handler、查重确认弹窗、导入结果面板和工作流动作区提示。
+3. 触发后再建设：对应前端页面或运行器进入真实开发，且能够明确错误展示位置、消费规则和“已处理后不再全局兜底”的返回契约。
+4. 如果先进入 shell 全局通知建设，先接通用 toast/modal/page-error adapter，再接业务特殊 handler。
+5. 后端持续约束：新增可定位业务校验优先使用 `PlatformErrors.validation(...)` 或 `PlatformErrors.business(...)`；历史 `new PlatformException(message)` 按业务链路逐步迁移，不做无差别批量重判。
+
+跨专题剩余债务记录在 [技术债记录](../../TECHNICAL_DEBT.md) 的 `DD-004`；本文件保留具体错误契约和触发条件。
