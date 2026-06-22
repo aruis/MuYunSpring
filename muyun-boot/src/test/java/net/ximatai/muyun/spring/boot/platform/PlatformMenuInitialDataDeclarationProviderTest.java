@@ -4,9 +4,15 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
+import net.ximatai.muyun.spring.boot.iam.DepartmentWebController;
+import net.ximatai.muyun.spring.boot.iam.EmployeeWebController;
+import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictException;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
+import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.Menu;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
@@ -14,9 +20,6 @@ import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
-import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictException;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
@@ -66,6 +69,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                 assertThat(value.getTitle()).isEqualTo("平台超管");
             });
             assertThat(menuService.rootMenus(scheme.getId()))
+                    .extracting(Menu::getId)
+                    .containsExactly(PlatformMenuGroups.PLATFORM);
+            assertThat(menuService.children(scheme.getId(), PlatformMenuGroups.PLATFORM))
                     .extracting(Menu::getId)
                     .containsExactly(
                             PlatformMenuGroups.CONFIG,
@@ -122,7 +128,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
 
             initializePlatformMenus(context);
 
-            assertThat(menuService.rootMenus(MenuSchemeService.ADMIN_SCHEME_ID)).hasSize(3);
+            assertThat(menuService.rootMenus(MenuSchemeService.ADMIN_SCHEME_ID)).hasSize(1);
+            assertThat(menuService.children(MenuSchemeService.ADMIN_SCHEME_ID, PlatformMenuGroups.PLATFORM))
+                    .hasSize(3);
             assertThat(menuService.children(MenuSchemeService.ADMIN_SCHEME_ID, PlatformMenuGroups.CONFIG))
                     .singleElement()
                     .satisfies(menu -> {
@@ -150,7 +158,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
 
             assertThat(menuService.select(PlatformMenuGroups.CONFIG)).satisfies(repaired -> {
                 assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
-                assertThat(repaired.getParentId()).isEqualTo(net.ximatai.muyun.spring.ability.TreeAbility.ROOT_ID);
+                assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.PLATFORM);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
                 assertThat(repaired.getRoute()).isNull();
             });
@@ -205,9 +213,17 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                 List<Menu> roots = menuService.currentUserVisibleRootMenus();
 
                 assertThat(roots).extracting(Menu::getId)
-                        .containsExactly(PlatformMenuGroups.CONFIG, PlatformMenuGroups.IDENTITY);
+                        .containsExactly(PlatformMenuGroups.PLATFORM);
             }
         }
+    }
+
+    @Test
+    void shouldDeclareMenusForCoreAdministrationEntryPoints() {
+        assertMenu(ApplicationWebController.class, PlatformMenuGroups.CONFIG, "应用管理", 10);
+        assertMenu(DepartmentWebController.class, PlatformMenuGroups.IDENTITY, "", 30);
+        assertMenu(PositionWebController.class, PlatformMenuGroups.IDENTITY, "", 40);
+        assertMenu(EmployeeWebController.class, PlatformMenuGroups.IDENTITY, "", 50);
     }
 
     @Test
@@ -227,10 +243,17 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         scheme.setScopeType(MenuScopeType.SYSTEM);
         scheme.setScopeId(MenuSchemeService.SYSTEM_SCOPE_ID);
         schemeDao.insert(scheme);
+        Menu platform = menu(
+                PlatformMenuGroups.PLATFORM,
+                MenuSchemeService.ADMIN_SCHEME_ID,
+                TreeAbility.ROOT_ID,
+                MenuType.GROUP
+        );
+        menuDao.insert(platform);
         Menu parent = menu(
                 PlatformMenuGroups.CONFIG,
                 MenuSchemeService.ADMIN_SCHEME_ID,
-                TreeAbility.ROOT_ID,
+                PlatformMenuGroups.PLATFORM,
                 MenuType.GROUP
         );
         menuDao.insert(parent);
@@ -306,6 +329,14 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                 .stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void assertMenu(Class<?> controllerType, String parent, String title, int order) {
+        PlatformMenu menu = controllerType.getAnnotation(PlatformMenu.class);
+        assertThat(menu).isNotNull();
+        assertThat(menu.parent()).isEqualTo(parent);
+        assertThat(menu.title()).isEqualTo(title);
+        assertThat(menu.order()).isEqualTo(order);
     }
 
     @RestController

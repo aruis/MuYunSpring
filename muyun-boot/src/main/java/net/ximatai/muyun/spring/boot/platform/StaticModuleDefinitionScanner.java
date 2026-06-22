@@ -131,10 +131,17 @@ public class StaticModuleDefinitionScanner {
     private List<StaticModuleActionDefinition> actions(Class<?> beanClass,
                                                        java.util.Set<EntityCapability> capabilities) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
+        addMenuAction(actions, beanClass);
         addStandardActions(actions, beanClass);
         addWorkflowActions(actions, capabilities);
         ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
         return List.copyOf(actions.values());
+    }
+
+    private void addMenuAction(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
+        if (AnnotationUtils.findAnnotation(beanClass, PlatformMenu.class) != null) {
+            addPlatform(actions, PlatformAction.MENU);
+        }
     }
 
     private void addStandardActions(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
