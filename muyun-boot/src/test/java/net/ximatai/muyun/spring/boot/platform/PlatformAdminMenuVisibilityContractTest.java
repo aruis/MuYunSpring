@@ -113,7 +113,6 @@ class PlatformAdminMenuVisibilityContractTest {
             Set<String> menuModuleAliases = menuModuleAliases(context);
             assertThat(menuModuleAliases).contains(
                     "platform.application",
-                    "platform.dictionary_category",
                     "platform.low_code_governance",
                     WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS
             );

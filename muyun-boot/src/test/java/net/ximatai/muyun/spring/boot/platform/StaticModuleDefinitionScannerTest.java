@@ -235,7 +235,7 @@ class StaticModuleDefinitionScannerTest {
                             "tree", "sort", "enable", "disable");
             assertThat(byAlias.get("platform.dictionary_category").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
-                    .contains("menu");
+                    .doesNotContain("menu");
         }
     }
 
