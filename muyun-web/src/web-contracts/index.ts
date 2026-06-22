@@ -111,7 +111,7 @@ export type PageType =
   | 'remote-url'
   | 'external-link';
 
-export type OpenMode = 'shell-route' | 'dynamic-runner' | 'iframe' | 'new-window';
+export type OpenMode = 'workbench-route' | 'dynamic-runner' | 'iframe' | 'new-window';
 
 export type PageHostType =
   | 'platform-route-host'
@@ -159,14 +159,14 @@ export interface RoutePageTarget {
 
 export type PlatformRoutePageDescriptor = PageDescriptorBase<
   'platform-route',
-  'shell-route',
+  'workbench-route',
   'platform-route-host',
   RoutePageTarget
 >;
 
 export type BusinessRoutePageDescriptor = PageDescriptorBase<
   'business-route',
-  'shell-route',
+  'workbench-route',
   'business-route-host',
   RoutePageTarget
 >;
@@ -219,7 +219,7 @@ export interface MenuTab {
   closable?: boolean;
 }
 
-export interface ShellStartupState {
+export interface WorkbenchStartupState {
   session: SessionContext;
   menus: MenuTreeNode[];
   tabs?: MenuTab[];

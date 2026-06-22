@@ -1,12 +1,12 @@
 # 菜单、路由与页签专项治理
 
-本文记录 MuYun 前端菜单入口、Shell 页签、Vue Router 和业务页面发布形态之间的专项治理规划。
+本文记录 MuYun 前端菜单入口、Workbench 页签、Vue Router 和业务页面发布形态之间的专项治理规划。
 
 ## 问题定位
 
 平台菜单体系是业务入口，不应退化为平台前端静态 Vue Router 表的展示层。
 
-业务开发常见场景是：业务页面由业务包提供，菜单由平台配置。业务包上线或菜单配置变化时，平台 Shell 应尽量通过菜单体系识别业务入口并打开页面，而不是要求平台前端每次都重新发包。
+业务开发常见场景是：业务页面由业务包提供，菜单由平台配置。业务包上线或菜单配置变化时，平台 Workbench 应尽量通过菜单体系识别业务入口并打开页面，而不是要求平台前端每次都重新发包。
 
 因此需要区分两层语义：
 
@@ -22,7 +22,7 @@ Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身�
 | 事项     | 含义                                                 |
 | -------- | ---------------------------------------------------- |
 | 导航意图 | 用户从菜单想进入哪个工作入口。                       |
-| 页面承载 | Shell 用哪种 host 承载这个入口。                     |
+| 页面承载 | Workbench 用哪种 host 承载这个入口。                 |
 | 页面实现 | 页面由平台内置、业务包、远程应用还是动态运行器实现。 |
 | 发布单元 | 页面是否随平台一起发布，还是业务包独立发布。         |
 
@@ -32,7 +32,7 @@ Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身�
 
 1. 菜单 target 不等同于 Vue route。
 2. Tab identity 应来自业务入口，而不是单纯来自 `route.fullPath`。
-3. Shell 负责菜单、tab 和页面 host 的编排；具体页面由对应 host 承载。
+3. Workbench 负责菜单、tab 和页面 host 的编排；具体页面由对应 host 承载。
 4. 平台内置页面可以走静态 Vue Router。
 5. 动态模块页面应优先走平台动态运行器。
 6. 独立业务页面应支持不重发平台包的承载方式。
@@ -46,7 +46,7 @@ Vue Router 是页面承载方式之一，不是所有菜单和 tab 的唯一身�
 
 1. 稳定 `MenuNavigationTarget`、`PageDescriptor`、`TabPolicy` 和 `PageHost` 的前端入口协议。
 2. 保证 active tab 与浏览器 URL 有基础恢复闭环，支持刷新和复制 URL 恢复当前业务入口。
-3. 保持 `PageHostOutlet`、host registry 和各类 host 的分层边界，避免页面承载逻辑散落在 Shell 或菜单解析中。
+3. 保持 `WorkbenchOutlet`、host registry 和各类 host 的分层边界，避免页面承载逻辑散落在 Workbench 或菜单解析中。
 4. 用测试锁住 tab key、URL 序列化、URL 恢复和 host 分发，防止后续业务接入退回到 route path 拼接。
 5. 对照后端 `Menu` 模型识别必要字段缺口；只有当现有字段会造成协议歧义或明显迁移成本时，才推动后端模型调整。
 
@@ -73,14 +73,14 @@ MenuRecord
   -> PageHost
 ```
 
-`MenuNavigationTarget` 保持贴近后端菜单模型，负责表达菜单配置中的业务入口。`PageDescriptor` 是 Shell 消费层的归一结果，负责把入口解释成可打开页面。
+`MenuNavigationTarget` 保持贴近后端菜单模型，负责表达菜单配置中的业务入口。`PageDescriptor` 是 Workbench 消费层的归一结果，负责把入口解释成可打开页面。
 
 建议 `PageDescriptor` 至少表达以下信息：
 
 | 字段        | 含义                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------- |
 | `pageType`  | 页面是什么，例如 `platform-route`、`business-route`、`dynamic-module`、`remote-url`、`micro-app`、`external-link`。 |
-| `openMode`  | Shell 怎么承载，例如 `shell-route`、`dynamic-runner`、`iframe`、`micro-app`、`new-window`。                         |
+| `openMode`  | Workbench 怎么承载，例如 `workbench-route`、`dynamic-runner`、`iframe`、`micro-app`、`new-window`。                     |
 | `target`    | 具体目标，例如 route name/path、moduleAlias、remote url、micro app entry。                                          |
 | `params`    | 页面入参，例如 route params/query、entryParams、动态模块配置 id。                                                   |
 | `tabPolicy` | tab 打开策略，例如单例、多实例、是否可关闭、刷新策略。                                                              |
@@ -110,7 +110,7 @@ MenuRecord
 3. 页面入口需要参与配置校验、权限、审计或配置包迁移，但只存在不可校验的 JSON 或 URL。
 4. URL 恢复需要跨菜单方案、跨租户或跨环境稳定，但只依赖当前菜单树 `menuId`。
 
-`pageType` 和 `openMode` 由 resolver 统一裁决。同一个 `pageType` 理论上可以有多个 `openMode`，例如 `remote-url` 可以选择 iframe 或新窗口；同一个 `openMode` 也可以承载不同 `pageType`，例如 `shell-route` 可承载平台内置页面和 offline 业务页面。
+`pageType` 和 `openMode` 由 resolver 统一裁决。同一个 `pageType` 理论上可以有多个 `openMode`，例如 `remote-url` 可以选择 iframe 或新窗口；同一个 `openMode` 也可以承载不同 `pageType`，例如 `workbench-route` 可承载平台内置页面和 offline 业务页面。
 
 建议长期保留以下 host 概念：
 
@@ -129,7 +129,7 @@ Online 场景指平台前端和业务前端独立发布，但部署在同一个 
 示例：
 
 ```text
-/platform/     平台 Shell
+/platform/     平台 Workbench
 /crm/          CRM 业务前端
 /wms/          仓储业务前端
 ```
@@ -145,11 +145,11 @@ Online 场景指平台前端和业务前端独立发布，但部署在同一个 
 
 可选承载方式：
 
-| 方式        | 优点                                     | 风险                                                |
-| ----------- | ---------------------------------------- | --------------------------------------------------- |
-| 新窗口打开  | 最简单，隔离强，发布独立。               | 体验割裂，Shell tab 无法统一管理内容状态。          |
-| iframe 内嵌 | 平台不重发，能放入 Shell tab，成本中等。 | 需要处理通信、title、刷新、样式隔离和页面生命周期。 |
-| 微前端      | 体验接近单体应用，可共享平台能力。       | 工程复杂度高，依赖版本、回滚和隔离成本高。          |
+| 方式        | 优点                                         | 风险                                                |
+| ----------- | -------------------------------------------- | --------------------------------------------------- |
+| 新窗口打开  | 最简单，隔离强，发布独立。                   | 体验割裂，Workbench tab 无法统一管理内容状态。      |
+| iframe 内嵌 | 平台不重发，能放入 Workbench tab，成本中等。 | 需要处理通信、title、刷新、样式隔离和页面生命周期。 |
+| 微前端      | 体验接近单体应用，可共享平台能力。           | 工程复杂度高，依赖版本、回滚和隔离成本高。          |
 
 第一阶段建议优先支持新窗口或 iframe，不急于引入微前端。
 
@@ -182,7 +182,7 @@ remote manifest 不应承担：
 
 ## Offline 发布场景
 
-Offline 场景指业务页面和平台 Shell 统一构建、统一发布。
+Offline 场景指业务页面和平台 Workbench 统一构建、统一发布。
 
 这种方式适合早期开发、核心业务线、或与平台组件和运行态强耦合的页面。
 
@@ -193,7 +193,7 @@ Offline 场景指业务页面和平台 Shell 统一构建、统一发布。
   -> route manifest
   -> 平台构建集成
   -> 菜单配置 path / routeName / pageKey
-  -> Shell 打开 BusinessRouteHost
+  -> Workbench 打开 BusinessRouteHost
 ```
 
 Offline route manifest 可以包含：
@@ -265,12 +265,12 @@ Router 只是某些 target 的实现细节。
 
 ## 浏览器 URL 与分享恢复
 
-Shell tab 不能只是内存状态。当前 active tab 应与浏览器 URL 联动，URL 应尽量表达当前页面的业务含义。
+Workbench tab 不能只是内存状态。当前 active tab 应与浏览器 URL 联动，URL 应尽量表达当前页面的业务含义。
 
 理想目标：
 
 1. 点击菜单打开或切换 tab 时，浏览器 URL 跟随 active tab 变化。
-2. 浏览器刷新后，Shell 能从 URL 恢复当前 active tab 和页面 host。
+2. 浏览器刷新后，Workbench 能从 URL 恢复当前 active tab 和页面 host。
 3. 用户复制 URL 给另一个用户，对方在另一个浏览器打开后，应进入同一个业务页面。
 4. URL 应可读，能看出页面业务含义，不应只是一段不可理解的随机 tab id。
 
@@ -321,19 +321,19 @@ onTabSnapshot(): snapshot
 onTabRestore(snapshot)
 ```
 
-Shell 负责保存和分发 tab 生命周期，页面或 host 负责声明哪些状态可保存、如何恢复。
+Workbench 负责保存和分发 tab 生命周期，页面或 host 负责声明哪些状态可保存、如何恢复。
 
 未保存内容必须显式进入 dirty check。切换 tab 可以保留 dirty 状态；关闭 tab 或刷新页面时，如果存在未保存内容，应由 `onTabBeforeClose` 或同等协议阻止静默丢失。
 
 不同 host 的状态策略不同：
 
-| Host              | 状态策略                                                            |
-| ----------------- | ------------------------------------------------------------------- |
-| PlatformRouteHost | 优先使用 keep-alive，后续补 snapshot/dirty 生命周期。               |
-| BusinessRouteHost | offline 业务页面可复用平台 PageHost 生命周期。                      |
-| DynamicModuleHost | 查询条件、分页、表单草稿等应由动态运行器统一 snapshot。             |
-| ExternalPageHost  | iframe 内部状态 Shell 无法直接读取，只能通过 postMessage 协议协作。 |
-| MicroAppHost      | 由微前端生命周期和子应用协议共同管理。                              |
+| Host              | 状态策略                                                                |
+| ----------------- | ----------------------------------------------------------------------- |
+| PlatformRouteHost | 优先使用 keep-alive，后续补 snapshot/dirty 生命周期。                   |
+| BusinessRouteHost | offline 业务页面可复用平台 PageHost 生命周期。                          |
+| DynamicModuleHost | 查询条件、分页、表单草稿等应由动态运行器统一 snapshot。                 |
+| ExternalPageHost  | iframe 内部状态 Workbench 无法直接读取，只能通过 postMessage 协议协作。 |
+| MicroAppHost      | 由微前端生命周期和子应用协议共同管理。                                  |
 
 iframe 或 online 页面如需参与 tab 状态管理，应通过最小消息协议：
 
@@ -348,7 +348,7 @@ tab:dirty-change
 tab:title-change
 ```
 
-如果 iframe 页面不接入协议，Shell 只能保存 iframe URL 和 tab 元信息，不能承诺恢复页面内部状态。
+如果 iframe 页面不接入协议，Workbench 只能保存 iframe URL 和 tab 元信息，不能承诺恢复页面内部状态。
 
 URL 与 tab 状态的边界应保持清楚：URL 保存可分享、可恢复的业务入口和关键参数；复杂 UI 状态和未保存草稿不默认塞进 URL。
 
@@ -368,7 +368,7 @@ Vue Router 不承担以下职责：
 3. 加载 online 独立业务包。
 4. 替代动态模块运行器。
 
-Shell 在处理菜单点击时，应先根据 `MenuNavigationTarget` 选择 host：
+Workbench 在处理菜单点击时，应先根据 `MenuNavigationTarget` 选择 host：
 
 ```text
 ROUTE  -> PlatformRouteHost 或 BusinessRouteHost
@@ -410,7 +410,7 @@ MenuNavigationTarget
 
 PageDescriptor
   pageType: platform-route
-  openMode: shell-route
+  openMode: workbench-route
   target.route: /platform/metadata
   tabPolicy.identity: by-menu
 ```
@@ -424,7 +424,7 @@ MenuNavigationTarget
 
 PageDescriptor
   pageType: business-route
-  openMode: shell-route
+  openMode: workbench-route
   target.routeName: crm.customer.list
   target.resolvedBy: offline-route-manifest
   tabPolicy.identity: by-target
@@ -502,16 +502,16 @@ PageDescriptor
 - [x] URL 生成结果可读，能表达业务含义。
 - [x] resolver 有纯函数测试。
 
-### 战役 2：PageHost Outlet 与 Shell 内容区重构
+### 战役 2：PageHost Outlet 与 Workbench 内容区重构
 
 目标：
 
-- [x] 增加 `PageHostOutlet` 或同等内容区承载器。
+- [x] 增加 `WorkbenchOutlet` 或同等内容区承载器。
 - [x] 增加 `PlatformRouteHost`。
 - [x] 增加 `BusinessRouteHost`。
 - [x] 增加 `DynamicModuleHost` 占位。
 - [x] 增加 `ExternalPageHost` 占位。
-- [x] `AdminShell` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
+- [x] `Workbench` 内容区通过 descriptor 选择 host，而不是散落判断菜单类型。
 
 验收：
 
@@ -537,7 +537,7 @@ PageDescriptor
 - [x] 点击菜单后 URL 跟随变化。
 - [x] 复制 URL 到新浏览器可打开同一业务入口。
 - [x] 刷新页面后恢复 active tab。
-- [x] 无效 shell-owned URL 不生成坏 tab，回到当前 tab 或空工作台。
+- [x] 无效 workbench-owned URL 不生成坏 tab，回到当前 tab 或空工作台。
 
 ### 战役 4：Tab 状态生命周期
 
@@ -569,7 +569,7 @@ PageDescriptor
 
 - [ ] mock 菜单配置业务 path 能打开业务页面。
 - [ ] mock 菜单配置 `routeName` 或 `pageKey` 能打开业务页面。
-- [ ] Shell 不硬编码业务 route。
+- [ ] Workbench 不硬编码业务 route。
 - [ ] 刷新后能恢复对应业务页面和 tab。
 
 ### 战役 6：Online ExternalPageHost MVP
@@ -598,7 +598,7 @@ PageDescriptor
 
 1. 完整微前端框架选型。
 2. 所有业务包动态发现。
-3. iframe 与 Shell 的完整通信协议。
+3. iframe 与 Workbench 的完整通信协议。
 4. 复杂 tab 多实例策略。
 5. 把所有菜单强行注册成平台 Vue Router route。
 6. 用单一 path 字段承载所有页面类型和打开策略。

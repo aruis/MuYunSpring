@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 import {
   activeTabUrlOf,
   closeMenuTab,
-  initialOpenMenuKeys,
-  loadShellStartupState,
+  loadWorkbenchStartupState,
   openMenuTab,
-  restoreShellStartupStateFromUrl,
-} from '../src/app/shellStartup.ts';
-import { getMenuNavigationTarget } from '../src/platform-shell/menuNavigation.ts';
+  restoreWorkbenchStartupStateFromUrl,
+} from '../src/app/workbenchStartup.ts';
+import { getMenuNavigationTarget } from '../src/platform-workbench/menuNavigation.ts';
 
 const currentUser = {
   userId: 'user-1',
@@ -75,10 +74,10 @@ const menus = [
 const platformAdminMenus = [
   {
     record: {
-      id: 'platform.menu.group.config',
+      id: 'platform.menu.group.platform',
       schemeId: 'platform.menu_scheme.admin',
       parentId: 'ROOT',
-      title: '平台配置与低代码运维',
+      title: '平台管理',
       menuType: 'GROUP',
       enabled: true,
       sortOrder: 10,
@@ -86,63 +85,118 @@ const platformAdminMenus = [
     children: [
       {
         record: {
-          id: 'platform.menu.module.platform.module',
+          id: 'platform.menu.group.config',
           schemeId: 'platform.menu_scheme.admin',
-          parentId: 'platform.menu.group.config',
-          title: '模块管理',
-          menuType: 'MODULE',
-          moduleAlias: 'platform.module',
-          pageMode: 'LIST',
+          parentId: 'platform.menu.group.platform',
+          title: '平台配置与低代码运维',
+          menuType: 'GROUP',
+          enabled: true,
+          sortOrder: 10,
+        },
+        children: [
+          {
+            record: {
+              id: 'platform.menu.module.platform.application',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.config',
+              title: '应用管理',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.application',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 10,
+            },
+            children: [],
+          },
+          {
+            record: {
+              id: 'platform.menu.module.platform.module',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.config',
+              title: '模块管理',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.module',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 20,
+            },
+            children: [],
+          },
+          {
+            record: {
+              id: 'platform.menu.module.platform.dictionary_category',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.config',
+              title: '字典管理',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.dictionary_category',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 50,
+            },
+            children: [],
+          },
+        ],
+      },
+      {
+        record: {
+          id: 'platform.menu.group.identity',
+          schemeId: 'platform.menu_scheme.admin',
+          parentId: 'platform.menu.group.platform',
+          title: '组织与权限',
+          menuType: 'GROUP',
           enabled: true,
           sortOrder: 20,
         },
-        children: [],
+        children: [
+          {
+            record: {
+              id: 'platform.menu.module.iam.employee',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.identity',
+              title: '职员管理',
+              menuType: 'MODULE',
+              moduleAlias: 'iam.employee',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 50,
+            },
+            children: [],
+          },
+          {
+            record: {
+              id: 'platform.menu.module.iam.role',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.identity',
+              title: '角色管理',
+              menuType: 'MODULE',
+              moduleAlias: 'iam.role',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 70,
+            },
+            children: [],
+          },
+        ],
       },
-    ],
-  },
-  {
-    record: {
-      id: 'platform.menu.group.identity',
-      schemeId: 'platform.menu_scheme.admin',
-      parentId: 'ROOT',
-      title: '组织与权限',
-      menuType: 'GROUP',
-      enabled: true,
-      sortOrder: 20,
-    },
-    children: [
       {
         record: {
-          id: 'platform.menu.module.iam.role',
+          id: 'platform.menu.group.ops',
           schemeId: 'platform.menu_scheme.admin',
-          parentId: 'platform.menu.group.identity',
-          title: '角色管理',
-          menuType: 'MODULE',
-          moduleAlias: 'iam.role',
-          pageMode: 'LIST',
+          parentId: 'platform.menu.group.platform',
+          title: '平台运行运维',
+          menuType: 'GROUP',
           enabled: true,
-          sortOrder: 40,
+          sortOrder: 30,
         },
         children: [],
       },
     ],
   },
-  {
-    record: {
-      id: 'platform.menu.group.ops',
-      schemeId: 'platform.menu_scheme.admin',
-      parentId: 'ROOT',
-      title: '平台运行运维',
-      menuType: 'GROUP',
-      enabled: true,
-      sortOrder: 30,
-    },
-    children: [],
-  },
 ];
 
-test('loadShellStartupState creates the first available navigation tab', async () => {
-  const state = await loadShellStartupState({
+test('loadWorkbenchStartupState creates the first available navigation tab', async () => {
+  const state = await loadWorkbenchStartupState({
     sessionClient: {
       current: async () => currentUser,
     },
@@ -159,8 +213,40 @@ test('loadShellStartupState creates the first available navigation tab', async (
   );
 });
 
-test('loadShellStartupState accepts backend initialized platform admin menus', async () => {
-  const state = await loadShellStartupState({
+test('loadWorkbenchStartupState skips disabled navigation menus', async () => {
+  const state = await loadWorkbenchStartupState({
+    sessionClient: {
+      current: async () => currentUser,
+    },
+    menuClient: {
+      mine: async () => ({
+        records: [
+          {
+            record: {
+              id: 'disabled-runtime',
+              schemeId: 'default',
+              title: 'Disabled Runtime',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.runtime',
+              enabled: false,
+            },
+            children: [],
+          },
+          ...menus,
+        ],
+      }),
+    },
+  });
+
+  assert.equal(state.activeTabKey, 'menu:metadata');
+  assert.deepEqual(
+    state.tabs?.map((tab) => tab.key),
+    ['menu:metadata'],
+  );
+});
+
+test('loadWorkbenchStartupState accepts backend initialized platform admin menus', async () => {
+  const state = await loadWorkbenchStartupState({
     sessionClient: {
       current: async () => ({
         userId: 'platform.user.super_admin',
@@ -173,13 +259,12 @@ test('loadShellStartupState accepts backend initialized platform admin menus', a
     },
   });
 
-  assert.equal(state.activeTabKey, 'menu:platform.menu.module.platform.module');
-  assert.deepEqual(initialOpenMenuKeys(state), ['platform.menu.group.config']);
-  assert.equal(state.tabs?.[0]?.title, '模块管理');
+  assert.equal(state.activeTabKey, 'menu:platform.menu.module.platform.application');
+  assert.equal(state.tabs?.[0]?.title, '应用管理');
   assert.deepEqual(state.tabs?.[0]?.target, {
-    menuId: 'platform.menu.module.platform.module',
+    menuId: 'platform.menu.module.platform.application',
     menuType: 'MODULE',
-    moduleAlias: 'platform.module',
+    moduleAlias: 'platform.application',
     pageMode: 'LIST',
     defaultUiConfigId: undefined,
     defaultQueryTemplateId: undefined,
@@ -241,27 +326,6 @@ test('closeMenuTab activates the neighboring tab when closing the active tab', (
   assert.equal(last.activeTabKey, 'B');
 });
 
-test('initialOpenMenuKeys expands ancestors of the active menu', () => {
-  const state = {
-    session: { currentUser },
-    menus,
-    tabs: [
-      {
-        key: 'menu:metadata',
-        title: 'Metadata',
-        target: {
-          menuId: 'metadata',
-          menuType: 'ROUTE',
-          route: '/platform/metadata',
-        },
-      },
-    ],
-    activeTabKey: 'menu:metadata',
-  };
-
-  assert.deepEqual(initialOpenMenuKeys(state), ['root', 'nested']);
-});
-
 test('activeTabUrlOf returns the active tab descriptor URL', () => {
   const metadata = menus[0].children[0].children[0].record;
   const target = getMenuNavigationTarget(metadata);
@@ -274,7 +338,7 @@ test('activeTabUrlOf returns the active tab descriptor URL', () => {
     target,
     pageDescriptor: {
       pageType: 'platform-route',
-      openMode: 'shell-route',
+      openMode: 'workbench-route',
       hostType: 'platform-route-host',
       menuId: 'metadata',
       target: { route: '/platform/metadata' },
@@ -293,7 +357,7 @@ test('activeTabUrlOf returns the active tab descriptor URL', () => {
   );
 });
 
-test('activeTabUrlOf keeps new-window external links on shell-owned URLs', () => {
+test('activeTabUrlOf keeps new-window external links on workbench-owned URLs', () => {
   const tab = {
     key: 'menu:external-bi',
     title: 'BI',
@@ -318,14 +382,14 @@ test('activeTabUrlOf keeps new-window external links on shell-owned URLs', () =>
   );
 });
 
-test('restoreShellStartupStateFromUrl activates the matching menu tab', () => {
+test('restoreWorkbenchStartupStateFromUrl activates the matching menu tab', () => {
   const state = {
     session: { currentUser },
     menus,
     tabs: [],
   };
 
-  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata');
+  const restored = restoreWorkbenchStartupStateFromUrl(state, '/platform/metadata');
 
   assert.equal(restored.activeTabKey, 'menu:metadata');
   assert.deepEqual(
@@ -335,7 +399,7 @@ test('restoreShellStartupStateFromUrl activates the matching menu tab', () => {
   assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata');
 });
 
-test('restoreShellStartupStateFromUrl preserves query when URL matches a menu tab', () => {
+test('restoreWorkbenchStartupStateFromUrl preserves query when URL matches a menu tab', () => {
   const metadata = menus[0].children[0].children[0].record;
   const target = getMenuNavigationTarget(metadata);
   assert.ok(target);
@@ -348,7 +412,7 @@ test('restoreShellStartupStateFromUrl preserves query when URL matches a menu ta
     activeTabKey: defaultTab.key,
   };
 
-  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata?view=advanced');
+  const restored = restoreWorkbenchStartupStateFromUrl(state, '/platform/metadata?view=advanced');
 
   assert.equal(restored.activeTabKey, 'menu:metadata');
   assert.equal(restored.tabs?.length, 1);
@@ -359,14 +423,14 @@ test('restoreShellStartupStateFromUrl preserves query when URL matches a menu ta
   );
 });
 
-test('restoreShellStartupStateFromUrl prefers explicit menu id when routes are duplicated', () => {
+test('restoreWorkbenchStartupStateFromUrl prefers explicit menu id when routes are duplicated', () => {
   const state = {
     session: { currentUser },
     menus,
     tabs: [],
   };
 
-  const restored = restoreShellStartupStateFromUrl(
+  const restored = restoreWorkbenchStartupStateFromUrl(
     state,
     '/platform/metadata?_muyunMenuId=metadata-shortcut',
   );
@@ -376,14 +440,14 @@ test('restoreShellStartupStateFromUrl prefers explicit menu id when routes are d
   assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata-shortcut');
 });
 
-test('restoreShellStartupStateFromUrl ignores explicit menu id when target does not match', () => {
+test('restoreWorkbenchStartupStateFromUrl ignores explicit menu id when target does not match', () => {
   const state = {
     session: { currentUser },
     menus,
     tabs: [],
   };
 
-  const restored = restoreShellStartupStateFromUrl(state, '/platform/metadata?_muyunMenuId=runtime');
+  const restored = restoreWorkbenchStartupStateFromUrl(state, '/platform/metadata?_muyunMenuId=runtime');
 
   assert.equal(restored.activeTabKey, 'menu:metadata');
   assert.equal(restored.tabs?.[0]?.title, 'Metadata');
@@ -402,21 +466,21 @@ test('activeTabUrlOf returns undefined when no active tab remains', () => {
   );
 });
 
-test('restoreShellStartupStateFromUrl creates direct tab when URL has no menu match', () => {
+test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no menu match', () => {
   const state = {
     session: { currentUser },
     menus,
     tabs: [],
   };
 
-  const restored = restoreShellStartupStateFromUrl(state, '/crm/customer/list?status=active');
+  const restored = restoreWorkbenchStartupStateFromUrl(state, '/crm/customer/list?status=active');
 
   assert.equal(restored.activeTabKey, 'platform-route:/crm/customer/list');
   assert.equal(restored.tabs?.[0]?.target, undefined);
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
 });
 
-test('restoreShellStartupStateFromUrl keeps current state for invalid shell-owned URLs', () => {
+test('restoreWorkbenchStartupStateFromUrl keeps current state for invalid workbench-owned URLs', () => {
   const metadata = menus[0].children[0].children[0].record;
   const target = getMenuNavigationTarget(metadata);
   assert.ok(target);
@@ -430,7 +494,7 @@ test('restoreShellStartupStateFromUrl keeps current state for invalid shell-owne
   };
 
   for (const url of ['/platform/external', '/platform/workspace']) {
-    const restored = restoreShellStartupStateFromUrl(state, url);
+    const restored = restoreWorkbenchStartupStateFromUrl(state, url);
 
     assert.equal(restored.activeTabKey, 'menu:metadata');
     assert.equal(restored.tabs?.length, 1);
@@ -438,7 +502,7 @@ test('restoreShellStartupStateFromUrl keeps current state for invalid shell-owne
   }
 });
 
-test('restoreShellStartupStateFromUrl keeps empty workspace for invalid shell-owned URLs', () => {
+test('restoreWorkbenchStartupStateFromUrl keeps empty workspace for invalid workbench-owned URLs', () => {
   const state = {
     session: { currentUser },
     menus,
@@ -447,21 +511,21 @@ test('restoreShellStartupStateFromUrl keeps empty workspace for invalid shell-ow
   };
 
   for (const url of ['/platform/dynamic', '/platform/dynamic//list']) {
-    const restored = restoreShellStartupStateFromUrl(state, url);
+    const restored = restoreWorkbenchStartupStateFromUrl(state, url);
 
     assert.equal(restored.activeTabKey, undefined);
     assert.deepEqual(restored.tabs, []);
   }
 });
 
-test('restoreShellStartupStateFromUrl matches dynamic menu without title query', () => {
+test('restoreWorkbenchStartupStateFromUrl matches dynamic menu without title query', () => {
   const state = {
     session: { currentUser },
     menus,
     tabs: [],
   };
 
-  const restored = restoreShellStartupStateFromUrl(
+  const restored = restoreWorkbenchStartupStateFromUrl(
     state,
     '/platform/dynamic/platform.runtime/list?uiConfigId=runtime-list-v1',
   );

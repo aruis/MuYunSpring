@@ -21,7 +21,7 @@
       "@muyun/vue-ui-antdv/styles.css": ["./src/vue-ui-antdv/styles.css"],
       "@muyun/dynamic-page-runtime": ["./src/dynamic-page-runtime/index.ts"],
       "@muyun/platform-components": ["./src/platform-components/index.ts"],
-      "@muyun/platform-shell": ["./src/platform-shell/index.ts"]
+      "@muyun/platform-workbench": ["./src/platform-workbench/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue"]

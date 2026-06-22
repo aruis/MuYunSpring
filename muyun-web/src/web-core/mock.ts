@@ -24,10 +24,10 @@ export const mockCurrentUser: CurrentUser = {
 export const mockMenuTree: WebTreeNode<MenuRecord>[] = [
   {
     record: {
-      id: 'menu-platform',
+      id: 'menu-platform-management',
       schemeId: 'default',
       parentId: 'root',
-      title: '平台配置',
+      title: '平台管理',
       menuType: 'GROUP',
       enabled: true,
       sortOrder: 10,
@@ -35,16 +35,84 @@ export const mockMenuTree: WebTreeNode<MenuRecord>[] = [
     children: [
       {
         record: {
-          id: 'menu-platform-metadata',
+          id: 'menu-platform-config',
           schemeId: 'default',
-          parentId: 'menu-platform',
-          title: '元数据',
-          menuType: 'ROUTE',
-          route: '/platform/metadata',
+          parentId: 'menu-platform-management',
+          title: '平台配置与低代码运维',
+          menuType: 'GROUP',
           enabled: true,
           sortOrder: 10,
         },
-        children: [],
+        children: [
+          {
+            record: {
+              id: 'menu-platform-application',
+              schemeId: 'default',
+              parentId: 'menu-platform-config',
+              title: '应用管理',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.application',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 10,
+            },
+            children: [],
+          },
+          {
+            record: {
+              id: 'menu-platform-metadata',
+              schemeId: 'default',
+              parentId: 'menu-platform-config',
+              title: '元数据管理',
+              menuType: 'ROUTE',
+              route: '/platform/metadata',
+              enabled: true,
+              sortOrder: 30,
+            },
+            children: [],
+          },
+          {
+            record: {
+              id: 'menu-platform-dictionary',
+              schemeId: 'default',
+              parentId: 'menu-platform-config',
+              title: '字典管理',
+              menuType: 'MODULE',
+              moduleAlias: 'platform.dictionary_category',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 50,
+            },
+            children: [],
+          },
+        ],
+      },
+      {
+        record: {
+          id: 'menu-platform-identity',
+          schemeId: 'default',
+          parentId: 'menu-platform-management',
+          title: '组织与权限',
+          menuType: 'GROUP',
+          enabled: true,
+          sortOrder: 20,
+        },
+        children: [
+          {
+            record: {
+              id: 'menu-platform-employee',
+              schemeId: 'default',
+              parentId: 'menu-platform-identity',
+              title: '职员管理',
+              menuType: 'MODULE',
+              moduleAlias: 'iam.employee',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 50,
+            },
+            children: [],
+          },
+        ],
       },
     ],
   },

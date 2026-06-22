@@ -149,7 +149,10 @@ test('normalizeError keeps AppError and wraps unknown errors', () => {
   const appError = new AppError('conflict', { code: platformErrorCodes.conflictVersion, status: 409 });
 
   assert.equal(normalizeError(appError), appError);
-  assert.deepEqual(normalizeError(new Error('boom')), new AppError('boom', { code: platformErrorCodes.appError }));
+  assert.deepEqual(
+    normalizeError(new Error('boom')),
+    new AppError('boom', { code: platformErrorCodes.appError }),
+  );
   assert.deepEqual(normalizeError('boom').details, { cause: 'boom' });
 });
 
@@ -157,21 +160,24 @@ test('resolveGlobalErrorPresentation maps common failures to fixed global slots'
   assert.equal(
     resolveGlobalErrorPresentation(new AppError('login required', { status: 401 }), {
       phase: 'action',
-      surface: 'shell',
+      surface: 'workbench',
     }).slot,
     'redirect-login',
   );
   assert.equal(
-    resolveGlobalErrorPresentation(new AppError('bad credentials', { code: platformErrorCodes.loginBadCredentials, status: 401 }), {
-      phase: 'action',
-      surface: 'form',
-    }).slot,
+    resolveGlobalErrorPresentation(
+      new AppError('bad credentials', { code: platformErrorCodes.loginBadCredentials, status: 401 }),
+      {
+        phase: 'action',
+        surface: 'form',
+      },
+    ).slot,
     'global-toast',
   );
   assert.equal(
     resolveGlobalErrorPresentation(new AppError('forbidden', { status: 403 }), {
       phase: 'page-load',
-      surface: 'shell',
+      surface: 'workbench',
     }).slot,
     'page-error',
   );
@@ -185,7 +191,7 @@ test('resolveGlobalErrorPresentation maps common failures to fixed global slots'
   assert.equal(
     resolveGlobalErrorPresentation(new AppError('failed', { status: 500 }), {
       phase: 'page-load',
-      surface: 'shell',
+      surface: 'workbench',
     }).slot,
     'page-error',
   );
@@ -196,5 +202,8 @@ test('resolveGlobalErrorPresentation maps common failures to fixed global slots'
     }).slot,
     'silent',
   );
-  assert.equal(resolveGlobalErrorPresentation(new AppError('bad request', { status: 400 })).slot, 'global-toast');
+  assert.equal(
+    resolveGlobalErrorPresentation(new AppError('bad request', { status: 400 })).slot,
+    'global-toast',
+  );
 });

@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { AdminShell, PageHostOutlet } from '@muyun/platform-shell';
+import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
 import { createAuthClient, createHttpClient } from '@muyun/web-core';
-import type { MenuNavigationTarget, MenuRecord, ShellStartupState } from '@muyun/web-contracts';
-import { clearAuthToken, effectiveAuthToken, isAuthenticationRequiredError, saveAuthToken } from './app/authSession';
-import { loadAppShellStartupState, usesMockStartup } from './app/appShellStartup';
+import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
+import {
+  clearAuthToken,
+  effectiveAuthToken,
+  isAuthenticationRequiredError,
+  saveAuthToken,
+} from './app/authSession';
+import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import LoginView from './app/LoginView.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
-  initialOpenMenuKeys,
   openMenuTab,
-  restoreShellStartupStateFromUrl,
-} from './app/shellStartup';
+  restoreWorkbenchStartupStateFromUrl,
+} from './app/workbenchStartup';
 
-const startup = ref<ShellStartupState>();
+const startup = ref<WorkbenchStartupState>();
 const loading = ref(true);
 const error = ref<string>();
 const activeTabKey = ref<string>();
-const openMenuKeys = ref<string[]>([]);
 const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
@@ -36,18 +39,17 @@ onMounted(async () => {
     loading.value = false;
     return;
   }
-  await loadShell();
+  await loadWorkbench();
 });
 
-async function loadShell() {
+async function loadWorkbench() {
   loading.value = true;
   error.value = undefined;
   try {
-    const startupState = await loadAppShellStartupState();
-    const state = restoreShellStartupStateFromUrl(startupState, currentBrowserPath());
+    const startupState = await loadAppWorkbenchStartupState();
+    const state = restoreWorkbenchStartupStateFromUrl(startupState, currentBrowserPath());
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
-    openMenuKeys.value = initialOpenMenuKeys(state);
     loginRequired.value = false;
     syncBrowserUrl(state);
   } catch (cause) {
@@ -55,7 +57,7 @@ async function loadShell() {
       clearAuthToken();
       loginRequired.value = true;
     }
-    error.value = cause instanceof Error ? cause.message : 'Shell startup failed';
+    error.value = cause instanceof Error ? cause.message : 'Workbench startup failed';
   } finally {
     loading.value = false;
   }
@@ -66,7 +68,7 @@ async function handleAuthenticated(token: string) {
   loginRequired.value = false;
   loginLoading.value = true;
   try {
-    await loadShell();
+    await loadWorkbench();
   } finally {
     loginLoading.value = false;
   }
@@ -92,7 +94,6 @@ async function handleLogout() {
     clearAuthToken();
     startup.value = undefined;
     activeTabKey.value = undefined;
-    openMenuKeys.value = [];
     error.value = undefined;
     loginRequired.value = true;
     loading.value = false;
@@ -153,7 +154,7 @@ function currentBrowserPath() {
   return `${window.location.pathname}${window.location.search}`;
 }
 
-function syncBrowserUrl(state: ShellStartupState) {
+function syncBrowserUrl(state: WorkbenchStartupState) {
   const url = activeTabUrlOf(state) ?? '/';
   if (url === currentBrowserPath()) {
     return;
@@ -182,10 +183,9 @@ function credentialsOf(value: string | undefined) {
     :error="error"
     @authenticated="handleAuthenticated"
   />
-  <AdminShell
+  <Workbench
     v-else
     v-model:active-tab-key="activeTabKey"
-    v-model:open-menu-keys="openMenuKeys"
     :startup="startup"
     :loading="loading"
     :error="error"
@@ -195,7 +195,7 @@ function credentialsOf(value: string | undefined) {
     @user-command="handleUserCommand"
   >
     <template #default="{ pageDescriptor }">
-      <PageHostOutlet :descriptor="pageDescriptor" />
+      <WorkbenchOutlet :descriptor="pageDescriptor" />
     </template>
-  </AdminShell>
+  </Workbench>
 </template>
