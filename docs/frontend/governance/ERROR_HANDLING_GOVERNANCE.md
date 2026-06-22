@@ -141,6 +141,8 @@ HTTP 状态码用于全局兜底和传输层语义，不承载完整业务含义
 
 特殊链路优先消费 `code`、`targets` 和 `details`；未消费时再交给全局兜底按 HTTP 状态和 UI 上下文处理。
 
+阶段限制：历史代码中大量 `new PlatformException(message)` 仍表示 `VALIDATION_FAILED + 400`，覆盖了请求语义错误、配置规则错误和部分业务校验。当前阶段不批量重判这些调用点。新增业务校验应优先使用 `PlatformErrors.validation(...)` 或 `PlatformErrors.business(...)` 返回 `422`；后续按业务链路逐步把可定位的表单/记录校验从默认 `PlatformException(message)` 迁出。
+
 ## 前端处理模型
 
 前端错误处理分两层：

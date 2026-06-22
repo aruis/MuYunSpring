@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.common.exception;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class PlatformException extends RuntimeException {
     private final String code;
@@ -36,7 +37,7 @@ public class PlatformException extends RuntimeException {
         this.code = normalizeCode(code);
         this.httpStatus = httpStatus;
         this.scope = scope == null ? ErrorScope.empty() : scope;
-        this.targets = targets == null ? List.of() : List.copyOf(targets);
+        this.targets = copyTargets(targets);
         this.details = details == null ? Map.of() : Map.copyOf(details);
     }
 
@@ -51,7 +52,7 @@ public class PlatformException extends RuntimeException {
         this.code = normalizeCode(code);
         this.httpStatus = httpStatus;
         this.scope = scope == null ? ErrorScope.empty() : scope;
-        this.targets = targets == null ? List.of() : List.copyOf(targets);
+        this.targets = copyTargets(targets);
         this.details = details == null ? Map.of() : Map.copyOf(details);
     }
 
@@ -77,5 +78,14 @@ public class PlatformException extends RuntimeException {
 
     private static String normalizeCode(String code) {
         return code == null || code.isBlank() ? PlatformErrorCodes.VALIDATION_FAILED : code;
+    }
+
+    private static List<ErrorTarget> copyTargets(List<ErrorTarget> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return List.of();
+        }
+        return targets.stream()
+                .filter(Objects::nonNull)
+                .toList();
     }
 }
