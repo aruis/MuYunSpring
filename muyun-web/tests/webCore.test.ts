@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AppError,
+  configureModuleContext,
   createAuthClient,
   createHttpClient,
+  createModuleContext,
+  createOrganizationClient,
+  createStaticModuleTreeClient,
   normalizeError,
   platformErrorCodes,
   resolveGlobalErrorPresentation,
@@ -45,6 +49,89 @@ test('http client sends platform trace header', async () => {
     await http.request({ path: '/platform.ping' });
 
     assert.equal(requests[0].headers.get('X-MuYun-Trace-Id'), 'trace-client');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('static module tree client maps standard CRUD and tree endpoints by module alias', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/tree?flat=true')) {
+      return Response.json({ records: [] });
+    }
+    if (request.url.endsWith('/insert')) {
+      return Response.json({ id: 'org-1', title: '总部' });
+    }
+    return Response.json({ count: 1 });
+  };
+
+  try {
+    const client = createStaticModuleTreeClient(createHttpClient({ baseUrl: 'http://api.local' }), {
+      moduleAlias: 'iam.organization',
+    });
+
+    await client.tree({ flat: true });
+    await client.insert({ title: '总部' });
+    await client.sort('org-1', { parentId: 'root' });
+
+    assert.equal(requests[0].url, 'http://api.local/iam.organization/tree?flat=true');
+    assert.equal(requests[0].method, 'GET');
+    assert.equal(requests[1].url, 'http://api.local/iam.organization/insert');
+    assert.equal(requests[1].method, 'POST');
+    assert.deepEqual(await requests[1].json(), { title: '总部' });
+    assert.equal(requests[2].url, 'http://api.local/iam.organization/sort/org-1');
+    assert.deepEqual(await requests[2].json(), { parentId: 'root' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('organization client binds iam organization base path', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push(new Request(input, init));
+    return Response.json({ id: 'org-1', code: 'HQ', title: '总部' });
+  };
+
+  try {
+    const client = createOrganizationClient(createHttpClient({ baseUrl: 'http://api.local' }));
+
+    await client.view('org-1');
+
+    assert.equal(requests[0].url, 'http://api.local/iam.organization/view/org-1');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module context creates standard module capabilities from configured http factory', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push(new Request(input, init));
+    return Response.json({ records: [] });
+  };
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleContext({ moduleAlias: 'iam.organization' });
+
+    await context.crud.query({ keyword: '总部' });
+    await context.tree.tree();
+
+    assert.equal(context.moduleAlias, 'iam.organization');
+    assert.equal(requests[0].url, 'http://api.local/iam.organization/query');
+    assert.equal(requests[0].method, 'POST');
+    assert.deepEqual(await requests[0].json(), { keyword: '总部' });
+    assert.equal(requests[1].url, 'http://api.local/iam.organization/tree');
   } finally {
     globalThis.fetch = originalFetch;
   }

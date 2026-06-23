@@ -20,10 +20,15 @@ export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupSt
     token: effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN),
     credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
   });
-  return loadWorkbenchStartupState({
-    sessionClient: createSessionClient(httpClient),
-    menuClient: createMenuClient(httpClient),
-  });
+  return loadWorkbenchStartupState(
+    {
+      sessionClient: createSessionClient(httpClient),
+      menuClient: createMenuClient(httpClient),
+    },
+    {
+      businessRoutePrefixes: ['/iam'],
+    },
+  );
 }
 
 function credentialsOf(value: string | undefined) {

@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import { createAuthClient, createHttpClient } from '@muyun/web-core';
-import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
+import {
+  configureModuleContext,
+  createAuthClient,
+  ModuleContextProvider,
+  provideModuleContextConfig,
+} from '@muyun/web-core';
+import type {
+  MenuNavigationTarget,
+  MenuRecord,
+  PageDescriptor,
+  WorkbenchStartupState,
+} from '@muyun/web-contracts';
 import {
   clearAuthToken,
   effectiveAuthToken,
@@ -10,7 +20,9 @@ import {
   saveAuthToken,
 } from './app/authSession';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
+import { createBackendHttpClient } from './app/backendHttp';
 import LoginView from './app/LoginView.vue';
+import OrganizationManagementView from './views/OrganizationManagementView.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
@@ -27,12 +39,10 @@ const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
 
-const authClient = createAuthClient(
-  createHttpClient({
-    baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
-    credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
-  }),
-);
+configureModuleContext({ httpFactory: createBackendHttpClient });
+provideModuleContextConfig({ httpFactory: createBackendHttpClient });
+
+const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 
 onMounted(async () => {
   if (!usesMockStartup() && !effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN)) {
@@ -48,7 +58,9 @@ async function loadWorkbench() {
   error.value = undefined;
   try {
     const startupState = await loadAppWorkbenchStartupState();
-    const state = restoreWorkbenchStartupStateFromUrl(startupState, currentBrowserPath());
+    const state = restoreWorkbenchStartupStateFromUrl(startupState, currentBrowserPath(), {
+      businessRoutePrefixes: ['/iam'],
+    });
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
@@ -116,7 +128,7 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     return;
   }
 
-  const result = openMenuTab(current.tabs ?? [], menu, target);
+  const result = openMenuTab(current.tabs ?? [], menu, target, { businessRoutePrefixes: ['/iam'] });
   startup.value = {
     ...current,
     tabs: result.tabs,
@@ -180,8 +192,20 @@ function requiresLogin(cause: unknown) {
   return isAuthenticationRequiredError(cause);
 }
 
-function credentialsOf(value: string | undefined) {
-  return value === 'include' || value === 'omit' || value === 'same-origin' ? value : undefined;
+function isOrganizationRoute(pageDescriptor?: PageDescriptor) {
+  return (
+    pageDescriptor?.pageType === 'business-route' && pageDescriptor.target.route === '/iam/organizations'
+  );
+}
+
+function moduleAliasOf(pageDescriptor?: PageDescriptor) {
+  if (pageDescriptor?.pageType !== 'business-route') {
+    return undefined;
+  }
+  return (
+    pageDescriptor.target.moduleAlias ??
+    (isOrganizationRoute(pageDescriptor) ? 'iam.organization' : undefined)
+  );
 }
 </script>
 
@@ -205,7 +229,13 @@ function credentialsOf(value: string | undefined) {
     @user-command="handleUserCommand"
   >
     <template #default="{ pageDescriptor }">
-      <WorkbenchOutlet :descriptor="pageDescriptor" />
+      <ModuleContextProvider
+        v-if="isOrganizationRoute(pageDescriptor)"
+        :module-alias="moduleAliasOf(pageDescriptor)"
+      >
+        <OrganizationManagementView />
+      </ModuleContextProvider>
+      <WorkbenchOutlet v-else :descriptor="pageDescriptor" />
     </template>
   </Workbench>
 </template>

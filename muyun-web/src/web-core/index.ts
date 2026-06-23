@@ -1,10 +1,18 @@
+import { computed, defineComponent, inject, provide, type InjectionKey } from 'vue';
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import type {
   CurrentUser,
   LoginRequest,
   LoginResult,
   MenuMineResponse,
+  Organization,
   RouteQueryValue,
+  TreeSortRequest,
+  WebCountResponse,
+  WebListResponse,
+  WebPageResponse,
+  WebQueryRequest,
+  WebTreeNode,
 } from '@muyun/web-contracts';
 
 export interface RequestContext {
@@ -191,6 +199,13 @@ export const queryKeys = {
   menu: {
     mine: ['menu', 'mine'] as const,
   },
+  staticModule: {
+    query: (moduleAlias: string, request?: unknown) =>
+      ['static-module', moduleAlias, 'query', request] as const,
+    tree: (moduleAlias: string, options?: unknown) =>
+      ['static-module', moduleAlias, 'tree', options] as const,
+    view: (moduleAlias: string, id: string) => ['static-module', moduleAlias, 'view', id] as const,
+  },
 };
 
 export interface SessionClient {
@@ -205,6 +220,91 @@ export interface AuthClient {
   login(request: LoginRequest): Promise<LoginResult>;
   logout(token?: string): Promise<void>;
 }
+
+export interface StaticModuleCrudClient<TRecord> {
+  query(request?: WebQueryRequest): Promise<WebPageResponse<TRecord>>;
+  view(id: string): Promise<TRecord>;
+  insert(record: TRecord): Promise<TRecord>;
+  update(id: string, record: TRecord): Promise<TRecord>;
+  delete(id: string): Promise<WebCountResponse>;
+  enable(id: string): Promise<WebCountResponse>;
+  disable(id: string): Promise<WebCountResponse>;
+}
+
+export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
+  tree(options?: { flat?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  treeFlat(options?: { rootId?: string; includeSelf?: boolean }): Promise<WebListResponse<TRecord>>;
+  subtree(
+    id: string,
+    options?: { flat?: boolean; includeSelf?: boolean },
+  ): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  sort(id: string, request: TreeSortRequest): Promise<WebCountResponse>;
+}
+
+export type OrganizationClient = StaticModuleTreeClient<Organization>;
+
+export interface ModuleContext<TRecord> {
+  moduleAlias: string;
+  crud: StaticModuleCrudClient<TRecord>;
+  tree: StaticModuleTreeClient<TRecord>;
+}
+
+export interface ModuleContextConfig {
+  http?: HttpClient;
+  httpFactory?: () => HttpClient;
+}
+
+export interface ModuleContextOptions extends ModuleContextConfig {
+  moduleAlias: string;
+}
+
+const moduleContextConfigKey: InjectionKey<ModuleContextConfig> = Symbol('muyun.module-context-config');
+const moduleAliasKey: InjectionKey<Readonly<{ value: string | undefined }>> = Symbol('muyun.module-alias');
+let defaultModuleContextConfig: ModuleContextConfig | undefined;
+
+export function configureModuleContext(config: ModuleContextConfig) {
+  defaultModuleContextConfig = config;
+}
+
+export function provideModuleContextConfig(config: ModuleContextConfig) {
+  provide(moduleContextConfigKey, config);
+}
+
+export function createModuleContext<TRecord>(options: ModuleContextOptions): ModuleContext<TRecord> {
+  const http = resolveModuleHttpClient(options);
+  return moduleContextOf<TRecord>(http, options.moduleAlias);
+}
+
+export function useModuleContext<TRecord>(
+  options: Partial<ModuleContextOptions> = {},
+): ModuleContext<TRecord> {
+  const config = inject(moduleContextConfigKey, undefined);
+  const injectedModuleAlias = inject(moduleAliasKey, undefined);
+  const moduleAlias = options.moduleAlias ?? injectedModuleAlias?.value;
+  if (!moduleAlias) {
+    throw new Error('Module context requires a moduleAlias');
+  }
+  const http = resolveModuleHttpClient(options, config);
+  return moduleContextOf<TRecord>(http, moduleAlias);
+}
+
+export const ModuleContextProvider = defineComponent({
+  name: 'ModuleContextProvider',
+  props: {
+    moduleAlias: {
+      type: String,
+      required: false,
+      default: undefined,
+    },
+  },
+  setup(props, { slots }) {
+    provide(
+      moduleAliasKey,
+      computed(() => props.moduleAlias),
+    );
+    return () => slots.default?.();
+  },
+});
 
 export function createSessionClient(http: HttpClient): SessionClient {
   return {
@@ -230,6 +330,112 @@ export function createAuthClient(http: HttpClient): AuthClient {
   };
 }
 
+export function createStaticModuleCrudClient<TRecord>(
+  http: HttpClient,
+  options: { moduleAlias: string },
+): StaticModuleCrudClient<TRecord> {
+  const modulePath = modulePathOf(options.moduleAlias);
+  return {
+    query: (request) =>
+      http.request<WebPageResponse<TRecord>>({
+        method: 'POST',
+        path: `${modulePath}/query`,
+        body: request,
+      }),
+    view: (id) => http.request<TRecord>({ path: `${modulePath}/view/${encodeURIComponent(id)}` }),
+    insert: (record) =>
+      http.request<TRecord>({
+        method: 'POST',
+        path: `${modulePath}/insert`,
+        body: record,
+      }),
+    update: (id, record) =>
+      http.request<TRecord>({
+        method: 'POST',
+        path: `${modulePath}/update/${encodeURIComponent(id)}`,
+        body: record,
+      }),
+    delete: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/delete/${encodeURIComponent(id)}`,
+      }),
+    enable: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/enable/${encodeURIComponent(id)}`,
+      }),
+    disable: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/disable/${encodeURIComponent(id)}`,
+      }),
+  };
+}
+
+export function createStaticModuleTreeClient<TRecord>(
+  http: HttpClient,
+  options: { moduleAlias: string },
+): StaticModuleTreeClient<TRecord> {
+  const modulePath = modulePathOf(options.moduleAlias);
+  const crud = createStaticModuleCrudClient<TRecord>(http, { moduleAlias: options.moduleAlias });
+  return {
+    ...crud,
+    tree: (query) =>
+      http.request<WebListResponse<WebTreeNode<TRecord>>>({
+        path: `${modulePath}/tree`,
+        query,
+      }),
+    treeFlat: (options) => {
+      const rootId = options?.rootId;
+      const path = rootId ? `${modulePath}/tree/${encodeURIComponent(rootId)}` : `${modulePath}/tree`;
+      return http.request<WebListResponse<TRecord>>({
+        path,
+        query: {
+          flat: true,
+          includeSelf: options?.includeSelf,
+        },
+      });
+    },
+    subtree: (id, query) =>
+      http.request<WebListResponse<WebTreeNode<TRecord>>>({
+        path: `${modulePath}/tree/${encodeURIComponent(id)}`,
+        query,
+      }),
+    sort: (id, request) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/sort/${encodeURIComponent(id)}`,
+        body: request,
+      }),
+  };
+}
+
+export function createOrganizationClient(http: HttpClient): OrganizationClient {
+  return createStaticModuleTreeClient<Organization>(http, { moduleAlias: 'iam.organization' });
+}
+
+function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): ModuleContext<TRecord> {
+  return {
+    moduleAlias,
+    crud: createStaticModuleCrudClient<TRecord>(http, { moduleAlias }),
+    tree: createStaticModuleTreeClient<TRecord>(http, { moduleAlias }),
+  };
+}
+
+function resolveModuleHttpClient(
+  options: ModuleContextConfig,
+  injectedConfig?: ModuleContextConfig,
+): HttpClient {
+  const config =
+    options.http || options.httpFactory ? options : (injectedConfig ?? defaultModuleContextConfig);
+  const http = config?.http ?? config?.httpFactory?.();
+  if (!http) {
+    throw new Error('Module context requires an HttpClient or httpFactory');
+  }
+  return http;
+}
+
 function urlOf(baseUrl: string | undefined, options: HttpRequestOptions) {
   const base = baseUrl?.replace(/\/$/, '') ?? '';
   const path = options.path.startsWith('/') ? options.path : `/${options.path}`;
@@ -244,6 +450,11 @@ function urlOf(baseUrl: string | undefined, options: HttpRequestOptions) {
     }
   });
   return url;
+}
+
+function modulePathOf(moduleAlias: string) {
+  const normalized = moduleAlias.trim();
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
 function headersOf(context: RequestContext, options: HttpRequestOptions) {

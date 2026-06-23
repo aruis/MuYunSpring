@@ -13,6 +13,7 @@ export {
   tabKeyOf,
   tryPageDescriptorFromUrl,
 } from './menuNavigation';
+export type { PageDescriptorResolveOptions, PageDescriptorUrlParseOptions } from './menuNavigation';
 export {
   buildWorkbenchMegaMenuModel,
   createWorkbenchMenuNodes,

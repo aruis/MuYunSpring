@@ -15,6 +15,7 @@ import {
   resolvePageDescriptor,
   tabKeyOf,
   tryPageDescriptorFromUrl,
+  type PageDescriptorResolveOptions,
 } from '@muyun/platform-workbench';
 
 export interface WorkbenchStartupClients {
@@ -24,12 +25,13 @@ export interface WorkbenchStartupClients {
 
 export async function loadWorkbenchStartupState(
   clients: WorkbenchStartupClients,
+  options: PageDescriptorResolveOptions = {},
 ): Promise<WorkbenchStartupState> {
   const [currentUser, menuResponse] = await Promise.all([
     clients.sessionClient.current(),
     clients.menuClient.mine(),
   ]);
-  const initialTab = initialTabOf(menuResponse.records);
+  const initialTab = initialTabOf(menuResponse.records, options);
 
   return {
     session: { currentUser },
@@ -43,8 +45,9 @@ export function openMenuTab(
   tabs: MenuTab[],
   menu: MenuRecord,
   target: MenuNavigationTarget,
+  options: PageDescriptorResolveOptions = {},
 ): { tabs: MenuTab[]; activeTabKey: string } {
-  const tab = createMenuTab(menu, target);
+  const tab = createMenuTab(menu, target, options);
   if (tabs.some((item) => item.key === tab.key)) {
     return { tabs, activeTabKey: tab.key };
   }
@@ -67,25 +70,26 @@ export function activeTabUrlOf(state: WorkbenchStartupState): string | undefined
 export function restoreWorkbenchStartupStateFromUrl(
   state: WorkbenchStartupState,
   url: string,
+  options: PageDescriptorResolveOptions = {},
 ): WorkbenchStartupState {
   if (url === '/' || url === '') {
     return state;
   }
 
-  const descriptor = tryPageDescriptorFromUrl(url);
+  const descriptor = tryPageDescriptorFromUrl(url, options);
   if (!descriptor) {
     return state;
   }
 
   const explicitMenu = descriptor.menuId ? findMenuById(state.menus, descriptor.menuId) : undefined;
   const menu =
-    explicitMenu && menuMatchesDescriptor(explicitMenu, descriptor)
+    explicitMenu && menuMatchesDescriptor(explicitMenu, descriptor, options)
       ? explicitMenu
-      : findMenuByDescriptor(state.menus, descriptor);
+      : findMenuByDescriptor(state.menus, descriptor, options);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
   const tab =
     menu && target && isTabMenuTarget(target)
-      ? createRestoredMenuTab(menu, target, descriptor)
+      ? createRestoredMenuTab(menu, target, descriptor, options)
       : createDirectTab(descriptor);
   const existingTabs = state.tabs ?? [];
   const tabs = upsertTab(existingTabs, tab);
@@ -118,10 +122,10 @@ export function closeMenuTab(
   };
 }
 
-function initialTabOf(menus: WorkbenchStartupState['menus']) {
+function initialTabOf(menus: WorkbenchStartupState['menus'], options: PageDescriptorResolveOptions) {
   const menu = findFirstNavigationMenu(menus);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
-  return menu && target ? createMenuTab(menu, target) : undefined;
+  return menu && target ? createMenuTab(menu, target, options) : undefined;
 }
 
 function createDirectTab(descriptor: PageDescriptor): MenuTab {
@@ -147,20 +151,57 @@ function createRestoredMenuTab(
   menu: MenuRecord,
   target: MenuNavigationTarget,
   descriptor: PageDescriptor,
+  options: PageDescriptorResolveOptions,
 ): MenuTab {
-  const tab = createMenuTab(menu, target);
-  const pageDescriptor = {
-    ...descriptor,
-    title: descriptor.title ?? menu.title,
-    menuId: menu.id,
-    tabPolicy: tab.pageDescriptor?.tabPolicy ?? descriptor.tabPolicy,
-  };
+  const tab = createMenuTab(menu, target, options);
+  const resolvedDescriptor = tab.pageDescriptor ?? descriptor;
+  const pageDescriptor: PageDescriptor =
+    isRouteDescriptor(descriptor) && isRouteDescriptor(resolvedDescriptor)
+      ? {
+          ...descriptor,
+          title: descriptor.title ?? menu.title,
+          menuId: menu.id,
+          target: {
+            ...descriptor.target,
+            moduleAlias: descriptor.target.moduleAlias ?? resolvedDescriptor.target.moduleAlias,
+          },
+          tabPolicy: resolvedDescriptor.tabPolicy,
+        }
+      : isUrlDescriptor(descriptor) && isUrlDescriptor(resolvedDescriptor)
+        ? {
+            ...descriptor,
+            title: descriptor.title ?? menu.title,
+            menuId: menu.id,
+            target: {
+              ...descriptor.target,
+              moduleAlias: descriptor.target.moduleAlias ?? resolvedDescriptor.target.moduleAlias,
+            },
+            tabPolicy: resolvedDescriptor.tabPolicy,
+          }
+        : {
+            ...descriptor,
+            title: descriptor.title ?? menu.title,
+            menuId: menu.id,
+            tabPolicy: resolvedDescriptor.tabPolicy,
+          };
 
   return {
     ...tab,
     pageDescriptor,
     restoreState: { url: pageDescriptorToUrl(pageDescriptor) },
   };
+}
+
+function isRouteDescriptor(
+  descriptor: PageDescriptor,
+): descriptor is Extract<PageDescriptor, { pageType: 'platform-route' | 'business-route' }> {
+  return descriptor.pageType === 'platform-route' || descriptor.pageType === 'business-route';
+}
+
+function isUrlDescriptor(
+  descriptor: PageDescriptor,
+): descriptor is Extract<PageDescriptor, { pageType: 'remote-url' | 'external-link' }> {
+  return descriptor.pageType === 'remote-url' || descriptor.pageType === 'external-link';
 }
 
 function directTabTitleOf(descriptor: PageDescriptor): string {
@@ -178,13 +219,14 @@ function directTabTitleOf(descriptor: PageDescriptor): string {
 function findMenuByDescriptor(
   nodes: WorkbenchStartupState['menus'],
   descriptor: PageDescriptor,
+  options: PageDescriptorResolveOptions,
 ): MenuRecord | undefined {
   for (const node of nodes) {
-    if (menuMatchesDescriptor(node.record, descriptor)) {
+    if (menuMatchesDescriptor(node.record, descriptor, options)) {
       return node.record;
     }
 
-    const childMenu = findMenuByDescriptor(node.children, descriptor);
+    const childMenu = findMenuByDescriptor(node.children, descriptor, options);
     if (childMenu) {
       return childMenu;
     }
@@ -193,9 +235,15 @@ function findMenuByDescriptor(
   return undefined;
 }
 
-function menuMatchesDescriptor(menu: MenuRecord, descriptor: PageDescriptor): boolean {
+function menuMatchesDescriptor(
+  menu: MenuRecord,
+  descriptor: PageDescriptor,
+  options: PageDescriptorResolveOptions,
+): boolean {
   const target = getMenuNavigationTarget(menu);
-  const menuDescriptor = target ? resolvePageDescriptor(target, { title: menu.title }) : undefined;
+  const menuDescriptor = target
+    ? resolvePageDescriptor(target, { ...options, title: menu.title })
+    : undefined;
   return menuDescriptor ? matchesPageDescriptor(menuDescriptor, descriptor) : false;
 }
 
