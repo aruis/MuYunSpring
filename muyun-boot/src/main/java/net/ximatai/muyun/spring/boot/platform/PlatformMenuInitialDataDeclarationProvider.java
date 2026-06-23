@@ -62,12 +62,14 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         Menu desired = new Menu();
         desired.setId(menuId);
         desired.setSchemeId(schemeId);
-        desired.setMenuType(MenuType.MODULE);
+        String route = menu.route().trim();
+        desired.setMenuType(route.isBlank() ? MenuType.MODULE : MenuType.ROUTE);
         desired.setOpenMode(menu.openMode());
         desired.setParentId(menu.parent());
         desired.setTitle(menu.title().isBlank() ? module.title() : menu.title().trim());
         desired.setModuleAlias(module.alias());
-        desired.setPageMode(MenuPageMode.LIST);
+        desired.setRoute(route.isBlank() ? null : route);
+        desired.setPageMode(route.isBlank() ? MenuPageMode.LIST : null);
         desired.setEnabled(menu.enabled());
         desired.setSortOrder(menu.order());
         return InitialDataDeclaration.reconcileManaged(menuService, desired);

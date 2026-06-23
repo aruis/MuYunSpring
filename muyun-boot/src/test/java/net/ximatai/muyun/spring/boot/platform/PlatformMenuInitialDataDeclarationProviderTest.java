@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.boot.iam.DepartmentWebController;
 import net.ximatai.muyun.spring.boot.iam.EmployeeWebController;
+import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -109,6 +110,38 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             assertThat(moduleMenu("platform.window")).satisfies(menu -> {
                 assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.WINDOW);
                 assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
+            });
+        }
+    }
+
+    @Test
+    void shouldRegisterRouteMenuWhenPlatformMenuDeclaresRoute() {
+        try (GenericApplicationContext context = context(RouteModuleWeb.class)) {
+            registerStaticModules(context);
+            initializePlatformMenus(context);
+
+            assertThat(moduleMenu("platform.route")).satisfies(menu -> {
+                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
+                assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
+                assertThat(menu.getModuleAlias()).isEqualTo("platform.route");
+                assertThat(menu.getRoute()).isEqualTo("/platform/routes");
+                assertThat(menu.getPageMode()).isNull();
+            });
+        }
+    }
+
+    @Test
+    void shouldRegisterOrganizationMenuAsRouteModuleEntry() {
+        try (GenericApplicationContext context = context(OrganizationWebController.class)) {
+            registerStaticModules(context);
+            initializePlatformMenus(context);
+
+            assertThat(moduleMenu("iam.organization")).satisfies(menu -> {
+                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
+                assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
+                assertThat(menu.getModuleAlias()).isEqualTo("iam.organization");
+                assertThat(menu.getRoute()).isEqualTo("/iam/organizations");
+                assertThat(menu.getPageMode()).isNull();
             });
         }
     }
@@ -240,6 +273,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     @Test
     void shouldDeclareMenusForCoreAdministrationEntryPoints() {
         assertMenu(ApplicationWebController.class, PlatformMenuGroups.CONFIG, "应用管理", 10);
+        assertMenu(OrganizationWebController.class, PlatformMenuGroups.IDENTITY, "", 20);
         assertMenu(DepartmentWebController.class, PlatformMenuGroups.IDENTITY, "", 30);
         assertMenu(PositionWebController.class, PlatformMenuGroups.IDENTITY, "", 40);
         assertMenu(EmployeeWebController.class, PlatformMenuGroups.IDENTITY, "", 50);
@@ -386,6 +420,13 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     @PlatformMenu(parent = PlatformMenuGroups.CONFIG, openMode = MenuOpenMode.WINDOW)
     @RequestMapping("/platform.window")
     static class WindowModuleWeb {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "platform", alias = "platform.route", title = "路由模块")
+    @PlatformMenu(parent = PlatformMenuGroups.CONFIG, route = "/platform/routes")
+    @RequestMapping("/platform.route")
+    static class RouteModuleWeb {
     }
 
     @RestController

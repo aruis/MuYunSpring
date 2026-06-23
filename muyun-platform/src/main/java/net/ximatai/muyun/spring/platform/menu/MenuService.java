@@ -218,7 +218,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         }
         MenuType type = menu.getMenuType() == null ? MenuType.GROUP : menu.getMenuType();
         try {
-            if (type == MenuType.MODULE) {
+            if (type == MenuType.MODULE || (type == MenuType.ROUTE && hasText(menu.getModuleAlias()))) {
                 return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
             }
             if (type == MenuType.GROUP) {
@@ -245,7 +245,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private Menu findVisibleModuleMenu(String schemeId, String parentId, String moduleAlias, Set<String> visiting) {
         for (Menu menu : visibleChildren(schemeId, parentId, visiting)) {
-            if (menu.getMenuType() == MenuType.MODULE && Objects.equals(menu.getModuleAlias(), moduleAlias)) {
+            if (isModuleEntryMenu(menu, moduleAlias)) {
                 return menu;
             }
             Menu found = findVisibleModuleMenu(schemeId, menu.getId(), moduleAlias, visiting);
@@ -254,6 +254,11 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             }
         }
         return null;
+    }
+
+    private boolean isModuleEntryMenu(Menu menu, String moduleAlias) {
+        return (menu.getMenuType() == MenuType.MODULE || menu.getMenuType() == MenuType.ROUTE)
+                && Objects.equals(menu.getModuleAlias(), moduleAlias);
     }
 
     private void normalizeAndValidate(Menu menu) {
@@ -299,8 +304,8 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             }
             case ROUTE -> {
                 requireOpenMode(menu);
-                requireText(menu.getRoute(), "ROUTE menu requires route");
-                requireBlank(menu.getModuleAlias(), "ROUTE menu cannot have moduleAlias");
+                normalizeInternalRoute(menu);
+                normalizeOptionalModuleAlias(menu);
                 requireBlank(menu.getExternalUrl(), "ROUTE menu cannot have externalUrl");
                 requireBlankEntry(menu, "ROUTE menu cannot have low-code entry config");
             }
@@ -332,6 +337,27 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         }
         validateDefaultUiConfig(menu, moduleAlias);
         validateDefaultQueryTemplate(menu, moduleAlias);
+    }
+
+    private void normalizeInternalRoute(Menu menu) {
+        requireText(menu.getRoute(), "ROUTE menu requires route");
+        String route = menu.getRoute().trim();
+        if (!route.startsWith("/") || route.startsWith("//") || route.contains("://")) {
+            throw new PlatformException("ROUTE menu route must be an internal path: " + route);
+        }
+        menu.setRoute(route);
+    }
+
+    private void normalizeOptionalModuleAlias(Menu menu) {
+        if (!hasText(menu.getModuleAlias())) {
+            menu.setModuleAlias(null);
+            return;
+        }
+        String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
+        if (moduleService.resolveVisibleModule(moduleAlias) == null) {
+            throw new PlatformException("ROUTE menu moduleAlias requires existing module: " + moduleAlias);
+        }
+        menu.setModuleAlias(moduleAlias);
     }
 
     private void validateDefaultUiConfig(Menu menu, String moduleAlias) {

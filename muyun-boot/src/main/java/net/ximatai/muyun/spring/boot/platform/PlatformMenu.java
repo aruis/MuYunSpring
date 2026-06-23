@@ -20,5 +20,7 @@ public @interface PlatformMenu {
 
     MenuOpenMode openMode() default MenuOpenMode.TAB;
 
+    String route() default "";
+
     boolean enabled() default true;
 }

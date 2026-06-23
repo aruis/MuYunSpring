@@ -278,6 +278,59 @@ class MenuServiceContractTest {
     }
 
     @Test
+    void shouldTreatRouteMenuWithModuleAliasAsVisibleModuleEntry() {
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.customer".equals(moduleAlias);
+        MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
+        String schemeId;
+        String rootId;
+        String customerId;
+        String contractId;
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
+             CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            rootId = scopedMenuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
+            customerId = scopedMenuService.insert(routeMenu(
+                    schemeId, "客户", rootId, "crm.customer", "/crm/customers"));
+            contractId = scopedMenuService.insert(routeMenu(
+                    schemeId, "合同", rootId, "crm.contract", "/crm/contracts"));
+
+            assertThat(scopedMenuService.visibleChildren(schemeId, rootId))
+                    .extracting(Menu::getId)
+                    .containsExactly(customerId);
+            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.customer").getId())
+                    .isEqualTo(customerId);
+            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.contract"))
+                    .isNull();
+            assertThat(scopedMenuService.children(schemeId, rootId))
+                    .extracting(Menu::getId)
+                    .containsExactly(customerId, contractId);
+        }
+    }
+
+    @Test
+    void shouldNormalizeAndValidateRouteMenuInternalPath() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            String schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
+            String menuId = menuService.insert(routeMenu(
+                    schemeId, "客户", TreeAbility.ROOT_ID, "crm.customer", " /crm/customers "));
+
+            assertThat(menuService.select(menuId).getRoute()).isEqualTo("/crm/customers");
+            assertThatThrownBy(() -> menuService.insert(routeMenu(
+                    schemeId, "坏路由", TreeAbility.ROOT_ID, "crm.customer", "crm/customers")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("internal path");
+            assertThatThrownBy(() -> menuService.insert(routeMenu(
+                    schemeId, "协议外链", TreeAbility.ROOT_ID, "crm.customer", "https://example.com/customers")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("internal path");
+            assertThatThrownBy(() -> menuService.insert(routeMenu(
+                    schemeId, "协议相对外链", TreeAbility.ROOT_ID, "crm.customer", "//example.com/customers")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("internal path");
+        }
+    }
+
+    @Test
     void shouldFailClosedForModuleMenusWhenNoVisibilityPolicyExists() {
         String schemeId;
         String rootId;
@@ -496,6 +549,18 @@ class MenuServiceContractTest {
         menu.setMenuType(MenuType.MODULE);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
+        return menu;
+    }
+
+    private Menu routeMenu(String schemeId, String title, String parentId, String moduleAlias, String route) {
+        Menu menu = new Menu();
+        menu.setSchemeId(schemeId);
+        menu.setTitle(title);
+        menu.setParentId(parentId);
+        menu.setMenuType(MenuType.ROUTE);
+        menu.setOpenMode(MenuOpenMode.TAB);
+        menu.setModuleAlias(moduleAlias);
+        menu.setRoute(route);
         return menu;
     }
 

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.organization", title = "机构管理")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20)
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 20, route = "/iam/organizations")
 @RequestMapping("/iam.organization")
 public class OrganizationWebController extends WebSupport<OrganizationService> implements
         CrudWeb<Organization, OrganizationService>,
