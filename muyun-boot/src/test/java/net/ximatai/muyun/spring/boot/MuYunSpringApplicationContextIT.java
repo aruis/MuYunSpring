@@ -10,9 +10,12 @@ import net.ximatai.muyun.spring.iam.user.UserSession;
 import net.ximatai.muyun.spring.iam.user.UserSessionDao;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.restclient.RestTemplateBuilder;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -51,8 +54,16 @@ class MuYunSpringApplicationContextIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
     private TestRestTemplate restTemplate;
+
+    @LocalServerPort
+    private int port;
+
+    @BeforeEach
+    void setUpRestTemplate() {
+        restTemplate = new TestRestTemplate(new RestTemplateBuilder()
+                .rootUri("http://localhost:" + port));
+    }
 
     @DynamicPropertySource
     static void applicationProperties(DynamicPropertyRegistry registry) {
