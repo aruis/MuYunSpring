@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import {
-  BellOutlined,
-  DownOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  SettingOutlined,
-} from '@ant-design/icons-vue';
-import { UiDropdown, UiError, UiSpin, UiTabs } from '@muyun/vue-ui-antdv';
+import { UiDropdown, UiError, UiIcon, UiSpin, UiTabs } from '@muyun/vue-ui-antdv';
 import type {
   MenuNavigationTarget,
   MenuRecord,
@@ -141,17 +134,17 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
 
         <div class="topbar-actions" aria-label="全局工具">
           <button class="icon-button wide" type="button" aria-label="搜索">
-            <SearchOutlined />
+            <UiIcon name="search" />
             <span>搜索</span>
           </button>
           <button class="icon-button" type="button" aria-label="刷新">
-            <ReloadOutlined />
+            <UiIcon name="reload" />
           </button>
           <button class="icon-button" type="button" aria-label="通知">
-            <BellOutlined />
+            <UiIcon name="notification" />
           </button>
           <button class="icon-button" type="button" aria-label="设置">
-            <SettingOutlined />
+            <UiIcon name="settings" />
           </button>
         </div>
 
@@ -162,7 +155,7 @@ function targetLabelOf(descriptor: PageDescriptor | undefined) {
               <strong>{{ userDisplayName }}</strong>
               <small>{{ currentUser?.system ? '系统管理员' : '业务用户' }}</small>
             </span>
-            <DownOutlined class="user-caret" />
+            <UiIcon class="user-caret" name="down" />
           </button>
         </UiDropdown>
       </header>

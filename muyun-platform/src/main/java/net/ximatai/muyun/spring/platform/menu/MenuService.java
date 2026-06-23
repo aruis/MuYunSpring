@@ -280,12 +280,14 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     private void normalizeTarget(Menu menu) {
         switch (menu.getMenuType()) {
             case GROUP -> {
+                requireNoOpenMode(menu);
                 requireBlank(menu.getModuleAlias(), "GROUP menu cannot have moduleAlias");
                 requireBlank(menu.getRoute(), "GROUP menu cannot have route");
                 requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
                 requireBlankEntry(menu, "GROUP menu cannot have low-code entry config");
             }
             case MODULE -> {
+                requireOpenMode(menu);
                 String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
                 if (moduleService.resolveVisibleModule(moduleAlias) == null) {
                     throw new PlatformException("MODULE menu requires existing module: " + moduleAlias);
@@ -296,17 +298,31 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 normalizeModuleEntry(menu, moduleAlias);
             }
             case ROUTE -> {
+                requireOpenMode(menu);
                 requireText(menu.getRoute(), "ROUTE menu requires route");
                 requireBlank(menu.getModuleAlias(), "ROUTE menu cannot have moduleAlias");
                 requireBlank(menu.getExternalUrl(), "ROUTE menu cannot have externalUrl");
                 requireBlankEntry(menu, "ROUTE menu cannot have low-code entry config");
             }
             case LINK -> {
+                requireOpenMode(menu);
                 requireText(menu.getExternalUrl(), "LINK menu requires externalUrl");
                 requireBlank(menu.getModuleAlias(), "LINK menu cannot have moduleAlias");
                 requireBlank(menu.getRoute(), "LINK menu cannot have route");
                 requireBlankEntry(menu, "LINK menu cannot have low-code entry config");
             }
+        }
+    }
+
+    private void requireOpenMode(Menu menu) {
+        if (menu.getOpenMode() == null) {
+            throw new PlatformException(menu.getMenuType() + " menu requires openMode");
+        }
+    }
+
+    private void requireNoOpenMode(Menu menu) {
+        if (menu.getOpenMode() != null) {
+            throw new PlatformException("GROUP menu cannot have openMode");
         }
     }
 

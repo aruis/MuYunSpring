@@ -5,6 +5,8 @@ export {
   createMenuTab,
   findFirstNavigationMenu,
   getMenuNavigationTarget,
+  isTabMenuTarget,
+  isWindowMenuTarget,
   pageDescriptorFromUrl,
   pageDescriptorToUrl,
   resolvePageDescriptor,

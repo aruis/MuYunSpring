@@ -39,6 +39,7 @@ const menus = [
               parentId: 'nested',
               title: 'Metadata',
               menuType: 'ROUTE',
+              openMode: 'TAB',
               route: '/platform/metadata',
             },
             children: [],
@@ -53,6 +54,7 @@ const menus = [
       schemeId: 'default',
       title: 'Runtime',
       menuType: 'MODULE',
+      openMode: 'TAB',
       moduleAlias: 'platform.runtime',
       pageMode: 'LIST',
       defaultUiConfigId: 'runtime-list-v1',
@@ -65,6 +67,7 @@ const menus = [
       schemeId: 'default',
       title: 'Metadata Shortcut',
       menuType: 'ROUTE',
+      openMode: 'TAB',
       route: '/platform/metadata',
     },
     children: [],
@@ -101,6 +104,7 @@ const platformAdminMenus = [
               parentId: 'platform.menu.group.config',
               title: '应用管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'platform.application',
               pageMode: 'LIST',
               enabled: true,
@@ -115,6 +119,7 @@ const platformAdminMenus = [
               parentId: 'platform.menu.group.config',
               title: '模块管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'platform.module',
               pageMode: 'LIST',
               enabled: true,
@@ -129,6 +134,7 @@ const platformAdminMenus = [
               parentId: 'platform.menu.group.config',
               title: '字典管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'platform.dictionary_category',
               pageMode: 'LIST',
               enabled: true,
@@ -156,6 +162,7 @@ const platformAdminMenus = [
               parentId: 'platform.menu.group.identity',
               title: '职员管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'iam.employee',
               pageMode: 'LIST',
               enabled: true,
@@ -170,6 +177,7 @@ const platformAdminMenus = [
               parentId: 'platform.menu.group.identity',
               title: '角色管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'iam.role',
               pageMode: 'LIST',
               enabled: true,
@@ -227,8 +235,41 @@ test('loadWorkbenchStartupState skips disabled navigation menus', async () => {
               schemeId: 'default',
               title: 'Disabled Runtime',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'platform.runtime',
               enabled: false,
+            },
+            children: [],
+          },
+          ...menus,
+        ],
+      }),
+    },
+  });
+
+  assert.equal(state.activeTabKey, 'menu:metadata');
+  assert.deepEqual(
+    state.tabs?.map((tab) => tab.key),
+    ['menu:metadata'],
+  );
+});
+
+test('loadWorkbenchStartupState skips window navigation menus for the initial tab', async () => {
+  const state = await loadWorkbenchStartupState({
+    sessionClient: {
+      current: async () => currentUser,
+    },
+    menuClient: {
+      mine: async () => ({
+        records: [
+          {
+            record: {
+              id: 'external-bi',
+              schemeId: 'default',
+              title: 'External BI',
+              menuType: 'LINK',
+              openMode: 'WINDOW',
+              externalUrl: 'https://bi.example.com/report',
             },
             children: [],
           },
@@ -264,6 +305,7 @@ test('loadWorkbenchStartupState accepts backend initialized platform admin menus
   assert.deepEqual(state.tabs?.[0]?.target, {
     menuId: 'platform.menu.module.platform.application',
     menuType: 'MODULE',
+    openMode: 'TAB',
     moduleAlias: 'platform.application',
     pageMode: 'LIST',
     defaultUiConfigId: undefined,
@@ -314,9 +356,9 @@ test('closeMenuTab keeps active tab when closing an inactive tab', () => {
 
 test('closeMenuTab activates the neighboring tab when closing the active tab', () => {
   const tabs = [
-    { key: 'A', title: 'A', target: { menuId: 'a', menuType: 'ROUTE', route: '/a' } },
-    { key: 'B', title: 'B', target: { menuId: 'b', menuType: 'ROUTE', route: '/b' } },
-    { key: 'C', title: 'C', target: { menuId: 'c', menuType: 'ROUTE', route: '/c' } },
+    { key: 'A', title: 'A', target: { menuId: 'a', menuType: 'ROUTE', openMode: 'TAB', route: '/a' } },
+    { key: 'B', title: 'B', target: { menuId: 'b', menuType: 'ROUTE', openMode: 'TAB', route: '/b' } },
+    { key: 'C', title: 'C', target: { menuId: 'c', menuType: 'ROUTE', openMode: 'TAB', route: '/c' } },
   ];
 
   const middle = closeMenuTab(tabs, 'B', 'B');
@@ -478,6 +520,36 @@ test('restoreWorkbenchStartupStateFromUrl creates direct tab when URL has no men
   assert.equal(restored.activeTabKey, 'platform-route:/crm/customer/list');
   assert.equal(restored.tabs?.[0]?.target, undefined);
   assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.route, '/crm/customer/list');
+});
+
+test('restoreWorkbenchStartupStateFromUrl does not restore window menus as workbench menu tabs', () => {
+  const state = {
+    session: { currentUser },
+    menus: [
+      {
+        record: {
+          id: 'external-bi',
+          schemeId: 'default',
+          title: 'External BI',
+          menuType: 'LINK' as const,
+          openMode: 'WINDOW' as const,
+          externalUrl: 'https://bi.example.com/report',
+        },
+        children: [],
+      },
+    ],
+    tabs: [],
+  };
+
+  const restored = restoreWorkbenchStartupStateFromUrl(
+    state,
+    '/platform/external?_muyunMenuId=external-bi&_muyunTitle=External%20BI&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
+  );
+
+  assert.equal(restored.activeTabKey, 'menu:external-bi');
+  assert.equal(restored.tabs?.[0]?.target, undefined);
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.menuId, 'external-bi');
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.openMode, 'new-window');
 });
 
 test('restoreWorkbenchStartupStateFromUrl keeps current state for invalid workbench-owned URLs', () => {

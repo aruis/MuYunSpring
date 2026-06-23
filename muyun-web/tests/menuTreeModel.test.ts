@@ -32,6 +32,7 @@ const menus: MenuTreeNode[] = [
               schemeId: 'default',
               title: '字典管理',
               menuType: 'MODULE',
+              openMode: 'TAB',
               moduleAlias: 'platform.dictionary_category',
             },
             children: [
@@ -41,6 +42,7 @@ const menus: MenuTreeNode[] = [
                   schemeId: 'default',
                   title: '字典项',
                   menuType: 'MODULE',
+                  openMode: 'TAB',
                   moduleAlias: 'platform.dictionary_item',
                   enabled: false,
                 },

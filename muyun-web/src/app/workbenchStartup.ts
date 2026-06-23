@@ -10,6 +10,7 @@ import {
   createMenuTab,
   findFirstNavigationMenu,
   getMenuNavigationTarget,
+  isTabMenuTarget,
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
@@ -51,6 +52,10 @@ export function openMenuTab(
   return { tabs: [...tabs, tab], activeTabKey: tab.key };
 }
 
+export function menuTargetUrl(menu: MenuRecord, target: MenuNavigationTarget): string {
+  return pageDescriptorToUrl(resolvePageDescriptor(target, { title: menu.title }));
+}
+
 export function activeTabUrlOf(state: WorkbenchStartupState): string | undefined {
   const activeTab = (state.tabs ?? []).find((tab) => tab.key === state.activeTabKey);
   const descriptor =
@@ -78,7 +83,10 @@ export function restoreWorkbenchStartupStateFromUrl(
       ? explicitMenu
       : findMenuByDescriptor(state.menus, descriptor);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
-  const tab = menu && target ? createRestoredMenuTab(menu, target, descriptor) : createDirectTab(descriptor);
+  const tab =
+    menu && target && isTabMenuTarget(target)
+      ? createRestoredMenuTab(menu, target, descriptor)
+      : createDirectTab(descriptor);
   const existingTabs = state.tabs ?? [];
   const tabs = upsertTab(existingTabs, tab);
 

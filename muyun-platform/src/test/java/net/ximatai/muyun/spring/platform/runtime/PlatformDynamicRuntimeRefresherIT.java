@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidato
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
@@ -456,6 +457,7 @@ class PlatformDynamicRuntimeRefresherIT {
         Menu menu = new Menu();
         menu.setSchemeId(schemeId);
         menu.setMenuType(MenuType.MODULE);
+        menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         menu.setTitle(title);
         return menu;

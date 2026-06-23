@@ -13,11 +13,15 @@ test('effectiveAuthToken ignores blank env token', () => {
 
 test('isAuthenticationRequiredError uses backend auth-required code for login recovery', () => {
   assert.equal(
-    isAuthenticationRequiredError(new AppError('login required', { code: platformErrorCodes.authRequired, status: 401 })),
+    isAuthenticationRequiredError(
+      new AppError('login required', { code: platformErrorCodes.authRequired, status: 401 }),
+    ),
     true,
   );
   assert.equal(
-    isAuthenticationRequiredError(new AppError('token expired', { code: platformErrorCodes.authExpired, status: 401 })),
+    isAuthenticationRequiredError(
+      new AppError('token expired', { code: platformErrorCodes.authExpired, status: 401 }),
+    ),
     true,
   );
   assert.equal(
@@ -27,7 +31,9 @@ test('isAuthenticationRequiredError uses backend auth-required code for login re
     false,
   );
   assert.equal(
-    isAuthenticationRequiredError(new AppError('legacy login required', { code: platformErrorCodes.httpError, status: 401 })),
+    isAuthenticationRequiredError(
+      new AppError('legacy login required', { code: platformErrorCodes.httpError, status: 401 }),
+    ),
     true,
   );
   assert.equal(isAuthenticationRequiredError(new AppError('forbidden', { status: 403 })), false);

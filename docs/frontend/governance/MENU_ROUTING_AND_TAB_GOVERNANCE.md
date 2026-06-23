@@ -96,7 +96,8 @@ MenuRecord
 | ---------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `menuType`                                     | 区分分组、模块、路由、外链等入口类型。                    | 如果继续扩展 online app 或 micro app，不宜把所有新入口都塞进 `LINK`。                                                |
 | `route`                                        | 表达平台 route、offline 业务 path、routeName 或 pageKey。 | 字段容易过载；新增能力应通过结构化 target 或 resolver 规则区分语义。                                                 |
-| `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | 需要配套 `openMode` 或推荐承载方式，否则前端只能按 URL 猜 iframe/new-window。                                        |
+| `openMode`                                     | 表达菜单入口在 Workbench 页签还是外部窗口打开。           | 使用 `TAB` / `WINDOW`，不按 URL 形态隐式推断承载方式；`GROUP` 不配置。                                               |
+| `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | URL 只表达目标，不表达打开方式；`LINK + TAB` 由前端编译为 iframe，`LINK + WINDOW` 打开新窗口。                       |
 | `moduleAlias`                                  | 表达动态模块入口。                                        | 动态页面如果需要稳定指向元数据、视图或页面配置，应避免只靠 loose params。                                            |
 | `pageMode`                                     | 表达动态模块列表、表单、详情等模式。                      | 应与动态运行器支持的页面模式保持枚举一致。                                                                           |
 | `defaultUiConfigId` / `defaultQueryTemplateId` | 表达默认页面配置和查询模板。                              | 如果页面入口长期由 alias 管理，后续可能需要 alias 或版本语义，避免跨环境 ID 不稳定。                                 |
@@ -106,11 +107,11 @@ MenuRecord
 第一阶段可以继续由前端把现有 `Menu` 字段编译成 `MenuNavigationTarget` 和 `PageDescriptor`。一旦出现以下情况，应优先提醒并评估后端字段或模型调整：
 
 1. 前端需要通过复杂字符串约定判断同一个字段的多种业务语义。
-2. 菜单配置需要显式选择 iframe、新窗口、动态运行器或未来 micro app，但后端没有承载方式字段。
+2. 菜单配置需要显式选择页签或外部窗口，但后端没有承载方式字段。
 3. 页面入口需要参与配置校验、权限、审计或配置包迁移，但只存在不可校验的 JSON 或 URL。
 4. URL 恢复需要跨菜单方案、跨租户或跨环境稳定，但只依赖当前菜单树 `menuId`。
 
-`pageType` 和 `openMode` 由 resolver 统一裁决。同一个 `pageType` 理论上可以有多个 `openMode`，例如 `remote-url` 可以选择 iframe 或新窗口；同一个 `openMode` 也可以承载不同 `pageType`，例如 `workbench-route` 可承载平台内置页面和 offline 业务页面。
+后端菜单 `openMode` 是业务打开方式，只表达 `TAB` 或 `WINDOW`。前端 resolver 再结合 `menuType` 编译成内部 `PageDescriptor.openMode`：`MODULE + TAB` 进入 dynamic runner，`ROUTE + TAB` 进入 route host，`LINK + TAB` 进入 iframe，`WINDOW` 入口点击时打开新窗口。不要根据 URL 是相对路径、同源地址还是绝对地址推断打开方式。
 
 建议长期保留以下 host 概念：
 
@@ -406,6 +407,7 @@ ROUTE 指向平台内置页面时：
 ```text
 MenuNavigationTarget
   menuType: ROUTE
+  openMode: TAB
   route: /platform/metadata
 
 PageDescriptor
@@ -420,6 +422,7 @@ ROUTE 指向 offline 业务页面时：
 ```text
 MenuNavigationTarget
   menuType: ROUTE
+  openMode: TAB
   route: crm.customer.list
 
 PageDescriptor
@@ -435,6 +438,7 @@ MODULE 指向动态模块时：
 ```text
 MenuNavigationTarget
   menuType: MODULE
+  openMode: TAB
   moduleAlias: crm.customer
   pageMode: LIST
   defaultUiConfigId: customer-list-v1
@@ -453,13 +457,14 @@ LINK 指向 online 业务页面时：
 ```text
 MenuNavigationTarget
   menuType: LINK
+  openMode: TAB
   externalUrl: /crm/customer/list
 
 PageDescriptor
   pageType: remote-url
   openMode: iframe
   target.url: /crm/customer/list
-  tabPolicy.identity: by-target
+  tabPolicy.identity: by-menu
 ```
 
 这些示例是治理目标，不要求当前代码一次性完成所有字段。

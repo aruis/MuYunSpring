@@ -52,6 +52,8 @@ export type MenuType = 'GROUP' | 'MODULE' | 'ROUTE' | 'LINK';
 // Matches current Spring/Jackson enum-name output from menu page mode fields.
 export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
 
+export type MenuOpenMode = 'TAB' | 'WINDOW';
+
 export interface MenuRecord {
   id: string;
   tenantId?: string;
@@ -59,6 +61,7 @@ export interface MenuRecord {
   parentId?: string;
   title: string;
   menuType: MenuType;
+  openMode?: MenuOpenMode;
   moduleAlias?: string;
   route?: string;
   externalUrl?: string;
@@ -77,6 +80,7 @@ export type MenuMineResponse = WebListResponse<MenuTreeNode>;
 export interface ModuleMenuTarget {
   menuId: string;
   menuType: 'MODULE';
+  openMode: MenuOpenMode;
   moduleAlias: string;
   pageMode?: MenuPageMode;
   defaultUiConfigId?: string;
@@ -88,6 +92,7 @@ export interface ModuleMenuTarget {
 export interface RouteMenuTarget {
   menuId: string;
   menuType: 'ROUTE';
+  openMode: MenuOpenMode;
   route: string;
   entryParamsJson?: string;
   query?: Record<string, RouteQueryValue>;
@@ -96,6 +101,7 @@ export interface RouteMenuTarget {
 export interface ExternalLinkMenuTarget {
   menuId: string;
   menuType: 'LINK';
+  openMode: MenuOpenMode;
   externalUrl: string;
   entryParamsJson?: string;
 }

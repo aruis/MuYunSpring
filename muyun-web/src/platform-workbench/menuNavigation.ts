@@ -4,7 +4,6 @@ import type {
   MenuPageMode,
   MenuTab,
   MenuTreeNode,
-  OpenMode,
   PageDescriptor,
   RoutePageTarget,
   RouteQueryPrimitive,
@@ -17,7 +16,6 @@ export interface PageDescriptorResolveOptions {
   businessRoutePrefixes?: string[];
   businessRouteNames?: string[];
   businessPageKeys?: string[];
-  defaultLinkOpenMode?: Extract<OpenMode, 'iframe' | 'new-window'>;
 }
 
 export interface PageDescriptorUrlParseOptions {
@@ -37,10 +35,11 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     return undefined;
   }
 
-  if (menu.menuType === 'MODULE' && menu.moduleAlias) {
+  if (menu.menuType === 'MODULE' && menu.openMode && menu.moduleAlias) {
     return {
       menuId: menu.id,
       menuType: 'MODULE',
+      openMode: menu.openMode,
       moduleAlias: menu.moduleAlias,
       pageMode: menu.pageMode,
       defaultUiConfigId: menu.defaultUiConfigId,
@@ -49,25 +48,35 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     };
   }
 
-  if (menu.menuType === 'ROUTE' && menu.route) {
+  if (menu.menuType === 'ROUTE' && menu.openMode && menu.route) {
     return {
       menuId: menu.id,
       menuType: 'ROUTE',
+      openMode: menu.openMode,
       route: menu.route,
       entryParamsJson: menu.entryParamsJson,
     };
   }
 
-  if (menu.menuType === 'LINK' && menu.externalUrl) {
+  if (menu.menuType === 'LINK' && menu.openMode && menu.externalUrl) {
     return {
       menuId: menu.id,
       menuType: 'LINK',
+      openMode: menu.openMode,
       externalUrl: menu.externalUrl,
       entryParamsJson: menu.entryParamsJson,
     };
   }
 
   return undefined;
+}
+
+export function isTabMenuTarget(target: MenuNavigationTarget): boolean {
+  return target.openMode === 'TAB';
+}
+
+export function isWindowMenuTarget(target: MenuNavigationTarget): boolean {
+  return target.openMode === 'WINDOW';
 }
 
 export function resolvePageDescriptor(
@@ -115,12 +124,10 @@ export function resolvePageDescriptor(
       : { ...descriptorBase, pageType, hostType: 'platform-route-host' };
   }
 
-  const openMode =
-    options.defaultLinkOpenMode ?? (isSameOriginPath(target.externalUrl) ? 'iframe' : 'new-window');
-  if (openMode === 'iframe') {
+  if (target.openMode === 'TAB') {
     return {
       pageType: 'remote-url',
-      openMode,
+      openMode: 'iframe',
       hostType: 'external-page-host',
       title: options.title,
       menuId: target.menuId,
@@ -135,7 +142,7 @@ export function resolvePageDescriptor(
 
   return {
     pageType: 'external-link',
-    openMode,
+    openMode: 'new-window',
     hostType: 'external-page-host',
     title: options.title,
     menuId: target.menuId,
@@ -153,6 +160,10 @@ export function createMenuTab(
   target: MenuNavigationTarget,
   options: PageDescriptorResolveOptions = {},
 ): MenuTab {
+  if (!isTabMenuTarget(target)) {
+    throw new Error(`WINDOW menu target cannot be opened as a workbench tab: ${target.menuId}`);
+  }
+
   const pageDescriptor = resolvePageDescriptor(target, { ...options, title: options.title ?? menu.title });
   return {
     key: tabKeyOf(pageDescriptor),
@@ -166,7 +177,8 @@ export function createMenuTab(
 
 export function findFirstNavigationMenu(nodes: MenuTreeNode[]): MenuRecord | undefined {
   for (const node of nodes) {
-    if (getMenuNavigationTarget(node.record)) {
+    const target = getMenuNavigationTarget(node.record);
+    if (target && isTabMenuTarget(target)) {
       return node.record;
     }
 
@@ -444,10 +456,6 @@ function isBusinessRoutePath(path: string, options: PageDescriptorUrlParseOption
     businessPrefixes.some((prefix) => matchesRoutePrefix(path, prefix)) &&
     !platformPrefixes.some((prefix) => matchesRoutePrefix(path, prefix))
   );
-}
-
-function isSameOriginPath(url: string): boolean {
-  return url.startsWith('/') && !url.startsWith('//');
 }
 
 function stableTargetKeyOf(descriptor: PageDescriptor): string {

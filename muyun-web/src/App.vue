@@ -14,6 +14,7 @@ import LoginView from './app/LoginView.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
+  menuTargetUrl,
   openMenuTab,
   restoreWorkbenchStartupStateFromUrl,
 } from './app/workbenchStartup';
@@ -105,6 +106,11 @@ async function handleLogout() {
 }
 
 function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
+  if (target.openMode === 'WINDOW') {
+    openWindow(menuTargetUrl(menu, target));
+    return;
+  }
+
   const current = startup.value;
   if (!current) {
     return;
@@ -118,6 +124,10 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
   };
   activeTabKey.value = result.activeTabKey;
   syncBrowserUrl(startup.value);
+}
+
+function openWindow(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function handleCloseTab(key: string) {

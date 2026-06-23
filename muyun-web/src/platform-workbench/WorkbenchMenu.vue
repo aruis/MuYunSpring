@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { AppstoreOutlined, SearchOutlined } from '@ant-design/icons-vue';
-import { UiEmpty } from '@muyun/vue-ui-antdv';
+import { UiEmpty, UiIcon } from '@muyun/vue-ui-antdv';
 import type { MenuNavigationTarget, MenuRecord, MenuTreeNode } from '@muyun/web-contracts';
 import WorkbenchMenuTree from './WorkbenchMenuTree.vue';
 import {
@@ -50,7 +49,9 @@ const activeRootNode = computed(() =>
   activeRootMenuId.value ? findWorkbenchMenuNodeById(filteredMenus.value, activeRootMenuId.value) : undefined,
 );
 const megaMenuModel = computed(() =>
-  activeRootNode.value ? buildWorkbenchMegaMenuModel(activeRootNode.value, activeDeepRootId.value) : undefined,
+  activeRootNode.value
+    ? buildWorkbenchMegaMenuModel(activeRootNode.value, activeDeepRootId.value)
+    : undefined,
 );
 const activeDeepRootNode = computed(() => megaMenuModel.value?.activeDeepRoot);
 
@@ -89,7 +90,7 @@ function updateMegaPanelTop(target: EventTarget | null | undefined) {
   }
   const rect = target.getBoundingClientRect();
   const panelHeight = Math.min(window.innerHeight - 16, 620);
-  const idealTop = rect.top - 8;
+  const idealTop = rect.top;
   const maxTop = Math.max(8, window.innerHeight - panelHeight - 8);
   megaPanelTop.value = Math.round(Math.min(Math.max(idealTop, 8), maxTop));
 }
@@ -108,7 +109,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
     <aside class="menu-sidebar">
       <div class="brand-area">
         <div class="brand-mark">
-          <AppstoreOutlined />
+          <UiIcon name="app" />
         </div>
         <div class="brand-copy">
           <strong>MuYun</strong>
@@ -117,7 +118,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
       </div>
 
       <div class="menu-search">
-        <SearchOutlined />
+        <UiIcon name="search" />
         <input v-model="menuFilter" type="search" :placeholder="searchPlaceholder" aria-label="搜索菜单" />
       </div>
 
@@ -157,16 +158,6 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
       class="mega-panel"
       :style="{ '--mega-panel-top': `${megaPanelTop}px` }"
     >
-      <header class="mega-header">
-        <div>
-          <span>菜单面板</span>
-          <strong>{{ activeRootNode.record.title }}</strong>
-        </div>
-        <button v-if="activeRootNode.navigable" type="button" @click="selectMenuNode(activeRootNode)">
-          打开
-        </button>
-      </header>
-
       <div class="mega-body" :class="{ 'has-deep': activeDeepRootNode }">
         <div class="mega-groups">
           <section v-for="group in megaMenuModel?.groups ?? []" :key="group.record.id" class="mega-group">
@@ -302,6 +293,8 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 }
 
 .root-menu {
+  position: relative;
+  z-index: 2;
   min-height: 0;
   overflow: auto;
   padding: 2px 0;
@@ -323,12 +316,14 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 }
 
 .root-menu-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-height: 34px;
   padding: 7px 8px;
+  border: 1px solid transparent;
   border-radius: 6px;
   color: #334155;
   font-size: 13px;
@@ -344,7 +339,8 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 }
 
 .root-menu-item:hover,
-.root-menu-item.active {
+.root-menu-item.active,
+.root-menu-item.active.selected {
   background: #edf4f7;
   color: #0f766e;
 }
@@ -353,6 +349,26 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   background: #e4f2ef;
   color: #0f766e;
   font-weight: 700;
+}
+
+.root-menu-item.active,
+.root-menu-item.active.selected {
+  z-index: 2;
+  border-color: #d8e1ea;
+  border-right-color: transparent;
+  border-radius: 6px 0 0 6px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.root-menu-item.active::after {
+  position: absolute;
+  top: 0;
+  right: -12px;
+  bottom: 0;
+  width: 12px;
+  background: #fff;
+  content: '';
 }
 
 .root-menu-item.navigable {
@@ -382,58 +398,32 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 
 .mega-panel {
   position: absolute;
+  z-index: 1;
   top: var(--mega-panel-top);
-  left: calc(100% + 8px);
+  left: calc(100% - 11px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   width: min(820px, calc(100vw - 286px));
   max-height: calc(100vh - 16px);
   border: 1px solid #d8e1ea;
-  border-radius: 8px;
+  border-radius: 0 8px 8px 0;
   background: #fff;
   box-shadow: 0 24px 60px rgb(15 23 42 / 14%);
+  clip-path: inset(0 -80px -80px 0);
   overflow: hidden;
 }
 
-.mega-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 46px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.mega-header div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.mega-header span,
 .mega-deep-panel header span {
   color: #64748b;
   font-size: 11px;
 }
 
-.mega-header strong,
 .mega-deep-panel header strong {
   overflow: hidden;
   color: #172033;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mega-header button {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #0f766e;
-  border-radius: 6px;
-  background: #0f766e;
-  color: #fff;
-  cursor: pointer;
 }
 
 .mega-body {
@@ -452,7 +442,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   align-content: start;
   gap: 16px 18px;
   min-width: 0;
-  max-height: calc(100vh - 64px);
+  max-height: calc(100vh - 16px);
   padding: 14px;
   overflow: auto;
 }
@@ -560,6 +550,8 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
     width: 100%;
     max-height: none;
     margin-top: 8px;
+    border-left: 1px solid #d8e1ea;
+    border-radius: 8px;
     box-shadow: 0 16px 34px rgb(15 23 42 / 10%);
   }
 

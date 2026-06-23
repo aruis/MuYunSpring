@@ -19,10 +19,7 @@ export function createWorkbenchMenuNodes(nodes: MenuTreeNode[]): WorkbenchMenuNo
   return nodes.map(createWorkbenchMenuNode);
 }
 
-export function filterWorkbenchMenuNodes(
-  nodes: WorkbenchMenuNode[],
-  keyword: string,
-): WorkbenchMenuNode[] {
+export function filterWorkbenchMenuNodes(nodes: WorkbenchMenuNode[], keyword: string): WorkbenchMenuNode[] {
   const normalized = keyword.trim().toLowerCase();
   if (!normalized) {
     return nodes;
@@ -90,9 +87,7 @@ export function buildWorkbenchMegaMenuModel(
   root: WorkbenchMenuNode,
   activeDeepRootId: string | undefined,
 ): WorkbenchMegaMenuModel {
-  const node = activeDeepRootId
-    ? findWorkbenchMenuNodeById(root.children, activeDeepRootId)
-    : undefined;
+  const node = activeDeepRootId ? findWorkbenchMenuNodeById(root.children, activeDeepRootId) : undefined;
   return {
     root,
     groups: root.children,
