@@ -279,33 +279,39 @@ class MenuServiceContractTest {
 
     @Test
     void shouldTreatRouteMenuWithModuleAliasAsVisibleModuleEntry() {
-        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.route_customer".equals(moduleAlias);
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) ->
+                "crm.route_customer".equals(moduleAlias) || "crm.external_docs".equals(moduleAlias);
         MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
         String schemeId;
         String rootId;
         String customerId;
         String contractId;
+        String docsId;
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
              CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
             insertRouteModule("crm.route_customer", "/crm/customers");
             insertRouteModule("crm.route_contract", "/crm/contracts");
+            insertLinkModule("crm.external_docs", "https://example.com/docs");
             schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
             rootId = scopedMenuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
             customerId = scopedMenuService.insert(routeMenu(
                     schemeId, "客户", rootId, "crm.route_customer"));
             contractId = scopedMenuService.insert(routeMenu(
                     schemeId, "合同", rootId, "crm.route_contract"));
+            docsId = scopedMenuService.insert(linkMenu(schemeId, "文档", rootId, "crm.external_docs"));
 
             assertThat(scopedMenuService.visibleChildren(schemeId, rootId))
                     .extracting(Menu::getId)
-                    .containsExactly(customerId);
+                    .containsExactly(customerId, docsId);
             assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.route_customer").getId())
                     .isEqualTo(customerId);
+            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.external_docs").getId())
+                    .isEqualTo(docsId);
             assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.route_contract"))
                     .isNull();
             assertThat(scopedMenuService.children(schemeId, rootId))
                     .extracting(Menu::getId)
-                    .containsExactly(customerId, contractId);
+                    .containsExactly(customerId, contractId, docsId);
         }
     }
 
@@ -574,6 +580,17 @@ class MenuServiceContractTest {
         return menu;
     }
 
+    private Menu linkMenu(String schemeId, String title, String parentId, String moduleAlias) {
+        Menu menu = new Menu();
+        menu.setSchemeId(schemeId);
+        menu.setTitle(title);
+        menu.setParentId(parentId);
+        menu.setMenuType(MenuType.LINK);
+        menu.setOpenMode(MenuOpenMode.TAB);
+        menu.setModuleAlias(moduleAlias);
+        return menu;
+    }
+
     private void insertModule(String alias) {
         PlatformModule module = new PlatformModule();
         module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
@@ -589,6 +606,16 @@ class MenuServiceContractTest {
         module.setTitle(alias);
         module.setEntryType(ModuleEntryType.ROUTE);
         module.setEntryRoute(route);
+        moduleService.insert(module);
+    }
+
+    private void insertLinkModule(String alias, String externalUrl) {
+        PlatformModule module = new PlatformModule();
+        module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
+        module.setAlias(alias);
+        module.setTitle(alias);
+        module.setEntryType(ModuleEntryType.LINK);
+        module.setEntryExternalUrl(externalUrl);
         moduleService.insert(module);
     }
 }

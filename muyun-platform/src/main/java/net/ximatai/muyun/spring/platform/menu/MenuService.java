@@ -220,7 +220,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         }
         MenuType type = menu.getMenuType() == null ? MenuType.GROUP : menu.getMenuType();
         try {
-            if (type == MenuType.MODULE || (type == MenuType.ROUTE && hasText(menu.getModuleAlias()))) {
+            if (isModuleEntryMenu(menu)) {
                 return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
             }
             if (type == MenuType.GROUP) {
@@ -259,8 +259,12 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     }
 
     private boolean isModuleEntryMenu(Menu menu, String moduleAlias) {
-        return (menu.getMenuType() == MenuType.MODULE || menu.getMenuType() == MenuType.ROUTE)
+        return isModuleEntryMenu(menu)
                 && Objects.equals(menu.getModuleAlias(), moduleAlias);
+    }
+
+    private boolean isModuleEntryMenu(Menu menu) {
+        return menu.getMenuType() != MenuType.GROUP && hasText(menu.getModuleAlias());
     }
 
     private void normalizeAndValidate(Menu menu) {

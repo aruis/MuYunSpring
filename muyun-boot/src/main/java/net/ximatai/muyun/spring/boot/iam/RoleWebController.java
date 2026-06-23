@@ -287,7 +287,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     private boolean isModuleEntryMenu(Menu menu) {
-        return (menu.getMenuType() == MenuType.MODULE || menu.getMenuType() == MenuType.ROUTE)
+        return menu.getMenuType() != MenuType.GROUP
                 && menu.getModuleAlias() != null
                 && !menu.getModuleAlias().isBlank();
     }

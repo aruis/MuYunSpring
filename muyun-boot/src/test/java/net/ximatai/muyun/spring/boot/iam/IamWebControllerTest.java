@@ -479,10 +479,13 @@ class IamWebControllerTest {
         Menu contract = menu("menu-1", "scheme-1", MenuType.MODULE, "sales.contract");
         Menu organization = menu("menu-2", "scheme-1", MenuType.ROUTE, "iam.organization");
         organization.setRoute("/iam/organizations");
+        Menu docs = menu("menu-3", "scheme-1", MenuType.LINK, "platform.docs");
+        docs.setExternalUrl("https://example.com/docs");
         when(menuService.rootMenus("scheme-1")).thenReturn(List.of(group));
-        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract, organization));
+        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract, organization, docs));
         when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
         when(menuService.children("scheme-1", "menu-2")).thenReturn(List.of());
+        when(menuService.children("scheme-1", "menu-3")).thenReturn(List.of());
         when(roleService.permissionMatrix(any(), any())).thenReturn(new RolePermissionMatrix(
                 "role-1",
                 List.of(
@@ -499,6 +502,13 @@ class IamWebControllerTest {
                                         "iam.organization", "menu", "menu", "Menu",
                                         true, false, true, DataScopePolicy.NONE,
                                         TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                        ),
+                        new RolePermissionMatrix.Module(
+                                "platform.docs",
+                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
+                                        "platform.docs", "menu", "menu", "Menu",
+                                        true, false, true, DataScopePolicy.NONE,
+                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
                         )
                 ))
         );
@@ -509,13 +519,15 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.records[0].children[0].menu.id").value("menu-1"))
                 .andExpect(jsonPath("$.records[0].children[0].granted").value(true))
                 .andExpect(jsonPath("$.records[0].children[1].menu.id").value("menu-2"))
-                .andExpect(jsonPath("$.records[0].children[1].granted").value(true));
+                .andExpect(jsonPath("$.records[0].children[1].granted").value(true))
+                .andExpect(jsonPath("$.records[0].children[2].menu.id").value("menu-3"))
+                .andExpect(jsonPath("$.records[0].children[2].granted").value(true));
 
         ArgumentCaptor<List<GrantableAction>> actionsCaptor = ArgumentCaptor.captor();
         verify(roleService).permissionMatrix(any(), actionsCaptor.capture());
         assertThat(actionsCaptor.getValue())
                 .extracting(GrantableAction::moduleAlias)
-                .containsExactly("sales.contract", "iam.organization");
+                .containsExactly("sales.contract", "iam.organization", "platform.docs");
     }
 
     @Test
