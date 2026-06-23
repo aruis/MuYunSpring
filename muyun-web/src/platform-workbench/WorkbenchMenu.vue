@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { UiEmpty, UiIcon } from '@muyun/vue-ui-antdv';
 import type { MenuNavigationTarget, MenuRecord, MenuTreeNode } from '@muyun/web-contracts';
 import WorkbenchMenuTree from './WorkbenchMenuTree.vue';
@@ -34,10 +34,18 @@ const emit = defineEmits<{
   invalidMenu: [menu: MenuRecord];
 }>();
 
+const menuShell = ref<HTMLElement>();
+const megaPanel = ref<HTMLElement>();
 const menuFilter = ref('');
 const activeRootMenuId = ref<string>();
 const activeDeepRootId = ref<string>();
 const megaPanelTop = ref(8);
+const megaPanelLeft = ref(0);
+const activeRootLeft = ref(0);
+const activeRootTop = ref(0);
+const activeRootHeight = ref(34);
+const megaPanelWidth = ref(0);
+const megaPanelHeight = ref(0);
 
 const menuNodes = computed(() => createWorkbenchMenuNodes(props.menus));
 const filteredMenus = computed(() => filterWorkbenchMenuNodes(menuNodes.value, menuFilter.value));
@@ -54,6 +62,33 @@ const megaMenuModel = computed(() =>
     : undefined,
 );
 const activeDeepRootNode = computed(() => megaMenuModel.value?.activeDeepRoot);
+const megaOutlinePath = computed(() => {
+  const activeLeft = activeRootLeft.value;
+  const activeTop = activeRootTop.value;
+  const activeBottom = activeTop + activeRootHeight.value;
+  const panelLeft = megaPanelLeft.value;
+  const panelTop = megaPanelTop.value;
+  const panelRight = panelLeft + megaPanelWidth.value;
+  const panelBottom = panelTop + megaPanelHeight.value;
+  const activeRadius = 6;
+  const panelRadius = 8;
+
+  return [
+    `M ${panelLeft} ${panelTop}`,
+    `H ${panelRight - panelRadius}`,
+    `Q ${panelRight} ${panelTop} ${panelRight} ${panelTop + panelRadius}`,
+    `V ${panelBottom - panelRadius}`,
+    `Q ${panelRight} ${panelBottom} ${panelRight - panelRadius} ${panelBottom}`,
+    `H ${panelLeft}`,
+    `V ${activeBottom}`,
+    `H ${activeLeft + activeRadius}`,
+    `Q ${activeLeft} ${activeBottom} ${activeLeft} ${activeBottom - activeRadius}`,
+    `V ${activeTop + activeRadius}`,
+    `Q ${activeLeft} ${activeTop} ${activeLeft + activeRadius} ${activeTop}`,
+    `H ${panelLeft}`,
+    `V ${panelTop}`,
+  ].join(' ');
+});
 
 function selectMenuNode(node: WorkbenchMenuNode) {
   if (node.target) {
@@ -71,6 +106,7 @@ function openRootMenu(node: WorkbenchMenuNode, event?: MouseEvent | FocusEvent) 
   activeRootMenuId.value = node.record.id;
   activeDeepRootId.value = firstDeepRootIdOf(node);
   updateMegaPanelTop(event?.currentTarget);
+  void nextTick(updateMegaPanelSize);
 }
 
 function closeMegaMenu() {
@@ -89,10 +125,30 @@ function updateMegaPanelTop(target: EventTarget | null | undefined) {
     return;
   }
   const rect = target.getBoundingClientRect();
+  const shellRect = menuShell.value?.getBoundingClientRect();
+  const shellTop = shellRect?.top ?? 0;
   const panelHeight = Math.min(window.innerHeight - 16, 620);
   const idealTop = rect.top;
   const maxTop = Math.max(8, window.innerHeight - panelHeight - 8);
-  megaPanelTop.value = Math.round(Math.min(Math.max(idealTop, 8), maxTop));
+  const panelTop = Math.min(Math.max(idealTop, 8), maxTop);
+  const shellLeft = shellRect?.left ?? 0;
+  megaPanelTop.value = Math.round(panelTop - shellTop);
+  megaPanelLeft.value = Math.round(rect.right - shellLeft);
+  activeRootLeft.value = Math.round(rect.left - shellLeft);
+  activeRootTop.value = Math.round(rect.top - shellTop);
+  activeRootHeight.value = Math.round(rect.height);
+  megaPanelWidth.value = Math.min(820, window.innerWidth - megaPanelLeft.value - 24);
+  megaPanelHeight.value = panelHeight;
+}
+
+function updateMegaPanelSize() {
+  const rect = megaPanel.value?.getBoundingClientRect();
+  if (!rect) {
+    return;
+  }
+
+  megaPanelWidth.value = Math.round(rect.width);
+  megaPanelHeight.value = Math.round(rect.height);
 }
 
 function keepDeepRoot(node: WorkbenchMenuNode) {
@@ -105,7 +161,13 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 </script>
 
 <template>
-  <div class="workbench-menu" @mouseleave="closeMegaMenu" @keydown="handleMenuKeydown">
+  <div
+    ref="menuShell"
+    class="workbench-menu"
+    :class="{ 'mega-open': activeRootNode }"
+    @mouseleave="closeMegaMenu"
+    @keydown="handleMenuKeydown"
+  >
     <aside class="menu-sidebar">
       <div class="brand-area">
         <div class="brand-mark">
@@ -152,11 +214,19 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
       </div>
     </aside>
 
+    <svg v-if="activeRootNode" class="mega-outline" aria-hidden="true">
+      <path :d="megaOutlinePath" />
+    </svg>
+
     <section
       v-if="activeRootNode"
       id="workbench-mega-panel"
+      ref="megaPanel"
       class="mega-panel"
-      :style="{ '--mega-panel-top': `${megaPanelTop}px` }"
+      :style="{
+        '--mega-panel-top': `${megaPanelTop}px`,
+        '--mega-panel-left': `${megaPanelLeft}px`,
+      }"
     >
       <div class="mega-body" :class="{ 'has-deep': activeDeepRootNode }">
         <div class="mega-groups">
@@ -209,6 +279,9 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 
 <style scoped>
 .workbench-menu {
+  --workbench-menu-surface: #fff;
+  --workbench-menu-border: #d8e1ea;
+  --workbench-menu-border-width: 1px;
   position: relative;
   z-index: 20;
   min-width: 0;
@@ -223,8 +296,12 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   height: 100vh;
   min-width: 0;
   padding: 12px 10px;
-  border-right: 1px solid #d8e1ea;
+  border-right: var(--workbench-menu-border-width) solid var(--workbench-menu-border);
   background: #fbfcfe;
+}
+
+.workbench-menu.mega-open .menu-sidebar {
+  border-right-color: transparent;
 }
 
 .brand-area {
@@ -272,7 +349,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   gap: 8px;
   height: 34px;
   padding: 0 9px;
-  border: 1px solid #d8e1ea;
+  border: var(--workbench-menu-border-width) solid var(--workbench-menu-border);
   border-radius: 7px;
   background: #fff;
   color: #64748b;
@@ -318,12 +395,13 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 .root-menu-item {
   position: relative;
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-height: 34px;
   padding: 7px 8px;
-  border: 1px solid transparent;
+  border: var(--workbench-menu-border-width) solid transparent;
   border-radius: 6px;
   color: #334155;
   font-size: 13px;
@@ -354,21 +432,10 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 .root-menu-item.active,
 .root-menu-item.active.selected {
   z-index: 2;
-  border-color: #d8e1ea;
-  border-right-color: transparent;
+  border-color: transparent;
   border-radius: 6px 0 0 6px;
-  background: #fff;
+  background: var(--workbench-menu-surface);
   font-weight: 700;
-}
-
-.root-menu-item.active::after {
-  position: absolute;
-  top: 0;
-  right: -12px;
-  bottom: 0;
-  width: 12px;
-  background: #fff;
-  content: '';
 }
 
 .root-menu-item.navigable {
@@ -381,7 +448,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   gap: 8px;
   height: 34px;
   padding: 0 9px;
-  border: 1px solid #d9e4ee;
+  border: var(--workbench-menu-border-width) solid var(--workbench-menu-border);
   border-radius: 7px;
   background: #fff;
   color: #475569;
@@ -400,17 +467,36 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
   position: absolute;
   z-index: 1;
   top: var(--mega-panel-top);
-  left: calc(100% - 11px);
+  left: var(--mega-panel-left);
   display: grid;
   grid-template-rows: minmax(0, 1fr);
-  width: min(820px, calc(100vw - 286px));
+  width: min(820px, calc(100vw - var(--mega-panel-left) - 24px));
   max-height: calc(100vh - 16px);
-  border: 1px solid #d8e1ea;
+  border: 0;
   border-radius: 0 8px 8px 0;
-  background: #fff;
+  background: var(--workbench-menu-surface);
   box-shadow: 0 24px 60px rgb(15 23 42 / 14%);
   clip-path: inset(0 -80px -80px 0);
   overflow: hidden;
+}
+
+.mega-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  width: 100vw;
+  height: 100vh;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.mega-outline path {
+  fill: none;
+  stroke: var(--workbench-menu-border);
+  stroke-linejoin: round;
+  stroke-width: var(--workbench-menu-border-width);
+  vector-effect: non-scaling-stroke;
 }
 
 .mega-deep-panel header span {
@@ -531,6 +617,10 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
 }
 
 @media (max-width: 980px) {
+  .mega-outline {
+    display: none;
+  }
+
   .menu-sidebar {
     position: relative;
     height: auto;
@@ -550,7 +640,7 @@ function isSelectedRoot(node: WorkbenchMenuNode) {
     width: 100%;
     max-height: none;
     margin-top: 8px;
-    border-left: 1px solid #d8e1ea;
+    border: var(--workbench-menu-border-width) solid var(--workbench-menu-border);
     border-radius: 8px;
     box-shadow: 0 16px 34px rgb(15 23 42 / 10%);
   }
