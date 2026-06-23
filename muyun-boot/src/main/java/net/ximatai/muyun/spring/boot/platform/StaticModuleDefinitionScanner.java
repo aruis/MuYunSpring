@@ -15,6 +15,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -55,10 +56,29 @@ public class StaticModuleDefinitionScanner {
                 module.alias(),
                 module.title(),
                 module.parent().isBlank() ? null : module.parent(),
+                entryType(module),
+                module.route(),
+                module.externalUrl(),
                 java.util.Set.of(module.capabilities()),
                 actions(beanClass, java.util.Set.of(module.capabilities())),
                 entities(beanClass, module)
         );
+    }
+
+    private ModuleEntryType entryType(PlatformStaticModule module) {
+        boolean hasRoute = !module.route().isBlank();
+        boolean hasExternalUrl = !module.externalUrl().isBlank();
+        if (hasRoute && hasExternalUrl) {
+            throw new IllegalStateException("@PlatformStaticModule cannot declare both route and externalUrl: "
+                    + module.alias());
+        }
+        if (hasRoute) {
+            return ModuleEntryType.ROUTE;
+        }
+        if (hasExternalUrl) {
+            return ModuleEntryType.LINK;
+        }
+        return ModuleEntryType.MODULE;
     }
 
     private List<EntityDefinition> entities(Class<?> beanClass, PlatformStaticModule module) {
@@ -163,6 +183,9 @@ public class StaticModuleDefinitionScanner {
                     target.moduleAlias(),
                     target.title(),
                     target.parentModuleAlias(),
+                    target.entryType(),
+                    target.entryRoute(),
+                    target.entryExternalUrl(),
                     target.capabilities(),
                     List.copyOf(merged.values()),
                     target.entities()

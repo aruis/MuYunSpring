@@ -28,6 +28,16 @@ public class PlatformModule extends StandardEnabledTreeEntity {
             defaultVal = @Default(varchar = "static"))
     private ModuleKind moduleKind = ModuleKind.STATIC;
 
+    @Column(name = "entry_type", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Module entry type",
+            defaultVal = @Default(varchar = "module"))
+    private ModuleEntryType entryType = ModuleEntryType.MODULE;
+
+    @Column(name = "entry_route", type = ColumnType.VARCHAR, length = 256, comment = "Internal route entry")
+    private String entryRoute;
+
+    @Column(name = "entry_external_url", type = ColumnType.VARCHAR, length = 512, comment = "External link entry")
+    private String entryExternalUrl;
+
     @Column(name = "system_managed", comment = "Whether module is managed by platform",
             defaultVal = @Default(bool = TrueOrFalse.FALSE))
     private Boolean systemManaged = Boolean.FALSE;

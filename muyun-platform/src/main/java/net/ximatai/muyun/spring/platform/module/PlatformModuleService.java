@@ -109,7 +109,43 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
         if (module.getModuleKind() == null) {
             module.setModuleKind(ModuleKind.STATIC);
         }
+        normalizeEntry(module);
         validateParentApplication(module);
+    }
+
+    private void normalizeEntry(PlatformModule module) {
+        if (module.getEntryType() == null) {
+            module.setEntryType(ModuleEntryType.MODULE);
+        }
+        switch (module.getEntryType()) {
+            case MODULE -> {
+                module.setEntryRoute(null);
+                module.setEntryExternalUrl(null);
+            }
+            case ROUTE -> {
+                module.setEntryRoute(normalizeInternalRoute(module.getEntryRoute()));
+                module.setEntryExternalUrl(null);
+            }
+            case LINK -> {
+                module.setEntryRoute(null);
+                module.setEntryExternalUrl(requireText(module.getEntryExternalUrl(), "LINK module entry requires externalUrl").trim());
+            }
+        }
+    }
+
+    private String normalizeInternalRoute(String route) {
+        String normalized = requireText(route, "ROUTE module entry requires route").trim();
+        if (!normalized.startsWith("/") || normalized.startsWith("//") || normalized.contains("://")) {
+            throw new PlatformException("ROUTE module entry route must be an internal path: " + normalized);
+        }
+        return normalized;
+    }
+
+    private String requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new PlatformException(message);
+        }
+        return value;
     }
 
     private String requireApplicationAlias(String applicationAlias) {

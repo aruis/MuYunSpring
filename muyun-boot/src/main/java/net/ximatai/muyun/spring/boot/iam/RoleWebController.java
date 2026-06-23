@@ -253,9 +253,8 @@ public class RoleWebController extends WebSupport<RoleService> implements
 
     private Map<String, Boolean> menuGrantState(String roleId, List<Menu> roots) {
         List<String> moduleAliases = flattenMenus(roots).stream()
-                .filter(menu -> menu.getMenuType() == MenuType.MODULE)
+                .filter(this::isModuleEntryMenu)
                 .map(Menu::getModuleAlias)
-                .filter(moduleAlias -> moduleAlias != null && !moduleAlias.isBlank())
                 .distinct()
                 .toList();
         if (moduleAliases.isEmpty()) {
@@ -276,7 +275,7 @@ public class RoleWebController extends WebSupport<RoleService> implements
     }
 
     private RoleMenuNode roleMenuNode(Menu menu, Map<String, Boolean> grantedByModule) {
-        boolean granted = menu.getMenuType() == MenuType.MODULE
+        boolean granted = isModuleEntryMenu(menu)
                 && Boolean.TRUE.equals(grantedByModule.get(menu.getModuleAlias()));
         return new RoleMenuNode(
                 menu,
@@ -285,6 +284,12 @@ public class RoleWebController extends WebSupport<RoleService> implements
                         .map(child -> roleMenuNode(child, grantedByModule))
                         .toList()
         );
+    }
+
+    private boolean isModuleEntryMenu(Menu menu) {
+        return menu.getMenuType() != MenuType.GROUP
+                && menu.getModuleAlias() != null
+                && !menu.getModuleAlias().isBlank();
     }
 
     private List<Menu> flattenMenus(List<Menu> menus) {

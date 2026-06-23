@@ -33,6 +33,7 @@ import net.ximatai.muyun.spring.platform.code.CodePreviewService;
 import net.ximatai.muyun.spring.platform.code.CodeOpsActionService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleConfigArchiveFacade;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleHealthService;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageExchangeService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModulePackageImportService;
 import net.ximatai.muyun.spring.platform.config.LowCodeModuleTemplateService;
@@ -92,6 +93,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("iam.organization")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("机构管理");
+                assertThat(definition.entryType()).isEqualTo(ModuleEntryType.ROUTE);
+                assertThat(definition.entryRoute()).isEqualTo("/iam/organizations");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactly("menu", "create", "view", "update", "delete", "query",
                                 "tree", "sort", "enable", "disable");

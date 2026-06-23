@@ -62,15 +62,35 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         Menu desired = new Menu();
         desired.setId(menuId);
         desired.setSchemeId(schemeId);
-        desired.setMenuType(MenuType.MODULE);
+        String route = module.route().trim();
+        String externalUrl = module.externalUrl().trim();
+        desired.setMenuType(menuType(module));
         desired.setOpenMode(menu.openMode());
         desired.setParentId(menu.parent());
         desired.setTitle(menu.title().isBlank() ? module.title() : menu.title().trim());
         desired.setModuleAlias(module.alias());
-        desired.setPageMode(MenuPageMode.LIST);
+        desired.setRoute(route.isBlank() ? null : route);
+        desired.setExternalUrl(externalUrl.isBlank() ? null : externalUrl);
+        desired.setPageMode(route.isBlank() && externalUrl.isBlank() ? MenuPageMode.LIST : null);
         desired.setEnabled(menu.enabled());
         desired.setSortOrder(menu.order());
         return InitialDataDeclaration.reconcileManaged(menuService, desired);
+    }
+
+    private MenuType menuType(PlatformStaticModule module) {
+        boolean hasRoute = !module.route().isBlank();
+        boolean hasExternalUrl = !module.externalUrl().isBlank();
+        if (hasRoute && hasExternalUrl) {
+            throw new IllegalStateException("@PlatformStaticModule cannot declare both route and externalUrl: "
+                    + module.alias());
+        }
+        if (hasRoute) {
+            return MenuType.ROUTE;
+        }
+        if (hasExternalUrl) {
+            return MenuType.LINK;
+        }
+        return MenuType.MODULE;
     }
 
     private String moduleMenuId(String moduleAlias) {

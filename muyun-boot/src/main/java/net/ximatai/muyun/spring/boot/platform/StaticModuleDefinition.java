@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -13,6 +14,9 @@ public record StaticModuleDefinition(
         String moduleAlias,
         String title,
         String parentModuleAlias,
+        ModuleEntryType entryType,
+        String entryRoute,
+        String entryExternalUrl,
         Set<EntityCapability> capabilities,
         List<StaticModuleActionDefinition> actions,
         List<EntityDefinition> entities
@@ -22,7 +26,8 @@ public record StaticModuleDefinition(
                                   String title,
                                   String parentModuleAlias,
                                   List<StaticModuleActionDefinition> actions) {
-        this(applicationAlias, moduleAlias, title, parentModuleAlias, Set.of(), actions, List.of());
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
+                Set.of(), actions, List.of());
     }
 
     public StaticModuleDefinition(String applicationAlias,
@@ -31,7 +36,8 @@ public record StaticModuleDefinition(
                                   String parentModuleAlias,
                                   Set<EntityCapability> capabilities,
                                   List<StaticModuleActionDefinition> actions) {
-        this(applicationAlias, moduleAlias, title, parentModuleAlias, capabilities, actions, List.of());
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
+                capabilities, actions, List.of());
     }
 
     public StaticModuleDefinition {
@@ -43,6 +49,15 @@ public record StaticModuleDefinition(
         }
         if (parentModuleAlias != null) {
             parentModuleAlias = PlatformNameRules.requireModuleAliasInApplication(parentModuleAlias, applicationAlias);
+        }
+        if (entryType == null) {
+            entryType = ModuleEntryType.MODULE;
+        }
+        if (entryRoute != null) {
+            entryRoute = entryRoute.trim();
+        }
+        if (entryExternalUrl != null) {
+            entryExternalUrl = entryExternalUrl.trim();
         }
         capabilities = normalizeCapabilities(capabilities);
         actions = actions == null ? List.of() : List.copyOf(actions);

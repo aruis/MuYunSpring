@@ -96,6 +96,9 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
                     : definition.parentModuleAlias());
             module.setTitle(definition.title());
             module.setModuleKind(ModuleKind.STATIC);
+            module.setEntryType(definition.entryType());
+            module.setEntryRoute(definition.entryRoute());
+            module.setEntryExternalUrl(definition.entryExternalUrl());
             module.setSystemManaged(Boolean.TRUE);
             moduleService.insert(module);
             return;
@@ -106,6 +109,9 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
                 : definition.parentModuleAlias());
         module.setTitle(definition.title());
         module.setModuleKind(ModuleKind.STATIC);
+        module.setEntryType(definition.entryType());
+        module.setEntryRoute(definition.entryRoute());
+        module.setEntryExternalUrl(definition.entryExternalUrl());
         module.setSystemManaged(Boolean.TRUE);
         moduleService.update(module);
     }

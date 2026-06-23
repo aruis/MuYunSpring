@@ -16,6 +16,8 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplate;
 import net.ximatai.muyun.spring.platform.ui.PlatformQueryTemplateService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiConfig;
@@ -218,7 +220,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         }
         MenuType type = menu.getMenuType() == null ? MenuType.GROUP : menu.getMenuType();
         try {
-            if (type == MenuType.MODULE) {
+            if (isModuleEntryMenu(menu)) {
                 return visibilityPolicyService.canViewModuleMenu(menu.getModuleAlias(), CurrentUserContext.currentUser());
             }
             if (type == MenuType.GROUP) {
@@ -245,7 +247,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
 
     private Menu findVisibleModuleMenu(String schemeId, String parentId, String moduleAlias, Set<String> visiting) {
         for (Menu menu : visibleChildren(schemeId, parentId, visiting)) {
-            if (menu.getMenuType() == MenuType.MODULE && Objects.equals(menu.getModuleAlias(), moduleAlias)) {
+            if (isModuleEntryMenu(menu, moduleAlias)) {
                 return menu;
             }
             Menu found = findVisibleModuleMenu(schemeId, menu.getId(), moduleAlias, visiting);
@@ -254,6 +256,15 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             }
         }
         return null;
+    }
+
+    private boolean isModuleEntryMenu(Menu menu, String moduleAlias) {
+        return isModuleEntryMenu(menu)
+                && Objects.equals(menu.getModuleAlias(), moduleAlias);
+    }
+
+    private boolean isModuleEntryMenu(Menu menu) {
+        return menu.getMenuType() != MenuType.GROUP && hasText(menu.getModuleAlias());
     }
 
     private void normalizeAndValidate(Menu menu) {
@@ -288,28 +299,18 @@ public class MenuService extends AbstractAbilityService<Menu> implements
             }
             case MODULE -> {
                 requireOpenMode(menu);
-                String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
-                if (moduleService.resolveVisibleModule(moduleAlias) == null) {
-                    throw new PlatformException("MODULE menu requires existing module: " + moduleAlias);
-                }
-                menu.setModuleAlias(moduleAlias);
-                requireBlank(menu.getRoute(), "MODULE menu cannot have route");
-                requireBlank(menu.getExternalUrl(), "MODULE menu cannot have externalUrl");
-                normalizeModuleEntry(menu, moduleAlias);
+                PlatformModule module = requireModuleEntry(menu);
+                syncModuleEntry(menu, module);
             }
             case ROUTE -> {
                 requireOpenMode(menu);
-                requireText(menu.getRoute(), "ROUTE menu requires route");
-                requireBlank(menu.getModuleAlias(), "ROUTE menu cannot have moduleAlias");
-                requireBlank(menu.getExternalUrl(), "ROUTE menu cannot have externalUrl");
-                requireBlankEntry(menu, "ROUTE menu cannot have low-code entry config");
+                PlatformModule module = requireModuleEntry(menu);
+                syncModuleEntry(menu, module);
             }
             case LINK -> {
                 requireOpenMode(menu);
-                requireText(menu.getExternalUrl(), "LINK menu requires externalUrl");
-                requireBlank(menu.getModuleAlias(), "LINK menu cannot have moduleAlias");
-                requireBlank(menu.getRoute(), "LINK menu cannot have route");
-                requireBlankEntry(menu, "LINK menu cannot have low-code entry config");
+                PlatformModule module = requireModuleEntry(menu);
+                syncModuleEntry(menu, module);
             }
         }
     }
@@ -332,6 +333,54 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         }
         validateDefaultUiConfig(menu, moduleAlias);
         validateDefaultQueryTemplate(menu, moduleAlias);
+    }
+
+    private PlatformModule requireModuleEntry(Menu menu) {
+        requireText(menu.getModuleAlias(), menu.getMenuType() + " menu requires moduleAlias");
+        String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
+        PlatformModule module = moduleService.resolveVisibleModule(moduleAlias);
+        if (module == null) {
+            throw new PlatformException(menu.getMenuType() + " menu requires existing module: " + moduleAlias);
+        }
+        menu.setModuleAlias(moduleAlias);
+        return module;
+    }
+
+    private void syncModuleEntry(Menu menu, PlatformModule module) {
+        ModuleEntryType entryType = module.getEntryType() == null ? ModuleEntryType.MODULE : module.getEntryType();
+        menu.setMenuType(menuType(entryType));
+        switch (entryType) {
+            case MODULE -> {
+                menu.setRoute(null);
+                menu.setExternalUrl(null);
+                normalizeModuleEntry(menu, module.getAlias());
+            }
+            case ROUTE -> {
+                menu.setRoute(module.getEntryRoute());
+                menu.setExternalUrl(null);
+                clearLowCodeEntry(menu);
+            }
+            case LINK -> {
+                menu.setRoute(null);
+                menu.setExternalUrl(module.getEntryExternalUrl());
+                clearLowCodeEntry(menu);
+            }
+        }
+    }
+
+    private MenuType menuType(ModuleEntryType entryType) {
+        return switch (entryType) {
+            case MODULE -> MenuType.MODULE;
+            case ROUTE -> MenuType.ROUTE;
+            case LINK -> MenuType.LINK;
+        };
+    }
+
+    private void clearLowCodeEntry(Menu menu) {
+        menu.setPageMode(null);
+        menu.setDefaultUiConfigId(null);
+        menu.setDefaultQueryTemplateId(null);
+        menu.setEntryParamsJson(null);
     }
 
     private void validateDefaultUiConfig(Menu menu, String moduleAlias) {
