@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
@@ -107,6 +108,7 @@ class StaticModuleDefinitionRegistrarTest {
             assertThat(module.getApplicationAlias()).isEqualTo("iam");
             assertThat(module.getTitle()).isEqualTo("用户管理");
             assertThat(module.getModuleKind()).isEqualTo(ModuleKind.STATIC);
+            assertThat(module.getEntryType()).isEqualTo(ModuleEntryType.MODULE);
             assertThat(module.getSystemManaged()).isTrue();
         });
         ArgumentCaptor<PlatformModuleAction> actionCaptor = ArgumentCaptor.forClass(PlatformModuleAction.class);
@@ -130,6 +132,40 @@ class StaticModuleDefinitionRegistrarTest {
                     assertThat(action.getSystemManaged()).isTrue();
                     assertThat(action.getEnabled()).isTrue();
                 });
+    }
+
+    @Test
+    void shouldRegisterStaticModuleEntryOnPlatformModule() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        when(moduleService.select("iam.organization")).thenReturn(null);
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                moduleService,
+                actionService,
+                List.of(new StaticModuleDefinition(
+                        "iam",
+                        "iam.organization",
+                        "机构管理",
+                        null,
+                        ModuleEntryType.ROUTE,
+                        "/iam/organizations",
+                        null,
+                        java.util.Set.of(),
+                        List.of(),
+                        List.of()
+                ))
+        );
+
+        registrar.registerAll();
+
+        ArgumentCaptor<PlatformModule> moduleCaptor = ArgumentCaptor.forClass(PlatformModule.class);
+        verify(moduleService).insert(moduleCaptor.capture());
+        assertThat(moduleCaptor.getValue()).satisfies(module -> {
+            assertThat(module.getAlias()).isEqualTo("iam.organization");
+            assertThat(module.getEntryType()).isEqualTo(ModuleEntryType.ROUTE);
+            assertThat(module.getEntryRoute()).isEqualTo("/iam/organizations");
+            assertThat(module.getEntryExternalUrl()).isNull();
+        });
     }
 
     @Test

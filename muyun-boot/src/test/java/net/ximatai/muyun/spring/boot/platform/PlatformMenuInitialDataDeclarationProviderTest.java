@@ -115,7 +115,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     }
 
     @Test
-    void shouldRegisterRouteMenuWhenPlatformMenuDeclaresRoute() {
+    void shouldRegisterRouteMenuWhenStaticModuleDeclaresRoute() {
         try (GenericApplicationContext context = context(RouteModuleWeb.class)) {
             registerStaticModules(context);
             initializePlatformMenus(context);
@@ -423,8 +423,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     }
 
     @RestController
-    @PlatformStaticModule(application = "platform", alias = "platform.route", title = "路由模块")
-    @PlatformMenu(parent = PlatformMenuGroups.CONFIG, route = "/platform/routes")
+    @PlatformStaticModule(application = "platform", alias = "platform.route", title = "路由模块",
+            route = "/platform/routes")
+    @PlatformMenu(parent = PlatformMenuGroups.CONFIG)
     @RequestMapping("/platform.route")
     static class RouteModuleWeb {
     }

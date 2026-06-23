@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.MenuVisibilityPolicyService;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
@@ -200,9 +201,8 @@ class MenuServiceContractTest {
                     .hasMessageContaining("GROUP");
             Menu moduleWithRoute = moduleMenu(firstSchemeId, "错误模块路由", TreeAbility.ROOT_ID, "crm.customer");
             moduleWithRoute.setRoute("/customer");
-            assertThatThrownBy(() -> menuService.insert(moduleWithRoute))
-                    .isInstanceOf(PlatformException.class)
-                    .hasMessageContaining("MODULE");
+            String moduleWithRouteId = menuService.insert(moduleWithRoute);
+            assertThat(menuService.select(moduleWithRouteId).getRoute()).isNull();
             Menu groupWithOpenMode = groupMenu(firstSchemeId, "错误分组打开方式", TreeAbility.ROOT_ID);
             groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
             assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))
@@ -279,7 +279,7 @@ class MenuServiceContractTest {
 
     @Test
     void shouldTreatRouteMenuWithModuleAliasAsVisibleModuleEntry() {
-        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.customer".equals(moduleAlias);
+        MenuVisibilityPolicyService visibility = (moduleAlias, currentUser) -> "crm.route_customer".equals(moduleAlias);
         MenuService scopedMenuService = new MenuService(menuDao, schemeService, moduleService, Optional.of(visibility));
         String schemeId;
         String rootId;
@@ -287,19 +287,21 @@ class MenuServiceContractTest {
         String contractId;
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a");
              CurrentUserContext.Scope ignoredUser = CurrentUserContext.use(CurrentUser.tenantUser("user-1", "User", "tenant-a"))) {
+            insertRouteModule("crm.route_customer", "/crm/customers");
+            insertRouteModule("crm.route_contract", "/crm/contracts");
             schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
             rootId = scopedMenuService.insert(groupMenu(schemeId, "业务中心", TreeAbility.ROOT_ID));
             customerId = scopedMenuService.insert(routeMenu(
-                    schemeId, "客户", rootId, "crm.customer", "/crm/customers"));
+                    schemeId, "客户", rootId, "crm.route_customer"));
             contractId = scopedMenuService.insert(routeMenu(
-                    schemeId, "合同", rootId, "crm.contract", "/crm/contracts"));
+                    schemeId, "合同", rootId, "crm.route_contract"));
 
             assertThat(scopedMenuService.visibleChildren(schemeId, rootId))
                     .extracting(Menu::getId)
                     .containsExactly(customerId);
-            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.customer").getId())
+            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.route_customer").getId())
                     .isEqualTo(customerId);
-            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.contract"))
+            assertThat(scopedMenuService.currentUserVisibleModuleMenu("crm.route_contract"))
                     .isNull();
             assertThat(scopedMenuService.children(schemeId, rootId))
                     .extracting(Menu::getId)
@@ -308,23 +310,32 @@ class MenuServiceContractTest {
     }
 
     @Test
-    void shouldNormalizeAndValidateRouteMenuInternalPath() {
+    void shouldProjectRouteMenuFromModuleEntry() {
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            insertRouteModule("crm.route_customer", " /crm/customers ");
             String schemeId = schemeService.insert(scheme("default", MenuScopeType.TENANT, null));
             String menuId = menuService.insert(routeMenu(
-                    schemeId, "客户", TreeAbility.ROOT_ID, "crm.customer", " /crm/customers "));
+                    schemeId, "客户", TreeAbility.ROOT_ID, "crm.route_customer"));
 
-            assertThat(menuService.select(menuId).getRoute()).isEqualTo("/crm/customers");
-            assertThatThrownBy(() -> menuService.insert(routeMenu(
-                    schemeId, "坏路由", TreeAbility.ROOT_ID, "crm.customer", "crm/customers")))
+            assertThat(menuService.select(menuId)).satisfies(menu -> {
+                assertThat(menu.getMenuType()).isEqualTo(MenuType.ROUTE);
+                assertThat(menu.getRoute()).isEqualTo("/crm/customers");
+                assertThat(menu.getModuleAlias()).isEqualTo("crm.route_customer");
+                assertThat(menu.getPageMode()).isNull();
+            });
+        }
+    }
+
+    @Test
+    void shouldValidateRouteModuleInternalPath() {
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> insertRouteModule("crm.bad_route", "crm/customers"))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("internal path");
-            assertThatThrownBy(() -> menuService.insert(routeMenu(
-                    schemeId, "协议外链", TreeAbility.ROOT_ID, "crm.customer", "https://example.com/customers")))
+            assertThatThrownBy(() -> insertRouteModule("crm.external_route", "https://example.com/customers"))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("internal path");
-            assertThatThrownBy(() -> menuService.insert(routeMenu(
-                    schemeId, "协议相对外链", TreeAbility.ROOT_ID, "crm.customer", "//example.com/customers")))
+            assertThatThrownBy(() -> insertRouteModule("crm.protocol_relative", "//example.com/customers"))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("internal path");
         }
@@ -552,7 +563,7 @@ class MenuServiceContractTest {
         return menu;
     }
 
-    private Menu routeMenu(String schemeId, String title, String parentId, String moduleAlias, String route) {
+    private Menu routeMenu(String schemeId, String title, String parentId, String moduleAlias) {
         Menu menu = new Menu();
         menu.setSchemeId(schemeId);
         menu.setTitle(title);
@@ -560,7 +571,6 @@ class MenuServiceContractTest {
         menu.setMenuType(MenuType.ROUTE);
         menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
-        menu.setRoute(route);
         return menu;
     }
 
@@ -569,6 +579,16 @@ class MenuServiceContractTest {
         module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
         module.setAlias(alias);
         module.setTitle(alias);
+        moduleService.insert(module);
+    }
+
+    private void insertRouteModule(String alias, String route) {
+        PlatformModule module = new PlatformModule();
+        module.setApplicationAlias(alias.substring(0, alias.indexOf('.')));
+        module.setAlias(alias);
+        module.setTitle(alias);
+        module.setEntryType(ModuleEntryType.ROUTE);
+        module.setEntryRoute(route);
         moduleService.insert(module);
     }
 }

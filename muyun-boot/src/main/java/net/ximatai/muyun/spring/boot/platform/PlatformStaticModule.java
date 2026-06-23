@@ -18,5 +18,9 @@ public @interface PlatformStaticModule {
 
     String parent() default "";
 
+    String route() default "";
+
+    String externalUrl() default "";
+
     EntityCapability[] capabilities() default {};
 }
