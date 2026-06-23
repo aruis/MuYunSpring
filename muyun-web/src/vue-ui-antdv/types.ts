@@ -17,3 +17,20 @@ export interface UiDropdownItem {
   disabled?: boolean;
   danger?: boolean;
 }
+
+export interface UiTreeNode {
+  key: string;
+  title: string;
+  disabled?: boolean;
+  tag?: string;
+  muted?: boolean;
+  children?: UiTreeNode[];
+}
+
+export interface UiConfirmOptions {
+  title: string;
+  content?: string;
+  okText?: string;
+  cancelText?: string;
+  danger?: boolean;
+}

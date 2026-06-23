@@ -54,6 +54,7 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
       menuType: 'ROUTE',
       openMode: menu.openMode,
       route: menu.route,
+      moduleAlias: menu.moduleAlias,
       entryParamsJson: menu.entryParamsJson,
     };
   }
@@ -64,6 +65,7 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
       menuType: 'LINK',
       openMode: menu.openMode,
       externalUrl: menu.externalUrl,
+      moduleAlias: menu.moduleAlias,
       entryParamsJson: menu.entryParamsJson,
     };
   }
@@ -103,7 +105,7 @@ export function resolvePageDescriptor(
   }
 
   if (target.menuType === 'ROUTE') {
-    const routeTarget = routeTargetOf(target.route, target.query);
+    const routeTarget = routeTargetOf(target.route, target.query, target.moduleAlias);
     const pageType = isBusinessRouteTarget(routeTarget, options) ? 'business-route' : 'platform-route';
     const descriptorBase = {
       openMode: 'workbench-route' as const,
@@ -131,7 +133,7 @@ export function resolvePageDescriptor(
       hostType: 'external-page-host',
       title: options.title,
       menuId: target.menuId,
-      target: { url: target.externalUrl },
+      target: { url: target.externalUrl, moduleAlias: target.moduleAlias },
       entryParamsJson: target.entryParamsJson,
       tabPolicy: {
         identity: target.menuId ? 'by-menu' : 'by-target',
@@ -146,7 +148,7 @@ export function resolvePageDescriptor(
     hostType: 'external-page-host',
     title: options.title,
     menuId: target.menuId,
-    target: { url: target.externalUrl },
+    target: { url: target.externalUrl, moduleAlias: target.moduleAlias },
     entryParamsJson: target.entryParamsJson,
     tabPolicy: {
       identity: target.menuId ? 'by-menu' : 'by-target',
@@ -425,16 +427,20 @@ export function tryPageDescriptorFromUrl(
   }
 }
 
-function routeTargetOf(route: string, query?: Record<string, RouteQueryValue>): RoutePageTarget {
+function routeTargetOf(
+  route: string,
+  query?: Record<string, RouteQueryValue>,
+  moduleAlias?: string,
+): RoutePageTarget {
   if (route.startsWith('/')) {
-    return { route, query };
+    return { route, moduleAlias, query };
   }
 
   if (route.includes('.')) {
-    return { routeName: route, query };
+    return { routeName: route, moduleAlias, query };
   }
 
-  return { pageKey: route, query };
+  return { pageKey: route, moduleAlias, query };
 }
 
 function isBusinessRouteTarget(target: RoutePageTarget, options: PageDescriptorResolveOptions): boolean {

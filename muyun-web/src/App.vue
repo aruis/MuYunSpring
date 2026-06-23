@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import { createAuthClient, createHttpClient } from '@muyun/web-core';
+import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
 import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
 import {
   clearAuthToken,
@@ -10,7 +10,10 @@ import {
   saveAuthToken,
 } from './app/authSession';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
+import { createBackendHttpClient } from './app/backendHttp';
+import { businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
 import LoginView from './app/LoginView.vue';
+import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
@@ -26,13 +29,12 @@ const activeTabKey = ref<string>();
 const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
+const businessRouteResolveOptions = { businessRoutePrefixes };
 
-const authClient = createAuthClient(
-  createHttpClient({
-    baseUrl: import.meta.env.VITE_MUYUN_API_BASE_URL,
-    credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
-  }),
-);
+configureModuleContext({ httpFactory: createBackendHttpClient });
+provideModuleContextConfig({ httpFactory: createBackendHttpClient });
+
+const authClient = createAuthClient(createBackendHttpClient({ withAuth: false }));
 
 onMounted(async () => {
   if (!usesMockStartup() && !effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN)) {
@@ -48,7 +50,11 @@ async function loadWorkbench() {
   error.value = undefined;
   try {
     const startupState = await loadAppWorkbenchStartupState();
-    const state = restoreWorkbenchStartupStateFromUrl(startupState, currentBrowserPath());
+    const state = restoreWorkbenchStartupStateFromUrl(
+      startupState,
+      currentBrowserPath(),
+      businessRouteResolveOptions,
+    );
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
@@ -116,7 +122,7 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     return;
   }
 
-  const result = openMenuTab(current.tabs ?? [], menu, target);
+  const result = openMenuTab(current.tabs ?? [], menu, target, businessRouteResolveOptions);
   startup.value = {
     ...current,
     tabs: result.tabs,
@@ -179,10 +185,6 @@ function requiresLogin(cause: unknown) {
   }
   return isAuthenticationRequiredError(cause);
 }
-
-function credentialsOf(value: string | undefined) {
-  return value === 'include' || value === 'omit' || value === 'same-origin' ? value : undefined;
-}
 </script>
 
 <template>
@@ -205,7 +207,11 @@ function credentialsOf(value: string | undefined) {
     @user-command="handleUserCommand"
   >
     <template #default="{ pageDescriptor }">
-      <WorkbenchOutlet :descriptor="pageDescriptor" />
+      <StaticBusinessRouteOutlet
+        v-if="isStaticBusinessRoutePage(pageDescriptor)"
+        :descriptor="pageDescriptor"
+      />
+      <WorkbenchOutlet v-else :descriptor="pageDescriptor" />
     </template>
   </Workbench>
 </template>

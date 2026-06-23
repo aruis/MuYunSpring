@@ -105,6 +105,25 @@ test('resolvePageDescriptor keeps path, routeName, and pageKey available for off
   assert.equal(pageKeyDescriptor.target.pageKey, 'customerList');
 });
 
+test('resolvePageDescriptor carries route menu module alias for business module context', () => {
+  const target = getMenuNavigationTarget({
+    id: 'organization',
+    schemeId: 'default',
+    title: '组织管理',
+    menuType: 'ROUTE',
+    openMode: 'TAB',
+    route: '/iam/organizations',
+    moduleAlias: 'iam.organization',
+  });
+
+  assert.ok(target);
+  const descriptor = resolvePageDescriptor(target, { businessRoutePrefixes: ['/iam'] });
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.target.route, '/iam/organizations');
+  assert.equal(descriptor.target.moduleAlias, 'iam.organization');
+});
+
 test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptors', () => {
   const descriptor = resolvePageDescriptor({
     menuId: 'customer-module',
@@ -141,6 +160,7 @@ test('resolvePageDescriptor resolves LINK targets by open mode', () => {
     menuType: 'LINK',
     openMode: 'TAB',
     externalUrl: '/crm/customer/list',
+    moduleAlias: 'crm.customer',
   });
   const newWindowDescriptor = resolvePageDescriptor({
     menuId: 'external-bi',
@@ -152,6 +172,7 @@ test('resolvePageDescriptor resolves LINK targets by open mode', () => {
   assert.equal(iframeDescriptor.pageType, 'remote-url');
   assert.equal(iframeDescriptor.openMode, 'iframe');
   assert.equal(iframeDescriptor.hostType, 'external-page-host');
+  assert.equal(iframeDescriptor.target.moduleAlias, 'crm.customer');
   assert.equal(tabKeyOf(iframeDescriptor), 'menu:crm-online');
   assert.equal(
     pageDescriptorToUrl(iframeDescriptor),
@@ -165,6 +186,26 @@ test('resolvePageDescriptor resolves LINK targets by open mode', () => {
     pageDescriptorToUrl(newWindowDescriptor),
     '/platform/external?_muyunMenuId=external-bi&mode=new-window&url=https%3A%2F%2Fbi.example.com%2Freport',
   );
+});
+
+test('getMenuNavigationTarget carries link module alias for module-first menu entries', () => {
+  const target = getMenuNavigationTarget({
+    id: 'external-bi',
+    schemeId: 'default',
+    title: 'External BI',
+    menuType: 'LINK',
+    openMode: 'WINDOW',
+    externalUrl: 'https://bi.example.com/report',
+    moduleAlias: 'ops.report',
+  });
+
+  assert.ok(target);
+  assert.equal(target.menuType, 'LINK');
+  assert.equal(target.moduleAlias, 'ops.report');
+
+  const descriptor = resolvePageDescriptor(target);
+  assert.equal(descriptor.pageType, 'external-link');
+  assert.equal(descriptor.target.moduleAlias, 'ops.report');
 });
 
 test('pageDescriptorToUrl keeps new-window external links on workbench-owned URLs', () => {

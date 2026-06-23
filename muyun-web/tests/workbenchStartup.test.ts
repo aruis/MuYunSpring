@@ -441,6 +441,43 @@ test('restoreWorkbenchStartupStateFromUrl activates the matching menu tab', () =
   assert.equal(restored.tabs?.[0]?.target?.menuId, 'metadata');
 });
 
+test('restoreWorkbenchStartupStateFromUrl matches business route menus with module context', () => {
+  const state = {
+    session: { currentUser },
+    menus: [
+      {
+        record: {
+          id: 'organization',
+          schemeId: 'default',
+          title: '组织管理',
+          menuType: 'ROUTE' as const,
+          openMode: 'TAB' as const,
+          route: '/iam/organizations',
+          moduleAlias: 'iam.organization',
+        },
+        children: [],
+      },
+    ],
+    tabs: [],
+  };
+
+  const restored = restoreWorkbenchStartupStateFromUrl(
+    state,
+    '/iam/organizations?_muyunMenuId=organization',
+    { businessRoutePrefixes: ['/iam'] },
+  );
+
+  assert.equal(restored.activeTabKey, 'menu:organization');
+  assert.equal(restored.tabs?.[0]?.title, '组织管理');
+  assert.equal(restored.tabs?.[0]?.target?.menuId, 'organization');
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.pageType, 'business-route');
+  assert.equal(restored.tabs?.[0]?.pageDescriptor?.target.moduleAlias, 'iam.organization');
+  assert.equal(
+    activeTabUrlOf(restored),
+    '/iam/organizations?_muyunMenuId=organization&_muyunTitle=%E7%BB%84%E7%BB%87%E7%AE%A1%E7%90%86',
+  );
+});
+
 test('restoreWorkbenchStartupStateFromUrl preserves query when URL matches a menu tab', () => {
   const metadata = menus[0].children[0].children[0].record;
   const target = getMenuNavigationTarget(metadata);

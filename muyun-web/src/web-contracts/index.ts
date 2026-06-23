@@ -16,6 +16,20 @@ export interface WebListResponse<T> {
   records: T[];
 }
 
+export interface WebPageResponse<T> {
+  records: T[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+  pages: number;
+  totalKnown: boolean;
+  navigation?: unknown;
+}
+
+export interface WebCountResponse {
+  count: number;
+}
+
 export interface WebTreeNode<T> {
   record: T;
   children: WebTreeNode<T>[];
@@ -94,6 +108,7 @@ export interface RouteMenuTarget {
   menuType: 'ROUTE';
   openMode: MenuOpenMode;
   route: string;
+  moduleAlias?: string;
   entryParamsJson?: string;
   query?: Record<string, RouteQueryValue>;
 }
@@ -103,6 +118,7 @@ export interface ExternalLinkMenuTarget {
   menuType: 'LINK';
   openMode: MenuOpenMode;
   externalUrl: string;
+  moduleAlias?: string;
   entryParamsJson?: string;
 }
 
@@ -160,6 +176,7 @@ export interface RoutePageTarget {
   route?: string;
   routeName?: string;
   pageKey?: string;
+  moduleAlias?: string;
   query?: Record<string, RouteQueryValue>;
 }
 
@@ -193,6 +210,7 @@ export type DynamicModulePageDescriptor = PageDescriptorBase<
 
 export interface UrlPageTarget {
   url: string;
+  moduleAlias?: string;
 }
 
 export type RemoteUrlPageDescriptor = PageDescriptorBase<
@@ -230,6 +248,59 @@ export interface WorkbenchStartupState {
   menus: MenuTreeNode[];
   tabs?: MenuTab[];
   activeTabKey?: string;
+}
+
+export interface WebPageRequest {
+  pageNum: number;
+  pageSize: number;
+}
+
+export interface WebQueryRequest {
+  page?: WebPageRequest;
+  conditions?: unknown[];
+  criteria?: unknown;
+  queryForm?: Record<string, unknown>;
+  sorts?: unknown[];
+  quickSearch?: string;
+  quickSearchFields?: string[];
+}
+
+export interface StandardEntity {
+  id?: string;
+  tenantId?: string;
+  version?: number;
+  deleted?: boolean;
+  deletedAt?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface StandardTitledEntity extends StandardEntity {
+  title?: string;
+}
+
+export interface StandardSortableEntity extends StandardTitledEntity {
+  sortOrder?: number;
+}
+
+export interface StandardTreeEntity extends StandardSortableEntity {
+  parentId?: string;
+}
+
+export interface StandardEnabledTreeEntity extends StandardTreeEntity {
+  enabled?: boolean;
+}
+
+export interface Organization extends StandardEnabledTreeEntity {
+  code?: string;
+}
+
+export interface TreeSortRequest {
+  previousId?: string | null;
+  nextId?: string | null;
+  parentId?: string | null;
 }
 
 export type FieldKind = 'input' | 'select' | 'dictionary-select' | 'reference-select';
