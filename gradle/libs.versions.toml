@@ -1,6 +1,6 @@
 [versions]
 spring-boot = "3.5.0"
-spring-framework = "6.2.7"
+spring-framework = "7.0.8"
 spring-dependency-management = "1.1.7"
 muyun-database = "3.26.10"
 junit = "6.0.1"
