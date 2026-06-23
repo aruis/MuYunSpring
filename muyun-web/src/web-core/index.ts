@@ -5,7 +5,6 @@ import type {
   LoginRequest,
   LoginResult,
   MenuMineResponse,
-  Organization,
   RouteQueryValue,
   TreeSortRequest,
   WebCountResponse,
@@ -232,16 +231,11 @@ export interface StaticModuleCrudClient<TRecord> {
 }
 
 export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
-  tree(options?: { flat?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  tree(): Promise<WebListResponse<WebTreeNode<TRecord>>>;
   treeFlat(options?: { rootId?: string; includeSelf?: boolean }): Promise<WebListResponse<TRecord>>;
-  subtree(
-    id: string,
-    options?: { flat?: boolean; includeSelf?: boolean },
-  ): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  subtree(id: string, options?: { includeSelf?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
   sort(id: string, request: TreeSortRequest): Promise<WebCountResponse>;
 }
-
-export type OrganizationClient = StaticModuleTreeClient<Organization>;
 
 export interface ModuleContext<TRecord> {
   moduleAlias: string;
@@ -381,10 +375,9 @@ export function createStaticModuleTreeClient<TRecord>(
   const crud = createStaticModuleCrudClient<TRecord>(http, { moduleAlias: options.moduleAlias });
   return {
     ...crud,
-    tree: (query) =>
+    tree: () =>
       http.request<WebListResponse<WebTreeNode<TRecord>>>({
         path: `${modulePath}/tree`,
-        query,
       }),
     treeFlat: (options) => {
       const rootId = options?.rootId;
@@ -409,10 +402,6 @@ export function createStaticModuleTreeClient<TRecord>(
         body: request,
       }),
   };
-}
-
-export function createOrganizationClient(http: HttpClient): OrganizationClient {
-  return createStaticModuleTreeClient<Organization>(http, { moduleAlias: 'iam.organization' });
 }
 
 function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): ModuleContext<TRecord> {

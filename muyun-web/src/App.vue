@@ -1,18 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { Workbench, WorkbenchOutlet } from '@muyun/platform-workbench';
-import {
-  configureModuleContext,
-  createAuthClient,
-  ModuleContextProvider,
-  provideModuleContextConfig,
-} from '@muyun/web-core';
-import type {
-  MenuNavigationTarget,
-  MenuRecord,
-  PageDescriptor,
-  WorkbenchStartupState,
-} from '@muyun/web-contracts';
+import { configureModuleContext, createAuthClient, provideModuleContextConfig } from '@muyun/web-core';
+import type { MenuNavigationTarget, MenuRecord, WorkbenchStartupState } from '@muyun/web-contracts';
 import {
   clearAuthToken,
   effectiveAuthToken,
@@ -21,8 +11,9 @@ import {
 } from './app/authSession';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
+import { businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
 import LoginView from './app/LoginView.vue';
-import OrganizationManagementView from './views/OrganizationManagementView.vue';
+import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
 import {
   activeTabUrlOf,
   closeMenuTab,
@@ -38,6 +29,7 @@ const activeTabKey = ref<string>();
 const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
+const businessRouteResolveOptions = { businessRoutePrefixes };
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
@@ -58,9 +50,11 @@ async function loadWorkbench() {
   error.value = undefined;
   try {
     const startupState = await loadAppWorkbenchStartupState();
-    const state = restoreWorkbenchStartupStateFromUrl(startupState, currentBrowserPath(), {
-      businessRoutePrefixes: ['/iam'],
-    });
+    const state = restoreWorkbenchStartupStateFromUrl(
+      startupState,
+      currentBrowserPath(),
+      businessRouteResolveOptions,
+    );
     startup.value = state;
     activeTabKey.value = state.activeTabKey;
     loginRequired.value = false;
@@ -128,7 +122,7 @@ function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
     return;
   }
 
-  const result = openMenuTab(current.tabs ?? [], menu, target, { businessRoutePrefixes: ['/iam'] });
+  const result = openMenuTab(current.tabs ?? [], menu, target, businessRouteResolveOptions);
   startup.value = {
     ...current,
     tabs: result.tabs,
@@ -191,22 +185,6 @@ function requiresLogin(cause: unknown) {
   }
   return isAuthenticationRequiredError(cause);
 }
-
-function isOrganizationRoute(pageDescriptor?: PageDescriptor) {
-  return (
-    pageDescriptor?.pageType === 'business-route' && pageDescriptor.target.route === '/iam/organizations'
-  );
-}
-
-function moduleAliasOf(pageDescriptor?: PageDescriptor) {
-  if (pageDescriptor?.pageType !== 'business-route') {
-    return undefined;
-  }
-  return (
-    pageDescriptor.target.moduleAlias ??
-    (isOrganizationRoute(pageDescriptor) ? 'iam.organization' : undefined)
-  );
-}
 </script>
 
 <template>
@@ -229,12 +207,10 @@ function moduleAliasOf(pageDescriptor?: PageDescriptor) {
     @user-command="handleUserCommand"
   >
     <template #default="{ pageDescriptor }">
-      <ModuleContextProvider
-        v-if="isOrganizationRoute(pageDescriptor)"
-        :module-alias="moduleAliasOf(pageDescriptor)"
-      >
-        <OrganizationManagementView />
-      </ModuleContextProvider>
+      <StaticBusinessRouteOutlet
+        v-if="isStaticBusinessRoutePage(pageDescriptor)"
+        :descriptor="pageDescriptor"
+      />
       <WorkbenchOutlet v-else :descriptor="pageDescriptor" />
     </template>
   </Workbench>

@@ -6,7 +6,6 @@ import {
   createAuthClient,
   createHttpClient,
   createModuleContext,
-  createOrganizationClient,
   createStaticModuleTreeClient,
   normalizeError,
   platformErrorCodes,
@@ -74,7 +73,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
       moduleAlias: 'iam.organization',
     });
 
-    await client.tree({ flat: true });
+    await client.treeFlat();
     await client.insert({ title: '总部' });
     await client.sort('org-1', { parentId: 'root' });
 
@@ -85,25 +84,6 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     assert.deepEqual(await requests[1].json(), { title: '总部' });
     assert.equal(requests[2].url, 'http://api.local/iam.organization/sort/org-1');
     assert.deepEqual(await requests[2].json(), { parentId: 'root' });
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test('organization client binds iam organization base path', async () => {
-  const requests: Request[] = [];
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input, init) => {
-    requests.push(new Request(input, init));
-    return Response.json({ id: 'org-1', code: 'HQ', title: '总部' });
-  };
-
-  try {
-    const client = createOrganizationClient(createHttpClient({ baseUrl: 'http://api.local' }));
-
-    await client.view('org-1');
-
-    assert.equal(requests[0].url, 'http://api.local/iam.organization/view/org-1');
   } finally {
     globalThis.fetch = originalFetch;
   }

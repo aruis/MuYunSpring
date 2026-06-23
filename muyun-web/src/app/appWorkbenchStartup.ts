@@ -1,6 +1,7 @@
 import { createHttpClient, createMenuClient, createSessionClient } from '@muyun/web-core';
 import type { WorkbenchStartupState } from '@muyun/web-contracts';
 import { effectiveAuthToken } from './authSession';
+import { businessRoutePrefixes } from './businessRoutes';
 import { loadWorkbenchStartupState } from './workbenchStartup';
 
 export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupState> {
@@ -26,7 +27,7 @@ export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupSt
       menuClient: createMenuClient(httpClient),
     },
     {
-      businessRoutePrefixes: ['/iam'],
+      businessRoutePrefixes,
     },
   );
 }
