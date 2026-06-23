@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Organization } from '../src/web-contracts/index.ts';
-import type { ModuleTreeContext } from '../src/web-core/index.ts';
+import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
 import { createOrganizationManagementState } from '../src/views/organizationManagementState.ts';
 
 test('organization management state selects first loaded organization and creates child records', async () => {
@@ -88,10 +88,24 @@ test('organization management state respects delete confirmation result', async 
   assert.equal(state.actionMessage.value, '已删除');
 });
 
+test('organization management state exposes action authorization flags', () => {
+  const context = createContext({}, (actionCode) => actionCode === 'view');
+  const state = createOrganizationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'org-root', code: 'ROOT', title: '总部', enabled: true });
+
+  assert.equal(state.canCreate.value, false);
+  assert.equal(state.canUpdate.value, false);
+  assert.equal(state.canDelete.value, false);
+  assert.equal(state.canEnable.value, false);
+  assert.equal(state.canMutate.value, false);
+});
+
 function createContext(
-  overrides: Partial<ModuleTreeContext<Organization>['crud']> = {},
-): ModuleTreeContext<Organization> {
-  const crud: ModuleTreeContext<Organization>['crud'] = {
+  overrides: Partial<ModuleContext<Organization>['crud']> = {},
+  canAction: (actionCode: string) => boolean | undefined = () => true,
+): ModuleContext<Organization> {
+  const crud: ModuleContext<Organization>['crud'] = {
     query: async () => ({
       records: [],
       total: 0,
@@ -108,15 +122,56 @@ function createContext(
     disable: async () => ({ count: 1 }),
     ...overrides,
   };
+  const enable = {
+    enable: crud.enable,
+    disable: crud.disable,
+  };
+  const tree = {
+    ...crud,
+    tree: async () => ({ records: [] }),
+    treeFlat: async () => ({ records: [] }),
+    subtree: async () => ({ records: [] }),
+    sort: async () => ({ count: 1 }),
+  };
   return {
     moduleAlias: 'iam.organization',
     crud,
-    tree: {
-      ...crud,
-      tree: async () => ({ records: [] }),
-      treeFlat: async () => ({ records: [] }),
-      subtree: async () => ({ records: [] }),
-      sort: async () => ({ count: 1 }),
+    runtime: fakeRuntimeState(),
+    abilities: {
+      crud: () => crud,
+      tree: () => tree,
+      enable: () => enable,
+      tryCrud: () => crud,
+      tryTree: () => tree,
+      tryEnable: () => enable,
+      has: () => undefined,
+      hasCrud: () => undefined,
+      hasTree: () => undefined,
+      hasEnable: () => undefined,
     },
+    action: () => undefined,
+    can: canAction,
+  };
+}
+
+function fakeRuntimeState(): ModuleRuntimeContextState {
+  return {
+    ready: Promise.resolve({
+      moduleAlias: 'iam.organization',
+      capabilities: ['CRUD', 'TREE', 'ENABLE'],
+      abilities: ['crud', 'tree', 'enable'],
+      actions: [],
+    }),
+    load: async () => ({
+      moduleAlias: 'iam.organization',
+      capabilities: ['CRUD', 'TREE', 'ENABLE'],
+      abilities: ['crud', 'tree', 'enable'],
+      actions: [],
+    }),
+    snapshot: () => undefined,
+    error: () => undefined,
+    hasAbility: () => undefined,
+    action: () => undefined,
+    can: () => undefined,
   };
 }

@@ -2,12 +2,12 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { UiEmpty, UiError, UiSpin, UiTree, type UiTreeNode } from '@muyun/vue-ui-antdv';
 import type { Organization, WebTreeNode } from '@muyun/web-contracts';
-import { normalizeError, type ModuleTreeContext } from '@muyun/web-core';
+import { normalizeError, type ModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'OrganizationTree' });
 
 const props = defineProps<{
-  context: ModuleTreeContext<Organization>;
+  context: ModuleContext<Organization>;
   selectedId?: string;
   reloadKey?: number;
 }>();
@@ -36,7 +36,9 @@ async function loadTree() {
   loading.value = true;
   error.value = undefined;
   try {
-    const response = await props.context.tree.tree();
+    await props.context.runtime.ready;
+    const treeCapability = props.context.abilities.tree();
+    const response = await treeCapability.tree();
     tree.value = response.records;
     expandedKeys.value = firstTwoLevels(response.records);
     emit('loaded', flattenRecords(response.records));

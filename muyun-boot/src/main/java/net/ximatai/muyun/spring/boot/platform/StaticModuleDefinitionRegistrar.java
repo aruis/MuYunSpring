@@ -8,7 +8,6 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -16,8 +15,8 @@ import java.util.Set;
 public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     private final PlatformModuleService moduleService;
     private final PlatformModuleActionService actionService;
-    private final List<StaticModuleDefinition> definitions;
-    private final List<StaticModuleDefinitionScanner> scanners;
+    private final StaticModuleDefinitionCatalog definitionCatalog;
+    private final boolean disablesStaleSystemManagedModules;
 
     public StaticModuleDefinitionRegistrar(PlatformModuleService moduleService,
                                            PlatformModuleActionService actionService,
@@ -29,10 +28,21 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
                                            PlatformModuleActionService actionService,
                                            List<StaticModuleDefinition> definitions,
                                            List<StaticModuleDefinitionScanner> scanners) {
+        this(moduleService, actionService,
+                new StaticModuleDefinitionCatalog(definitions, scanners),
+                scanners != null && !scanners.isEmpty());
+    }
+
+    public StaticModuleDefinitionRegistrar(PlatformModuleService moduleService,
+                                           PlatformModuleActionService actionService,
+                                           StaticModuleDefinitionCatalog definitionCatalog,
+                                           boolean disablesStaleSystemManagedModules) {
         this.moduleService = moduleService;
         this.actionService = actionService;
-        this.definitions = definitions == null ? List.of() : List.copyOf(definitions);
-        this.scanners = scanners == null ? List.of() : List.copyOf(scanners);
+        this.definitionCatalog = definitionCatalog == null
+                ? new StaticModuleDefinitionCatalog(List.of())
+                : definitionCatalog;
+        this.disablesStaleSystemManagedModules = disablesStaleSystemManagedModules;
     }
 
     @Override
@@ -47,41 +57,12 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
 
     public void registerAll() {
         try (TenantContext.Scope ignored = TenantContext.system("register static modules")) {
-            List<StaticModuleDefinition> allDefinitions = allDefinitions();
+            List<StaticModuleDefinition> allDefinitions = definitionCatalog.definitions();
             for (StaticModuleDefinition definition : allDefinitions) {
                 registerModule(definition);
                 registerActions(definition);
             }
             disableStaleSystemManagedModules(allDefinitions);
-        }
-    }
-
-    private List<StaticModuleDefinition> allDefinitions() {
-        if (scanners.isEmpty()) {
-            validateDefinitions(definitions);
-            return definitions;
-        }
-        ArrayList<StaticModuleDefinition> all = new ArrayList<>(definitions);
-        for (StaticModuleDefinitionScanner scanner : scanners) {
-            all.addAll(scanner.scan());
-        }
-        validateDefinitions(all);
-        return List.copyOf(all);
-    }
-
-    private void validateDefinitions(List<StaticModuleDefinition> definitions) {
-        Set<String> modules = new HashSet<>();
-        for (StaticModuleDefinition definition : definitions) {
-            if (!modules.add(definition.moduleAlias())) {
-                throw new IllegalStateException("duplicate static module definition: " + definition.moduleAlias());
-            }
-            Set<String> actions = new HashSet<>();
-            for (StaticModuleActionDefinition action : definition.actions()) {
-                if (!actions.add(action.actionCode())) {
-                    throw new IllegalStateException("duplicate static module action definition: "
-                            + definition.moduleAlias() + "." + action.actionCode());
-                }
-            }
         }
     }
 
@@ -148,7 +129,7 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     }
 
     private void disableStaleSystemManagedModules(List<StaticModuleDefinition> definitions) {
-        if (scanners.isEmpty()) {
+        if (!disablesStaleSystemManagedModules) {
             return;
         }
         Set<String> currentModuleAliases = new HashSet<>();

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { OrganizationTree } from '@muyun/platform-components';
+import { ModuleActionButton, OrganizationTree } from '@muyun/platform-components';
 import type { Organization } from '@muyun/web-contracts';
-import { useModuleTreeContext } from '@muyun/web-core';
+import { useModuleContext } from '@muyun/web-core';
 import { confirmAction } from '@muyun/vue-ui-antdv';
 import { createOrganizationManagementState } from './organizationManagementState';
 
 defineOptions({ name: 'OrganizationManagementView' });
 
-const organizationContext = useModuleTreeContext<Organization>();
+const organizationContext = useModuleContext<Organization>();
 const {
   selected,
   draft,
@@ -18,7 +18,6 @@ const {
   actionMessage,
   cardTitle,
   readonly,
-  canMutate,
   handleTreeLoaded,
   handleSelect,
   startCreateRoot,
@@ -42,8 +41,17 @@ const {
         <button type="button" class="icon-button" title="刷新机构树" @click="reloadKey += 1">刷新</button>
       </div>
       <div class="sidebar-actions">
-        <button type="button" @click="startCreateRoot">新建根机构</button>
-        <button type="button" :disabled="!selected" @click="startCreateChild">新建下级</button>
+        <ModuleActionButton :context="organizationContext" action-code="create" @click="startCreateRoot">
+          新建根机构
+        </ModuleActionButton>
+        <ModuleActionButton
+          :context="organizationContext"
+          action-code="create"
+          :disabled="!selected"
+          @click="startCreateChild"
+        >
+          新建下级
+        </ModuleActionButton>
       </div>
       <OrganizationTree
         :context="organizationContext"
@@ -61,31 +69,56 @@ const {
           <h2>{{ cardTitle }}</h2>
         </div>
         <div class="card-actions">
-          <button v-if="mode === 'view'" type="button" :disabled="!canMutate" @click="startEdit">编辑</button>
-          <button v-if="mode === 'view'" type="button" :disabled="!canMutate" @click="startCreateChild">
-            新建下级
-          </button>
-          <button
+          <ModuleActionButton
             v-if="mode === 'view'"
-            type="button"
-            :disabled="!canMutate || saving"
+            :context="organizationContext"
+            action-code="update"
+            :disabled="!selected"
+            @click="startEdit"
+          >
+            编辑
+          </ModuleActionButton>
+          <ModuleActionButton
+            v-if="mode === 'view'"
+            :context="organizationContext"
+            action-code="create"
+            :disabled="!selected"
+            @click="startCreateChild"
+          >
+            新建下级
+          </ModuleActionButton>
+          <ModuleActionButton
+            v-if="mode === 'view'"
+            :context="organizationContext"
+            :action-code="selected?.enabled === false ? 'enable' : 'disable'"
+            :disabled="!selected"
+            :loading="saving"
             @click="toggleEnabled"
           >
             {{ selected?.enabled === false ? '启用' : '停用' }}
-          </button>
-          <button
+          </ModuleActionButton>
+          <ModuleActionButton
             v-if="mode === 'view'"
-            type="button"
-            class="danger"
-            :disabled="!canMutate || saving"
+            :context="organizationContext"
+            action-code="delete"
+            :disabled="!selected"
+            :loading="saving"
+            danger
             @click="removeSelected"
           >
             删除
-          </button>
+          </ModuleActionButton>
           <button v-if="mode !== 'view'" type="button" :disabled="saving" @click="cancelEdit">取消</button>
-          <button v-if="mode !== 'view'" type="button" class="primary" :disabled="saving" @click="save">
+          <ModuleActionButton
+            v-if="mode !== 'view'"
+            :context="organizationContext"
+            :action-code="mode === 'create' ? 'create' : 'update'"
+            :loading="saving"
+            primary
+            @click="save"
+          >
             {{ saving ? '保存中' : '保存' }}
-          </button>
+          </ModuleActionButton>
         </div>
       </header>
 
