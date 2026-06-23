@@ -247,13 +247,13 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | 二级 | `platform.menu.group.identity` | 组织与权限           | `platform.menu.group.platform` |
 | 二级 | `platform.menu.group.ops`      | 平台运行运维         | `platform.menu.group.platform` |
 
-第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`，`openMode` 默认 `TAB`，需要外部窗口打开时由注解显式声明。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+`@PlatformMenu` 默认生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`，`openMode` 默认 `TAB`，需要外部窗口打开时由注解显式声明。声明 `route` 时生成 `ROUTE` 菜单，并保留 `moduleAlias` 作为权限和模块上下文锚点；`ROUTE + moduleAlias` 不承载 `pageMode/defaultUiConfig/defaultQueryTemplate` 等低代码入口配置。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
 
 注册顺序是先注册静态模块和动作，再执行初始化数据能力。平台菜单只做同方案内治理，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。菜单方案的 `alias/scope/tenantId` 和菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案或身份字段漂移，应显式失败，而不是启动时自动迁移。
 
 菜单方案、默认分组和模块菜单的结构字段由平台持续校准；标题、排序、启停属于运维字段，创建后重启不覆盖运维调整。需要强锁定的系统数据应显式使用 `LOCKED` 策略，不作为默认行为。
 
-前端消费这类菜单时需要区分静态模块和动态模块。当前菜单模型表达 `MODULE + moduleAlias + openMode`，前端再按模块类型和打开方式选择 PageHost。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
+前端消费这类菜单时需要区分静态模块和动态模块。菜单模型用 `MODULE + moduleAlias + openMode` 表达动态模块入口，用 `ROUTE + route + moduleAlias` 表达静态业务页面入口；两者都可以通过 `moduleAlias` 参与菜单授权和可见性裁剪。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
 
 ## 数据字典
 

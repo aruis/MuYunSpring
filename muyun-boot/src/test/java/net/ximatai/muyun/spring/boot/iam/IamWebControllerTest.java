@@ -40,6 +40,7 @@ import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -476,25 +477,45 @@ class IamWebControllerTest {
 
         Menu group = menu("group-1", "scheme-1", MenuType.GROUP, null);
         Menu contract = menu("menu-1", "scheme-1", MenuType.MODULE, "sales.contract");
+        Menu organization = menu("menu-2", "scheme-1", MenuType.ROUTE, "iam.organization");
+        organization.setRoute("/iam/organizations");
         when(menuService.rootMenus("scheme-1")).thenReturn(List.of(group));
-        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract));
+        when(menuService.children("scheme-1", "group-1")).thenReturn(List.of(contract, organization));
         when(menuService.children("scheme-1", "menu-1")).thenReturn(List.of());
+        when(menuService.children("scheme-1", "menu-2")).thenReturn(List.of());
         when(roleService.permissionMatrix(any(), any())).thenReturn(new RolePermissionMatrix(
                 "role-1",
-                List.of(new RolePermissionMatrix.Module(
-                        "sales.contract",
-                        List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
-                                "sales.contract", "menu", "menu", "Menu",
-                                true, false, true, DataScopePolicy.NONE,
-                                TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                List.of(
+                        new RolePermissionMatrix.Module(
+                                "sales.contract",
+                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
+                                        "sales.contract", "menu", "menu", "Menu",
+                                        true, false, true, DataScopePolicy.NONE,
+                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                        ),
+                        new RolePermissionMatrix.Module(
+                                "iam.organization",
+                                List.of(new net.ximatai.muyun.spring.iam.role.RolePermissionAction(
+                                        "iam.organization", "menu", "menu", "Menu",
+                                        true, false, true, DataScopePolicy.NONE,
+                                        TenantScopePolicy.CURRENT_TENANT, null, null, null))
+                        )
                 ))
-        ));
+        );
 
         mvc.perform(get("/iam.role/menuMatrix/{roleId}/{schemeId}", "role-1", "scheme-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].menu.id").value("group-1"))
                 .andExpect(jsonPath("$.records[0].children[0].menu.id").value("menu-1"))
-                .andExpect(jsonPath("$.records[0].children[0].granted").value(true));
+                .andExpect(jsonPath("$.records[0].children[0].granted").value(true))
+                .andExpect(jsonPath("$.records[0].children[1].menu.id").value("menu-2"))
+                .andExpect(jsonPath("$.records[0].children[1].granted").value(true));
+
+        ArgumentCaptor<List<GrantableAction>> actionsCaptor = ArgumentCaptor.captor();
+        verify(roleService).permissionMatrix(any(), actionsCaptor.capture());
+        assertThat(actionsCaptor.getValue())
+                .extracting(GrantableAction::moduleAlias)
+                .containsExactly("sales.contract", "iam.organization");
     }
 
     @Test
