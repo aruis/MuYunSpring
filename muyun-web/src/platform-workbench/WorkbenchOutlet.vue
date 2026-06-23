@@ -15,7 +15,7 @@ import ExternalPageHost from './hosts/ExternalPageHost.vue';
 import PlatformRouteHost from './hosts/PlatformRouteHost.vue';
 import { resolvePageHostComponentName } from './pageHostRegistry';
 
-defineOptions({ name: 'PageHostOutlet' });
+defineOptions({ name: 'WorkbenchOutlet' });
 
 const props = defineProps<{
   descriptor?: PageDescriptor;

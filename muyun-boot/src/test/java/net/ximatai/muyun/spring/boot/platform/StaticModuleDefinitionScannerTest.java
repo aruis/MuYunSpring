@@ -16,6 +16,7 @@ import net.ximatai.muyun.spring.boot.workflow.WorkflowRuntimeAdminWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowDefinitionWebController;
 import net.ximatai.muyun.spring.boot.workflow.WorkflowVersionWebController;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
+import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionExecutorType;
@@ -216,13 +217,16 @@ class StaticModuleDefinitionScannerTest {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.registerBean(MenuSchemeWebController.class);
             context.registerBean(MenuManagementWebController.class);
+            context.registerBean(DictionaryCategoryWebController.class);
+            context.registerBean(DictionaryItemWebController.class);
             context.refresh();
             StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
 
             Map<String, StaticModuleDefinition> byAlias = scanner.scan().stream()
                     .collect(Collectors.toMap(StaticModuleDefinition::moduleAlias, Function.identity()));
 
-            assertThat(byAlias.keySet()).containsExactlyInAnyOrder("platform.menu_scheme", "platform.menu");
+            assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
+                    "platform.menu_scheme", "platform.menu", "platform.dictionary_category");
             assertThat(byAlias.get("platform.menu_scheme").actions())
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
@@ -231,6 +235,34 @@ class StaticModuleDefinitionScannerTest {
                     .extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder("create", "view", "update", "delete", "query",
                             "tree", "sort", "enable", "disable");
+            assertThat(byAlias.get("platform.dictionary_category").actions())
+                    .extracting(StaticModuleActionDefinition::actionCode)
+                    .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
+                            "tree", "sort", "enable", "disable",
+                            "item_create", "item_view", "item_update", "item_delete", "item_query",
+                            "item_tree", "item_sort", "item_enable", "item_disable");
+            assertThat(byAlias.get("platform.dictionary_category").actions())
+                    .filteredOn(action -> action.actionCode().equals("item_query"))
+                    .singleElement()
+                    .satisfies(action -> {
+                        assertThat(action.permissionActionCode()).isEqualTo("item_view");
+                        assertThat(action.title()).isEqualTo("查询字典项");
+                    });
+        }
+    }
+
+    @Test
+    void shouldRejectActionContributionConflictingWithTargetModuleAction() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.registerBean(ConflictingDictionaryCategoryWeb.class);
+            context.registerBean(DictionaryItemWebController.class);
+            context.refresh();
+            StaticModuleDefinitionScanner scanner = new StaticModuleDefinitionScanner(context);
+
+            assertThatThrownBy(scanner::scan)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("action conflicts with target module")
+                    .hasMessageContaining("platform.dictionary_category.item_query");
         }
     }
 
@@ -294,6 +326,7 @@ class StaticModuleDefinitionScannerTest {
             assertThat(definition.moduleAlias()).isEqualTo(WorkflowActionPolicyService.MANAGEMENT_MODULE_ALIAS);
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                     .containsExactlyInAnyOrder(
+                            "menu",
                             WorkflowActionPolicyService.MANAGEMENT_QUERY_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_TODO_TASK_QUERY_ACTION,
                             WorkflowActionPolicyService.MANAGEMENT_FORCE_APPROVE_ACTION,
@@ -449,7 +482,8 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(definition.moduleAlias()).isEqualTo("platform.low_code_governance");
             assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                    .containsExactlyInAnyOrder("checkPackageHealth", "archivePackage", "switchCurrentPackageVersion",
+                    .containsExactlyInAnyOrder("menu",
+                            "checkPackageHealth", "archivePackage", "switchCurrentPackageVersion",
                             "exportCurrentPackage", "exportVersionPackage", "dryRunImportPackage",
                             "prepareImportDraft", "archiveImportDraft",
                             "createTemplateFromVersion", "instantiateTemplate");
@@ -538,6 +572,14 @@ class StaticModuleDefinitionScannerTest {
     @PlatformStaticModule(application = "sales", alias = "sales.contract", title = "合同",
             capabilities = EntityCapability.APPROVAL)
     static class WorkflowEnabledWeb {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "platform", alias = "platform.dictionary_category", title = "字典管理")
+    static class ConflictingDictionaryCategoryWeb {
+        @CustomActionEndpoint("item_query")
+        public void itemQuery() {
+        }
     }
 
     @RestController

@@ -56,6 +56,10 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
         return children(applicationAlias, TreeAbility.ROOT_ID);
     }
 
+    public List<DictionaryCategory> rootCategories() {
+        return TreeAbility.super.children(TreeAbility.ROOT_ID);
+    }
+
     public List<DictionaryCategory> children(String applicationAlias, String parentId) {
         return TreeAbility.super.children(applicationScope(PlatformNameRules.requireApplicationAlias(applicationAlias)), parentId);
     }
@@ -71,6 +75,18 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
         }
         if (category.getCategoryKind() != DictionaryCategoryKind.DICTIONARY) {
             throw new PlatformException("Dictionary items require DICTIONARY category: " + validCategoryAlias);
+        }
+        return category;
+    }
+
+    public DictionaryCategory requireDictionaryCategory(String categoryId) {
+        String validCategoryId = requireText(categoryId, "dictionaryCategoryId");
+        DictionaryCategory category = select(validCategoryId);
+        if (category == null) {
+            throw new PlatformException("Dictionary category requires existing category: " + validCategoryId);
+        }
+        if (category.getCategoryKind() != DictionaryCategoryKind.DICTIONARY) {
+            throw new PlatformException("Dictionary items require DICTIONARY category: " + validCategoryId);
         }
         return category;
     }
@@ -116,5 +132,12 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
 
     private Criteria applicationScope(String applicationAlias) {
         return Criteria.of().eq("applicationAlias", applicationAlias);
+    }
+
+    private String requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new PlatformException(name + " is required");
+        }
+        return value.trim();
     }
 }

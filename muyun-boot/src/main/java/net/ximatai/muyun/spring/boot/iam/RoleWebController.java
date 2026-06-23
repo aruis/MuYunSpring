@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.role", title = "角色管理")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 40)
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 70)
 @RequestMapping("/iam.role")
 public class RoleWebController extends WebSupport<RoleService> implements
         CrudWeb<Role, RoleService>,

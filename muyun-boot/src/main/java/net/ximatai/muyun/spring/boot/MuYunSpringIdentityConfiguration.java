@@ -11,6 +11,7 @@ import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.RequestTraceWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.iam.role.RoleActionDao;
@@ -59,6 +60,12 @@ public class MuYunSpringIdentityConfiguration {
     @ConditionalOnMissingBean(CurrentUserWebFilter.class)
     public CurrentUserWebFilter currentUserWebFilter(CurrentUserProvider currentUserProvider) {
         return new CurrentUserWebFilter(currentUserProvider);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(RequestTraceWebFilter.class)
+    public RequestTraceWebFilter requestTraceWebFilter() {
+        return new RequestTraceWebFilter();
     }
 
     @Bean

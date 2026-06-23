@@ -261,50 +261,6 @@ record DynamicWebActionResultBody(String type,
     }
 }
 
-record DynamicWebError(String code,
-                       int status,
-                       String message,
-                       String traceId) {
-    static DynamicWebError badRequest(String message) {
-        return new DynamicWebError("DYNAMIC_BAD_REQUEST", 400, message, null);
-    }
-
-    static DynamicWebError uiValidation(String message) {
-        return new DynamicWebError("DYNAMIC_UI_VALIDATION", 400, message, null);
-    }
-
-    static DynamicWebError attachment(String message) {
-        return new DynamicWebError("DYNAMIC_ATTACHMENT_ERROR", 400, message, null);
-    }
-
-    static DynamicWebError duplicateCheck(String message) {
-        return new DynamicWebError("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, message, null);
-    }
-
-    static DynamicWebError conflict(String message) {
-        return new DynamicWebError("DYNAMIC_CONFLICT", 409, message, null);
-    }
-}
-
-record DynamicWebActionError(String code,
-                             int status,
-                             String message,
-                             String failureStage,
-                             String traceId,
-                             DynamicWebActionContext context) {
-    static DynamicWebActionError from(DynamicActionExecutionException exception) {
-        DynamicWebActionContext context = DynamicWebActionContext.from(exception.context());
-        return new DynamicWebActionError(
-                "DYNAMIC_ACTION_FAILED",
-                400,
-                exception.getMessage(),
-                exception.failureStage(),
-                context == null ? null : context.traceId(),
-                context
-        );
-    }
-}
-
 final class DynamicWebValues {
     private DynamicWebValues() {
     }

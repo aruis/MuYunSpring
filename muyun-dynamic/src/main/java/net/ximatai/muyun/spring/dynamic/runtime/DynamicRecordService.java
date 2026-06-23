@@ -26,6 +26,7 @@ import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.common.web.RequestTraceContext;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicActionDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationItem;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
@@ -1666,7 +1667,7 @@ public class DynamicRecordService {
             DynamicRecord availabilityRecord = availabilityRecord(moduleAlias, entityAlias, scopedRequest);
             return actionAvailability(moduleAlias, entityAlias, action.code(), availabilityRecord);
         });
-        String traceId = UUID.randomUUID().toString();
+        String traceId = actionTraceId();
         DynamicActionExecutionContext context = executionContext(moduleAlias, entityAlias, action, scopedRequest,
                 availability, null, traceId, authorization);
         if (!availability.available()) {
@@ -2022,7 +2023,11 @@ public class DynamicRecordService {
                                                            DynamicActionDescriptor action,
                                                            DynamicActionExecutionRequest request,
                                                            DynamicActionAvailability availability) {
-        return executionContext(moduleAlias, entityAlias, action, request, availability, null, UUID.randomUUID().toString(), null);
+        return executionContext(moduleAlias, entityAlias, action, request, availability, null, actionTraceId(), null);
+    }
+
+    private String actionTraceId() {
+        return RequestTraceContext.currentTraceId().orElseGet(() -> UUID.randomUUID().toString());
     }
 
     private DynamicActionExecutionContext executionContext(String moduleAlias,

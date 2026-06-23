@@ -24,6 +24,7 @@ import net.ximatai.muyun.spring.platform.dictionary.DictionaryFieldValueValidato
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItem;
 import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuScopeType;
@@ -102,7 +103,7 @@ class PlatformDynamicRuntimeRefresherIT {
         services.moduleService.insert(module("crm.customer"));
         String categoryId = services.categoryService.insert(
                 category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY));
-        services.itemService.insert(item("crm", "customer_status", "active"));
+        services.itemService.insert(item(categoryId, "customer_status", "active"));
         String customerMetadataId = services.metadataService.insert(metadata("crm", "customer", "platform_refresh_customer_it"));
         String contactMetadataId = services.metadataService.insert(metadata("crm", "customer_contact", "platform_refresh_contact_it"));
         services.fieldService.insert(titleField(customerMetadataId));
@@ -456,6 +457,7 @@ class PlatformDynamicRuntimeRefresherIT {
         Menu menu = new Menu();
         menu.setSchemeId(schemeId);
         menu.setMenuType(MenuType.MODULE);
+        menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         menu.setTitle(title);
         return menu;
@@ -470,9 +472,9 @@ class PlatformDynamicRuntimeRefresherIT {
         return category;
     }
 
-    private DictionaryItem item(String applicationAlias, String categoryAlias, String code) {
+    private DictionaryItem item(String categoryId, String categoryAlias, String code) {
         DictionaryItem item = new DictionaryItem();
-        item.setApplicationAlias(applicationAlias);
+        item.setCategoryId(categoryId);
         item.setCategoryAlias(categoryAlias);
         item.setCode(code);
         item.setTitle(code);

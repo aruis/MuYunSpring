@@ -9,6 +9,8 @@ import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSort;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -73,6 +75,7 @@ class DynamicExportWebControllerTest {
         mvc = MockMvcBuilders
                 .standaloneSetup(new DynamicExportWebController(
                         recordService, activeTenantVerifier, exportFacade))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -118,6 +121,7 @@ class DynamicExportWebControllerTest {
         MockMvc exportMvc = MockMvcBuilders
                 .standaloneSetup(new DynamicExportWebController(
                         recordService, activeTenantVerifier, exportFacade, snapshotService, queryItemService))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -213,6 +217,7 @@ class DynamicExportWebControllerTest {
                 .standaloneSetup(new DynamicExportWebController(
                         recordService, activeTenantVerifier, exportFacade,
                         snapshotService, queryItemService, moduleFieldService))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();
@@ -327,6 +332,7 @@ class DynamicExportWebControllerTest {
                 .standaloneSetup(new DynamicExportWebController(
                         recordService, activeTenantVerifier, exportFacade,
                         snapshotService, null, moduleFieldService))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
                         CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
                 .build();

@@ -20,6 +20,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityViewType;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
@@ -157,6 +158,7 @@ class PlatformUiConfigurationServiceContractTest {
         menu.setId("menu-1");
         menu.setTitle("Contracts");
         menu.setMenuType(MenuType.MODULE);
+        menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias("crm.contract");
         menu.setPageMode(MenuPageMode.LIST);
         MenuService menuService = org.mockito.Mockito.mock(MenuService.class);
@@ -194,6 +196,7 @@ class PlatformUiConfigurationServiceContractTest {
         menu.setId("menu-virtual");
         menu.setTitle("Customers");
         menu.setMenuType(MenuType.MODULE);
+        menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias("crm.customer");
         menu.setPageMode(MenuPageMode.LIST);
         MenuService menuService = org.mockito.Mockito.mock(MenuService.class);

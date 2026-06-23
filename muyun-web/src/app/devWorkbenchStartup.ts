@@ -1,8 +1,8 @@
 import { createMockMenuClient, createMockSessionClient } from '@/web-core/mock';
-import { loadShellStartupState } from './shellStartup';
+import { loadWorkbenchStartupState } from './workbenchStartup';
 
-export function loadDevShellStartupState() {
-  return loadShellStartupState({
+export function loadDevWorkbenchStartupState() {
+  return loadWorkbenchStartupState({
     sessionClient: createMockSessionClient(),
     menuClient: createMockMenuClient(),
   });
