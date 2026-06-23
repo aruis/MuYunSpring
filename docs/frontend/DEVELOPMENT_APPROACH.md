@@ -29,7 +29,7 @@
 启动应用
 获取当前会话
 获取菜单树
-渲染 Shell 菜单
+渲染 Workbench 菜单
 点击菜单
 打开菜单 tab
 内容区渲染占位页
@@ -40,7 +40,7 @@
 1. 会话、租户、菜单和路由语义是否能进入 `web-contracts`。
 2. HTTP、请求上下文、错误、Query 治理、会话和菜单读取是否能进入 `web-core`。
 3. 基础 UI adapter 是否能支撑菜单、页签、顶部栏、loading、empty 和 error。
-4. `platform-shell` 是否能承载侧边菜单、顶部栏、内容区、菜单 tab 和全局状态出口。
+4. `platform-workbench` 是否能承载侧边菜单、顶部栏、内容区、菜单 tab 和全局状态出口。
 5. 业务项目后续是否能通过 `@muyun/*` 包名复用同一套主框架。
 
 ## 第一阶段建议
@@ -70,10 +70,10 @@ UiEmpty
 UiError
 ```
 
-建议强化的 Shell 能力：
+建议强化的 Workbench 能力：
 
 ```text
-AdminShell / PlatformShell
+Workbench
 侧边菜单
 顶部栏
 用户和租户入口占位
@@ -87,15 +87,15 @@ AdminShell / PlatformShell
 
 ## 临时后端联调
 
-菜单初始化数据可用后，前端第一轮后端联调只验证登录上下文、`/platform.menu/mine` 菜单树和 shell menu+tab 消费链路，不立即扩大到动态页面 entry/bootstrap。
+菜单初始化数据可用后，前端第一轮后端联调只验证登录上下文、`/platform.menu/mine` 菜单树和 Workbench menu+tab 消费链路，不立即扩大到动态页面 entry/bootstrap。
 
 联调方式：
 
-1. 后端启动裸库或可重置测试库，确认初始化数据已创建平台超级管理员、系统菜单方案、默认一级分组和 `@PlatformMenu` 模块菜单。
+1. 后端启动裸库或可重置测试库，确认初始化数据已创建平台超级管理员、系统菜单方案、默认 1-2-3 导航分组和 `@PlatformMenu` 模块菜单。
 2. 前端执行 `npm run dev:backend --prefix muyun-web`，该模式使用 `muyun-web/.env.backend`，关闭 mock 并请求本地后端。
 3. 浏览器打开前端后使用简易登录页登录；本地可通过 `VITE_MUYUN_LOGIN_TENANT_ID`、`VITE_MUYUN_LOGIN_USERNAME`、`VITE_MUYUN_LOGIN_PASSWORD` 预填联调账号。
 4. 登录成功后前端将 token 存入浏览器本地 storage，后续请求自动携带 `Authorization: Bearer <token>`。
-5. 验证 shell 能加载 `/iam.auth/context` 和 `/platform.menu/mine`，菜单分组能展开，点击菜单能打开稳定的 `menu:<menuId>` tab。
+5. 验证 Workbench 能加载 `/iam.auth/context` 和 `/platform.menu/mine`，菜单分组能展开，点击菜单能打开稳定的 `menu:<menuId>` tab。
 
 `muyun-web/.env.backend.local` 仍可写入 `VITE_MUYUN_AUTH_TOKEN=<token>` 作为自动化或特殊调试兜底，也可写入登录页本地预填项；这些值只应保留在本机配置中。
 
@@ -110,7 +110,7 @@ AdminShell / PlatformShell
 3. 在 `web-contracts` 收口必要类型。
 4. 在 `web-core` 补齐必要 client、上下文、错误和缓存入口。
 5. 在 `vue-ui-antdv` 或 `platform-components` 沉淀必要 UI 能力。
-6. 用 `platform-shell` 或业务示例完成可运行闭环。
+6. 用 `platform-workbench` 或业务示例完成可运行闭环。
 7. 通过测试、边界检查或示例构建锁住新增契约。
 8. 复盘哪些能力上升、保留、暂缓或明确不做。
 
@@ -118,13 +118,13 @@ AdminShell / PlatformShell
 
 每轮结束后按以下口径归类：
 
-| 归属 | 判断口径 |
-| --- | --- |
+| 归属     | 判断口径                                                   |
+| -------- | ---------------------------------------------------------- |
 | 当前要做 | 本轮主框架闭环必须依赖，且不做会导致后续页面绕过平台边界。 |
 | 上升平台 | 语义稳定、跨业务复用、依赖平台标准能力，并能降低接入成本。 |
-| 业务保留 | 只服务单业务，或抽象后收益不清楚。 |
-| 后续预留 | 方向明确但当前闭环不需要，提前建设会扩大范围。 |
-| 明确不做 | 业务面未看清、变化风险高，或与当前平台路线不一致。 |
+| 业务保留 | 只服务单业务，或抽象后收益不清楚。                         |
+| 后续预留 | 方向明确但当前闭环不需要，提前建设会扩大范围。             |
+| 明确不做 | 业务面未看清、变化风险高，或与当前平台路线不一致。         |
 
 ## 第二阶段候选
 

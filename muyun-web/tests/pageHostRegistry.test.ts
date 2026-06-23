@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolvePageHostComponentName } from '../src/platform-shell/pageHostRegistry.ts';
+import { resolvePageHostComponentName } from '../src/platform-workbench/pageHostRegistry.ts';
 
 test('resolvePageHostComponentName maps platform route hosts to PlatformRouteHost', () => {
   assert.equal(resolvePageHostComponentName('platform-route-host'), 'PlatformRouteHost');

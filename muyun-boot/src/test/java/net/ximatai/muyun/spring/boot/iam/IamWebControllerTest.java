@@ -34,6 +34,7 @@ import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.junit.jupiter.api.AfterEach;
@@ -578,6 +579,9 @@ class IamWebControllerTest {
         menu.setId(id);
         menu.setSchemeId(schemeId);
         menu.setMenuType(menuType);
+        if (menuType != MenuType.GROUP) {
+            menu.setOpenMode(MenuOpenMode.TAB);
+        }
         menu.setModuleAlias(moduleAlias);
         menu.setTitle(id);
         menu.setEnabled(Boolean.TRUE);

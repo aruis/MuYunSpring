@@ -1,5 +1,11 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
-import type { CurrentUser, LoginRequest, LoginResult, MenuMineResponse, RouteQueryValue } from '@muyun/web-contracts';
+import type {
+  CurrentUser,
+  LoginRequest,
+  LoginResult,
+  MenuMineResponse,
+  RouteQueryValue,
+} from '@muyun/web-contracts';
 
 export interface RequestContext {
   baseUrl?: string;
@@ -31,7 +37,7 @@ export interface ErrorTarget {
 
 export interface ErrorUiContext {
   phase: 'page-load' | 'action' | 'background';
-  surface: 'shell' | 'form' | 'table' | 'dialog' | 'unknown';
+  surface: 'workbench' | 'form' | 'table' | 'dialog' | 'unknown';
 }
 
 export type GlobalErrorSlot = 'redirect-login' | 'page-error' | 'global-toast' | 'global-modal' | 'silent';

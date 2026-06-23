@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.platform.initialdata.InitialDataConflictExceptio
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclaration;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuPageMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
@@ -86,6 +87,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                     .isEqualTo("platform.menu.module.platform.module");
             assertThat(platformModuleMenu).satisfies(menu -> {
                 assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
+                assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(menu.getModuleAlias()).isEqualTo("platform.module");
                 assertThat(menu.getPageMode()).isEqualTo(MenuPageMode.LIST);
                 assertThat(menu.getTitle()).isEqualTo("模块管理");
@@ -95,6 +97,19 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                     .extracting(Menu::getModuleAlias)
                     .containsExactly("iam.role");
             assertThat(moduleMenu("platform.hidden")).isNull();
+        }
+    }
+
+    @Test
+    void shouldUsePlatformMenuAnnotationOpenMode() {
+        try (GenericApplicationContext context = context(WindowModuleWeb.class)) {
+            registerStaticModules(context);
+            initializePlatformMenus(context);
+
+            assertThat(moduleMenu("platform.window")).satisfies(menu -> {
+                assertThat(menu.getOpenMode()).isEqualTo(MenuOpenMode.WINDOW);
+                assertThat(menu.getMenuType()).isEqualTo(MenuType.MODULE);
+            });
         }
     }
 
@@ -149,9 +164,11 @@ class PlatformMenuInitialDataDeclarationProviderTest {
             Menu group = menuDao.findById(PlatformMenuGroups.CONFIG);
             group.setParentId("wrong-parent");
             group.setMenuType(MenuType.ROUTE);
+            group.setOpenMode(MenuOpenMode.TAB);
             group.setRoute("/wrong");
             Menu moduleMenu = moduleMenu("platform.module");
             moduleMenu.setMenuType(MenuType.LINK);
+            moduleMenu.setOpenMode(MenuOpenMode.TAB);
             moduleMenu.setExternalUrl("https://example.com");
 
             initializePlatformMenus(context);
@@ -160,12 +177,14 @@ class PlatformMenuInitialDataDeclarationProviderTest {
                 assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.PLATFORM);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.GROUP);
+                assertThat(repaired.getOpenMode()).isNull();
                 assertThat(repaired.getRoute()).isNull();
             });
             assertThat(moduleMenu("platform.module")).satisfies(repaired -> {
                 assertThat(repaired.getSchemeId()).isEqualTo(MenuSchemeService.ADMIN_SCHEME_ID);
                 assertThat(repaired.getParentId()).isEqualTo(PlatformMenuGroups.CONFIG);
                 assertThat(repaired.getMenuType()).isEqualTo(MenuType.MODULE);
+                assertThat(repaired.getOpenMode()).isEqualTo(MenuOpenMode.TAB);
                 assertThat(repaired.getModuleAlias()).isEqualTo("platform.module");
                 assertThat(repaired.getExternalUrl()).isNull();
             });
@@ -318,6 +337,9 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         menu.setSchemeId(schemeId);
         menu.setParentId(parentId);
         menu.setMenuType(type);
+        if (type != MenuType.GROUP) {
+            menu.setOpenMode(MenuOpenMode.TAB);
+        }
         menu.setTitle("模块管理");
         menu.setEnabled(Boolean.TRUE);
         menu.setSortOrder(20);
@@ -357,6 +379,13 @@ class PlatformMenuInitialDataDeclarationProviderTest {
     @PlatformStaticModule(application = "platform", alias = "platform.hidden", title = "隐藏模块")
     @RequestMapping("/platform.hidden")
     static class HiddenModuleWeb {
+    }
+
+    @RestController
+    @PlatformStaticModule(application = "platform", alias = "platform.window", title = "窗口模块")
+    @PlatformMenu(parent = PlatformMenuGroups.CONFIG, openMode = MenuOpenMode.WINDOW)
+    @RequestMapping("/platform.window")
+    static class WindowModuleWeb {
     }
 
     @RestController

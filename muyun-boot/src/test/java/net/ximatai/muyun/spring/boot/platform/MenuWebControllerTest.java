@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.user.UserSessionService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuScheme;
 import net.ximatai.muyun.spring.platform.menu.MenuSchemeService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
@@ -61,6 +62,7 @@ class MenuWebControllerTest {
         mvc.perform(get("/platform.menu/mine"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
+                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("TAB"))
                 .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
     }
 
@@ -92,6 +94,7 @@ class MenuWebControllerTest {
                         .header("Authorization", "Bearer token-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
+                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("TAB"))
                 .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
 
         verify(sessionService).currentUser("token-1");
@@ -205,6 +208,9 @@ class MenuWebControllerTest {
         menu.setTitle(title);
         menu.setModuleAlias(moduleAlias);
         menu.setMenuType(type);
+        if (type != MenuType.GROUP) {
+            menu.setOpenMode(MenuOpenMode.TAB);
+        }
         menu.setEnabled(Boolean.TRUE);
         return menu;
     }

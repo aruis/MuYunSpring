@@ -4,24 +4,27 @@ import type {
   MenuRecord,
   MenuTab,
   PageDescriptor,
-  ShellStartupState,
+  WorkbenchStartupState,
 } from '@muyun/web-contracts';
 import {
   createMenuTab,
   findFirstNavigationMenu,
   getMenuNavigationTarget,
+  isTabMenuTarget,
   pageDescriptorToUrl,
   resolvePageDescriptor,
   tabKeyOf,
   tryPageDescriptorFromUrl,
-} from '@muyun/platform-shell';
+} from '@muyun/platform-workbench';
 
-export interface ShellStartupClients {
+export interface WorkbenchStartupClients {
   sessionClient: SessionClient;
   menuClient: MenuClient;
 }
 
-export async function loadShellStartupState(clients: ShellStartupClients): Promise<ShellStartupState> {
+export async function loadWorkbenchStartupState(
+  clients: WorkbenchStartupClients,
+): Promise<WorkbenchStartupState> {
   const [currentUser, menuResponse] = await Promise.all([
     clients.sessionClient.current(),
     clients.menuClient.mine(),
@@ -49,7 +52,11 @@ export function openMenuTab(
   return { tabs: [...tabs, tab], activeTabKey: tab.key };
 }
 
-export function activeTabUrlOf(state: ShellStartupState): string | undefined {
+export function menuTargetUrl(menu: MenuRecord, target: MenuNavigationTarget): string {
+  return pageDescriptorToUrl(resolvePageDescriptor(target, { title: menu.title }));
+}
+
+export function activeTabUrlOf(state: WorkbenchStartupState): string | undefined {
   const activeTab = (state.tabs ?? []).find((tab) => tab.key === state.activeTabKey);
   const descriptor =
     activeTab?.pageDescriptor ??
@@ -57,7 +64,10 @@ export function activeTabUrlOf(state: ShellStartupState): string | undefined {
   return descriptor ? pageDescriptorToUrl(descriptor) : undefined;
 }
 
-export function restoreShellStartupStateFromUrl(state: ShellStartupState, url: string): ShellStartupState {
+export function restoreWorkbenchStartupStateFromUrl(
+  state: WorkbenchStartupState,
+  url: string,
+): WorkbenchStartupState {
   if (url === '/' || url === '') {
     return state;
   }
@@ -73,7 +83,10 @@ export function restoreShellStartupStateFromUrl(state: ShellStartupState, url: s
       ? explicitMenu
       : findMenuByDescriptor(state.menus, descriptor);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
-  const tab = menu && target ? createRestoredMenuTab(menu, target, descriptor) : createDirectTab(descriptor);
+  const tab =
+    menu && target && isTabMenuTarget(target)
+      ? createRestoredMenuTab(menu, target, descriptor)
+      : createDirectTab(descriptor);
   const existingTabs = state.tabs ?? [];
   const tabs = upsertTab(existingTabs, tab);
 
@@ -105,12 +118,7 @@ export function closeMenuTab(
   };
 }
 
-export function initialOpenMenuKeys(state: ShellStartupState) {
-  const activeMenuId = (state.tabs ?? []).find((tab) => tab.key === state.activeTabKey)?.target?.menuId;
-  return activeMenuId ? ancestorMenuIds(state.menus, activeMenuId) : [];
-}
-
-function initialTabOf(menus: ShellStartupState['menus']) {
+function initialTabOf(menus: WorkbenchStartupState['menus']) {
   const menu = findFirstNavigationMenu(menus);
   const target = menu ? getMenuNavigationTarget(menu) : undefined;
   return menu && target ? createMenuTab(menu, target) : undefined;
@@ -168,7 +176,7 @@ function directTabTitleOf(descriptor: PageDescriptor): string {
 }
 
 function findMenuByDescriptor(
-  nodes: ShellStartupState['menus'],
+  nodes: WorkbenchStartupState['menus'],
   descriptor: PageDescriptor,
 ): MenuRecord | undefined {
   for (const node of nodes) {
@@ -226,7 +234,7 @@ function matchesPageDescriptor(left: PageDescriptor, right: PageDescriptor): boo
   return false;
 }
 
-function findMenuById(nodes: ShellStartupState['menus'], menuId: string): MenuRecord | undefined {
+function findMenuById(nodes: WorkbenchStartupState['menus'], menuId: string): MenuRecord | undefined {
   for (const node of nodes) {
     if (node.record.id === menuId) {
       return node.record;
@@ -239,23 +247,4 @@ function findMenuById(nodes: ShellStartupState['menus'], menuId: string): MenuRe
   }
 
   return undefined;
-}
-
-function ancestorMenuIds(
-  nodes: ShellStartupState['menus'],
-  menuId: string,
-  ancestors: string[] = [],
-): string[] {
-  for (const node of nodes) {
-    if (node.record.id === menuId) {
-      return ancestors;
-    }
-
-    const childAncestors = ancestorMenuIds(node.children, menuId, [...ancestors, node.record.id]);
-    if (childAncestors.length > 0) {
-      return childAncestors;
-    }
-  }
-
-  return [];
 }
