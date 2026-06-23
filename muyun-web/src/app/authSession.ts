@@ -1,4 +1,4 @@
-import { AppError } from '@muyun/web-core';
+import { AppError, platformErrorCodes } from '@muyun/web-core';
 
 const AUTH_TOKEN_STORAGE_KEY = 'muyun.auth.token';
 
@@ -31,7 +31,11 @@ export function isAuthenticationRequiredError(cause: unknown) {
   if (!(cause instanceof AppError)) {
     return false;
   }
-  return cause.code === 'AUTHENTICATION_REQUIRED' || (cause.status === 401 && cause.code === 'HTTP_ERROR');
+  return (
+    cause.code === platformErrorCodes.authRequired ||
+    cause.code === platformErrorCodes.authExpired ||
+    (cause.status === 401 && cause.code === platformErrorCodes.httpError)
+  );
 }
 
 function normalizeToken(token?: string | null) {

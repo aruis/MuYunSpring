@@ -39,7 +39,6 @@ async function submit() {
     submitting.value = false;
   }
 }
-
 </script>
 
 <template>
@@ -50,10 +49,7 @@ async function submit() {
         <h1>平台登录</h1>
       </header>
 
-      <p
-        v-if="formError || error"
-        class="login-error"
-      >
+      <p v-if="formError || error" class="login-error">
         {{ formError || error }}
       </p>
 

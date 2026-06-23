@@ -19,7 +19,9 @@ export default defineConfig({
       '@muyun/platform-components': fileURLToPath(
         new URL('./src/platform-components/index.ts', import.meta.url),
       ),
-      '@muyun/platform-shell': fileURLToPath(new URL('./src/platform-shell/index.ts', import.meta.url)),
+      '@muyun/platform-workbench': fileURLToPath(
+        new URL('./src/platform-workbench/index.ts', import.meta.url),
+      ),
     },
   },
   build: {

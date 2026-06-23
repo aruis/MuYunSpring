@@ -15,7 +15,7 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
 @Table(name = "platform_menu", comment = "Platform menu")
 @InitialDataFields(
         identity = {"schemeId"},
-        managed = {"parentId", "menuType", "moduleAlias", "route", "externalUrl", "pageMode",
+        managed = {"parentId", "menuType", "openMode", "moduleAlias", "route", "externalUrl", "pageMode",
                 "defaultUiConfigId", "defaultQueryTemplateId", "entryParamsJson"},
         operator = {"title", "enabled", "sortOrder"}
 )
@@ -30,6 +30,9 @@ public class Menu extends StandardEnabledTreeEntity {
     @Column(name = "menu_type", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Menu type",
             defaultVal = @Default(varchar = "group"))
     private MenuType menuType = MenuType.GROUP;
+
+    @Column(name = "open_mode", type = ColumnType.VARCHAR, length = 32, comment = "Menu open mode")
+    private MenuOpenMode openMode;
 
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, comment = "Target module alias")
     private String moduleAlias;

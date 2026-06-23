@@ -1,28 +1,14 @@
 <script setup lang="ts">
 import type { ExternalLinkPageDescriptor, RemoteUrlPageDescriptor } from '@muyun/web-contracts';
-import { computed, onMounted, watch } from 'vue';
+import { computed } from 'vue';
 
 defineOptions({ name: 'ExternalPageHost' });
-
-const openedNewWindowUrls = new Set<string>();
 
 const props = defineProps<{
   descriptor: ExternalLinkPageDescriptor | RemoteUrlPageDescriptor;
 }>();
 
 const title = computed(() => props.descriptor.title ?? props.descriptor.target.url);
-const isNewWindow = computed(() => props.descriptor.openMode === 'new-window');
-
-onMounted(openExternalLinkIfNeeded);
-watch(() => props.descriptor.target.url, openExternalLinkIfNeeded);
-
-function openExternalLinkIfNeeded() {
-  const url = props.descriptor.target.url;
-  if (isNewWindow.value && !openedNewWindowUrls.has(url)) {
-    openedNewWindowUrls.add(url);
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-}
 </script>
 
 <template>
@@ -33,7 +19,7 @@ function openExternalLinkIfNeeded() {
     :title="title"
   />
   <section v-else class="page-host">
-    <p class="eyebrow">{{ descriptor.openMode }}</p>
+    <span class="host-badge">{{ descriptor.openMode }}</span>
     <h2>{{ title }}</h2>
     <a class="external-link" :href="descriptor.target.url" target="_blank" rel="noopener noreferrer">
       打开页面
@@ -46,34 +32,44 @@ function openExternalLinkIfNeeded() {
   display: block;
   width: 100%;
   min-height: 520px;
-  border: 1px solid #dbe4ef;
+  border: 1px solid #d8e1ea;
   border-radius: 8px;
   background: #fff;
+  box-shadow: 0 16px 34px rgb(15 23 42 / 7%);
 }
 
 .page-host {
-  min-height: 240px;
-  padding: 24px;
-  border: 1px solid #dbe4ef;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 280px;
+  padding: 28px;
+  border: 1px solid #d8e1ea;
   border-radius: 8px;
   background: #fff;
+  box-shadow: 0 16px 34px rgb(15 23 42 / 7%);
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: #6b7788;
+.host-badge {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
   font-size: 12px;
+  font-weight: 700;
 }
 
 h2 {
   margin: 0;
   color: #1f2933;
-  font-size: 18px;
+  font-size: 22px;
 }
 
 .external-link {
   display: inline-flex;
-  margin-top: 16px;
+  width: fit-content;
+  margin-top: 8px;
   color: #1677ff;
   text-decoration: none;
 }

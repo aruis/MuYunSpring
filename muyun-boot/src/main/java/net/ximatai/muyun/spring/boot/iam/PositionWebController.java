@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.position", title = "岗位管理")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 40)
 @RequestMapping("/iam.position")
 public class PositionWebController extends WebSupport<PositionService> implements
         CrudWeb<Position, PositionService>,

@@ -212,7 +212,7 @@ class PlatformModelSchemaTest {
                 .doesNotContain("parent_id", "application_alias");
         assertThat(columnNames(mapper.toTable(Menu.class)))
                 .contains("id", "tenant_id", "scheme_id", "parent_id", "menu_type", "module_alias",
-                        "route", "external_url", "page_mode", "default_ui_config_id", "default_query_template_id",
+                        "open_mode", "route", "external_url", "page_mode", "default_ui_config_id", "default_query_template_id",
                         "entry_params_json", "title", "enabled", "sort_order")
                 .doesNotContain("application_alias");
     }
@@ -223,12 +223,13 @@ class PlatformModelSchemaTest {
                 .contains("id", "tenant_id", "application_alias", "alias", "category_kind",
                         "parent_id", "title", "enabled", "sort_order");
         assertThat(columnNames(mapper.toTable(DictionaryItem.class)))
-                .contains("id", "tenant_id", "application_alias", "category_alias", "code",
-                        "parent_id", "title", "enabled", "sort_order");
+                .contains("id", "tenant_id", "category_id", "category_alias", "code",
+                        "parent_id", "title", "enabled", "sort_order")
+                .doesNotContain("application_alias");
         assertThat(uniqueIndexes(mapper.toTable(DictionaryCategory.class)))
                 .contains(List.of("tenant_id", "application_alias", "alias"));
         assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
-                .contains(List.of("tenant_id", "application_alias", "category_alias", "code"));
+                .contains(List.of("tenant_id", "category_id", "code"));
     }
 
     @Test
