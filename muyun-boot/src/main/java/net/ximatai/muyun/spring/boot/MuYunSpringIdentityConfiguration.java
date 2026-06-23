@@ -7,6 +7,8 @@ import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionRegistrar;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionScanner;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
@@ -87,11 +89,18 @@ public class MuYunSpringIdentityConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(StaticModuleDefinitionCatalog.class)
+    public StaticModuleDefinitionCatalog staticModuleDefinitionCatalog(List<StaticModuleDefinition> definitions,
+                                                                       StaticModuleDefinitionScanner scanner) {
+        return new StaticModuleDefinitionCatalog(definitions, List.of(scanner));
+    }
+
+    @Bean
     @ConditionalOnMissingBean(StaticModuleDefinitionRegistrar.class)
     public StaticModuleDefinitionRegistrar staticModuleDefinitionRegistrar(PlatformModuleService moduleService,
                                                                           PlatformModuleActionService actionService,
-                                                                          StaticModuleDefinitionScanner scanner) {
-        return new StaticModuleDefinitionRegistrar(moduleService, actionService, List.of(), List.of(scanner));
+                                                                          StaticModuleDefinitionCatalog catalog) {
+        return new StaticModuleDefinitionRegistrar(moduleService, actionService, catalog, true);
     }
 
     @Bean

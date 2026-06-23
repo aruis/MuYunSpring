@@ -1,4 +1,4 @@
-import { computed, defineComponent, inject, provide, type InjectionKey } from 'vue';
+import { computed, defineComponent, inject, provide, shallowRef, type InjectionKey } from 'vue';
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import type {
   CurrentUser,
@@ -237,9 +237,95 @@ export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<
   sort(id: string, request: TreeSortRequest): Promise<WebCountResponse>;
 }
 
+export const moduleAbilityCodes = {
+  crud: 'crud',
+  softDelete: 'softDelete',
+  lifecycle: 'lifecycle',
+  cache: 'cache',
+  tree: 'tree',
+  sort: 'sort',
+  reference: 'reference',
+  enable: 'enable',
+  dataScope: 'dataScope',
+  workflow: 'workflow',
+  approval: 'approval',
+  childRelation: 'childRelation',
+  referenceDependency: 'referenceDependency',
+  exchange: 'exchange',
+} as const;
+
+export type ModuleAbilityCode = (typeof moduleAbilityCodes)[keyof typeof moduleAbilityCodes];
+
+export interface ModuleEnableClient {
+  enable(id: string): Promise<WebCountResponse>;
+  disable(id: string): Promise<WebCountResponse>;
+}
+
+export interface ModuleAbilityClients<TRecord> {
+  crud: StaticModuleCrudClient<TRecord>;
+  tree: StaticModuleTreeClient<TRecord>;
+  enable: ModuleEnableClient;
+}
+
+export interface ModuleAbilities<TRecord> {
+  crud(): StaticModuleCrudClient<TRecord>;
+  tree(): StaticModuleTreeClient<TRecord>;
+  enable(): ModuleEnableClient;
+  tryCrud(): StaticModuleCrudClient<TRecord> | undefined;
+  tryTree(): StaticModuleTreeClient<TRecord> | undefined;
+  tryEnable(): ModuleEnableClient | undefined;
+  has(ability: ModuleAbilityCode | string): boolean | undefined;
+  hasCrud(): boolean | undefined;
+  hasTree(): boolean | undefined;
+  hasEnable(): boolean | undefined;
+}
+
+export interface ModuleRuntimeAction {
+  actionCode: string;
+  permissionActionCode?: string;
+  title?: string;
+  actionLevel?: 'DEFAULT' | 'LIST' | 'RECORD' | 'BATCH' | 'ANY';
+  category?: string;
+  accessMode?: 'AUTH_REQUIRED' | 'LOGIN_REQUIRED' | 'ANONYMOUS_ALLOWED';
+  actionAuth?: boolean;
+  dataAuth?: boolean;
+  defaultGrantPolicy?: string;
+  executorType?: string;
+  executorKey?: string;
+  authorized: boolean;
+  authorizationDecision?: string;
+}
+
+export interface ModuleRuntimeContext {
+  moduleAlias: string;
+  title?: string;
+  moduleKind?: 'STATIC' | 'DYNAMIC';
+  entryType?: 'MODULE' | 'ROUTE' | 'LINK';
+  entryRoute?: string;
+  entryExternalUrl?: string;
+  mainEntityAlias?: string;
+  capabilities: string[];
+  abilities?: string[];
+  actions: ModuleRuntimeAction[];
+}
+
+export interface ModuleRuntimeContextState {
+  ready: Promise<ModuleRuntimeContext>;
+  load(): Promise<ModuleRuntimeContext>;
+  snapshot(): ModuleRuntimeContext | undefined;
+  error(): AppError | undefined;
+  hasAbility(ability: ModuleAbilityCode | string): boolean | undefined;
+  action(actionCode: string): ModuleRuntimeAction | undefined;
+  can(actionCode: string): boolean | undefined;
+}
+
 export interface ModuleContext<TRecord> {
   moduleAlias: string;
   crud: StaticModuleCrudClient<TRecord>;
+  runtime: ModuleRuntimeContextState;
+  abilities: ModuleAbilities<TRecord>;
+  action(actionCode: string): ModuleRuntimeAction | undefined;
+  can(actionCode: string): boolean | undefined;
 }
 
 export interface ModuleTreeContext<TRecord> extends ModuleContext<TRecord> {
@@ -257,6 +343,8 @@ export interface ModuleContextOptions extends ModuleContextConfig {
 
 const moduleContextConfigKey: InjectionKey<ModuleContextConfig> = Symbol('muyun.module-context-config');
 const moduleAliasKey: InjectionKey<Readonly<{ value: string | undefined }>> = Symbol('muyun.module-alias');
+const moduleContextKey: InjectionKey<Readonly<{ value: ModuleContext<unknown> | undefined }>> =
+  Symbol('muyun.module-context');
 let defaultModuleContextConfig: ModuleContextConfig | undefined;
 
 export function configureModuleContext(config: ModuleContextConfig) {
@@ -281,10 +369,14 @@ export function useModuleContext<TRecord>(
   options: Partial<ModuleContextOptions> = {},
 ): ModuleContext<TRecord> {
   const config = inject(moduleContextConfigKey, undefined);
+  const injectedContext = inject(moduleContextKey, undefined);
   const injectedModuleAlias = inject(moduleAliasKey, undefined);
   const moduleAlias = options.moduleAlias ?? injectedModuleAlias?.value;
   if (!moduleAlias) {
     throw new Error('Module context requires a moduleAlias');
+  }
+  if (!options.http && !options.httpFactory && injectedContext?.value?.moduleAlias === moduleAlias) {
+    return injectedContext.value as ModuleContext<TRecord>;
   }
   const http = resolveModuleHttpClient(options, config);
   return moduleContextOf<TRecord>(http, moduleAlias);
@@ -313,10 +405,19 @@ export const ModuleContextProvider = defineComponent({
     },
   },
   setup(props, { slots }) {
+    const config = inject(moduleContextConfigKey, undefined);
+    const moduleContext = computed<ModuleContext<unknown> | undefined>(() => {
+      if (!props.moduleAlias) {
+        return undefined;
+      }
+      const http = resolveModuleHttpClient({}, config);
+      return moduleContextOf<unknown>(http, props.moduleAlias);
+    });
     provide(
       moduleAliasKey,
       computed(() => props.moduleAlias),
     );
+    provide(moduleContextKey, moduleContext);
     return () => slots.default?.();
   },
 });
@@ -426,17 +527,138 @@ export function createStaticModuleTreeClient<TRecord>(
 }
 
 function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): ModuleContext<TRecord> {
+  const crud = createStaticModuleCrudClient<TRecord>(http, { moduleAlias });
+  const tree = createStaticModuleTreeClient<TRecord>(http, { moduleAlias });
+  const enable: ModuleEnableClient = {
+    enable: crud.enable,
+    disable: crud.disable,
+  };
+  const runtime = moduleRuntimeContextState(http, moduleAlias);
   return {
     moduleAlias,
-    crud: createStaticModuleCrudClient<TRecord>(http, { moduleAlias }),
+    crud,
+    runtime,
+    abilities: moduleAbilities(moduleAlias, runtime, { crud, tree, enable }),
+    action: runtime.action,
+    can: runtime.can,
   };
 }
 
 function moduleTreeContextOf<TRecord>(http: HttpClient, moduleAlias: string): ModuleTreeContext<TRecord> {
+  const context = moduleContextOf<TRecord>(http, moduleAlias);
   return {
-    ...moduleContextOf<TRecord>(http, moduleAlias),
-    tree: createStaticModuleTreeClient<TRecord>(http, { moduleAlias }),
+    ...context,
+    tree: runtimeCheckedTreeClient(context),
   };
+}
+
+function runtimeCheckedTreeClient<TRecord>(context: ModuleContext<TRecord>): StaticModuleTreeClient<TRecord> {
+  const tree = async () => {
+    await context.runtime.ready;
+    return context.abilities.tree();
+  };
+  return {
+    query: async (request) => (await tree()).query(request),
+    view: async (id) => (await tree()).view(id),
+    insert: async (record) => (await tree()).insert(record),
+    update: async (id, record) => (await tree()).update(id, record),
+    delete: async (id) => (await tree()).delete(id),
+    enable: async (id) => (await tree()).enable(id),
+    disable: async (id) => (await tree()).disable(id),
+    tree: async () => (await tree()).tree(),
+    treeFlat: async (options) => (await tree()).treeFlat(options),
+    subtree: async (id, options) => (await tree()).subtree(id, options),
+    sort: async (id, request) => (await tree()).sort(id, request),
+  };
+}
+
+function moduleAbilities<TRecord>(
+  moduleAlias: string,
+  runtime: ModuleRuntimeContextState,
+  clients: ModuleAbilityClients<TRecord>,
+): ModuleAbilities<TRecord> {
+  const requireAbility = <TAbility>(name: ModuleAbilityCode, value: TAbility | undefined) => {
+    if (!value) {
+      if (!runtime.snapshot()) {
+        throw new Error(`Module runtime context is not ready: ${moduleAlias}`);
+      }
+      throw new Error(`Module ability is not available: ${moduleAlias}.${name}`);
+    }
+    return value;
+  };
+  const tryAbility = <TAbility>(name: ModuleAbilityCode, value: TAbility) =>
+    isRuntimeAbilityAvailable(runtime.snapshot(), name) ? value : undefined;
+  return {
+    crud: () => requireAbility(moduleAbilityCodes.crud, tryAbility(moduleAbilityCodes.crud, clients.crud)),
+    tree: () => requireAbility(moduleAbilityCodes.tree, tryAbility(moduleAbilityCodes.tree, clients.tree)),
+    enable: () => requireAbility(moduleAbilityCodes.enable, tryAbility(moduleAbilityCodes.enable, clients.enable)),
+    tryCrud: () => tryAbility(moduleAbilityCodes.crud, clients.crud),
+    tryTree: () => tryAbility(moduleAbilityCodes.tree, clients.tree),
+    tryEnable: () => tryAbility(moduleAbilityCodes.enable, clients.enable),
+    has: runtime.hasAbility,
+    hasCrud: () => runtime.hasAbility(moduleAbilityCodes.crud),
+    hasTree: () => runtime.hasAbility(moduleAbilityCodes.tree),
+    hasEnable: () => runtime.hasAbility(moduleAbilityCodes.enable),
+  };
+}
+
+function moduleRuntimeContextState(http: HttpClient, moduleAlias: string): ModuleRuntimeContextState {
+  const current = shallowRef<ModuleRuntimeContext>();
+  const currentError = shallowRef<AppError>();
+  let loading: Promise<ModuleRuntimeContext> | undefined;
+  const load = () => {
+    loading ??= http
+      .request<ModuleRuntimeContext>({
+        path: `/platform.module/${encodeURIComponent(moduleAlias)}/context`,
+      })
+      .then((context) => {
+        current.value = context;
+        currentError.value = undefined;
+        return context;
+      })
+      .catch((cause) => {
+        currentError.value = normalizeError(cause);
+        loading = undefined;
+        throw cause;
+      });
+    return loading;
+  };
+  const ready = load();
+  ready.catch(() => {
+    // Keep background context loading from becoming an unhandled rejection.
+  });
+  return {
+    ready,
+    load,
+    snapshot: () => current.value,
+    error: () => currentError.value,
+    hasAbility: (ability) => {
+      const context = current.value;
+      if (!context) {
+        return undefined;
+      }
+      return runtimeAbilityCodes(context).includes(ability);
+    },
+    action: (actionCode) => current.value?.actions.find((action) => action.actionCode === actionCode),
+    can: (actionCode) => current.value?.actions.find((action) => action.actionCode === actionCode)?.authorized,
+  };
+}
+
+function isRuntimeAbilityAvailable(context: ModuleRuntimeContext | undefined, ability: ModuleAbilityCode) {
+  if (!context) {
+    return false;
+  }
+  return runtimeAbilityCodes(context).includes(ability);
+}
+
+function runtimeAbilityCodes(context: ModuleRuntimeContext): string[] {
+  return context.abilities ?? context.capabilities.map(abilityCodeOfCapability);
+}
+
+function abilityCodeOfCapability(capability: string) {
+  return capability
+    .toLowerCase()
+    .replace(/_([a-z])/g, (_match, char: string) => char.toUpperCase());
 }
 
 function resolveModuleHttpClient(

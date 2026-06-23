@@ -1,13 +1,13 @@
 import { computed, ref } from 'vue';
 import type { Organization } from '@muyun/web-contracts';
-import { normalizeError, type ModuleTreeContext } from '@muyun/web-core';
+import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
 export function createOrganizationManagementState(
-  organizationContext: ModuleTreeContext<Organization>,
+  organizationContext: ModuleContext<Organization>,
   confirmAction: ConfirmAction,
 ) {
   const selected = ref<Organization>();
@@ -25,7 +25,14 @@ export function createOrganizationManagementState(
     return selected.value?.title ?? '机构详情';
   });
   const readonly = computed(() => mode.value === 'view');
-  const canMutate = computed(() => Boolean(selected.value?.id));
+  const canCreate = computed(() => organizationContext.can('create') === true);
+  const canUpdate = computed(() => Boolean(selected.value?.id) && organizationContext.can('update') === true);
+  const canDelete = computed(() => Boolean(selected.value?.id) && organizationContext.can('delete') === true);
+  const canEnable = computed(() => {
+    const actionCode = selected.value?.enabled === false ? 'enable' : 'disable';
+    return Boolean(selected.value?.id) && organizationContext.can(actionCode) === true;
+  });
+  const canMutate = computed(() => canUpdate.value || canDelete.value || canEnable.value);
 
   function handleTreeLoaded(records: Organization[]) {
     if (selected.value?.id && records.some((item) => item.id === selected.value?.id)) {
@@ -76,6 +83,10 @@ export function createOrganizationManagementState(
     if (mode.value === 'view') {
       return;
     }
+    if (mode.value === 'create' ? !canCreate.value : !canUpdate.value) {
+      actionError.value = '当前用户无权保存机构';
+      return;
+    }
     clearFeedback();
     const validDraft = normalizedDraft(draft.value);
     if (!validDraft.title || !validDraft.code) {
@@ -85,10 +96,12 @@ export function createOrganizationManagementState(
 
     saving.value = true;
     try {
+      await organizationContext.runtime.ready;
+      const crud = organizationContext.abilities.crud();
       const saved =
         mode.value === 'create'
-          ? await organizationContext.crud.insert(validDraft)
-          : await organizationContext.crud.update(requiredId(validDraft), validDraft);
+          ? await crud.insert(validDraft)
+          : await crud.update(requiredId(validDraft), validDraft);
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
@@ -105,15 +118,22 @@ export function createOrganizationManagementState(
     if (!selected.value?.id) {
       return;
     }
+    if (!canEnable.value) {
+      actionError.value = '当前用户无权变更机构启停状态';
+      return;
+    }
     clearFeedback();
     saving.value = true;
     try {
+      await organizationContext.runtime.ready;
+      const crud = organizationContext.abilities.crud();
+      const enable = organizationContext.abilities.enable();
       if (selected.value.enabled === false) {
-        await organizationContext.crud.enable(selected.value.id);
+        await enable.enable(selected.value.id);
       } else {
-        await organizationContext.crud.disable(selected.value.id);
+        await enable.disable(selected.value.id);
       }
-      const refreshed = await organizationContext.crud.view(selected.value.id);
+      const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
       actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
@@ -129,6 +149,10 @@ export function createOrganizationManagementState(
     if (!selected.value?.id) {
       return;
     }
+    if (!canDelete.value) {
+      actionError.value = '当前用户无权删除机构';
+      return;
+    }
     const confirmed = await confirmAction({
       title: '删除机构',
       content: `确认删除机构「${selected.value.title ?? selected.value.code ?? selected.value.id}」？`,
@@ -141,7 +165,9 @@ export function createOrganizationManagementState(
     clearFeedback();
     saving.value = true;
     try {
-      await organizationContext.crud.delete(selected.value.id);
+      await organizationContext.runtime.ready;
+      const crud = organizationContext.abilities.crud();
+      await crud.delete(selected.value.id);
       selected.value = undefined;
       draft.value = emptyDraft();
       mode.value = 'create';
@@ -169,6 +195,10 @@ export function createOrganizationManagementState(
     actionMessage,
     cardTitle,
     readonly,
+    canCreate,
+    canUpdate,
+    canDelete,
+    canEnable,
     canMutate,
     handleTreeLoaded,
     handleSelect,

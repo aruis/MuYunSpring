@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { computed, nextTick } from 'vue';
 import {
   AppError,
   configureModuleContext,
@@ -94,7 +95,11 @@ test('module context creates standard CRUD capabilities from configured http fac
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
-    requests.push(new Request(input, init));
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/context')) {
+      return Response.json(runtimeContext());
+    }
     return Response.json({ records: [] });
   };
 
@@ -105,22 +110,94 @@ test('module context creates standard CRUD capabilities from configured http fac
 
     const context = createModuleContext({ moduleAlias: 'iam.organization' });
 
-    await context.crud.query({ keyword: '总部' });
+    await context.runtime.ready;
+    await context.abilities.crud().query({ keyword: '总部' });
 
     assert.equal(context.moduleAlias, 'iam.organization');
-    assert.equal(requests[0].url, 'http://api.local/iam.organization/query');
-    assert.equal(requests[0].method, 'POST');
-    assert.deepEqual(await requests[0].json(), { keyword: '总部' });
+    assert.equal(requests[0].url, 'http://api.local/platform.module/iam.organization/context');
+    assert.equal(requests[1].url, 'http://api.local/iam.organization/query');
+    assert.equal(requests[1].method, 'POST');
+    assert.deepEqual(await requests[1].json(), { keyword: '总部' });
+    assert.equal(context.runtime.can('update'), true);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('module tree context opt-in creates tree capabilities from configured http factory', async () => {
+test('module runtime authorization updates Vue computed state after context loads', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json(runtimeContext());
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleContext({ moduleAlias: 'iam.organization' });
+    const canCreate = computed(() => context.can('create') === true);
+
+    assert.equal(canCreate.value, false);
+
+    await context.runtime.ready;
+    await nextTick();
+
+    assert.equal(canCreate.value, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module context abilities compose tree and enable capabilities', async () => {
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
-    requests.push(new Request(input, init));
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/context')) {
+      return Response.json(runtimeContext());
+    }
+    return Response.json({ records: [] });
+  };
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleContext<{ id?: string }>({ moduleAlias: 'iam.organization' });
+    assert.equal(context.abilities.tryTree(), undefined);
+    assert.throws(() => context.abilities.tree(), /Module runtime context is not ready/);
+
+    await context.runtime.ready;
+    const tree = context.abilities.tree();
+    const enable = context.abilities.enable();
+
+    await context.abilities.crud().query({ keyword: '总部' });
+    await tree.tree();
+    await enable.disable('org-1');
+
+    assert.equal(context.moduleAlias, 'iam.organization');
+    assert.equal(requests[0].url, 'http://api.local/platform.module/iam.organization/context');
+    assert.equal(requests[1].url, 'http://api.local/iam.organization/query');
+    assert.equal(requests[2].url, 'http://api.local/iam.organization/tree');
+    assert.equal(requests[3].url, 'http://api.local/iam.organization/disable/org-1');
+    assert.equal(context.abilities.hasTree(), true);
+    assert.equal(context.abilities.has('tree'), true);
+    assert.equal(context.abilities.tryTree(), tree);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module tree context remains compatible with explicit tree opt-in', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    requests.push(request);
+    if (request.url.endsWith('/context')) {
+      return Response.json(runtimeContext());
+    }
     return Response.json({ records: [] });
   };
 
@@ -131,12 +208,45 @@ test('module tree context opt-in creates tree capabilities from configured http 
 
     const context = createModuleTreeContext({ moduleAlias: 'iam.organization' });
 
-    await context.crud.query({ keyword: '总部' });
     await context.tree.tree();
+    await context.runtime.ready;
 
-    assert.equal(context.moduleAlias, 'iam.organization');
-    assert.equal(requests[0].url, 'http://api.local/iam.organization/query');
+    assert.equal(requests[0].url, 'http://api.local/platform.module/iam.organization/context');
     assert.equal(requests[1].url, 'http://api.local/iam.organization/tree');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module runtime context records background load errors and retries explicit load', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return Response.json(
+        {
+          code: platformErrorCodes.accessDenied,
+          status: 403,
+          message: '权限不足',
+        },
+        { status: 403 },
+      );
+    }
+    return Response.json(runtimeContext());
+  };
+
+  try {
+    const context = createModuleContext({ moduleAlias: 'iam.organization', http: createHttpClient() });
+
+    await assert.rejects(() => context.runtime.ready);
+
+    assert.equal(context.runtime.error()?.code, platformErrorCodes.accessDenied);
+
+    const loaded = await context.runtime.load();
+
+    assert.equal(loaded.moduleAlias, 'iam.organization');
+    assert.equal(context.runtime.error(), undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -236,6 +346,26 @@ test('http client wraps invalid json error response as AppError', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+function runtimeContext() {
+  return {
+    moduleAlias: 'iam.organization',
+    title: '组织管理',
+    moduleKind: 'STATIC',
+    entryType: 'ROUTE',
+    entryRoute: '/iam/organizations',
+    mainEntityAlias: 'organization',
+    capabilities: ['CRUD', 'SOFT_DELETE', 'LIFECYCLE', 'CACHE', 'TREE', 'SORT', 'ENABLE'],
+    abilities: ['crud', 'softDelete', 'lifecycle', 'cache', 'tree', 'sort', 'enable'],
+    actions: [
+      { actionCode: 'query', permissionActionCode: 'view', title: 'Query', authorized: true },
+      { actionCode: 'create', permissionActionCode: 'create', title: 'Create', authorized: true },
+      { actionCode: 'update', permissionActionCode: 'update', title: 'Update', authorized: true },
+      { actionCode: 'tree', permissionActionCode: 'view', title: 'Tree', authorized: true },
+      { actionCode: 'disable', permissionActionCode: 'enable', title: 'Disable', authorized: true },
+    ],
+  };
+}
 
 test('normalizeError keeps AppError and wraps unknown errors', () => {
   const appError = new AppError('conflict', { code: platformErrorCodes.conflictVersion, status: 409 });
