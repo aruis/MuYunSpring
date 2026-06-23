@@ -240,6 +240,9 @@ export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<
 export interface ModuleContext<TRecord> {
   moduleAlias: string;
   crud: StaticModuleCrudClient<TRecord>;
+}
+
+export interface ModuleTreeContext<TRecord> extends ModuleContext<TRecord> {
   tree: StaticModuleTreeClient<TRecord>;
 }
 
@@ -269,6 +272,11 @@ export function createModuleContext<TRecord>(options: ModuleContextOptions): Mod
   return moduleContextOf<TRecord>(http, options.moduleAlias);
 }
 
+export function createModuleTreeContext<TRecord>(options: ModuleContextOptions): ModuleTreeContext<TRecord> {
+  const http = resolveModuleHttpClient(options);
+  return moduleTreeContextOf<TRecord>(http, options.moduleAlias);
+}
+
 export function useModuleContext<TRecord>(
   options: Partial<ModuleContextOptions> = {},
 ): ModuleContext<TRecord> {
@@ -280,6 +288,19 @@ export function useModuleContext<TRecord>(
   }
   const http = resolveModuleHttpClient(options, config);
   return moduleContextOf<TRecord>(http, moduleAlias);
+}
+
+export function useModuleTreeContext<TRecord>(
+  options: Partial<ModuleContextOptions> = {},
+): ModuleTreeContext<TRecord> {
+  const config = inject(moduleContextConfigKey, undefined);
+  const injectedModuleAlias = inject(moduleAliasKey, undefined);
+  const moduleAlias = options.moduleAlias ?? injectedModuleAlias?.value;
+  if (!moduleAlias) {
+    throw new Error('Module tree context requires a moduleAlias');
+  }
+  const http = resolveModuleHttpClient(options, config);
+  return moduleTreeContextOf<TRecord>(http, moduleAlias);
 }
 
 export const ModuleContextProvider = defineComponent({
@@ -408,6 +429,12 @@ function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): Module
   return {
     moduleAlias,
     crud: createStaticModuleCrudClient<TRecord>(http, { moduleAlias }),
+  };
+}
+
+function moduleTreeContextOf<TRecord>(http: HttpClient, moduleAlias: string): ModuleTreeContext<TRecord> {
+  return {
+    ...moduleContextOf<TRecord>(http, moduleAlias),
     tree: createStaticModuleTreeClient<TRecord>(http, { moduleAlias }),
   };
 }

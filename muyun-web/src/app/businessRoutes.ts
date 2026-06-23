@@ -16,7 +16,7 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
   },
 ];
 
-export const businessRoutePrefixes = uniquePrefixes(staticBusinessRoutes.map((route) => route.route));
+export const businessRoutePrefixes = staticBusinessRoutes.map((route) => route.route);
 
 export function resolveStaticBusinessRoute(
   descriptor?: BusinessRoutePageDescriptor,
@@ -35,14 +35,4 @@ export function isStaticBusinessRoutePage(
 
 function routeMatchesTarget(route: StaticBusinessRoute, target: RoutePageTarget) {
   return target.route === route.route;
-}
-
-function uniquePrefixes(routes: string[]) {
-  return Array.from(new Set(routes.map(firstPathSegment))).filter((prefix) => prefix !== '/');
-}
-
-function firstPathSegment(route: string) {
-  const normalized = route.startsWith('/') ? route : `/${route}`;
-  const [, segment] = normalized.split('/');
-  return segment ? `/${segment}` : '/';
 }

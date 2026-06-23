@@ -5,10 +5,11 @@ import {
   isStaticBusinessRoutePage,
   resolveStaticBusinessRoute,
 } from '../src/app/businessRoutes.ts';
+import { pageDescriptorFromUrl } from '../src/platform-workbench/menuNavigation.ts';
 import type { BusinessRoutePageDescriptor } from '../src/web-contracts/index.ts';
 
 test('static business route registry exposes route prefixes for navigation resolution', () => {
-  assert.deepEqual(businessRoutePrefixes, ['/iam']);
+  assert.deepEqual(businessRoutePrefixes, ['/iam/organizations']);
 });
 
 test('static business route registry resolves module alias by route', () => {
@@ -37,4 +38,10 @@ test('static business route registry rejects unregistered business routes', () =
 
   assert.equal(resolveStaticBusinessRoute(descriptor), undefined);
   assert.equal(isStaticBusinessRoutePage(descriptor), false);
+});
+
+test('static business route registry does not classify unregistered sibling routes as business pages', () => {
+  const descriptor = pageDescriptorFromUrl('/iam/users', { businessRoutePrefixes });
+
+  assert.equal(descriptor.pageType, 'platform-route');
 });

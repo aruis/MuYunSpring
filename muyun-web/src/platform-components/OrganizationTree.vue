@@ -2,12 +2,12 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { UiEmpty, UiError, UiSpin, UiTree, type UiTreeNode } from '@muyun/vue-ui-antdv';
 import type { Organization, WebTreeNode } from '@muyun/web-contracts';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import { normalizeError, type ModuleTreeContext } from '@muyun/web-core';
 
 defineOptions({ name: 'OrganizationTree' });
 
 const props = defineProps<{
-  context: ModuleContext<Organization>;
+  context: ModuleTreeContext<Organization>;
   selectedId?: string;
   reloadKey?: number;
 }>();

@@ -1,0 +1,212 @@
+import { computed, ref } from 'vue';
+import type { Organization } from '@muyun/web-contracts';
+import { normalizeError, type ModuleTreeContext } from '@muyun/web-core';
+import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
+
+type CardMode = 'view' | 'edit' | 'create';
+type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
+
+export function createOrganizationManagementState(
+  organizationContext: ModuleTreeContext<Organization>,
+  confirmAction: ConfirmAction,
+) {
+  const selected = ref<Organization>();
+  const draft = ref<Organization>(emptyDraft());
+  const mode = ref<CardMode>('view');
+  const reloadKey = ref(0);
+  const saving = ref(false);
+  const actionError = ref<string>();
+  const actionMessage = ref<string>();
+
+  const cardTitle = computed(() => {
+    if (mode.value === 'create') {
+      return draft.value.parentId ? '新建下级机构' : '新建根机构';
+    }
+    return selected.value?.title ?? '机构详情';
+  });
+  const readonly = computed(() => mode.value === 'view');
+  const canMutate = computed(() => Boolean(selected.value?.id));
+
+  function handleTreeLoaded(records: Organization[]) {
+    if (selected.value?.id && records.some((item) => item.id === selected.value?.id)) {
+      return;
+    }
+    const first = records[0];
+    selected.value = first;
+    draft.value = first ? copyRecord(first) : emptyDraft();
+    mode.value = first ? 'view' : 'create';
+  }
+
+  function handleSelect(organization: Organization) {
+    selected.value = organization;
+    draft.value = copyRecord(organization);
+    mode.value = 'view';
+    clearFeedback();
+  }
+
+  function startCreateRoot() {
+    selected.value = undefined;
+    draft.value = emptyDraft();
+    mode.value = 'create';
+    clearFeedback();
+  }
+
+  function startCreateChild() {
+    draft.value = emptyDraft(selected.value?.id);
+    mode.value = 'create';
+    clearFeedback();
+  }
+
+  function startEdit() {
+    if (!selected.value) {
+      return;
+    }
+    draft.value = copyRecord(selected.value);
+    mode.value = 'edit';
+    clearFeedback();
+  }
+
+  function cancelEdit() {
+    draft.value = selected.value ? copyRecord(selected.value) : emptyDraft();
+    mode.value = selected.value ? 'view' : 'create';
+    clearFeedback();
+  }
+
+  async function save() {
+    if (mode.value === 'view') {
+      return;
+    }
+    clearFeedback();
+    const validDraft = normalizedDraft(draft.value);
+    if (!validDraft.title || !validDraft.code) {
+      actionError.value = '机构名称和机构编码不能为空';
+      return;
+    }
+
+    saving.value = true;
+    try {
+      const saved =
+        mode.value === 'create'
+          ? await organizationContext.crud.insert(validDraft)
+          : await organizationContext.crud.update(requiredId(validDraft), validDraft);
+      selected.value = saved;
+      draft.value = copyRecord(saved);
+      mode.value = 'view';
+      actionMessage.value = '已保存';
+      reloadKey.value += 1;
+    } catch (cause) {
+      actionError.value = normalizeError(cause).message;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  async function toggleEnabled() {
+    if (!selected.value?.id) {
+      return;
+    }
+    clearFeedback();
+    saving.value = true;
+    try {
+      if (selected.value.enabled === false) {
+        await organizationContext.crud.enable(selected.value.id);
+      } else {
+        await organizationContext.crud.disable(selected.value.id);
+      }
+      const refreshed = await organizationContext.crud.view(selected.value.id);
+      selected.value = refreshed;
+      draft.value = copyRecord(refreshed);
+      actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
+      reloadKey.value += 1;
+    } catch (cause) {
+      actionError.value = normalizeError(cause).message;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  async function removeSelected() {
+    if (!selected.value?.id) {
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: '删除机构',
+      content: `确认删除机构「${selected.value.title ?? selected.value.code ?? selected.value.id}」？`,
+      okText: '删除',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    clearFeedback();
+    saving.value = true;
+    try {
+      await organizationContext.crud.delete(selected.value.id);
+      selected.value = undefined;
+      draft.value = emptyDraft();
+      mode.value = 'create';
+      actionMessage.value = '已删除';
+      reloadKey.value += 1;
+    } catch (cause) {
+      actionError.value = normalizeError(cause).message;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  function clearFeedback() {
+    actionError.value = undefined;
+    actionMessage.value = undefined;
+  }
+
+  return {
+    selected,
+    draft,
+    mode,
+    reloadKey,
+    saving,
+    actionError,
+    actionMessage,
+    cardTitle,
+    readonly,
+    canMutate,
+    handleTreeLoaded,
+    handleSelect,
+    startCreateRoot,
+    startCreateChild,
+    startEdit,
+    cancelEdit,
+    save,
+    toggleEnabled,
+    removeSelected,
+  };
+}
+
+function copyRecord(record: Organization): Organization {
+  return { ...record };
+}
+
+function emptyDraft(parentId?: string): Organization {
+  return {
+    parentId,
+    enabled: true,
+    title: '',
+    code: '',
+  };
+}
+
+function normalizedDraft(record: Organization): Organization {
+  return {
+    ...record,
+    title: record.title?.trim(),
+    code: record.code?.trim(),
+    parentId: record.parentId?.trim() || undefined,
+  };
+}
+
+function requiredId(record: Organization) {
+  if (!record.id) {
+    throw new Error('机构 ID 不能为空');
+  }
+  return record.id;
+}

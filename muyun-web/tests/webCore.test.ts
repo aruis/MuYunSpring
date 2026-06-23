@@ -6,6 +6,7 @@ import {
   createAuthClient,
   createHttpClient,
   createModuleContext,
+  createModuleTreeContext,
   createStaticModuleTreeClient,
   normalizeError,
   platformErrorCodes,
@@ -89,7 +90,7 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
   }
 });
 
-test('module context creates standard module capabilities from configured http factory', async () => {
+test('module context creates standard CRUD capabilities from configured http factory', async () => {
   const requests: Request[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -105,12 +106,36 @@ test('module context creates standard module capabilities from configured http f
     const context = createModuleContext({ moduleAlias: 'iam.organization' });
 
     await context.crud.query({ keyword: '总部' });
-    await context.tree.tree();
 
     assert.equal(context.moduleAlias, 'iam.organization');
     assert.equal(requests[0].url, 'http://api.local/iam.organization/query');
     assert.equal(requests[0].method, 'POST');
     assert.deepEqual(await requests[0].json(), { keyword: '总部' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('module tree context opt-in creates tree capabilities from configured http factory', async () => {
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push(new Request(input, init));
+    return Response.json({ records: [] });
+  };
+
+  try {
+    configureModuleContext({
+      httpFactory: () => createHttpClient({ baseUrl: 'http://api.local' }),
+    });
+
+    const context = createModuleTreeContext({ moduleAlias: 'iam.organization' });
+
+    await context.crud.query({ keyword: '总部' });
+    await context.tree.tree();
+
+    assert.equal(context.moduleAlias, 'iam.organization');
+    assert.equal(requests[0].url, 'http://api.local/iam.organization/query');
     assert.equal(requests[1].url, 'http://api.local/iam.organization/tree');
   } finally {
     globalThis.fetch = originalFetch;
