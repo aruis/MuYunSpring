@@ -12,14 +12,14 @@
 
 ## 标识规则
 
-| 对象 | 字段 | 规则 |
-| --- | --- | --- |
-| 应用 | `applicationAlias` | 全局唯一，创建后不允许手动修改 |
-| 模块 | `moduleAlias` | 全局唯一，必须满足 `applicationAlias.xxx`，创建后不允许手动修改 |
-| 元数据 | `metadataAlias` | 在应用下唯一，不能作为物理表身份 |
-| 菜单方案 | `menuSchemeAlias` | 在同一租户/scope 内唯一；菜单节点不设计 alias/code |
-| 数据字典类目 | `dictionaryCategoryAlias` | 在应用下唯一；字段绑定字典类目 |
-| 数据字典项目 | `dictionaryItemCode` | 在字典类目下唯一；业务数据默认存项目 code |
+| 对象         | 字段                      | 规则                                                            |
+| ------------ | ------------------------- | --------------------------------------------------------------- |
+| 应用         | `applicationAlias`        | 全局唯一，创建后不允许手动修改                                  |
+| 模块         | `moduleAlias`             | 全局唯一，必须满足 `applicationAlias.xxx`，创建后不允许手动修改 |
+| 元数据       | `metadataAlias`           | 在应用下唯一，不能作为物理表身份                                |
+| 菜单方案     | `menuSchemeAlias`         | 在同一租户/scope 内唯一；菜单节点不设计 alias/code              |
+| 数据字典类目 | `dictionaryCategoryAlias` | 在应用下唯一；字段绑定字典类目                                  |
+| 数据字典项目 | `dictionaryItemCode`      | 在字典类目下唯一；业务数据默认存项目 code                       |
 
 `Module.id` 可以等于 `moduleAlias`，但业务字段、参数、DTO 和关系表列统一使用 `moduleAlias` / `module_alias`，不使用 `moduleId` / `module_id` 表达模块身份。
 
@@ -35,13 +35,13 @@
 
 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 与 `applicationAlias` 保持一致或由模型适配为同一值 |
-| `alias` | 应用别名，对外参数使用 `applicationAlias` |
-| `title` | 应用名称 |
-| `enabled` | 是否启用 |
-| `sortOrder` | 排序 |
+| 字段        | 含义                                               |
+| ----------- | -------------------------------------------------- |
+| `id`        | 与 `applicationAlias` 保持一致或由模型适配为同一值 |
+| `alias`     | 应用别名，对外参数使用 `applicationAlias`          |
+| `title`     | 应用名称                                           |
+| `enabled`   | 是否启用                                           |
+| `sortOrder` | 排序                                               |
 
 ### Module
 
@@ -49,16 +49,16 @@
 
 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 与 `moduleAlias` 保持一致 |
-| `applicationAlias` | 所属应用 |
-| `alias` | 完整模块别名，对外参数使用 `moduleAlias` |
-| `title` | 模块名称 |
-| `parentId` | 父模块；根模块使用平台树能力的根节点值 |
-| `moduleKind` | `STATIC` / `DYNAMIC` |
-| `enabled` | 是否启用 |
-| `sortOrder` | 排序 |
+| 字段               | 含义                                     |
+| ------------------ | ---------------------------------------- |
+| `id`               | 与 `moduleAlias` 保持一致                |
+| `applicationAlias` | 所属应用                                 |
+| `alias`            | 完整模块别名，对外参数使用 `moduleAlias` |
+| `title`            | 模块名称                                 |
+| `parentId`         | 父模块；根模块使用平台树能力的根节点值   |
+| `moduleKind`       | `STATIC` / `DYNAMIC`                     |
+| `enabled`          | 是否启用                                 |
+| `sortOrder`        | 排序                                     |
 
 模块 alias 创建后不允许手动修改。模块按“应用 -> 多级模块”组织成树，排序范围限定在同一应用和同一父模块下。`moduleKind` 表达当前模块接入方式：静态模块可以没有元数据；动态模块必须有一个主元数据。
 
@@ -68,15 +68,15 @@
 
 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 平台稳定 ID，自动生成 |
-| `applicationAlias` | 所属应用 |
-| `alias` | 元数据别名，对外参数使用 `metadataAlias` |
-| `title` | 元数据名称 |
-| `schemaName` | 物理 schema，可默认 |
-| `tableName` | 物理表名，可默认生成 |
-| `enabled` | 是否启用 |
+| 字段               | 含义                                     |
+| ------------------ | ---------------------------------------- |
+| `id`               | 平台稳定 ID，自动生成                    |
+| `applicationAlias` | 所属应用                                 |
+| `alias`            | 元数据别名，对外参数使用 `metadataAlias` |
+| `title`            | 元数据名称                               |
+| `schemaName`       | 物理 schema，可默认                      |
+| `tableName`        | 物理表名，可默认生成                     |
+| `enabled`          | 是否启用                                 |
 
 `metadataAlias` 在同一应用下唯一。`schemaName + tableName` 是物理表定位，不参与元数据语义身份。
 
@@ -110,17 +110,17 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `moduleAlias` | 当前运行模块 |
-| `metadataId` | 被使用的元数据 |
-| `relationRole` | `MAIN` / `CHILD` |
-| `parentMetadataId` | 父级元数据，可为空 |
-| `foreignKey` | 子表指向父表的字段 |
-| `relationAlias` | 关系别名，在模块下唯一 |
-| `autoPopulate` | 读取主记录时是否装配子记录 |
-| `cascadeDelete` | 删除父记录时是否联动删除子记录 |
-| `sortOrder` | 关系排序 |
+| 字段               | 含义                           |
+| ------------------ | ------------------------------ |
+| `moduleAlias`      | 当前运行模块                   |
+| `metadataId`       | 被使用的元数据                 |
+| `relationRole`     | `MAIN` / `CHILD`               |
+| `parentMetadataId` | 父级元数据，可为空             |
+| `foreignKey`       | 子表指向父表的字段             |
+| `relationAlias`    | 关系别名，在模块下唯一         |
+| `autoPopulate`     | 读取主记录时是否装配子记录     |
+| `cascadeDelete`    | 删除父记录时是否联动删除子记录 |
+| `sortOrder`        | 关系排序                       |
 
 约束：
 
@@ -157,32 +157,33 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 `MenuScheme` 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `tenantId` | 租户 ID；系统方案为空 |
-| `alias` | 方案别名，在同一 scope 内唯一 |
-| `scopeType` | `SYSTEM` / `TENANT` / `ORGANIZATION` |
-| `scopeId` | scope 标识；租户方案默认等于 `tenantId`，系统方案固定为 `system` |
-| `title` | 方案名称 |
-| `enabled` | 是否启用 |
-| `sortOrder` | 排序 |
+| 字段        | 含义                                                             |
+| ----------- | ---------------------------------------------------------------- |
+| `tenantId`  | 租户 ID；系统方案为空                                            |
+| `alias`     | 方案别名，在同一 scope 内唯一                                    |
+| `scopeType` | `SYSTEM` / `TENANT` / `ORGANIZATION`                             |
+| `scopeId`   | scope 标识；租户方案默认等于 `tenantId`，系统方案固定为 `system` |
+| `title`     | 方案名称                                                         |
+| `enabled`   | 是否启用                                                         |
+| `sortOrder` | 排序                                                             |
 
 `Menu` 建议字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `tenantId` | 从所属方案继承，用于租户隔离 |
-| `schemeId` | 所属菜单方案 |
-| `parentId` | 父菜单；根菜单使用平台树根节点值 |
-| `title` | 菜单名称 |
-| `menuType` | `GROUP` / `MODULE` / `ROUTE` / `LINK` |
-| `moduleAlias` | 模块菜单挂载的模块 |
-| `route` | 路由菜单的路由 |
-| `externalUrl` | 外链菜单的 URL |
-| `enabled` | 是否启用 |
-| `sortOrder` | 排序 |
+| 字段          | 含义                                  |
+| ------------- | ------------------------------------- |
+| `tenantId`    | 从所属方案继承，用于租户隔离          |
+| `schemeId`    | 所属菜单方案                          |
+| `parentId`    | 父菜单；根菜单使用平台树根节点值      |
+| `title`       | 菜单名称                              |
+| `menuType`    | `GROUP` / `MODULE` / `ROUTE` / `LINK` |
+| `openMode`    | `TAB` / `WINDOW`；分组菜单不配置      |
+| `moduleAlias` | 模块菜单挂载的模块                    |
+| `route`       | 路由菜单的路由                        |
+| `externalUrl` | 外链菜单的 URL                        |
+| `enabled`     | 是否启用                              |
+| `sortOrder`   | 排序                                  |
 
-菜单基础能力只要求菜单方案、菜单树、排序、启停和模块挂载。权限只对已解析的菜单树做剪枝，不进入菜单模型。
+菜单基础能力只要求菜单方案、菜单树、排序、启停、模块挂载和入口打开方式。权限只对已解析的菜单树做剪枝，不进入菜单模型。
 
 ### 系统共享配置读取债务
 
@@ -220,38 +221,39 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 
 平台内置菜单由初始化数据能力承载，按数据来源分层：
 
-1. `MenuSchemeService` 和 `MenuService` 通过 service-owned `InitialDataAbility` 维护系统菜单方案和默认一级分组。
+1. `MenuSchemeService` 和 `MenuService` 通过 service-owned `InitialDataAbility` 维护系统菜单方案和默认导航分组。
 2. `platform.menu-contributions`：由薄 `PlatformMenuInitialDataDeclarationProvider` 扫描 `@PlatformMenu` 并注册模块菜单项。
 
 菜单领域的字段角色由 `Menu` 和 `MenuScheme` 模型上的初始化字段声明表达。固定领域数据由菜单 service 自己声明；扫描型菜单项由 provider 只构造期望菜单对象并调用通用初始化声明门面，不直接维护字段清单，也不直接执行插入/更新。
 
 平台只维护一个系统菜单方案：
 
-| 字段 | 值 |
-| --- | --- |
-| `id` | `platform.menu_scheme.admin` |
-| `alias` | `platform_admin` |
-| `scopeType` | `SYSTEM` |
-| `scopeId` | `system` |
-| `title` | `平台超管` |
+| 字段        | 值                           |
+| ----------- | ---------------------------- |
+| `id`        | `platform.menu_scheme.admin` |
+| `alias`     | `platform_admin`             |
+| `scopeType` | `SYSTEM`                     |
+| `scopeId`   | `system`                     |
+| `title`     | `平台超管`                   |
 
 该方案不作为租户菜单 fallback。当前平台超级管理员账号读取该方案属于身份模型收敛前的过渡兼容；租户和机构菜单仍由各自方案维护。
 
-平台内置三个一级分组：
+平台内置菜单默认按 1-2-3 级组织：一级是稳定主导航，二级是面板分组，三级是具体模块入口。当前系统方案内置一个一级分组和三个二级分组：
 
-| ID | 标题 |
-| --- | --- |
-| `platform.menu.group.config` | 平台配置与低代码运维 |
-| `platform.menu.group.identity` | 组织与权限 |
-| `platform.menu.group.ops` | 平台运行运维 |
+| 层级 | ID                             | 标题                 | 父节点                         |
+| ---- | ------------------------------ | -------------------- | ------------------------------ |
+| 一级 | `platform.menu.group.platform` | 平台管理             | `ROOT`                         |
+| 二级 | `platform.menu.group.config`   | 平台配置与低代码运维 | `platform.menu.group.platform` |
+| 二级 | `platform.menu.group.identity` | 组织与权限           | `platform.menu.group.platform` |
+| 二级 | `platform.menu.group.ops`      | 平台运行运维         | `platform.menu.group.platform` |
 
-第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+第一阶段 `@PlatformMenu` 只生成 `MODULE` 菜单，`moduleAlias` 来自同类上的 `@PlatformStaticModule.alias`，`openMode` 默认 `TAB`，需要外部窗口打开时由注解显式声明。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
 
 注册顺序是先注册静态模块和动作，再执行初始化数据能力。平台菜单只做同方案内治理，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。菜单方案的 `alias/scope/tenantId` 和菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案或身份字段漂移，应显式失败，而不是启动时自动迁移。
 
 菜单方案、默认分组和模块菜单的结构字段由平台持续校准；标题、排序、启停属于运维字段，创建后重启不覆盖运维调整。需要强锁定的系统数据应显式使用 `LOCKED` 策略，不作为默认行为。
 
-前端消费这类菜单时需要区分静态模块和动态模块。当前菜单模型只表达 `MODULE + moduleAlias`，不直接表达承载方式；后续进入前端联调时，应由菜单响应补充模块类型或由前端按 `moduleAlias` 读取模块定义后再选择 PageHost。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
+前端消费这类菜单时需要区分静态模块和动态模块。当前菜单模型表达 `MODULE + moduleAlias + openMode`，前端再按模块类型和打开方式选择 PageHost。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
 
 ## 数据字典
 
@@ -260,9 +262,11 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 数据字典拆成：
 
 1. `DictionaryCategory`：字典类目，应用内唯一 `dictionaryCategoryAlias`，支持树。类目可作为目录，也可作为可绑定字典。
-2. `DictionaryItem`：字典项目，归属具体字典类目，支持树、排序、启停和标题。
+2. `DictionaryItem`：字典项目，归属具体字典类目，实体以 `categoryId` 绑定类目并保留 `categoryAlias` 作为可读冗余，支持树、排序、启停和标题。
 
-业务字段绑定字典类目，不绑定单个字典项目。业务数据默认存字典项目 `code`，不存内部项目 ID；展示和校验时通过 `applicationAlias + dictionaryCategoryAlias + code` 解析字典项目。同一类目内项目 `code` 必须唯一，即使项目本身是树，也不能只按同父级唯一，否则业务数据只存 code 时会产生解析歧义。
+业务字段绑定字典类目，不绑定单个字典项目。业务数据默认存字典项目 `code`，不存内部项目 ID；展示和校验时通过 `applicationAlias + dictionaryCategoryAlias + code` 解析到类目，再按 `categoryId + code` 解析字典项目。同一类目内项目 `code` 必须唯一，即使项目本身是树，也不能只按同父级唯一，否则业务数据只存 code 时会产生解析歧义。
+
+字典管理是单一可见模块入口，静态模块别名为 `platform.dictionary_category`。字典项目维护不单独注册可见模块，它的动作作为类目模块的子资源动作贡献，动作码采用 `item_create`、`item_query`、`item_update` 等 `resource_operation` 命名，并可通过权限码继承到 `item_view` 等更粗粒度能力。
 
 字典基础能力只建设字典类目和字典项目的基础维护；字段如何引用字典进入元数据字段行为配置，不塞进最小元数据字段模型。
 

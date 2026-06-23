@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
@@ -76,6 +77,16 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
             }
         }
         return selectGlobalModule(validAlias);
+    }
+
+    public List<PlatformModule> listSystemManagedStaticModules() {
+        try (TenantContext.Scope ignored = TenantContext.system("select system managed static modules")) {
+            return list(Criteria.of()
+                    .eq("moduleKind", ModuleKind.STATIC)
+                    .eq("systemManaged", Boolean.TRUE)
+                    .isNull(StandardEntitySchema.TENANT_ID_FIELD),
+                    new PageRequest(0, Integer.MAX_VALUE));
+        }
     }
 
     private PlatformModule selectGlobalModule(String moduleAlias) {

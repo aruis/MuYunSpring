@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.openapi;
 
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformPermissionCode;
@@ -20,12 +21,12 @@ public class DynamicOpenApiGenerator {
     private static final String METHOD_GET = "GET";
     private static final String METHOD_POST = "POST";
     private static final List<String> DEFAULT_ERRORS = List.of(
-            "DYNAMIC_BAD_REQUEST",
-            "DYNAMIC_UI_VALIDATION",
-            "DYNAMIC_ATTACHMENT_ERROR",
-            "DYNAMIC_DUPLICATE_CHECK_ERROR",
+            PlatformErrorCodes.VALIDATION_FAILED,
             "DYNAMIC_ACTION_FAILED",
-            "DYNAMIC_CONFLICT"
+            PlatformErrorCodes.CONFLICT_VERSION,
+            PlatformErrorCodes.RESOURCE_NOT_FOUND,
+            PlatformErrorCodes.CONFIG_MISSING,
+            PlatformErrorCodes.INTERNAL_ERROR
     );
 
     public DynamicOpenApiDocument generate(DynamicModuleDescriptor descriptor) {
@@ -348,12 +349,18 @@ public class DynamicOpenApiGenerator {
 
     private Map<String, DynamicOpenApiDocument.ErrorResponse> errors() {
         return Map.of(
-                "DYNAMIC_BAD_REQUEST", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"),
-                "DYNAMIC_UI_VALIDATION", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_UI_VALIDATION", 400, "DynamicWebError"),
-                "DYNAMIC_ATTACHMENT_ERROR", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ATTACHMENT_ERROR", 400, "DynamicWebError"),
-                "DYNAMIC_DUPLICATE_CHECK_ERROR", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, "DynamicWebError"),
-                "DYNAMIC_ACTION_FAILED", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "DynamicWebActionError"),
-                "DYNAMIC_CONFLICT", new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_CONFLICT", 409, "DynamicWebError")
+                PlatformErrorCodes.VALIDATION_FAILED,
+                new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.VALIDATION_FAILED, 400, "PlatformWebError"),
+                "DYNAMIC_ACTION_FAILED",
+                new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "PlatformWebError"),
+                PlatformErrorCodes.CONFLICT_VERSION,
+                new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.CONFLICT_VERSION, 409, "PlatformWebError"),
+                PlatformErrorCodes.RESOURCE_NOT_FOUND,
+                new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.RESOURCE_NOT_FOUND, 404, "PlatformWebError"),
+                PlatformErrorCodes.CONFIG_MISSING,
+                new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.CONFIG_MISSING, 409, "PlatformWebError"),
+                PlatformErrorCodes.INTERNAL_ERROR,
+                new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.INTERNAL_ERROR, 500, "PlatformWebError")
         );
     }
 

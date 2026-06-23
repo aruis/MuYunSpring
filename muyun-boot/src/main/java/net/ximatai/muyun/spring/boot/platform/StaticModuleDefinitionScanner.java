@@ -21,7 +21,6 @@ import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,7 @@ public class StaticModuleDefinitionScanner {
     }
 
     public List<StaticModuleDefinition> scan() {
-        List<StaticModuleDefinition> definitions = new ArrayList<>();
+        LinkedHashMap<String, StaticModuleDefinition> definitions = new LinkedHashMap<>();
         for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticModule.class)) {
             Object bean = applicationContext.getBean(beanName);
             Class<?> beanClass = AopUtils.getTargetClass(bean);
@@ -42,9 +41,11 @@ public class StaticModuleDefinitionScanner {
             if (module == null) {
                 continue;
             }
-            definitions.add(definition(beanClass, module));
+            StaticModuleDefinition definition = definition(beanClass, module);
+            definitions.put(definition.moduleAlias(), definition);
         }
-        return List.copyOf(definitions);
+        addActionContributions(definitions);
+        return List.copyOf(definitions.values());
     }
 
     private StaticModuleDefinition definition(Class<?> beanClass, PlatformStaticModule module) {
@@ -131,10 +132,68 @@ public class StaticModuleDefinitionScanner {
     private List<StaticModuleActionDefinition> actions(Class<?> beanClass,
                                                        java.util.Set<EntityCapability> capabilities) {
         LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
+        addMenuAction(actions, beanClass);
         addStandardActions(actions, beanClass);
         addWorkflowActions(actions, capabilities);
         ReflectionUtils.doWithMethods(beanClass, method -> addAnnotatedAction(actions, method));
         return List.copyOf(actions.values());
+    }
+
+    private void addActionContributions(LinkedHashMap<String, StaticModuleDefinition> definitions) {
+        for (String beanName : applicationContext.getBeanNamesForAnnotation(PlatformStaticActionContribution.class)) {
+            Object bean = applicationContext.getBean(beanName);
+            Class<?> beanClass = AopUtils.getTargetClass(bean);
+            PlatformStaticActionContribution contribution =
+                    AnnotationUtils.findAnnotation(beanClass, PlatformStaticActionContribution.class);
+            if (contribution == null) {
+                continue;
+            }
+            String targetModule = PlatformStaticActionContributionSupport.targetModule(contribution);
+            StaticModuleDefinition target = definitions.get(targetModule);
+            if (target == null) {
+                throw new IllegalStateException("@PlatformStaticActionContribution target module is not scanned: "
+                        + targetModule + " <- " + beanClass.getName());
+            }
+            LinkedHashMap<String, StaticModuleActionDefinition> merged = new LinkedHashMap<>();
+            target.actions().forEach(action -> merged.put(action.actionCode(), action));
+            contributionActions(beanClass, contribution)
+                    .forEach(action -> mergeContributionAction(target.moduleAlias(), beanClass, merged, action));
+            definitions.put(targetModule, new StaticModuleDefinition(
+                    target.applicationAlias(),
+                    target.moduleAlias(),
+                    target.title(),
+                    target.parentModuleAlias(),
+                    target.capabilities(),
+                    List.copyOf(merged.values()),
+                    target.entities()
+            ));
+        }
+    }
+
+    private void mergeContributionAction(String targetModule,
+                                         Class<?> contributor,
+                                         LinkedHashMap<String, StaticModuleActionDefinition> actions,
+                                         StaticModuleActionDefinition action) {
+        if (actions.containsKey(action.actionCode())) {
+            throw new IllegalStateException("@PlatformStaticActionContribution action conflicts with target module: "
+                    + targetModule + "." + action.actionCode() + " <- " + contributor.getName());
+        }
+        actions.put(action.actionCode(), action);
+    }
+
+    private List<StaticModuleActionDefinition> contributionActions(Class<?> beanClass,
+                                                                   PlatformStaticActionContribution contribution) {
+        LinkedHashMap<String, StaticModuleActionDefinition> actions = new LinkedHashMap<>();
+        addContributionStandardActions(actions, beanClass, contribution);
+        ReflectionUtils.doWithMethods(beanClass, method -> addContributionAnnotatedAction(actions, method,
+                contribution));
+        return List.copyOf(actions.values());
+    }
+
+    private void addMenuAction(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
+        if (AnnotationUtils.findAnnotation(beanClass, PlatformMenu.class) != null) {
+            addPlatform(actions, PlatformAction.MENU);
+        }
     }
 
     private void addStandardActions(Map<String, StaticModuleActionDefinition> actions, Class<?> beanClass) {
@@ -162,6 +221,34 @@ public class StaticModuleDefinitionScanner {
         }
         if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
             addPlatform(actions, PlatformAction.REFERENCE);
+        }
+    }
+
+    private void addContributionStandardActions(Map<String, StaticModuleActionDefinition> actions,
+                                                Class<?> beanClass,
+                                                PlatformStaticActionContribution contribution) {
+        if (CrudWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.CREATE);
+            addContributionPlatform(actions, contribution, PlatformAction.VIEW);
+            addContributionPlatform(actions, contribution, PlatformAction.UPDATE);
+            addContributionPlatform(actions, contribution, PlatformAction.DELETE);
+            addContributionPlatform(actions, contribution, PlatformAction.QUERY);
+        } else if (ReadOnlyWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.VIEW);
+            addContributionPlatform(actions, contribution, PlatformAction.QUERY);
+        }
+        if (TreeWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.TREE);
+            addContributionPlatform(actions, contribution, PlatformAction.SORT);
+        } else if (SortWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.SORT);
+        }
+        if (EnableWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.ENABLE);
+            addContributionPlatform(actions, contribution, PlatformAction.DISABLE);
+        }
+        if (ReferenceWeb.class.isAssignableFrom(beanClass)) {
+            addContributionPlatform(actions, contribution, PlatformAction.REFERENCE);
         }
     }
 
@@ -196,8 +283,51 @@ public class StaticModuleDefinitionScanner {
         }
     }
 
+    private void addContributionAnnotatedAction(Map<String, StaticModuleActionDefinition> actions,
+                                                Method method,
+                                                PlatformStaticActionContribution contribution) {
+        ActionEndpoint standard = AnnotationUtils.findAnnotation(method, ActionEndpoint.class);
+        if (standard != null) {
+            addContributionPlatform(actions, contribution, standard.value());
+        }
+        CustomActionEndpoint custom = AnnotationUtils.findAnnotation(method, CustomActionEndpoint.class);
+        if (custom != null) {
+            String actionCode = PlatformStaticActionContributionSupport.actionCode(contribution, custom.value());
+            actions.put(actionCode, new StaticModuleActionDefinition(
+                    actionCode,
+                    actionCode,
+                    PlatformStaticActionContributionSupport.title(contribution,
+                            custom.title().isBlank() ? custom.value() : custom.title()),
+                    toEntityLevel(custom.level()),
+                    net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode.AUTH_REQUIRED,
+                    true,
+                    custom.dataAuth(),
+                    net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy.NONE
+            ));
+        }
+    }
+
     private void addPlatform(Map<String, StaticModuleActionDefinition> actions, PlatformAction action) {
         actions.putIfAbsent(action.code(), StaticModuleActionDefinition.platformAction(action));
+    }
+
+    private void addContributionPlatform(Map<String, StaticModuleActionDefinition> actions,
+                                         PlatformStaticActionContribution contribution,
+                                         PlatformAction action) {
+        if (action == PlatformAction.MENU) {
+            return;
+        }
+        String actionCode = PlatformStaticActionContributionSupport.actionCode(contribution, action);
+        actions.putIfAbsent(actionCode, new StaticModuleActionDefinition(
+                actionCode,
+                PlatformStaticActionContributionSupport.permissionActionCode(contribution, action),
+                PlatformStaticActionContributionSupport.title(contribution, action),
+                toEntityLevel(action.level()),
+                net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode.valueOf(action.accessMode().name()),
+                action.actionAuth(),
+                action.dataAuth(),
+                action.defaultGrantPolicy()
+        ));
     }
 
     private EntityActionLevel toEntityLevel(net.ximatai.muyun.spring.common.platform.PlatformActionLevel level) {

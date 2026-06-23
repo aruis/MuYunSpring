@@ -133,6 +133,34 @@ class StaticModuleDefinitionRegistrarTest {
     }
 
     @Test
+    void shouldDisableStaleSystemManagedStaticModulesWhenScanningAllDefinitions() {
+        PlatformModuleService moduleService = mock(PlatformModuleService.class);
+        PlatformModuleActionService actionService = mock(PlatformModuleActionService.class);
+        StaticModuleDefinitionScanner scanner = mock(StaticModuleDefinitionScanner.class);
+        when(scanner.scan()).thenReturn(List.of(definition("iam.user",
+                List.of(StaticModuleActionDefinition.platformAction(PlatformAction.MENU)))));
+        when(moduleService.select("iam.user")).thenReturn(null);
+        when(actionService.findByModuleAliasAndActionCode("iam.user", "menu")).thenReturn(null);
+        PlatformModule current = module("iam.user");
+        PlatformModule stale = module("platform.dictionary_item");
+        PlatformModuleAction staleAction = action("action-1", "platform.dictionary_item", "query");
+        when(moduleService.listSystemManagedStaticModules()).thenReturn(List.of(current, stale));
+        when(actionService.listSystemManagedActions("platform.dictionary_item")).thenReturn(List.of(staleAction));
+
+        StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
+                moduleService,
+                actionService,
+                List.of(),
+                List.of(scanner)
+        );
+
+        registrar.registerAll();
+
+        verify(actionService).disable("action-1");
+        verify(moduleService).disable("platform.dictionary_item");
+    }
+
+    @Test
     void shouldRejectDuplicateStaticModuleDefinitions() {
         StaticModuleDefinitionRegistrar registrar = new StaticModuleDefinitionRegistrar(
                 mock(PlatformModuleService.class),
@@ -166,5 +194,23 @@ class StaticModuleDefinitionRegistrarTest {
 
     private StaticModuleDefinition definition(String moduleAlias, List<StaticModuleActionDefinition> actions) {
         return new StaticModuleDefinition("iam", moduleAlias, "用户管理", null, actions);
+    }
+
+    private PlatformModule module(String moduleAlias) {
+        PlatformModule module = new PlatformModule();
+        module.setAlias(moduleAlias);
+        module.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
+        module.setModuleKind(ModuleKind.STATIC);
+        module.setSystemManaged(Boolean.TRUE);
+        return module;
+    }
+
+    private PlatformModuleAction action(String id, String moduleAlias, String actionCode) {
+        PlatformModuleAction action = new PlatformModuleAction();
+        action.setId(id);
+        action.setModuleAlias(moduleAlias);
+        action.setActionCode(actionCode);
+        action.setSystemManaged(Boolean.TRUE);
+        return action;
     }
 }

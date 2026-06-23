@@ -27,9 +27,9 @@ export function normalizeInitialValue(value: string | null | undefined) {
 
 function tenantIdFromSearch(search: string, allowGenericTenantParameter: boolean) {
   const params = new URLSearchParams(search.startsWith('?') ? search : `?${search}`);
-  const shellTenantId = normalizeInitialValue(params.get('_muyunTenantId'));
-  if (shellTenantId || !allowGenericTenantParameter) {
-    return shellTenantId;
+  const workbenchTenantId = normalizeInitialValue(params.get('_muyunTenantId'));
+  if (workbenchTenantId || !allowGenericTenantParameter) {
+    return workbenchTenantId;
   }
   return normalizeInitialValue(params.get('tenantId')) || normalizeInitialValue(params.get('tenant'));
 }

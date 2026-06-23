@@ -63,6 +63,7 @@ public class PlatformMenuInitialDataDeclarationProvider implements InitialDataDe
         desired.setId(menuId);
         desired.setSchemeId(schemeId);
         desired.setMenuType(MenuType.MODULE);
+        desired.setOpenMode(menu.openMode());
         desired.setParentId(menu.parent());
         desired.setTitle(menu.title().isBlank() ? module.title() : menu.title().trim());
         desired.setModuleAlias(module.alias());

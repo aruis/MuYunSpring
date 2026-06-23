@@ -1,18 +1,18 @@
 import { createHttpClient, createMenuClient, createSessionClient } from '@muyun/web-core';
-import type { ShellStartupState } from '@muyun/web-contracts';
+import type { WorkbenchStartupState } from '@muyun/web-contracts';
 import { effectiveAuthToken } from './authSession';
-import { loadShellStartupState } from './shellStartup';
+import { loadWorkbenchStartupState } from './workbenchStartup';
 
-export async function loadAppShellStartupState(): Promise<ShellStartupState> {
+export async function loadAppWorkbenchStartupState(): Promise<WorkbenchStartupState> {
   if (usesMockStartup()) {
     if (!import.meta.env.DEV) {
-      throw new Error('Mock shell startup is only available in dev mode.');
+      throw new Error('Mock workbench startup is only available in dev mode.');
     }
 
-    const { loadDevShellStartupState } = await import(
-      /* @vite-ignore */ `/src/app/devShellStartup.ts?t=${Date.now()}`
+    const { loadDevWorkbenchStartupState } = await import(
+      /* @vite-ignore */ `/src/app/devWorkbenchStartup.ts?t=${Date.now()}`
     );
-    return loadDevShellStartupState();
+    return loadDevWorkbenchStartupState();
   }
 
   const httpClient = createHttpClient({
@@ -20,7 +20,7 @@ export async function loadAppShellStartupState(): Promise<ShellStartupState> {
     token: effectiveAuthToken(import.meta.env.VITE_MUYUN_AUTH_TOKEN),
     credentials: credentialsOf(import.meta.env.VITE_MUYUN_CREDENTIALS),
   });
-  return loadShellStartupState({
+  return loadWorkbenchStartupState({
     sessionClient: createSessionClient(httpClient),
     menuClient: createMenuClient(httpClient),
   });

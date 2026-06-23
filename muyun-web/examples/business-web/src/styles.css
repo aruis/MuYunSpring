@@ -16,7 +16,7 @@ body {
   min-height: 100vh;
 }
 
-.business-shell {
+.business-workbench {
   width: min(1120px, calc(100% - 40px));
   margin: 0 auto;
   padding: 32px 0;

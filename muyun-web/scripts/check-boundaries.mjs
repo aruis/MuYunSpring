@@ -27,7 +27,7 @@ for (const sourceRoot of sourceRoots) {
 
     const projectPath = relative(root, file);
     const source = readFileSync(file, 'utf8');
-    const usesAntdvPackage = source.includes('ant-design-vue');
+    const usesAntdvPackage = source.includes('ant-design-vue') || source.includes('@ant-design/icons-vue');
     const usesAntdvTemplate = file.endsWith('.vue') && antdvTemplatePattern.test(source);
 
     if ((usesAntdvPackage || usesAntdvTemplate) && !projectPath.startsWith(allowedAntdvPrefix)) {

@@ -11,10 +11,10 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 @Getter
 @Setter
 @Table(name = "platform_dictionary_item", comment = "Platform dictionary item")
-@CompositeIndex(columns = {"tenant_id", "application_alias", "category_alias", "code"}, unique = true)
+@CompositeIndex(columns = {"tenant_id", "category_id", "code"}, unique = true)
 public class DictionaryItem extends StandardEnabledTreeEntity {
-    @Column(name = "application_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Application alias")
-    private String applicationAlias;
+    @Column(name = "category_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Dictionary category id")
+    private String categoryId;
 
     @Column(name = "category_alias", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Dictionary category alias")
     private String categoryAlias;

@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const aliases = new Map([
-  ['@muyun/platform-shell', pathToFileURL(`${root}/src/platform-shell/index.ts`).href],
+  ['@muyun/platform-workbench', pathToFileURL(`${root}/src/platform-workbench/index.ts`).href],
   ['@muyun/web-contracts', pathToFileURL(`${root}/src/web-contracts/index.ts`).href],
   ['@muyun/web-core', pathToFileURL(`${root}/src/web-core/index.ts`).href],
 ]);

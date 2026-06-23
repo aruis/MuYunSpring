@@ -665,13 +665,16 @@ class PlatformConfigurationWebControllerTest {
         DictionaryItemWebController controller = new DictionaryItemWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
-        DictionaryItem root = dictionaryItem("item-1", "platform", "status", "enabled", null);
-        DictionaryItem child = dictionaryItem("item-2", "platform", "status", "active", "item-1");
+        DictionaryCategory category = dictionaryCategory("category-1", "platform", "status", null);
+        DictionaryItem root = dictionaryItem("item-1", "category-1", "status", "enabled", null);
+        DictionaryItem child = dictionaryItem("item-2", "category-1", "status", "active", "item-1");
+        when(service.category("platform", "status")).thenReturn(category);
+        when(service.category("category-1")).thenReturn(category);
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(root), 1, PageRequest.of(1, 20)));
-        when(service.rootItems("platform", "status")).thenReturn(List.of(root));
-        when(service.children("platform", "status", "item-1")).thenReturn(List.of(child));
-        when(service.children("platform", "status", "item-2")).thenReturn(List.of());
+        when(service.rootItems("category-1")).thenReturn(List.of(root));
+        when(service.children("category-1", "item-1")).thenReturn(List.of(child));
+        when(service.children("category-1", "item-2")).thenReturn(List.of());
         when(service.insert(any(DictionaryItem.class))).thenReturn("item-1");
         when(service.select("item-1")).thenReturn(root);
 
@@ -680,9 +683,9 @@ class PlatformConfigurationWebControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"conditions":[{"fieldName":"code","values":["enabled"]}]}
-                                """))
+                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.records[0].applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.records[0].categoryId").value("category-1"))
                 .andExpect(jsonPath("$.records[0].categoryAlias").value("status"))
                 .andExpect(jsonPath("$.records[0].code").value("enabled"));
         mvc.perform(get("/platform.application/platform/dictionary-categories/status/items/tree"))
@@ -693,19 +696,21 @@ class PlatformConfigurationWebControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"applicationAlias":"other","categoryAlias":"other","code":"enabled","title":"Enabled"}
-                                """))
+                """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.applicationAlias").value("platform"))
+                .andExpect(jsonPath("$.categoryId").value("category-1"))
                 .andExpect(jsonPath("$.categoryAlias").value("status"));
+        mvc.perform(get("/platform.dictionary_category/categories/category-1/items/tree"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].record.id").value("item-1"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
-        assertClause(criteria.getValue(), "applicationAlias", "platform");
-        assertClause(criteria.getValue(), "categoryAlias", "status");
+        assertClause(criteria.getValue(), "categoryId", "category-1");
         assertClause(criteria.getValue(), "code", "enabled");
         ArgumentCaptor<DictionaryItem> captor = ArgumentCaptor.forClass(DictionaryItem.class);
         verify(service).insert(captor.capture());
-        assertThat(captor.getValue().getApplicationAlias()).isEqualTo("platform");
+        assertThat(captor.getValue().getCategoryId()).isEqualTo("category-1");
         assertThat(captor.getValue().getCategoryAlias()).isEqualTo("status");
     }
 
@@ -714,7 +719,9 @@ class PlatformConfigurationWebControllerTest {
         DictionaryItemService service = mock(DictionaryItemService.class);
         DictionaryItemWebController controller = new DictionaryItemWebController();
         ReflectionTestUtils.setField(controller, "service", service);
-        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "platform", "priority", "enabled", null));
+        when(service.category("platform", "status"))
+                .thenReturn(dictionaryCategory("category-1", "platform", "status", null));
+        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "category-2", "priority", "enabled", null));
 
         MockHttpServletRequest request = requestVars(Map.of(
                 "applicationAlias", "platform",
@@ -730,9 +737,11 @@ class PlatformConfigurationWebControllerTest {
         DictionaryItemService service = mock(DictionaryItemService.class);
         DictionaryItemWebController controller = new DictionaryItemWebController();
         ReflectionTestUtils.setField(controller, "service", service);
-        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "platform", "status", "enabled", null));
-        when(service.select("item-0")).thenReturn(dictionaryItem("item-0", "platform", "status", "disabled", "parent-1"));
-        when(service.select("parent-1")).thenReturn(dictionaryItem("parent-1", "platform", "status", "group", null));
+        when(service.category("platform", "status"))
+                .thenReturn(dictionaryCategory("category-1", "platform", "status", null));
+        when(service.select("item-1")).thenReturn(dictionaryItem("item-1", "category-1", "status", "enabled", null));
+        when(service.select("item-0")).thenReturn(dictionaryItem("item-0", "category-1", "status", "disabled", "parent-1"));
+        when(service.select("parent-1")).thenReturn(dictionaryItem("parent-1", "category-1", "status", "group", null));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(post("/platform.application/platform/dictionary-categories/status/items/sort/item-1")
@@ -745,8 +754,7 @@ class PlatformConfigurationWebControllerTest {
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).moveInTree(criteria.capture(), eq("item-1"), eq("item-0"), eq(null), eq("parent-1"));
-        assertClause(criteria.getValue(), "applicationAlias", "platform");
-        assertClause(criteria.getValue(), "categoryAlias", "status");
+        assertClause(criteria.getValue(), "categoryId", "category-1");
     }
 
     @Test
@@ -1016,11 +1024,11 @@ class PlatformConfigurationWebControllerTest {
         return category;
     }
 
-    private DictionaryItem dictionaryItem(String id, String applicationAlias, String categoryAlias,
+    private DictionaryItem dictionaryItem(String id, String categoryId, String categoryAlias,
                                           String code, String parentId) {
         DictionaryItem item = new DictionaryItem();
         item.setId(id);
-        item.setApplicationAlias(applicationAlias);
+        item.setCategoryId(categoryId);
         item.setCategoryAlias(categoryAlias);
         item.setCode(code);
         item.setParentId(parentId);

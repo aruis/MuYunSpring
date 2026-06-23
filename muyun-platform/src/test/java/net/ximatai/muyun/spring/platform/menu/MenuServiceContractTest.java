@@ -203,6 +203,16 @@ class MenuServiceContractTest {
             assertThatThrownBy(() -> menuService.insert(moduleWithRoute))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("MODULE");
+            Menu groupWithOpenMode = groupMenu(firstSchemeId, "错误分组打开方式", TreeAbility.ROOT_ID);
+            groupWithOpenMode.setOpenMode(MenuOpenMode.TAB);
+            assertThatThrownBy(() -> menuService.insert(groupWithOpenMode))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("GROUP menu cannot have openMode");
+            Menu moduleWithoutOpenMode = moduleMenu(firstSchemeId, "错误模块打开方式", TreeAbility.ROOT_ID, "crm.customer");
+            moduleWithoutOpenMode.setOpenMode(null);
+            assertThatThrownBy(() -> menuService.insert(moduleWithoutOpenMode))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("MODULE menu requires openMode");
         }
     }
 
@@ -484,6 +494,7 @@ class MenuServiceContractTest {
         menu.setTitle(title);
         menu.setParentId(parentId);
         menu.setMenuType(MenuType.MODULE);
+        menu.setOpenMode(MenuOpenMode.TAB);
         menu.setModuleAlias(moduleAlias);
         return menu;
     }

@@ -90,6 +90,16 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         }
     }
 
+    public List<PlatformModuleAction> listSystemManagedActions(String moduleAlias) {
+        String validModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
+        try (TenantContext.Scope ignored = TenantContext.system("select system managed module actions")) {
+            return list(Criteria.of()
+                    .eq("moduleAlias", validModuleAlias)
+                    .eq("systemManaged", Boolean.TRUE)
+                    .isNull(StandardEntitySchema.TENANT_ID_FIELD), ALL, Sort.asc("sortOrder"));
+        }
+    }
+
     public PlatformModuleAction findByModuleAliasAndActionCode(String moduleAlias, String actionCode) {
         String validModuleAlias = PlatformNameRules.requireModuleAlias(moduleAlias);
         String validActionCode = PlatformNameRules.requireActionCode(actionCode, "actionCode");

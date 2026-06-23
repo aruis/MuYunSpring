@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContribution;
+import net.ximatai.muyun.spring.boot.platform.PlatformStaticActionContributionSupport;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleAction;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -41,12 +43,20 @@ public class ActionEndpointContextResolver {
     public Optional<ActionExecutionContext> resolve(HttpServletRequest request,
                                                     HandlerMethod handlerMethod,
                                                     ActionEndpoint endpoint) {
-        String moduleAlias = moduleAlias(request, handlerMethod);
+        PlatformStaticActionContribution contribution = contribution(handlerMethod);
+        String moduleAlias = contribution == null
+                ? moduleAlias(request, handlerMethod)
+                : PlatformStaticActionContributionSupport.targetModule(contribution);
         if (moduleAlias == null || moduleAlias.isBlank()) {
             return Optional.empty();
         }
-        ActionExecutionPolicy policy = registeredPolicy(moduleAlias, endpoint.value().code())
-                .orElseGet(endpoint.value()::executionPolicy);
+        String actionCode = contribution == null
+                ? endpoint.value().code()
+                : PlatformStaticActionContributionSupport.actionCode(contribution, endpoint.value());
+        ActionExecutionPolicy policy = registeredPolicy(moduleAlias, actionCode)
+                .orElseGet(() -> contribution == null
+                        ? endpoint.value().executionPolicy()
+                        : contributionPolicy(contribution, endpoint.value()));
         return Optional.of(ActionExecutionContext.ofPolicy(
                 moduleAlias,
                 policy,
@@ -58,11 +68,16 @@ public class ActionEndpointContextResolver {
     public Optional<ActionExecutionContext> resolve(HttpServletRequest request,
                                                     HandlerMethod handlerMethod,
                                                     CustomActionEndpoint endpoint) {
-        String moduleAlias = moduleAlias(request, handlerMethod);
+        PlatformStaticActionContribution contribution = contribution(handlerMethod);
+        String moduleAlias = contribution == null
+                ? moduleAlias(request, handlerMethod)
+                : PlatformStaticActionContributionSupport.targetModule(contribution);
         if (moduleAlias == null || moduleAlias.isBlank()) {
             return Optional.empty();
         }
-        String actionCode = PlatformNameRules.requireActionCode(endpoint.value(), "actionCode");
+        String actionCode = contribution == null
+                ? PlatformNameRules.requireActionCode(endpoint.value(), "actionCode")
+                : PlatformStaticActionContributionSupport.actionCode(contribution, endpoint.value());
         ActionExecutionPolicy policy = registeredPolicy(moduleAlias, actionCode)
                 .orElseGet(() -> new ActionExecutionPolicy(
                         actionCode,
@@ -79,6 +94,32 @@ public class ActionEndpointContextResolver {
                 customRecordIds(request, endpoint),
                 CurrentUserContext.currentUser()
         ));
+    }
+
+    private PlatformStaticActionContribution contribution(HandlerMethod handlerMethod) {
+        PlatformStaticActionContribution methodContribution =
+                org.springframework.core.annotation.AnnotationUtils.findAnnotation(
+                        handlerMethod.getMethod(), PlatformStaticActionContribution.class);
+        if (methodContribution != null) {
+            return methodContribution;
+        }
+        return org.springframework.core.annotation.AnnotationUtils.findAnnotation(
+                handlerMethod.getBeanType(), PlatformStaticActionContribution.class);
+    }
+
+    private ActionExecutionPolicy contributionPolicy(PlatformStaticActionContribution contribution,
+                                                     net.ximatai.muyun.spring.common.platform.PlatformAction action) {
+        String actionCode = PlatformStaticActionContributionSupport.actionCode(contribution, action);
+        String permissionActionCode = PlatformStaticActionContributionSupport.permissionActionCode(contribution, action);
+        return new ActionExecutionPolicy(
+                actionCode,
+                action.level(),
+                action.accessMode(),
+                action.actionAuth(),
+                action.dataAuth(),
+                action.defaultGrantPolicy(),
+                actionCode.equals(permissionActionCode) ? null : permissionActionCode
+        );
     }
 
     private String moduleAlias(HttpServletRequest request, HandlerMethod handlerMethod) {

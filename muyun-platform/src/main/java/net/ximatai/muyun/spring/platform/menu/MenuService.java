@@ -40,6 +40,7 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         TreeAbility<Menu>,
         InitialDataAbility<Menu> {
     public static final String MODULE_ALIAS = "platform.menu";
+    public static final String ADMIN_PLATFORM_GROUP_ID = "platform.menu.group.platform";
     public static final String ADMIN_CONFIG_GROUP_ID = "platform.menu.group.config";
     public static final String ADMIN_IDENTITY_GROUP_ID = "platform.menu.group.identity";
     public static final String ADMIN_OPS_GROUP_ID = "platform.menu.group.ops";
@@ -113,17 +114,18 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     @Override
     public List<Menu> initialData() {
         return List.of(
-                group(ADMIN_CONFIG_GROUP_ID, "平台配置与低代码运维", 10),
-                group(ADMIN_IDENTITY_GROUP_ID, "组织与权限", 20),
-                group(ADMIN_OPS_GROUP_ID, "平台运行运维", 30)
+                group(ADMIN_PLATFORM_GROUP_ID, TreeAbility.ROOT_ID, "平台管理", 10),
+                group(ADMIN_CONFIG_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台配置与低代码运维", 10),
+                group(ADMIN_IDENTITY_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "组织与权限", 20),
+                group(ADMIN_OPS_GROUP_ID, ADMIN_PLATFORM_GROUP_ID, "平台运行运维", 30)
         );
     }
 
-    private Menu group(String id, String title, int sortOrder) {
+    private Menu group(String id, String parentId, String title, int sortOrder) {
         Menu menu = new Menu();
         menu.setId(id);
         menu.setSchemeId(MenuSchemeService.ADMIN_SCHEME_ID);
-        menu.setParentId(TreeAbility.ROOT_ID);
+        menu.setParentId(parentId);
         menu.setMenuType(MenuType.GROUP);
         menu.setTitle(title);
         menu.setEnabled(Boolean.TRUE);
@@ -278,12 +280,14 @@ public class MenuService extends AbstractAbilityService<Menu> implements
     private void normalizeTarget(Menu menu) {
         switch (menu.getMenuType()) {
             case GROUP -> {
+                requireNoOpenMode(menu);
                 requireBlank(menu.getModuleAlias(), "GROUP menu cannot have moduleAlias");
                 requireBlank(menu.getRoute(), "GROUP menu cannot have route");
                 requireBlank(menu.getExternalUrl(), "GROUP menu cannot have externalUrl");
                 requireBlankEntry(menu, "GROUP menu cannot have low-code entry config");
             }
             case MODULE -> {
+                requireOpenMode(menu);
                 String moduleAlias = PlatformNameRules.requireModuleAlias(menu.getModuleAlias());
                 if (moduleService.resolveVisibleModule(moduleAlias) == null) {
                     throw new PlatformException("MODULE menu requires existing module: " + moduleAlias);
@@ -294,17 +298,31 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 normalizeModuleEntry(menu, moduleAlias);
             }
             case ROUTE -> {
+                requireOpenMode(menu);
                 requireText(menu.getRoute(), "ROUTE menu requires route");
                 requireBlank(menu.getModuleAlias(), "ROUTE menu cannot have moduleAlias");
                 requireBlank(menu.getExternalUrl(), "ROUTE menu cannot have externalUrl");
                 requireBlankEntry(menu, "ROUTE menu cannot have low-code entry config");
             }
             case LINK -> {
+                requireOpenMode(menu);
                 requireText(menu.getExternalUrl(), "LINK menu requires externalUrl");
                 requireBlank(menu.getModuleAlias(), "LINK menu cannot have moduleAlias");
                 requireBlank(menu.getRoute(), "LINK menu cannot have route");
                 requireBlankEntry(menu, "LINK menu cannot have low-code entry config");
             }
+        }
+    }
+
+    private void requireOpenMode(Menu menu) {
+        if (menu.getOpenMode() == null) {
+            throw new PlatformException(menu.getMenuType() + " menu requires openMode");
+        }
+    }
+
+    private void requireNoOpenMode(Menu menu) {
+        if (menu.getOpenMode() != null) {
+            throw new PlatformException("GROUP menu cannot have openMode");
         }
     }
 

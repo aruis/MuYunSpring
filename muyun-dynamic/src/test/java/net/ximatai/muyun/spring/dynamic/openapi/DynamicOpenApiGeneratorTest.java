@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.dynamic.openapi;
 
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicModuleDescriptor;
@@ -114,7 +115,9 @@ class DynamicOpenApiGeneratorTest {
                     assertThat(operation.responseSchema()).isEqualTo("DynamicWebActionExecutionResponse");
                     assertThat(operation.actionCode()).isEqualTo("submit");
                     assertThat(operation.permissionCode()).isEqualTo("sales.contract:submit");
-                    assertThat(operation.errorCodes()).contains("DYNAMIC_ACTION_FAILED", "DYNAMIC_CONFLICT");
+                    assertThat(operation.errorCodes())
+                            .contains("DYNAMIC_ACTION_FAILED", PlatformErrorCodes.CONFLICT_VERSION)
+                            .doesNotContain("DYNAMIC_CONFLICT");
                 });
         assertThat(document.operations().stream()
                 .filter(operation -> operation.path().equals("/sales.contract/insert"))
@@ -465,7 +468,7 @@ class DynamicOpenApiGeneratorTest {
     }
 
     @Test
-    void shouldExposeDynamicWebErrorSchemas() {
+    void shouldExposePlatformWebErrorSchemas() {
         DynamicOpenApiDocument document = generator.generate(DynamicModuleDescriptor.from(module()));
 
         assertThat(document.schemas().get("WebQueryRequest").properties().get("conditions"))
@@ -491,20 +494,22 @@ class DynamicOpenApiGeneratorTest {
         assertThat(document.schemas().get("RecordDuplicateCheckResult").properties())
                 .containsKeys("ruleId", "actionCode", "fieldNames", "duplicated", "matches");
         assertThat(document.errors())
-                .containsEntry("DYNAMIC_BAD_REQUEST",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_BAD_REQUEST", 400, "DynamicWebError"))
-                .containsEntry("DYNAMIC_UI_VALIDATION",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_UI_VALIDATION", 400, "DynamicWebError"))
-                .containsEntry("DYNAMIC_ATTACHMENT_ERROR",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ATTACHMENT_ERROR", 400, "DynamicWebError"))
-                .containsEntry("DYNAMIC_DUPLICATE_CHECK_ERROR",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_DUPLICATE_CHECK_ERROR", 400, "DynamicWebError"))
+                .containsEntry(PlatformErrorCodes.VALIDATION_FAILED,
+                        new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.VALIDATION_FAILED, 400, "PlatformWebError"))
                 .containsEntry("DYNAMIC_ACTION_FAILED",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "DynamicWebActionError"))
-                .containsEntry("DYNAMIC_CONFLICT",
-                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_CONFLICT", 409, "DynamicWebError"));
-        assertThat(document.schemas().get("DynamicWebActionError").properties())
-                .containsKeys("code", "status", "message", "traceId", "failureStage", "context");
+                        new DynamicOpenApiDocument.ErrorResponse("DYNAMIC_ACTION_FAILED", 400, "PlatformWebError"))
+                .containsEntry(PlatformErrorCodes.CONFLICT_VERSION,
+                        new DynamicOpenApiDocument.ErrorResponse(PlatformErrorCodes.CONFLICT_VERSION, 409, "PlatformWebError"))
+                .doesNotContainKeys("DYNAMIC_BAD_REQUEST", "DYNAMIC_UI_VALIDATION", "DYNAMIC_ATTACHMENT_ERROR",
+                        "DYNAMIC_DUPLICATE_CHECK_ERROR", "DYNAMIC_CONFLICT");
+        assertThat(document.schemas()).doesNotContainKeys("DynamicWebError", "DynamicWebActionError");
+        assertThat(document.schemas().get("PlatformWebError").properties())
+                .containsKeys("traceId", "code", "status", "message", "scope", "targets", "details");
+        assertThat(document.schemas().get("PlatformWebError").required())
+                .containsExactly("traceId", "code", "status", "message", "targets", "details");
+        assertThat(document.schemas().get("ErrorTarget").properties())
+                .containsKeys("kind", "moduleAlias", "entityAlias", "relationAlias", "fieldName", "rowIndex",
+                        "recordId", "actionCode", "attachmentId");
     }
 
     @Test

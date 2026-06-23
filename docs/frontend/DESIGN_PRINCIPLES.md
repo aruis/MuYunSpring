@@ -59,14 +59,14 @@ MuYun 前端不采用先闭门建设完整组件库、再统一交付业务页�
 
 前端分层服务于长期演进，不服务于形式化拆目录。
 
-| 层 | 设计取舍 |
-| --- | --- |
-| `web-contracts` | 承载前后端共享的稳定语义、DTO、动作、字段、保存 envelope 和错误结构。 |
-| `web-core` | 承载无 UI 的平台能力，例如 HTTP、请求上下文、错误、权限、Query 治理、字典、引用候选和动作执行。 |
-| `vue-ui-antdv` | 承载 Vue + Ant Design Vue adapter 和受控值归一，不承接平台数据获取和业务编排。 |
-| `platform-components` | 承载跨业务复用、依赖平台标准能力、语义稳定的平台业务组件。 |
-| `dynamic-page-runtime` | 将后端 descriptor、运行上下文、组件 registry 和平台 client 组合为动态页面能力。 |
-| `platform-shell` | 承载菜单、登录态、租户切换、全局错误出口和路由框架。 |
+| 层                     | 设计取舍                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| `web-contracts`        | 承载前后端共享的稳定语义、DTO、动作、字段、保存 envelope 和错误结构。                           |
+| `web-core`             | 承载无 UI 的平台能力，例如 HTTP、请求上下文、错误、权限、Query 治理、字典、引用候选和动作执行。 |
+| `vue-ui-antdv`         | 承载 Vue + Ant Design Vue adapter 和受控值归一，不承接平台数据获取和业务编排。                  |
+| `platform-components`  | 承载跨业务复用、依赖平台标准能力、语义稳定的平台业务组件。                                      |
+| `dynamic-page-runtime` | 将后端 descriptor、运行上下文、组件 registry 和平台 client 组合为动态页面能力。                 |
+| `platform-workbench`   | 承载菜单、登录态、租户切换、全局错误出口和路由框架。                                            |
 
 组件不应各自拼 URL、处理 token、解释权限、实现缓存失效或自定义错误展示。涉及这些能力时，应回到 `web-core`。
 

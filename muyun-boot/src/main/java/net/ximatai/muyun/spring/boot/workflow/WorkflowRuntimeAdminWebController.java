@@ -189,12 +189,6 @@ public class WorkflowRuntimeAdminWebController {
         return new WebCountResponse(adminFacade.deleteHistory(historyInstanceId));
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, PlatformException.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public WorkflowWebError handleBadRequest(RuntimeException exception) {
-        return new WorkflowWebError("bad_request", exception.getMessage());
-    }
-
     private String operatorId(String operatorId) {
         if (operatorId != null && !operatorId.isBlank()) {
             return operatorId;

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -15,6 +17,8 @@ public @interface PlatformMenu {
     String title() default "";
 
     int order() default 100;
+
+    MenuOpenMode openMode() default MenuOpenMode.TAB;
 
     boolean enabled() default true;
 }

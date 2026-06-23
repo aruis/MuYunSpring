@@ -37,7 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.user", title = "用户管理")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 30)
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 60)
 @RequestMapping("/iam.user")
 public class UserAccountWebController extends WebSupport<UserAccountService> implements
         CrudWeb<UserAccount, UserAccountService>,

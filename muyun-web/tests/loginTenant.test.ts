@@ -29,8 +29,12 @@ test('login tenant falls back to environment tenant when url tenant is blank', (
   });
 });
 
-test('login tenant uses shell-reserved tenant parameter on deep links', () => {
-  const defaults = resolveLoginTenantDefaults('env-tenant', '?_muyunTenantId=platform', '/platform/dynamic/crm.customer/list');
+test('login tenant uses workbench-reserved tenant parameter on deep links', () => {
+  const defaults = resolveLoginTenantDefaults(
+    'env-tenant',
+    '?_muyunTenantId=platform',
+    '/platform/dynamic/crm.customer/list',
+  );
 
   assert.deepEqual(defaults, {
     tenantId: 'platform',
@@ -39,7 +43,11 @@ test('login tenant uses shell-reserved tenant parameter on deep links', () => {
 });
 
 test('login tenant does not lock from generic tenant parameter on deep links', () => {
-  const defaults = resolveLoginTenantDefaults('env-tenant', '?tenantId=business-tenant', '/platform/dynamic/crm.customer/list');
+  const defaults = resolveLoginTenantDefaults(
+    'env-tenant',
+    '?tenantId=business-tenant',
+    '/platform/dynamic/crm.customer/list',
+  );
 
   assert.deepEqual(defaults, {
     tenantId: 'env-tenant',

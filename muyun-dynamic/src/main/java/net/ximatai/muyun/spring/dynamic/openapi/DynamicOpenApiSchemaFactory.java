@@ -91,13 +91,14 @@ final class DynamicOpenApiSchemaFactory {
         schemas.put("DynamicWebActionAvailabilityResponse", actionAvailabilityResponseSchema());
         schemas.put("DynamicWebActionContext", actionContextSchema());
         schemas.put("DynamicWebActionResultBody", actionResultBodySchema());
+        schemas.put("PlatformWebError", platformWebErrorSchema());
+        schemas.put("ErrorScope", errorScopeSchema());
+        schemas.put("ErrorTarget", errorTargetSchema());
         schemas.put("DynamicActionDialog", actionDialogSchema());
         schemas.put("DynamicActionRefreshStrategy", actionRefreshStrategySchema());
         schemas.put("DynamicReferenceResolveItem", referenceResolveItemSchema());
         schemas.put("DynamicReferenceResolveResult", referenceResolveResultSchema());
         schemas.put("WebCountResponse", countResponseSchema("WebCountResponse"));
-        schemas.put("DynamicWebError", errorSchema("DynamicWebError", false));
-        schemas.put("DynamicWebActionError", errorSchema("DynamicWebActionError", true));
         return Map.copyOf(schemas);
     }
 
@@ -1052,24 +1053,44 @@ final class DynamicOpenApiSchemaFactory {
                 true, null, null, null, null, itemName, List.of());
     }
 
-    private DynamicOpenApiDocument.Schema errorSchema(String name, boolean action) {
+    private DynamicOpenApiDocument.Schema platformWebErrorSchema() {
         Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("traceId", new DynamicOpenApiDocument.Property("string", null, true, false,
+                false, null, null, null, null, null, List.of()));
         properties.put("code", new DynamicOpenApiDocument.Property("string", null, true, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("status", new DynamicOpenApiDocument.Property("integer", "int32", true, false,
                 false, null, null, null, null, null, List.of()));
         properties.put("message", new DynamicOpenApiDocument.Property("string", null, true, false,
                 false, null, null, null, null, null, List.of()));
-        properties.put("traceId", new DynamicOpenApiDocument.Property("string", null, false, true,
-                false, null, null, null, null, null, List.of()));
-        if (action) {
-            properties.put("failureStage", new DynamicOpenApiDocument.Property("string", null, true, false,
-                    false, null, null, null, null, null, List.of()));
-            properties.put("context", new DynamicOpenApiDocument.Property("object", null, false, true,
-                    false, null, null, null, null, null, List.of()));
-        }
-        return new DynamicOpenApiDocument.Schema(name, "object", null,
-                action ? List.of("code", "status", "message", "failureStage") : List.of("code", "status", "message"),
+        properties.put("scope", objectProperty("ErrorScope"));
+        properties.put("targets", arrayProperty("ErrorTarget"));
+        properties.put("details", objectProperty("object"));
+        return new DynamicOpenApiDocument.Schema("PlatformWebError", "object", null,
+                List.of("traceId", "code", "status", "message", "targets", "details"),
+                properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema errorScopeSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("moduleAlias", stringProperty(true));
+        properties.put("entityAlias", stringProperty(true));
+        properties.put("actionCode", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("ErrorScope", "object", null, List.of(), properties, null);
+    }
+
+    private DynamicOpenApiDocument.Schema errorTargetSchema() {
+        Map<String, DynamicOpenApiDocument.Property> properties = new LinkedHashMap<>();
+        properties.put("kind", stringProperty(true));
+        properties.put("moduleAlias", stringProperty(true));
+        properties.put("entityAlias", stringProperty(true));
+        properties.put("relationAlias", stringProperty(true));
+        properties.put("fieldName", stringProperty(true));
+        properties.put("rowIndex", integerProperty(true));
+        properties.put("recordId", stringProperty(true));
+        properties.put("actionCode", stringProperty(true));
+        properties.put("attachmentId", stringProperty(true));
+        return new DynamicOpenApiDocument.Schema("ErrorTarget", "object", null, List.of(),
                 properties, null);
     }
 

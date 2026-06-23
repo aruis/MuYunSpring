@@ -7,6 +7,8 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
+import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -32,6 +34,7 @@ import net.ximatai.muyun.spring.iam.user.UserAccount;
 import net.ximatai.muyun.spring.iam.user.UserAccountDao;
 import net.ximatai.muyun.spring.iam.user.UserAccountService;
 import net.ximatai.muyun.spring.platform.menu.Menu;
+import net.ximatai.muyun.spring.platform.menu.MenuOpenMode;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.MenuType;
 import org.junit.jupiter.api.AfterEach;
@@ -93,7 +96,7 @@ class IamWebControllerTest {
                         userAccountController,
                         roleController
                 )
-                .setControllerAdvice(new IamWebExceptionHandler())
+                .setControllerAdvice(new PlatformWebExceptionHandler())
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.ofNullable(currentUser)))
                 .build();
     }
@@ -141,7 +144,8 @@ class IamWebControllerTest {
                                 ))
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("query conditions are not supported by iam.tenant"));
     }
 
@@ -160,7 +164,8 @@ class IamWebControllerTest {
                                 )
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("query criteria are not supported by iam.tenant"));
     }
 
@@ -302,7 +307,8 @@ class IamWebControllerTest {
 
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("Tenant is not active: tenant_a"));
     }
 
@@ -310,7 +316,8 @@ class IamWebControllerTest {
     void shouldRequireCurrentUserTenantForOrganizationAccess() throws Exception {
         mvc.perform(get("/iam.organization/tree"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("IAM_BAD_REQUEST"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("iam.organization requires tenant context"));
     }
 
@@ -572,6 +579,9 @@ class IamWebControllerTest {
         menu.setId(id);
         menu.setSchemeId(schemeId);
         menu.setMenuType(menuType);
+        if (menuType != MenuType.GROUP) {
+            menu.setOpenMode(MenuOpenMode.TAB);
+        }
         menu.setModuleAlias(moduleAlias);
         menu.setTitle(id);
         menu.setEnabled(Boolean.TRUE);

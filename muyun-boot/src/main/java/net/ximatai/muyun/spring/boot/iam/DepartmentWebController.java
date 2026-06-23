@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
+import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -27,6 +29,7 @@ import java.util.List;
 
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 30)
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,
