@@ -285,6 +285,10 @@ export interface StandardSortableEntity extends StandardTitledEntity {
   sortOrder?: number;
 }
 
+export interface StandardEnabledSortableEntity extends StandardSortableEntity {
+  enabled?: boolean;
+}
+
 export interface StandardTreeEntity extends StandardSortableEntity {
   parentId?: string;
 }
@@ -295,6 +299,10 @@ export interface StandardEnabledTreeEntity extends StandardTreeEntity {
 
 export interface Organization extends StandardEnabledTreeEntity {
   code?: string;
+}
+
+export interface Application extends StandardEnabledSortableEntity {
+  alias?: string;
 }
 
 export interface TreeSortRequest {

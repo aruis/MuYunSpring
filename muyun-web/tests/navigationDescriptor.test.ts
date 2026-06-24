@@ -154,6 +154,30 @@ test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptor
   assert.equal(roundTrip.tabPolicy.identity, 'by-menu');
 });
 
+test('resolvePageDescriptor resolves configured MODULE targets as business routes', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'platform.menu.module.platform.application',
+      menuType: 'MODULE',
+      openMode: 'TAB',
+      moduleAlias: 'platform.application',
+    },
+    {
+      title: '应用管理',
+      businessModuleRoutes: {
+        'platform.application': '/config/applications',
+      },
+    },
+  );
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.hostType, 'business-route-host');
+  assert.equal(descriptor.title, '应用管理');
+  assert.equal(descriptor.target.route, '/config/applications');
+  assert.equal(descriptor.target.moduleAlias, 'platform.application');
+  assert.equal(tabKeyOf(descriptor), 'menu:platform.menu.module.platform.application');
+});
+
 test('resolvePageDescriptor resolves LINK targets by open mode', () => {
   const iframeDescriptor = resolvePageDescriptor({
     menuId: 'crm-online',

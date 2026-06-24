@@ -1,5 +1,6 @@
 import type { Component } from 'vue';
 import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } from '@muyun/web-contracts';
+import ApplicationManagementView from '../views/ApplicationManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 
 export interface StaticBusinessRoute {
@@ -10,6 +11,11 @@ export interface StaticBusinessRoute {
 
 export const staticBusinessRoutes: StaticBusinessRoute[] = [
   {
+    route: '/config/applications',
+    moduleAlias: 'platform.application',
+    component: ApplicationManagementView,
+  },
+  {
     route: '/iam/organizations',
     moduleAlias: 'iam.organization',
     component: OrganizationManagementView,
@@ -17,6 +23,9 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
 ];
 
 export const businessRoutePrefixes = staticBusinessRoutes.map((route) => route.route);
+export const businessModuleRoutes = Object.fromEntries(
+  staticBusinessRoutes.map((route) => [route.moduleAlias, route.route]),
+);
 
 export function resolveStaticBusinessRoute(
   descriptor?: BusinessRoutePageDescriptor,
@@ -34,5 +43,5 @@ export function isStaticBusinessRoutePage(
 }
 
 function routeMatchesTarget(route: StaticBusinessRoute, target: RoutePageTarget) {
-  return target.route === route.route;
+  return target.route ? target.route === route.route : target.moduleAlias === route.moduleAlias;
 }

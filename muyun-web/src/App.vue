@@ -11,7 +11,7 @@ import {
 } from './app/authSession';
 import { loadAppWorkbenchStartupState, usesMockStartup } from './app/appWorkbenchStartup';
 import { createBackendHttpClient } from './app/backendHttp';
-import { businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
+import { businessModuleRoutes, businessRoutePrefixes, isStaticBusinessRoutePage } from './app/businessRoutes';
 import LoginView from './app/LoginView.vue';
 import StaticBusinessRouteOutlet from './app/StaticBusinessRouteOutlet.vue';
 import {
@@ -29,7 +29,7 @@ const activeTabKey = ref<string>();
 const loginRequired = ref(false);
 const loginLoading = ref(false);
 const logoutLoading = ref(false);
-const businessRouteResolveOptions = { businessRoutePrefixes };
+const businessRouteResolveOptions = { businessRoutePrefixes, businessModuleRoutes };
 
 configureModuleContext({ httpFactory: createBackendHttpClient });
 provideModuleContextConfig({ httpFactory: createBackendHttpClient });
