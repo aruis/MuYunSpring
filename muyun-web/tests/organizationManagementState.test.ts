@@ -62,6 +62,30 @@ test('organization management state updates existing records and refreshes enabl
   assert.equal(state.reloadKey.value, 2);
 });
 
+test('organization management state trims parent id and clears blank parent id', async () => {
+  const calls: unknown[] = [];
+  const context = createContext({
+    update: async (_id, record) => {
+      calls.push(record);
+      return { ...record, id: 'org-east' };
+    },
+  });
+  const state = createOrganizationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'org-east', code: 'EAST', title: '华东', parentId: 'org-root', enabled: true });
+  state.startEdit();
+  state.draft.value.parentId = '   ';
+  await state.save();
+
+  assert.equal((calls[0] as Organization).parentId, undefined);
+
+  state.startEdit();
+  state.draft.value.parentId = '  org-root  ';
+  await state.save();
+
+  assert.equal((calls[1] as Organization).parentId, 'org-root');
+});
+
 test('organization management state respects delete confirmation result', async () => {
   const calls: string[] = [];
   const context = createContext({
