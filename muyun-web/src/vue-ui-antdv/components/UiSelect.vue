@@ -4,12 +4,21 @@ import type { Option, OptionValue } from '@muyun/web-contracts';
 
 defineOptions({ name: 'UiSelect' });
 
-defineProps<{
-  value?: OptionValue | null;
-  options: Option[];
-  placeholder?: string;
-  disabled?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    value?: OptionValue | null;
+    options: Option[];
+    placeholder?: string;
+    disabled?: boolean;
+    allowClear?: boolean;
+  }>(),
+  {
+    value: undefined,
+    placeholder: undefined,
+    disabled: false,
+    allowClear: true,
+  },
+);
 
 const emit = defineEmits<{
   'update:value': [value: OptionValue | null];
@@ -22,7 +31,7 @@ function normalize(value: unknown) {
 
 <template>
   <ASelect
-    allow-clear
+    :allow-clear="allowClear"
     :value="value ?? undefined"
     :options="options"
     :placeholder="placeholder"

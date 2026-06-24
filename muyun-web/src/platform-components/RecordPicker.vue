@@ -166,6 +166,10 @@ function handleTreeSelect(node: UiTreeNode) {
   }
 }
 
+function isRecordDisabled(record: RecordPickerRecord) {
+  return Boolean(firstConstraintMessage(record, pickerContext.value, props.constraints));
+}
+
 function clearValue() {
   emit('update:value', undefined);
   emit('select', undefined);
@@ -224,7 +228,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
         <li v-for="record in filteredRecords" :key="record.id">
           <button
             type="button"
-            :disabled="Boolean(firstConstraintMessage(record, pickerContext, constraints))"
+            :disabled="isRecordDisabled(record)"
             @click="selectRecord(record)"
           >
             <span>{{ recordTitle(record) }}</span>
