@@ -1,0 +1,116 @@
+import type {
+  TreeSortRequest,
+  WebCountResponse,
+  WebListResponse,
+  WebPageResponse,
+  WebQueryRequest,
+  WebTreeNode,
+} from '@muyun/web-contracts';
+import type { HttpClient } from '../http';
+
+export interface StaticModuleCrudClient<TRecord> {
+  query(request?: WebQueryRequest): Promise<WebPageResponse<TRecord>>;
+  view(id: string): Promise<TRecord>;
+  insert(record: TRecord): Promise<TRecord>;
+  update(id: string, record: TRecord): Promise<TRecord>;
+  delete(id: string): Promise<WebCountResponse>;
+  enable(id: string): Promise<WebCountResponse>;
+  disable(id: string): Promise<WebCountResponse>;
+}
+
+export interface StaticModuleTreeClient<TRecord> extends StaticModuleCrudClient<TRecord> {
+  tree(): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  treeFlat(options?: { rootId?: string; includeSelf?: boolean }): Promise<WebListResponse<TRecord>>;
+  subtree(id: string, options?: { includeSelf?: boolean }): Promise<WebListResponse<WebTreeNode<TRecord>>>;
+  sort(id: string, request: TreeSortRequest): Promise<WebCountResponse>;
+}
+
+export interface ModuleEnableClient {
+  enable(id: string): Promise<WebCountResponse>;
+  disable(id: string): Promise<WebCountResponse>;
+}
+
+export function createStaticModuleCrudClient<TRecord>(
+  http: HttpClient,
+  options: { moduleAlias: string },
+): StaticModuleCrudClient<TRecord> {
+  const modulePath = modulePathOf(options.moduleAlias);
+  return {
+    query: (request) =>
+      http.request<WebPageResponse<TRecord>>({
+        method: 'POST',
+        path: `${modulePath}/query`,
+        body: request,
+      }),
+    view: (id) => http.request<TRecord>({ path: `${modulePath}/view/${encodeURIComponent(id)}` }),
+    insert: (record) =>
+      http.request<TRecord>({
+        method: 'POST',
+        path: `${modulePath}/insert`,
+        body: record,
+      }),
+    update: (id, record) =>
+      http.request<TRecord>({
+        method: 'POST',
+        path: `${modulePath}/update/${encodeURIComponent(id)}`,
+        body: record,
+      }),
+    delete: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/delete/${encodeURIComponent(id)}`,
+      }),
+    enable: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/enable/${encodeURIComponent(id)}`,
+      }),
+    disable: (id) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/disable/${encodeURIComponent(id)}`,
+      }),
+  };
+}
+
+export function createStaticModuleTreeClient<TRecord>(
+  http: HttpClient,
+  options: { moduleAlias: string },
+): StaticModuleTreeClient<TRecord> {
+  const modulePath = modulePathOf(options.moduleAlias);
+  const crud = createStaticModuleCrudClient<TRecord>(http, { moduleAlias: options.moduleAlias });
+  return {
+    ...crud,
+    tree: () =>
+      http.request<WebListResponse<WebTreeNode<TRecord>>>({
+        path: `${modulePath}/tree`,
+      }),
+    treeFlat: (options) => {
+      const rootId = options?.rootId;
+      const path = rootId ? `${modulePath}/tree/${encodeURIComponent(rootId)}` : `${modulePath}/tree`;
+      return http.request<WebListResponse<TRecord>>({
+        path,
+        query: {
+          flat: true,
+          includeSelf: options?.includeSelf,
+        },
+      });
+    },
+    subtree: (id, query) =>
+      http.request<WebListResponse<WebTreeNode<TRecord>>>({
+        path: `${modulePath}/tree/${encodeURIComponent(id)}`,
+        query,
+      }),
+    sort: (id, request) =>
+      http.request<WebCountResponse>({
+        method: 'POST',
+        path: `${modulePath}/sort/${encodeURIComponent(id)}`,
+        body: request,
+      }),
+  };
+}
+
+function modulePathOf(moduleAlias: string) {
+  const normalized = moduleAlias.trim();
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
