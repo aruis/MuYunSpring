@@ -1,6 +1,10 @@
 import { moduleAbilityCodes, type ModuleAbilityCode } from './abilityCodes';
 import { isRuntimeAbilityAvailable, type ModuleRuntimeContextState } from './runtimeContext';
-import type { ModuleEnableClient, StaticModuleCrudClient, StaticModuleTreeClient } from './staticModuleClient';
+import type {
+  ModuleEnableClient,
+  StaticModuleCrudClient,
+  StaticModuleTreeClient,
+} from './staticModuleClient';
 
 export interface ModuleAbilityClients<TRecord> {
   crud: StaticModuleCrudClient<TRecord>;
@@ -40,7 +44,8 @@ export function createModuleAbilities<TRecord>(
   return {
     crud: () => requireAbility(moduleAbilityCodes.crud, tryAbility(moduleAbilityCodes.crud, clients.crud)),
     tree: () => requireAbility(moduleAbilityCodes.tree, tryAbility(moduleAbilityCodes.tree, clients.tree)),
-    enable: () => requireAbility(moduleAbilityCodes.enable, tryAbility(moduleAbilityCodes.enable, clients.enable)),
+    enable: () =>
+      requireAbility(moduleAbilityCodes.enable, tryAbility(moduleAbilityCodes.enable, clients.enable)),
     tryCrud: () => tryAbility(moduleAbilityCodes.crud, clients.crud),
     tryTree: () => tryAbility(moduleAbilityCodes.tree, clients.tree),
     tryEnable: () => tryAbility(moduleAbilityCodes.enable, clients.enable),

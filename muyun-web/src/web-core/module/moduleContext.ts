@@ -1,7 +1,11 @@
 import { computed, defineComponent, inject, provide, type InjectionKey } from 'vue';
 import type { HttpClient } from '../http';
 import { createModuleAbilities, type ModuleAbilities } from './abilities';
-import { createModuleRuntimeContextState, type ModuleRuntimeAction, type ModuleRuntimeContextState } from './runtimeContext';
+import {
+  createModuleRuntimeContextState,
+  type ModuleRuntimeAction,
+  type ModuleRuntimeContextState,
+} from './runtimeContext';
 import {
   createStaticModuleCrudClient,
   createStaticModuleTreeClient,

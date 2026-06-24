@@ -1,5 +1,5 @@
 export * from './abilityCodes';
 export * from './staticModuleClient';
-export * from './runtimeContext';
-export * from './abilities';
+export type { ModuleRuntimeAction, ModuleRuntimeContext, ModuleRuntimeContextState } from './runtimeContext';
+export type { ModuleAbilityClients, ModuleAbilities } from './abilities';
 export * from './moduleContext';

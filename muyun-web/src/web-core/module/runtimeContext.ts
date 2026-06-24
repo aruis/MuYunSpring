@@ -42,7 +42,10 @@ export interface ModuleRuntimeContextState {
   can(actionCode: string): boolean | undefined;
 }
 
-export function createModuleRuntimeContextState(http: HttpClient, moduleAlias: string): ModuleRuntimeContextState {
+export function createModuleRuntimeContextState(
+  http: HttpClient,
+  moduleAlias: string,
+): ModuleRuntimeContextState {
   const current = shallowRef<ModuleRuntimeContext>();
   const currentError = shallowRef<AppError>();
   let loading: Promise<ModuleRuntimeContext> | undefined;
@@ -80,7 +83,8 @@ export function createModuleRuntimeContextState(http: HttpClient, moduleAlias: s
       return runtimeAbilityCodes(context).includes(ability);
     },
     action: (actionCode) => current.value?.actions.find((action) => action.actionCode === actionCode),
-    can: (actionCode) => current.value?.actions.find((action) => action.actionCode === actionCode)?.authorized,
+    can: (actionCode) =>
+      current.value?.actions.find((action) => action.actionCode === actionCode)?.authorized,
   };
 }
 
@@ -99,7 +103,5 @@ function runtimeAbilityCodes(context: ModuleRuntimeContext): string[] {
 }
 
 function abilityCodeOfCapability(capability: string) {
-  return capability
-    .toLowerCase()
-    .replace(/_([a-z])/g, (_match, char: string) => char.toUpperCase());
+  return capability.toLowerCase().replace(/_([a-z])/g, (_match, char: string) => char.toUpperCase());
 }
