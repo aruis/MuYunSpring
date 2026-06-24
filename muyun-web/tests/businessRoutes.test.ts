@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  businessModuleRoutes,
   businessRoutePrefixes,
   isStaticBusinessRoutePage,
   resolveStaticBusinessRoute,
@@ -9,7 +10,11 @@ import { pageDescriptorFromUrl } from '../src/platform-workbench/menuNavigation.
 import type { BusinessRoutePageDescriptor } from '../src/web-contracts/index.ts';
 
 test('static business route registry exposes route prefixes for navigation resolution', () => {
-  assert.deepEqual(businessRoutePrefixes, ['/iam/organizations']);
+  assert.deepEqual(businessRoutePrefixes, ['/config/applications', '/iam/organizations']);
+  assert.deepEqual(businessModuleRoutes, {
+    'platform.application': '/config/applications',
+    'iam.organization': '/iam/organizations',
+  });
 });
 
 test('static business route registry resolves module alias by route', () => {
@@ -25,6 +30,35 @@ test('static business route registry resolves module alias by route', () => {
 
   assert.equal(route?.moduleAlias, 'iam.organization');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves by module alias for module menus', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/config/applications', moduleAlias: 'platform.application' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/config/applications');
+  assert.equal(route?.moduleAlias, 'platform.application');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry prefers explicit route over module alias fallback', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/config/unknown', moduleAlias: 'platform.application' },
+    tabPolicy: { identity: 'by-target' },
+  };
+
+  assert.equal(resolveStaticBusinessRoute(descriptor), undefined);
+  assert.equal(isStaticBusinessRoutePage(descriptor), false);
 });
 
 test('static business route registry rejects unregistered business routes', () => {

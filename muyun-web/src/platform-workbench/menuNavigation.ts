@@ -14,6 +14,7 @@ export interface PageDescriptorResolveOptions {
   title?: string;
   platformRoutePrefixes?: string[];
   businessRoutePrefixes?: string[];
+  businessModuleRoutes?: Record<string, string>;
   businessRouteNames?: string[];
   businessPageKeys?: string[];
 }
@@ -86,6 +87,22 @@ export function resolvePageDescriptor(
   options: PageDescriptorResolveOptions = {},
 ): PageDescriptor {
   if (target.menuType === 'MODULE') {
+    const businessRoute = options.businessModuleRoutes?.[target.moduleAlias];
+    if (businessRoute) {
+      return {
+        pageType: 'business-route',
+        openMode: 'workbench-route',
+        hostType: 'business-route-host',
+        title: options.title,
+        menuId: target.menuId,
+        target: {
+          route: businessRoute,
+          moduleAlias: target.moduleAlias,
+        },
+        entryParamsJson: target.entryParamsJson,
+        tabPolicy: { identity: 'by-menu', closable: true, cacheable: true },
+      };
+    }
     return {
       pageType: 'dynamic-module',
       openMode: 'dynamic-runner',

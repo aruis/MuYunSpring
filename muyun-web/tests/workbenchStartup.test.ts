@@ -287,18 +287,25 @@ test('loadWorkbenchStartupState skips window navigation menus for the initial ta
 });
 
 test('loadWorkbenchStartupState accepts backend initialized platform admin menus', async () => {
-  const state = await loadWorkbenchStartupState({
-    sessionClient: {
-      current: async () => ({
-        userId: 'platform.user.super_admin',
-        username: 'admin',
-        system: true,
-      }),
+  const state = await loadWorkbenchStartupState(
+    {
+      sessionClient: {
+        current: async () => ({
+          userId: 'platform.user.super_admin',
+          username: 'admin',
+          system: true,
+        }),
+      },
+      menuClient: {
+        mine: async () => ({ records: platformAdminMenus }),
+      },
     },
-    menuClient: {
-      mine: async () => ({ records: platformAdminMenus }),
+    {
+      businessModuleRoutes: {
+        'platform.application': '/config/applications',
+      },
     },
-  });
+  );
 
   assert.equal(state.activeTabKey, 'menu:platform.menu.module.platform.application');
   assert.equal(state.tabs?.[0]?.title, '应用管理');
@@ -311,6 +318,11 @@ test('loadWorkbenchStartupState accepts backend initialized platform admin menus
     defaultUiConfigId: undefined,
     defaultQueryTemplateId: undefined,
     entryParamsJson: undefined,
+  });
+  assert.equal(state.tabs?.[0]?.pageDescriptor?.pageType, 'business-route');
+  assert.deepEqual(state.tabs?.[0]?.pageDescriptor?.target, {
+    route: '/config/applications',
+    moduleAlias: 'platform.application',
   });
 });
 
