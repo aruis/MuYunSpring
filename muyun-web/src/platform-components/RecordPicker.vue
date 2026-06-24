@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { UiButton, UiEmpty, UiError, UiInput, UiSpin, UiTree, type UiTreeNode } from '@muyun/vue-ui-antdv';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { WebTreeNode } from '@muyun/web-contracts';
@@ -51,6 +51,7 @@ const emit = defineEmits<{
   select: [record: RecordPickerRecord | undefined];
 }>();
 
+const root = ref<HTMLElement>();
 const open = ref(false);
 const loading = ref(false);
 const error = ref<string>();
@@ -76,7 +77,16 @@ const hasRecords = computed(() =>
   actualMode.value === 'tree' ? nodes.value.length > 0 : filteredRecords.value.length > 0,
 );
 
-onMounted(loadRecords);
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick);
+  document.addEventListener('keydown', handleDocumentKeydown);
+  void loadRecords();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick);
+  document.removeEventListener('keydown', handleDocumentKeydown);
+});
 
 watch(
   () => [props.context, props.mode] as const,
@@ -156,21 +166,51 @@ function handleTreeSelect(node: UiTreeNode) {
   }
 }
 
+function isRecordDisabled(record: RecordPickerRecord) {
+  return Boolean(firstConstraintMessage(record, pickerContext.value, props.constraints));
+}
+
 function clearValue() {
   emit('update:value', undefined);
   emit('select', undefined);
+  open.value = false;
+}
+
+function toggleOpen() {
+  if (props.disabled) {
+    return;
+  }
+  open.value = !open.value;
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!root.value?.contains(event.target as Node)) {
+    open.value = false;
+  }
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    open.value = false;
+  }
 }
 </script>
 
 <template>
-  <div class="record-picker" :class="{ 'record-picker-disabled': disabled }">
+  <div ref="root" class="record-picker" :class="{ 'record-picker-disabled': disabled }">
     <div class="record-picker-control">
-      <button class="record-picker-value" type="button" :disabled="disabled" @click="open = !open">
-        <span v-if="selectedTitle">{{ selectedTitle }}</span>
+      <button
+        class="record-picker-value"
+        type="button"
+        :disabled="disabled"
+        :aria-expanded="open"
+        @click.stop="toggleOpen"
+      >
+        <span v-if="selectedTitle" class="record-picker-value-text">{{ selectedTitle }}</span>
         <span v-else class="record-picker-placeholder">{{ placeholder }}</span>
+        <span class="record-picker-caret" aria-hidden="true"></span>
       </button>
       <UiButton v-if="allowClear && value && !disabled" title="清空" @click="clearValue">清空</UiButton>
-      <UiButton :disabled="disabled" @click="open = !open">{{ open ? '收起' : '选择' }}</UiButton>
     </div>
     <div v-if="open && !disabled" class="record-picker-panel">
       <UiInput v-model:value="keyword" placeholder="搜索名称、编码或 ID" />
@@ -186,11 +226,7 @@ function clearValue() {
       />
       <ul v-else class="record-picker-list">
         <li v-for="record in filteredRecords" :key="record.id">
-          <button
-            type="button"
-            :disabled="Boolean(firstConstraintMessage(record, pickerContext, constraints))"
-            @click="selectRecord(record)"
-          >
+          <button type="button" :disabled="isRecordDisabled(record)" @click="selectRecord(record)">
             <span>{{ recordTitle(record) }}</span>
             <small v-if="descriptionOf?.(record)">{{ descriptionOf(record) }}</small>
             <small v-else-if="record.code">{{ record.code }}</small>
@@ -206,6 +242,7 @@ function clearValue() {
   display: grid;
   gap: 8px;
   min-width: 0;
+  position: relative;
 }
 
 .record-picker-control {
@@ -215,6 +252,9 @@ function clearValue() {
 }
 
 .record-picker-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
   height: 34px;
@@ -229,6 +269,14 @@ function clearValue() {
   white-space: nowrap;
 }
 
+.record-picker-value-text,
+.record-picker-placeholder {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .record-picker-value:disabled {
   background: #f8fafc;
   color: #475569;
@@ -239,9 +287,24 @@ function clearValue() {
   color: #94a3b8;
 }
 
+.record-picker-caret {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid #64748b;
+  border-bottom: 1px solid #64748b;
+  transform: rotate(45deg) translateY(-2px);
+}
+
 .record-picker-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
   display: grid;
   gap: 10px;
+  min-width: 280px;
   max-height: 320px;
   overflow: auto;
   padding: 10px;
