@@ -8,6 +8,7 @@ import {
   type PickerConstraint,
   type RecordPickerRecord,
 } from './recordPickerConstraints';
+import { resolveRecordPickerMode, type RecordPickerMode } from './recordPickerModel';
 import {
   defaultTreeRecordMatches,
   defaultTreeRecordTitle,
@@ -57,23 +58,28 @@ const keyword = ref('');
 const tree = ref<WebTreeNode<RecordPickerRecord>[]>([]);
 const records = ref<RecordPickerRecord[]>([]);
 const expandedKeys = ref<string[]>([]);
+const actualMode = ref<RecordPickerMode>(props.mode);
 
 const selectedRecord = computed(() => records.value.find((record) => record.id === props.value));
 const selectedTitle = computed(() =>
   selectedRecord.value ? recordTitle(selectedRecord.value) : props.value ? props.value : '',
 );
-const filteredRecords = computed(() => records.value.filter((record) => matchesKeyword(record, keyword.value)));
+const filteredRecords = computed(() =>
+  records.value.filter((record) => matchesKeyword(record, keyword.value)),
+);
 const filteredTree = computed(() =>
   filterTreeRecords(tree.value, keyword.value, (record, normalized) => matchesKeyword(record, normalized)),
 );
 const nodes = computed(() => filteredTree.value.map(toTreeNode));
 const pickerContext = computed(() => ({ records: records.value }));
-const hasRecords = computed(() => (props.mode === 'tree' ? nodes.value.length > 0 : filteredRecords.value.length > 0));
+const hasRecords = computed(() =>
+  actualMode.value === 'tree' ? nodes.value.length > 0 : filteredRecords.value.length > 0,
+);
 
 onMounted(loadRecords);
 
 watch(
-  () => props.context,
+  () => [props.context, props.mode] as const,
   () => loadRecords(),
 );
 
@@ -89,7 +95,8 @@ async function loadRecords() {
   try {
     await props.context.runtime.ready;
     const treeAbility = props.context.abilities.tryTree();
-    if (props.mode === 'tree' && treeAbility) {
+    actualMode.value = resolveRecordPickerMode(props.mode, Boolean(treeAbility));
+    if (actualMode.value === 'tree' && treeAbility) {
       const response = await treeAbility.tree();
       tree.value = response.records;
       records.value = flattenTreeRecords(response.records);
@@ -153,7 +160,6 @@ function clearValue() {
   emit('update:value', undefined);
   emit('select', undefined);
 }
-
 </script>
 
 <template>
@@ -172,7 +178,7 @@ function clearValue() {
       <UiError v-else-if="error" :message="error" />
       <UiEmpty v-else-if="!hasRecords" description="暂无可选记录" />
       <UiTree
-        v-else-if="mode === 'tree'"
+        v-else-if="actualMode === 'tree'"
         v-model:expanded-keys="expandedKeys"
         :nodes="nodes"
         :selected-key="value"

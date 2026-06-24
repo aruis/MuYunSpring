@@ -100,7 +100,9 @@ function recordTitle(record: TreeRecordBase) {
 }
 
 function matchesKeyword(record: TreeRecordBase, normalized: string) {
-  return props.filterOption?.(record, normalized) ?? defaultTreeRecordMatches(record, normalized, recordTitle);
+  return (
+    props.filterOption?.(record, normalized) ?? defaultTreeRecordMatches(record, normalized, recordTitle)
+  );
 }
 
 function handleSelect(node: UiTreeNode) {

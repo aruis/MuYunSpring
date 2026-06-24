@@ -46,9 +46,7 @@ export function defaultTreeRecordMatches<TRecord extends TreeRecordBase>(
     .some((item) => String(item).toLowerCase().includes(normalizedKeyword));
 }
 
-export function firstTwoTreeLevels<TRecord extends { id?: string }>(
-  nodes: WebTreeNode<TRecord>[],
-) {
+export function firstTwoTreeLevels<TRecord extends { id?: string }>(nodes: WebTreeNode<TRecord>[]) {
   return nodes.flatMap((node) => [
     ...(node.record.id ? [node.record.id] : []),
     ...node.children.flatMap((child) => (child.record.id ? [child.record.id] : [])),

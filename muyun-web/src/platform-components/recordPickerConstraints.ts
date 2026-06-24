@@ -35,7 +35,8 @@ export function notDescendantOf<TRecord extends RecordPickerRecord>(
   return {
     code: 'not-descendant',
     message,
-    test: (record, context) => !record.id || !ancestorId || !isDescendant(record.id, ancestorId, context.records),
+    test: (record, context) =>
+      !record.id || !ancestorId || !isDescendant(record.id, ancestorId, context.records),
   };
 }
 

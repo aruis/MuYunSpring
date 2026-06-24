@@ -25,6 +25,8 @@ export type {
   PickerConstraintContext,
   RecordPickerRecord,
 } from './recordPickerConstraints';
+export { resolveRecordPickerMode } from './recordPickerModel';
+export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
 export { resolveRecordActions } from './recordActionBarModel';
 export type { TreeRecordBase } from './treeRecordModel';

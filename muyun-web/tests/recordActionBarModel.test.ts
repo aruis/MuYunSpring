@@ -3,14 +3,11 @@ import assert from 'node:assert/strict';
 import { resolveRecordActions } from '../src/platform-components/recordActionBarModel.ts';
 
 test('resolveRecordActions filters invisible actions and applies authorization', () => {
-  const actions = resolveRecordActions(
-    { can: (actionCode) => actionCode !== 'delete' },
-    [
-      { key: 'edit', actionCode: 'update', title: '编辑' },
-      { key: 'delete', actionCode: 'delete', title: '删除', danger: true },
-      { key: 'hidden', title: '隐藏', visible: false },
-    ],
-  );
+  const actions = resolveRecordActions({ can: (actionCode) => actionCode !== 'delete' }, [
+    { key: 'edit', actionCode: 'update', title: '编辑' },
+    { key: 'delete', actionCode: 'delete', title: '删除', danger: true },
+    { key: 'hidden', title: '隐藏', visible: false },
+  ]);
 
   assert.deepEqual(
     actions.map((action) => ({

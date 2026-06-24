@@ -16,7 +16,10 @@ test('tree record model filters matched nodes with ancestors', () => {
 
   const filtered = filterTreeRecords(tree, '上海', defaultTreeRecordMatches);
 
-  assert.deepEqual(flattenTreeRecords(filtered).map((record) => record.id), ['root', 'east', 'shanghai']);
+  assert.deepEqual(
+    flattenTreeRecords(filtered).map((record) => record.id),
+    ['root', 'east', 'shanghai'],
+  );
 });
 
 test('tree record model builds stable titles and expansion keys', () => {
