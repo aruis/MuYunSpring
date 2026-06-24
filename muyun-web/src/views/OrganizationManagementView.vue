@@ -185,7 +185,12 @@ function handleCardAction(action: RecordActionItem) {
         </label>
         <label>
           <span>启用状态</span>
-          <UiSelect v-model:value="enabledValue" :options="enabledOptions" :disabled="readonly" :allow-clear="false" />
+          <UiSelect
+            v-model:value="enabledValue"
+            :options="enabledOptions"
+            :disabled="readonly"
+            :allow-clear="false"
+          />
         </label>
       </form>
 

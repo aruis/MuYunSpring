@@ -226,11 +226,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
       />
       <ul v-else class="record-picker-list">
         <li v-for="record in filteredRecords" :key="record.id">
-          <button
-            type="button"
-            :disabled="isRecordDisabled(record)"
-            @click="selectRecord(record)"
-          >
+          <button type="button" :disabled="isRecordDisabled(record)" @click="selectRecord(record)">
             <span>{{ recordTitle(record) }}</span>
             <small v-if="descriptionOf?.(record)">{{ descriptionOf(record) }}</small>
             <small v-else-if="record.code">{{ record.code }}</small>
