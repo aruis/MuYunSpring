@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Button as AButton, Space as ASpace, Tooltip as ATooltip } from 'ant-design-vue';
+import { Space as ASpace, Tooltip as ATooltip } from 'ant-design-vue';
 import type { ActionContract } from '@muyun/web-contracts';
+import UiButton from './UiButton.vue';
 
 defineOptions({ name: 'ActionBar' });
 
@@ -20,14 +21,14 @@ const emit = defineEmits<{
       :key="action.actionCode"
       :title="action.disabled ? action.disabledReason : undefined"
     >
-      <AButton
+      <UiButton
         :type="action.level === 'primary' ? 'primary' : 'default'"
         :danger="action.level === 'danger'"
         :disabled="action.disabled"
         @click="emit('execute', action)"
       >
         {{ action.title }}
-      </AButton>
+      </UiButton>
     </ATooltip>
   </ASpace>
 </template>

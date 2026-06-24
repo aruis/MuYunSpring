@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ModuleContext } from '@muyun/web-core';
+import { UiButton } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'ModuleActionButton' });
 
@@ -44,42 +45,15 @@ function handleClick(event: MouseEvent) {
 </script>
 
 <template>
-  <button
-    :type="type"
-    class="module-action-button"
-    :class="{ primary, danger }"
+  <UiButton
+    :html-type="type"
+    :type="primary ? 'primary' : 'default'"
     :disabled="buttonDisabled"
+    :loading="loading"
+    :danger="danger"
     :title="buttonTitle"
     @click="handleClick"
   >
     <slot>{{ action?.title ?? actionCode }}</slot>
-  </button>
+  </UiButton>
 </template>
-
-<style scoped>
-.module-action-button {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid #cfd9e5;
-  border-radius: 6px;
-  background: #fff;
-  color: #243447;
-  cursor: pointer;
-}
-
-.module-action-button:disabled {
-  color: #9aa7b5;
-  cursor: not-allowed;
-}
-
-.module-action-button.primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-.module-action-button.danger {
-  border-color: #f3c6c6;
-  color: #b42318;
-}
-</style>
