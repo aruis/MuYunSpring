@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Button as AButton, Form as AForm, FormItem as AFormItem } from 'ant-design-vue';
+import { Form as AForm, FormItem as AFormItem } from 'ant-design-vue';
 import { resolveFieldComponent } from '../registry';
+import UiButton from './UiButton.vue';
 import type {
   FieldCondition,
   FieldContract,
@@ -95,7 +96,7 @@ const visibleFields = computed(() => props.contract.fields.filter(isVisible));
     </AFormItem>
 
     <AFormItem>
-      <AButton type="primary" html-type="submit">{{ submitText ?? '保存' }}</AButton>
+      <UiButton type="primary" html-type="submit">{{ submitText ?? '保存' }}</UiButton>
     </AFormItem>
   </AForm>
 </template>

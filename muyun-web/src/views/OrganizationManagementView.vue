@@ -2,7 +2,7 @@
 import { ModuleActionButton, OrganizationTree } from '@muyun/platform-components';
 import type { Organization } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import { confirmAction } from '@muyun/vue-ui-antdv';
+import { confirmAction, UiButton } from '@muyun/vue-ui-antdv';
 import { createOrganizationManagementState } from './organizationManagementState';
 
 defineOptions({ name: 'OrganizationManagementView' });
@@ -38,7 +38,7 @@ const {
           <p>组织管理</p>
           <h2>机构树</h2>
         </div>
-        <button type="button" class="icon-button" title="刷新机构树" @click="reloadKey += 1">刷新</button>
+        <UiButton title="刷新机构树" @click="reloadKey += 1">刷新</UiButton>
       </div>
       <div class="sidebar-actions">
         <ModuleActionButton :context="organizationContext" action-code="create" @click="startCreateRoot">
@@ -108,7 +108,7 @@ const {
           >
             删除
           </ModuleActionButton>
-          <button v-if="mode !== 'view'" type="button" :disabled="saving" @click="cancelEdit">取消</button>
+          <UiButton v-if="mode !== 'view'" :disabled="saving" @click="cancelEdit">取消</UiButton>
           <ModuleActionButton
             v-if="mode !== 'view'"
             :context="organizationContext"
@@ -233,32 +233,6 @@ h2 {
 .card-actions {
   gap: 8px;
   flex-wrap: wrap;
-}
-
-button {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid #cfd9e5;
-  border-radius: 6px;
-  background: #fff;
-  color: #243447;
-  cursor: pointer;
-}
-
-button:disabled {
-  color: #9aa7b5;
-  cursor: not-allowed;
-}
-
-button.primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-button.danger {
-  border-color: #f3c6c6;
-  color: #b42318;
 }
 
 .organization-card {
