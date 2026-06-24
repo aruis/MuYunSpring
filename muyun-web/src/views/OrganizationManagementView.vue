@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { ModuleActionButton, OrganizationTree } from '@muyun/platform-components';
+import { computed } from 'vue';
+import {
+  ModuleActionButton,
+  OrganizationTree,
+  RecordActionBar,
+  parentRecordConstraints,
+  RecordPicker,
+  RecordStatusTag,
+  type RecordActionItem,
+  type RecordPickerRecord,
+} from '@muyun/platform-components';
 import type { Organization } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiButton } from '@muyun/vue-ui-antdv';
@@ -28,6 +38,70 @@ const {
   toggleEnabled,
   removeSelected,
 } = createOrganizationManagementState(organizationContext, confirmAction);
+
+const cardActions = computed<RecordActionItem[]>(() => {
+  if (mode.value !== 'view') {
+    return [
+      { key: 'cancel', title: '取消', disabled: saving.value },
+      {
+        key: 'save',
+        actionCode: mode.value === 'create' ? 'create' : 'update',
+        title: saving.value ? '保存中' : '保存',
+        loading: saving.value,
+        primary: true,
+      },
+    ];
+  }
+  return [
+    { key: 'edit', actionCode: 'update', title: '编辑', disabled: !selected.value },
+    { key: 'create-child', actionCode: 'create', title: '新建下级', disabled: !selected.value },
+    {
+      key: 'toggle-enabled',
+      actionCode: selected.value?.enabled === false ? 'enable' : 'disable',
+      title: selected.value?.enabled === false ? '启用' : '停用',
+      disabled: !selected.value,
+      loading: saving.value,
+    },
+    {
+      key: 'delete',
+      actionCode: 'delete',
+      title: '删除',
+      disabled: !selected.value,
+      loading: saving.value,
+      danger: true,
+    },
+  ];
+});
+
+function organizationTitle(record: RecordPickerRecord) {
+  return record.title ?? record.code ?? record.id ?? '未命名机构';
+}
+
+function handleCardAction(action: RecordActionItem) {
+  if (action.key === 'edit') {
+    startEdit();
+    return;
+  }
+  if (action.key === 'create-child') {
+    startCreateChild();
+    return;
+  }
+  if (action.key === 'toggle-enabled') {
+    void toggleEnabled();
+    return;
+  }
+  if (action.key === 'delete') {
+    void removeSelected();
+    return;
+  }
+  if (action.key === 'cancel') {
+    cancelEdit();
+    return;
+  }
+  if (action.key === 'save') {
+    void save();
+  }
+}
 </script>
 
 <template>
@@ -66,60 +140,12 @@ const {
       <header class="card-header">
         <div>
           <p>{{ mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新建' }}</p>
-          <h2>{{ cardTitle }}</h2>
+          <div class="title-line">
+            <h2>{{ cardTitle }}</h2>
+            <RecordStatusTag v-if="selected && mode === 'view'" :enabled="selected.enabled" />
+          </div>
         </div>
-        <div class="card-actions">
-          <ModuleActionButton
-            v-if="mode === 'view'"
-            :context="organizationContext"
-            action-code="update"
-            :disabled="!selected"
-            @click="startEdit"
-          >
-            编辑
-          </ModuleActionButton>
-          <ModuleActionButton
-            v-if="mode === 'view'"
-            :context="organizationContext"
-            action-code="create"
-            :disabled="!selected"
-            @click="startCreateChild"
-          >
-            新建下级
-          </ModuleActionButton>
-          <ModuleActionButton
-            v-if="mode === 'view'"
-            :context="organizationContext"
-            :action-code="selected?.enabled === false ? 'enable' : 'disable'"
-            :disabled="!selected"
-            :loading="saving"
-            @click="toggleEnabled"
-          >
-            {{ selected?.enabled === false ? '启用' : '停用' }}
-          </ModuleActionButton>
-          <ModuleActionButton
-            v-if="mode === 'view'"
-            :context="organizationContext"
-            action-code="delete"
-            :disabled="!selected"
-            :loading="saving"
-            danger
-            @click="removeSelected"
-          >
-            删除
-          </ModuleActionButton>
-          <UiButton v-if="mode !== 'view'" :disabled="saving" @click="cancelEdit">取消</UiButton>
-          <ModuleActionButton
-            v-if="mode !== 'view'"
-            :context="organizationContext"
-            :action-code="mode === 'create' ? 'create' : 'update'"
-            :loading="saving"
-            primary
-            @click="save"
-          >
-            {{ saving ? '保存中' : '保存' }}
-          </ModuleActionButton>
-        </div>
+        <RecordActionBar :context="organizationContext" :actions="cardActions" @action="handleCardAction" />
       </header>
 
       <div v-if="actionError" class="message error">{{ actionError }}</div>
@@ -135,8 +161,15 @@ const {
           <input v-model="draft.code" :readonly="readonly" required />
         </label>
         <label>
-          <span>上级机构 ID</span>
-          <input v-model="draft.parentId" :readonly="readonly" placeholder="根机构留空" />
+          <span>上级机构</span>
+          <RecordPicker
+            v-model:value="draft.parentId"
+            :context="organizationContext"
+            :disabled="readonly"
+            :constraints="parentRecordConstraints(draft.id)"
+            :title-of="organizationTitle"
+            placeholder="根机构留空"
+          />
         </label>
         <label>
           <span>启用状态</span>
@@ -198,7 +231,6 @@ const {
 
 .sidebar-header,
 .card-header,
-.card-actions,
 .sidebar-actions {
   display: flex;
   align-items: center;
@@ -208,6 +240,13 @@ const {
 .card-header {
   justify-content: space-between;
   gap: 12px;
+}
+
+.title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .sidebar-header p,
@@ -229,8 +268,7 @@ h2 {
   font-size: 16px;
 }
 
-.sidebar-actions,
-.card-actions {
+.sidebar-actions {
   gap: 8px;
   flex-wrap: wrap;
 }

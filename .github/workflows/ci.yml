@@ -10,30 +10,172 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Build & Test (Java 21)
+  changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed areas
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            merge_base="$(git merge-base "$base" "$head")"
+            changed_files="$(git diff --name-only "$merge_base" "$head")"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            if [[ "$base" =~ ^0+$ ]]; then
+              changed_files="$(git ls-tree -r --name-only "$head")"
+            else
+              changed_files="$(git diff --name-only "$base" "$head")"
+            fi
+          fi
+
+          backend=false
+          frontend=false
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            case "$file" in
+              .github/workflows/ci.yml | \
+              build.gradle | build.gradle.kts | settings.gradle | settings.gradle.kts | gradle.properties | \
+              gradle/* | gradlew | gradlew.bat | \
+              muyun-common/* | muyun-ability/* | muyun-dynamic/* | \
+              muyun-platform/* | muyun-iam/* | muyun-boot/*)
+                backend=true
+                ;;
+            esac
+
+            case "$file" in
+              .github/workflows/ci.yml | muyun-web/* | docs/frontend/*)
+                frontend=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+          } >> "$GITHUB_OUTPUT"
+
+  backend:
+    name: Backend Build & Test (Java 21)
+    needs: changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        if: needs.changes.outputs.backend == 'true'
+        uses: actions/checkout@v7
 
       - name: Set up Java 21
+        if: needs.changes.outputs.backend == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Setup Gradle
+        if: needs.changes.outputs.backend == 'true'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run tests
+        if: needs.changes.outputs.backend == 'true'
         run: ./gradlew test :muyun-boot:integrationTest --no-daemon --stacktrace
+
+      - name: Skip backend tests
+        if: needs.changes.outputs.backend != 'true'
+        run: echo "No backend changes detected."
 
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ github.run_attempt }}
+          name: backend-test-results-${{ github.run_attempt }}
           path: '**/build/test-results/**'
           if-no-files-found: ignore
+
+  frontend:
+    name: Frontend Build & Test
+    needs: changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        if: needs.changes.outputs.frontend == 'true'
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        if: needs.changes.outputs.frontend == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: muyun-web/.nvmrc
+          cache: npm
+          cache-dependency-path: muyun-web/package-lock.json
+
+      - name: Install dependencies
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm ci --prefix muyun-web
+
+      - name: Run lint
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run lint --prefix muyun-web
+
+      - name: Check format
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run format:check --prefix muyun-web
+
+      - name: Run tests
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run test --prefix muyun-web
+
+      - name: Build
+        if: needs.changes.outputs.frontend == 'true'
+        run: npm run build --prefix muyun-web
+
+      - name: Skip frontend tests
+        if: needs.changes.outputs.frontend != 'true'
+        run: echo "No frontend changes detected."
+
+  required:
+    name: Build & Test (Java 21)
+    needs: [changes, backend, frontend]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check CI result
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection failed."
+            exit 1
+          fi
+
+          if [[ "${{ needs.backend.result }}" != "success" ]]; then
+            echo "Backend CI failed."
+            exit 1
+          fi
+
+          if [[ "${{ needs.frontend.result }}" != "success" ]]; then
+            echo "Frontend CI failed."
+            exit 1
+          fi
+
+          echo "CI passed."

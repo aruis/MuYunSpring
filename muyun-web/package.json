@@ -10,7 +10,7 @@
     "build:business-example": "npm ci --prefix examples/business-web && npm run build --prefix examples/business-web",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "npm run test:workbench",
-    "test:workbench": "node --experimental-strip-types --import ./scripts/register-workbench-test-loader.mjs --test tests/authSession.test.ts tests/workbenchStartup.test.ts tests/navigationDescriptor.test.ts tests/loginTenant.test.ts tests/pageHostRegistry.test.ts tests/menuTreeModel.test.ts tests/businessRoutes.test.ts tests/organizationManagementState.test.ts tests/webCore.test.ts",
+    "test:workbench": "node --experimental-strip-types --import ./scripts/register-workbench-test-loader.mjs --test tests/authSession.test.ts tests/workbenchStartup.test.ts tests/navigationDescriptor.test.ts tests/loginTenant.test.ts tests/pageHostRegistry.test.ts tests/menuTreeModel.test.ts tests/treeRecordModel.test.ts tests/businessRoutes.test.ts tests/organizationManagementState.test.ts tests/recordActionBarModel.test.ts tests/recordPickerConstraints.test.ts tests/recordPickerModel.test.ts tests/webCore.test.ts",
     "lint": "eslint . && npm run check:boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
