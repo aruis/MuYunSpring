@@ -143,7 +143,14 @@ function toUiTreeNode(node: WebTreeNode<TreeRecordBase>): UiTreeNode {
 <style scoped>
 .tree-record-explorer {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   min-height: 0;
+  overflow: hidden;
+}
+
+.tree-record-explorer :deep(.ant-tree) {
+  min-height: 0;
+  overflow: auto;
 }
 </style>

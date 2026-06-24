@@ -12,7 +12,7 @@ import {
 } from '@muyun/platform-components';
 import type { Organization } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
-import { confirmAction, UiButton } from '@muyun/vue-ui-antdv';
+import { confirmAction, UiButton, UiInput, UiSelect } from '@muyun/vue-ui-antdv';
 import { createOrganizationManagementState } from './organizationManagementState';
 
 defineOptions({ name: 'OrganizationManagementView' });
@@ -38,6 +38,18 @@ const {
   toggleEnabled,
   removeSelected,
 } = createOrganizationManagementState(organizationContext, confirmAction);
+
+const enabledOptions = [
+  { label: '启用', value: 'true' },
+  { label: '停用', value: 'false' },
+];
+
+const enabledValue = computed({
+  get: () => (draft.value.enabled === false ? 'false' : 'true'),
+  set: (value) => {
+    draft.value.enabled = value !== 'false';
+  },
+});
 
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -154,11 +166,11 @@ function handleCardAction(action: RecordActionItem) {
       <form class="record-form" @submit.prevent="save">
         <label>
           <span>机构名称</span>
-          <input v-model="draft.title" :readonly="readonly" required />
+          <UiInput v-model:value="draft.title" :disabled="readonly" />
         </label>
         <label>
           <span>机构编码</span>
-          <input v-model="draft.code" :readonly="readonly" required />
+          <UiInput v-model:value="draft.code" :disabled="readonly" />
         </label>
         <label>
           <span>上级机构</span>
@@ -173,10 +185,7 @@ function handleCardAction(action: RecordActionItem) {
         </label>
         <label>
           <span>启用状态</span>
-          <select v-model="draft.enabled" :disabled="readonly">
-            <option :value="true">启用</option>
-            <option :value="false">停用</option>
-          </select>
+          <UiSelect v-model:value="enabledValue" :options="enabledOptions" :disabled="readonly" />
         </label>
       </form>
 
@@ -291,24 +300,6 @@ label {
   gap: 6px;
   color: #465569;
   font-size: 13px;
-}
-
-input,
-select {
-  width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid #cfd9e5;
-  border-radius: 6px;
-  background: #fff;
-  color: #172033;
-}
-
-input:read-only,
-select:disabled {
-  background: #f8fafc;
-  color: #475569;
 }
 
 .message {
