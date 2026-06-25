@@ -19,13 +19,19 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
         ReferenceAbility<Position> {
     public static final String MODULE_ALIAS = "iam.position";
 
+    private final PositionCategoryService positionCategoryService;
+
     @Autowired
-    public PositionService(PositionDao positionDao, ActiveTenantVerifier activeTenantVerifier) {
+    public PositionService(PositionDao positionDao,
+                           ActiveTenantVerifier activeTenantVerifier,
+                           PositionCategoryService positionCategoryService) {
         super(MODULE_ALIAS, Position.class, positionDao, activeTenantVerifier);
+        this.positionCategoryService = positionCategoryService;
     }
 
     @Override
     public void normalizeBeforeMutation(Position position) {
+        position.setCategoryId(normalizeBlank(position.getCategoryId()));
         position.setCode(Preconditions.requireText(position.getCode(), "positionCode"));
         position.setTitle(Preconditions.requireText(position.getTitle(), "positionTitle"));
         position.setDescription(normalizeBlank(position.getDescription()));
@@ -33,8 +39,37 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
 
     @Override
     protected void validateBeforeSave(Position position) {
+        requireActiveCategory(position.getCategoryId());
         rejectDuplicate(position, Criteria.of().eq("code", position.getCode()),
                 "positionCode must be unique within tenant: " + position.getCode());
+    }
+
+    @Override
+    public Criteria sortScope(Position position) {
+        return categoryScope(position.getCategoryId());
+    }
+
+    @Override
+    public void validateSortScope(Position left, Position right) {
+        validateSortScopeByFields(left, right,
+                "Position sort can only move records within the same category", "categoryId");
+    }
+
+    private void requireActiveCategory(String categoryId) {
+        if (categoryId == null) {
+            return;
+        }
+        positionCategoryService.requireEnabled(categoryId,
+                "position category is not active: " + categoryId);
+    }
+
+    private Criteria categoryScope(String categoryId) {
+        Criteria criteria = Criteria.of();
+        if (categoryId == null) {
+            criteria.isNull("categoryId");
+            return criteria;
+        }
+        return criteria.eq("categoryId", categoryId);
     }
 
     private String normalizeBlank(String value) {
