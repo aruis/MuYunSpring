@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -179,6 +180,53 @@ class PlatformMetadataServiceContractTest {
         assertThat(saved.getSchemaName()).isEqualTo(MetadataService.DEFAULT_SCHEMA);
         assertThat(saved.getTableName()).isEqualTo("crm_customer");
         assertThat(saved.getEnabled()).isTrue();
+    }
+
+    @Test
+    void shouldProtectSystemManagedMetadataFieldFromOrdinaryMutation() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField managed = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+        managed.setSystemManaged(Boolean.TRUE);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> fieldService.insert(managed));
+
+        MetadataField protectedUpdate = new MetadataField();
+        protectedUpdate.setId(managed.getId());
+        protectedUpdate.setVersion(managed.getVersion());
+        protectedUpdate.setMetadataId(metadataId);
+        protectedUpdate.setFieldName("changedName");
+        protectedUpdate.setColumnName("changed_name");
+        protectedUpdate.setFieldTypeAlias("string");
+        protectedUpdate.setTitle("Changed");
+
+        assertThatThrownBy(() -> fieldService.update(protectedUpdate))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+        assertThatThrownBy(() -> fieldService.delete(managed.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+    }
+
+    @Test
+    void shouldAllowOrdinaryEnabledAndSortUpdateOnSystemManagedMetadataField() {
+        String metadataId = metadataService.insert(metadata("crm", "customer"));
+        MetadataField managed = field(metadataId, "customerName", "customer_name", FieldType.STRING);
+        managed.setSystemManaged(Boolean.TRUE);
+        managed.setSortOrder(10);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> fieldService.insert(managed));
+
+        MetadataField update = new MetadataField();
+        update.setId(managed.getId());
+        update.setVersion(managed.getVersion());
+        update.setEnabled(Boolean.FALSE);
+        update.setSortOrder(20);
+
+        assertThat(fieldService.update(update)).isEqualTo(1);
+
+        MetadataField selected = fieldService.select(managed.getId());
+        assertThat(selected.getEnabled()).isFalse();
+        assertThat(selected.getSortOrder()).isEqualTo(20);
+        assertThat(selected.getFieldName()).isEqualTo("customerName");
+        assertThat(selected.getSystemManaged()).isTrue();
     }
 
     @Test

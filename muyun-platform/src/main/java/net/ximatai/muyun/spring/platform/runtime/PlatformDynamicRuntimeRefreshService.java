@@ -17,6 +17,10 @@ public class PlatformDynamicRuntimeRefreshService {
         return refresher.refresh(moduleAlias);
     }
 
+    public DynamicModuleRefreshResult executeRefresh(String moduleAlias) {
+        return refresher.executeRefresh(moduleAlias);
+    }
+
     public DynamicModuleRefreshResult previewRefresh(String moduleAlias) {
         return refresher.previewRefresh(moduleAlias);
     }

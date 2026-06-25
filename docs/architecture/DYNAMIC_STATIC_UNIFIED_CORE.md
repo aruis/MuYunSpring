@@ -92,6 +92,8 @@ DynamicRecordService
 平台级初始化、批量拉齐、dry-run、strict migration 和后续审计治理，应统一从 `StaticSchemaService` 进入。
 业务 Service 不应为了保存普通业务数据而手工触发表结构变更。
 
+Schema migration 默认策略由平台运行模式决定：`DEVELOPMENT` 默认使用普通 execute，`PRODUCTION` 默认使用 strict execute。显式传入 `MigrationOptions` 时以调用方选项为准，例如治理接口的 dry-run 或 strict 不被运行模式覆盖。运行模式只提供默认治理口径，不替代配置包、迁移任务和破坏性 DDL 的显式审批边界。
+
 ## 能力挂载原则
 
 后续工作流、编码规则、生成规则、回写、导入导出、附件、字典、权限、审计等平台能力，都应优先考虑能否同时挂载到静态模块和动态模块。

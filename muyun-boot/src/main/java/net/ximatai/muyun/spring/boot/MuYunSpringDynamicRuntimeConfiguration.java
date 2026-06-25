@@ -12,6 +12,8 @@ import net.ximatai.muyun.spring.common.platform.AllowAllActionExecutionPolicySer
 import net.ximatai.muyun.spring.common.platform.AllowAllDataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaService;
 import net.ximatai.muyun.spring.common.platform.ReferenceDependencyScopeResolver;
+import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
+import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
 import net.ximatai.muyun.spring.common.time.NaturalBusinessCalendarService;
@@ -47,7 +49,7 @@ import java.time.ZoneId;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(MuYunSpringPlatformTimeProperties.class)
-@Import(MuYunSpringDatabaseValueConversionConfiguration.class)
+@Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
 public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
     @ConditionalOnBean(DictionaryItemService.class)
@@ -105,8 +107,10 @@ public class MuYunSpringDynamicRuntimeConfiguration {
     @Bean
     @ConditionalOnMissingBean
     DynamicSchemaService dynamicSchemaService(IDatabaseOperations<?> operations,
-                                              ModuleDefinitionValidator moduleDefinitionValidator) {
-        return new DynamicSchemaService(operations, new DynamicTableMapper(), moduleDefinitionValidator);
+                                              ModuleDefinitionValidator moduleDefinitionValidator,
+                                              PlatformRuntimeModeProvider runtimeModeProvider) {
+        return new DynamicSchemaService(operations, new DynamicTableMapper(), moduleDefinitionValidator,
+                new PlatformSchemaMigrationPolicy(runtimeModeProvider));
     }
 
     @Bean

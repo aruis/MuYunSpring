@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.module.ModuleKind;
@@ -58,11 +59,13 @@ public class StaticModuleDefinitionRegistrar implements PlatformBootstrapTask {
     public void registerAll() {
         try (TenantContext.Scope ignored = TenantContext.system("register static modules")) {
             List<StaticModuleDefinition> allDefinitions = definitionCatalog.definitions();
-            for (StaticModuleDefinition definition : allDefinitions) {
-                registerModule(definition);
-                registerActions(definition);
-            }
-            disableStaleSystemManagedModules(allDefinitions);
+            PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                for (StaticModuleDefinition definition : allDefinitions) {
+                    registerModule(definition);
+                    registerActions(definition);
+                }
+                disableStaleSystemManagedModules(allDefinitions);
+            });
         }
     }
 

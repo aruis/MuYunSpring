@@ -4,6 +4,7 @@ import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
@@ -281,8 +282,9 @@ class PlatformMetadataSchemaEnsureServiceTest {
 
         @Override
         public MigrationResult ensureTable(EntityDefinition entity, MigrationOptions options) {
+            MigrationOptions effectiveOptions = PlatformSchemaMigrationPolicy.executeByDefault().resolve(options);
             ensuredEntities.add(entity);
-            return new MigrationResult(true, options.isDryRun(), false, List.of(), List.of());
+            return new MigrationResult(true, effectiveOptions.isDryRun(), false, List.of(), List.of());
         }
     }
 

@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
@@ -18,7 +19,8 @@ import java.util.List;
 public class PlatformModuleService extends AbstractAbilityService<PlatformModule> implements
         SoftDeleteAbility<PlatformModule>,
         EnableAbility<PlatformModule>,
-        TreeAbility<PlatformModule> {
+        TreeAbility<PlatformModule>,
+        PlatformManagedProtectionAbility<PlatformModule> {
 
     public static final String MODULE_ALIAS = "platform.module";
 

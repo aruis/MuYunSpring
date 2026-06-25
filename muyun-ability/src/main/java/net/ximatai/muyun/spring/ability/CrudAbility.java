@@ -39,6 +39,7 @@ public interface CrudAbility<T extends EntityContract> {
         EntityLifecycle.prepareInsert(entity, Instant.now());
         prepareAbilityDefaults(entity);
         beforeInsert(entity);
+        PlatformManagedMutationGuard.beforeInsert(this, entity);
         prepareSortDefault(entity);
         validateTreePlacementIfNeeded(entity);
         String id;
@@ -90,20 +91,17 @@ public interface CrudAbility<T extends EntityContract> {
             }
             Integer expectedVersion = expectedVersionForUpdate(entity);
             EntityLifecycle.prepareUpdate(entity, Instant.now(), EntityLifecycle.nextVersion(expectedVersion));
+            T platformManagedExisting = existing == null && this instanceof PlatformManagedProtectionAbility<?>
+                    ? selectActiveRaw(entity.getId())
+                    : existing;
+            PlatformManagedMutationGuard.UpdateDecision<T> platformManagedDecision =
+                    PlatformManagedMutationGuard.beforeUpdate(this, entity, platformManagedExisting);
+            if (platformManagedDecision.lightweight()) {
+                return updatePreparedRecord(platformManagedDecision.record(), expectedVersion, false);
+            }
             beforeUpdate(entity);
             validateTreePlacementIfNeeded(entity);
-            int updated;
-            try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
-                updated = getDao().updateByIdAndVersion(entity, expectedVersion);
-            }
-            if (updated <= 0) {
-                throw new OptimisticLockException("record version conflict: " + entity.getId());
-            }
-            PlatformAbilityDispatcher.afterUpdate(this, entity, updated);
-            afterUpdate(entity, updated);
-            afterChanged(entity);
-            CacheInvalidationSupport.clearAfterChanged(this, entity);
-            return updated;
+            return updatePreparedRecord(entity, expectedVersion, true);
         });
     }
 
@@ -126,6 +124,7 @@ public interface CrudAbility<T extends EntityContract> {
             if (entity == null) {
                 return 0;
             }
+            PlatformManagedMutationGuard.beforeDelete(this, entity);
             Integer effectiveExpectedVersion = expectedVersion == null ? entity.getVersion() : expectedVersion;
             int deleted = getDao().deleteByIdAndVersion(id, effectiveExpectedVersion);
             if (deleted <= 0) {
@@ -298,6 +297,23 @@ public interface CrudAbility<T extends EntityContract> {
             }
         }
         return supplier.get();
+    }
+
+    private int updatePreparedRecord(T entity, Integer expectedVersion, boolean dispatchPlatformAfterUpdate) {
+        int updated;
+        try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
+            updated = getDao().updateByIdAndVersion(entity, expectedVersion);
+        }
+        if (updated <= 0) {
+            throw new OptimisticLockException("record version conflict: " + entity.getId());
+        }
+        if (dispatchPlatformAfterUpdate) {
+            PlatformAbilityDispatcher.afterUpdate(this, entity, updated);
+            afterUpdate(entity, updated);
+        }
+        afterChanged(entity);
+        CacheInvalidationSupport.clearAfterChanged(this, entity);
+        return updated;
     }
 
     private void prepareAbilityDefaults(T entity) {

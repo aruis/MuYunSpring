@@ -17,6 +17,11 @@ public class PlatformDynamicRuntimeRefresher {
     }
 
     public DynamicModuleRefreshResult refresh(String moduleAlias) {
+        ModuleDefinition definition = compiler.compile(moduleAlias);
+        return refresher.refresh(definition);
+    }
+
+    public DynamicModuleRefreshResult executeRefresh(String moduleAlias) {
         return refresh(moduleAlias, MigrationOptions.execute());
     }
 

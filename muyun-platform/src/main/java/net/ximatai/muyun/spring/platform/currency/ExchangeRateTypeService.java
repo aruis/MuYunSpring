@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.CacheAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
@@ -27,7 +28,8 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
         EnableAbility<ExchangeRateType>,
         SortAbility<ExchangeRateType>,
         ReferenceAbility<ExchangeRateType>,
-        CacheAbility<ExchangeRateType> {
+        CacheAbility<ExchangeRateType>,
+        PlatformManagedProtectionAbility<ExchangeRateType> {
     public static final String MODULE_ALIAS = "platform.exchange_rate_type";
 
     public ExchangeRateTypeService(BaseDao<ExchangeRateType, String> rateTypeDao) {

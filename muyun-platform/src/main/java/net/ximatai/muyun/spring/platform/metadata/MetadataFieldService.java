@@ -5,6 +5,7 @@ import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
+import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -20,7 +21,8 @@ import java.util.Optional;
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
         SoftDeleteAbility<MetadataField>,
         EnableAbility<MetadataField>,
-        SortAbility<MetadataField> {
+        SortAbility<MetadataField>,
+        PlatformManagedProtectionAbility<MetadataField> {
     public static final String MODULE_ALIAS = "platform.metadata_field";
 
     private final MetadataService metadataService;
@@ -76,6 +78,13 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
     @Override
     public void beforeUpdate(MetadataField field) {
         normalizeAndValidate(field);
+    }
+
+    @Override
+    public boolean allowOrdinaryPlatformManagedInsert(MetadataField field) {
+        return field != null && (field.getFieldRole() == MetadataFieldRole.MEASURE_BASE_VALUE
+                || field.getFieldRole() == MetadataFieldRole.MONEY_BASE_AMOUNT
+                || field.getFieldRole() == MetadataFieldRole.MONEY_EXCHANGE_RATE);
     }
 
     @Override

@@ -122,6 +122,23 @@ class PlatformConfigurationWebControllerTest {
     }
 
     @Test
+    void shouldExecuteRefreshDynamicRuntimeThroughExplicitEndpoint() throws Exception {
+        PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
+        when(refreshService.executeRefresh("crm.contract")).thenReturn(runtimeRefreshResult(false));
+        PlatformModuleWebController controller = new PlatformModuleWebController(refreshService);
+
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            mvc.perform(post("/platform.module/crm.contract/runtime/execute-refresh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.module.moduleAlias").value("crm.contract"))
+                    .andExpect(jsonPath("$.dryRun").value(false));
+        }
+
+        verify(refreshService).executeRefresh("crm.contract");
+    }
+
+    @Test
     void shouldPreviewRefreshDynamicRuntimeThroughDryRunEndpoint() throws Exception {
         PlatformDynamicRuntimeRefreshService refreshService = mock(PlatformDynamicRuntimeRefreshService.class);
         when(refreshService.previewRefresh("crm.contract")).thenReturn(runtimeRefreshResult(true));

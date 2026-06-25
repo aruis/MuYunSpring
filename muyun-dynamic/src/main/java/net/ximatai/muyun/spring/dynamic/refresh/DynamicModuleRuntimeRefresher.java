@@ -25,7 +25,7 @@ public class DynamicModuleRuntimeRefresher {
     }
 
     public DynamicModuleRefreshResult refresh(ModuleDefinition module) {
-        return refresh(module, MigrationOptions.execute());
+        return refresh(module, null);
     }
 
     public DynamicModuleRefreshResult previewRefresh(ModuleDefinition module) {
@@ -33,14 +33,16 @@ public class DynamicModuleRuntimeRefresher {
     }
 
     public DynamicModuleRefreshResult refresh(ModuleDefinition module, MigrationOptions options) {
-        MigrationOptions safeOptions = options == null ? MigrationOptions.execute() : options;
         ModuleDefinition previousModule = runtime.registry().findModule(module.moduleAlias()).orElse(null);
-        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, safeOptions);
-        if (!safeOptions.isDryRun()) {
+        Map<String, MigrationResult> migrations = schemaService.ensureModule(module, previousModule, options);
+        boolean dryRun = migrations != null && !migrations.isEmpty()
+                ? migrations.values().stream().allMatch(MigrationResult::isDryRun)
+                : options != null && options.isDryRun();
+        if (!dryRun) {
             runtime.refresh(module);
             publishModuleEvent(module, migrations);
         }
-        return new DynamicModuleRefreshResult(module, migrations, safeOptions.isDryRun());
+        return new DynamicModuleRefreshResult(module, migrations, dryRun);
     }
 
     private void publishModuleEvent(ModuleDefinition module, Map<String, MigrationResult> migrations) {

@@ -139,6 +139,13 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         return webScope(() -> runtimeRefreshService.refresh(moduleAlias));
     }
 
+    @PostMapping("/{moduleAlias}/runtime/execute-refresh")
+    @CustomActionEndpoint(value = "executeRefreshDynamicRuntime", title = "执行刷新动态运行态",
+            level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")
+    public DynamicModuleRefreshResult executeRefreshRuntime(@PathVariable String moduleAlias) {
+        return webScope(() -> runtimeRefreshService.executeRefresh(moduleAlias));
+    }
+
     @PostMapping("/{moduleAlias}/runtime/preview-refresh")
     @CustomActionEndpoint(value = "previewRefreshDynamicRuntime", title = "预览刷新动态运行态",
             level = PlatformActionLevel.RECORD, recordIdPathVariable = "moduleAlias")

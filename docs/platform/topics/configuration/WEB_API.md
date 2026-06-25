@@ -66,7 +66,8 @@
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}` | 获取指定应用下的模块树 |
 | 模块 | `GET` | `/platform.module/tree/{applicationAlias}/{parentId}` | 获取指定父模块下的子树或扁平列表 |
 | 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/preview-refresh` | 预览把当前模块配置编译并同步到动态运行态的 schema 变更；dry-run，不更新运行态 registry |
-| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/refresh` | 把当前模块配置编译为 `ModuleDefinition`，必要时执行 schema ensure，并刷新 `DynamicRecordRuntime` registry |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/refresh` | 按当前运行模式默认策略刷新动态运行态；开发态默认 execute，产品态默认 strict |
+| 模块 | `POST` | `/platform.module/{moduleAlias}/runtime/execute-refresh` | 显式 execute 刷新动态运行态；用于受控执行入口，后续审批和审计应挂在这里 |
 | 元数据 | `POST` | `/platform.metadata/query` | 查询元数据列表，支持按应用、别名、物理表等字段过滤 |
 | 元数据 | `GET` | `/platform.metadata/view/{id}` | 查看元数据 |
 | 元数据 | `POST` | `/platform.metadata/insert` | 新增元数据 |
@@ -470,7 +471,7 @@
 | --- | --- | --- |
 | `GET` | `/{moduleAlias}/describe` | 读取动态模块运行态描述 |
 
-动态运行态刷新通过 `/platform.module/{moduleAlias}/runtime/refresh` 完成，返回 `DynamicModuleRefreshResult`。它表达“当前配置同步到运行态”，不是配置包定稿、归档或跨环境迁移版本；配置包版本归档、指针切换、导入 dry-run 仍归属配置治理专题。影响 `ModuleDefinition` 编译结果的配置保存后会自动刷新受影响动态模块，事务提交后执行，无事务时立即执行：模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变化后引用该 metadata 的所有动态模块。页面配置和查询模板发布通过 `/platform.page_config_publish` 完成，保留“用户可见生效/取消生效”的发布语义，UI/query 普通保存不触发 runtime refresh。
+动态运行态刷新通过 `/platform.module/{moduleAlias}/runtime/refresh` 完成，返回 `DynamicModuleRefreshResult`。它表达“当前配置同步到运行态”，不是配置包定稿、归档或跨环境迁移版本；配置包版本归档、指针切换、导入 dry-run 仍归属配置治理专题。`preview-refresh` 固定 dry-run，`refresh` 沿用平台运行模式默认策略，`execute-refresh` 显式使用 execute 并作为后续审批和审计治理的挂点。影响 `ModuleDefinition` 编译结果的配置保存后会自动刷新受影响动态模块，事务提交后执行，无事务时立即执行：模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变化后引用该 metadata 的所有动态模块。页面配置和查询模板发布通过 `/platform.page_config_publish` 完成，保留“用户可见生效/取消生效”的发布语义，UI/query 普通保存不触发 runtime refresh。
 
 ## 关联专题入口
 

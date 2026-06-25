@@ -41,9 +41,22 @@ class DynamicModuleRuntimeRefresherTest {
 
         assertThat(result.changed()).isTrue();
         assertThat(result.migrations()).containsKey("contract");
+        assertThat(schemaService.lastOptions).isNull();
         assertThat(schemaService.ensuredEntities).containsExactly("contract");
         assertThat(runtime.registry().requireEntity("sales.contract", "contract").tableName())
                 .isEqualTo("app_contract");
+    }
+
+    @Test
+    void shouldPassExplicitMigrationOptionsThroughRefresh() {
+        RecordingSchemaService schemaService = new RecordingSchemaService(false);
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations());
+        DynamicModuleRuntimeRefresher refresher = new DynamicModuleRuntimeRefresher(schemaService, runtime);
+        MigrationOptions options = MigrationOptions.strict();
+
+        refresher.refresh(contractModule(), options);
+
+        assertThat(schemaService.lastOptions).isSameAs(options);
     }
 
     @Test

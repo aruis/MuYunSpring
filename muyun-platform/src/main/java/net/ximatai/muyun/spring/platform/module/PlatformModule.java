@@ -8,12 +8,13 @@ import net.ximatai.muyun.database.core.annotation.Id;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.model.capability.PlatformManagedCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 
 @Getter
 @Setter
 @Table(name = "platform_module", comment = "Platform module")
-public class PlatformModule extends StandardEnabledTreeEntity {
+public class PlatformModule extends StandardEnabledTreeEntity implements PlatformManagedCapable {
     @Id
     @Column(name = "id", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String id;
