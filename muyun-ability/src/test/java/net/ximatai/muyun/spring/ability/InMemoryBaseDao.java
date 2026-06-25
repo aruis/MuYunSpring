@@ -107,6 +107,14 @@ final class InMemoryBaseDao<T extends EntityContract> implements BaseDao<T, Stri
     }
 
     @Override
+    public List<T> list(Criteria criteria, Sort... sorts) {
+        List<T> filtered = rows.values().stream()
+                .filter(row -> matches(row, criteria))
+                .toList();
+        return sort(filtered, sorts);
+    }
+
+    @Override
     public PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         List<T> filtered = rows.values().stream()
                 .filter(row -> matches(row, criteria))

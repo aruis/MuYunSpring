@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.writeback;
 
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicRelationDescriptor;
@@ -273,7 +274,7 @@ class RecordWriteBackRuntimeServiceTest {
                 .setValue("receivedAmount", BigDecimal.ZERO);
         target.setId("invoice-1");
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -323,7 +324,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -360,7 +361,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -402,7 +403,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -445,7 +446,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -484,7 +485,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -531,7 +532,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -576,7 +577,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -607,7 +608,7 @@ class RecordWriteBackRuntimeServiceTest {
 
         service.onMutationEvent(eventWithState("DRAFT", "DRAFT", BigDecimal.TEN, BigDecimal.TEN));
 
-        verify(dynamicRecordService, never()).listSystem(any(), any(), any(), any());
+        verify(dynamicRecordService, never()).listSystem(any(), any(), any(Criteria.class), any(PageRequest.class));
         verify(dynamicRecordService, never()).updateWriteBack(any(), any(), any(), any());
     }
 
@@ -650,7 +651,7 @@ class RecordWriteBackRuntimeServiceTest {
         ArgumentCaptor<DynamicRecord> recordCaptor = ArgumentCaptor.forClass(DynamicRecord.class);
         verify(dynamicRecordService).updateWriteBack(eq("sales.contract"), eq("contract"),
                 recordCaptor.capture(), any());
-        verify(dynamicRecordService, never()).listSystem(any(), any(), any(), any());
+        verify(dynamicRecordService, never()).listSystem(any(), any(), any(Criteria.class), any(PageRequest.class));
         assertThat(recordCaptor.getValue().getId()).isEqualTo("contract-1");
         assertThat(recordCaptor.getValue().getValue("receivedAmount")).isEqualTo(BigDecimal.TEN);
         RecordWriteBackExecutionLog executionLog = logService.selectByRuleId(rule.getId(), 10).getFirst();
@@ -685,9 +686,9 @@ class RecordWriteBackRuntimeServiceTest {
         when(dynamicRecordService.relations("finance.invoice")).thenReturn(List.of(
                 new DynamicRelationDescriptor("lines", "invoice", "invoice_line", "invoiceId", false, false)
         ));
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(targetRoot));
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice_line"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice_line"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(targetLine));
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -733,7 +734,7 @@ class RecordWriteBackRuntimeServiceTest {
 
         service.onMutationEvent(event(RuntimeMutationSource.WRITE_BACK, false));
 
-        verify(dynamicRecordService, never()).listSystem(any(), any(), any(), any());
+        verify(dynamicRecordService, never()).listSystem(any(), any(), any(Criteria.class), any(PageRequest.class));
     }
 
     @Test
@@ -744,7 +745,7 @@ class RecordWriteBackRuntimeServiceTest {
                 new RecordWriteBackExecutionLogService(new TestMemoryDao<>());
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of());
         RecordWriteBackRuntimeService service = new RecordWriteBackRuntimeService(
                 List.of(),
@@ -779,7 +780,7 @@ class RecordWriteBackRuntimeServiceTest {
         target.setId("invoice-1");
         DynamicRecordService dynamicRecordService = mock(DynamicRecordService.class);
         when(dynamicRecordService.mainEntityAlias("finance.invoice")).thenReturn("invoice");
-        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(), any()))
+        when(dynamicRecordService.listSystem(eq("finance.invoice"), eq("invoice"), any(Criteria.class), any(PageRequest.class)))
                 .thenReturn(List.of(target));
         when(dynamicRecordService.updateWriteBack(eq("finance.invoice"), eq("invoice"), any(), any()))
                 .thenThrow(new PlatformException("target save failed"));

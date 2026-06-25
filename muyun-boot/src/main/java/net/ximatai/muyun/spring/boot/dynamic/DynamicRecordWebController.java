@@ -340,10 +340,27 @@ public class DynamicRecordWebController implements
     }
 
     @Override
+    public List<DynamicRecord> queryListRecords(WebQueryRequest request) {
+        List<DynamicRecord> records = CrudWeb.super.queryListRecords(request);
+        if (request == null || !hasText(request.uiConfigId())) {
+            return records;
+        }
+        Set<String> projectionFields = projectionFields(DynamicWebRequest.moduleAlias(), request);
+        return records.stream()
+                .map(record -> project(record, projectionFields))
+                .toList();
+    }
+
+    @Override
     @PostMapping("/query")
     @ActionEndpoint(PlatformAction.QUERY)
     public WebPageResponse<DynamicRecord> query(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
+            if (request != null && request.unpagedEnabled()) {
+                List<DynamicRecord> records = WebOutputSupport.records(
+                        service(), queryListRecords(request), FieldOutputContext.LIST);
+                return WebPageResponse.fromList(records);
+            }
             PageResult<DynamicRecord> page = queryRecords(request);
             PageResult<DynamicRecord> output = WebOutputSupport.page(service(), page, FieldOutputContext.LIST);
             return WebPageResponse.from(output, navigationContext(request, output));

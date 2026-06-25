@@ -137,6 +137,14 @@ class ApplicationServiceContractTest {
         }
 
         @Override
+        public List<Application> list(Criteria criteria, Sort... sorts) {
+            return rows.values().stream()
+                    .filter(row -> matches(row, criteria))
+                    .sorted(Comparator.comparing(Application::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                    .toList();
+        }
+
+        @Override
         public PageResult<Application> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
             return PageResult.of(List.of(), 0, pageRequest);
         }

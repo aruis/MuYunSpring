@@ -395,6 +395,13 @@ public class DynamicEntityService implements
                 .toList();
     }
 
+    @Override
+    public List<DynamicRecord> list(Criteria criteria, Sort... sorts) {
+        return getDao().list(activeCriteria(criteria), sorts).stream()
+                .peek(this::applyReadPipeline)
+                .toList();
+    }
+
     public List<DynamicRecord> sortedList(Criteria criteria) {
         requireCapability(EntityCapability.SORT);
         List<DynamicRecord> records;

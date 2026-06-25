@@ -160,6 +160,10 @@ public interface CrudAbility<T extends EntityContract> {
         return getDao().query(activeCriteria(criteria), pageRequest, sorts);
     }
 
+    default List<T> list(Criteria criteria, Sort... sorts) {
+        return getDao().list(activeCriteria(criteria), sorts);
+    }
+
     default long count(Criteria criteria) {
         return getDao().count(activeCriteria(criteria));
     }

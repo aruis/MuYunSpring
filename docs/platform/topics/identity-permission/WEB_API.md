@@ -24,7 +24,8 @@
 | 组织机构 | `/iam.organization` | CRUD、启停、树、树内排序 |
 | 部门 | `/iam.department` | CRUD、启停、树、树内排序 |
 | 职员 | `/iam.employee` | CRUD、启停、排序 |
-| 岗位 | `/iam.position` | CRUD、启停、排序 |
+| 岗位分类 | `/iam.position_category` | CRUD、启停、树、树内排序 |
+| 岗位 | `/iam.position` | CRUD、启停、排序，可挂岗位分类 |
 | 用户 | `/iam.user` | CRUD、启停、排序 |
 | 角色 | `/iam.role` | CRUD、启停、排序 |
 
@@ -143,6 +144,23 @@
 | `X-MuYun-Acting-Principal-Position-Id` | 可选，被代办任岗关系 ID；用于让被代办业务主体落到具体任岗上下文。 |
 
 声明代办并命中当前模块动作后，动作权限和数据权限按被代办业务主体解释；当前登录账号仍作为实际操作者用于租户上下文和审计。
+
+## 岗位分类
+
+根路径：`/iam.position_category`
+
+| 方法 | URL | 功能 |
+| --- | --- | --- |
+| `POST` | `/iam.position_category/query` | 查询岗位分类。 |
+| `GET` | `/iam.position_category/view/{id}` | 查看岗位分类。 |
+| `POST` | `/iam.position_category/insert` | 新增岗位分类。 |
+| `POST` | `/iam.position_category/update/{id}` | 更新岗位分类。 |
+| `POST` | `/iam.position_category/delete/{id}` | 删除岗位分类。 |
+| `POST` | `/iam.position_category/enable/{id}` | 启用岗位分类。 |
+| `POST` | `/iam.position_category/disable/{id}` | 停用岗位分类。 |
+| `GET` | `/iam.position_category/tree` | 读取岗位分类树。 |
+| `GET` | `/iam.position_category/tree/{id}` | 读取指定岗位分类子树。 |
+| `POST` | `/iam.position_category/sort/{id}` | 调整岗位分类树位置或同级顺序。 |
 
 ## 岗位
 

@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Map;
 
 public record WebQueryRequest(WebPageRequest page,
+                              Boolean unpaged,
                               List<WebQueryCondition> conditions,
                               WebQueryCriteria criteria,
                               Map<String, Object> queryForm,
@@ -32,7 +33,7 @@ public record WebQueryRequest(WebPageRequest page,
     public WebQueryRequest(WebPageRequest page,
                            List<WebQueryCondition> conditions,
                            List<WebSort> sorts) {
-        this(page, conditions, null, Map.of(), sorts, null, null, Map.of(), null, null, List.of(), null);
+        this(page, null, conditions, null, Map.of(), sorts, null, null, Map.of(), null, null, List.of(), null);
     }
 
     public WebPageRequest pageOrDefault() {
@@ -41,5 +42,9 @@ public record WebQueryRequest(WebPageRequest page,
 
     public boolean navigationSessionEnabled() {
         return Boolean.TRUE.equals(navigationSession);
+    }
+
+    public boolean unpagedEnabled() {
+        return Boolean.TRUE.equals(unpaged);
     }
 }

@@ -49,6 +49,13 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
         return withDataScopeTenant(scope, () -> list(scope.criteria(), pageRequest, sorts));
     }
 
+    default List<T> listForAction(PlatformAction action,
+                                  Criteria criteria,
+                                  Sort... sorts) {
+        DataScopeCriteriaResult scope = readScope(action, criteria);
+        return withDataScopeTenant(scope, () -> list(scope.criteria(), sorts));
+    }
+
     default long countForAction(PlatformAction action, Criteria criteria) {
         DataScopeCriteriaResult scope = readScope(action, criteria);
         return withDataScopeTenant(scope, () -> count(scope.criteria()));
@@ -106,8 +113,7 @@ public interface DataScopeAbility<T extends EntityContract & DataScopeCapable> e
     }
 
     default List<T> sortedListForAction(PlatformAction action, Criteria criteria) {
-        return listForAction(action, criteria, new PageRequest(0, Integer.MAX_VALUE),
-                Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return listForAction(action, criteria, Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     default <R> R withDataScopeTenant(DataScopeCriteriaResult scope, Supplier<R> supplier) {

@@ -9,16 +9,16 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PositionModelSchemaTest {
+class PositionCategoryModelSchemaTest {
     private final StaticEntityTableMapper mapper = new StaticEntityTableMapper();
 
     @Test
-    void shouldMapPositionAsTenantScopedMasterData() {
-        TableWrapper table = mapper.toTable(Position.class);
+    void shouldMapPositionCategoryAsTenantScopedTree() {
+        TableWrapper table = mapper.toTable(PositionCategory.class);
 
-        assertThat(table.getName()).isEqualTo("iam_position");
+        assertThat(table.getName()).isEqualTo("iam_position_category");
         assertThat(columnNames(table))
-                .contains("id", "tenant_id", "category_id", "code", "title", "description",
+                .contains("id", "tenant_id", "parent_id", "code", "title", "description",
                         "sort_order", "enabled", "deleted", "version");
         assertThat(table.getColumns().stream().filter(column -> "code".equals(column.getName())).findFirst())
                 .get()

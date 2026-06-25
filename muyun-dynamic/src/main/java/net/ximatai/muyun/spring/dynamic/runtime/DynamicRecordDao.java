@@ -126,6 +126,13 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     }
 
     @Override
+    public List<DynamicRecord> list(Criteria criteria, Sort... sorts) {
+        return tableGateway.listColumns(criteria, sorts).stream()
+                .map(this::fromColumnMap)
+                .toList();
+    }
+
+    @Override
     public PageResult<DynamicRecord> page(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         return pageQuery(criteria, pageRequest, sorts);
     }
