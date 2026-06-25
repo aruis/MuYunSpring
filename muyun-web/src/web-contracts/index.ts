@@ -305,6 +305,10 @@ export interface Application extends StandardEnabledSortableEntity {
   alias?: string;
 }
 
+export interface Tenant extends StandardEnabledSortableEntity {
+  alias?: string;
+}
+
 export interface TreeSortRequest {
   previousId?: string | null;
   nextId?: string | null;

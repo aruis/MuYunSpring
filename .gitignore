@@ -4,6 +4,7 @@ build/
 **/build/
 out/
 .idea/
+.codex/
 *.iml
 *.log
 LOCAL_ENVIRONMENT.md

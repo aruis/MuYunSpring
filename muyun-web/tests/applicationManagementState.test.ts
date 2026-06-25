@@ -84,6 +84,64 @@ test('application management state toggles enable state and refreshes selected r
   assert.equal(state.reloadKey.value, 1);
 });
 
+test('application management state refreshes selected draft from loaded records in view mode', () => {
+  const context = createContext();
+  const state = createApplicationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.handleListLoaded([
+    { id: 'platform', alias: 'platform', title: '平台配置', enabled: false, sortOrder: 20 },
+  ]);
+
+  assert.equal(state.selected.value?.title, '平台配置');
+  assert.equal(state.selected.value?.enabled, false);
+  assert.equal(state.draft.value.title, '平台配置');
+  assert.equal(state.draft.value.enabled, false);
+});
+
+test('application management state does not overwrite editing draft when loaded records refresh', () => {
+  const context = createContext();
+  const state = createApplicationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.startEdit();
+  state.draft.value.title = '本地编辑';
+  state.handleListLoaded([{ id: 'platform', alias: 'platform', title: '远端刷新', enabled: false }]);
+
+  assert.equal(state.selected.value?.title, '远端刷新');
+  assert.equal(state.draft.value.title, '本地编辑');
+  assert.equal(state.draft.value.enabled, true);
+});
+
+test('application management state ignores duplicate save while saving', async () => {
+  const calls: unknown[] = [];
+  let releaseInsert: ((record: Application) => void) | undefined;
+  const context = createContext({
+    insert: async (record) => {
+      calls.push(record);
+      return new Promise<Application>((resolve) => {
+        releaseInsert = () => resolve({ ...record, sortOrder: 10 });
+      });
+    },
+  });
+  const state = createApplicationManagementState(context, async () => true);
+
+  state.startCreate();
+  state.draft.value.alias = 'sales';
+  state.draft.value.title = '销售应用';
+  const firstSave = state.save();
+  await Promise.resolve();
+  const secondSave = state.save();
+
+  assert.equal(calls.length, 1);
+
+  releaseInsert?.({ id: 'sales', alias: 'sales', title: '销售应用', enabled: true });
+  await Promise.all([firstSave, secondSave]);
+
+  assert.equal(calls.length, 1);
+  assert.equal(state.selected.value?.id, 'sales');
+});
+
 test('application management state respects delete confirmation result', async () => {
   const calls: string[] = [];
   const context = createContext({

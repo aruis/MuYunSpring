@@ -157,6 +157,21 @@ const platformAdminMenus = [
         children: [
           {
             record: {
+              id: 'platform.menu.module.iam.tenant',
+              schemeId: 'platform.menu_scheme.admin',
+              parentId: 'platform.menu.group.identity',
+              title: '租户管理',
+              menuType: 'MODULE',
+              openMode: 'TAB',
+              moduleAlias: 'iam.tenant',
+              pageMode: 'LIST',
+              enabled: true,
+              sortOrder: 10,
+            },
+            children: [],
+          },
+          {
+            record: {
               id: 'platform.menu.module.iam.employee',
               schemeId: 'platform.menu_scheme.admin',
               parentId: 'platform.menu.group.identity',
@@ -303,6 +318,7 @@ test('loadWorkbenchStartupState accepts backend initialized platform admin menus
     {
       businessModuleRoutes: {
         'platform.application': '/config/applications',
+        'iam.tenant': '/iam/tenants',
       },
     },
   );
@@ -323,6 +339,38 @@ test('loadWorkbenchStartupState accepts backend initialized platform admin menus
   assert.deepEqual(state.tabs?.[0]?.pageDescriptor?.target, {
     route: '/config/applications',
     moduleAlias: 'platform.application',
+  });
+});
+
+test('loadWorkbenchStartupState resolves backend tenant module menu to business route', async () => {
+  const state = await loadWorkbenchStartupState(
+    {
+      sessionClient: {
+        current: async () => ({
+          userId: 'platform.user.super_admin',
+          username: 'admin',
+          system: true,
+        }),
+      },
+      menuClient: {
+        mine: async () => ({
+          records: [platformAdminMenus[0].children[1].children[0]],
+        }),
+      },
+    },
+    {
+      businessModuleRoutes: {
+        'iam.tenant': '/iam/tenants',
+      },
+    },
+  );
+
+  assert.equal(state.activeTabKey, 'menu:platform.menu.module.iam.tenant');
+  assert.equal(state.tabs?.[0]?.title, '租户管理');
+  assert.equal(state.tabs?.[0]?.pageDescriptor?.pageType, 'business-route');
+  assert.deepEqual(state.tabs?.[0]?.pageDescriptor?.target, {
+    route: '/iam/tenants',
+    moduleAlias: 'iam.tenant',
   });
 });
 
