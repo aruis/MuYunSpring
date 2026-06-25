@@ -3,23 +3,21 @@ import { computed } from 'vue';
 import {
   EnabledSelect,
   ModuleActionButton,
-  OrganizationTree,
   RecordActionBar,
-  parentRecordConstraints,
   RecordMetaSection,
-  RecordPicker,
   StaticManagementLayout,
   type RecordActionItem,
-  type RecordPickerRecord,
 } from '@muyun/platform-components';
-import type { Organization } from '@muyun/web-contracts';
+import type { Tenant } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiInput } from '@muyun/vue-ui-antdv';
-import { createOrganizationManagementState } from './organizationManagementState';
+import { createTenantManagementState } from './tenantManagementState';
+import FlatRecordExplorer from './static-management/FlatRecordExplorer.vue';
+import type { FlatRecordBase } from './static-management/flatRecordModel';
 
-defineOptions({ name: 'OrganizationManagementView' });
+defineOptions({ name: 'TenantManagementView' });
 
-const organizationContext = useModuleContext<Organization>();
+const tenantContext = useModuleContext<Tenant>();
 const {
   selected,
   draft,
@@ -30,16 +28,23 @@ const {
   actionMessage,
   cardTitle,
   readonly,
-  handleTreeLoaded,
+  aliasReadonly,
+  isPlatformTenant,
+  canDelete,
+  canEnable,
+  handleListLoaded,
   handleSelect,
-  startCreateRoot,
-  startCreateChild,
+  startCreate,
   startEdit,
   cancelEdit,
   save,
   toggleEnabled,
   removeSelected,
-} = createOrganizationManagementState(organizationContext, confirmAction);
+} = createTenantManagementState(tenantContext, confirmAction);
+
+const enabledReadonly = computed(
+  () => readonly.value || (isPlatformTenant.value && draft.value.enabled !== false),
+);
 
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -56,36 +61,43 @@ const cardActions = computed<RecordActionItem[]>(() => {
   }
   return [
     { key: 'edit', actionCode: 'update', title: '编辑', disabled: !selected.value },
-    { key: 'create-child', actionCode: 'create', title: '新建下级', disabled: !selected.value },
     {
       key: 'toggle-enabled',
       actionCode: selected.value?.enabled === false ? 'enable' : 'disable',
       title: selected.value?.enabled === false ? '启用' : '停用',
-      disabled: !selected.value,
+      disabled: !selected.value || !canEnable.value,
       loading: saving.value,
     },
     {
       key: 'delete',
       actionCode: 'delete',
       title: '删除',
-      disabled: !selected.value,
+      disabled: !selected.value || !canDelete.value,
       loading: saving.value,
       danger: true,
     },
   ];
 });
 
-function organizationTitle(record: RecordPickerRecord) {
-  return record.title ?? record.code ?? record.id ?? '未命名机构';
+function tenantTitle(record: FlatRecordBase) {
+  return record.title ?? record.alias ?? record.id ?? '未命名租户';
+}
+
+function tenantSubtitle(record: FlatRecordBase) {
+  return record.alias ?? record.id;
+}
+
+function handleLoaded(records: FlatRecordBase[]) {
+  handleListLoaded(records as Tenant[]);
+}
+
+function handleTenantSelect(record: FlatRecordBase) {
+  handleSelect(record as Tenant);
 }
 
 function handleCardAction(action: RecordActionItem) {
   if (action.key === 'edit') {
     startEdit();
-    return;
-  }
-  if (action.key === 'create-child') {
-    startCreateChild();
     return;
   }
   if (action.key === 'toggle-enabled') {
@@ -108,71 +120,59 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
-    group-title="组织管理"
-    sidebar-title="机构树"
-    refresh-title="刷新机构树"
+    group-title="身份权限"
+    sidebar-title="租户列表"
+    refresh-title="刷新租户列表"
     :mode="mode"
     :card-title="cardTitle"
     :action-error="actionError"
     :action-message="actionMessage"
+    :muted-message="isPlatformTenant ? '平台租户是系统内置身份根，不能删除或停用。' : undefined"
     :show-status="Boolean(selected && mode === 'view')"
     :enabled="selected?.enabled"
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>
-      <ModuleActionButton :context="organizationContext" action-code="create" @click="startCreateRoot">
-        新建根机构
-      </ModuleActionButton>
-      <ModuleActionButton
-        :context="organizationContext"
-        action-code="create"
-        :disabled="!selected"
-        @click="startCreateChild"
-      >
-        新建下级
+      <ModuleActionButton :context="tenantContext" action-code="create" @click="startCreate">
+        新建租户
       </ModuleActionButton>
     </template>
 
     <template #explorer>
-      <OrganizationTree
-        :context="organizationContext"
+      <FlatRecordExplorer
+        :context="tenantContext"
         :selected-id="selected?.id"
         :reload-key="reloadKey"
-        @select="handleSelect"
-        @loaded="handleTreeLoaded"
+        search-placeholder="搜索租户名称、alias 或 ID"
+        empty-description="暂无租户"
+        loading-tip="加载租户列表"
+        fallback-title="未命名租户"
+        :title-of="tenantTitle"
+        :subtitle-of="tenantSubtitle"
+        @select="handleTenantSelect"
+        @loaded="handleLoaded"
       />
     </template>
 
     <template #card-actions>
-      <RecordActionBar :context="organizationContext" :actions="cardActions" @action="handleCardAction" />
+      <RecordActionBar :context="tenantContext" :actions="cardActions" @action="handleCardAction" />
     </template>
 
     <form class="static-record-form" @submit.prevent="save">
       <label>
-        <span>机构名称</span>
+        <span>租户 alias</span>
+        <UiInput v-model:value="draft.alias" :disabled="aliasReadonly" />
+      </label>
+      <label>
+        <span>租户名称</span>
         <UiInput v-model:value="draft.title" :disabled="readonly" />
       </label>
       <label>
-        <span>机构编码</span>
-        <UiInput v-model:value="draft.code" :disabled="readonly" />
-      </label>
-      <label>
-        <span>上级机构</span>
-        <RecordPicker
-          v-model:value="draft.parentId"
-          :context="organizationContext"
-          :disabled="readonly"
-          :constraints="parentRecordConstraints(draft.id)"
-          :title-of="organizationTitle"
-          placeholder="根机构留空"
-        />
-      </label>
-      <label>
         <span>启用状态</span>
-        <EnabledSelect v-model:value="draft.enabled" :disabled="readonly" />
+        <EnabledSelect v-model:value="draft.enabled" :disabled="enabledReadonly" />
       </label>
     </form>
 
-    <RecordMetaSection :record="draft" />
+    <RecordMetaSection :record="draft" show-sort-order />
   </StaticManagementLayout>
 </template>

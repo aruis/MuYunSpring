@@ -41,9 +41,21 @@ class TenantServiceContractTest {
         assertThatThrownBy(() -> service.insert(tenant("ximatai", "Ximatai")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("system context");
+        assertThatThrownBy(() -> service.beforeUpdate(tenant("ximatai", "Ximatai")))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
+        assertThatThrownBy(() -> service.beforeDelete("ximatai"))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("system context");
 
         try (TenantContext.Scope ignored = TenantContext.use("ximatai")) {
             assertThatThrownBy(() -> service.insert(tenant("tenant_b", "Tenant B")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system context");
+            assertThatThrownBy(() -> service.beforeUpdate(tenant("tenant_b", "Tenant B")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("system context");
+            assertThatThrownBy(() -> service.beforeDelete("tenant_b"))
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("system context");
         }
@@ -76,6 +88,28 @@ class TenantServiceContractTest {
         assertThatThrownBy(() -> service.requireActiveTenant("missing"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("not active");
+    }
+
+    @Test
+    void shouldProtectPlatformTenantFromDisableAndDelete() {
+        TenantService service = new TenantService(mock(TenantDao.class));
+
+        try (TenantContext.Scope ignored = TenantContext.system("test system context")) {
+            assertThatThrownBy(() -> service.beforeUpdate(disabledTenant(TenantService.PLATFORM_TENANT_ID, "平台租户")))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("cannot be disabled");
+            Tenant tenantWithoutEnabled = tenant(TenantService.PLATFORM_TENANT_ID, "平台租户");
+            tenantWithoutEnabled.setEnabled(null);
+            assertThatThrownBy(() -> service.beforeUpdate(tenantWithoutEnabled))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("cannot be disabled");
+            assertThatThrownBy(() -> service.beforeDelete(TenantService.PLATFORM_TENANT_ID))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("cannot be deleted");
+
+            service.beforeUpdate(tenant(TenantService.PLATFORM_TENANT_ID, "平台租户"));
+            service.beforeDelete("tenant_a");
+        }
     }
 
     private Tenant tenant(String alias, String title) {

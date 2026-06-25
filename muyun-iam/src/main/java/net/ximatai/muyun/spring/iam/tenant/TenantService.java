@@ -9,6 +9,7 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -49,6 +50,23 @@ public class TenantService extends AbstractAbilityService<Tenant> implements
     public void normalizeBeforeMutation(Tenant tenant) {
         tenant.setAlias(requireTenantAlias(tenant.getAlias()));
         tenant.setTenantId(null);
+    }
+
+    @Override
+    public void beforeUpdate(Tenant tenant) {
+        requireSystemMutationContext();
+        normalizeBeforeMutation(tenant);
+        if (PLATFORM_TENANT_ID.equals(tenant.getAlias()) && !Boolean.TRUE.equals(tenant.getEnabled())) {
+            throw new PlatformException("platform tenant cannot be disabled");
+        }
+    }
+
+    @Override
+    public void beforeDelete(String id) {
+        requireSystemMutationContext();
+        if (PLATFORM_TENANT_ID.equals(id)) {
+            throw new PlatformException("platform tenant cannot be deleted");
+        }
     }
 
     public Tenant requireActiveTenant(String tenantAlias) {

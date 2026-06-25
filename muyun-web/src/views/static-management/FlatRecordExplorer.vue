@@ -3,28 +3,28 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { UiEmpty, UiError, UiInput, UiSpin } from '@muyun/vue-ui-antdv';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import {
-  defaultListRecordMatches,
-  defaultListRecordSubtitle,
-  defaultListRecordTitle,
-  type ListRecordBase,
-} from './listRecordModel';
+  defaultFlatRecordMatches,
+  defaultFlatRecordSubtitle,
+  defaultFlatRecordTitle,
+  type FlatRecordBase,
+} from './flatRecordModel';
 
-defineOptions({ name: 'ListRecordExplorer' });
+defineOptions({ name: 'FlatRecordExplorer' });
 
 const props = withDefaults(
   defineProps<{
-    context: ModuleContext<ListRecordBase>;
+    context: ModuleContext<FlatRecordBase>;
     selectedId?: string;
     reloadKey?: number;
     searchPlaceholder?: string;
     emptyDescription?: string;
     loadingTip?: string;
     fallbackTitle?: string;
-    titleOf?: (record: ListRecordBase) => string;
-    subtitleOf?: (record: ListRecordBase) => string | undefined;
-    filterOption?: (record: ListRecordBase, normalizedKeyword: string) => boolean;
-    tagOf?: (record: ListRecordBase) => string | undefined;
-    mutedOf?: (record: ListRecordBase) => boolean;
+    titleOf?: (record: FlatRecordBase) => string;
+    subtitleOf?: (record: FlatRecordBase) => string | undefined;
+    filterOption?: (record: FlatRecordBase, normalizedKeyword: string) => boolean;
+    tagOf?: (record: FlatRecordBase) => string | undefined;
+    mutedOf?: (record: FlatRecordBase) => boolean;
   }>(),
   {
     selectedId: undefined,
@@ -42,14 +42,14 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  select: [record: ListRecordBase];
-  loaded: [records: ListRecordBase[]];
+  select: [record: FlatRecordBase];
+  loaded: [records: FlatRecordBase[]];
 }>();
 
 const loading = ref(false);
 const error = ref<string>();
 const keyword = ref('');
-const records = ref<ListRecordBase[]>([]);
+const records = ref<FlatRecordBase[]>([]);
 
 const filteredRecords = computed(() =>
   records.value.filter((record) => matchesKeyword(record, keyword.value.trim().toLowerCase())),
@@ -82,25 +82,25 @@ async function loadRecords() {
   }
 }
 
-function recordTitle(record: ListRecordBase) {
-  return props.titleOf?.(record) ?? defaultListRecordTitle(record, props.fallbackTitle);
+function recordTitle(record: FlatRecordBase) {
+  return props.titleOf?.(record) ?? defaultFlatRecordTitle(record, props.fallbackTitle);
 }
 
-function recordSubtitle(record: ListRecordBase) {
-  return props.subtitleOf?.(record) ?? defaultListRecordSubtitle(record);
+function recordSubtitle(record: FlatRecordBase) {
+  return props.subtitleOf?.(record) ?? defaultFlatRecordSubtitle(record);
 }
 
-function matchesKeyword(record: ListRecordBase, normalized: string) {
+function matchesKeyword(record: FlatRecordBase, normalized: string) {
   if (!normalized) {
     return true;
   }
   return (
     props.filterOption?.(record, normalized) ??
-    defaultListRecordMatches(record, normalized, recordTitle, recordSubtitle)
+    defaultFlatRecordMatches(record, normalized, recordTitle, recordSubtitle)
   );
 }
 
-function handleSelect(record: ListRecordBase) {
+function handleSelect(record: FlatRecordBase) {
   emit('select', record);
 }
 </script>

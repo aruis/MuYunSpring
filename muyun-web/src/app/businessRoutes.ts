@@ -2,6 +2,7 @@ import type { Component } from 'vue';
 import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } from '@muyun/web-contracts';
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
+import TenantManagementView from '../views/TenantManagementView.vue';
 
 export interface StaticBusinessRoute {
   route: string;
@@ -14,6 +15,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/config/applications',
     moduleAlias: 'platform.application',
     component: ApplicationManagementView,
+  },
+  {
+    route: '/iam/tenants',
+    moduleAlias: 'iam.tenant',
+    component: TenantManagementView,
   },
   {
     route: '/iam/organizations',

@@ -1,4 +1,4 @@
-export interface ListRecordBase {
+export interface FlatRecordBase {
   id?: string;
   title?: string;
   alias?: string;
@@ -6,22 +6,22 @@ export interface ListRecordBase {
   enabled?: boolean;
 }
 
-export function defaultListRecordTitle<TRecord extends ListRecordBase>(
+export function defaultFlatRecordTitle<TRecord extends FlatRecordBase>(
   record: TRecord,
   fallback = '未命名记录',
 ) {
   return record.title ?? record.alias ?? record.code ?? record.id ?? fallback;
 }
 
-export function defaultListRecordSubtitle<TRecord extends ListRecordBase>(record: TRecord) {
+export function defaultFlatRecordSubtitle<TRecord extends FlatRecordBase>(record: TRecord) {
   return record.alias ?? record.code ?? record.id;
 }
 
-export function defaultListRecordMatches<TRecord extends ListRecordBase>(
+export function defaultFlatRecordMatches<TRecord extends FlatRecordBase>(
   record: TRecord,
   normalizedKeyword: string,
-  titleOf: (record: TRecord) => string = defaultListRecordTitle,
-  subtitleOf: (record: TRecord) => string | undefined = defaultListRecordSubtitle,
+  titleOf: (record: TRecord) => string = defaultFlatRecordTitle,
+  subtitleOf: (record: TRecord) => string | undefined = defaultFlatRecordSubtitle,
 ) {
   return [titleOf(record), subtitleOf(record), record.alias, record.code, record.id]
     .filter(Boolean)

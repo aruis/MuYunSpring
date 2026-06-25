@@ -166,6 +166,7 @@ test('resolvePageDescriptor resolves configured MODULE targets as business route
       title: '应用管理',
       businessModuleRoutes: {
         'platform.application': '/config/applications',
+        'iam.tenant': '/iam/tenants',
       },
     },
   );
@@ -176,6 +177,27 @@ test('resolvePageDescriptor resolves configured MODULE targets as business route
   assert.equal(descriptor.target.route, '/config/applications');
   assert.equal(descriptor.target.moduleAlias, 'platform.application');
   assert.equal(tabKeyOf(descriptor), 'menu:platform.menu.module.platform.application');
+});
+
+test('resolvePageDescriptor resolves tenant MODULE target as business route', () => {
+  const descriptor = resolvePageDescriptor(
+    {
+      menuId: 'platform.menu.module.iam.tenant',
+      menuType: 'MODULE',
+      openMode: 'TAB',
+      moduleAlias: 'iam.tenant',
+    },
+    {
+      title: '租户管理',
+      businessModuleRoutes: {
+        'iam.tenant': '/iam/tenants',
+      },
+    },
+  );
+
+  assert.equal(descriptor.pageType, 'business-route');
+  assert.equal(descriptor.target.route, '/iam/tenants');
+  assert.equal(descriptor.target.moduleAlias, 'iam.tenant');
 });
 
 test('resolvePageDescriptor resolves LINK targets by open mode', () => {
