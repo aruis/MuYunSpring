@@ -146,6 +146,11 @@ public final class DynamicEntityOperations implements
         return service.list(moduleAlias, entityAlias, criteria, pageRequest, sorts);
     }
 
+    @Override
+    public List<DynamicRecord> list(Criteria criteria, Sort... sorts) {
+        return service.list(moduleAlias, entityAlias, criteria, sorts);
+    }
+
     public PageResult<DynamicRecord> page(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         return service.page(moduleAlias, entityAlias, criteria, pageRequest, sorts);
     }

@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.util.List;
+
 public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
     default PageResult<T> queryRecords(WebQueryRequest request) {
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
@@ -34,6 +36,34 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
             return result;
         }
         return service().pageQuery(queryCriteria(request), pageRequest, querySorts(request));
+    }
+
+    default List<T> queryListRecords(WebQueryRequest request) {
+        requireUnpagedQuerySupported(request);
+        if (service() instanceof DataScopeAbility<?>) {
+            DataScopeAbility<?> dataScopeAbility = DataScopeAbility.cast(service());
+            @SuppressWarnings("unchecked")
+            List<T> result = (List<T>) dataScopeAbility.listForAction(
+                    PlatformAction.QUERY, queryCriteria(request), querySorts(request));
+            return result;
+        }
+        return service().list(queryCriteria(request), querySorts(request));
+    }
+
+    default boolean supportsUnpagedQuery() {
+        return false;
+    }
+
+    default void requireUnpagedQuerySupported(WebQueryRequest request) {
+        if (!supportsUnpagedQuery()) {
+            throw new IllegalArgumentException("unpaged query is not supported by " + webScopeName());
+        }
+        if (request != null && request.page() != null) {
+            throw new IllegalArgumentException("unpaged query cannot specify page");
+        }
+        if (request != null && request.navigationSessionEnabled()) {
+            throw new IllegalArgumentException("unpaged query navigation is not supported by " + webScopeName());
+        }
     }
 
     default Criteria queryCriteria(WebQueryRequest request) {
@@ -59,7 +89,13 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     @PostMapping("/query")
     @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
-        return webScope(() -> WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST)));
+        return webScope(() -> {
+            if (request != null && request.unpagedEnabled()) {
+                List<T> records = WebOutputSupport.records(service(), queryListRecords(request), FieldOutputContext.LIST);
+                return WebPageResponse.fromList(records);
+            }
+            return WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST));
+        });
     }
 
     @GetMapping("/view/{id}")

@@ -27,4 +27,21 @@ public record WebPageResponse<T>(List<T> records,
                 navigation
         );
     }
+
+    public static <T> WebPageResponse<T> fromList(List<T> records) {
+        return fromList(records, null);
+    }
+
+    public static <T> WebPageResponse<T> fromList(List<T> records, Object navigation) {
+        List<T> safeRecords = records == null ? List.of() : List.copyOf(records);
+        return new WebPageResponse<>(
+                safeRecords,
+                safeRecords.size(),
+                1,
+                safeRecords.size(),
+                safeRecords.isEmpty() ? 0 : 1,
+                true,
+                navigation
+        );
+    }
 }

@@ -49,6 +49,13 @@ public interface FieldProtectionAbility<T extends EntityContract> extends CrudAb
                 .toList();
     }
 
+    @Override
+    default List<T> list(Criteria criteria, Sort... sorts) {
+        return getDao().list(activeCriteria(criteria), sorts).stream()
+                .peek(this::restoreProtectedFieldsFromStorage)
+                .toList();
+    }
+
     default FieldProtectionMutation protectFieldsForStorage(T entity) {
         FieldProtectionPlan<T> plan = fieldProtectionPlan();
         if (entity == null || plan.isEmpty()) {

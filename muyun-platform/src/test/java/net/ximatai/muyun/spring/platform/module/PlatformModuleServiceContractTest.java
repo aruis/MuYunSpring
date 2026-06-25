@@ -292,6 +292,14 @@ class PlatformModuleServiceContractTest {
         }
 
         @Override
+        public List<PlatformModule> list(Criteria criteria, Sort... sorts) {
+            return rows.values().stream()
+                    .filter(row -> matches(row, criteria))
+                    .sorted(Comparator.comparing(PlatformModule::getSortOrder, Comparator.nullsLast(Integer::compareTo)))
+                    .toList();
+        }
+
+        @Override
         public PageResult<PlatformModule> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
             List<PlatformModule> records = query(criteria, pageRequest, sorts);
             return PageResult.of(records, records.size(), pageRequest);

@@ -907,12 +907,24 @@ public class DynamicRecordService {
                 pageRequest, sorts));
     }
 
+    public List<DynamicRecord> list(String moduleAlias, String entityAlias, Criteria criteria, Sort... sorts) {
+        DataScopeCriteriaResult scope = readScope(moduleAlias, PlatformAction.QUERY, criteria);
+        return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(), sorts));
+    }
+
     public List<DynamicRecord> listSystem(String moduleAlias,
                                           String entityAlias,
                                           Criteria criteria,
                                           PageRequest pageRequest,
                                           Sort... sorts) {
         return entityService(moduleAlias, entityAlias).list(criteria, pageRequest, sorts);
+    }
+
+    public List<DynamicRecord> listSystem(String moduleAlias,
+                                          String entityAlias,
+                                          Criteria criteria,
+                                          Sort... sorts) {
+        return entityService(moduleAlias, entityAlias).list(criteria, sorts);
     }
 
     List<DynamicRecord> listForAction(String moduleAlias,
@@ -924,6 +936,15 @@ public class DynamicRecordService {
         DataScopeCriteriaResult scope = readScope(moduleAlias, action, criteria);
         return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(),
                 pageRequest, sorts));
+    }
+
+    List<DynamicRecord> listForAction(String moduleAlias,
+                                      String entityAlias,
+                                      PlatformAction action,
+                                      Criteria criteria,
+                                      Sort... sorts) {
+        DataScopeCriteriaResult scope = readScope(moduleAlias, action, criteria);
+        return withTenantScope(scope, () -> entityService(moduleAlias, entityAlias).list(scope.criteria(), sorts));
     }
 
     public PageResult<DynamicRecord> page(String moduleAlias, String entityAlias, Criteria criteria, PageRequest pageRequest, Sort... sorts) {

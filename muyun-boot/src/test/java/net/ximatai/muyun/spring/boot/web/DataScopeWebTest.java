@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class DataScopeWebTest {
@@ -60,6 +61,36 @@ class DataScopeWebTest {
             assertThat(viewed.getTitle()).isEqualTo("View record-1");
             assertThat(service.queryAction).isEqualTo(PlatformAction.QUERY);
             assertThat(service.viewAction).isEqualTo(PlatformAction.VIEW);
+        }
+    }
+
+    @Test
+    void crudWebShouldRejectUnpagedQueryUnlessControllerOptsIn() {
+        DataScopedCrudController controller = new DataScopedCrudController(new DataScopedCrudService());
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> controller.query(unpagedRequest(false)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("unpaged query is not supported");
+        }
+    }
+
+    @Test
+    void crudWebShouldDelegateUnpagedQueryOnlyAfterExplicitOptIn() {
+        DataScopedCrudService service = new DataScopedCrudService();
+        UnpagedDataScopedCrudController controller = new UnpagedDataScopedCrudController(service);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            WebPageResponse<DataScopedRecord> page = controller.query(unpagedRequest(false));
+
+            assertThat(page.records()).extracting(DataScopedRecord::getTitle).containsExactly("List");
+            assertThat(service.queryAction).isEqualTo(PlatformAction.QUERY);
+        }
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> controller.query(unpagedRequest(true)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("unpaged query navigation is not supported");
         }
     }
 
@@ -233,6 +264,14 @@ class DataScopeWebTest {
             DataScopedRecord record = new DataScopedRecord();
             record.setTitle("Query");
             return PageResult.of(List.of(record), 1, pageRequest);
+        }
+
+        @Override
+        public List<DataScopedRecord> listForAction(PlatformAction action, Criteria criteria, Sort... sorts) {
+            queryAction = action;
+            DataScopedRecord record = new DataScopedRecord();
+            record.setTitle("List");
+            return List.of(record);
         }
 
         @Override
@@ -418,6 +457,18 @@ class DataScopeWebTest {
         }
     }
 
+    private static final class UnpagedDataScopedCrudController extends WebSupport<DataScopedCrudService>
+            implements CrudWeb<DataScopedRecord, DataScopedCrudService> {
+        private UnpagedDataScopedCrudController(DataScopedCrudService service) {
+            this.service = service;
+        }
+
+        @Override
+        public boolean supportsUnpagedQuery() {
+            return true;
+        }
+    }
+
     private static final class DataScopedEnabledController extends WebSupport<DataScopedEnabledService>
             implements EnableWeb<DataScopedEnabledRecord, DataScopedEnabledService> {
         private DataScopedEnabledController(DataScopedEnabledService service) {
@@ -460,6 +511,11 @@ class DataScopeWebTest {
         record.setTitle(id);
         record.setSortOrder(100);
         return record;
+    }
+
+    private static WebQueryRequest unpagedRequest(boolean navigationSession) {
+        return new WebQueryRequest(null, true, List.of(), null, java.util.Map.of(), List.of(),
+                null, null, java.util.Map.of(), navigationSession, null, List.of(), null);
     }
 
     @SuppressWarnings("unchecked")

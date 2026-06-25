@@ -65,6 +65,11 @@ final class DynamicRecordViewDao<T extends DynamicRecordView> implements BaseDao
     }
 
     @Override
+    public List<T> list(Criteria criteria, Sort... sorts) {
+        return delegate.list(criteria, sorts).stream().map(wrapper).toList();
+    }
+
+    @Override
     public PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         PageResult<DynamicRecord> page = delegate.pageQuery(criteria, pageRequest, sorts);
         return PageResult.of(page.getRecords().stream().map(wrapper).toList(), page.getTotal(), pageRequest);

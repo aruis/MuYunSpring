@@ -239,6 +239,11 @@ class FieldProtectionAbilityTest {
         }
 
         @Override
+        public List<ProtectedDemoRecord> list(Criteria criteria, Sort... sorts) {
+            return rows.values().stream().map(this::copy).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        }
+
+        @Override
         public PageResult<ProtectedDemoRecord> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
             List<ProtectedDemoRecord> records = query(criteria, pageRequest, sorts);
             return PageResult.of(records, records.size(), pageRequest);

@@ -78,6 +78,14 @@ class TestMemoryDao<T extends EntityContract> implements BaseDao<T, String> {
     }
 
     @Override
+    public List<T> list(Criteria criteria, Sort... sorts) {
+        return rows.values().stream()
+                .filter(row -> matches(row, criteria))
+                .sorted(comparator(sorts))
+                .toList();
+    }
+
+    @Override
     public PageResult<T> pageQuery(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         List<T> records = query(criteria, pageRequest, sorts);
         return PageResult.of(records, records.size(), pageRequest);
