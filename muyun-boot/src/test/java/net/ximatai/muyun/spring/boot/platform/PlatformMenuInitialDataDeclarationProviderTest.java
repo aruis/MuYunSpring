@@ -8,7 +8,6 @@ import net.ximatai.muyun.spring.boot.iam.DepartmentWebController;
 import net.ximatai.muyun.spring.boot.iam.EmployeeWebController;
 import net.ximatai.muyun.spring.boot.iam.OrganizationWebController;
 import net.ximatai.muyun.spring.boot.iam.PositionCategoryWebController;
-import net.ximatai.muyun.spring.boot.iam.PositionWebController;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -276,8 +275,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         assertMenu(ApplicationWebController.class, PlatformMenuGroups.CONFIG, "应用管理", 10);
         assertMenu(OrganizationWebController.class, PlatformMenuGroups.IDENTITY, "", 20);
         assertMenu(DepartmentWebController.class, PlatformMenuGroups.IDENTITY, "", 30);
-        assertMenu(PositionCategoryWebController.class, PlatformMenuGroups.IDENTITY, "", 35);
-        assertMenu(PositionWebController.class, PlatformMenuGroups.IDENTITY, "", 40);
+        assertMenu(PositionCategoryWebController.class, PlatformMenuGroups.IDENTITY, "岗位管理", 40);
         assertMenu(EmployeeWebController.class, PlatformMenuGroups.IDENTITY, "", 50);
     }
 

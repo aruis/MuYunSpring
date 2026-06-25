@@ -84,7 +84,7 @@ class StaticModuleDefinitionScannerTest {
 
             assertThat(byAlias.keySet()).containsExactlyInAnyOrder(
                     "iam.tenant", "iam.organization", "iam.department", "iam.employee",
-                    "iam.position_category", "iam.position", "iam.role", "iam.user");
+                    "iam.position_category", "iam.role", "iam.user");
             assertThat(byAlias.get("iam.tenant")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("租户管理");
@@ -128,19 +128,23 @@ class StaticModuleDefinitionScannerTest {
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
             });
-            assertThat(byAlias.get("iam.position")).satisfies(definition -> {
-                assertThat(definition.applicationAlias()).isEqualTo("iam");
-                assertThat(definition.title()).isEqualTo("岗位管理");
-                assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
-                        .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "sort", "enable", "disable");
-            });
             assertThat(byAlias.get("iam.position_category")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
-                assertThat(definition.title()).isEqualTo("岗位分类");
+                assertThat(definition.title()).isEqualTo("岗位管理");
+                assertThat(definition.entryType()).isEqualTo(ModuleEntryType.ROUTE);
+                assertThat(definition.entryRoute()).isEqualTo("/iam/positions");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
-                                "tree", "sort", "enable", "disable");
+                                "tree", "sort", "enable", "disable",
+                                "position_create", "position_view", "position_update", "position_delete",
+                                "position_query", "position_sort", "position_enable", "position_disable");
+                assertThat(definition.actions())
+                        .filteredOn(action -> action.actionCode().equals("position_query"))
+                        .singleElement()
+                        .satisfies(action -> {
+                            assertThat(action.permissionActionCode()).isEqualTo("position_view");
+                            assertThat(action.title()).isEqualTo("查询岗位");
+                        });
             });
             assertThat(byAlias.get("iam.role")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");

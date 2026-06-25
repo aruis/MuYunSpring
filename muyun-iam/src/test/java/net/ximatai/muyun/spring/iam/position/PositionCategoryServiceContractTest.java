@@ -16,8 +16,7 @@ import static org.mockito.Mockito.when;
 class PositionCategoryServiceContractTest {
     @Test
     void shouldExposeStableModuleAlias() {
-        PositionCategoryService service = new PositionCategoryService(mock(PositionCategoryDao.class),
-                activeTenantVerifier());
+        PositionCategoryService service = service(mock(PositionCategoryDao.class));
 
         assertThat(service.getModuleAlias()).isEqualTo("iam.position_category");
     }
@@ -27,7 +26,7 @@ class PositionCategoryServiceContractTest {
         PositionCategoryDao dao = mock(PositionCategoryDao.class);
         when(dao.insert(any())).thenReturn("position-category-1");
         ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
-        PositionCategoryService service = new PositionCategoryService(dao, tenantVerifier);
+        PositionCategoryService service = new PositionCategoryService(dao, tenantVerifier, mock(PositionDao.class));
         PositionCategory category = category("TECH", "Technology");
         category.setDescription(" ");
 
@@ -44,8 +43,7 @@ class PositionCategoryServiceContractTest {
 
     @Test
     void shouldRequireTenantContextForPositionCategoryMutation() {
-        PositionCategoryService service = new PositionCategoryService(mock(PositionCategoryDao.class),
-                activeTenantVerifier());
+        PositionCategoryService service = service(mock(PositionCategoryDao.class));
 
         assertThatThrownBy(() -> service.insert(category("TECH", "Technology")))
                 .isInstanceOf(PlatformException.class)
@@ -54,8 +52,7 @@ class PositionCategoryServiceContractTest {
 
     @Test
     void shouldRequirePositionCategoryCodeAndTitle() {
-        PositionCategoryService service = new PositionCategoryService(mock(PositionCategoryDao.class),
-                activeTenantVerifier());
+        PositionCategoryService service = service(mock(PositionCategoryDao.class));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             assertThatThrownBy(() -> service.insert(category(" ", "Technology")))
@@ -67,6 +64,40 @@ class PositionCategoryServiceContractTest {
         }
     }
 
+    @Test
+    void shouldRejectDeletingPositionCategoryReferencedByPositions() {
+        PositionCategoryDao categoryDao = mock(PositionCategoryDao.class);
+        PositionDao positionDao = mock(PositionDao.class);
+        when(positionDao.count(any())).thenReturn(1L);
+        PositionCategoryService service = new PositionCategoryService(categoryDao,
+                activeTenantVerifier(), positionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeDelete("category-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("position category is referenced by positions");
+        }
+
+        verify(positionDao).count(any());
+    }
+
+    @Test
+    void shouldRejectDeletingPositionCategoryWithChildCategories() {
+        PositionCategoryDao categoryDao = mock(PositionCategoryDao.class);
+        when(categoryDao.count(any())).thenReturn(1L);
+        PositionDao positionDao = mock(PositionDao.class);
+        PositionCategoryService service = new PositionCategoryService(categoryDao,
+                activeTenantVerifier(), positionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeDelete("category-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("position category has child categories");
+        }
+
+        verify(categoryDao).count(any());
+    }
+
     private PositionCategory category(String code, String title) {
         PositionCategory category = new PositionCategory();
         category.setCode(code);
@@ -76,5 +107,9 @@ class PositionCategoryServiceContractTest {
 
     private ActiveTenantVerifier activeTenantVerifier() {
         return mock(ActiveTenantVerifier.class);
+    }
+
+    private PositionCategoryService service(PositionCategoryDao categoryDao) {
+        return new PositionCategoryService(categoryDao, activeTenantVerifier(), mock(PositionDao.class));
     }
 }

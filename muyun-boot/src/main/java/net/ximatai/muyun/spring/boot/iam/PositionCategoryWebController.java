@@ -13,8 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.position_category", title = "岗位分类")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 35)
+@PlatformStaticModule(application = "iam", alias = "iam.position_category", title = "岗位管理",
+        route = "/iam/positions")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "岗位管理", order = 40)
 @RequestMapping("/iam.position_category")
 public class PositionCategoryWebController extends WebSupport<PositionCategoryService> implements
         CrudWeb<PositionCategory, PositionCategoryService>,

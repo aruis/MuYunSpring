@@ -26,6 +26,12 @@ class PositionModelSchemaTest {
                     assertThat(column.getLength()).isEqualTo(64);
                     assertThat(column.isNullable()).isFalse();
                 });
+        assertThat(table.getColumns().stream().filter(column -> "category_id".equals(column.getName())).findFirst())
+                .get()
+                .satisfies(column -> {
+                    assertThat(column.getLength()).isEqualTo(32);
+                    assertThat(column.isNullable()).isFalse();
+                });
         assertThat(table.getIndexes())
                 .anySatisfy(index -> {
                     assertThat(index.isUnique()).isTrue();
