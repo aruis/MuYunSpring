@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -26,7 +27,8 @@ import java.util.Optional;
 public class PlatformModuleActionService extends AbstractAbilityService<PlatformModuleAction> implements
         SoftDeleteAbility<PlatformModuleAction>,
         EnableAbility<PlatformModuleAction>,
-        SortAbility<PlatformModuleAction> {
+        SortAbility<PlatformModuleAction>,
+        PlatformManagedProtectionAbility<PlatformModuleAction> {
     public static final String MODULE_ALIAS = "platform.module_action";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 

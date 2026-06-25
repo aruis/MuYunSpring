@@ -4,12 +4,14 @@ import net.ximatai.muyun.database.core.IDatabaseOperations;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.metadata.DBInfo;
+import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.spring.ability.event.RuntimeEvent;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventListener;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventMulticaster;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventType;
 import net.ximatai.muyun.spring.ability.event.RuntimeMutationSource;
+import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.common.time.BusinessCalendarService;
 import net.ximatai.muyun.spring.common.time.BusinessTimeContext;
 import net.ximatai.muyun.spring.common.time.BusinessTimeZoneResolver;
@@ -23,6 +25,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationCoordinator
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
+import net.ximatai.muyun.spring.dynamic.schema.DynamicSchemaService;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -36,6 +39,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -271,6 +275,43 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
     }
 
     @Test
+    void shouldConfigureDynamicSchemaServiceWithProductionStrictDefault() {
+        contextRunner.run(context -> {
+            PlatformSchemaMigrationPolicy policy = migrationPolicy(context.getBean(DynamicSchemaService.class));
+
+            MigrationOptions options = policy.defaultOptions();
+
+            assertThat(options.isStrict()).isTrue();
+            assertThat(options.isDryRun()).isFalse();
+        });
+    }
+
+    @Test
+    void shouldConfigureDynamicSchemaServiceWithDevelopmentExecuteDefault() {
+        contextRunner.withPropertyValues("muyun.runtime.mode=development")
+                .run(context -> {
+                    PlatformSchemaMigrationPolicy policy = migrationPolicy(context.getBean(DynamicSchemaService.class));
+
+                    MigrationOptions options = policy.defaultOptions();
+
+                    assertThat(options.isStrict()).isFalse();
+                    assertThat(options.isDryRun()).isFalse();
+                });
+    }
+
+    @Test
+    void shouldKeepExplicitMigrationOptionsBeforeRuntimeModeDefault() {
+        contextRunner.run(context -> {
+            PlatformSchemaMigrationPolicy policy = migrationPolicy(context.getBean(DynamicSchemaService.class));
+
+            MigrationOptions options = policy.resolve(MigrationOptions.dryRun());
+
+            assertThat(options.isStrict()).isFalse();
+            assertThat(options.isDryRun()).isTrue();
+        });
+    }
+
+    @Test
     void shouldApplyConfiguredDefaultZoneToDynamicRuntimeQueries() {
         contextRunner
                 .withBean(Clock.class, () -> Clock.fixed(Instant.parse("2026-06-17T00:00:00Z"), ZoneOffset.UTC))
@@ -340,6 +381,16 @@ class MuYunSpringDynamicRuntimeConfigurationTest {
                 "deleted", Boolean.FALSE,
                 "version", 0
         );
+    }
+
+    private PlatformSchemaMigrationPolicy migrationPolicy(DynamicSchemaService schemaService) {
+        try {
+            Field field = DynamicSchemaService.class.getDeclaredField("migrationPolicy");
+            field.setAccessible(true);
+            return (PlatformSchemaMigrationPolicy) field.get(schemaService);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("DynamicSchemaService migration policy is not inspectable", e);
+        }
     }
 
     @Configuration(proxyBeanMethods = false)

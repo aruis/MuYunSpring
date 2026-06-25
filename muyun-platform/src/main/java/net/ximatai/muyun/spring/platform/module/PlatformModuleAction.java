@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
+import net.ximatai.muyun.spring.common.model.capability.PlatformManagedCapable;
 import net.ximatai.muyun.spring.common.platform.ActionDefaultGrantPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionCategory;
@@ -19,7 +20,7 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityActionLevel;
 @Setter
 @Table(name = "platform_module_action", comment = "Platform module action")
 @CompositeIndex(columns = {"module_alias", "action_code"}, unique = true)
-public class PlatformModuleAction extends StandardEnabledSortableEntity {
+public class PlatformModuleAction extends StandardEnabledSortableEntity implements PlatformManagedCapable {
     @Column(name = "module_alias", type = ColumnType.VARCHAR, length = 128, nullable = false, comment = "Module alias")
     private String moduleAlias;
 

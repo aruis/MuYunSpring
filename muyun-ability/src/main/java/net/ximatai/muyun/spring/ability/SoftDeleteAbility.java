@@ -77,6 +77,7 @@ public interface SoftDeleteAbility<T extends EntityContract> extends CrudAbility
         if (isSoftDeleted(entity)) {
             return 0;
         }
+        PlatformManagedMutationGuard.beforeDelete(this, entity);
         if (expectedVersion != null && !expectedVersion.equals(entity.getVersion())) {
             throw new OptimisticLockException("record version conflict: " + id);
         }

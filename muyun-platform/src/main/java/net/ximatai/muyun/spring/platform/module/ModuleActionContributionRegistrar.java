@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.platform.module;
 
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.stereotype.Service;
@@ -42,11 +43,13 @@ public class ModuleActionContributionRegistrar {
                             contribution -> new ContributionSource(contribution.sourceType(), contribution.sourceId()),
                             LinkedHashMap::new,
                             java.util.stream.Collectors.toList()));
-            for (List<ModuleActionContribution> sourceContributions : bySource.values()) {
-                sourceContributions.forEach(this::validateContribution);
-                disableStaleActions(sourceContributions);
-                sourceContributions.forEach(this::upsert);
-            }
+            PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                for (List<ModuleActionContribution> sourceContributions : bySource.values()) {
+                    sourceContributions.forEach(this::validateContribution);
+                    disableStaleActions(sourceContributions);
+                    sourceContributions.forEach(this::upsert);
+                }
+            });
         }
     }
 
@@ -74,13 +77,15 @@ public class ModuleActionContributionRegistrar {
             return;
         }
         try (TenantContext.Scope ignored = TenantContext.system("disable contributed module actions")) {
-            for (PlatformModuleAction action : actionService.listBySource(sourceType, sourceId)) {
-                if (Boolean.FALSE.equals(action.getEnabled())) {
-                    continue;
+            PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                for (PlatformModuleAction action : actionService.listBySource(sourceType, sourceId)) {
+                    if (Boolean.FALSE.equals(action.getEnabled())) {
+                        continue;
+                    }
+                    action.setEnabled(Boolean.FALSE);
+                    actionService.update(action);
                 }
-                action.setEnabled(Boolean.FALSE);
-                actionService.update(action);
-            }
+            });
         }
     }
 

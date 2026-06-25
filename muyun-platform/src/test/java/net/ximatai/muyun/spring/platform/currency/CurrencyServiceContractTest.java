@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.currency;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
@@ -133,6 +134,49 @@ class CurrencyServiceContractTest {
         assertThatThrownBy(() -> rateTypeService.requireEnabledRateType("SPOT"))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void shouldProtectSystemManagedExchangeRateTypeFromOrdinaryMutation() {
+        ExchangeRateType managed = rateType("spot", "Spot");
+        managed.setSystemManaged(Boolean.TRUE);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> rateTypeService.insert(managed));
+
+        ExchangeRateType protectedUpdate = new ExchangeRateType();
+        protectedUpdate.setId(managed.getId());
+        protectedUpdate.setVersion(managed.getVersion());
+        protectedUpdate.setCode("SPOT");
+        protectedUpdate.setTitle("Changed");
+
+        assertThatThrownBy(() -> rateTypeService.update(protectedUpdate))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+        assertThatThrownBy(() -> rateTypeService.delete(managed.getId()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+    }
+
+    @Test
+    void shouldAllowOrdinaryEnabledAndSortUpdateOnSystemManagedExchangeRateType() {
+        ExchangeRateType managed = rateType("spot", "Spot");
+        managed.setSystemManaged(Boolean.TRUE);
+        managed.setSortOrder(10);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> rateTypeService.insert(managed));
+
+        ExchangeRateType update = new ExchangeRateType();
+        update.setId(managed.getId());
+        update.setVersion(managed.getVersion());
+        update.setEnabled(Boolean.FALSE);
+        update.setSortOrder(20);
+
+        assertThat(rateTypeService.update(update)).isEqualTo(1);
+
+        ExchangeRateType selected = rateTypeService.select(managed.getId());
+        assertThat(selected.getEnabled()).isFalse();
+        assertThat(selected.getSortOrder()).isEqualTo(20);
+        assertThat(selected.getCode()).isEqualTo("SPOT");
+        assertThat(selected.getTitle()).isEqualTo("Spot");
+        assertThat(selected.getSystemManaged()).isTrue();
     }
 
     @Test

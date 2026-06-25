@@ -24,32 +24,51 @@ class PlatformDynamicRuntimeRefreshServiceTest {
     void shouldExposeRefreshFacadeWithoutCreatingSeparateLifecycleConcept() {
         PlatformDynamicRuntimeRefresher refresher = mock(PlatformDynamicRuntimeRefresher.class);
         DynamicModuleRefreshResult refreshed = result(false);
+        DynamicModuleRefreshResult executed = result(false);
         DynamicModuleRefreshResult preview = result(true);
         when(refresher.refresh("crm.contract")).thenReturn(refreshed);
+        when(refresher.executeRefresh("crm.contract")).thenReturn(executed);
         when(refresher.previewRefresh("crm.contract")).thenReturn(preview);
         PlatformDynamicRuntimeRefreshService service = new PlatformDynamicRuntimeRefreshService(refresher);
 
         assertThat(service.refresh("crm.contract")).isSameAs(refreshed);
+        assertThat(service.executeRefresh("crm.contract")).isSameAs(executed);
         assertThat(service.previewRefresh("crm.contract")).isSameAs(preview);
 
         verify(refresher).refresh("crm.contract");
+        verify(refresher).executeRefresh("crm.contract");
         verify(refresher).previewRefresh("crm.contract");
     }
 
     @Test
-    void shouldUseExecuteMigrationOptionsForRefresh() {
+    void shouldUseRuntimeDefaultMigrationOptionsForRefresh() {
+        PlatformModuleDefinitionCompiler compiler = mock(PlatformModuleDefinitionCompiler.class);
+        DynamicModuleRuntimeRefresher dynamicRefresher = mock(DynamicModuleRuntimeRefresher.class);
+        when(compiler.compile("crm.contract")).thenReturn(module);
+        when(dynamicRefresher.refresh(module)).thenReturn(result(false));
+        PlatformDynamicRuntimeRefresher refresher = new PlatformDynamicRuntimeRefresher(compiler, dynamicRefresher);
+
+        DynamicModuleRefreshResult result = refresher.refresh("crm.contract");
+
+        verify(dynamicRefresher).refresh(module);
+        assertThat(result.dryRun()).isFalse();
+    }
+
+    @Test
+    void shouldUseExecuteMigrationOptionsForExecuteRefresh() {
         PlatformModuleDefinitionCompiler compiler = mock(PlatformModuleDefinitionCompiler.class);
         DynamicModuleRuntimeRefresher dynamicRefresher = mock(DynamicModuleRuntimeRefresher.class);
         when(compiler.compile("crm.contract")).thenReturn(module);
         when(dynamicRefresher.refresh(eq(module), any(MigrationOptions.class))).thenReturn(result(false));
         PlatformDynamicRuntimeRefresher refresher = new PlatformDynamicRuntimeRefresher(compiler, dynamicRefresher);
 
-        DynamicModuleRefreshResult result = refresher.refresh("crm.contract");
+        DynamicModuleRefreshResult result = refresher.executeRefresh("crm.contract");
 
         ArgumentCaptor<MigrationOptions> optionsCaptor = ArgumentCaptor.forClass(MigrationOptions.class);
         verify(dynamicRefresher).refresh(eq(module), optionsCaptor.capture());
         assertThat(result.dryRun()).isFalse();
         assertThat(optionsCaptor.getValue().isDryRun()).isFalse();
+        assertThat(optionsCaptor.getValue().isStrict()).isFalse();
     }
 
     @Test

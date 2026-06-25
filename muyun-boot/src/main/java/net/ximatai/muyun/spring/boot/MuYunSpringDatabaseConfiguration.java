@@ -5,7 +5,11 @@ import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.database.core.orm.EntityMetaResolver;
 import net.ximatai.muyun.database.core.orm.SimpleEntityManager;
 import net.ximatai.muyun.database.spring.boot.JdbiConfigurer;
+import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeModeProvider;
 import net.ximatai.muyun.spring.common.schema.PlatformEntityManagers;
+import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
+import net.ximatai.muyun.spring.common.schema.StaticEntityTableMapper;
+import net.ximatai.muyun.spring.common.schema.StaticSchemaService;
 import net.ximatai.muyun.spring.platform.code.CodeRecycleConsumer;
 import net.ximatai.muyun.spring.platform.code.CodeSequenceAllocator;
 import net.ximatai.muyun.spring.platform.code.PostgresCodeRecycleConsumer;
@@ -24,7 +28,7 @@ import java.math.BigInteger;
 import java.sql.Types;
 
 @Configuration(proxyBeanMethods = false)
-@Import(MuYunSpringDatabaseValueConversionConfiguration.class)
+@Import({MuYunSpringDatabaseValueConversionConfiguration.class, MuYunSpringRuntimeConfiguration.class})
 public class MuYunSpringDatabaseConfiguration {
     @Bean
     @ConditionalOnMissingBean
@@ -38,6 +42,15 @@ public class MuYunSpringDatabaseConfiguration {
                                             EntityMetaResolver entityMetaResolver,
                                             DatabaseValueConverter databaseValueConverter) {
         return PlatformEntityManagers.simpleEntityManager(operations, entityMetaResolver, databaseValueConverter);
+    }
+
+    @Bean
+    @ConditionalOnBean(IDatabaseOperations.class)
+    @ConditionalOnMissingBean
+    StaticSchemaService staticSchemaService(IDatabaseOperations<?> operations,
+                                            PlatformRuntimeModeProvider runtimeModeProvider) {
+        return new StaticSchemaService(operations, new StaticEntityTableMapper(),
+                new PlatformSchemaMigrationPolicy(runtimeModeProvider));
     }
 
     @Bean

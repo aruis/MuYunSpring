@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.boot.iam.PlatformRoleActionGrantVerifier;
 import net.ximatai.muyun.spring.boot.iam.PlatformSuperAdminAuthorizationInitialDataDeclarationProvider;
@@ -174,25 +175,29 @@ class PlatformSuperAdminAuthorizationInitialDataDeclarationProviderTest {
                                       boolean dataAuth) {
         try (TenantContext.Scope ignored = TenantContext.system("register test module action")) {
             if (moduleService.select(moduleAlias) == null) {
-                PlatformModule module = new PlatformModule();
-                module.setAlias(moduleAlias);
-                module.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
-                module.setTitle(moduleTitle);
-                module.setModuleKind(ModuleKind.STATIC);
-                module.setSystemManaged(Boolean.TRUE);
-                moduleService.insert(module);
+                PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                    PlatformModule module = new PlatformModule();
+                    module.setAlias(moduleAlias);
+                    module.setApplicationAlias(moduleAlias.substring(0, moduleAlias.indexOf('.')));
+                    module.setTitle(moduleTitle);
+                    module.setModuleKind(ModuleKind.STATIC);
+                    module.setSystemManaged(Boolean.TRUE);
+                    moduleService.insert(module);
+                });
             }
 
-            PlatformModuleAction action = new PlatformModuleAction();
-            action.setModuleAlias(moduleAlias);
-            action.setActionCode(actionCode);
-            action.setPermissionActionCode(permissionActionCode);
-            action.setTitle(actionCode);
-            action.setActionAuth(Boolean.TRUE);
-            action.setDataAuth(dataAuth);
-            action.setEnabled(Boolean.TRUE);
-            action.setSystemManaged(Boolean.TRUE);
-            moduleActionService.insert(action);
+            PlatformManagedMutationContext.runAsPlatformManaged(() -> {
+                PlatformModuleAction action = new PlatformModuleAction();
+                action.setModuleAlias(moduleAlias);
+                action.setActionCode(actionCode);
+                action.setPermissionActionCode(permissionActionCode);
+                action.setTitle(actionCode);
+                action.setActionAuth(Boolean.TRUE);
+                action.setDataAuth(dataAuth);
+                action.setEnabled(Boolean.TRUE);
+                action.setSystemManaged(Boolean.TRUE);
+                moduleActionService.insert(action);
+            });
         }
     }
 

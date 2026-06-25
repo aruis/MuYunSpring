@@ -43,6 +43,12 @@
 | [外部写入接入边界](EXTERNAL_WRITE_BOUNDARY.md) | 说明外部写入应复用标准模块动作、权限、租户、校验、生命周期和运行审计；幂等、回执、重试和报文治理按触发条件后续建设。 |
 | [后台任务与异步批次边界](BACKGROUND_JOB_AND_BATCH_BOUNDARY.md) | 说明同步批量动作、异步导入、补偿任务、进度查询、重试和批次模型的建设触发条件。 |
 
+## 平台运行模式
+
+平台运行模式通过 `muyun.runtime.mode` 配置，当前只区分 `development` 和 `production`，未配置时默认 `production`。
+
+运行模式只提供平台治理默认值，不替代具体能力的显式边界。当前 schema migration 默认策略是：开发态默认 execute，产品态默认 strict execute；调用方显式传入 `MigrationOptions` 时以显式选项为准。元数据结构保存、动态模块 refresh 和平台级 schema ensure 应沿用该默认策略；preview refresh 始终 dry-run。平台托管数据修改仍以 `PlatformManagedMutationContext`、租户系统态和对应 Ability 契约为准，不因为运行模式切换而放开。
+
 ## 写作原则
 
 1. 以业务能力梳理为主，少写实现细节。

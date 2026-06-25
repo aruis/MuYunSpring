@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataPhase;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataPolicy;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -138,7 +139,7 @@ public class InitialDataExecutor {
         InitialDataRecord<T> record = declaration.record();
         T existing = declaration.existing();
         if (existing == null) {
-            declaration.insert();
+            PlatformManagedMutationContext.runAsPlatformManaged(declaration::insert);
             return new InitialDataResult(record.key(), record.policy(), InitialDataStatus.INSERTED, List.of());
         }
         rejectSoftDeleted(record, existing);
@@ -152,7 +153,7 @@ public class InitialDataExecutor {
             return new InitialDataResult(record.key(), record.policy(), InitialDataStatus.UNCHANGED, List.of());
         }
         copyManagedFields(record, existing);
-        declaration.update(existing);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> declaration.update(existing));
         return new InitialDataResult(record.key(), record.policy(), InitialDataStatus.UPDATED, changedFields);
     }
 

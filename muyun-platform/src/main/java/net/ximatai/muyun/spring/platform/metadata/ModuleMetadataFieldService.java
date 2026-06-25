@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.platform.metadata;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
@@ -556,7 +557,7 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 || role == MetadataFieldRole.MONEY_BASE_AMOUNT
                 || role == MetadataFieldRole.MONEY_EXCHANGE_RATE);
         field.setSortOrder(nextSortOrder(metadata.getId()));
-        String id = fieldService.insert(field);
+        String id = PlatformManagedMutationContext.runAsPlatformManaged(() -> fieldService.insert(field));
         return fieldService.select(id);
     }
 

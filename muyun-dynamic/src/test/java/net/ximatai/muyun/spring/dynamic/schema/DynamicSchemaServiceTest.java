@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.dynamic.schema;
 
 import net.ximatai.muyun.database.core.orm.MigrationOptions;
 import net.ximatai.muyun.database.core.orm.MigrationResult;
+import net.ximatai.muyun.spring.common.runtime.PlatformRuntimeMode;
+import net.ximatai.muyun.spring.common.schema.PlatformSchemaMigrationPolicy;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
@@ -77,6 +79,22 @@ class DynamicSchemaServiceTest {
         assertThat(service.ensuredEntities).containsExactly("contract", "invoice");
     }
 
+    @Test
+    void shouldResolveDefaultMigrationOptionsFromPolicy() {
+        CapturingDynamicSchemaService service = new CapturingDynamicSchemaService(
+                new PlatformSchemaMigrationPolicy(() -> PlatformRuntimeMode.PRODUCTION));
+
+        service.ensureModule(new ModuleDefinition(
+                "contract.app",
+                "Contract App",
+                List.of(entity("contract", "app_contract"))
+        ));
+
+        assertThat(service.capturedOptions).isNotNull();
+        assertThat(service.capturedOptions.isStrict()).isTrue();
+        assertThat(service.capturedOptions.isDryRun()).isFalse();
+    }
+
     private EntityDefinition entity(String code, String tableName) {
         return new EntityDefinition(
                 code,
@@ -119,6 +137,23 @@ class DynamicSchemaServiceTest {
                 throw new IllegalStateException("schema failed");
             }
             return new MigrationResult(true, false, false, List.of());
+        }
+    }
+
+    private static class CapturingDynamicSchemaService extends DynamicSchemaService {
+        private MigrationOptions capturedOptions;
+
+        CapturingDynamicSchemaService(PlatformSchemaMigrationPolicy migrationPolicy) {
+            super(null, new DynamicTableMapper(), new net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinitionValidator(),
+                    migrationPolicy);
+        }
+
+        @Override
+        public MigrationResult ensureTable(EntityDefinition entity,
+                                           EntityDefinition previousEntity,
+                                           MigrationOptions options) {
+            capturedOptions = options;
+            return new MigrationResult(false, options.isDryRun(), false, List.of());
         }
     }
 }

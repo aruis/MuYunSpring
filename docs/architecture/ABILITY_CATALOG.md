@@ -28,10 +28,21 @@
 | `SoftDeleteAbility` | 统一软删除写入、默认过滤和忽略软删读取 | `EntityContract.deleted/deletedAt` | 默认读写隐藏已删除数据；确需读取已删除数据时使用明确的 RAW/ignore 入口。 |
 | `EnableAbility` | 统一启用、停用、启用校验和启用条件构造 | `EnabledCapable.enabled` | 启停不是默认过滤条件；业务需要时显式调用 `enabledCriteria` 或 `requireEnabled`。 |
 | `SystemManagedAbility` | 限制系统级配置只能在系统态维护 | `TenantContext.system(reason)` | 适合租户、应用、平台模块等系统态配置；写入前可做 `normalizeBeforeMutation`。 |
+| `PlatformManagedProtectionAbility` | 保护平台托管记录，限制普通运行态创建、删除和核心字段修改 | `PlatformManagedCapable.systemManaged`、`PlatformManagedMutationContext` | 适合模块动作、元数据标准字段等由平台贡献或初始化数据维护的记录；普通入口默认只允许启停和排序，平台同步应显式进入托管 mutation context。 |
 | `TenantActiveScopedAbility` | 限制租户内业务写入必须处于有效租户上下文 | `TenantContext.currentTenantId()`、`ActiveTenantVerifier` | 写入前会要求租户上下文并校验租户有效；适合组织、部门等租户内业务。 |
 | `TenantActiveScopedService` | 收口租户内业务 Service 对 `ActiveTenantVerifier` 的样板依赖 | `AbstractAbilityService`、`TenantActiveScopedAbility` | 后续租户内静态 Service 优先继承它，而不是重复声明 verifier 字段和转发方法。 |
 | `TenantStandardBusinessService` | 在租户有效性校验基础上收口租户内业务保存 hook 模板 | `TenantActiveScopedService` | 适合部门、职员等租户内标准业务，业务只补规范化和业务校验，不重复写租户校验链路。 |
 | `GlobalScopedAbility` | 表达不受当前租户过滤影响的全局配置读取 | `SoftDeleteAbility` | 适合租户自身、平台全局配置等；不要用于普通租户业务绕过隔离。 |
+
+`SystemManagedAbility`、`PlatformManagedProtectionAbility` 和 `InitialDataAbility` 表达不同边界：
+
+- `SystemManagedAbility` 是 service 级写入门禁，要求写入口处于系统态。
+- `PlatformManagedProtectionAbility` 是 record 级运行态保护，保护已由平台贡献、生成或初始化维护的 `systemManaged` 记录。
+- `InitialDataAbility` 是启动和同步时的期望数据校准能力；执行托管记录写入时应显式进入 `PlatformManagedMutationContext`。
+
+接入 `PlatformManagedProtectionAbility` 时，模型应实现 `PlatformManagedCapable` 并复用 `systemManaged` 字段。普通入口默认只允许 `enabled` 和 `sortOrder`，不要把业务身份、来源、绑定、权限语义或物理结构字段加入默认白名单。确有领域内平台派生记录需要由普通业务动作创建时，应由具体 service 覆盖 `allowOrdinaryPlatformManagedInsert` 并收窄到明确字段角色或来源。
+
+平台运行模式由 `PlatformRuntimeModeProvider` 读取，当前只区分 `DEVELOPMENT` 和 `PRODUCTION`，Spring Boot 配置项为 `muyun.runtime.mode`，未配置时默认 `PRODUCTION`。运行模式只作为平台治理策略的默认输入，例如 schema migration 默认选项、配置包、调试接口和安全默认值；它不替代 `TenantContext.system(...)`、`PlatformManagedMutationContext` 或具体 Ability 的显式边界。Schema migration 在开发态默认 execute，在产品态默认 strict execute；显式传入的 `MigrationOptions` 优先。
 
 ## 结构能力
 

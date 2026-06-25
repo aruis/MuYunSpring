@@ -7,12 +7,13 @@ import net.ximatai.muyun.database.core.annotation.Default;
 import net.ximatai.muyun.database.core.annotation.Table;
 import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
+import net.ximatai.muyun.spring.common.model.capability.PlatformManagedCapable;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 
 @Getter
 @Setter
 @Table(name = "platform_metadata_field", comment = "Platform metadata field")
-public class MetadataField extends StandardEnabledSortableEntity {
+public class MetadataField extends StandardEnabledSortableEntity implements PlatformManagedCapable {
     @Column(name = "metadata_id", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Metadata id")
     private String metadataId;
 

@@ -9,6 +9,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.ability.PlatformManagedMutationContext;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
@@ -180,6 +181,49 @@ class PlatformModuleServiceContractTest {
         assertThatThrownBy(() -> service.reorder(List.of("crm.customer", "crm.customer.profile")))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same parent");
+    }
+
+    @Test
+    void shouldProtectSystemManagedModuleFromOrdinaryMutation() {
+        PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
+        PlatformModule managed = module("crm.customer", "crm");
+        managed.setSystemManaged(Boolean.TRUE);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> service.insert(managed));
+
+        PlatformModule protectedUpdate = new PlatformModule();
+        protectedUpdate.setAlias(managed.getAlias());
+        protectedUpdate.setVersion(managed.getVersion());
+        protectedUpdate.setApplicationAlias("crm");
+        protectedUpdate.setTitle("Changed");
+
+        assertThatThrownBy(() -> service.update(protectedUpdate))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+        assertThatThrownBy(() -> service.delete(managed.getAlias()))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("platform-managed");
+    }
+
+    @Test
+    void shouldAllowOrdinaryEnabledAndSortUpdateOnSystemManagedModule() {
+        PlatformModuleService service = new PlatformModuleService(new ModuleMemoryDao());
+        PlatformModule managed = module("crm.customer", "crm");
+        managed.setSystemManaged(Boolean.TRUE);
+        PlatformManagedMutationContext.runAsPlatformManaged(() -> service.insert(managed));
+
+        PlatformModule update = new PlatformModule();
+        update.setAlias(managed.getAlias());
+        update.setVersion(managed.getVersion());
+        update.setEnabled(Boolean.FALSE);
+        update.setSortOrder(50);
+
+        assertThat(service.update(update)).isEqualTo(1);
+
+        PlatformModule selected = service.select(managed.getAlias());
+        assertThat(selected.getEnabled()).isFalse();
+        assertThat(selected.getSortOrder()).isEqualTo(50);
+        assertThat(selected.getTitle()).isEqualTo("crm.customer");
+        assertThat(selected.getSystemManaged()).isTrue();
     }
 
     private PlatformModule module(String alias, String applicationAlias) {
