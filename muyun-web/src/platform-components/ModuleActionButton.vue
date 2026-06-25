@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ModuleContext } from '@muyun/web-core';
-import { UiButton } from '@muyun/vue-ui-antdv';
+import { UiButton, type UiIconName } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'ModuleActionButton' });
 
@@ -15,6 +15,8 @@ const props = withDefaults(
     primary?: boolean;
     danger?: boolean;
     title?: string;
+    iconName?: UiIconName;
+    iconOnly?: boolean;
   }>(),
   {
     type: 'button',
@@ -23,6 +25,8 @@ const props = withDefaults(
     primary: false,
     danger: false,
     title: undefined,
+    iconName: undefined,
+    iconOnly: false,
   },
 );
 
@@ -42,6 +46,23 @@ function handleClick(event: MouseEvent) {
   }
   emit('click', event);
 }
+
+function defaultIconName(actionCode: string): UiIconName | undefined {
+  const operation = actionCode.split('_').at(-1) ?? actionCode;
+  if (operation === 'create') {
+    return 'plus';
+  }
+  if (operation === 'update') {
+    return 'edit';
+  }
+  if (operation === 'delete') {
+    return 'delete';
+  }
+  if (operation === 'enable' || operation === 'disable') {
+    return 'power';
+  }
+  return undefined;
+}
 </script>
 
 <template>
@@ -51,9 +72,12 @@ function handleClick(event: MouseEvent) {
     :disabled="buttonDisabled"
     :loading="loading"
     :danger="danger"
+    :icon-name="iconName ?? defaultIconName(actionCode)"
     :title="buttonTitle"
     @click="handleClick"
   >
-    <slot>{{ action?.title ?? actionCode }}</slot>
+    <template v-if="!iconOnly">
+      <slot>{{ action?.title ?? actionCode }}</slot>
+    </template>
   </UiButton>
 </template>

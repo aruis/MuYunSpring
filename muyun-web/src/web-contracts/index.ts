@@ -255,12 +255,25 @@ export interface WebPageRequest {
   pageSize: number;
 }
 
+export interface WebQueryCondition {
+  fieldName: string;
+  operator?: string;
+  values?: unknown[];
+  timeZone?: string;
+}
+
+export interface WebSort {
+  field: string;
+  desc?: boolean;
+}
+
 export interface WebQueryRequest {
   page?: WebPageRequest;
-  conditions?: unknown[];
+  unpaged?: boolean;
+  conditions?: WebQueryCondition[];
   criteria?: unknown;
   queryForm?: Record<string, unknown>;
-  sorts?: unknown[];
+  sorts?: WebSort[];
   quickSearch?: string;
   quickSearchFields?: string[];
 }
@@ -307,6 +320,17 @@ export interface Application extends StandardEnabledSortableEntity {
 
 export interface Tenant extends StandardEnabledSortableEntity {
   alias?: string;
+}
+
+export interface PositionCategory extends StandardEnabledTreeEntity {
+  code?: string;
+  description?: string;
+}
+
+export interface Position extends StandardEnabledSortableEntity {
+  categoryId?: string;
+  code?: string;
+  description?: string;
 }
 
 export interface TreeSortRequest {

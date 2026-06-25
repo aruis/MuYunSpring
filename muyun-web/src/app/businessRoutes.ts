@@ -2,6 +2,7 @@ import type { Component } from 'vue';
 import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } from '@muyun/web-contracts';
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
+import PositionManagementView from '../views/PositionManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
 
 export interface StaticBusinessRoute {
@@ -26,9 +27,14 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     moduleAlias: 'iam.organization',
     component: OrganizationManagementView,
   },
+  {
+    route: '/iam/positions',
+    moduleAlias: 'iam.position_category',
+    component: PositionManagementView,
+  },
 ];
 
-export const businessRoutePrefixes = staticBusinessRoutes.map((route) => route.route);
+export const businessRoutePrefixes = Array.from(new Set(staticBusinessRoutes.map((route) => route.route)));
 export const businessModuleRoutes = Object.fromEntries(
   staticBusinessRoutes.map((route) => [route.moduleAlias, route.route]),
 );

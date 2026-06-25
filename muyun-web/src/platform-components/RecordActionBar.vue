@@ -11,9 +11,11 @@ const props = withDefaults(
     context: ModuleContext<unknown>;
     actions: RecordActionItem[];
     loading?: boolean;
+    size?: 'default' | 'compact';
   }>(),
   {
     loading: false,
+    size: 'default',
   },
 );
 
@@ -29,14 +31,15 @@ function handleClick(action: RecordActionItem, event: MouseEvent) {
 </script>
 
 <template>
-  <div class="record-action-bar">
+  <div class="record-action-bar" :class="{ compact: size === 'compact' }">
     <UiButton
       v-for="action in resolvedActions"
       :key="action.key"
-      :type="action.primary ? 'primary' : 'default'"
+      :type="action.primary ? 'primary' : size === 'compact' && !action.danger ? 'text' : 'default'"
       :disabled="action.disabled"
       :loading="action.loading"
       :danger="action.danger"
+      :icon-name="action.iconName"
       @click="handleClick(action, $event)"
     >
       {{ action.title }}
@@ -50,5 +53,20 @@ function handleClick(action: RecordActionItem, event: MouseEvent) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.record-action-bar.compact {
+  gap: 4px;
+}
+
+.record-action-bar.compact :deep(.ant-btn) {
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.record-action-bar.compact :deep(.ant-btn-icon) {
+  font-size: 12px;
 }
 </style>

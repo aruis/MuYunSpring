@@ -1,3 +1,5 @@
+import type { UiIconName } from './components/UiIcon.vue';
+
 export interface UiMenuItem {
   key: string;
   title: string;
@@ -18,12 +20,23 @@ export interface UiDropdownItem {
   danger?: boolean;
 }
 
+export interface UiRecordInlineAction {
+  key: string;
+  title: string;
+  iconName?: UiIconName;
+  disabled?: boolean;
+  danger?: boolean;
+}
+
+export type UiTreeNodeAction = UiRecordInlineAction;
+
 export interface UiTreeNode {
   key: string;
   title: string;
   disabled?: boolean;
   tag?: string;
   muted?: boolean;
+  actions?: UiRecordInlineAction[];
   children?: UiTreeNode[];
 }
 
