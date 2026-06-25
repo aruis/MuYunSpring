@@ -6,9 +6,11 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
-import org.springframework.beans.factory.annotation.Autowired;
+import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,18 +22,20 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
     public static final String MODULE_ALIAS = "iam.position";
 
     private final PositionCategoryService positionCategoryService;
+    private final EmployeePositionDao employeePositionDao;
 
-    @Autowired
     public PositionService(PositionDao positionDao,
                            ActiveTenantVerifier activeTenantVerifier,
-                           PositionCategoryService positionCategoryService) {
+                           PositionCategoryService positionCategoryService,
+                           EmployeePositionDao employeePositionDao) {
         super(MODULE_ALIAS, Position.class, positionDao, activeTenantVerifier);
         this.positionCategoryService = positionCategoryService;
+        this.employeePositionDao = employeePositionDao;
     }
 
     @Override
     public void normalizeBeforeMutation(Position position) {
-        position.setCategoryId(normalizeBlank(position.getCategoryId()));
+        position.setCategoryId(Preconditions.requireText(position.getCategoryId(), "positionCategoryId"));
         position.setCode(Preconditions.requireText(position.getCode(), "positionCode"));
         position.setTitle(Preconditions.requireText(position.getTitle(), "positionTitle"));
         position.setDescription(normalizeBlank(position.getDescription()));
@@ -46,7 +50,7 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
 
     @Override
     public Criteria sortScope(Position position) {
-        return categoryScope(position.getCategoryId());
+        return Criteria.of().eq("categoryId", position.getCategoryId());
     }
 
     @Override
@@ -55,21 +59,25 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
                 "Position sort can only move records within the same category", "categoryId");
     }
 
+    @Override
+    public void beforeDelete(String id) {
+        String tenantId = requireActiveTenantMutationContext();
+        String positionId = Preconditions.requireText(id, "positionId");
+        long referencedEmployeePositions = employeePositionDao.count(Criteria.of()
+                .eq("positionId", positionId)
+                .eq(StandardEntitySchema.TENANT_ID_FIELD, tenantId)
+                .eq(StandardEntitySchema.DELETED_FIELD, Boolean.FALSE));
+        if (referencedEmployeePositions > 0) {
+            throw new PlatformException("position is referenced by employee positions: " + id);
+        }
+    }
+
     private void requireActiveCategory(String categoryId) {
         if (categoryId == null) {
             return;
         }
         positionCategoryService.requireEnabled(categoryId,
                 "position category is not active: " + categoryId);
-    }
-
-    private Criteria categoryScope(String categoryId) {
-        Criteria criteria = Criteria.of();
-        if (categoryId == null) {
-            criteria.isNull("categoryId");
-            return criteria;
-        }
-        return criteria.eq("categoryId", categoryId);
     }
 
     private String normalizeBlank(String value) {

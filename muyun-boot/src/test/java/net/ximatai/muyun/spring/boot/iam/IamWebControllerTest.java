@@ -16,9 +16,15 @@ import net.ximatai.muyun.spring.common.platform.ActionExecutionPolicy;
 import net.ximatai.muyun.spring.common.platform.DataScopeCriteriaResult;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationDao;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import net.ximatai.muyun.spring.iam.position.Position;
+import net.ximatai.muyun.spring.iam.position.PositionCategoryDao;
+import net.ximatai.muyun.spring.iam.position.PositionCategoryService;
+import net.ximatai.muyun.spring.iam.position.PositionDao;
+import net.ximatai.muyun.spring.iam.position.PositionService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
 import net.ximatai.muyun.spring.iam.role.RoleGrant;
@@ -53,6 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -64,6 +71,9 @@ class IamWebControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private TenantDao tenantDao;
     private OrganizationDao organizationDao;
+    private PositionDao positionDao;
+    private PositionCategoryDao positionCategoryDao;
+    private EmployeePositionDao employeePositionDao;
     private UserAccountDao userAccountDao;
     private RoleService roleService;
     private RoleGrantableActionResolver grantableActionResolver;
@@ -75,25 +85,35 @@ class IamWebControllerTest {
         currentUser = null;
         tenantDao = mock(TenantDao.class);
         organizationDao = mock(OrganizationDao.class);
+        positionDao = mock(PositionDao.class);
+        positionCategoryDao = mock(PositionCategoryDao.class);
+        employeePositionDao = mock(EmployeePositionDao.class);
         userAccountDao = mock(UserAccountDao.class);
         roleService = mock(RoleService.class);
         grantableActionResolver = mock(RoleGrantableActionResolver.class);
         TenantService tenantService = new TenantService(tenantDao);
         OrganizationService organizationService = new OrganizationService(organizationDao, tenantService);
+        PositionCategoryService positionCategoryService = new PositionCategoryService(
+                positionCategoryDao, tenantService, positionDao);
+        PositionService positionService = new PositionService(positionDao, tenantService, positionCategoryService,
+                employeePositionDao);
         UserAccountService userAccountService = new UserAccountService(
                 userAccountDao, tenantService, new PasswordHashingService());
         TenantWebController tenantController = new TenantWebController();
         OrganizationWebController organizationController = new OrganizationWebController();
+        PositionWebController positionController = new PositionWebController();
         UserAccountWebController userAccountController = new UserAccountWebController(null);
         RoleWebController roleController = new RoleWebController(grantableActionResolver);
         ReflectionTestUtils.setField(tenantController, "service", tenantService);
         ReflectionTestUtils.setField(organizationController, "service", organizationService);
+        ReflectionTestUtils.setField(positionController, "service", positionService);
         ReflectionTestUtils.setField(userAccountController, "service", userAccountService);
         ReflectionTestUtils.setField(roleController, "service", roleService);
         mvc = MockMvcBuilders
                 .standaloneSetup(
                         tenantController,
                         organizationController,
+                        positionController,
                         userAccountController,
                         roleController
                 )
@@ -168,6 +188,84 @@ class IamWebControllerTest {
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
                 .andExpect(jsonPath("$.message").value("query criteria are not supported by iam.tenant"));
+    }
+
+    @Test
+    void shouldRejectUnsupportedIamQuerySurfacesInsteadOfIgnoringThem() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+
+        mvc.perform(post("/iam.position/query")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "unpaged", true,
+                                "quickSearch", "dev",
+                                "quickSearchFields", List.of("title"),
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "categoryId",
+                                        "operator", "EQ",
+                                        "values", List.of("category-1")
+                                ))
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message").value("quick search is not supported by iam.position"));
+    }
+
+    @Test
+    void shouldQueryPositionsByCategoryCondition() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+        when(positionDao.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(position("pos-1", "category-1", "DEV", "Developer")), 1,
+                        PageRequest.of(1, 20)));
+
+        mvc.perform(post("/iam.position/query")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "categoryId",
+                                        "operator", "EQ",
+                                        "values", List.of("category-1")
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("pos-1"))
+                .andExpect(jsonPath("$.records[0].categoryId").value("category-1"));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(positionDao).pageQuery(criteriaCaptor.capture(), any(PageRequest.class), any(Sort[].class));
+        assertThat(containsCondition(criteriaCaptor.getValue(), "categoryId", "category-1")).isTrue();
+    }
+
+    @Test
+    void shouldQueryPositionsWithoutPagingWhenRequested() throws Exception {
+        currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
+        when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
+        when(positionDao.list(any(Criteria.class), any(Sort[].class)))
+                .thenReturn(List.of(position("pos-1", "category-1", "DEV", "Developer")));
+
+        mvc.perform(post("/iam.position/query")
+                        .contentType("application/json")
+                        .content(json(Map.of(
+                                "unpaged", true,
+                                "conditions", List.of(Map.of(
+                                        "fieldName", "categoryId",
+                                        "operator", "EQ",
+                                        "values", List.of("category-1")
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("pos-1"))
+                .andExpect(jsonPath("$.pageNum").value(1))
+                .andExpect(jsonPath("$.pageSize").value(1))
+                .andExpect(jsonPath("$.total").value(1));
+
+        ArgumentCaptor<Criteria> criteriaCaptor = ArgumentCaptor.captor();
+        verify(positionDao).list(criteriaCaptor.capture(), any(Sort[].class));
+        verify(positionDao, never()).pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class));
+        assertThat(containsCondition(criteriaCaptor.getValue(), "categoryId", "category-1")).isTrue();
     }
 
     @Test
@@ -595,6 +693,17 @@ class IamWebControllerTest {
         user.setEnabled(Boolean.TRUE);
         user.setSortOrder(1);
         return user;
+    }
+
+    private Position position(String id, String categoryId, String code, String title) {
+        Position position = new Position();
+        position.setId(id);
+        position.setCategoryId(categoryId);
+        position.setCode(code);
+        position.setTitle(title);
+        position.setEnabled(Boolean.TRUE);
+        position.setSortOrder(1);
+        return position;
     }
 
     private RoleGrant roleGrant(String id, String roleId, RoleGrantSubjectType subjectType, String subjectId) {

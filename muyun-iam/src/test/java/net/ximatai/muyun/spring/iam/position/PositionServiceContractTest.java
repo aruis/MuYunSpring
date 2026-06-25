@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.position;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,7 +18,7 @@ class PositionServiceContractTest {
     @Test
     void shouldExposeStableModuleAlias() {
         PositionService service = new PositionService(mock(PositionDao.class), activeTenantVerifier(),
-                positionCategoryService());
+                positionCategoryService(), mock(EmployeePositionDao.class));
 
         assertThat(service.getModuleAlias()).isEqualTo("iam.position");
     }
@@ -27,10 +28,11 @@ class PositionServiceContractTest {
         PositionDao dao = mock(PositionDao.class);
         when(dao.insert(any())).thenReturn("position-1");
         ActiveTenantVerifier tenantVerifier = activeTenantVerifier();
-        PositionService service = new PositionService(dao, tenantVerifier, positionCategoryService());
+        PositionService service = new PositionService(dao, tenantVerifier, positionCategoryService(),
+                mock(EmployeePositionDao.class));
         Position position = position("SALES_MANAGER", "Sales Manager");
         position.setDescription(" ");
-        position.setCategoryId(" ");
+        position.setCategoryId("category-1");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             service.insert(position);
@@ -38,7 +40,7 @@ class PositionServiceContractTest {
 
         assertThat(position.getEnabled()).isTrue();
         assertThat(position.getTenantId()).isEqualTo("tenant_a");
-        assertThat(position.getCategoryId()).isNull();
+        assertThat(position.getCategoryId()).isEqualTo("category-1");
         assertThat(position.getDescription()).isNull();
         verify(tenantVerifier).verifyActiveTenant("tenant_a");
     }
@@ -46,7 +48,7 @@ class PositionServiceContractTest {
     @Test
     void shouldRequireTenantContextForPositionMutation() {
         PositionService service = new PositionService(mock(PositionDao.class), activeTenantVerifier(),
-                positionCategoryService());
+                positionCategoryService(), mock(EmployeePositionDao.class));
 
         assertThatThrownBy(() -> service.insert(position("SALES_MANAGER", "Sales Manager")))
                 .isInstanceOf(PlatformException.class)
@@ -54,15 +56,18 @@ class PositionServiceContractTest {
     }
 
     @Test
-    void shouldRequirePositionCodeAndTitle() {
+    void shouldRequirePositionCategoryCodeAndTitle() {
         PositionService service = new PositionService(mock(PositionDao.class), activeTenantVerifier(),
-                positionCategoryService());
+                positionCategoryService(), mock(EmployeePositionDao.class));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
-            assertThatThrownBy(() -> service.insert(position(" ", "Sales Manager")))
+            assertThatThrownBy(() -> service.insert(position("SALES_MANAGER", "Sales Manager")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("positionCategoryId");
+            assertThatThrownBy(() -> service.insert(position("category-1", " ", "Sales Manager")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("positionCode");
-            assertThatThrownBy(() -> service.insert(position("SALES_MANAGER", " ")))
+            assertThatThrownBy(() -> service.insert(position("category-1", "SALES_MANAGER", " ")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("positionTitle");
         }
@@ -76,7 +81,8 @@ class PositionServiceContractTest {
         PositionCategory category = new PositionCategory();
         category.setId("category-1");
         when(categoryService.requireEnabled(eq("category-1"), any())).thenReturn(category);
-        PositionService service = new PositionService(dao, activeTenantVerifier(), categoryService);
+        PositionService service = new PositionService(dao, activeTenantVerifier(), categoryService,
+                mock(EmployeePositionDao.class));
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             Position position = position("SALES_MANAGER", "Sales Manager");
@@ -91,9 +97,7 @@ class PositionServiceContractTest {
     @Test
     void shouldUseCategorySortScopeForPositionCatalog() {
         PositionService service = new PositionService(mock(PositionDao.class), activeTenantVerifier(),
-                positionCategoryService());
-        Position uncategorizedLeft = position("SALES_MANAGER", "Sales Manager");
-        Position uncategorizedRight = position("SALES_DIRECTOR", "Sales Director");
+                positionCategoryService(), mock(EmployeePositionDao.class));
         Position sameCategoryLeft = position("FINANCE_REVIEWER", "Finance Reviewer");
         sameCategoryLeft.setCategoryId("category-1");
         Position sameCategoryRight = position("FINANCE_MANAGER", "Finance Manager");
@@ -101,22 +105,39 @@ class PositionServiceContractTest {
         Position anotherCategory = position("TECH_LEAD", "Tech Lead");
         anotherCategory.setCategoryId("category-2");
 
-        assertThat(service.sortScope(uncategorizedLeft).isEmpty()).isFalse();
         assertThat(service.sortScope(sameCategoryLeft).isEmpty()).isFalse();
-        service.validateSortScope(uncategorizedLeft, uncategorizedRight);
         service.validateSortScope(sameCategoryLeft, sameCategoryRight);
-        assertThatThrownBy(() -> service.validateSortScope(uncategorizedLeft, sameCategoryLeft))
-                .isInstanceOf(PlatformException.class)
-                .hasMessageContaining("same category");
         assertThatThrownBy(() -> service.validateSortScope(sameCategoryLeft, anotherCategory))
                 .isInstanceOf(PlatformException.class)
                 .hasMessageContaining("same category");
+    }
+
+    @Test
+    void shouldRejectDeletingPositionReferencedByEmployeePositions() {
+        EmployeePositionDao employeePositionDao = mock(EmployeePositionDao.class);
+        when(employeePositionDao.count(any())).thenReturn(1L);
+        PositionService service = new PositionService(mock(PositionDao.class), activeTenantVerifier(),
+                positionCategoryService(), employeePositionDao);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            assertThatThrownBy(() -> service.beforeDelete("position-1"))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("position is referenced by employee positions");
+        }
+
+        verify(employeePositionDao).count(any());
     }
 
     private Position position(String code, String title) {
         Position position = new Position();
         position.setCode(code);
         position.setTitle(title);
+        return position;
+    }
+
+    private Position position(String categoryId, String code, String title) {
+        Position position = position(code, title);
+        position.setCategoryId(categoryId);
         return position;
     }
 

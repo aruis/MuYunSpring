@@ -13,7 +13,8 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEnt
 @Table(name = "iam_position", comment = "Position")
 @CompositeIndex(columns = {"tenant_id", "code"}, unique = true)
 public class Position extends StandardEnabledSortableEntity {
-    @Column(name = "category_id", type = ColumnType.VARCHAR, length = 32, comment = "Position category id")
+    @Column(name = "category_id", type = ColumnType.VARCHAR, length = 32, nullable = false,
+            comment = "Position category id")
     private String categoryId;
 
     @Column(name = "code", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Position code")
