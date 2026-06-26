@@ -59,6 +59,11 @@ function recordCode(record: RecordListExplorerRecord) {
   return props.codeOf?.(record) ?? record.code ?? record.id;
 }
 
+function recordSecondary(record: RecordListExplorerRecord) {
+  const code = recordCode(record);
+  return code && code !== recordTitle(record) ? code : undefined;
+}
+
 function recordMuted(record: RecordListExplorerRecord) {
   return props.mutedOf?.(record) ?? record.enabled === false;
 }
@@ -93,6 +98,7 @@ function handleAction(action: UiRecordInlineAction, record: RecordListExplorerRe
         tabindex="0"
         clickable
         :title="recordTitle(record)"
+        :secondary="recordSecondary(record)"
         :tag="recordTag(record)"
         :muted="recordMuted(record)"
         :selected="record.id === selectedId"

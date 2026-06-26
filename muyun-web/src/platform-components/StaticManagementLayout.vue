@@ -42,6 +42,7 @@ const emit = defineEmits<{
   <section class="static-management-page">
     <RecordExplorerPanel
       class="static-management-sidebar"
+      :eyebrow="groupTitle"
       :title="sidebarTitle"
       :refresh-title="refreshTitle"
       :search-keyword="sidebarSearchKeyword"

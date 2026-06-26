@@ -7,6 +7,7 @@ defineOptions({ name: 'UiRecordExplorerItem' });
 withDefaults(
   defineProps<{
     title: string;
+    secondary?: string;
     tag?: string;
     muted?: boolean;
     selected?: boolean;
@@ -14,6 +15,7 @@ withDefaults(
     clickable?: boolean;
   }>(),
   {
+    secondary: undefined,
     tag: undefined,
     muted: false,
     selected: false,
@@ -52,7 +54,10 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
     @click="emit('click')"
   >
     <span class="ui-record-explorer-item-main">
-      <span class="ui-record-explorer-item-title">{{ title }}</span>
+      <span class="ui-record-explorer-item-text">
+        <span class="ui-record-explorer-item-title">{{ title }}</span>
+        <span v-if="secondary" class="ui-record-explorer-item-secondary">{{ secondary }}</span>
+      </span>
       <span v-if="tag" class="ui-record-explorer-item-tag">{{ tag }}</span>
     </span>
     <span v-if="actions?.length" class="ui-record-explorer-item-actions">
@@ -82,11 +87,11 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
   min-width: 0;
   width: 100%;
   min-height: 24px;
-  padding: 0 4px;
+  padding: 2px 4px;
   border-radius: 4px;
   color: var(--muyun-text-body);
   font-size: 14px;
-  line-height: 24px;
+  line-height: 20px;
 }
 
 .ui-record-explorer-item-clickable {
@@ -110,11 +115,27 @@ function actionFallbackLabel(action: UiRecordInlineAction) {
   min-width: 0;
 }
 
+.ui-record-explorer-item-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 1px;
+  min-width: 0;
+}
+
 .ui-record-explorer-item-title {
   overflow: hidden;
   color: inherit;
   font-size: inherit;
   line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-record-explorer-item-secondary {
+  overflow: hidden;
+  color: var(--muyun-text-muted);
+  font-size: 12px;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
