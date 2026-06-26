@@ -62,7 +62,6 @@ const {
   startEditCategory,
   cancelCategoryEdit,
   saveCategory,
-  toggleCategory,
   deleteCategory,
   loadPositions,
   selectPosition,
@@ -263,10 +262,9 @@ function handlePositionAction(action: RecordActionItem) {
             </form>
             <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
               <RecordStatusSwitch
-                :enabled="selectedCategory.enabled"
+                :enabled="categoryDraft.enabled"
                 :disabled="categorySaving || !canToggleCategory"
-                :loading="categorySaving"
-                @change="toggleCategory"
+                @change="categoryDraft.enabled = $event"
               />
             </section>
           </section>
@@ -308,7 +306,7 @@ function handlePositionAction(action: RecordActionItem) {
     <RecordDetailPanel class="position-column" :title="positionCardTitle">
       <template #status>
         <RecordStatusSwitch
-          v-if="positionMode === 'create'"
+          v-if="positionMode !== 'view'"
           :enabled="positionDraft.enabled"
           :show-label="false"
           @change="positionDraft.enabled = $event"

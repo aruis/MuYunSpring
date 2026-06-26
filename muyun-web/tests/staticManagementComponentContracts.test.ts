@@ -154,6 +154,20 @@ test('three-column management pages use the platform detail panel', () => {
   assert.equal(matchCount(positionViewSource, /<RecordDetailPanel/g), 1);
   assert.equal(matchCount(dictionaryViewSource, /<RecordDetailPanel/g), 1);
   assert.equal(matchCount(departmentViewSource, /<RecordDetailPanel/g), 1);
+  assert.match(positionViewSource, /v-if="positionMode !== 'view'"[\s\S]*:enabled="positionDraft\.enabled"/);
+  assert.match(dictionaryViewSource, /v-if="itemMode !== 'view'"[\s\S]*:enabled="itemDraft\.enabled"/);
+  assert.match(departmentViewSource, /v-if="mode !== 'view'"[\s\S]*:enabled="draft\.enabled"/);
+  assert.doesNotMatch(positionViewSource, /v-if="positionMode === 'create'"/);
+  assert.doesNotMatch(dictionaryViewSource, /v-if="itemMode === 'create'"/);
+  assert.doesNotMatch(departmentViewSource, /v-if="mode\.startsWith\('create'\)"/);
+  assert.match(
+    positionViewSource,
+    /:enabled="categoryDraft\.enabled"[\s\S]*@change="categoryDraft\.enabled = \$event"/,
+  );
+  assert.match(
+    dictionaryViewSource,
+    /:enabled="categoryDraft\.enabled"[\s\S]*@change="categoryDraft\.enabled = \$event"/,
+  );
   assert.doesNotMatch(positionViewSource, /detail-column|detail-title-group|detail-header-actions/);
   assert.doesNotMatch(dictionaryViewSource, /detail-column|detail-title-group|detail-header-actions/);
   assert.doesNotMatch(departmentViewSource, /detail-column|detail-title-group|detail-header-actions/);

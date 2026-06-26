@@ -302,7 +302,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
     <RecordDetailPanel :title="cardTitle">
       <template #status>
         <RecordStatusSwitch
-          v-if="mode.startsWith('create')"
+          v-if="mode !== 'view'"
           :enabled="draft.enabled"
           :show-label="false"
           @change="draft.enabled = $event"

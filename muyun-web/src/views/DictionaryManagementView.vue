@@ -74,7 +74,6 @@ const {
   startEditCategory,
   cancelCategoryEdit,
   saveCategory,
-  toggleCategory,
   deleteCategory,
   handleItemsLoaded,
   selectItem,
@@ -530,10 +529,9 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
             </form>
             <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
               <RecordStatusSwitch
-                :enabled="selectedCategory.enabled"
+                :enabled="categoryDraft.enabled"
                 :disabled="categorySaving || !canToggleCategory"
-                :loading="categorySaving"
-                @change="toggleCategory"
+                @change="categoryDraft.enabled = $event"
               />
             </section>
           </section>
@@ -587,7 +585,7 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
     <RecordDetailPanel class="dictionary-column" :title="itemCardTitle">
       <template #status>
         <RecordStatusSwitch
-          v-if="itemMode === 'create'"
+          v-if="itemMode !== 'view'"
           :enabled="itemDraft.enabled"
           :show-label="false"
           @change="itemDraft.enabled = $event"
