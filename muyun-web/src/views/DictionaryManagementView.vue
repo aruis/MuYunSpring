@@ -12,6 +12,7 @@ import {
   EnabledSelect,
   ModuleActionButton,
   RecordActionBar,
+  RecordDetailPanel,
   RecordExplorerPanel,
   RecordMetaSection,
   RecordPicker,
@@ -50,12 +51,10 @@ const {
   categoryDraft,
   categoryMode,
   categorySaving,
-  categoryMessage,
   selectedItem,
   itemDraft,
   itemMode,
   itemSaving,
-  itemMessage,
   selectedCategoryIsDictionary,
   canCreateCategory,
   canDeleteCategory,
@@ -75,7 +74,6 @@ const {
   startEditCategory,
   cancelCategoryEdit,
   saveCategory,
-  toggleCategory,
   deleteCategory,
   handleItemsLoaded,
   selectItem,
@@ -506,7 +504,6 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
                 @action="handleCategoryAction"
               />
             </header>
-            <div v-if="categoryMessage" class="message success">{{ categoryMessage }}</div>
             <form class="category-form" @submit.prevent="saveCategory">
               <label>
                 <span>类目 alias</span>
@@ -532,10 +529,9 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
             </form>
             <section v-if="categoryMode === 'edit' && selectedCategory?.id" class="category-status-panel">
               <RecordStatusSwitch
-                :enabled="selectedCategory.enabled"
+                :enabled="categoryDraft.enabled"
                 :disabled="categorySaving || !canToggleCategory"
-                :loading="categorySaving"
-                @change="toggleCategory"
+                @change="categoryDraft.enabled = $event"
               />
             </section>
           </section>
@@ -586,28 +582,26 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
       />
     </RecordExplorerPanel>
 
-    <main class="dictionary-column detail-column">
-      <header class="column-header">
-        <div class="detail-title-group">
-          <h2>{{ itemCardTitle }}</h2>
-          <RecordStatusSwitch
-            v-if="itemMode === 'create'"
-            :enabled="itemDraft.enabled"
-            :show-label="false"
-            @change="itemDraft.enabled = $event"
-          />
-          <RecordStatusSwitch
-            v-else-if="selectedItem"
-            :enabled="selectedItem.enabled"
-            :disabled="itemSaving || !canToggleItem"
-            :loading="itemSaving"
-            :show-label="false"
-            @change="toggleItem"
-          />
-        </div>
+    <RecordDetailPanel class="dictionary-column" :title="itemCardTitle">
+      <template #status>
+        <RecordStatusSwitch
+          v-if="itemMode !== 'view'"
+          :enabled="itemDraft.enabled"
+          :show-label="false"
+          @change="itemDraft.enabled = $event"
+        />
+        <RecordStatusSwitch
+          v-else-if="selectedItem"
+          :enabled="selectedItem.enabled"
+          :disabled="itemSaving || !canToggleItem"
+          :loading="itemSaving"
+          :show-label="false"
+          @change="toggleItem"
+        />
+      </template>
+      <template #actions>
         <RecordActionBar :context="categoryContext" :actions="itemActions" @action="handleItemAction" />
-      </header>
-      <div v-if="itemMessage" class="message success">{{ itemMessage }}</div>
+      </template>
       <UiEmpty v-if="!selectedItem && itemMode === 'view'" description="请选择或新建字典项" />
       <form v-else class="item-form" @submit.prevent="saveItem">
         <label>
@@ -636,13 +630,9 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
           />
           <UiInput v-else :value="itemDraft.parentId ?? ''" disabled placeholder="无权查看上级字典项" />
         </label>
-        <label>
-          <span>启用状态</span>
-          <EnabledSelect v-model:value="itemDraft.enabled" :disabled="itemReadonly" />
-        </label>
       </form>
       <RecordMetaSection v-if="selectedItem || itemMode !== 'view'" :record="itemDraft" show-sort-order />
-    </main>
+    </RecordDetailPanel>
   </section>
 </template>
 
@@ -669,28 +659,14 @@ function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
   min-height: 0;
 }
 
-.detail-column {
-  gap: 12px;
-  padding: 14px;
-}
-
-.column-header,
-.detail-title-group,
 .category-editor-header {
   display: flex;
   align-items: center;
 }
 
-.column-header,
 .category-editor-header {
   justify-content: space-between;
   gap: 12px;
-}
-
-.detail-title-group {
-  flex: 1 1 auto;
-  gap: 10px;
-  min-width: 0;
 }
 
 .record-panel-create-button {
@@ -786,18 +762,6 @@ h3 {
 .category-status-panel {
   padding-top: 10px;
   border-top: 1px solid var(--muyun-border-subtle);
-}
-
-.message {
-  padding: 9px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.message.success {
-  border: 1px solid var(--muyun-success-border);
-  background: var(--muyun-success-bg);
-  color: var(--muyun-success-text);
 }
 
 @media (max-width: 1180px) {

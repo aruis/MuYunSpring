@@ -61,7 +61,6 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
   const reloadKey = ref(0);
   const saving = ref(false);
   const actionError = ref<string>();
-  const actionMessage = ref<string>();
   const copyRecord = options.copyRecord ?? ((record: TRecord) => ({ ...record }) as TRecord);
 
   const cardTitle = computed(() => {
@@ -172,7 +171,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
-      actionMessage.value = '已保存';
+      presentActionSuccess('已保存');
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, mode.value === 'create' ? 'create' : 'update');
@@ -206,7 +205,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
+      presentActionSuccess(refreshed.enabled === false ? '已停用' : '已启用');
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, selected.value?.enabled === false ? 'enable' : 'disable');
@@ -244,7 +243,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       selected.value = undefined;
       draft.value = options.emptyDraft();
       mode.value = canCreate.value ? 'create' : 'view';
-      actionMessage.value = '已删除';
+      presentActionSuccess('已删除');
       reloadKey.value += 1;
     } catch (cause) {
       handleActionError(cause, 'delete');
@@ -287,7 +286,14 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
 
   function clearFeedback() {
     actionError.value = undefined;
-    actionMessage.value = undefined;
+  }
+
+  function presentActionSuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'static-crud-action',
+      phase: 'action',
+      tone: 'success',
+    });
   }
 
   return {
@@ -297,7 +303,6 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
     reloadKey,
     saving,
     actionError,
-    actionMessage,
     cardTitle,
     readonly,
     canCreate,

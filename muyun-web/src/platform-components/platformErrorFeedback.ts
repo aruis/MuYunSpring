@@ -5,11 +5,12 @@ import {
   type ErrorUiContext,
   type GlobalErrorPresentation,
 } from '@muyun/web-core';
-import { showErrorMessage } from '@muyun/vue-ui-antdv';
+import { showErrorMessage, showSuccessMessage } from '@muyun/vue-ui-antdv';
 
 export interface PlatformErrorFeedbackContext {
   source?: string;
   phase?: 'load' | 'action' | 'validation' | 'authorization';
+  tone?: 'error' | 'success';
 }
 
 export function presentPlatformError(cause: unknown, context: PlatformErrorFeedbackContext = {}) {
@@ -20,7 +21,10 @@ export function presentPlatformError(cause: unknown, context: PlatformErrorFeedb
 }
 
 export function presentPlatformMessage(message: string, context: PlatformErrorFeedbackContext = {}) {
-  void context;
+  if (context.tone === 'success') {
+    showSuccessMessage(message);
+    return;
+  }
   showErrorMessage(message);
 }
 

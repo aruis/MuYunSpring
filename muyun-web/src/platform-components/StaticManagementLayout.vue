@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import RecordDetailPanel from './RecordDetailPanel.vue';
 import RecordExplorerPanel from './RecordExplorerPanel.vue';
-import RecordStatusTag from './RecordStatusTag.vue';
 
 defineOptions({ name: 'StaticManagementLayout' });
 
@@ -10,19 +10,13 @@ withDefaults(
     refreshTitle: string;
     mode: 'view' | 'edit' | 'create';
     cardTitle: string;
-    actionMessage?: string;
     mutedMessage?: string;
-    showStatus?: boolean;
-    enabled?: boolean;
     sidebarSearchKeyword?: string;
     sidebarSearchPlaceholder?: string;
     sidebarSearchable?: boolean;
   }>(),
   {
-    actionMessage: undefined,
     mutedMessage: undefined,
-    showStatus: false,
-    enabled: undefined,
     sidebarSearchKeyword: '',
     sidebarSearchPlaceholder: '搜索名称、编码或 ID',
     sidebarSearchable: true,
@@ -53,23 +47,18 @@ const emit = defineEmits<{
       <slot name="explorer" />
     </RecordExplorerPanel>
 
-    <main class="static-management-card">
-      <header class="card-header">
-        <div>
-          <p>{{ mode === 'view' ? '查看' : mode === 'edit' ? '编辑' : '新建' }}</p>
-          <div class="title-line">
-            <h2>{{ cardTitle }}</h2>
-            <RecordStatusTag v-if="showStatus" :enabled="enabled" />
-          </div>
-        </div>
+    <RecordDetailPanel class="static-management-card" :title="cardTitle">
+      <template #status>
+        <slot name="card-status" />
+      </template>
+      <template #actions>
         <slot name="card-actions" />
-      </header>
+      </template>
 
-      <div v-if="actionMessage" class="message success">{{ actionMessage }}</div>
-      <div v-else-if="mutedMessage" class="message muted">{{ mutedMessage }}</div>
+      <div v-if="mutedMessage" class="message muted">{{ mutedMessage }}</div>
 
       <slot />
-    </main>
+    </RecordDetailPanel>
   </section>
 </template>
 
@@ -84,54 +73,18 @@ const emit = defineEmits<{
 .static-management-sidebar,
 .static-management-card {
   min-width: 0;
-  border: 1px solid var(--muyun-border);
-  border-radius: 8px;
-  background: var(--muyun-surface);
 }
 
 .static-management-sidebar {
+  border: 1px solid var(--muyun-border);
+  border-radius: 8px;
+  background: var(--muyun-surface);
   min-height: 0;
 }
 
-.card-header,
 .static-management-sidebar :deep(.record-explorer-panel-actions) {
   display: flex;
   align-items: center;
-}
-
-.card-header {
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.title-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.card-header p,
-h2 {
-  margin: 0;
-}
-
-.card-header p {
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-h2 {
-  color: var(--muyun-text);
-  font-size: 16px;
-}
-
-.static-management-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 16px;
 }
 
 .static-management-sidebar :deep(.record-panel-create-button) {
@@ -145,12 +98,6 @@ h2 {
   padding: 9px 10px;
   border-radius: 6px;
   font-size: 13px;
-}
-
-.message.success {
-  border: 1px solid var(--muyun-success-border);
-  background: var(--muyun-success-bg);
-  color: var(--muyun-success-text);
 }
 
 .message.muted {

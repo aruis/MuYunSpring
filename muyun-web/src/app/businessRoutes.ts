@@ -1,6 +1,7 @@
 import type { Component } from 'vue';
 import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } from '@muyun/web-contracts';
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
+import DepartmentManagementView from '../views/DepartmentManagementView.vue';
 import DictionaryManagementView from '../views/DictionaryManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
@@ -32,6 +33,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/iam/organizations',
     moduleAlias: 'iam.organization',
     component: OrganizationManagementView,
+  },
+  {
+    route: '/iam/departments',
+    moduleAlias: 'iam.department',
+    component: DepartmentManagementView,
   },
   {
     route: '/iam/positions',

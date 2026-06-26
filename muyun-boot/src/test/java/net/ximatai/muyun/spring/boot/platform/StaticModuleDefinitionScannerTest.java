@@ -104,6 +104,8 @@ class StaticModuleDefinitionScannerTest {
             assertThat(byAlias.get("iam.department")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");
                 assertThat(definition.title()).isEqualTo("部门管理");
+                assertThat(definition.entryType()).isEqualTo(ModuleEntryType.ROUTE);
+                assertThat(definition.entryRoute()).isEqualTo("/iam/departments");
                 assertThat(definition.actions()).extracting(StaticModuleActionDefinition::actionCode)
                         .containsExactlyInAnyOrder("menu", "create", "view", "update", "delete", "query",
                                 "tree", "sort", "enable", "disable");

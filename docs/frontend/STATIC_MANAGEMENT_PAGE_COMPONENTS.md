@@ -12,7 +12,8 @@
 4. `CrudRecordListExplorer` 负责标准 CRUD 平铺列表的数据加载适配，内部复用 `RecordListExplorer`。
 5. `TreeRecordExplorer` 负责标准树能力的数据加载和树展示。
 6. `RecordPicker` 负责记录选择，树模型的父级选择应使用 tree 模式和父级约束。
-7. 业务语义封装只有在出现真实复用场景后再沉淀，例如未来的机构树选择或组织范围浏览。
+7. `RecordDetailPanel` 负责右侧详情/编辑区域的基础外壳，包括单级标题、标题旁状态入口、右侧动作区和内容槽。
+8. 业务语义封装只有在出现真实复用场景后再沉淀，例如未来的机构树选择或组织范围浏览。
 
 ## 组件层级
 
@@ -127,6 +128,23 @@ RecordPicker
 
 根节点通过清空 `parentId` 表达，不在选项中额外伪造“根节点”记录。
 
+### RecordDetailPanel
+
+`RecordDetailPanel` 是右侧详情/编辑区域的外壳组件，不访问业务数据。
+
+它适合承载：
+
+```text
+单级标题
+标题右侧状态切换
+右上角动作
+内容 slot
+```
+
+详情区标题只保留一级标题，不显示 eyebrow 或第二级标题。启用/停用切换如果存在，应放在标题紧邻右侧，通过 `status` slot 接入；表单内不再重复展示“启用状态”字段，启停成功也不额外用详情区横幅重复表达状态。
+
+它不应承载字段布局、保存逻辑、加载逻辑、权限解释或业务状态机。
+
 ## 常见组合
 
 两栏平铺管理页：
@@ -135,7 +153,7 @@ RecordPicker
 StaticManagementLayout
   -> RecordExplorerPanel
     -> CrudRecordListExplorer
-  -> detail card
+  -> RecordDetailPanel
 ```
 
 两栏树管理页：
@@ -144,7 +162,7 @@ StaticManagementLayout
 StaticManagementLayout
   -> RecordExplorerPanel
     -> TreeRecordExplorer
-  -> detail card
+  -> RecordDetailPanel
 ```
 
 三栏主子管理页：
@@ -154,20 +172,21 @@ RecordExplorerPanel
   -> TreeRecordExplorer
 RecordExplorerPanel
   -> RecordListExplorer 或 TreeRecordExplorer
-detail area
+RecordDetailPanel
 ```
 
 第二栏是否使用列表或树由子模型能力决定。子模型具备树能力时应使用 `TreeRecordExplorer`，不因为它依赖左侧 scope 就降级为平铺列表；scope 只影响传入的 context 或 client。
 
 ## 当前页面口径
 
-| 页面 | Explorer 组合 | 状态口径 |
-| --- | --- | --- |
-| 应用管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`。 |
-| 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，页面保留平台租户保护规则。 |
-| 组织管理 | `StaticManagementLayout -> TreeRecordExplorer` | 页面直接依赖树能力，避免在主业务页套业务语义树封装。 |
-| 岗位管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer` | 分类树和岗位列表由页面统一编排，岗位列表加载依赖选中分类。 |
-| 字典管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> TreeRecordExplorer` | 应用 scope 由页面控制，类目树和字典项树由页面统一编排；字典项父级使用 `RecordPicker + parentRecordConstraints`。 |
+| 页面     | Explorer 组合                                                                                 | 状态口径                                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 应用管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer -> RecordDetailPanel` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，详情区复用标准详情外壳。                                        |
+| 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer -> RecordDetailPanel` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，页面保留平台租户保护规则，详情区复用标准详情外壳。              |
+| 组织管理 | `StaticManagementLayout -> TreeRecordExplorer -> RecordDetailPanel`                           | 页面直接依赖树能力，避免在主业务页套业务语义树封装，详情区复用标准详情外壳。                                     |
+| 部门管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> TreeRecordExplorer`    | 左侧机构树只作为 scope 选择，不承载机构管理动作；部门树按机构 scope 加载和维护。                                 |
+| 岗位管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer`    | 分类树和岗位列表由页面统一编排，岗位列表加载依赖选中分类。                                                       |
+| 字典管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> TreeRecordExplorer`    | 应用 scope 由页面控制，类目树和字典项树由页面统一编排；字典项父级使用 `RecordPicker + parentRecordConstraints`。 |
 
 ## 新页面判断
 

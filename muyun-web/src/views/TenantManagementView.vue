@@ -3,10 +3,10 @@ import { computed, ref } from 'vue';
 import {
   CrudRecordListExplorer,
   type CrudRecordListBase,
-  EnabledSelect,
   ModuleActionButton,
   RecordActionBar,
   RecordMetaSection,
+  RecordStatusSwitch,
   StaticManagementLayout,
   type RecordActionItem,
 } from '@muyun/platform-components';
@@ -25,7 +25,6 @@ const {
   mode,
   reloadKey,
   saving,
-  actionMessage,
   cardTitle,
   readonly,
   aliasReadonly,
@@ -42,9 +41,7 @@ const {
   removeSelected,
 } = createTenantManagementState(tenantContext, confirmAction);
 
-const enabledReadonly = computed(
-  () => readonly.value || (isPlatformTenant.value && draft.value.enabled !== false),
-);
+const enabledReadonly = computed(() => isPlatformTenant.value && draft.value.enabled !== false);
 
 const cardActions = computed<RecordActionItem[]>(() => {
   if (mode.value !== 'view') {
@@ -61,13 +58,6 @@ const cardActions = computed<RecordActionItem[]>(() => {
   }
   return [
     { key: 'edit', actionCode: 'update', title: '编辑', disabled: !selected.value },
-    {
-      key: 'toggle-enabled',
-      actionCode: selected.value?.enabled === false ? 'enable' : 'disable',
-      title: selected.value?.enabled === false ? '启用' : '停用',
-      disabled: !selected.value || !canEnable.value,
-      loading: saving.value,
-    },
     {
       key: 'delete',
       actionCode: 'delete',
@@ -100,10 +90,6 @@ function handleCardAction(action: RecordActionItem) {
     startEdit();
     return;
   }
-  if (action.key === 'toggle-enabled') {
-    void toggleEnabled();
-    return;
-  }
   if (action.key === 'delete') {
     void removeSelected();
     return;
@@ -126,10 +112,7 @@ function handleCardAction(action: RecordActionItem) {
     sidebar-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
-    :action-message="actionMessage"
     :muted-message="isPlatformTenant ? '平台租户是系统内置身份根，不能删除或停用。' : undefined"
-    :show-status="Boolean(selected && mode === 'view')"
-    :enabled="selected?.enabled"
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>
@@ -162,6 +145,23 @@ function handleCardAction(action: RecordActionItem) {
     <template #card-actions>
       <RecordActionBar :context="tenantContext" :actions="cardActions" @action="handleCardAction" />
     </template>
+    <template #card-status>
+      <RecordStatusSwitch
+        v-if="mode !== 'view'"
+        :enabled="draft.enabled"
+        :disabled="enabledReadonly"
+        :show-label="false"
+        @change="draft.enabled = $event"
+      />
+      <RecordStatusSwitch
+        v-else-if="selected"
+        :enabled="selected.enabled"
+        :disabled="saving || !canEnable"
+        :loading="saving"
+        :show-label="false"
+        @change="toggleEnabled"
+      />
+    </template>
 
     <form class="static-record-form" @submit.prevent="save">
       <label>
@@ -171,10 +171,6 @@ function handleCardAction(action: RecordActionItem) {
       <label>
         <span>租户名称</span>
         <UiInput v-model:value="draft.title" :disabled="readonly" />
-      </label>
-      <label>
-        <span>启用状态</span>
-        <EnabledSelect v-model:value="draft.enabled" :disabled="enabledReadonly" />
       </label>
     </form>
 

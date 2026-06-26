@@ -314,6 +314,11 @@ export interface Organization extends StandardEnabledTreeEntity {
   code?: string;
 }
 
+export interface Department extends StandardEnabledTreeEntity {
+  organizationId?: string;
+  code?: string;
+}
+
 export interface Application extends StandardEnabledSortableEntity {
   alias?: string;
 }

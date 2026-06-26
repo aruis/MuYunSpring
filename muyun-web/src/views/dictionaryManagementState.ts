@@ -31,7 +31,6 @@ export function createDictionaryManagementState(
   const categoryMode = ref<DictionaryCategoryMode>('view');
   const categorySaving = ref(false);
   const categoryError = ref<string>();
-  const categoryMessage = ref<string>();
 
   const items = ref<DictionaryItem[]>([]);
   const selectedItem = ref<DictionaryItem>();
@@ -40,7 +39,6 @@ export function createDictionaryManagementState(
   const itemLoading = ref(false);
   const itemSaving = ref(false);
   const itemError = ref<string>();
-  const itemMessage = ref<string>();
 
   const selectedCategoryId = computed(() => selectedCategory.value?.id);
   const selectedCategoryTitle = computed(() => dictionaryCategoryTitleOf(selectedCategory.value));
@@ -173,7 +171,7 @@ export function createDictionaryManagementState(
       selectedCategory.value = saved;
       categoryDraft.value = copyDictionaryCategory(saved);
       categoryMode.value = 'view';
-      categoryMessage.value = '已保存';
+      presentCategorySuccess('已保存');
       categoryReloadKey.value += 1;
       resetItemsForCategory();
     } catch (cause) {
@@ -203,7 +201,7 @@ export function createDictionaryManagementState(
       }
       selectedCategory.value = await categoryClientOf().view(selectedCategory.value.id);
       categoryDraft.value = copyDictionaryCategory(selectedCategory.value);
-      categoryMessage.value = selectedCategory.value.enabled === false ? '已停用' : '已启用';
+      presentCategorySuccess(selectedCategory.value.enabled === false ? '已停用' : '已启用');
       categoryReloadKey.value += 1;
     } catch (cause) {
       handleCategoryError(cause);
@@ -237,7 +235,7 @@ export function createDictionaryManagementState(
       selectedCategory.value = undefined;
       categoryDraft.value = emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
       categoryMode.value = 'view';
-      categoryMessage.value = '已删除';
+      presentCategorySuccess('已删除');
       categoryReloadKey.value += 1;
       resetItemsForCategory();
     } catch (cause) {
@@ -364,7 +362,7 @@ export function createDictionaryManagementState(
       selectedItem.value = saved;
       itemDraft.value = copyDictionaryItem(saved);
       itemMode.value = 'view';
-      itemMessage.value = '已保存';
+      presentItemSuccess('已保存');
       itemReloadKey.value += 1;
     } catch (cause) {
       handleItemError(cause);
@@ -423,7 +421,7 @@ export function createDictionaryManagementState(
       selectedItem.value = undefined;
       itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
       itemMode.value = selectedCategoryIsDictionary.value && canCreateItem.value ? 'create' : 'view';
-      itemMessage.value = '已删除';
+      presentItemSuccess('已删除');
       itemReloadKey.value += 1;
     } catch (cause) {
       handleItemError(cause);
@@ -470,12 +468,10 @@ export function createDictionaryManagementState(
 
   function clearCategoryFeedback() {
     categoryError.value = undefined;
-    categoryMessage.value = undefined;
   }
 
   function clearItemFeedback() {
     itemError.value = undefined;
-    itemMessage.value = undefined;
   }
 
   function handleCategoryError(cause: unknown) {
@@ -514,6 +510,22 @@ export function createDictionaryManagementState(
     presentPlatformMessage(message, { source: 'dictionary-item-action', phase: 'action' });
   }
 
+  function presentCategorySuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'dictionary-category-action',
+      phase: 'action',
+      tone: 'success',
+    });
+  }
+
+  function presentItemSuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'dictionary-item-action',
+      phase: 'action',
+      tone: 'success',
+    });
+  }
+
   return {
     categoryReloadKey,
     itemReloadKey,
@@ -523,7 +535,6 @@ export function createDictionaryManagementState(
     categoryMode,
     categorySaving,
     categoryError,
-    categoryMessage,
     items,
     selectedItem,
     itemDraft,
@@ -531,7 +542,6 @@ export function createDictionaryManagementState(
     itemLoading,
     itemSaving,
     itemError,
-    itemMessage,
     selectedCategoryId,
     selectedCategoryTitle,
     selectedCategoryIsDictionary,

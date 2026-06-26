@@ -4,6 +4,7 @@ export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue'
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
 export { default as RecordActionBar } from './RecordActionBar.vue';
+export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
