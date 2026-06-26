@@ -8,6 +8,7 @@ export { default as UiMenu } from './components/UiMenu.vue';
 export { default as UiTabs } from './components/UiTabs.vue';
 export { default as UiTree } from './components/UiTree.vue';
 export { default as UiDropdown } from './components/UiDropdown.vue';
+export { default as UiRecordExplorerItem } from './components/UiRecordExplorerItem.vue';
 export { default as UiSpin } from './components/UiSpin.vue';
 export { default as UiEmpty } from './components/UiEmpty.vue';
 export { default as UiError } from './components/UiError.vue';

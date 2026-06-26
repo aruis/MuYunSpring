@@ -52,7 +52,6 @@ export function createOrganizationManagementState(
   }
 
   function startCreateRoot() {
-    selected.value = undefined;
     draft.value = emptyDraft();
     mode.value = 'create';
     clearFeedback();

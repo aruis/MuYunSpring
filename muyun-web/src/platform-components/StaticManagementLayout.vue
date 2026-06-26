@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UiButton } from '@muyun/vue-ui-antdv';
+import RecordExplorerPanel from './RecordExplorerPanel.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 
 defineOptions({ name: 'StaticManagementLayout' });
@@ -16,6 +16,9 @@ withDefaults(
     mutedMessage?: string;
     showStatus?: boolean;
     enabled?: boolean;
+    sidebarSearchKeyword?: string;
+    sidebarSearchPlaceholder?: string;
+    sidebarSearchable?: boolean;
   }>(),
   {
     actionError: undefined,
@@ -23,31 +26,35 @@ withDefaults(
     mutedMessage: undefined,
     showStatus: false,
     enabled: undefined,
+    sidebarSearchKeyword: '',
+    sidebarSearchPlaceholder: '搜索名称、编码或 ID',
+    sidebarSearchable: true,
   },
 );
 
 const emit = defineEmits<{
   refresh: [];
+  'update:sidebarSearchKeyword': [keyword: string];
 }>();
 </script>
 
 <template>
   <section class="static-management-page">
-    <aside class="static-management-sidebar">
-      <div class="sidebar-header">
-        <div>
-          <p>{{ groupTitle }}</p>
-          <h2>{{ sidebarTitle }}</h2>
-        </div>
-        <slot name="refresh">
-          <UiButton icon-name="reload" :title="refreshTitle" @click="emit('refresh')"> 刷新 </UiButton>
-        </slot>
-      </div>
-      <div class="sidebar-actions">
+    <RecordExplorerPanel
+      class="static-management-sidebar"
+      :title="sidebarTitle"
+      :refresh-title="refreshTitle"
+      :search-keyword="sidebarSearchKeyword"
+      :search-placeholder="sidebarSearchPlaceholder"
+      :searchable="sidebarSearchable"
+      @update:search-keyword="emit('update:sidebarSearchKeyword', $event)"
+      @refresh="emit('refresh')"
+    >
+      <template #actions>
         <slot name="sidebar-actions" />
-      </div>
+      </template>
       <slot name="explorer" />
-    </aside>
+    </RecordExplorerPanel>
 
     <main class="static-management-card">
       <header class="card-header">
@@ -87,21 +94,15 @@ const emit = defineEmits<{
 }
 
 .static-management-sidebar {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px;
-  overflow: hidden;
+  min-height: 0;
 }
 
-.sidebar-header,
 .card-header,
-.sidebar-actions {
+.static-management-sidebar :deep(.record-explorer-panel-actions) {
   display: flex;
   align-items: center;
 }
 
-.sidebar-header,
 .card-header {
   justify-content: space-between;
   gap: 12px;
@@ -114,13 +115,11 @@ const emit = defineEmits<{
   min-width: 0;
 }
 
-.sidebar-header p,
 .card-header p,
 h2 {
   margin: 0;
 }
 
-.sidebar-header p,
 .card-header p {
   color: var(--muyun-text-muted);
   font-size: 12px;
@@ -132,16 +131,18 @@ h2 {
   font-size: 16px;
 }
 
-.sidebar-actions {
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .static-management-card {
   display: grid;
   align-content: start;
   gap: 14px;
   padding: 16px;
+}
+
+.static-management-sidebar :deep(.record-panel-create-button) {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
 }
 
 .message {

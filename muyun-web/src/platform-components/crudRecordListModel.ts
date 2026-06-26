@@ -1,4 +1,4 @@
-export interface FlatRecordBase {
+export interface CrudRecordListBase {
   id?: string;
   title?: string;
   alias?: string;
@@ -6,22 +6,22 @@ export interface FlatRecordBase {
   enabled?: boolean;
 }
 
-export function defaultFlatRecordTitle<TRecord extends FlatRecordBase>(
+export function defaultCrudRecordListTitle<TRecord extends CrudRecordListBase>(
   record: TRecord,
   fallback = '未命名记录',
 ) {
   return record.title ?? record.alias ?? record.code ?? record.id ?? fallback;
 }
 
-export function defaultFlatRecordSubtitle<TRecord extends FlatRecordBase>(record: TRecord) {
+export function defaultCrudRecordListSubtitle<TRecord extends CrudRecordListBase>(record: TRecord) {
   return record.alias ?? record.code ?? record.id;
 }
 
-export function defaultFlatRecordMatches<TRecord extends FlatRecordBase>(
+export function defaultCrudRecordListMatches<TRecord extends CrudRecordListBase>(
   record: TRecord,
   normalizedKeyword: string,
-  titleOf: (record: TRecord) => string = defaultFlatRecordTitle,
-  subtitleOf: (record: TRecord) => string | undefined = defaultFlatRecordSubtitle,
+  titleOf: (record: TRecord) => string = defaultCrudRecordListTitle,
+  subtitleOf: (record: TRecord) => string | undefined = defaultCrudRecordListSubtitle,
 ) {
   return [titleOf(record), subtitleOf(record), record.alias, record.code, record.id]
     .filter(Boolean)

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
+  CrudRecordListExplorer,
+  type CrudRecordListBase,
   EnabledSelect,
   ModuleActionButton,
   RecordActionBar,
@@ -12,12 +14,11 @@ import type { Tenant } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiInput } from '@muyun/vue-ui-antdv';
 import { createTenantManagementState } from './tenantManagementState';
-import FlatRecordExplorer from './static-management/FlatRecordExplorer.vue';
-import type { FlatRecordBase } from './static-management/flatRecordModel';
 
 defineOptions({ name: 'TenantManagementView' });
 
 const tenantContext = useModuleContext<Tenant>();
+const explorerSearchKeyword = ref('');
 const {
   selected,
   draft,
@@ -79,19 +80,19 @@ const cardActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
-function tenantTitle(record: FlatRecordBase) {
+function tenantTitle(record: CrudRecordListBase) {
   return record.title ?? record.alias ?? record.id ?? '未命名租户';
 }
 
-function tenantSubtitle(record: FlatRecordBase) {
+function tenantSubtitle(record: CrudRecordListBase) {
   return record.alias ?? record.id;
 }
 
-function handleLoaded(records: FlatRecordBase[]) {
+function handleLoaded(records: CrudRecordListBase[]) {
   handleListLoaded(records as Tenant[]);
 }
 
-function handleTenantSelect(record: FlatRecordBase) {
+function handleTenantSelect(record: CrudRecordListBase) {
   handleSelect(record as Tenant);
 }
 
@@ -123,6 +124,8 @@ function handleCardAction(action: RecordActionItem) {
     group-title="身份权限"
     sidebar-title="租户列表"
     refresh-title="刷新租户列表"
+    v-model:sidebar-search-keyword="explorerSearchKeyword"
+    sidebar-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
     :action-error="actionError"
@@ -133,17 +136,22 @@ function handleCardAction(action: RecordActionItem) {
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>
-      <ModuleActionButton :context="tenantContext" action-code="create" @click="startCreate">
-        新建租户
-      </ModuleActionButton>
+      <ModuleActionButton
+        class="record-panel-create-button"
+        :context="tenantContext"
+        action-code="create"
+        title="新建租户"
+        icon-only
+        @click="startCreate"
+      />
     </template>
 
     <template #explorer>
-      <FlatRecordExplorer
+      <CrudRecordListExplorer
         :context="tenantContext"
         :selected-id="selected?.id"
         :reload-key="reloadKey"
-        search-placeholder="搜索租户名称、alias 或 ID"
+        :keyword="explorerSearchKeyword"
         empty-description="暂无租户"
         loading-tip="加载租户列表"
         fallback-title="未命名租户"

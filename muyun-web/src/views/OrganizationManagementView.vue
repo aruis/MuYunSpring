@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
   EnabledSelect,
   ModuleActionButton,
-  OrganizationTree,
   RecordActionBar,
   parentRecordConstraints,
   RecordMetaSection,
   RecordPicker,
   StaticManagementLayout,
+  TreeRecordExplorer,
   type RecordActionItem,
   type RecordPickerRecord,
+  type TreeRecordBase,
 } from '@muyun/platform-components';
 import type { Organization } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
@@ -20,6 +21,7 @@ import { createOrganizationManagementState } from './organizationManagementState
 defineOptions({ name: 'OrganizationManagementView' });
 
 const organizationContext = useModuleContext<Organization>();
+const explorerSearchKeyword = ref('');
 const {
   selected,
   draft,
@@ -79,6 +81,10 @@ function organizationTitle(record: RecordPickerRecord) {
   return record.title ?? record.code ?? record.id ?? '未命名机构';
 }
 
+function treeOrganizationTitle(record: TreeRecordBase) {
+  return record.title ?? record.code ?? record.id ?? '未命名机构';
+}
+
 function handleCardAction(action: RecordActionItem) {
   if (action.key === 'edit') {
     startEdit();
@@ -111,6 +117,8 @@ function handleCardAction(action: RecordActionItem) {
     group-title="组织管理"
     sidebar-title="机构树"
     refresh-title="刷新机构树"
+    v-model:sidebar-search-keyword="explorerSearchKeyword"
+    sidebar-search-placeholder="搜索机构名称、编码或 ID"
     :mode="mode"
     :card-title="cardTitle"
     :action-error="actionError"
@@ -120,26 +128,30 @@ function handleCardAction(action: RecordActionItem) {
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>
-      <ModuleActionButton :context="organizationContext" action-code="create" @click="startCreateRoot">
-        新建根机构
-      </ModuleActionButton>
       <ModuleActionButton
+        class="record-panel-create-button"
         :context="organizationContext"
         action-code="create"
-        :disabled="!selected"
-        @click="startCreateChild"
-      >
-        新建下级
-      </ModuleActionButton>
+        title="新建根机构"
+        icon-only
+        @click="startCreateRoot"
+      />
     </template>
 
     <template #explorer>
-      <OrganizationTree
+      <TreeRecordExplorer
         :context="organizationContext"
         :selected-id="selected?.id"
         :reload-key="reloadKey"
+        :keyword="explorerSearchKeyword"
+        search-mode="none"
+        search-placeholder="搜索机构名称、编码或 ID"
+        empty-description="暂无机构"
+        loading-tip="加载机构树"
+        fallback-title="未命名机构"
+        :title-of="treeOrganizationTitle"
         @select="handleSelect"
-        @loaded="handleTreeLoaded"
+        @loaded="handleTreeLoaded($event as Organization[])"
       />
     </template>
 

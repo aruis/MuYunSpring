@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
+  CrudRecordListExplorer,
+  type CrudRecordListBase,
   EnabledSelect,
   ModuleActionButton,
   RecordActionBar,
@@ -12,12 +14,11 @@ import type { Application } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 import { confirmAction, UiInput } from '@muyun/vue-ui-antdv';
 import { createApplicationManagementState } from './applicationManagementState';
-import FlatRecordExplorer from './static-management/FlatRecordExplorer.vue';
-import type { FlatRecordBase } from './static-management/flatRecordModel';
 
 defineOptions({ name: 'ApplicationManagementView' });
 
 const applicationContext = useModuleContext<Application>();
+const explorerSearchKeyword = ref('');
 const {
   selected,
   draft,
@@ -72,19 +73,19 @@ const cardActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
-function applicationTitle(record: FlatRecordBase) {
+function applicationTitle(record: CrudRecordListBase) {
   return record.title ?? record.alias ?? record.id ?? '未命名应用';
 }
 
-function applicationSubtitle(record: FlatRecordBase) {
+function applicationSubtitle(record: CrudRecordListBase) {
   return record.alias ?? record.id;
 }
 
-function handleLoaded(records: FlatRecordBase[]) {
+function handleLoaded(records: CrudRecordListBase[]) {
   handleListLoaded(records as Application[]);
 }
 
-function handleApplicationSelect(record: FlatRecordBase) {
+function handleApplicationSelect(record: CrudRecordListBase) {
   handleSelect(record as Application);
 }
 
@@ -116,6 +117,8 @@ function handleCardAction(action: RecordActionItem) {
     group-title="平台配置"
     sidebar-title="应用列表"
     refresh-title="刷新应用列表"
+    v-model:sidebar-search-keyword="explorerSearchKeyword"
+    sidebar-search-placeholder="搜索应用名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
     :action-error="actionError"
@@ -125,17 +128,22 @@ function handleCardAction(action: RecordActionItem) {
     @refresh="reloadKey += 1"
   >
     <template #sidebar-actions>
-      <ModuleActionButton :context="applicationContext" action-code="create" @click="startCreate">
-        新建应用
-      </ModuleActionButton>
+      <ModuleActionButton
+        class="record-panel-create-button"
+        :context="applicationContext"
+        action-code="create"
+        title="新建应用"
+        icon-only
+        @click="startCreate"
+      />
     </template>
 
     <template #explorer>
-      <FlatRecordExplorer
+      <CrudRecordListExplorer
         :context="applicationContext"
         :selected-id="selected?.id"
         :reload-key="reloadKey"
-        search-placeholder="搜索应用名称、alias 或 ID"
+        :keyword="explorerSearchKeyword"
         empty-description="暂无应用"
         loading-tip="加载应用列表"
         fallback-title="未命名应用"

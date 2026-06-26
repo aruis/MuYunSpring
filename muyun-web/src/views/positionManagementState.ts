@@ -353,6 +353,7 @@ export function createPositionManagementState(
       positionMessage.value = '已保存';
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         selectedCategory.value = categories.value.find((category) => category.id === saved.categoryId);
+        positions.value = [saved];
       }
       positionReloadKey.value += 1;
     } catch (cause) {
