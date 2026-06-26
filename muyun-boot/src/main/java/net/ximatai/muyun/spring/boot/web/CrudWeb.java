@@ -7,6 +7,8 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.ActionExecutionContext;
@@ -67,6 +69,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     }
 
     default Criteria queryCriteria(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            return queryAbility.queryCriteria(WebQueryRequests.from(request));
+        }
         if (request != null && !request.conditions().isEmpty()) {
             throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
         }
@@ -77,6 +82,9 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            return queryAbility.querySorts(WebQueryRequests.from(request));
+        }
         if (request != null && !request.sorts().isEmpty()) {
             throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());
         }

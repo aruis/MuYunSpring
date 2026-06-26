@@ -1,0 +1,82 @@
+package net.ximatai.muyun.spring.boot.web.query;
+
+import net.ximatai.muyun.spring.ability.query.QueryCondition;
+import net.ximatai.muyun.spring.ability.query.QueryCriteria;
+import net.ximatai.muyun.spring.ability.query.QueryGroupOperator;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.ability.query.QuerySort;
+import net.ximatai.muyun.spring.boot.web.WebQueryCondition;
+import net.ximatai.muyun.spring.boot.web.WebQueryCriteria;
+import net.ximatai.muyun.spring.boot.web.WebQueryGroupOperator;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebSort;
+
+import java.util.List;
+public final class WebQueryRequests {
+    private WebQueryRequests() {
+    }
+
+    public static QueryRequest from(WebQueryRequest request) {
+        if (request == null) {
+            return QueryRequest.empty();
+        }
+        return new QueryRequest(
+                conditions(request.conditions()),
+                criteria(request.criteria()),
+                request.queryForm(),
+                sorts(request.sorts()),
+                request.uiConfigId(),
+                request.queryTemplateId(),
+                request.externalQueryValues(),
+                request.quickSearch(),
+                request.quickSearchFields(),
+                request.navigationSessionEnabled(),
+                request.navigationQueryKey()
+        );
+    }
+
+    public static QueryCriteria criteria(WebQueryCriteria criteria) {
+        if (criteria == null) {
+            return null;
+        }
+        return new QueryCriteria(
+                groupOperator(criteria.operator()),
+                conditions(criteria.conditions()),
+                criteria.groups().stream().map(WebQueryRequests::criteria).toList()
+        );
+    }
+
+    public static List<QueryCondition> conditions(List<WebQueryCondition> conditions) {
+        if (conditions == null || conditions.isEmpty()) {
+            return List.of();
+        }
+        return conditions.stream()
+                .map(WebQueryRequests::condition)
+                .toList();
+    }
+
+    public static QueryCondition condition(WebQueryCondition condition) {
+        return new QueryCondition(condition.fieldName(),
+                operator(condition.operator()),
+                condition.values(),
+                condition.timeZone());
+    }
+
+    public static List<QuerySort> sorts(List<WebSort> sorts) {
+        if (sorts == null || sorts.isEmpty()) {
+            return List.of();
+        }
+        return sorts.stream()
+                .map(sort -> new QuerySort(sort.field(), sort.desc()))
+                .toList();
+    }
+
+    private static QueryGroupOperator groupOperator(WebQueryGroupOperator operator) {
+        return operator == WebQueryGroupOperator.OR ? QueryGroupOperator.OR : QueryGroupOperator.AND;
+    }
+
+    private static QueryOperator operator(String operator) {
+        return operator == null || operator.isBlank() ? null : QueryOperator.from(operator);
+    }
+}

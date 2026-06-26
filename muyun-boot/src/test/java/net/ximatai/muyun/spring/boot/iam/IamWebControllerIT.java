@@ -1,5 +1,11 @@
 package net.ximatai.muyun.spring.boot.iam;
 
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaClause;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
+import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.PageResult;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -37,11 +43,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -216,6 +227,91 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("employee-1"))
                 .andExpect(jsonPath("$.departmentId").value("dept-1"));
+    }
+
+    @Test
+    void shouldQueryEmployeesWithDeclaredConditionsQuickSearchAndDepartmentScope() throws Exception {
+        Employee employee = new Employee();
+        employee.setId("employee-1");
+        employee.setOrganizationId("org-1");
+        employee.setDepartmentId("dept-child");
+        employee.setEmployeeNo("E001");
+        employee.setTitle("Alice");
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(departmentService.selfAndDescendantIds("org-1", "dept-root"))
+                .thenReturn(List.of("dept-root", "dept-child"));
+        when(employeeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/iam.employee/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "quickSearch": "Alice",
+                                  "conditions": [
+                                    {"fieldName":"enabled","operator":"EQ","values":[true]}
+                                  ],
+                                  "externalQueryValues": {
+                                    "departmentScope": {
+                                      "organizationId": "org-1",
+                                      "departmentId": "dept-root",
+                                      "includeChildren": true
+                                    }
+                                  },
+                                  "sorts": [{"field":"employeeNo","desc":false}]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("employee-1"));
+
+        org.mockito.ArgumentCaptor<Criteria> criteria = org.mockito.ArgumentCaptor.forClass(Criteria.class);
+        org.mockito.ArgumentCaptor<Sort[]> sorts = org.mockito.ArgumentCaptor.forClass(Sort[].class);
+        verify(employeeService).pageQuery(criteria.capture(), any(PageRequest.class), sorts.capture());
+        assertThat(containsCondition(criteria.getValue(), "enabled", true)).isTrue();
+        assertThat(containsCondition(criteria.getValue(), "organizationId", "org-1")).isTrue();
+        assertThat(containsCondition(criteria.getValue(), "departmentId", "dept-child")).isTrue();
+        assertThat(containsCondition(criteria.getValue(), "title", "Alice")).isTrue();
+        assertThat(sorts.getValue()).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectUndeclaredEmployeeQueryFieldsInRealMvcContext() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(post("/iam.employee/query")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "conditions": [
+                                    {"fieldName":"passwordHash","operator":"EQ","values":["secret"]}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message")
+                        .value("query field is not supported by iam.employee: passwordHash"));
+
+        verify(employeeService, never()).pageQuery(isA(Criteria.class), isA(PageRequest.class), any(Sort[].class));
+    }
+
+    @Test
+    void shouldRejectEmployeeQueryTemplateUntilStaticTemplateSourceExists() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(post("/iam.employee/query")
+                        .contentType("application/json")
+                        .content("""
+                                {"queryTemplateId":"employee-default"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
+                .andExpect(jsonPath("$.message").value("query template is not supported by iam.employee"));
+
+        verify(employeeService, never()).pageQuery(isA(Criteria.class), isA(PageRequest.class), any(Sort[].class));
     }
 
     @Test
@@ -557,5 +653,37 @@ class IamWebControllerIT {
         delegation.setDelegateEmployeeId(delegateEmployeeId);
         delegation.setEnabled(Boolean.TRUE);
         return delegation;
+    }
+
+    private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
+        return clauses(criteria).stream()
+                .anyMatch(clause -> fieldName.equals(clause.getField())
+                        && clause.getValues().contains(value));
+    }
+
+    private List<CriteriaClause> clauses(Criteria criteria) {
+        List<CriteriaClause> result = new ArrayList<>();
+        collect(criteria.getRoot(), result);
+        return result;
+    }
+
+    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = criteriaNode(entry);
+            if (node instanceof CriteriaClause clause) {
+                result.add(clause);
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collect(childGroup, result);
+            }
+        }
+    }
+
+    private Object criteriaNode(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
     }
 }
