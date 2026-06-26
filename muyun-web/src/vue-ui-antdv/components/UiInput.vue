@@ -15,6 +15,7 @@ const emit = defineEmits<{
   'update:value': [value: string];
   blur: [event: FocusEvent];
   focus: [event: FocusEvent];
+  keydown: [event: KeyboardEvent];
 }>();
 </script>
 
@@ -26,6 +27,7 @@ const emit = defineEmits<{
     :autofocus="autofocus"
     @blur="emit('blur', $event)"
     @focus="emit('focus', $event)"
+    @keydown="emit('keydown', $event)"
     @update:value="emit('update:value', $event)"
   />
 </template>

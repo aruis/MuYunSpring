@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { UiButton, UiInput } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'RecordExplorerPanel' });
@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const searchExpanded = ref(false);
+const searchRoot = ref<HTMLElement>();
 const searchVisible = computed(
   () => props.searchable && (searchExpanded.value || props.searchKeyword.trim().length > 0),
 );
@@ -37,12 +38,23 @@ function toggleSearch() {
     return;
   }
   searchExpanded.value = true;
+  focusSearchInput();
 }
 
 function handleSearchBlur() {
   if (!props.searchKeyword.trim()) {
     searchExpanded.value = false;
   }
+}
+
+function handleSearchEscape() {
+  emit('update:searchKeyword', '');
+  searchExpanded.value = false;
+}
+
+async function focusSearchInput() {
+  await nextTick();
+  searchRoot.value?.querySelector('input')?.focus();
 }
 </script>
 
@@ -74,13 +86,14 @@ function handleSearchBlur() {
     </header>
 
     <Transition name="record-explorer-search">
-      <div v-if="searchVisible" class="record-explorer-search">
+      <div v-if="searchVisible" ref="searchRoot" class="record-explorer-search">
         <UiInput
           :value="searchKeyword"
           :placeholder="searchPlaceholder"
           autofocus
           @update:value="emit('update:searchKeyword', $event)"
           @blur="handleSearchBlur"
+          @keydown.esc="handleSearchEscape"
         />
       </div>
     </Transition>

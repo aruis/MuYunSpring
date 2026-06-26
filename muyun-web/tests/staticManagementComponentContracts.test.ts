@@ -23,6 +23,16 @@ test('record explorer panel uses a single title contract', () => {
   assert.doesNotMatch(layoutSource, /groupTitle/);
 });
 
+test('record explorer panel focuses and closes search from keyboard', () => {
+  const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
+  const inputSource = readSource('src/vue-ui-antdv/components/UiInput.vue');
+
+  assert.match(panelSource, /focusSearchInput/);
+  assert.match(panelSource, /querySelector\('input'\)\?\.focus\(\)/);
+  assert.match(panelSource, /@keydown\.esc="handleSearchEscape"/);
+  assert.match(inputSource, /keydown: \[event: KeyboardEvent\]/);
+});
+
 function readSource(path: string) {
   return readFileSync(resolve(root, path), 'utf8');
 }
