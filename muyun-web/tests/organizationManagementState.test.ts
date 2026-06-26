@@ -86,6 +86,19 @@ test('organization management state trims parent id and clears blank parent id',
   assert.equal((calls[1] as Organization).parentId, 'org-root');
 });
 
+test('organization management state cancels root creation back to selected organization', () => {
+  const state = createOrganizationManagementState(createContext(), async () => true);
+
+  state.handleSelect({ id: 'org-root', code: 'ROOT', title: '总部', enabled: true });
+  state.startCreateRoot();
+  state.draft.value.title = '临时机构';
+  state.cancelEdit();
+
+  assert.equal(state.selected.value?.id, 'org-root');
+  assert.equal(state.mode.value, 'view');
+  assert.equal(state.draft.value.title, '总部');
+});
+
 test('organization management state respects delete confirmation result', async () => {
   const calls: string[] = [];
   const context = createContext({

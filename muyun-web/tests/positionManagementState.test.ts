@@ -161,6 +161,43 @@ test('position management state saves normalized positions with required categor
   assert.equal(state.positionReloadKey.value, 1);
 });
 
+test('position management state moves selected category when saved position changes category', async () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position', {
+    update: async (_id, record) => ({ ...record, id: 'pos-dev' }),
+  });
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([
+    { id: 'category-tech', code: 'TECH', title: '技术序列' },
+    { id: 'category-admin', code: 'ADMIN', title: '职能序列' },
+  ]);
+  state.positions.value = [
+    { id: 'pos-dev', categoryId: 'category-tech', code: 'DEV', title: '开发工程师' },
+    { id: 'pos-test', categoryId: 'category-tech', code: 'TEST', title: '测试工程师' },
+  ];
+  state.selectPosition({
+    id: 'pos-dev',
+    categoryId: 'category-tech',
+    code: 'DEV',
+    title: '开发工程师',
+  });
+  state.startEditPosition();
+  state.positionDraft.value.categoryId = 'category-admin';
+
+  await state.savePosition();
+
+  assert.equal(state.selectedCategory.value?.id, 'category-admin');
+  assert.equal(state.selectedPosition.value?.id, 'pos-dev');
+  assert.equal(state.selectedPosition.value?.categoryId, 'category-admin');
+  assert.deepEqual(
+    state.filteredPositions.value.map((record) => record.id),
+    ['pos-dev'],
+  );
+  assert.equal(state.positionMode.value, 'view');
+  assert.equal(state.positionReloadKey.value, 1);
+});
+
 test('position management state leaves position edit mode when switching category', () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category');
   const positionContext = createContext<Position>('iam.position');
@@ -186,6 +223,30 @@ test('position management state leaves position edit mode when switching categor
   assert.equal(state.selectedPosition.value, undefined);
   assert.deepEqual(state.positionDraft.value, emptyPositionDraft('category-admin'));
   assert.equal(state.positionError.value, undefined);
+});
+
+test('position management state cancels category creation back to selected category', () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category');
+  const positionContext = createContext<Position>('iam.position');
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+
+  state.startCreateRootCategory();
+  state.categoryDraft.value.title = '临时根分类';
+  state.cancelCategoryEdit();
+
+  assert.equal(state.selectedCategory.value?.id, 'category-tech');
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryDraft.value.title, '技术序列');
+
+  state.startCreateChildCategory();
+  state.categoryDraft.value.title = '临时子分类';
+  state.cancelCategoryEdit();
+
+  assert.equal(state.selectedCategory.value?.id, 'category-tech');
+  assert.equal(state.categoryMode.value, 'view');
+  assert.equal(state.categoryDraft.value.title, '技术序列');
 });
 
 test('position management state cancels creating a position back to empty view', () => {

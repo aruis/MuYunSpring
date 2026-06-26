@@ -1,7 +1,7 @@
 export {};
+export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
-export { default as OrganizationTree } from './OrganizationTree.vue';
 export { default as RecordActionBar } from './RecordActionBar.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
@@ -34,6 +34,13 @@ export type {
 export { resolveRecordPickerMode } from './recordPickerModel';
 export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
+export type { RecordListExplorerRecord } from './RecordListExplorer.vue';
+export type { CrudRecordListBase } from './crudRecordListModel';
+export {
+  defaultCrudRecordListMatches,
+  defaultCrudRecordListSubtitle,
+  defaultCrudRecordListTitle,
+} from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type {

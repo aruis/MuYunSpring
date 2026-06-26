@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { UiButton, UiInput } from '@muyun/vue-ui-antdv';
 
 defineOptions({ name: 'RecordExplorerPanel' });
@@ -7,11 +7,13 @@ defineOptions({ name: 'RecordExplorerPanel' });
 const props = withDefaults(
   defineProps<{
     title: string;
+    refreshTitle?: string;
     searchKeyword?: string;
     searchPlaceholder?: string;
     searchable?: boolean;
   }>(),
   {
+    refreshTitle: undefined,
     searchKeyword: '',
     searchPlaceholder: '搜索名称、编码或 ID',
     searchable: true,
@@ -24,6 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const searchExpanded = ref(false);
+const searchRoot = ref<HTMLElement>();
 const searchVisible = computed(
   () => props.searchable && (searchExpanded.value || props.searchKeyword.trim().length > 0),
 );
@@ -35,12 +38,23 @@ function toggleSearch() {
     return;
   }
   searchExpanded.value = true;
+  focusSearchInput();
 }
 
 function handleSearchBlur() {
   if (!props.searchKeyword.trim()) {
     searchExpanded.value = false;
   }
+}
+
+function handleSearchEscape() {
+  emit('update:searchKeyword', '');
+  searchExpanded.value = false;
+}
+
+async function focusSearchInput() {
+  await nextTick();
+  searchRoot.value?.querySelector('input')?.focus();
 }
 </script>
 
@@ -52,10 +66,12 @@ function handleSearchBlur() {
         icon-name="reload"
         icon-position="end"
         type="text"
-        :title="`刷新${title}`"
+        :title="refreshTitle ?? `刷新${title}`"
         @click="emit('refresh')"
       >
-        <span>{{ title }}</span>
+        <span class="record-explorer-panel-title-text">
+          <span>{{ title }}</span>
+        </span>
       </UiButton>
       <div class="record-explorer-panel-actions">
         <UiButton
@@ -70,13 +86,14 @@ function handleSearchBlur() {
     </header>
 
     <Transition name="record-explorer-search">
-      <div v-if="searchVisible" class="record-explorer-search">
+      <div v-if="searchVisible" ref="searchRoot" class="record-explorer-search">
         <UiInput
           :value="searchKeyword"
           :placeholder="searchPlaceholder"
           autofocus
           @update:value="emit('update:searchKeyword', $event)"
           @blur="handleSearchBlur"
+          @keydown.esc="handleSearchEscape"
         />
       </div>
     </Transition>
@@ -118,6 +135,12 @@ function handleSearchBlur() {
   color: var(--muyun-text);
   font-size: 16px;
   font-weight: 700;
+}
+
+.record-explorer-panel-title-text {
+  display: inline-grid;
+  justify-items: start;
+  gap: 2px;
 }
 
 .record-explorer-panel-title :deep(.ui-button-trailing-icon) {
