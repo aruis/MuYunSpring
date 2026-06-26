@@ -15,11 +15,12 @@ test('record list explorer exposes visible secondary identity text', () => {
   assert.match(listSource, /:secondary="recordSecondary\(record\)"/);
 });
 
-test('static management layout forwards group title to explorer eyebrow', () => {
-  const source = readSource('src/platform-components/StaticManagementLayout.vue');
+test('record explorer panel uses a single title contract', () => {
+  const panelSource = readSource('src/platform-components/RecordExplorerPanel.vue');
+  const layoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
 
-  assert.match(source, /groupTitle: string/);
-  assert.match(source, /:eyebrow="groupTitle"/);
+  assert.doesNotMatch(panelSource, /eyebrow/);
+  assert.doesNotMatch(layoutSource, /groupTitle/);
 });
 
 function readSource(path: string) {

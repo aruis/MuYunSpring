@@ -114,7 +114,6 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
-    group-title="平台配置"
     sidebar-title="应用列表"
     refresh-title="刷新应用列表"
     v-model:sidebar-search-keyword="explorerSearchKeyword"

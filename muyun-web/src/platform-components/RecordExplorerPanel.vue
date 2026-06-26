@@ -7,14 +7,12 @@ defineOptions({ name: 'RecordExplorerPanel' });
 const props = withDefaults(
   defineProps<{
     title: string;
-    eyebrow?: string;
     refreshTitle?: string;
     searchKeyword?: string;
     searchPlaceholder?: string;
     searchable?: boolean;
   }>(),
   {
-    eyebrow: undefined,
     refreshTitle: undefined,
     searchKeyword: '',
     searchPlaceholder: '搜索名称、编码或 ID',
@@ -60,7 +58,6 @@ function handleSearchBlur() {
         @click="emit('refresh')"
       >
         <span class="record-explorer-panel-title-text">
-          <span v-if="eyebrow" class="record-explorer-panel-eyebrow">{{ eyebrow }}</span>
           <span>{{ title }}</span>
         </span>
       </UiButton>
@@ -131,13 +128,6 @@ function handleSearchBlur() {
   display: inline-grid;
   justify-items: start;
   gap: 2px;
-}
-
-.record-explorer-panel-eyebrow {
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .record-explorer-panel-title :deep(.ui-button-trailing-icon) {

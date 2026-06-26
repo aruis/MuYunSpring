@@ -121,7 +121,6 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
-    group-title="身份权限"
     sidebar-title="租户列表"
     refresh-title="刷新租户列表"
     v-model:sidebar-search-keyword="explorerSearchKeyword"

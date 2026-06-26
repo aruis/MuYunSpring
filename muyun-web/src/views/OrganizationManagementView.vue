@@ -114,7 +114,6 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
-    group-title="组织管理"
     sidebar-title="机构树"
     refresh-title="刷新机构树"
     v-model:sidebar-search-keyword="explorerSearchKeyword"
