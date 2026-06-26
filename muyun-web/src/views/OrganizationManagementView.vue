@@ -114,9 +114,9 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
+    v-model:sidebar-search-keyword="explorerSearchKeyword"
     sidebar-title="机构树"
     refresh-title="刷新机构树"
-    v-model:sidebar-search-keyword="explorerSearchKeyword"
     sidebar-search-placeholder="搜索机构名称、编码或 ID"
     :mode="mode"
     :card-title="cardTitle"

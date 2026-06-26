@@ -142,6 +142,19 @@ test('application management state ignores duplicate save while saving', async (
   assert.equal(state.selected.value?.id, 'sales');
 });
 
+test('application management state cancels creation back to selected application', () => {
+  const context = createContext();
+  const state = createApplicationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'platform', alias: 'platform', title: '平台', enabled: true });
+  state.startCreate();
+  state.cancelEdit();
+
+  assert.equal(state.selected.value?.id, 'platform');
+  assert.equal(state.draft.value.id, 'platform');
+  assert.equal(state.mode.value, 'view');
+});
+
 test('application management state respects delete confirmation result', async () => {
   const calls: string[] = [];
   const context = createContext({

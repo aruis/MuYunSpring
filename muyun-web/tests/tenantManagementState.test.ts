@@ -84,6 +84,19 @@ test('tenant management state toggles enable state and refreshes selected record
   assert.equal(state.reloadKey.value, 1);
 });
 
+test('tenant management state cancels creation back to selected tenant', () => {
+  const context = createContext();
+  const state = createTenantManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'tenant_a', alias: 'tenant_a', title: '租户 A', enabled: true });
+  state.startCreate();
+  state.cancelEdit();
+
+  assert.equal(state.selected.value?.id, 'tenant_a');
+  assert.equal(state.draft.value.id, 'tenant_a');
+  assert.equal(state.mode.value, 'view');
+});
+
 test('tenant management state respects delete confirmation result', async () => {
   const calls: string[] = [];
   const context = createContext({

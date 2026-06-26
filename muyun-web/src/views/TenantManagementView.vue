@@ -121,9 +121,9 @@ function handleCardAction(action: RecordActionItem) {
 
 <template>
   <StaticManagementLayout
+    v-model:sidebar-search-keyword="explorerSearchKeyword"
     sidebar-title="租户列表"
     refresh-title="刷新租户列表"
-    v-model:sidebar-search-keyword="explorerSearchKeyword"
     sidebar-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"

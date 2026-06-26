@@ -100,7 +100,6 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       actionError.value = options.createDeniedMessage;
       return;
     }
-    selected.value = undefined;
     draft.value = options.emptyDraft();
     mode.value = 'create';
     clearFeedback();
