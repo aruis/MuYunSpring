@@ -34,6 +34,8 @@
 
 管理页 explorer 标题使用单行标题，不显示业务分组 eyebrow。业务分组属于页面导航或详情区语义，不进入 explorer header。
 
+`editor` slot 只承载显式 create/edit 态的轻量抽屉，不承载选中记录的常驻详情展示。选中记录是 explorer body 与右侧详情区的上下文，不应让 `RecordExplorerPanel` 因为 `selected` 存在就打开 editor。常见写法是由父页面用 `mode !== 'view'` 控制 editor 可见性。
+
 右上角动作区应保持克制：
 
 1. 常规管理页只放一个主新增动作，使用 icon-only 圆形按钮。
@@ -139,6 +141,7 @@ detail area
 | 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，页面保留平台租户保护规则。 |
 | 组织管理 | `StaticManagementLayout -> TreeRecordExplorer` | 页面直接依赖树能力，避免在主业务页套业务语义树封装。 |
 | 岗位管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer` | 分类树和岗位列表由页面统一编排，岗位列表加载依赖选中分类。 |
+| 字典管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer` | 应用 scope 由页面控制，类目树和字典项列表由页面统一编排，左侧类目 editor 只在显式新建/编辑时展开。 |
 
 ## 新页面判断
 
@@ -158,4 +161,5 @@ detail area
 2. 新建子记录时，取消回到触发新建时的父级或列表上下文。
 3. 新建根记录时，如果进入前已有选中记录，取消应回到原选中记录。
 4. 不要用“当前 selected 是否为空”隐式决定取消行为，除非该页面已经明确没有返回对象。
-5. 复杂主子页面应为 create/edit/cancel 补状态测试。
+5. 空列表、删除最后一条记录、切换 scope 或重新加载后，默认回到 `view`；新增必须由用户显式点击新增动作触发，除非页面明确设计为连续录入。
+6. 复杂主子页面应为 create/edit/cancel、空列表和 scope 切换补状态测试。

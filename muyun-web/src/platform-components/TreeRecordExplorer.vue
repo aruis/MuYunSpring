@@ -3,14 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue';
 import {
   UiButton,
   UiEmpty,
-  UiError,
   UiInput,
   UiSpin,
   UiTree,
   type UiRecordInlineAction,
   type UiTreeNode,
 } from '@muyun/vue-ui-antdv';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import type { ModuleContext } from '@muyun/web-core';
 import type { WebTreeNode } from '@muyun/web-contracts';
 import {
   defaultTreeRecordMatches,
@@ -21,6 +20,7 @@ import {
   flattenTreeRecords,
   type TreeRecordBase,
 } from './treeRecordModel';
+import { presentPlatformError } from './platformErrorFeedback';
 
 defineOptions({ name: 'TreeRecordExplorer' });
 
@@ -69,7 +69,6 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
-const error = ref<string>();
 const localKeyword = ref('');
 const searchExpanded = ref(false);
 const tree = ref<WebTreeNode<TreeRecordBase>[]>([]);
@@ -117,7 +116,6 @@ watch(effectiveKeyword, () => {
 
 async function loadTree() {
   loading.value = true;
-  error.value = undefined;
   try {
     await props.context.runtime.ready;
     const treeCapability = props.context.abilities.tree();
@@ -126,7 +124,10 @@ async function loadTree() {
     expandedKeys.value = firstTwoTreeLevels(response.records);
     emit('loaded', flattenTreeRecords(response.records));
   } catch (cause) {
-    error.value = normalizeError(cause).message;
+    tree.value = [];
+    expandedKeys.value = [];
+    emit('loaded', []);
+    presentPlatformError(cause, { source: 'tree-record-explorer', phase: 'load' });
   } finally {
     loading.value = false;
   }
@@ -216,7 +217,6 @@ defineExpose({ openSearch, toggleSearch });
       </div>
     </Transition>
     <UiSpin v-if="loading" :tip="loadingTip" />
-    <UiError v-else-if="error" :message="error" />
     <UiEmpty v-else-if="nodes.length === 0" :description="emptyDescription" />
     <UiTree
       v-else

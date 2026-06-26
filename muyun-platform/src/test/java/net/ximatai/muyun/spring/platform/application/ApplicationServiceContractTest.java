@@ -8,14 +8,24 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategory;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.metadata.Metadata;
+import net.ximatai.muyun.spring.platform.metadata.MetadataService;
+import net.ximatai.muyun.spring.platform.module.PlatformModule;
+import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.platform.support.TestMemoryDao;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.lang.reflect.Method;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,11 +82,96 @@ class ApplicationServiceContractTest {
                 .containsExactly("sales", "crm");
     }
 
+    @Test
+    void shouldRejectDeletingApplicationReferencedByModules() {
+        PlatformModuleService moduleService = new PlatformModuleService(new TestMemoryDao<>());
+        ApplicationService service = applicationService(moduleService, new MetadataService(new TestMemoryDao<>()),
+                new DictionaryCategoryService(new TestMemoryDao<>()));
+        service.insert(application("crm"));
+        moduleService.insert(module("crm.customer", "crm"));
+
+        assertThatThrownBy(() -> service.delete("crm"))
+                .isInstanceOf(PlatformException.class)
+                .satisfies(cause -> assertApplicationReferencedError(cause, "module"))
+                .hasMessageContaining("模块");
+    }
+
+    @Test
+    void shouldRejectDeletingApplicationReferencedByMetadata() {
+        MetadataService metadataService = new MetadataService(new TestMemoryDao<>());
+        ApplicationService service = applicationService(new PlatformModuleService(new TestMemoryDao<>()), metadataService,
+                new DictionaryCategoryService(new TestMemoryDao<>()));
+        service.insert(application("crm"));
+        metadataService.insert(metadata("customer", "crm"));
+
+        assertThatThrownBy(() -> service.delete("crm"))
+                .isInstanceOf(PlatformException.class)
+                .satisfies(cause -> assertApplicationReferencedError(cause, "metadata"))
+                .hasMessageContaining("元数据");
+    }
+
+    @Test
+    void shouldRejectDeletingApplicationReferencedByDictionaryCategories() {
+        DictionaryCategoryService categoryService = new DictionaryCategoryService(new TestMemoryDao<>());
+        ApplicationService service = applicationService(new PlatformModuleService(new TestMemoryDao<>()),
+                new MetadataService(new TestMemoryDao<>()), categoryService);
+        service.insert(application("crm"));
+        categoryService.insert(dictionaryCategory("status", "crm"));
+
+        assertThatThrownBy(() -> service.delete("crm"))
+                .isInstanceOf(PlatformException.class)
+                .satisfies(cause -> assertApplicationReferencedError(cause, "dictionaryCategory"))
+                .hasMessageContaining("字典类目");
+    }
+
     private Application application(String alias) {
         Application application = new Application();
         application.setAlias(alias);
         application.setTitle(alias);
         return application;
+    }
+
+    private ApplicationService applicationService(PlatformModuleService moduleService,
+                                                  MetadataService metadataService,
+                                                  DictionaryCategoryService dictionaryCategoryService) {
+        return new ApplicationService(new ApplicationMemoryDao(), Optional.of(moduleService), Optional.of(metadataService),
+                Optional.of(dictionaryCategoryService));
+    }
+
+    private PlatformModule module(String alias, String applicationAlias) {
+        PlatformModule module = new PlatformModule();
+        module.setAlias(alias);
+        module.setTitle(alias);
+        module.setApplicationAlias(applicationAlias);
+        return module;
+    }
+
+    private Metadata metadata(String alias, String applicationAlias) {
+        Metadata metadata = new Metadata();
+        metadata.setAlias(alias);
+        metadata.setTitle(alias);
+        metadata.setApplicationAlias(applicationAlias);
+        return metadata;
+    }
+
+    private DictionaryCategory dictionaryCategory(String alias, String applicationAlias) {
+        DictionaryCategory category = new DictionaryCategory();
+        category.setAlias(alias);
+        category.setTitle(alias);
+        category.setApplicationAlias(applicationAlias);
+        return category;
+    }
+
+    private void assertApplicationReferencedError(Throwable cause, String referencedResource) {
+        PlatformException exception = (PlatformException) cause;
+        assertThat(exception.code()).isEqualTo(PlatformErrorCodes.RESOURCE_IN_USE);
+        assertThat(exception.httpStatus()).isEqualTo(409);
+        assertThat(exception.scope().moduleAlias()).isEqualTo(ApplicationService.MODULE_ALIAS);
+        assertThat(exception.scope().actionCode()).isEqualTo("delete");
+        assertThat(exception.targets()).extracting("recordId").containsExactly("crm");
+        assertThat(exception.details())
+                .containsEntry("applicationAlias", "crm")
+                .containsEntry("referencedResource", referencedResource);
     }
 
     private static class ApplicationMemoryDao implements BaseDao<Application, String> {

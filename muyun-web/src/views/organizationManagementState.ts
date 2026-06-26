@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import type { Organization } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
+import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
@@ -83,13 +84,13 @@ export function createOrganizationManagementState(
       return;
     }
     if (mode.value === 'create' ? !canCreate.value : !canUpdate.value) {
-      actionError.value = '当前用户无权保存机构';
+      presentActionMessage('当前用户无权保存机构');
       return;
     }
     clearFeedback();
     const validDraft = normalizedDraft(draft.value);
     if (!validDraft.title || !validDraft.code) {
-      actionError.value = '机构名称和机构编码不能为空';
+      presentActionMessage('机构名称和机构编码不能为空');
       return;
     }
 
@@ -107,7 +108,7 @@ export function createOrganizationManagementState(
       actionMessage.value = '已保存';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      presentActionCause(cause);
     } finally {
       saving.value = false;
     }
@@ -118,7 +119,7 @@ export function createOrganizationManagementState(
       return;
     }
     if (!canEnable.value) {
-      actionError.value = '当前用户无权变更机构启停状态';
+      presentActionMessage('当前用户无权变更机构启停状态');
       return;
     }
     clearFeedback();
@@ -138,7 +139,7 @@ export function createOrganizationManagementState(
       actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      presentActionCause(cause);
     } finally {
       saving.value = false;
     }
@@ -149,7 +150,7 @@ export function createOrganizationManagementState(
       return;
     }
     if (!canDelete.value) {
-      actionError.value = '当前用户无权删除机构';
+      presentActionMessage('当前用户无权删除机构');
       return;
     }
     const confirmed = await confirmAction({
@@ -173,7 +174,7 @@ export function createOrganizationManagementState(
       actionMessage.value = '已删除';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      presentActionCause(cause);
     } finally {
       saving.value = false;
     }
@@ -182,6 +183,17 @@ export function createOrganizationManagementState(
   function clearFeedback() {
     actionError.value = undefined;
     actionMessage.value = undefined;
+  }
+
+  function presentActionCause(cause: unknown) {
+    const error = normalizeError(cause);
+    actionError.value = error.message;
+    presentPlatformError(error, { source: 'organization-management-action', phase: 'action' });
+  }
+
+  function presentActionMessage(message: string) {
+    actionError.value = message;
+    presentPlatformMessage(message, { source: 'organization-management-action', phase: 'action' });
   }
 
   return {

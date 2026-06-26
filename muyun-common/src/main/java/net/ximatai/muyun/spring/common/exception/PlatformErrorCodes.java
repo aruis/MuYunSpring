@@ -7,6 +7,7 @@ public final class PlatformErrorCodes {
     public static final String ACCESS_DENIED = "ACCESS_DENIED";
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String CONFLICT_VERSION = "CONFLICT_VERSION";
+    public static final String RESOURCE_IN_USE = "RESOURCE_IN_USE";
     public static final String RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
     public static final String CONFIG_MISSING = "CONFIG_MISSING";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";

@@ -34,7 +34,14 @@ export function createStaticModuleCrudClient<TRecord>(
   http: HttpClient,
   options: { moduleAlias: string },
 ): StaticModuleCrudClient<TRecord> {
-  const modulePath = modulePathOf(options.moduleAlias);
+  return createStaticResourceCrudClient(http, modulePathOf(options.moduleAlias));
+}
+
+export function createStaticResourceCrudClient<TRecord>(
+  http: HttpClient,
+  resourcePath: string,
+): StaticModuleCrudClient<TRecord> {
+  const modulePath = modulePathOf(resourcePath);
   return {
     query: (request) =>
       http.request<WebPageResponse<TRecord>>({
@@ -77,8 +84,15 @@ export function createStaticModuleTreeClient<TRecord>(
   http: HttpClient,
   options: { moduleAlias: string },
 ): StaticModuleTreeClient<TRecord> {
-  const modulePath = modulePathOf(options.moduleAlias);
-  const crud = createStaticModuleCrudClient<TRecord>(http, { moduleAlias: options.moduleAlias });
+  return createStaticResourceTreeClient(http, modulePathOf(options.moduleAlias));
+}
+
+export function createStaticResourceTreeClient<TRecord>(
+  http: HttpClient,
+  resourcePath: string,
+): StaticModuleTreeClient<TRecord> {
+  const modulePath = modulePathOf(resourcePath);
+  const crud = createStaticResourceCrudClient<TRecord>(http, modulePath);
   return {
     ...crud,
     tree: () =>

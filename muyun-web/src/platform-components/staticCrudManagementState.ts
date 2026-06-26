@@ -1,8 +1,15 @@
 import { computed, ref } from 'vue';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import { normalizeError, type AppError, type ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
+import {
+  matchesPlatformActionErrorHandler,
+  presentPlatformError,
+  presentPlatformMessage,
+  type PlatformActionErrorHandler,
+} from './platformErrorFeedback';
 
 export type StaticCrudCardMode = 'view' | 'edit' | 'create';
+export type StaticCrudActionCode = 'create' | 'update' | 'delete' | 'enable' | 'disable';
 
 export interface StaticCrudRecord {
   id?: string;
@@ -11,6 +18,16 @@ export interface StaticCrudRecord {
 }
 
 export type StaticCrudConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
+
+export interface StaticCrudActionErrorContext<TRecord extends StaticCrudRecord> {
+  actionCode: StaticCrudActionCode;
+  mode: StaticCrudCardMode;
+  record: TRecord | undefined;
+}
+
+export type StaticCrudActionErrorHandler<TRecord extends StaticCrudRecord> = PlatformActionErrorHandler<
+  StaticCrudActionErrorContext<TRecord>
+>;
 
 export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   context: ModuleContext<TRecord>;
@@ -32,6 +49,7 @@ export interface StaticCrudManagementOptions<TRecord extends StaticCrudRecord> {
   canDeleteRecord?: (record: TRecord) => boolean;
   canEnableRecord?: (record: TRecord, actionCode: 'enable' | 'disable') => boolean;
   validateBeforeSave?: (record: TRecord) => string | undefined;
+  actionErrorHandlers?: StaticCrudActionErrorHandler<TRecord>[];
 }
 
 export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
@@ -97,7 +115,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
 
   function startCreate() {
     if (!canCreate.value) {
-      actionError.value = options.createDeniedMessage;
+      presentActionMessage(options.createDeniedMessage, 'authorization');
       return;
     }
     draft.value = options.emptyDraft();
@@ -128,18 +146,18 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       return;
     }
     if (mode.value === 'create' ? !canCreate.value : !canUpdate.value) {
-      actionError.value = options.saveDeniedMessage;
+      presentActionMessage(options.saveDeniedMessage, 'authorization');
       return;
     }
     clearFeedback();
     const validDraft = options.normalizeDraft(draft.value, selected.value, mode.value);
     if (!options.isValid(validDraft)) {
-      actionError.value = options.requiredMessage;
+      presentActionMessage(options.requiredMessage, 'validation');
       return;
     }
     const validationError = options.validateBeforeSave?.(validDraft);
     if (validationError) {
-      actionError.value = validationError;
+      presentActionMessage(validationError, 'validation');
       return;
     }
 
@@ -157,7 +175,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       actionMessage.value = '已保存';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      handleActionError(cause, mode.value === 'create' ? 'create' : 'update');
     } finally {
       saving.value = false;
     }
@@ -171,7 +189,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       return;
     }
     if (!canEnable.value) {
-      actionError.value = options.enableDeniedMessage;
+      presentActionMessage(options.enableDeniedMessage, 'authorization');
       return;
     }
     clearFeedback();
@@ -191,7 +209,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      handleActionError(cause, selected.value?.enabled === false ? 'enable' : 'disable');
     } finally {
       saving.value = false;
     }
@@ -205,7 +223,7 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       return;
     }
     if (!canDelete.value) {
-      actionError.value = options.deleteDeniedMessage(selected.value);
+      presentActionMessage(options.deleteDeniedMessage(selected.value), 'authorization');
       return;
     }
     const confirmed = await options.confirmAction({
@@ -229,10 +247,42 @@ export function useFlatCrudManagementState<TRecord extends StaticCrudRecord>(
       actionMessage.value = '已删除';
       reloadKey.value += 1;
     } catch (cause) {
-      actionError.value = normalizeError(cause).message;
+      handleActionError(cause, 'delete');
     } finally {
       saving.value = false;
     }
+  }
+
+  function handleActionError(cause: unknown, actionCode: StaticCrudActionCode) {
+    const error = normalizeError(cause);
+    const context: StaticCrudActionErrorContext<TRecord> = {
+      actionCode,
+      mode: mode.value,
+      record: selected.value,
+    };
+    if (tryHandleActionError(error, context)) {
+      return;
+    }
+    actionError.value = error.message;
+    presentPlatformError(error, { source: 'static-crud-action', phase: 'action' });
+  }
+
+  function tryHandleActionError(error: AppError, context: StaticCrudActionErrorContext<TRecord>) {
+    const handlers = options.actionErrorHandlers ?? [];
+    const handler = handlers.find((item) => matchesActionErrorHandler(error, item));
+    if (!handler) {
+      return false;
+    }
+    handler.handle(error, context);
+    return true;
+  }
+
+  function presentActionMessage(
+    message: string,
+    phase: 'validation' | 'authorization' | 'action' = 'action',
+  ) {
+    actionError.value = message;
+    presentPlatformMessage(message, { source: 'static-crud-action', phase });
   }
 
   function clearFeedback() {
@@ -271,4 +321,11 @@ function requiredId(record: StaticCrudRecord, recordName: string) {
     throw new Error(`${recordName} ID 不能为空`);
   }
   return record.id;
+}
+
+function matchesActionErrorHandler<TRecord extends StaticCrudRecord>(
+  error: AppError,
+  handler: StaticCrudActionErrorHandler<TRecord>,
+) {
+  return matchesPlatformActionErrorHandler(error, handler);
 }

@@ -73,6 +73,9 @@ async function focusSearchInput() {
           <span>{{ title }}</span>
         </span>
       </UiButton>
+      <div v-if="$slots['title-extra']" class="record-explorer-panel-title-extra">
+        <slot name="title-extra" />
+      </div>
       <div class="record-explorer-panel-actions">
         <UiButton
           v-if="searchable"
@@ -141,6 +144,13 @@ async function focusSearchInput() {
   display: inline-grid;
   justify-items: start;
   gap: 2px;
+}
+
+.record-explorer-panel-title-extra {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
 }
 
 .record-explorer-panel-title :deep(.ui-button-trailing-icon) {

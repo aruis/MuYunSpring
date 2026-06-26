@@ -1,4 +1,5 @@
 export {};
+export { default as ApplicationScopeSwitcher } from './ApplicationScopeSwitcher.vue';
 export { default as CrudRecordListExplorer } from './CrudRecordListExplorer.vue';
 export { default as EnabledSelect } from './EnabledSelect.vue';
 export { default as ModuleActionButton } from './ModuleActionButton.vue';
@@ -42,7 +43,9 @@ export {
   defaultCrudRecordListTitle,
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
+export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
+export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
 export type {
   StaticCrudCardMode,
   StaticCrudConfirmAction,

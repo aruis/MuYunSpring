@@ -10,7 +10,6 @@ withDefaults(
     refreshTitle: string;
     mode: 'view' | 'edit' | 'create';
     cardTitle: string;
-    actionError?: string;
     actionMessage?: string;
     mutedMessage?: string;
     showStatus?: boolean;
@@ -20,7 +19,6 @@ withDefaults(
     sidebarSearchable?: boolean;
   }>(),
   {
-    actionError: undefined,
     actionMessage: undefined,
     mutedMessage: undefined,
     showStatus: false,
@@ -67,8 +65,7 @@ const emit = defineEmits<{
         <slot name="card-actions" />
       </header>
 
-      <div v-if="actionError" class="message error">{{ actionError }}</div>
-      <div v-else-if="actionMessage" class="message success">{{ actionMessage }}</div>
+      <div v-if="actionMessage" class="message success">{{ actionMessage }}</div>
       <div v-else-if="mutedMessage" class="message muted">{{ mutedMessage }}</div>
 
       <slot />
@@ -148,12 +145,6 @@ h2 {
   padding: 9px 10px;
   border-radius: 6px;
   font-size: 13px;
-}
-
-.message.error {
-  border: 1px solid var(--muyun-danger-border);
-  background: var(--muyun-danger-bg);
-  color: var(--muyun-danger-text);
 }
 
 .message.success {

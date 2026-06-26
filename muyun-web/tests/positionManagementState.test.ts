@@ -249,6 +249,20 @@ test('position management state cancels category creation back to selected categ
   assert.equal(state.categoryDraft.value.title, '技术序列');
 });
 
+test('position management state keeps category editor closed after deleting category', async () => {
+  const categoryContext = createContext<PositionCategory>('iam.position_category', {
+    delete: async () => ({ count: 1 }),
+  });
+  const positionContext = createContext<Position>('iam.position');
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
+
+  state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
+  await state.deleteCategory();
+
+  assert.equal(state.selectedCategory.value, undefined);
+  assert.equal(state.categoryMode.value, 'view');
+});
+
 test('position management state cancels creating a position back to empty view', () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category');
   const positionContext = createContext<Position>('iam.position');
@@ -316,7 +330,6 @@ test('position management state respects delete confirmation result', async () =
 });
 
 test('position management state notifies delete failures globally', async () => {
-  const notifications: string[] = [];
   const categoryContext = createContext<PositionCategory>('iam.position_category', {
     delete: async () => {
       throw new Error('position category is referenced by positions: category-tech');
@@ -327,12 +340,7 @@ test('position management state notifies delete failures globally', async () => 
       throw new Error('position is referenced by employees: pos-dev');
     },
   });
-  const state = createPositionManagementState(
-    categoryContext,
-    positionContext.crud,
-    async () => true,
-    (message) => notifications.push(message),
-  );
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
 
   state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
   await state.deleteCategory();
@@ -346,14 +354,9 @@ test('position management state notifies delete failures globally', async () => 
   });
   await state.deletePosition();
   assert.equal(state.positionError.value, 'position is referenced by employees: pos-dev');
-  assert.deepEqual(notifications, [
-    'position category is referenced by positions: category-tech',
-    'position is referenced by employees: pos-dev',
-  ]);
 });
 
-test('position management state keeps non-delete failures local', async () => {
-  const notifications: string[] = [];
+test('position management state notifies action failures through unified feedback', async () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category');
   const positionContext = createContext<Position>('iam.position', {
     insert: async () => {
@@ -363,12 +366,7 @@ test('position management state keeps non-delete failures local', async () => {
       throw new Error('position enable failed');
     },
   });
-  const state = createPositionManagementState(
-    categoryContext,
-    positionContext.crud,
-    async () => true,
-    (message) => notifications.push(message),
-  );
+  const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
 
   state.handleCategoriesLoaded([{ id: 'category-tech', code: 'TECH', title: '技术序列' }]);
   state.startCreatePosition();
@@ -386,7 +384,6 @@ test('position management state keeps non-delete failures local', async () => {
   await state.togglePosition();
 
   assert.equal(state.positionError.value, 'position enable failed');
-  assert.deepEqual(notifications, []);
 });
 
 test('position management state stays readonly without create permissions after empty states', async () => {

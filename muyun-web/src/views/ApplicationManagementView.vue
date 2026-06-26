@@ -25,7 +25,6 @@ const {
   mode,
   reloadKey,
   saving,
-  actionError,
   actionMessage,
   cardTitle,
   readonly,
@@ -120,7 +119,6 @@ function handleCardAction(action: RecordActionItem) {
     sidebar-search-placeholder="搜索应用名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
-    :action-error="actionError"
     :action-message="actionMessage"
     :show-status="Boolean(selected && mode === 'view')"
     :enabled="selected?.enabled"

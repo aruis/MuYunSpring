@@ -14,9 +14,7 @@ import type { Option, Position, PositionCategory } from '@muyun/web-contracts';
 import { useModuleContext } from '@muyun/web-core';
 import {
   confirmAction,
-  showErrorMessage,
   UiEmpty,
-  UiError,
   UiInput,
   UiSelect,
   UiSpin,
@@ -42,14 +40,12 @@ const {
   categoryDraft,
   categoryMode,
   categorySaving,
-  categoryError,
   categoryMessage,
   selectedPosition,
   positionDraft,
   positionMode,
   positionLoading,
   positionSaving,
-  positionError,
   positionMessage,
   selectedCategoryId,
   filteredPositions,
@@ -77,7 +73,7 @@ const {
   savePosition,
   togglePosition,
   deletePosition,
-} = createPositionManagementState(categoryContext, positionContext.crud, confirmAction, showErrorMessage);
+} = createPositionManagementState(categoryContext, positionContext.crud, confirmAction);
 
 const categoryOptions = computed<Option[]>(() =>
   categories.value
@@ -252,8 +248,7 @@ function handlePositionAction(action: RecordActionItem) {
                 @action="handleCategoryAction"
               />
             </header>
-            <div v-if="categoryError" class="message error">{{ categoryError }}</div>
-            <div v-else-if="categoryMessage" class="message success">{{ categoryMessage }}</div>
+            <div v-if="categoryMessage" class="message success">{{ categoryMessage }}</div>
             <form class="category-form" @submit.prevent="saveCategory">
               <label>
                 <span>分类编码</span>
@@ -300,7 +295,6 @@ function handlePositionAction(action: RecordActionItem) {
         />
       </template>
       <UiSpin v-if="positionLoading" tip="加载岗位列表" />
-      <UiError v-else-if="positionError" :message="positionError" />
       <UiEmpty v-else-if="!selectedCategory" description="请选择岗位分类" />
       <RecordListExplorer
         v-else
@@ -340,8 +334,7 @@ function handlePositionAction(action: RecordActionItem) {
           />
         </div>
       </header>
-      <div v-if="positionError" class="message error">{{ positionError }}</div>
-      <div v-else-if="positionMessage" class="message success">{{ positionMessage }}</div>
+      <div v-if="positionMessage" class="message success">{{ positionMessage }}</div>
       <UiEmpty v-if="!selectedPosition && positionMode === 'view'" description="请选择或新建岗位" />
       <form v-else class="position-form" @submit.prevent="savePosition">
         <label>
@@ -580,12 +573,6 @@ h3 {
   padding: 9px 10px;
   border-radius: 6px;
   font-size: 13px;
-}
-
-.message.error {
-  border: 1px solid var(--muyun-danger-border);
-  background: var(--muyun-danger-bg);
-  color: var(--muyun-danger-text);
 }
 
 .message.success {

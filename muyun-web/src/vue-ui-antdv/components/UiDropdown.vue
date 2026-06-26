@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import UiIcon from './UiIcon.vue';
 import type { UiDropdownItem } from '../types';
 
 defineOptions({ name: 'UiDropdown' });
 
-defineProps<{
-  items: UiDropdownItem[];
-}>();
+withDefaults(
+  defineProps<{
+    items: UiDropdownItem[];
+    selectedKey?: string;
+    align?: 'start' | 'end';
+  }>(),
+  {
+    selectedKey: undefined,
+    align: 'end',
+  },
+);
 
 defineSlots<{
   default(props: { toggle: () => void }): unknown;
@@ -59,18 +68,19 @@ onBeforeUnmount(() => {
     <span class="ui-dropdown-trigger" @click.stop="toggle">
       <slot :toggle="toggle" />
     </span>
-    <div v-if="open" class="ui-dropdown-popup" role="menu">
+    <div v-if="open" class="ui-dropdown-popup" :class="`align-${align}`" role="menu">
       <button
         v-for="item in items"
         :key="item.key"
         class="ui-dropdown-item"
-        :class="{ danger: item.danger }"
+        :class="{ danger: item.danger, selected: item.key === selectedKey }"
         :disabled="item.disabled"
         type="button"
         role="menuitem"
         @click="select(item)"
       >
-        {{ item.title }}
+        <span class="ui-dropdown-item-title">{{ item.title }}</span>
+        <UiIcon v-if="item.key === selectedKey" name="check" class="ui-dropdown-item-check" />
       </button>
     </div>
   </div>
@@ -89,34 +99,68 @@ onBeforeUnmount(() => {
 .ui-dropdown-popup {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
   z-index: 50;
-  min-width: 120px;
-  padding: 4px;
-  border: 1px solid #d6e0ec;
-  border-radius: 6px;
+  min-width: max(100%, 112px);
+  padding: 5px;
+  border: 1px solid var(--muyun-border-subtle);
+  border-radius: 8px;
   background: #fff;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 14%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
+}
+
+.ui-dropdown-popup.align-start {
+  left: 0;
+}
+
+.ui-dropdown-popup.align-end {
+  right: 0;
 }
 
 .ui-dropdown-item {
+  display: flex;
   width: 100%;
-  padding: 8px 10px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
-  color: #1f2933;
+  color: var(--muyun-text-body);
+  font-size: 13px;
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
 
 .ui-dropdown-item:hover:not(:disabled) {
-  background: #f3f6fa;
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text);
+}
+
+.ui-dropdown-item.selected {
+  background: var(--muyun-selected);
+  color: var(--muyun-text);
+}
+
+.ui-dropdown-item-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-dropdown-item-check {
+  flex: 0 0 auto;
+  color: var(--muyun-text-muted);
+  font-size: 11px;
 }
 
 .ui-dropdown-item:disabled {
-  color: #9aa6b2;
+  color: var(--muyun-text-muted);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .ui-dropdown-item.danger {

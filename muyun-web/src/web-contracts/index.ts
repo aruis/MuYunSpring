@@ -333,6 +333,20 @@ export interface Position extends StandardEnabledSortableEntity {
   description?: string;
 }
 
+export type DictionaryCategoryKind = 'FOLDER' | 'DICTIONARY' | 'folder' | 'dictionary';
+
+export interface DictionaryCategory extends StandardEnabledTreeEntity {
+  applicationAlias?: string;
+  alias?: string;
+  categoryKind?: DictionaryCategoryKind;
+}
+
+export interface DictionaryItem extends StandardEnabledTreeEntity {
+  categoryId?: string;
+  categoryAlias?: string;
+  code?: string;
+}
+
 export interface TreeSortRequest {
   previousId?: string | null;
   nextId?: string | null;

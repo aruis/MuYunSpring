@@ -2,14 +2,22 @@ import { computed } from 'vue';
 import type { Application } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { useFlatCrudManagementState } from '../platform-components/staticCrudManagementState';
+import {
+  type StaticCrudActionErrorHandler,
+  useFlatCrudManagementState,
+} from '../platform-components/staticCrudManagementState';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 
+export interface ApplicationManagementStateOptions {
+  actionErrorHandlers?: StaticCrudActionErrorHandler<Application>[];
+}
+
 export function createApplicationManagementState(
   applicationContext: ModuleContext<Application>,
   confirmAction: ConfirmAction,
+  options: ApplicationManagementStateOptions = {},
 ) {
   const state = useFlatCrudManagementState<Application>({
     context: applicationContext,
@@ -28,6 +36,7 @@ export function createApplicationManagementState(
     createDeniedMessage: '当前用户无权新建应用',
     enableDeniedMessage: '当前用户无权变更应用启停状态',
     deleteDeniedMessage: () => '当前用户无权删除应用',
+    actionErrorHandlers: options.actionErrorHandlers,
   });
   const aliasReadonly = computed(() => state.mode.value !== 'create');
   return {
