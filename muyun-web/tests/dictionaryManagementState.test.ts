@@ -211,7 +211,6 @@ test('dictionary management state sends unexpected item save failures to global 
   await state.saveItem();
 
   assert.equal(state.itemError.value, undefined);
-  assert.equal(state.itemMessage.value, undefined);
   assert.equal(state.itemMode.value, 'create');
   assert.equal(state.itemReloadKey.value, 0);
 });

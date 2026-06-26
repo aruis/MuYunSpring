@@ -125,6 +125,64 @@ test('dictionary item parent selector uses tree-aware record picker', () => {
   assert.match(pickerSource, /\(\) => loadRecords\(\)/);
 });
 
+test('three-column management pages use the platform detail panel', () => {
+  const indexSource = readSource('src/platform-components/index.ts');
+  const panelSource = readSource('src/platform-components/RecordDetailPanel.vue');
+  const layoutSource = readSource('src/platform-components/StaticManagementLayout.vue');
+  const applicationViewSource = readSource('src/views/ApplicationManagementView.vue');
+  const tenantViewSource = readSource('src/views/TenantManagementView.vue');
+  const organizationViewSource = readSource('src/views/OrganizationManagementView.vue');
+  const positionViewSource = readSource('src/views/PositionManagementView.vue');
+  const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
+  const departmentViewSource = readSource('src/views/DepartmentManagementView.vue');
+  const dictionaryDetailSource = dictionaryViewSource.slice(
+    dictionaryViewSource.indexOf('<RecordDetailPanel class="dictionary-column"'),
+  );
+
+  assert.match(indexSource, /RecordDetailPanel/);
+  assert.match(panelSource, /defineOptions\(\{ name: 'RecordDetailPanel' \}\)/);
+  assert.match(panelSource, /<slot name="status" \/>/);
+  assert.match(panelSource, /<slot name="actions" \/>/);
+  assert.match(layoutSource, /<RecordDetailPanel[\s\S]*:title="cardTitle"/);
+  assert.match(layoutSource, /<slot name="card-status" \/>/);
+  assert.doesNotMatch(layoutSource, /RecordStatusTag|card-header|title-line/);
+  for (const source of [applicationViewSource, tenantViewSource, organizationViewSource]) {
+    assert.match(source, /<template #card-status>/);
+    assert.match(source, /<RecordStatusSwitch/);
+    assert.doesNotMatch(source, /EnabledSelect|启用状态|toggle-enabled|show-status/);
+  }
+  assert.equal(matchCount(positionViewSource, /<RecordDetailPanel/g), 1);
+  assert.equal(matchCount(dictionaryViewSource, /<RecordDetailPanel/g), 1);
+  assert.equal(matchCount(departmentViewSource, /<RecordDetailPanel/g), 1);
+  assert.doesNotMatch(positionViewSource, /detail-column|detail-title-group|detail-header-actions/);
+  assert.doesNotMatch(dictionaryViewSource, /detail-column|detail-title-group|detail-header-actions/);
+  assert.doesNotMatch(departmentViewSource, /detail-column|detail-title-group|detail-header-actions/);
+  assert.doesNotMatch(dictionaryDetailSource, /EnabledSelect|启用状态/);
+  assert.doesNotMatch(layoutSource, /actionMessage|message success|message\.success/);
+  assert.doesNotMatch(positionViewSource, /message success|message\.success/);
+  assert.doesNotMatch(dictionaryViewSource, /message success|message\.success/);
+  assert.doesNotMatch(departmentViewSource, /message success|message\.success/);
+});
+
+test('department management uses organization as read-only scope and department as tree business', () => {
+  const departmentViewSource = readSource('src/views/DepartmentManagementView.vue');
+  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
+
+  assert.equal(matchCount(departmentViewSource, /<TreeRecordExplorer/g), 2);
+  assert.match(departmentViewSource, /moduleAlias: 'iam\.organization'/);
+  assert.match(departmentViewSource, /moduleAlias: 'iam\.department'/);
+  assert.match(departmentViewSource, /createOrganizationScopedDepartmentContext/);
+  assert.match(departmentViewSource, /path: '\/iam\.department\/tree'/);
+  assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
+  assert.match(departmentViewSource, /<RecordPicker[\s\S]*v-model:value="draft\.parentId"/);
+  assert.match(departmentViewSource, /parentRecordConstraints\(draft\.id\)/);
+  assert.doesNotMatch(departmentViewSource, /OrganizationManagementView/);
+  assert.doesNotMatch(departmentViewSource, /EnabledSelect/);
+  assert.doesNotMatch(departmentViewSource, /启用状态/);
+  assert.match(departmentStateSource, /resetDepartmentsForOrganization/);
+  assert.doesNotMatch(departmentStateSource, /已启用|已停用/);
+});
+
 test('static crud state supports business-owned action errors before platform fallback', () => {
   const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
@@ -140,11 +198,28 @@ test('static crud state supports business-owned action errors before platform fa
 
 test('platform error feedback respects global error presentation slots', () => {
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
+  const uiFeedbackSource = readSource('src/vue-ui-antdv/feedback.ts');
+  const staticCrudStateSource = readSource('src/platform-components/staticCrudManagementState.ts');
+  const departmentStateSource = readSource('src/views/departmentManagementState.ts');
+  const organizationStateSource = readSource('src/views/organizationManagementState.ts');
+  const positionStateSource = readSource('src/views/positionManagementState.ts');
+  const dictionaryStateSource = readSource('src/views/dictionaryManagementState.ts');
 
   assert.match(feedbackSource, /resolveGlobalErrorPresentation/);
   assert.match(feedbackSource, /toErrorUiContext/);
   assert.match(feedbackSource, /presentation\.slot === 'silent'/);
   assert.match(feedbackSource, /presentation\.slot === 'redirect-login'/);
+  assert.match(feedbackSource, /tone\?: 'error' \| 'success'/);
+  assert.match(feedbackSource, /showSuccessMessage\(message\)/);
+  assert.match(uiFeedbackSource, /const id = `muyun-global-feedback-\$\{tone\}`/);
+  assert.match(uiFeedbackSource, /className = `muyun-global-feedback \$\{tone\}`/);
+  assert.match(uiFeedbackSource, /\.muyun-global-feedback\.success[\s\S]*right: 20px/);
+  assert.match(uiFeedbackSource, /\.muyun-global-feedback\.error[\s\S]*left: 50%/);
+  assert.match(staticCrudStateSource, /tone: 'success'/);
+  assert.match(departmentStateSource, /tone: 'success'/);
+  assert.match(organizationStateSource, /tone: 'success'/);
+  assert.match(positionStateSource, /tone: 'success'/);
+  assert.match(dictionaryStateSource, /tone: 'success'/);
 });
 
 function readSource(path: string) {

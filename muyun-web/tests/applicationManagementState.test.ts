@@ -85,7 +85,6 @@ test('application management state toggles enable state and refreshes selected r
 
   assert.deepEqual(calls, ['disable:platform', 'view:platform']);
   assert.equal(state.selected.value?.enabled, false);
-  assert.equal(state.actionMessage.value, '已停用');
   assert.equal(state.reloadKey.value, 1);
 });
 
@@ -183,7 +182,6 @@ test('application management state respects delete confirmation result', async (
   assert.deepEqual(calls, ['delete:platform']);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'create');
-  assert.equal(state.actionMessage.value, '已删除');
 });
 
 test('application management state records unhandled chain errors for platform fallback', async () => {
@@ -201,7 +199,6 @@ test('application management state records unhandled chain errors for platform f
   await state.removeSelected();
 
   assert.equal(state.actionError.value, '该应用下仍有字典类目，不能删除');
-  assert.equal(state.actionMessage.value, undefined);
   assert.equal(state.selected.value?.id, 'app');
 });
 
@@ -268,7 +265,6 @@ test('application management state stays readonly after deleting last applicatio
   assert.deepEqual(calls, ['delete:platform']);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'view');
-  assert.equal(state.actionMessage.value, '已删除');
 });
 
 test('application management state exposes action authorization flags', () => {

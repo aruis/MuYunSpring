@@ -21,7 +21,6 @@ export function createPositionManagementState(
   const categoryMode = ref<CategoryCardMode>('view');
   const categorySaving = ref(false);
   const categoryError = ref<string>();
-  const categoryMessage = ref<string>();
 
   const positions = ref<Position[]>([]);
   const selectedPosition = ref<Position>();
@@ -30,7 +29,6 @@ export function createPositionManagementState(
   const positionLoading = ref(false);
   const positionSaving = ref(false);
   const positionError = ref<string>();
-  const positionMessage = ref<string>();
 
   const selectedCategoryId = computed(() => selectedCategory.value?.id);
   const selectedCategoryTitle = computed(() => positionCategoryTitleOf(selectedCategory.value));
@@ -169,7 +167,7 @@ export function createPositionManagementState(
       selectedCategory.value = saved;
       categoryDraft.value = copyCategory(saved);
       categoryMode.value = 'view';
-      categoryMessage.value = '已保存';
+      presentCategorySuccess('已保存');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -198,7 +196,7 @@ export function createPositionManagementState(
       }
       selectedCategory.value = await categoryContext.abilities.crud().view(selectedCategory.value.id);
       categoryDraft.value = copyCategory(selectedCategory.value);
-      categoryMessage.value = selectedCategory.value.enabled === false ? '已停用' : '已启用';
+      presentCategorySuccess(selectedCategory.value.enabled === false ? '已停用' : '已启用');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -232,7 +230,7 @@ export function createPositionManagementState(
       selectedCategory.value = undefined;
       categoryDraft.value = emptyCategoryDraft();
       categoryMode.value = 'view';
-      categoryMessage.value = '已删除';
+      presentCategorySuccess('已删除');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -348,7 +346,7 @@ export function createPositionManagementState(
       selectedPosition.value = saved;
       positionDraft.value = copyPosition(saved);
       positionMode.value = 'view';
-      positionMessage.value = '已保存';
+      presentPositionSuccess('已保存');
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         selectedCategory.value = categories.value.find((category) => category.id === saved.categoryId);
         positions.value = [saved];
@@ -411,7 +409,7 @@ export function createPositionManagementState(
       selectedPosition.value = undefined;
       positionDraft.value = emptyPositionDraft(selectedCategoryId.value ?? '');
       positionMode.value = selectedCategoryId.value && canCreatePosition.value ? 'create' : 'view';
-      positionMessage.value = '已删除';
+      presentPositionSuccess('已删除');
       positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);
@@ -422,12 +420,10 @@ export function createPositionManagementState(
 
   function clearCategoryFeedback() {
     categoryError.value = undefined;
-    categoryMessage.value = undefined;
   }
 
   function clearPositionFeedback() {
     positionError.value = undefined;
-    positionMessage.value = undefined;
   }
 
   function presentCategoryCause(cause: unknown) {
@@ -452,6 +448,22 @@ export function createPositionManagementState(
     presentPlatformMessage(message, { source: 'position-action', phase: 'action' });
   }
 
+  function presentCategorySuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'position-category-action',
+      phase: 'action',
+      tone: 'success',
+    });
+  }
+
+  function presentPositionSuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'position-action',
+      phase: 'action',
+      tone: 'success',
+    });
+  }
+
   return {
     categoryReloadKey,
     positionReloadKey,
@@ -461,7 +473,6 @@ export function createPositionManagementState(
     categoryMode,
     categorySaving,
     categoryError,
-    categoryMessage,
     positions,
     selectedPosition,
     positionDraft,
@@ -469,7 +480,6 @@ export function createPositionManagementState(
     positionLoading,
     positionSaving,
     positionError,
-    positionMessage,
     selectedCategoryId,
     selectedCategoryTitle,
     filteredPositions,

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import {
   ModuleActionButton,
   RecordActionBar,
+  RecordDetailPanel,
   RecordExplorerPanel,
   RecordListExplorer,
   RecordMetaSection,
@@ -40,13 +41,11 @@ const {
   categoryDraft,
   categoryMode,
   categorySaving,
-  categoryMessage,
   selectedPosition,
   positionDraft,
   positionMode,
   positionLoading,
   positionSaving,
-  positionMessage,
   selectedCategoryId,
   filteredPositions,
   canToggleCategory,
@@ -248,7 +247,6 @@ function handlePositionAction(action: RecordActionItem) {
                 @action="handleCategoryAction"
               />
             </header>
-            <div v-if="categoryMessage" class="message success">{{ categoryMessage }}</div>
             <form class="category-form" @submit.prevent="saveCategory">
               <label>
                 <span>分类编码</span>
@@ -307,34 +305,30 @@ function handlePositionAction(action: RecordActionItem) {
       />
     </RecordExplorerPanel>
 
-    <main class="position-column detail-column">
-      <header class="column-header">
-        <div class="detail-title-group">
-          <h2>{{ positionCardTitle }}</h2>
-          <RecordStatusSwitch
-            v-if="positionMode === 'create'"
-            :enabled="positionDraft.enabled"
-            :show-label="false"
-            @change="positionDraft.enabled = $event"
-          />
-          <RecordStatusSwitch
-            v-else-if="selectedPosition"
-            :enabled="selectedPosition.enabled"
-            :disabled="positionSaving || !canTogglePosition"
-            :loading="positionSaving"
-            :show-label="false"
-            @change="togglePosition"
-          />
-        </div>
-        <div class="detail-header-actions">
-          <RecordActionBar
-            :context="categoryContext"
-            :actions="positionActions"
-            @action="handlePositionAction"
-          />
-        </div>
-      </header>
-      <div v-if="positionMessage" class="message success">{{ positionMessage }}</div>
+    <RecordDetailPanel class="position-column" :title="positionCardTitle">
+      <template #status>
+        <RecordStatusSwitch
+          v-if="positionMode === 'create'"
+          :enabled="positionDraft.enabled"
+          :show-label="false"
+          @change="positionDraft.enabled = $event"
+        />
+        <RecordStatusSwitch
+          v-else-if="selectedPosition"
+          :enabled="selectedPosition.enabled"
+          :disabled="positionSaving || !canTogglePosition"
+          :loading="positionSaving"
+          :show-label="false"
+          @change="togglePosition"
+        />
+      </template>
+      <template #actions>
+        <RecordActionBar
+          :context="categoryContext"
+          :actions="positionActions"
+          @action="handlePositionAction"
+        />
+      </template>
       <UiEmpty v-if="!selectedPosition && positionMode === 'view'" description="请选择或新建岗位" />
       <form v-else class="position-form" @submit.prevent="savePosition">
         <label>
@@ -373,7 +367,7 @@ function handlePositionAction(action: RecordActionItem) {
         :record="positionDraft"
         show-sort-order
       />
-    </main>
+    </RecordDetailPanel>
   </section>
 </template>
 
@@ -395,49 +389,9 @@ function handlePositionAction(action: RecordActionItem) {
   background: var(--muyun-surface);
 }
 
-.detail-column {
-  gap: 12px;
-  padding: 14px;
-}
-
 .category-column,
 .list-column {
   min-height: 0;
-}
-
-.column-header {
-  display: flex;
-  align-items: center;
-}
-
-.column-header {
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.column-header > div:first-child {
-  min-width: 0;
-}
-
-.column-header h2 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-header-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.detail-title-group {
-  display: inline-flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
 }
 
 .record-panel-create-button {
@@ -447,16 +401,9 @@ function handlePositionAction(action: RecordActionItem) {
   border-radius: 999px;
 }
 
-.column-header p,
 h2,
 h3 {
   margin: 0;
-}
-
-.column-header p {
-  color: var(--muyun-text-muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 h2 {
@@ -567,18 +514,6 @@ h3 {
 
 .full-row {
   grid-column: 1 / -1;
-}
-
-.message {
-  padding: 9px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.message.success {
-  border: 1px solid var(--muyun-success-border);
-  background: var(--muyun-success-bg);
-  color: var(--muyun-success-text);
 }
 
 @media (max-width: 1180px) {

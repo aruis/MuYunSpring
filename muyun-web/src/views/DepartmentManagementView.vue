@@ -1,0 +1,400 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import {
+  ModuleActionButton,
+  parentRecordConstraints,
+  RecordActionBar,
+  RecordDetailPanel,
+  RecordExplorerPanel,
+  RecordMetaSection,
+  RecordPicker,
+  RecordStatusSwitch,
+  TreeRecordExplorer,
+  type RecordActionItem,
+} from '@muyun/platform-components';
+import type {
+  Department,
+  Organization,
+  WebListResponse,
+  WebQueryRequest,
+  WebTreeNode,
+} from '@muyun/web-contracts';
+import {
+  useModuleContext,
+  type ModuleAbilities,
+  type ModuleContext,
+  type StaticModuleTreeClient,
+} from '@muyun/web-core';
+import { confirmAction, UiEmpty, UiInput, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
+import {
+  createDepartmentManagementState,
+  departmentTitleOf,
+  organizationTitleOf,
+} from './departmentManagementState';
+
+defineOptions({ name: 'DepartmentManagementView' });
+
+const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
+const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
+const organizationSearchKeyword = ref('');
+const departmentSearchKeyword = ref('');
+const {
+  organizationReloadKey,
+  departmentReloadKey,
+  selectedOrganization,
+  selectedDepartment,
+  draft,
+  mode,
+  saving,
+  selectedOrganizationId,
+  selectedOrganizationTitle,
+  readonly,
+  canCreate,
+  canToggle,
+  cardTitle,
+  handleOrganizationsLoaded,
+  selectOrganization,
+  handleDepartmentsLoaded,
+  selectDepartment,
+  startCreateRoot,
+  startCreateChild,
+  startEdit,
+  cancelEdit,
+  save,
+  toggleEnabled,
+  removeSelected,
+} = createDepartmentManagementState(departmentContext, confirmAction);
+
+const scopedDepartmentContext = computed<ModuleContext<Department>>(() =>
+  createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
+);
+
+const departmentActions = computed<RecordActionItem[]>(() => {
+  if (mode.value !== 'view') {
+    return [
+      { key: 'cancel', title: '取消', disabled: saving.value },
+      {
+        key: 'save',
+        actionCode: mode.value.startsWith('create') ? 'create' : 'update',
+        iconName: 'save',
+        title: saving.value ? '保存中' : '保存',
+        loading: saving.value,
+        primary: true,
+      },
+    ];
+  }
+  return [
+    { key: 'edit', actionCode: 'update', title: '编辑', disabled: !selectedDepartment.value },
+    {
+      key: 'create-child',
+      actionCode: 'create',
+      title: '新建下级',
+      disabled: !selectedDepartment.value,
+    },
+    {
+      key: 'delete',
+      actionCode: 'delete',
+      title: '删除',
+      disabled: !selectedDepartment.value,
+      loading: saving.value,
+      danger: true,
+    },
+  ];
+});
+
+function departmentTreeActionsOf(record: Department): UiRecordInlineAction[] {
+  const actions: UiRecordInlineAction[] = [];
+  if (record.id && departmentContext.can('create') === true) {
+    actions.push({ key: 'create-child', title: '新增下级', iconName: 'plus' });
+  }
+  if (record.id && departmentContext.can('update') === true) {
+    actions.push({ key: 'edit', title: '编辑部门', iconName: 'edit' });
+  }
+  if (record.id && departmentContext.can('delete') === true) {
+    actions.push({ key: 'delete', title: '删除部门', iconName: 'delete', danger: true });
+  }
+  return actions;
+}
+
+function handleDepartmentTreeAction(action: UiRecordInlineAction, record: Department) {
+  selectDepartment(record);
+  if (action.key === 'create-child') {
+    startCreateChild(record);
+    return;
+  }
+  if (action.key === 'edit') {
+    startEdit();
+    return;
+  }
+  if (action.key === 'delete') {
+    void removeSelected();
+  }
+}
+
+function handleDepartmentAction(action: RecordActionItem) {
+  if (action.key === 'edit') {
+    startEdit();
+    return;
+  }
+  if (action.key === 'create-child') {
+    startCreateChild();
+    return;
+  }
+  if (action.key === 'delete') {
+    void removeSelected();
+    return;
+  }
+  if (action.key === 'cancel') {
+    cancelEdit();
+    return;
+  }
+  if (action.key === 'save') {
+    void save();
+  }
+}
+
+function createOrganizationScopedDepartmentContext(
+  context: ModuleContext<Department>,
+  organizationId: string | undefined,
+): ModuleContext<Department> {
+  const treeClient = createOrganizationScopedDepartmentTreeClient(context, organizationId);
+  const abilities: ModuleAbilities<Department> = {
+    ...context.abilities,
+    tree: () => treeClient,
+    tryTree: () => (context.abilities.hasTree() ? treeClient : undefined),
+  };
+  return {
+    ...context,
+    abilities,
+  };
+}
+
+function createOrganizationScopedDepartmentTreeClient(
+  context: ModuleContext<Department>,
+  organizationId: string | undefined,
+): StaticModuleTreeClient<Department> {
+  return {
+    ...context.crud,
+    query: (request) => context.crud.query(scopedQuery(request, organizationId)),
+    tree: () => {
+      if (!organizationId) {
+        return emptyTreeResponse<Department>();
+      }
+      return context.http.request<WebListResponse<WebTreeNode<Department>>>({
+        path: '/iam.department/tree',
+        query: { organizationId },
+      });
+    },
+    treeFlat: (options) => {
+      if (!organizationId) {
+        return emptyListResponse<Department>();
+      }
+      const rootId = options?.rootId;
+      const path = rootId ? `/iam.department/tree/${encodeURIComponent(rootId)}` : '/iam.department/tree';
+      return context.http.request<WebListResponse<Department>>({
+        path,
+        query: {
+          organizationId,
+          flat: true,
+          includeSelf: options?.includeSelf,
+        },
+      });
+    },
+    subtree: (id, options) =>
+      context.http.request<WebListResponse<WebTreeNode<Department>>>({
+        path: `/iam.department/tree/${encodeURIComponent(id)}`,
+        query: options,
+      }),
+    sort: (id, request) =>
+      context.http.request({
+        method: 'POST',
+        path: `/iam.department/sort/${encodeURIComponent(id)}`,
+        body: request,
+      }),
+  };
+}
+
+function scopedQuery(request: WebQueryRequest | undefined, organizationId: string | undefined) {
+  if (!organizationId) {
+    return request;
+  }
+  return {
+    ...request,
+    conditions: [
+      ...(request?.conditions ?? []),
+      { fieldName: 'organizationId', operator: 'EQ', values: [organizationId] },
+    ],
+  };
+}
+
+async function emptyTreeResponse<TRecord>(): Promise<WebListResponse<WebTreeNode<TRecord>>> {
+  return { records: [] };
+}
+
+async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
+  return { records: [] };
+}
+</script>
+
+<template>
+  <section class="department-workspace">
+    <RecordExplorerPanel
+      v-model:search-keyword="organizationSearchKeyword"
+      class="organization-column"
+      title="机构树"
+      search-placeholder="搜索机构名称、编码或 ID"
+      @refresh="organizationReloadKey += 1"
+    >
+      <TreeRecordExplorer
+        :context="organizationContext"
+        :selected-id="selectedOrganization?.id"
+        :reload-key="organizationReloadKey"
+        :keyword="organizationSearchKeyword"
+        search-mode="none"
+        search-placeholder="搜索机构名称、编码或 ID"
+        empty-description="暂无机构"
+        loading-tip="加载机构树"
+        fallback-title="未命名机构"
+        :title-of="organizationTitleOf"
+        @loaded="handleOrganizationsLoaded"
+        @select="selectOrganization"
+      />
+    </RecordExplorerPanel>
+
+    <RecordExplorerPanel
+      v-model:search-keyword="departmentSearchKeyword"
+      class="department-column"
+      title="部门"
+      search-placeholder="搜索部门名称、编码或 ID"
+      @refresh="departmentReloadKey += 1"
+    >
+      <template #actions>
+        <ModuleActionButton
+          class="record-panel-create-button"
+          :context="departmentContext"
+          action-code="create"
+          title="新增部门"
+          icon-only
+          :disabled="!selectedOrganization || saving || !canCreate"
+          @click="startCreateRoot"
+        />
+      </template>
+      <UiEmpty v-if="!selectedOrganization" description="请选择机构" />
+      <TreeRecordExplorer
+        v-else
+        :context="scopedDepartmentContext"
+        :selected-id="selectedDepartment?.id"
+        :reload-key="departmentReloadKey"
+        :keyword="departmentSearchKeyword"
+        search-mode="none"
+        search-placeholder="搜索部门名称、编码或 ID"
+        empty-description="当前机构暂无部门"
+        loading-tip="加载部门树"
+        fallback-title="未命名部门"
+        :title-of="departmentTitleOf"
+        :actions-of="departmentTreeActionsOf"
+        @loaded="handleDepartmentsLoaded"
+        @select="selectDepartment"
+        @action="handleDepartmentTreeAction"
+      />
+    </RecordExplorerPanel>
+
+    <RecordDetailPanel :title="cardTitle">
+      <template #status>
+        <RecordStatusSwitch
+          v-if="mode.startsWith('create')"
+          :enabled="draft.enabled"
+          :show-label="false"
+          @change="draft.enabled = $event"
+        />
+        <RecordStatusSwitch
+          v-else-if="selectedDepartment"
+          :enabled="selectedDepartment.enabled"
+          :disabled="saving || !canToggle"
+          :loading="saving"
+          :show-label="false"
+          @change="toggleEnabled"
+        />
+      </template>
+      <template #actions>
+        <RecordActionBar
+          :context="departmentContext"
+          :actions="departmentActions"
+          @action="handleDepartmentAction"
+        />
+      </template>
+      <UiEmpty v-if="!selectedDepartment && mode === 'view'" description="请选择或新建部门" />
+      <form v-else class="department-form" @submit.prevent="save">
+        <label>
+          <span>所属机构</span>
+          <UiInput :value="selectedOrganizationTitle" disabled />
+        </label>
+        <label>
+          <span>上级部门</span>
+          <RecordPicker
+            v-model:value="draft.parentId"
+            :context="scopedDepartmentContext"
+            :disabled="readonly"
+            :reload-key="departmentReloadKey"
+            :constraints="parentRecordConstraints(draft.id)"
+            :title-of="departmentTitleOf"
+            placeholder="根部门留空"
+          />
+        </label>
+        <label>
+          <span>部门编码</span>
+          <UiInput v-model:value="draft.code" :disabled="readonly" placeholder="请输入部门编码" />
+        </label>
+        <label>
+          <span>部门名称</span>
+          <UiInput v-model:value="draft.title" :disabled="readonly" placeholder="请输入部门名称" />
+        </label>
+      </form>
+      <RecordMetaSection v-if="selectedDepartment || mode !== 'view'" :record="draft" show-sort-order />
+    </RecordDetailPanel>
+  </section>
+</template>
+
+<style scoped>
+.department-workspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 240px) minmax(240px, 260px) minmax(340px, 1fr);
+  gap: 12px;
+  min-height: calc(100vh - 116px);
+}
+
+.organization-column,
+.department-column {
+  min-height: 0;
+}
+
+.record-panel-create-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.department-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.department-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muyun-text-body);
+  font-size: 13px;
+}
+
+@media (max-width: 1180px) {
+  .department-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .department-form {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

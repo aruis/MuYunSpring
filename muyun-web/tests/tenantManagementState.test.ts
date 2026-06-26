@@ -80,7 +80,6 @@ test('tenant management state toggles enable state and refreshes selected record
 
   assert.deepEqual(calls, ['disable:tenant_a', 'view:tenant_a']);
   assert.equal(state.selected.value?.enabled, false);
-  assert.equal(state.actionMessage.value, '已停用');
   assert.equal(state.reloadKey.value, 1);
 });
 
@@ -120,7 +119,6 @@ test('tenant management state respects delete confirmation result', async () => 
   assert.deepEqual(calls, ['delete:tenant_a']);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'create');
-  assert.equal(state.actionMessage.value, '已删除');
 });
 
 test('tenant management state protects platform tenant from disable and delete actions', async () => {
@@ -204,7 +202,6 @@ test('tenant management state stays readonly after deleting last tenant without 
   assert.deepEqual(calls, ['delete:tenant_a']);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'view');
-  assert.equal(state.actionMessage.value, '已删除');
 });
 
 test('tenant management state exposes action authorization flags', () => {

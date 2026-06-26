@@ -58,7 +58,6 @@ test('organization management state updates existing records and refreshes enabl
 
   assert.deepEqual(calls, ['update:org-root:总部修订', 'disable:org-root', 'view:org-root']);
   assert.equal(state.selected.value?.enabled, false);
-  assert.equal(state.actionMessage.value, '已停用');
   assert.equal(state.reloadKey.value, 2);
 });
 
@@ -122,7 +121,6 @@ test('organization management state respects delete confirmation result', async 
   assert.deepEqual(calls, ['delete:org-root']);
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'create');
-  assert.equal(state.actionMessage.value, '已删除');
 });
 
 test('organization management state exposes action authorization flags', () => {

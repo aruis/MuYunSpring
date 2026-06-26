@@ -17,7 +17,7 @@ export { default as DictionarySelect } from './components/DictionarySelect.vue';
 export { default as ReferenceSelect } from './components/ReferenceSelect.vue';
 export { default as UiTable } from './components/UiTable.vue';
 export { confirmAction } from './confirm';
-export { showErrorMessage } from './feedback';
+export { showErrorMessage, showSuccessMessage } from './feedback';
 export { resolveFieldComponent } from './registry';
 export type { UiIconName } from './components/UiIcon.vue';
 export type {

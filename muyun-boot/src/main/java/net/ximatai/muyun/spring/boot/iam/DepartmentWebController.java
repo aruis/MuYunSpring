@@ -28,8 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 30)
+@PlatformStaticModule(application = "iam", alias = "iam.department", title = "部门管理", route = "/iam/departments")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "部门管理", order = 30)
 @RequestMapping("/iam.department")
 public class DepartmentWebController extends WebSupport<DepartmentService> implements
         CrudWeb<Department, DepartmentService>,

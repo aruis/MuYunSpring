@@ -17,7 +17,6 @@ export function createOrganizationManagementState(
   const reloadKey = ref(0);
   const saving = ref(false);
   const actionError = ref<string>();
-  const actionMessage = ref<string>();
 
   const cardTitle = computed(() => {
     if (mode.value === 'create') {
@@ -105,7 +104,7 @@ export function createOrganizationManagementState(
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
-      actionMessage.value = '已保存';
+      presentActionSuccess('已保存');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -136,7 +135,7 @@ export function createOrganizationManagementState(
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      actionMessage.value = refreshed.enabled === false ? '已停用' : '已启用';
+      presentActionSuccess(refreshed.enabled === false ? '已停用' : '已启用');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -171,7 +170,7 @@ export function createOrganizationManagementState(
       selected.value = undefined;
       draft.value = emptyDraft();
       mode.value = 'create';
-      actionMessage.value = '已删除';
+      presentActionSuccess('已删除');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -182,7 +181,6 @@ export function createOrganizationManagementState(
 
   function clearFeedback() {
     actionError.value = undefined;
-    actionMessage.value = undefined;
   }
 
   function presentActionCause(cause: unknown) {
@@ -196,6 +194,14 @@ export function createOrganizationManagementState(
     presentPlatformMessage(message, { source: 'organization-management-action', phase: 'action' });
   }
 
+  function presentActionSuccess(message: string) {
+    presentPlatformMessage(message, {
+      source: 'organization-management-action',
+      phase: 'action',
+      tone: 'success',
+    });
+  }
+
   return {
     selected,
     draft,
@@ -203,7 +209,6 @@ export function createOrganizationManagementState(
     reloadKey,
     saving,
     actionError,
-    actionMessage,
     cardTitle,
     readonly,
     canCreate,
