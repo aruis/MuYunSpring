@@ -13,22 +13,17 @@ import {
   ModuleActionButton,
   RecordActionBar,
   RecordExplorerPanel,
-  RecordListExplorer,
   RecordMetaSection,
+  RecordPicker,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  parentRecordConstraints,
   presentPlatformError,
   type RecordActionItem,
+  type RecordPickerRecord,
   type TreeRecordBase,
 } from '@muyun/platform-components';
-import {
-  UiEmpty,
-  UiInput,
-  UiSelect,
-  UiSpin,
-  confirmAction,
-  type UiRecordInlineAction,
-} from '@muyun/vue-ui-antdv';
+import { UiEmpty, UiInput, UiSelect, confirmAction, type UiRecordInlineAction } from '@muyun/vue-ui-antdv';
 import {
   createDictionaryManagementState,
   dictionaryCategoryTitleOf,
@@ -56,17 +51,16 @@ const {
   categoryMode,
   categorySaving,
   categoryMessage,
-  items,
   selectedItem,
   itemDraft,
   itemMode,
-  itemLoading,
   itemSaving,
   itemMessage,
   selectedCategoryIsDictionary,
   canCreateCategory,
   canDeleteCategory,
   canToggleCategory,
+  canTreeItem,
   canCreateItem,
   canDeleteItem,
   canToggleItem,
@@ -83,9 +77,10 @@ const {
   saveCategory,
   toggleCategory,
   deleteCategory,
-  loadItems,
+  handleItemsLoaded,
   selectItem,
   startCreateItem,
+  startCreateChildItem,
   startEditItem,
   cancelItemEdit,
   saveItem,
@@ -109,6 +104,7 @@ const applicationOptions = computed(() =>
   })),
 );
 const categoryExplorerContext = computed(() => scopedCategoryContext(selectedApplicationAlias.value));
+const itemExplorerContext = computed(() => scopedItemContext(selectedCategory.value?.id));
 const itemListEmptyDescription = computed(() =>
   itemSearchKeyword.value.trim() ? '没有匹配的字典项' : '当前类目暂无字典项',
 );
@@ -116,16 +112,6 @@ const categoryKindOptions = [
   { label: '字典', value: 'DICTIONARY' },
   { label: '目录', value: 'FOLDER' },
 ];
-const itemParentOptions = computed(() => [
-  { label: '根字典项', value: '' },
-  ...items.value
-    .filter((item) => item.id && item.id !== itemDraft.value.id)
-    .map((item) => ({
-      label: dictionaryItemTitleOf(item),
-      value: item.id ?? '',
-    })),
-]);
-
 const categoryActions = computed<RecordActionItem[]>(() => {
   if (categoryMode.value !== 'view') {
     return [
@@ -185,17 +171,6 @@ watch(selectedApplicationAlias, () => {
   categoryReloadKey.value += 1;
 });
 
-watch(
-  () => selectedCategory.value?.id,
-  () => {
-    void loadItems();
-  },
-);
-
-watch(itemReloadKey, () => {
-  void loadItems();
-});
-
 onMounted(loadApplications);
 
 async function loadApplications() {
@@ -253,7 +228,43 @@ function scopedCategoryContext(applicationAlias: string | undefined): ModuleCont
   };
 }
 
+function scopedItemContext(categoryId: string | undefined): ModuleContext<DictionaryItem> {
+  const scopedClient = categoryId ? itemClientOf(categoryId) : fallbackItemClient();
+  return {
+    ...categoryContext,
+    crud: scopedClient,
+    abilities: {
+      crud: () => scopedClient,
+      tree: () => scopedClient,
+      enable: () => scopedClient,
+      tryCrud: () => scopedClient,
+      tryTree: () => scopedClient,
+      tryEnable: () => scopedClient,
+      has: categoryContext.abilities.has,
+      hasCrud: categoryContext.abilities.hasCrud,
+      hasTree: categoryContext.abilities.hasTree,
+      hasEnable: categoryContext.abilities.hasEnable,
+    },
+  };
+}
+
 function fallbackCategoryClient(): StaticModuleTreeClient<DictionaryCategory> {
+  return {
+    query: async () => emptyPage(),
+    view: async () => ({}),
+    insert: async (record) => record,
+    update: async (_id, record) => record,
+    delete: async () => ({ count: 0 }),
+    enable: async () => ({ count: 0 }),
+    disable: async () => ({ count: 0 }),
+    tree: async () => ({ records: [] }),
+    treeFlat: async () => ({ records: [] }),
+    subtree: async () => ({ records: [] }),
+    sort: async () => ({ count: 0 }),
+  };
+}
+
+function fallbackItemClient(): StaticModuleTreeClient<DictionaryItem> {
   return {
     query: async () => emptyPage(),
     view: async () => ({}),
@@ -336,12 +347,36 @@ function itemMatchesKeyword(record: DictionaryItem, normalized: string) {
   );
 }
 
-function itemSecondary(record: DictionaryItem) {
-  return record.code ?? record.id;
+function itemPickerTitle(record: RecordPickerRecord) {
+  return dictionaryItemTitleOf(record as DictionaryItem);
 }
 
 function itemTagOf(record: DictionaryItem) {
   return record.enabled === false ? '停用' : undefined;
+}
+
+function itemTreeActionsOf(record: TreeRecordBase): UiRecordInlineAction[] {
+  return [
+    {
+      key: 'create-child',
+      title: '新增下级字典项',
+      iconName: 'plus',
+      disabled: !selectedCategoryIsDictionary.value || !canCreateItem.value || itemSaving.value,
+    },
+    {
+      key: 'edit',
+      title: '编辑字典项',
+      iconName: 'edit',
+      disabled: itemSaving.value,
+    },
+    {
+      key: 'delete',
+      title: '删除字典项',
+      iconName: 'delete',
+      danger: true,
+      disabled: !record.id || !canDeleteItem.value || itemSaving.value,
+    },
+  ];
 }
 
 function handleCategoryTreeAction(action: { key: string }, record: DictionaryCategory) {
@@ -392,6 +427,21 @@ function handleItemAction(action: RecordActionItem) {
   }
   if (action.key === 'item-save') {
     void saveItem();
+  }
+}
+
+function handleItemTreeAction(action: { key: string }, record: DictionaryItem) {
+  selectItem(record);
+  if (action.key === 'create-child') {
+    startCreateChildItem(record);
+    return;
+  }
+  if (action.key === 'edit') {
+    startEditItem();
+    return;
+  }
+  if (action.key === 'delete') {
+    void deleteItem();
   }
 }
 </script>
@@ -511,21 +561,28 @@ function handleItemAction(action: RecordActionItem) {
           @click="startCreateItem"
         />
       </template>
-      <UiSpin v-if="itemLoading" tip="加载字典项" />
-      <UiEmpty v-else-if="!selectedCategory" description="请选择字典类目" />
+      <UiEmpty v-if="!selectedCategory" description="请选择字典类目" />
       <UiEmpty v-else-if="!selectedCategoryIsDictionary" description="目录类目不维护字典项" />
-      <RecordListExplorer
+      <UiEmpty v-else-if="!canTreeItem" description="当前用户无权查看字典项" />
+      <TreeRecordExplorer
         v-else
-        :records="items"
+        :context="itemExplorerContext"
         :selected-id="selectedItem?.id"
+        :reload-key="itemReloadKey"
         :keyword="itemSearchKeyword"
+        search-mode="none"
+        search-placeholder="搜索字典项名称、编码或 ID"
         :empty-description="itemListEmptyDescription"
+        loading-tip="加载字典项"
+        fallback-title="未命名字典项"
         :title-of="dictionaryItemTitleOf"
-        :code-of="itemSecondary"
+        :actions-of="itemTreeActionsOf"
         :filter-option="itemMatchesKeyword"
         :tag-of="itemTagOf"
         :muted-of="(record) => record.enabled === false"
+        @loaded="handleItemsLoaded"
         @select="selectItem"
+        @action="handleItemTreeAction"
       />
     </RecordExplorerPanel>
 
@@ -567,12 +624,17 @@ function handleItemAction(action: RecordActionItem) {
         </label>
         <label>
           <span>上级字典项</span>
-          <UiSelect
+          <RecordPicker
+            v-if="canTreeItem"
             v-model:value="itemDraft.parentId"
-            :options="itemParentOptions"
+            :context="itemExplorerContext"
+            :reload-key="itemReloadKey"
             :disabled="itemReadonly"
-            :allow-clear="false"
+            :constraints="parentRecordConstraints(itemDraft.id)"
+            :title-of="itemPickerTitle"
+            placeholder="根字典项留空"
           />
+          <UiInput v-else :value="itemDraft.parentId ?? ''" disabled placeholder="无权查看上级字典项" />
         </label>
         <label>
           <span>启用状态</span>

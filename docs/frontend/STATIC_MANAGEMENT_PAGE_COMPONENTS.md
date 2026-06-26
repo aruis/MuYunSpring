@@ -11,7 +11,8 @@
 3. `RecordListExplorer` 负责纯平铺列表展示，只消费已加载记录。
 4. `CrudRecordListExplorer` 负责标准 CRUD 平铺列表的数据加载适配，内部复用 `RecordListExplorer`。
 5. `TreeRecordExplorer` 负责标准树能力的数据加载和树展示。
-6. 业务语义封装只有在出现真实复用场景后再沉淀，例如未来的机构树选择或组织范围浏览。
+6. `RecordPicker` 负责记录选择，树模型的父级选择应使用 tree 模式和父级约束。
+7. 业务语义封装只有在出现真实复用场景后再沉淀，例如未来的机构树选择或组织范围浏览。
 
 ## 组件层级
 
@@ -103,6 +104,29 @@ emit loaded/select/action
 
 业务语义树组件不提前沉淀。比如机构树只有在多个业务页面真实复用时，再基于 `TreeRecordExplorer` 轻封装 `OrganizationTree` 或 `OrganizationSelectTree`。
 
+### RecordPicker
+
+`RecordPicker` 是记录选择组件。树模型的父级字段不是普通枚举，不应使用 `UiSelect` 平铺处理。
+
+树模型编辑 `parentId` 时应使用：
+
+```text
+RecordPicker
+  -> context 使用当前树模型上下文
+  -> reloadKey 跟随当前树模型记录变更
+  -> constraints 使用 parentRecordConstraints(currentId)
+```
+
+这样可以保持三个语义：
+
+```text
+按树形展示候选记录
+禁止选择当前记录
+禁止选择当前记录的下级
+```
+
+根节点通过清空 `parentId` 表达，不在选项中额外伪造“根节点”记录。
+
 ## 常见组合
 
 两栏平铺管理页：
@@ -129,9 +153,11 @@ StaticManagementLayout
 RecordExplorerPanel
   -> TreeRecordExplorer
 RecordExplorerPanel
-  -> RecordListExplorer
+  -> RecordListExplorer 或 TreeRecordExplorer
 detail area
 ```
+
+第二栏是否使用列表或树由子模型能力决定。子模型具备树能力时应使用 `TreeRecordExplorer`，不因为它依赖左侧 scope 就降级为平铺列表；scope 只影响传入的 context 或 client。
 
 ## 当前页面口径
 
@@ -141,7 +167,7 @@ detail area
 | 租户管理 | `StaticManagementLayout -> CrudRecordListExplorer -> RecordListExplorer` | 平铺 CRUD 状态复用 `useFlatCrudManagementState`，页面保留平台租户保护规则。 |
 | 组织管理 | `StaticManagementLayout -> TreeRecordExplorer` | 页面直接依赖树能力，避免在主业务页套业务语义树封装。 |
 | 岗位管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer` | 分类树和岗位列表由页面统一编排，岗位列表加载依赖选中分类。 |
-| 字典管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> RecordListExplorer` | 应用 scope 由页面控制，类目树和字典项列表由页面统一编排，左侧类目 editor 只在显式新建/编辑时展开。 |
+| 字典管理 | `RecordExplorerPanel -> TreeRecordExplorer` 和 `RecordExplorerPanel -> TreeRecordExplorer` | 应用 scope 由页面控制，类目树和字典项树由页面统一编排；字典项父级使用 `RecordPicker + parentRecordConstraints`。 |
 
 ## 新页面判断
 
@@ -149,9 +175,10 @@ detail area
 
 1. 是否是独立平铺 CRUD 列表。是则优先使用 `CrudRecordListExplorer`。
 2. 是否是标准树模型。是则优先使用 `TreeRecordExplorer`。
-3. 列表数据是否依赖其他区域选择或复杂权限组合。是则页面 state 自己加载，body 使用 `RecordListExplorer`。
-4. 是否需要业务语义封装。只有跨页面真实复用后再沉淀，不为单一页面提前封装。
-5. 是否需要新的平台组件。只有它能降低重复、稳定边界并减少接入成本时再新增。
+3. 是否是树模型的 `parentId` 字段。是则优先使用 `RecordPicker + parentRecordConstraints`。
+4. 列表数据是否依赖其他区域选择或复杂权限组合。是则页面 state 自己加载，body 使用 `RecordListExplorer`。
+5. 是否需要业务语义封装。只有跨页面真实复用后再沉淀，不为单一页面提前封装。
+6. 是否需要新的平台组件。只有它能降低重复、稳定边界并减少接入成本时再新增。
 
 ## 状态机约束
 

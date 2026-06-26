@@ -55,6 +55,7 @@ export function createDictionaryManagementState(
     return categoryContext.can(categoryToggleActionCode(selectedCategory.value)) === true;
   });
   const canQueryItem = computed(() => categoryContext.can('item_query') === true);
+  const canTreeItem = computed(() => categoryContext.can('item_tree') === true);
   const canCreateItem = computed(() => categoryContext.can('item_create') === true);
   const canUpdateItem = computed(() => categoryContext.can('item_update') === true);
   const canDeleteItem = computed(() => categoryContext.can('item_delete') === true);
@@ -252,7 +253,7 @@ export function createDictionaryManagementState(
       syncSelectedItem();
       return;
     }
-    if (!canQueryItem.value) {
+    if (!canTreeItem.value) {
       items.value = [];
       itemError.value = undefined;
       syncSelectedItem();
@@ -269,6 +270,11 @@ export function createDictionaryManagementState(
     } finally {
       itemLoading.value = false;
     }
+  }
+
+  function handleItemsLoaded(records: DictionaryItem[]) {
+    items.value = records;
+    syncSelectedItem();
   }
 
   function selectItem(record: DictionaryItem) {
@@ -289,6 +295,27 @@ export function createDictionaryManagementState(
     }
     selectedItem.value = undefined;
     itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
+    itemMode.value = 'create';
+    clearItemFeedback();
+  }
+
+  function startCreateChildItem(parent: DictionaryItem) {
+    if (!selectedCategoryId.value || !selectedCategoryIsDictionary.value) {
+      presentItemMessage('请先选择可绑定的字典类目');
+      return;
+    }
+    if (!parent.id) {
+      return;
+    }
+    if (!canCreateItem.value) {
+      presentItemMessage('当前用户无权新增字典项');
+      return;
+    }
+    selectedItem.value = parent;
+    itemDraft.value = {
+      ...emptyDictionaryItemDraft(selectedCategory.value),
+      parentId: parent.id,
+    };
     itemMode.value = 'create';
     clearItemFeedback();
   }
@@ -513,6 +540,7 @@ export function createDictionaryManagementState(
     canDeleteCategory,
     canToggleCategory,
     canQueryItem,
+    canTreeItem,
     canCreateItem,
     canUpdateItem,
     canDeleteItem,
@@ -530,9 +558,11 @@ export function createDictionaryManagementState(
     saveCategory,
     toggleCategory,
     deleteCategory,
+    handleItemsLoaded,
     loadItems,
     selectItem,
     startCreateItem,
+    startCreateChildItem,
     startEditItem,
     cancelItemEdit,
     saveItem,
