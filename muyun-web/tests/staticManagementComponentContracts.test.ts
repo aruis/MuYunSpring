@@ -101,6 +101,30 @@ test('application scope switcher is a platform component for scoped management p
   assert.doesNotMatch(dictionaryViewSource, /class="application-scope-select"/);
 });
 
+test('dictionary item explorer uses tree explorer for tree-backed items', () => {
+  const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
+
+  assert.equal(matchCount(dictionaryViewSource, /<TreeRecordExplorer/g), 2);
+  assert.doesNotMatch(dictionaryViewSource, /RecordListExplorer/);
+  assert.match(dictionaryViewSource, /v-else-if="!canTreeItem"/);
+  assert.match(dictionaryViewSource, /function itemTreeActionsOf/);
+  assert.match(dictionaryViewSource, /startCreateChildItem\(record\)/);
+});
+
+test('dictionary item parent selector uses tree-aware record picker', () => {
+  const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
+  const pickerSource = readSource('src/platform-components/RecordPicker.vue');
+
+  assert.match(dictionaryViewSource, /<RecordPicker[\s\S]*v-model:value="itemDraft\.parentId"/);
+  assert.match(dictionaryViewSource, /:context="itemExplorerContext"/);
+  assert.match(dictionaryViewSource, /:reload-key="itemReloadKey"/);
+  assert.match(dictionaryViewSource, /parentRecordConstraints\(itemDraft\.id\)/);
+  assert.doesNotMatch(dictionaryViewSource, /itemParentOptions/);
+  assert.match(pickerSource, /reloadKey\?: number/);
+  assert.match(pickerSource, /\(\) => props\.reloadKey/);
+  assert.match(pickerSource, /\(\) => loadRecords\(\)/);
+});
+
 test('static crud state supports business-owned action errors before platform fallback', () => {
   const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
@@ -125,4 +149,8 @@ test('platform error feedback respects global error presentation slots', () => {
 
 function readSource(path: string) {
   return readFileSync(resolve(root, path), 'utf8');
+}
+
+function matchCount(source: string, pattern: RegExp) {
+  return source.match(pattern)?.length ?? 0;
 }

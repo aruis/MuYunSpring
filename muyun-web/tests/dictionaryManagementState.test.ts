@@ -146,6 +146,38 @@ test('dictionary management state saves category-bound dictionary items', async 
   assert.equal(state.itemReloadKey.value, 1);
 });
 
+test('dictionary management state creates child dictionary items under selected parent', () => {
+  const state = createDictionaryManagementState(
+    createContext(),
+    () => createCategoryClient(),
+    () => createItemClient(),
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+    },
+  ]);
+  state.startCreateChildItem({
+    id: 'item-enabled',
+    categoryId: 'category-status',
+    categoryAlias: 'status',
+    code: 'enabled',
+    title: '启用',
+  });
+
+  assert.equal(state.selectedItem.value?.id, 'item-enabled');
+  assert.equal(state.itemMode.value, 'create');
+  assert.equal(state.itemDraft.value.categoryId, 'category-status');
+  assert.equal(state.itemDraft.value.parentId, 'item-enabled');
+});
+
 test('dictionary management state sends unexpected item save failures to global feedback', async () => {
   const categoryContext = createContext();
   const itemClient = createItemClient({
@@ -215,6 +247,40 @@ test('dictionary management state sends unexpected item load failures to global 
 
   assert.equal(state.itemError.value, undefined);
   assert.equal(state.itemLoading.value, false);
+  assert.deepEqual(state.items.value, []);
+});
+
+test('dictionary management state does not load item tree without tree permission', async () => {
+  const calls: string[] = [];
+  const categoryContext = createContext((actionCode) => actionCode !== 'item_tree');
+  const itemClient = createItemClient({
+    treeFlat: async () => {
+      calls.push('treeFlat');
+      return { records: [] };
+    },
+  });
+  const state = createDictionaryManagementState(
+    categoryContext,
+    () => createCategoryClient(),
+    () => itemClient,
+    () => 'platform',
+    async () => true,
+  );
+
+  state.handleCategoriesLoaded([
+    {
+      id: 'category-status',
+      applicationAlias: 'platform',
+      alias: 'status',
+      categoryKind: 'DICTIONARY',
+      title: '状态字典',
+    },
+  ]);
+  await state.loadItems();
+
+  assert.equal(state.canQueryItem.value, true);
+  assert.equal(state.canTreeItem.value, false);
+  assert.deepEqual(calls, []);
   assert.deepEqual(state.items.value, []);
 });
 

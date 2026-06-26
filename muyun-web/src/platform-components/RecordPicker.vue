@@ -24,6 +24,7 @@ const props = withDefaults(
   defineProps<{
     context: ModuleContext<RecordPickerRecord>;
     value?: string;
+    reloadKey?: number;
     mode?: 'list' | 'tree';
     placeholder?: string;
     disabled?: boolean;
@@ -35,6 +36,7 @@ const props = withDefaults(
   }>(),
   {
     value: undefined,
+    reloadKey: undefined,
     mode: 'tree',
     placeholder: '请选择',
     disabled: false,
@@ -90,6 +92,11 @@ onBeforeUnmount(() => {
 
 watch(
   () => [props.context, props.mode] as const,
+  () => loadRecords(),
+);
+
+watch(
+  () => props.reloadKey,
   () => loadRecords(),
 );
 
