@@ -33,6 +33,7 @@ export const platformErrorCodes = {
   accessDenied: 'ACCESS_DENIED',
   validationFailed: 'VALIDATION_FAILED',
   conflictVersion: 'CONFLICT_VERSION',
+  resourceInUse: 'RESOURCE_IN_USE',
   resourceNotFound: 'RESOURCE_NOT_FOUND',
   configMissing: 'CONFIG_MISSING',
   internalError: 'INTERNAL_ERROR',
@@ -108,7 +109,18 @@ export function resolveGlobalErrorPresentation(
 function presentation(slot: GlobalErrorSlot, error: AppError): GlobalErrorPresentation {
   return {
     slot,
-    message: error.message,
+    message: userFacingErrorMessage(error),
     traceId: error.traceId,
   };
+}
+
+export function userFacingErrorMessage(error: AppError) {
+  if (isUnexpectedPlatformError(error)) {
+    return '系统异常，操作未完成';
+  }
+  return error.message;
+}
+
+export function isUnexpectedPlatformError(error: AppError) {
+  return error.code === platformErrorCodes.internalError || (error.status ?? 0) >= 500;
 }

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiError, UiSpin } from '@muyun/vue-ui-antdv';
-import { normalizeError, type ModuleContext } from '@muyun/web-core';
+import { UiSpin } from '@muyun/vue-ui-antdv';
+import type { ModuleContext } from '@muyun/web-core';
 import RecordListExplorer, { type RecordListExplorerRecord } from './RecordListExplorer.vue';
 import {
   defaultCrudRecordListMatches,
   defaultCrudRecordListTitle,
   type CrudRecordListBase,
 } from './crudRecordListModel';
+import { presentPlatformError } from './platformErrorFeedback';
 
 defineOptions({ name: 'CrudRecordListExplorer' });
 
@@ -47,7 +48,6 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
-const error = ref<string>();
 const records = ref<CrudRecordListBase[]>([]);
 
 const listRecords = computed<RecordListExplorerRecord[]>(() => records.value);
@@ -66,14 +66,15 @@ watch(
 
 async function loadRecords() {
   loading.value = true;
-  error.value = undefined;
   try {
     await props.context.runtime.ready;
     const response = await props.context.abilities.crud().query({ page: { pageNum: 1, pageSize: 200 } });
     records.value = response.records;
     emit('loaded', response.records);
   } catch (cause) {
-    error.value = normalizeError(cause).message;
+    records.value = [];
+    emit('loaded', []);
+    presentPlatformError(cause, { source: 'crud-record-list-explorer', phase: 'load' });
   } finally {
     loading.value = false;
   }
@@ -102,7 +103,6 @@ function handleSelect(record: CrudRecordListBase) {
 <template>
   <div class="crud-record-list-explorer">
     <UiSpin v-if="loading" :tip="loadingTip" />
-    <UiError v-else-if="error" :message="error" />
     <RecordListExplorer
       v-else
       :records="listRecords"

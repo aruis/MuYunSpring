@@ -2,17 +2,16 @@ import { computed, ref } from 'vue';
 import type { Position, PositionCategory, WebQueryCondition } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
+import { presentPlatformError, presentPlatformMessage } from '@muyun/platform-components';
 
 export type PositionCardMode = 'view' | 'edit' | 'create';
 export type CategoryCardMode = 'view' | 'edit' | 'create-root' | 'create-child';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
-type NotifyError = (message: string) => void;
 
 export function createPositionManagementState(
   categoryContext: ModuleContext<PositionCategory>,
   positionClient: StaticModuleCrudClient<Position>,
   confirmAction: ConfirmAction,
-  notifyError?: NotifyError,
 ) {
   const categoryReloadKey = ref(0);
   const positionReloadKey = ref(0);
@@ -102,7 +101,7 @@ export function createPositionManagementState(
 
   function startCreateRootCategory() {
     if (!canCreateCategory.value) {
-      categoryError.value = '当前用户无权新增岗位分类';
+      presentCategoryError('当前用户无权新增岗位分类');
       return;
     }
     categoryDraft.value = emptyCategoryDraft();
@@ -112,11 +111,11 @@ export function createPositionManagementState(
 
   function startCreateChildCategory() {
     if (!canCreateCategory.value) {
-      categoryError.value = '当前用户无权新增岗位分类';
+      presentCategoryError('当前用户无权新增岗位分类');
       return;
     }
     if (!selectedCategory.value?.id) {
-      categoryError.value = '请先选择上级分类';
+      presentCategoryError('请先选择上级分类');
       return;
     }
     categoryDraft.value = emptyCategoryDraft(selectedCategory.value.id);
@@ -129,7 +128,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canUpdateCategory.value) {
-      categoryError.value = '当前用户无权编辑岗位分类';
+      presentCategoryError('当前用户无权编辑岗位分类');
       return;
     }
     categoryDraft.value = copyCategory(selectedCategory.value);
@@ -150,12 +149,12 @@ export function createPositionManagementState(
       return;
     }
     if (categoryMode.value.startsWith('create') ? !canCreateCategory.value : !canUpdateCategory.value) {
-      categoryError.value = '当前用户无权保存岗位分类';
+      presentCategoryError('当前用户无权保存岗位分类');
       return;
     }
     const validDraft = normalizeCategoryDraft(categoryDraft.value);
     if (!isValidCategory(validDraft)) {
-      categoryError.value = '分类编码和分类名称不能为空';
+      presentCategoryError('分类编码和分类名称不能为空');
       return;
     }
     clearCategoryFeedback();
@@ -173,7 +172,7 @@ export function createPositionManagementState(
       categoryMessage.value = '已保存';
       categoryReloadKey.value += 1;
     } catch (cause) {
-      categoryError.value = normalizeError(cause).message;
+      presentCategoryCause(cause);
     } finally {
       categorySaving.value = false;
     }
@@ -184,7 +183,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canToggleCategory.value) {
-      categoryError.value = '当前用户无权变更岗位分类启停状态';
+      presentCategoryError('当前用户无权变更岗位分类启停状态');
       return;
     }
     clearCategoryFeedback();
@@ -202,7 +201,7 @@ export function createPositionManagementState(
       categoryMessage.value = selectedCategory.value.enabled === false ? '已停用' : '已启用';
       categoryReloadKey.value += 1;
     } catch (cause) {
-      categoryError.value = normalizeError(cause).message;
+      presentCategoryCause(cause);
     } finally {
       categorySaving.value = false;
     }
@@ -213,7 +212,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canDeleteCategory.value) {
-      categoryError.value = '当前用户无权删除岗位分类';
+      presentCategoryError('当前用户无权删除岗位分类');
       return;
     }
     const confirmed = await confirmAction({
@@ -232,12 +231,11 @@ export function createPositionManagementState(
       await categoryContext.abilities.crud().delete(selectedCategory.value.id);
       selectedCategory.value = undefined;
       categoryDraft.value = emptyCategoryDraft();
-      categoryMode.value = canCreateCategory.value ? 'create-root' : 'view';
+      categoryMode.value = 'view';
       categoryMessage.value = '已删除';
       categoryReloadKey.value += 1;
     } catch (cause) {
-      categoryError.value = normalizeError(cause).message;
-      notifyError?.(categoryError.value);
+      presentCategoryCause(cause);
     } finally {
       categorySaving.value = false;
     }
@@ -265,7 +263,7 @@ export function createPositionManagementState(
       positions.value = response.records;
       syncSelectedPosition();
     } catch (cause) {
-      positionError.value = normalizeError(cause).message;
+      presentPositionCause(cause);
     } finally {
       positionLoading.value = false;
     }
@@ -293,11 +291,11 @@ export function createPositionManagementState(
 
   function startCreatePosition() {
     if (!selectedCategoryId.value) {
-      positionError.value = '请先选择岗位分类';
+      presentPositionError('请先选择岗位分类');
       return;
     }
     if (!canCreatePosition.value) {
-      positionError.value = '当前用户无权新增岗位';
+      presentPositionError('当前用户无权新增岗位');
       return;
     }
     selectedPosition.value = undefined;
@@ -311,7 +309,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canUpdatePosition.value) {
-      positionError.value = '当前用户无权编辑岗位';
+      presentPositionError('当前用户无权编辑岗位');
       return;
     }
     positionDraft.value = copyPosition(selectedPosition.value);
@@ -332,12 +330,12 @@ export function createPositionManagementState(
       return;
     }
     if (positionMode.value === 'create' ? !canCreatePosition.value : !canUpdatePosition.value) {
-      positionError.value = '当前用户无权保存岗位';
+      presentPositionError('当前用户无权保存岗位');
       return;
     }
     const validDraft = normalizePositionDraft(positionDraft.value);
     if (!isValidPosition(validDraft)) {
-      positionError.value = '所属分类、岗位编码和岗位名称不能为空';
+      presentPositionError('所属分类、岗位编码和岗位名称不能为空');
       return;
     }
     clearPositionFeedback();
@@ -357,7 +355,7 @@ export function createPositionManagementState(
       }
       positionReloadKey.value += 1;
     } catch (cause) {
-      positionError.value = normalizeError(cause).message;
+      presentPositionCause(cause);
     } finally {
       positionSaving.value = false;
     }
@@ -368,7 +366,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canTogglePosition.value) {
-      positionError.value = '当前用户无权变更岗位启停状态';
+      presentPositionError('当前用户无权变更岗位启停状态');
       return;
     }
     clearPositionFeedback();
@@ -383,7 +381,7 @@ export function createPositionManagementState(
       positionDraft.value = copyPosition(selectedPosition.value);
       positionReloadKey.value += 1;
     } catch (cause) {
-      positionError.value = normalizeError(cause).message;
+      presentPositionCause(cause);
     } finally {
       positionSaving.value = false;
     }
@@ -394,7 +392,7 @@ export function createPositionManagementState(
       return;
     }
     if (!canDeletePosition.value) {
-      positionError.value = '当前用户无权删除岗位';
+      presentPositionError('当前用户无权删除岗位');
       return;
     }
     const confirmed = await confirmAction({
@@ -416,8 +414,7 @@ export function createPositionManagementState(
       positionMessage.value = '已删除';
       positionReloadKey.value += 1;
     } catch (cause) {
-      positionError.value = normalizeError(cause).message;
-      notifyError?.(positionError.value);
+      presentPositionCause(cause);
     } finally {
       positionSaving.value = false;
     }
@@ -431,6 +428,28 @@ export function createPositionManagementState(
   function clearPositionFeedback() {
     positionError.value = undefined;
     positionMessage.value = undefined;
+  }
+
+  function presentCategoryCause(cause: unknown) {
+    const error = normalizeError(cause);
+    categoryError.value = error.message;
+    presentPlatformError(error, { source: 'position-category-action', phase: 'action' });
+  }
+
+  function presentPositionCause(cause: unknown) {
+    const error = normalizeError(cause);
+    positionError.value = error.message;
+    presentPlatformError(error, { source: 'position-action', phase: 'action' });
+  }
+
+  function presentCategoryError(message: string) {
+    categoryError.value = message;
+    presentPlatformMessage(message, { source: 'position-category-action', phase: 'action' });
+  }
+
+  function presentPositionError(message: string) {
+    positionError.value = message;
+    presentPlatformMessage(message, { source: 'position-action', phase: 'action' });
   }
 
   return {

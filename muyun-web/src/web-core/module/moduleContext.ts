@@ -16,6 +16,7 @@ import {
 
 export interface ModuleContext<TRecord> {
   moduleAlias: string;
+  http: HttpClient;
   crud: StaticModuleCrudClient<TRecord>;
   runtime: ModuleRuntimeContextState;
   abilities: ModuleAbilities<TRecord>;
@@ -127,6 +128,7 @@ function moduleContextOf<TRecord>(http: HttpClient, moduleAlias: string): Module
   const runtime = createModuleRuntimeContextState(http, moduleAlias);
   return {
     moduleAlias,
+    http,
     crud,
     runtime,
     abilities: createModuleAbilities(moduleAlias, runtime, { crud, tree, enable }),

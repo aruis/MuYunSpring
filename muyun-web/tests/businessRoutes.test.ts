@@ -12,12 +12,14 @@ import type { BusinessRoutePageDescriptor } from '../src/web-contracts/index.ts'
 test('static business route registry exposes route prefixes for navigation resolution', () => {
   assert.deepEqual(businessRoutePrefixes, [
     '/config/applications',
+    '/config/dictionaries',
     '/iam/tenants',
     '/iam/organizations',
     '/iam/positions',
   ]);
   assert.deepEqual(businessModuleRoutes, {
     'platform.application': '/config/applications',
+    'platform.dictionary_category': '/config/dictionaries',
     'iam.tenant': '/iam/tenants',
     'iam.organization': '/iam/organizations',
     'iam.position_category': '/iam/positions',
@@ -83,6 +85,22 @@ test('static business route registry resolves position category as position mana
 
   assert.equal(route?.route, '/iam/positions');
   assert.equal(route?.moduleAlias, 'iam.position_category');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves dictionary category as dictionary management entry', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/config/dictionaries', moduleAlias: 'platform.dictionary_category' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/config/dictionaries');
+  assert.equal(route?.moduleAlias, 'platform.dictionary_category');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 

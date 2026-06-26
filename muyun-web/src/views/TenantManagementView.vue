@@ -25,7 +25,6 @@ const {
   mode,
   reloadKey,
   saving,
-  actionError,
   actionMessage,
   cardTitle,
   readonly,
@@ -127,7 +126,6 @@ function handleCardAction(action: RecordActionItem) {
     sidebar-search-placeholder="搜索租户名称、alias 或 ID"
     :mode="mode"
     :card-title="cardTitle"
-    :action-error="actionError"
     :action-message="actionMessage"
     :muted-message="isPlatformTenant ? '平台租户是系统内置身份根，不能删除或停用。' : undefined"
     :show-status="Boolean(selected && mode === 'view')"

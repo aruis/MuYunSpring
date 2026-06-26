@@ -2,15 +2,23 @@ import { computed } from 'vue';
 import type { Tenant } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
-import { useFlatCrudManagementState } from '../platform-components/staticCrudManagementState';
+import {
+  type StaticCrudActionErrorHandler,
+  useFlatCrudManagementState,
+} from '../platform-components/staticCrudManagementState';
 
 type CardMode = 'view' | 'edit' | 'create';
 type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
 const PLATFORM_TENANT_ID = 'platform';
 
+export interface TenantManagementStateOptions {
+  actionErrorHandlers?: StaticCrudActionErrorHandler<Tenant>[];
+}
+
 export function createTenantManagementState(
   tenantContext: ModuleContext<Tenant>,
   confirmAction: ConfirmAction,
+  options: TenantManagementStateOptions = {},
 ) {
   const state = useFlatCrudManagementState<Tenant>({
     context: tenantContext,
@@ -34,6 +42,7 @@ export function createTenantManagementState(
     canEnableRecord: (record, actionCode) => !(isPlatformTenantRecord(record) && actionCode === 'disable'),
     validateBeforeSave: (record) =>
       record.id === PLATFORM_TENANT_ID && record.enabled === false ? '平台租户不能停用' : undefined,
+    actionErrorHandlers: options.actionErrorHandlers,
   });
   const aliasReadonly = computed(() => state.mode.value !== 'create');
   const isPlatformTenant = computed(() => isPlatformTenantRecord(state.selected.value));

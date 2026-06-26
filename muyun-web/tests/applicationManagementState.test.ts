@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Application } from '../src/web-contracts/index.ts';
-import type { ModuleContext, ModuleRuntimeContextState } from '../src/web-core/index.ts';
+import {
+  AppError,
+  platformErrorCodes,
+  type ModuleContext,
+  type ModuleRuntimeContextState,
+} from '../src/web-core/index.ts';
 import { createApplicationManagementState } from '../src/views/applicationManagementState.ts';
 
 test('application management state selects first loaded application and creates records with alias as id', async () => {
@@ -179,6 +184,54 @@ test('application management state respects delete confirmation result', async (
   assert.equal(state.selected.value, undefined);
   assert.equal(state.mode.value, 'create');
   assert.equal(state.actionMessage.value, '已删除');
+});
+
+test('application management state records unhandled chain errors for platform fallback', async () => {
+  const context = createContext({
+    delete: async () => {
+      throw new AppError('该应用下仍有字典类目，不能删除', {
+        code: platformErrorCodes.resourceInUse,
+        status: 409,
+      });
+    },
+  });
+  const state = createApplicationManagementState(context, async () => true);
+
+  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true });
+  await state.removeSelected();
+
+  assert.equal(state.actionError.value, '该应用下仍有字典类目，不能删除');
+  assert.equal(state.actionMessage.value, undefined);
+  assert.equal(state.selected.value?.id, 'app');
+});
+
+test('application management state lets business handler own matched action errors', async () => {
+  const handled: string[] = [];
+  const context = createContext({
+    delete: async () => {
+      throw new AppError('该应用下仍有字典类目，不能删除', {
+        code: platformErrorCodes.resourceInUse,
+        status: 409,
+        details: { referencedResource: 'dictionaryCategory' },
+      });
+    },
+  });
+  const state = createApplicationManagementState(context, async () => true, {
+    actionErrorHandlers: [
+      {
+        code: platformErrorCodes.resourceInUse,
+        handle: (error, errorContext) => {
+          handled.push(`${errorContext.actionCode}:${error.details?.referencedResource ?? ''}`);
+        },
+      },
+    ],
+  });
+
+  state.handleSelect({ id: 'app', alias: 'app', title: '测试应用', enabled: true });
+  await state.removeSelected();
+
+  assert.deepEqual(handled, ['delete:dictionaryCategory']);
+  assert.equal(state.actionError.value, undefined);
 });
 
 test('application management state does not enter create mode without create permission', async () => {

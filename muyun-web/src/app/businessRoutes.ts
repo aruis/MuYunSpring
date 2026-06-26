@@ -1,6 +1,7 @@
 import type { Component } from 'vue';
 import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } from '@muyun/web-contracts';
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
+import DictionaryManagementView from '../views/DictionaryManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
@@ -16,6 +17,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/config/applications',
     moduleAlias: 'platform.application',
     component: ApplicationManagementView,
+  },
+  {
+    route: '/config/dictionaries',
+    moduleAlias: 'platform.dictionary_category',
+    component: DictionaryManagementView,
   },
   {
     route: '/iam/tenants',
