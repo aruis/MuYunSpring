@@ -1,0 +1,577 @@
+import { computed, ref } from 'vue';
+import type { Position, PositionCategory, WebQueryCondition } from '@muyun/web-contracts';
+import { normalizeError, type ModuleContext, type StaticModuleCrudClient } from '@muyun/web-core';
+import type { UiConfirmOptions } from '@muyun/vue-ui-antdv';
+
+export type PositionCardMode = 'view' | 'edit' | 'create';
+export type CategoryCardMode = 'view' | 'edit' | 'create-root' | 'create-child';
+type ConfirmAction = (options: UiConfirmOptions) => Promise<boolean>;
+type NotifyError = (message: string) => void;
+
+export function createPositionManagementState(
+  categoryContext: ModuleContext<PositionCategory>,
+  positionClient: StaticModuleCrudClient<Position>,
+  confirmAction: ConfirmAction,
+  notifyError?: NotifyError,
+) {
+  const categoryReloadKey = ref(0);
+  const positionReloadKey = ref(0);
+  const categories = ref<PositionCategory[]>([]);
+  const selectedCategory = ref<PositionCategory>();
+  const categoryDraft = ref<PositionCategory>(emptyCategoryDraft());
+  const categoryMode = ref<CategoryCardMode>('view');
+  const categorySaving = ref(false);
+  const categoryError = ref<string>();
+  const categoryMessage = ref<string>();
+
+  const positions = ref<Position[]>([]);
+  const selectedPosition = ref<Position>();
+  const positionDraft = ref<Position>(emptyPositionDraft(''));
+  const positionMode = ref<PositionCardMode>('view');
+  const positionLoading = ref(false);
+  const positionSaving = ref(false);
+  const positionError = ref<string>();
+  const positionMessage = ref<string>();
+
+  const selectedCategoryId = computed(() => selectedCategory.value?.id);
+  const selectedCategoryTitle = computed(() => positionCategoryTitleOf(selectedCategory.value));
+  const filteredPositions = computed(() =>
+    positions.value.filter((record) => positionMatchesCategory(record, selectedCategoryId.value)),
+  );
+  const canCreateCategory = computed(() => categoryContext.can('create') === true);
+  const canUpdateCategory = computed(() => categoryContext.can('update') === true);
+  const canDeleteCategory = computed(() => categoryContext.can('delete') === true);
+  const canToggleCategory = computed(() => {
+    if (!selectedCategory.value?.id) {
+      return false;
+    }
+    return categoryContext.can(categoryToggleActionCode(selectedCategory.value)) === true;
+  });
+  const canQueryPosition = computed(() => categoryContext.can('position_query') === true);
+  const canCreatePosition = computed(() => categoryContext.can('position_create') === true);
+  const canUpdatePosition = computed(() => categoryContext.can('position_update') === true);
+  const canDeletePosition = computed(() => categoryContext.can('position_delete') === true);
+  const canTogglePosition = computed(() => {
+    if (!selectedPosition.value?.id) {
+      return false;
+    }
+    return categoryContext.can(positionToggleActionCode(selectedPosition.value)) === true;
+  });
+  const positionReadonly = computed(() => positionMode.value === 'view');
+  const categoryReadonly = computed(() => categoryMode.value === 'view');
+  const positionCardTitle = computed(() =>
+    positionMode.value === 'create' ? '新建岗位' : positionTitleOf(selectedPosition.value),
+  );
+  const categoryEditorTitle = computed(() => {
+    if (categoryMode.value === 'create-root') {
+      return '新建分类';
+    }
+    if (categoryMode.value === 'create-child') {
+      return `新建下级：${selectedCategoryTitle.value}`;
+    }
+    return positionCategoryTitleOf(selectedCategory.value);
+  });
+
+  function handleCategoriesLoaded(records: PositionCategory[]) {
+    categories.value = records;
+    if (!selectedCategory.value?.id || !records.some((item) => item.id === selectedCategory.value?.id)) {
+      selectedCategory.value = records[0];
+    } else {
+      selectedCategory.value = records.find((item) => item.id === selectedCategory.value?.id);
+    }
+    categoryDraft.value = selectedCategory.value
+      ? copyCategory(selectedCategory.value)
+      : emptyCategoryDraft();
+    categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
+    syncSelectedPosition();
+  }
+
+  function handleSelectCategory(record: PositionCategory) {
+    selectedCategory.value = record;
+    categoryDraft.value = copyCategory(record);
+    categoryMode.value = 'view';
+    if (positionMode.value !== 'view') {
+      selectedPosition.value = undefined;
+      positionDraft.value = emptyPositionDraft(record.id ?? '');
+      positionMode.value = 'view';
+    }
+    clearCategoryFeedback();
+    clearPositionFeedback();
+    syncSelectedPosition();
+  }
+
+  function startCreateRootCategory() {
+    if (!canCreateCategory.value) {
+      categoryError.value = '当前用户无权新增岗位分类';
+      return;
+    }
+    categoryDraft.value = emptyCategoryDraft();
+    categoryMode.value = 'create-root';
+    clearCategoryFeedback();
+  }
+
+  function startCreateChildCategory() {
+    if (!canCreateCategory.value) {
+      categoryError.value = '当前用户无权新增岗位分类';
+      return;
+    }
+    if (!selectedCategory.value?.id) {
+      categoryError.value = '请先选择上级分类';
+      return;
+    }
+    categoryDraft.value = emptyCategoryDraft(selectedCategory.value.id);
+    categoryMode.value = 'create-child';
+    clearCategoryFeedback();
+  }
+
+  function startEditCategory() {
+    if (!selectedCategory.value) {
+      return;
+    }
+    if (!canUpdateCategory.value) {
+      categoryError.value = '当前用户无权编辑岗位分类';
+      return;
+    }
+    categoryDraft.value = copyCategory(selectedCategory.value);
+    categoryMode.value = 'edit';
+    clearCategoryFeedback();
+  }
+
+  function cancelCategoryEdit() {
+    categoryDraft.value = selectedCategory.value
+      ? copyCategory(selectedCategory.value)
+      : emptyCategoryDraft();
+    categoryMode.value = selectedCategory.value || !canCreateCategory.value ? 'view' : 'create-root';
+    clearCategoryFeedback();
+  }
+
+  async function saveCategory() {
+    if (categorySaving.value || categoryMode.value === 'view') {
+      return;
+    }
+    if (categoryMode.value.startsWith('create') ? !canCreateCategory.value : !canUpdateCategory.value) {
+      categoryError.value = '当前用户无权保存岗位分类';
+      return;
+    }
+    const validDraft = normalizeCategoryDraft(categoryDraft.value);
+    if (!isValidCategory(validDraft)) {
+      categoryError.value = '分类编码和分类名称不能为空';
+      return;
+    }
+    clearCategoryFeedback();
+    categorySaving.value = true;
+    try {
+      await categoryContext.runtime.ready;
+      const crud = categoryContext.abilities.crud();
+      const saved =
+        categoryMode.value === 'edit' && validDraft.id
+          ? await crud.update(validDraft.id, validDraft)
+          : await crud.insert(validDraft);
+      selectedCategory.value = saved;
+      categoryDraft.value = copyCategory(saved);
+      categoryMode.value = 'view';
+      categoryMessage.value = '已保存';
+      categoryReloadKey.value += 1;
+    } catch (cause) {
+      categoryError.value = normalizeError(cause).message;
+    } finally {
+      categorySaving.value = false;
+    }
+  }
+
+  async function toggleCategory() {
+    if (!selectedCategory.value?.id || categorySaving.value) {
+      return;
+    }
+    if (!canToggleCategory.value) {
+      categoryError.value = '当前用户无权变更岗位分类启停状态';
+      return;
+    }
+    clearCategoryFeedback();
+    categorySaving.value = true;
+    try {
+      await categoryContext.runtime.ready;
+      const enable = categoryContext.abilities.enable();
+      if (selectedCategory.value.enabled === false) {
+        await enable.enable(selectedCategory.value.id);
+      } else {
+        await enable.disable(selectedCategory.value.id);
+      }
+      selectedCategory.value = await categoryContext.abilities.crud().view(selectedCategory.value.id);
+      categoryDraft.value = copyCategory(selectedCategory.value);
+      categoryMessage.value = selectedCategory.value.enabled === false ? '已停用' : '已启用';
+      categoryReloadKey.value += 1;
+    } catch (cause) {
+      categoryError.value = normalizeError(cause).message;
+    } finally {
+      categorySaving.value = false;
+    }
+  }
+
+  async function deleteCategory() {
+    if (!selectedCategory.value?.id || categorySaving.value) {
+      return;
+    }
+    if (!canDeleteCategory.value) {
+      categoryError.value = '当前用户无权删除岗位分类';
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: '删除岗位分类',
+      content: `确认删除分类「${positionCategoryTitleOf(selectedCategory.value)}」？`,
+      okText: '删除',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    clearCategoryFeedback();
+    categorySaving.value = true;
+    try {
+      await categoryContext.runtime.ready;
+      await categoryContext.abilities.crud().delete(selectedCategory.value.id);
+      selectedCategory.value = undefined;
+      categoryDraft.value = emptyCategoryDraft();
+      categoryMode.value = canCreateCategory.value ? 'create-root' : 'view';
+      categoryMessage.value = '已删除';
+      categoryReloadKey.value += 1;
+    } catch (cause) {
+      categoryError.value = normalizeError(cause).message;
+      notifyError?.(categoryError.value);
+    } finally {
+      categorySaving.value = false;
+    }
+  }
+
+  async function loadPositions() {
+    if (!selectedCategoryId.value) {
+      positions.value = [];
+      syncSelectedPosition();
+      return;
+    }
+    if (!canQueryPosition.value) {
+      positions.value = [];
+      positionError.value = undefined;
+      syncSelectedPosition();
+      return;
+    }
+    positionLoading.value = true;
+    positionError.value = undefined;
+    try {
+      const response = await positionClient.query({
+        unpaged: true,
+        conditions: [eqCondition('categoryId', selectedCategoryId.value)],
+      });
+      positions.value = response.records;
+      syncSelectedPosition();
+    } catch (cause) {
+      positionError.value = normalizeError(cause).message;
+    } finally {
+      positionLoading.value = false;
+    }
+  }
+
+  function syncSelectedPosition() {
+    const rows = filteredPositions.value;
+    const matched = selectedPosition.value?.id
+      ? rows.find((item) => item.id === selectedPosition.value?.id)
+      : undefined;
+    selectedPosition.value = matched ?? rows[0];
+    if (positionMode.value === 'view') {
+      positionDraft.value = selectedPosition.value
+        ? copyPosition(selectedPosition.value)
+        : emptyPositionDraft(selectedCategoryId.value ?? '');
+    }
+  }
+
+  function selectPosition(record: Position) {
+    selectedPosition.value = record;
+    positionDraft.value = copyPosition(record);
+    positionMode.value = 'view';
+    clearPositionFeedback();
+  }
+
+  function startCreatePosition() {
+    if (!selectedCategoryId.value) {
+      positionError.value = '请先选择岗位分类';
+      return;
+    }
+    if (!canCreatePosition.value) {
+      positionError.value = '当前用户无权新增岗位';
+      return;
+    }
+    selectedPosition.value = undefined;
+    positionDraft.value = emptyPositionDraft(selectedCategoryId.value);
+    positionMode.value = 'create';
+    clearPositionFeedback();
+  }
+
+  function startEditPosition() {
+    if (!selectedPosition.value) {
+      return;
+    }
+    if (!canUpdatePosition.value) {
+      positionError.value = '当前用户无权编辑岗位';
+      return;
+    }
+    positionDraft.value = copyPosition(selectedPosition.value);
+    positionMode.value = 'edit';
+    clearPositionFeedback();
+  }
+
+  function cancelPositionEdit() {
+    positionDraft.value = selectedPosition.value
+      ? copyPosition(selectedPosition.value)
+      : emptyPositionDraft(selectedCategoryId.value ?? '');
+    positionMode.value = 'view';
+    clearPositionFeedback();
+  }
+
+  async function savePosition() {
+    if (positionSaving.value || positionMode.value === 'view') {
+      return;
+    }
+    if (positionMode.value === 'create' ? !canCreatePosition.value : !canUpdatePosition.value) {
+      positionError.value = '当前用户无权保存岗位';
+      return;
+    }
+    const validDraft = normalizePositionDraft(positionDraft.value);
+    if (!isValidPosition(validDraft)) {
+      positionError.value = '所属分类、岗位编码和岗位名称不能为空';
+      return;
+    }
+    clearPositionFeedback();
+    positionSaving.value = true;
+    try {
+      const saved =
+        positionMode.value === 'edit' && validDraft.id
+          ? await positionClient.update(validDraft.id, validDraft)
+          : await positionClient.insert(validDraft);
+      selectedPosition.value = saved;
+      positionDraft.value = copyPosition(saved);
+      positionMode.value = 'view';
+      positionMessage.value = '已保存';
+      if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
+        selectedCategory.value = categories.value.find((category) => category.id === saved.categoryId);
+      }
+      positionReloadKey.value += 1;
+    } catch (cause) {
+      positionError.value = normalizeError(cause).message;
+    } finally {
+      positionSaving.value = false;
+    }
+  }
+
+  async function togglePosition() {
+    if (!selectedPosition.value?.id || positionSaving.value) {
+      return;
+    }
+    if (!canTogglePosition.value) {
+      positionError.value = '当前用户无权变更岗位启停状态';
+      return;
+    }
+    clearPositionFeedback();
+    positionSaving.value = true;
+    try {
+      if (selectedPosition.value.enabled === false) {
+        await positionClient.enable(selectedPosition.value.id);
+      } else {
+        await positionClient.disable(selectedPosition.value.id);
+      }
+      selectedPosition.value = await positionClient.view(selectedPosition.value.id);
+      positionDraft.value = copyPosition(selectedPosition.value);
+      positionReloadKey.value += 1;
+    } catch (cause) {
+      positionError.value = normalizeError(cause).message;
+    } finally {
+      positionSaving.value = false;
+    }
+  }
+
+  async function deletePosition() {
+    if (!selectedPosition.value?.id || positionSaving.value) {
+      return;
+    }
+    if (!canDeletePosition.value) {
+      positionError.value = '当前用户无权删除岗位';
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: '删除岗位',
+      content: `确认删除岗位「${positionTitleOf(selectedPosition.value)}」？`,
+      okText: '删除',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    clearPositionFeedback();
+    positionSaving.value = true;
+    try {
+      await positionClient.delete(selectedPosition.value.id);
+      selectedPosition.value = undefined;
+      positionDraft.value = emptyPositionDraft(selectedCategoryId.value ?? '');
+      positionMode.value = selectedCategoryId.value && canCreatePosition.value ? 'create' : 'view';
+      positionMessage.value = '已删除';
+      positionReloadKey.value += 1;
+    } catch (cause) {
+      positionError.value = normalizeError(cause).message;
+      notifyError?.(positionError.value);
+    } finally {
+      positionSaving.value = false;
+    }
+  }
+
+  function clearCategoryFeedback() {
+    categoryError.value = undefined;
+    categoryMessage.value = undefined;
+  }
+
+  function clearPositionFeedback() {
+    positionError.value = undefined;
+    positionMessage.value = undefined;
+  }
+
+  return {
+    categoryReloadKey,
+    positionReloadKey,
+    categories,
+    selectedCategory,
+    categoryDraft,
+    categoryMode,
+    categorySaving,
+    categoryError,
+    categoryMessage,
+    positions,
+    selectedPosition,
+    positionDraft,
+    positionMode,
+    positionLoading,
+    positionSaving,
+    positionError,
+    positionMessage,
+    selectedCategoryId,
+    selectedCategoryTitle,
+    filteredPositions,
+    canCreateCategory,
+    canUpdateCategory,
+    canDeleteCategory,
+    canToggleCategory,
+    canQueryPosition,
+    canCreatePosition,
+    canUpdatePosition,
+    canDeletePosition,
+    canTogglePosition,
+    positionReadonly,
+    categoryReadonly,
+    positionCardTitle,
+    categoryEditorTitle,
+    handleCategoriesLoaded,
+    handleSelectCategory,
+    startCreateRootCategory,
+    startCreateChildCategory,
+    startEditCategory,
+    cancelCategoryEdit,
+    saveCategory,
+    toggleCategory,
+    deleteCategory,
+    loadPositions,
+    syncSelectedPosition,
+    selectPosition,
+    startCreatePosition,
+    startEditPosition,
+    cancelPositionEdit,
+    savePosition,
+    togglePosition,
+    deletePosition,
+  };
+}
+
+export function positionTitleOf(record: Position | undefined) {
+  return record?.title ?? record?.code ?? record?.id ?? '岗位详情';
+}
+
+export function positionCategoryTitleOf(record: PositionCategory | undefined) {
+  return record?.title ?? record?.code ?? record?.id ?? '岗位分类';
+}
+
+export function emptyPositionDraft(categoryId: string): Position {
+  return {
+    categoryId,
+    code: '',
+    title: '',
+    description: '',
+    enabled: true,
+  };
+}
+
+export function copyPosition(record: Position): Position {
+  return { ...record };
+}
+
+export function normalizePositionDraft(record: Position): Position {
+  return {
+    ...record,
+    categoryId: record.categoryId?.trim(),
+    code: record.code?.trim(),
+    title: record.title?.trim(),
+    description: normalizeBlank(record.description),
+  };
+}
+
+export function isValidPosition(record: Position) {
+  return Boolean(record.categoryId && record.code && record.title);
+}
+
+export function positionMatchesCategory(record: Position, categoryId: string | undefined) {
+  return Boolean(categoryId) && record.categoryId === categoryId;
+}
+
+function positionToggleActionCode(record: Position) {
+  return record.enabled === false ? 'position_enable' : 'position_disable';
+}
+
+function categoryToggleActionCode(record: PositionCategory) {
+  return record.enabled === false ? 'enable' : 'disable';
+}
+
+export function emptyCategoryDraft(parentId?: string): PositionCategory {
+  return {
+    parentId,
+    code: '',
+    title: '',
+    description: '',
+    enabled: true,
+  };
+}
+
+export function copyCategory(record: PositionCategory): PositionCategory {
+  return { ...record };
+}
+
+export function normalizeCategoryDraft(record: PositionCategory): PositionCategory {
+  return {
+    ...record,
+    parentId: normalizeBlank(record.parentId),
+    code: record.code?.trim(),
+    title: record.title?.trim(),
+    description: normalizeBlank(record.description),
+  };
+}
+
+export function isValidCategory(record: PositionCategory) {
+  return Boolean(record.code && record.title);
+}
+
+function normalizeBlank(value: string | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function eqCondition(fieldName: string, value: unknown): WebQueryCondition {
+  return {
+    fieldName,
+    operator: 'EQ',
+    values: [value],
+  };
+}

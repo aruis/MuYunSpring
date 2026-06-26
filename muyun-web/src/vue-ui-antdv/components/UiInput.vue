@@ -8,10 +8,13 @@ defineProps<{
   value?: Primitive;
   placeholder?: string;
   disabled?: boolean;
+  autofocus?: boolean;
 }>();
 
 const emit = defineEmits<{
   'update:value': [value: string];
+  blur: [event: FocusEvent];
+  focus: [event: FocusEvent];
 }>();
 </script>
 
@@ -20,6 +23,9 @@ const emit = defineEmits<{
     :value="String(value ?? '')"
     :placeholder="placeholder"
     :disabled="disabled"
+    :autofocus="autofocus"
+    @blur="emit('blur', $event)"
+    @focus="emit('focus', $event)"
     @update:value="emit('update:value', $event)"
   />
 </template>

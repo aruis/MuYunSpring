@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UiButton } from '@muyun/vue-ui-antdv';
 import RecordStatusTag from './RecordStatusTag.vue';
 
 defineOptions({ name: 'StaticManagementLayout' });
@@ -39,9 +40,7 @@ const emit = defineEmits<{
           <h2>{{ sidebarTitle }}</h2>
         </div>
         <slot name="refresh">
-          <button type="button" class="refresh-button" :title="refreshTitle" @click="emit('refresh')">
-            刷新
-          </button>
+          <UiButton icon-name="reload" :title="refreshTitle" @click="emit('refresh')"> 刷新 </UiButton>
         </slot>
       </div>
       <div class="sidebar-actions">
@@ -82,9 +81,9 @@ const emit = defineEmits<{
 .static-management-sidebar,
 .static-management-card {
   min-width: 0;
-  border: 1px solid #d8e1ea;
+  border: 1px solid var(--muyun-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--muyun-surface);
 }
 
 .static-management-sidebar {
@@ -123,13 +122,13 @@ h2 {
 
 .sidebar-header p,
 .card-header p {
-  color: #64748b;
+  color: var(--muyun-text-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
 h2 {
-  color: #172033;
+  color: var(--muyun-text);
   font-size: 16px;
 }
 
@@ -145,20 +144,6 @@ h2 {
   padding: 16px;
 }
 
-.refresh-button {
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid #d8e1ea;
-  border-radius: 6px;
-  background: #fff;
-  color: #172033;
-  cursor: pointer;
-}
-
-.refresh-button:hover {
-  background: #f8fafc;
-}
-
 .message {
   padding: 9px 10px;
   border-radius: 6px;
@@ -166,21 +151,21 @@ h2 {
 }
 
 .message.error {
-  border: 1px solid #f4b8b8;
-  background: #fff5f5;
-  color: #b42318;
+  border: 1px solid var(--muyun-danger-border);
+  background: var(--muyun-danger-bg);
+  color: var(--muyun-danger-text);
 }
 
 .message.success {
-  border: 1px solid #a9d7c8;
-  background: #f1fbf7;
-  color: #0f6b57;
+  border: 1px solid var(--muyun-success-border);
+  background: var(--muyun-success-bg);
+  color: var(--muyun-success-text);
 }
 
 .message.muted {
-  border: 1px solid #d8e1ea;
-  background: #f8fafc;
-  color: #58677a;
+  border: 1px solid var(--muyun-border);
+  background: var(--muyun-hover-subtle);
+  color: var(--muyun-text-muted);
 }
 
 :deep(.static-record-form) {
@@ -192,7 +177,7 @@ h2 {
 :deep(.static-record-form label) {
   display: grid;
   gap: 6px;
-  color: #465569;
+  color: var(--muyun-text-body);
   font-size: 13px;
 }
 

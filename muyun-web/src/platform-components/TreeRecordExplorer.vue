@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiEmpty, UiError, UiInput, UiSpin, UiTree, type UiTreeNode } from '@muyun/vue-ui-antdv';
+import {
+  UiButton,
+  UiEmpty,
+  UiError,
+  UiInput,
+  UiSpin,
+  UiTree,
+  type UiRecordInlineAction,
+  type UiTreeNode,
+} from '@muyun/vue-ui-antdv';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import type { WebTreeNode } from '@muyun/web-contracts';
 import {
@@ -15,16 +24,22 @@ import {
 
 defineOptions({ name: 'TreeRecordExplorer' });
 
+type TreeRecordSearchMode = 'always' | 'collapsible' | 'none';
+
 const props = withDefaults(
   defineProps<{
     context: ModuleContext<TreeRecordBase>;
     selectedId?: string;
     reloadKey?: number;
+    keyword?: string;
+    searchMode?: TreeRecordSearchMode;
+    searchTrigger?: 'inline' | 'external';
     searchPlaceholder?: string;
     emptyDescription?: string;
     loadingTip?: string;
     fallbackTitle?: string;
     titleOf?: (record: TreeRecordBase) => string;
+    actionsOf?: (record: TreeRecordBase) => UiRecordInlineAction[];
     filterOption?: (record: TreeRecordBase, normalizedKeyword: string) => boolean;
     tagOf?: (record: TreeRecordBase) => string | undefined;
     mutedOf?: (record: TreeRecordBase) => boolean;
@@ -32,11 +47,15 @@ const props = withDefaults(
   {
     selectedId: undefined,
     reloadKey: undefined,
+    keyword: undefined,
+    searchMode: 'always',
+    searchTrigger: 'inline',
     searchPlaceholder: '搜索名称、编码或 ID',
     emptyDescription: '暂无记录',
     loadingTip: '加载树形记录',
     fallbackTitle: '未命名记录',
     titleOf: undefined,
+    actionsOf: undefined,
     filterOption: undefined,
     tagOf: undefined,
     mutedOf: undefined,
@@ -45,17 +64,35 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [record: TreeRecordBase];
+  action: [action: UiRecordInlineAction, record: TreeRecordBase];
   loaded: [records: TreeRecordBase[]];
 }>();
 
 const loading = ref(false);
 const error = ref<string>();
-const keyword = ref('');
+const localKeyword = ref('');
+const searchExpanded = ref(false);
 const tree = ref<WebTreeNode<TreeRecordBase>[]>([]);
 const expandedKeys = ref<string[]>([]);
 
+const currentKeyword = computed(() => props.keyword ?? localKeyword.value);
+const effectiveKeyword = computed(() =>
+  props.searchMode === 'none' && props.keyword === undefined ? '' : currentKeyword.value,
+);
+const searchVisible = computed(
+  () =>
+    props.searchMode === 'always' ||
+    (props.searchMode === 'collapsible' && (searchExpanded.value || localKeyword.value.trim().length > 0)),
+);
+const searchRowVisible = computed(
+  () =>
+    props.searchMode !== 'none' &&
+    (searchVisible.value || (props.searchMode === 'collapsible' && props.searchTrigger === 'inline')),
+);
 const filteredTree = computed(() =>
-  filterTreeRecords(tree.value, keyword.value, (record, normalized) => matchesKeyword(record, normalized)),
+  filterTreeRecords(tree.value, effectiveKeyword.value, (record, normalized) =>
+    matchesKeyword(record, normalized),
+  ),
 );
 const nodes = computed(() => filteredTree.value.map(toUiTreeNode));
 const records = computed(() => flattenTreeRecords(tree.value));
@@ -72,8 +109,8 @@ watch(
   () => loadTree(),
 );
 
-watch(keyword, () => {
-  if (keyword.value.trim()) {
+watch(effectiveKeyword, () => {
+  if (effectiveKeyword.value.trim()) {
     expandedKeys.value = filteredTree.value.flatMap(expandAllTreeRecords);
   }
 });
@@ -112,6 +149,36 @@ function handleSelect(node: UiTreeNode) {
   }
 }
 
+function handleAction(action: UiRecordInlineAction, node: UiTreeNode) {
+  const record = records.value.find((item) => item.id === node.key);
+  if (record) {
+    emit('action', action, record);
+  }
+}
+
+function openSearch() {
+  searchExpanded.value = true;
+}
+
+function closeSearch() {
+  localKeyword.value = '';
+  searchExpanded.value = false;
+}
+
+function toggleSearch() {
+  if (props.searchMode === 'collapsible' && searchVisible.value) {
+    closeSearch();
+    return;
+  }
+  openSearch();
+}
+
+function handleSearchBlur() {
+  if (props.searchMode === 'collapsible' && !localKeyword.value.trim()) {
+    searchExpanded.value = false;
+  }
+}
+
 function toUiTreeNode(node: WebTreeNode<TreeRecordBase>): UiTreeNode {
   const record = node.record;
   return {
@@ -119,14 +186,35 @@ function toUiTreeNode(node: WebTreeNode<TreeRecordBase>): UiTreeNode {
     title: recordTitle(record),
     tag: props.tagOf?.(record) ?? (record.enabled === false ? '停用' : undefined),
     muted: props.mutedOf?.(record) ?? record.enabled === false,
+    actions: props.actionsOf?.(record),
     children: node.children.map(toUiTreeNode),
   };
 }
+
+defineExpose({ openSearch, toggleSearch });
 </script>
 
 <template>
   <div class="tree-record-explorer">
-    <UiInput v-model:value="keyword" :placeholder="searchPlaceholder" />
+    <Transition name="tree-record-search">
+      <div v-if="searchRowVisible" class="tree-record-search">
+        <UiInput
+          v-if="searchVisible"
+          v-model:value="localKeyword"
+          :autofocus="searchMode === 'collapsible'"
+          :placeholder="searchPlaceholder"
+          @blur="handleSearchBlur"
+        />
+        <UiButton
+          v-else-if="searchTrigger === 'inline'"
+          class="tree-record-search-trigger"
+          icon-name="search"
+          type="text"
+          title="搜索"
+          @click="openSearch"
+        />
+      </div>
+    </Transition>
     <UiSpin v-if="loading" :tip="loadingTip" />
     <UiError v-else-if="error" :message="error" />
     <UiEmpty v-else-if="nodes.length === 0" :description="emptyDescription" />
@@ -136,20 +224,68 @@ function toUiTreeNode(node: WebTreeNode<TreeRecordBase>): UiTreeNode {
       :nodes="nodes"
       :selected-key="selectedId"
       @select="handleSelect"
+      @action="handleAction"
     />
   </div>
 </template>
 
 <style scoped>
 .tree-record-explorer {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 
+.tree-record-search {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.tree-record-search-enter-active,
+.tree-record-search-leave-active {
+  max-height: 40px;
+  transition:
+    max-height 0.16s ease,
+    margin-bottom 0.16s ease,
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.tree-record-search-enter-from,
+.tree-record-search-leave-to {
+  max-height: 0;
+  margin-bottom: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.tree-record-search-enter-to,
+.tree-record-search-leave-from {
+  max-height: 40px;
+  margin-bottom: 10px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tree-record-search :deep(.ant-input) {
+  width: 100%;
+}
+
+.tree-record-search-trigger {
+  color: var(--muyun-text-muted);
+}
+
+.tree-record-explorer > :not(.tree-record-search) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .tree-record-explorer :deep(.ant-tree) {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }

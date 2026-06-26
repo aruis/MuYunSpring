@@ -10,11 +10,17 @@ import { pageDescriptorFromUrl } from '../src/platform-workbench/menuNavigation.
 import type { BusinessRoutePageDescriptor } from '../src/web-contracts/index.ts';
 
 test('static business route registry exposes route prefixes for navigation resolution', () => {
-  assert.deepEqual(businessRoutePrefixes, ['/config/applications', '/iam/tenants', '/iam/organizations']);
+  assert.deepEqual(businessRoutePrefixes, [
+    '/config/applications',
+    '/iam/tenants',
+    '/iam/organizations',
+    '/iam/positions',
+  ]);
   assert.deepEqual(businessModuleRoutes, {
     'platform.application': '/config/applications',
     'iam.tenant': '/iam/tenants',
     'iam.organization': '/iam/organizations',
+    'iam.position_category': '/iam/positions',
   });
 });
 
@@ -62,6 +68,22 @@ test('static business route registry resolves tenant management module route', (
 
   assert.equal(route?.route, '/iam/tenants');
   assert.equal(route?.moduleAlias, 'iam.tenant');
+});
+
+test('static business route registry resolves position category as position management entry', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/iam/positions', moduleAlias: 'iam.position_category' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/iam/positions');
+  assert.equal(route?.moduleAlias, 'iam.position_category');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 
 test('static business route registry prefers explicit route over module alias fallback', () => {

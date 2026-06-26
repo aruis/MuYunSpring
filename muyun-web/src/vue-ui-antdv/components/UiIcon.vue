@@ -3,15 +3,35 @@ import { computed } from 'vue';
 import {
   AppstoreOutlined,
   BellOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  DeleteOutlined,
   DownOutlined,
+  EditOutlined,
+  PlusOutlined,
+  PoweroffOutlined,
   ReloadOutlined,
+  SaveOutlined,
   SearchOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue';
 
 defineOptions({ name: 'UiIcon' });
 
-export type UiIconName = 'app' | 'down' | 'notification' | 'reload' | 'search' | 'settings';
+export type UiIconName =
+  | 'app'
+  | 'check'
+  | 'close'
+  | 'delete'
+  | 'down'
+  | 'edit'
+  | 'notification'
+  | 'plus'
+  | 'power'
+  | 'reload'
+  | 'save'
+  | 'search'
+  | 'settings';
 
 const props = defineProps<{
   name: UiIconName;
@@ -19,9 +39,16 @@ const props = defineProps<{
 
 const icons = {
   app: AppstoreOutlined,
+  check: CheckOutlined,
+  close: CloseOutlined,
+  delete: DeleteOutlined,
   down: DownOutlined,
+  edit: EditOutlined,
   notification: BellOutlined,
+  plus: PlusOutlined,
+  power: PoweroffOutlined,
   reload: ReloadOutlined,
+  save: SaveOutlined,
   search: SearchOutlined,
   settings: SettingOutlined,
 } as const;

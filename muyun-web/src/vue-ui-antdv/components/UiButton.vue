@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button as AButton } from 'ant-design-vue';
+import UiIcon, { type UiIconName } from './UiIcon.vue';
 
 defineOptions({ name: 'UiButton' });
 
@@ -10,6 +11,8 @@ withDefaults(
     disabled?: boolean;
     loading?: boolean;
     danger?: boolean;
+    iconName?: UiIconName;
+    iconPosition?: 'start' | 'end';
   }>(),
   {
     type: 'default',
@@ -17,6 +20,8 @@ withDefaults(
     disabled: false,
     loading: false,
     danger: false,
+    iconName: undefined,
+    iconPosition: 'start',
   },
 );
 
@@ -34,6 +39,16 @@ const emit = defineEmits<{
     :danger="danger"
     @click="emit('click', $event)"
   >
+    <template v-if="iconName && iconPosition === 'start'" #icon>
+      <UiIcon :name="iconName" />
+    </template>
     <slot />
+    <UiIcon v-if="iconName && iconPosition === 'end'" class="ui-button-trailing-icon" :name="iconName" />
   </AButton>
 </template>
+
+<style scoped>
+.ui-button-trailing-icon {
+  margin-inline-start: 8px;
+}
+</style>
