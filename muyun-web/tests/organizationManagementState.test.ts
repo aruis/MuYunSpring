@@ -9,7 +9,7 @@ test('organization management state selects first loaded organization and create
   const context = createContext({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, id: 'org-child' };
+      return { record: { ...record, id: 'org-child' } };
     },
   });
   const state = createOrganizationManagementState(context, async () => true);
@@ -37,7 +37,7 @@ test('organization management state updates existing records and refreshes enabl
   const context = createContext({
     update: async (id, record) => {
       calls.push(`update:${id}:${record.title}`);
-      return { ...record, title: '总部修订' };
+      return { record: { ...record, title: '总部修订' } };
     },
     disable: async (id) => {
       calls.push(`disable:${id}`);
@@ -66,7 +66,7 @@ test('organization management state trims parent id and clears blank parent id',
   const context = createContext({
     update: async (_id, record) => {
       calls.push(record);
-      return { ...record, id: 'org-east' };
+      return { record: { ...record, id: 'org-east' } };
     },
   });
   const state = createOrganizationManagementState(context, async () => true);
@@ -150,8 +150,8 @@ function createContext(
       totalKnown: true,
     }),
     view: async (id) => ({ id, code: 'ROOT', title: '总部', enabled: true }),
-    insert: async (record) => ({ ...record, id: 'org-new' }),
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record: { ...record, id: 'org-new' } }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

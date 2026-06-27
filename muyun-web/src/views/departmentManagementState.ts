@@ -164,14 +164,15 @@ export function createDepartmentManagementState(
     try {
       await departmentContext.runtime.ready;
       const crud = departmentContext.abilities.crud();
-      const saved =
+      const result =
         mode.value === 'edit' && validDraft.id
           ? await crud.update(validDraft.id, validDraft)
           : await crud.insert(validDraft);
+      const saved = result.record;
       selectedDepartment.value = saved;
       draft.value = copyDepartment(saved);
       mode.value = 'view';
-      presentActionSuccess('已保存');
+      presentActionSuccess(result.message ?? '操作成功');
       departmentReloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -193,14 +194,14 @@ export function createDepartmentManagementState(
     try {
       await departmentContext.runtime.ready;
       const enable = departmentContext.abilities.enable();
-      if (selectedDepartment.value.enabled === false) {
-        await enable.enable(selectedDepartment.value.id);
-      } else {
-        await enable.disable(selectedDepartment.value.id);
-      }
+      const result =
+        selectedDepartment.value.enabled === false
+          ? await enable.enable(selectedDepartment.value.id)
+          : await enable.disable(selectedDepartment.value.id);
       const refreshed = await departmentContext.abilities.crud().view(selectedDepartment.value.id);
       selectedDepartment.value = refreshed;
       draft.value = copyDepartment(refreshed);
+      presentActionSuccess(result.message ?? '操作成功');
       departmentReloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -229,11 +230,11 @@ export function createDepartmentManagementState(
     clearFeedback();
     saving.value = true;
     try {
-      await departmentContext.abilities.crud().delete(selectedDepartment.value.id);
+      const result = await departmentContext.abilities.crud().delete(selectedDepartment.value.id);
       selectedDepartment.value = undefined;
       draft.value = emptyDepartmentDraft(selectedOrganizationId.value);
       mode.value = 'view';
-      presentActionSuccess('已删除');
+      presentActionSuccess(result.message ?? '操作成功');
       departmentReloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);

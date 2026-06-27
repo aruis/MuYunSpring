@@ -1,18 +1,26 @@
 import type {
   TreeSortRequest,
+  QuerySchema,
   WebCountResponse,
   WebListResponse,
   WebPageResponse,
   WebQueryRequest,
+  WebRecordResponse,
   WebTreeNode,
 } from '@muyun/web-contracts';
 import type { HttpClient } from '../http';
 
+export interface StaticRecordMutationResult<TRecord> {
+  record: TRecord;
+  message?: string;
+}
+
 export interface StaticModuleCrudClient<TRecord> {
+  querySchema(): Promise<QuerySchema>;
   query(request?: WebQueryRequest): Promise<WebPageResponse<TRecord>>;
   view(id: string): Promise<TRecord>;
-  insert(record: TRecord): Promise<TRecord>;
-  update(id: string, record: TRecord): Promise<TRecord>;
+  insert(record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
+  update(id: string, record: TRecord): Promise<StaticRecordMutationResult<TRecord>>;
   delete(id: string): Promise<WebCountResponse>;
   enable(id: string): Promise<WebCountResponse>;
   disable(id: string): Promise<WebCountResponse>;
@@ -43,6 +51,7 @@ export function createStaticResourceCrudClient<TRecord>(
 ): StaticModuleCrudClient<TRecord> {
   const modulePath = modulePathOf(resourcePath);
   return {
+    querySchema: () => http.request<QuerySchema>({ path: `${modulePath}/query/schema` }),
     query: (request) =>
       http.request<WebPageResponse<TRecord>>({
         method: 'POST',
@@ -50,18 +59,22 @@ export function createStaticResourceCrudClient<TRecord>(
         body: request,
       }),
     view: (id) => http.request<TRecord>({ path: `${modulePath}/view/${encodeURIComponent(id)}` }),
-    insert: (record) =>
-      http.request<TRecord>({
-        method: 'POST',
-        path: `${modulePath}/insert`,
-        body: record,
-      }),
-    update: (id, record) =>
-      http.request<TRecord>({
-        method: 'POST',
-        path: `${modulePath}/update/${encodeURIComponent(id)}`,
-        body: record,
-      }),
+    insert: async (record) =>
+      normalizeRecordMutationResponse(
+        await http.request<TRecord | WebRecordResponse<TRecord>>({
+          method: 'POST',
+          path: `${modulePath}/insert`,
+          body: record,
+        }),
+      ),
+    update: async (id, record) =>
+      normalizeRecordMutationResponse(
+        await http.request<TRecord | WebRecordResponse<TRecord>>({
+          method: 'POST',
+          path: `${modulePath}/update/${encodeURIComponent(id)}`,
+          body: record,
+        }),
+      ),
     delete: (id) =>
       http.request<WebCountResponse>({
         method: 'POST',
@@ -127,4 +140,22 @@ export function createStaticResourceTreeClient<TRecord>(
 function modulePathOf(moduleAlias: string) {
   const normalized = moduleAlias.trim();
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function normalizeRecordMutationResponse<TRecord>(
+  response: TRecord | WebRecordResponse<TRecord>,
+): StaticRecordMutationResult<TRecord> {
+  if (isWebRecordResponse(response)) {
+    return {
+      record: response.record,
+      message: response.message,
+    };
+  }
+  return { record: response };
+}
+
+function isWebRecordResponse<TRecord>(
+  response: TRecord | WebRecordResponse<TRecord>,
+): response is WebRecordResponse<TRecord> {
+  return typeof response === 'object' && response !== null && 'record' in response;
 }

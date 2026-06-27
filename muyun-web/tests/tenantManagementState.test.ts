@@ -9,7 +9,7 @@ test('tenant management state selects first loaded tenant and creates records wi
   const context = createContext({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, sortOrder: 10 };
+      return { record: { ...record, sortOrder: 10 } };
     },
   });
   const state = createTenantManagementState(context, async () => true);
@@ -38,7 +38,7 @@ test('tenant management state keeps existing alias stable while editing title', 
   const context = createContext({
     update: async (id, record) => {
       calls.push({ id, record });
-      return { ...record, title: '身份权限' };
+      return { record: { ...record, title: '身份权限' } };
     },
   });
   const state = createTenantManagementState(context, async () => true);
@@ -154,7 +154,7 @@ test('tenant management state rejects saving disabled platform tenant', async ()
   const context = createContext({
     update: async (id, record) => {
       calls.push({ id, record });
-      return record;
+      return { record };
     },
   });
   const state = createTenantManagementState(context, async () => true);
@@ -231,8 +231,8 @@ function createContext(
       totalKnown: true,
     }),
     view: async (id) => ({ id, alias: id, title: '平台', enabled: true }),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

@@ -16,6 +16,7 @@ test('static business route registry exposes route prefixes for navigation resol
     '/iam/tenants',
     '/iam/organizations',
     '/iam/departments',
+    '/iam/employees',
     '/iam/positions',
   ]);
   assert.deepEqual(businessModuleRoutes, {
@@ -24,6 +25,7 @@ test('static business route registry exposes route prefixes for navigation resol
     'iam.tenant': '/iam/tenants',
     'iam.organization': '/iam/organizations',
     'iam.department': '/iam/departments',
+    'iam.employee': '/iam/employees',
     'iam.position_category': '/iam/positions',
   });
 });
@@ -103,6 +105,22 @@ test('static business route registry resolves department management module route
 
   assert.equal(route?.route, '/iam/departments');
   assert.equal(route?.moduleAlias, 'iam.department');
+  assert.equal(isStaticBusinessRoutePage(descriptor), true);
+});
+
+test('static business route registry resolves employee management module route', () => {
+  const descriptor: BusinessRoutePageDescriptor = {
+    pageType: 'business-route',
+    openMode: 'workbench-route',
+    hostType: 'business-route-host',
+    target: { route: '/iam/employees', moduleAlias: 'iam.employee' },
+    tabPolicy: { identity: 'by-menu' },
+  };
+
+  const route = resolveStaticBusinessRoute(descriptor);
+
+  assert.equal(route?.route, '/iam/employees');
+  assert.equal(route?.moduleAlias, 'iam.employee');
   assert.equal(isStaticBusinessRoutePage(descriptor), true);
 });
 

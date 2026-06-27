@@ -138,7 +138,7 @@ test('position management state saves normalized positions with required categor
   const positionContext = createContext<Position>('iam.position', {
     insert: async (record) => {
       calls.push(record);
-      return { ...record, id: 'pos-dev' };
+      return { record: { ...record, id: 'pos-dev' } };
     },
   });
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
@@ -164,7 +164,7 @@ test('position management state saves normalized positions with required categor
 test('position management state moves selected category when saved position changes category', async () => {
   const categoryContext = createContext<PositionCategory>('iam.position_category');
   const positionContext = createContext<Position>('iam.position', {
-    update: async (_id, record) => ({ ...record, id: 'pos-dev' }),
+    update: async (_id, record) => ({ record: { ...record, id: 'pos-dev' } }),
   });
   const state = createPositionManagementState(categoryContext, positionContext.crud, async () => true);
 
@@ -427,11 +427,11 @@ test('position management state rejects position actions without contributed per
   const positionContext = createContext<Position>('iam.position', {
     insert: async (record) => {
       calls.push(`insert:${record.code}`);
-      return record;
+      return { record };
     },
     update: async (id, record) => {
       calls.push(`update:${id}:${record.code}`);
-      return record;
+      return { record };
     },
     delete: async (id) => {
       calls.push(`delete:${id}`);
@@ -514,8 +514,8 @@ function createContext<TRecord>(
       totalKnown: true,
     }),
     view: async (id) => ({ id }) as TRecord,
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

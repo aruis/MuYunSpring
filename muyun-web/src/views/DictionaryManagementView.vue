@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Application, DictionaryCategory, DictionaryItem } from '@muyun/web-contracts';
+import type { Application, DictionaryCategory, DictionaryItem, QuerySchema } from '@muyun/web-contracts';
 import {
   createStaticResourceTreeClient,
   useModuleContext,
@@ -248,10 +248,11 @@ function scopedItemContext(categoryId: string | undefined): ModuleContext<Dictio
 
 function fallbackCategoryClient(): StaticModuleTreeClient<DictionaryCategory> {
   return {
+    querySchema: async () => emptyQuerySchema('platform.dictionary_category'),
     query: async () => emptyPage(),
     view: async () => ({}),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 0 }),
     enable: async () => ({ count: 0 }),
     disable: async () => ({ count: 0 }),
@@ -264,10 +265,11 @@ function fallbackCategoryClient(): StaticModuleTreeClient<DictionaryCategory> {
 
 function fallbackItemClient(): StaticModuleTreeClient<DictionaryItem> {
   return {
+    querySchema: async () => emptyQuerySchema('platform.dictionary_item'),
     query: async () => emptyPage(),
     view: async () => ({}),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 0 }),
     enable: async () => ({ count: 0 }),
     disable: async () => ({ count: 0 }),
@@ -275,6 +277,16 @@ function fallbackItemClient(): StaticModuleTreeClient<DictionaryItem> {
     treeFlat: async () => ({ records: [] }),
     subtree: async () => ({ records: [] }),
     sort: async () => ({ count: 0 }),
+  };
+}
+
+function emptyQuerySchema(scopeName: string): QuerySchema {
+  return {
+    scopeName,
+    quickSearch: { enabled: false, fields: [], fieldSchemas: [] },
+    fields: [],
+    externalCriteria: [],
+    defaultSorts: [],
   };
 }
 
