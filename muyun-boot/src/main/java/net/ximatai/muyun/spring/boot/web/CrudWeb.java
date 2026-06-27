@@ -73,20 +73,20 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
 
     default Criteria queryCriteria(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
-            return queryAbility.queryCriteria(WebQueryRequests.from(request));
-        }
-        if (request != null && !request.conditions().isEmpty()) {
-            throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
-        }
-        if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
-            throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
+            Criteria delegated = queryAbility.queryCriteria(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
         }
         return Criteria.of();
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
-            return queryAbility.querySorts(WebQueryRequests.from(request));
+            Sort[] delegated = queryAbility.querySorts(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
         }
         if (request != null && !request.sorts().isEmpty()) {
             throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());

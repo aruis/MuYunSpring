@@ -2,11 +2,9 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -19,43 +17,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Set;
-
 @RestController
 @PlatformStaticModule(application = "platform", alias = ModuleMetadataFieldService.MODULE_ALIAS, title = "平台模块字段配置")
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/fields")
 public class PlatformModuleMetadataFieldWebController
         extends NestedSortableCrudWebSupport<ModuleMetadataField, ModuleMetadataFieldService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "relationId", "metadataFieldId", "cloneable",
-            "dictionaryApplicationAlias", "dictionaryCategoryAlias",
-            "referenceModuleAlias", "referenceModuleKeyField", "referenceModuleLabelField",
-            "referenceGenerateRuleId", "referenceQueryTemplateId",
-            "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode",
-            "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode",
-            "unitConversionMode", "conversionScopeFieldId", "unitRequired",
-            "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode",
-            "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode",
-            "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId",
-            "moneyCurrencyRequired",
-            "title", "sortOrder", "createdAt", "updatedAt");
-
     private final ModuleMetadataRelationService relationService;
 
     public PlatformModuleMetadataFieldWebController(ModuleMetadataRelationService relationService) {
         this.relationService = relationService;
     }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"));
-    }
-
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
         requireRelation(request);

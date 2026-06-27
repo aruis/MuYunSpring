@@ -5,6 +5,9 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QuerySchema;
+import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -13,23 +16,41 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
     default Criteria queryCriteria(WebQueryRequest request) {
-        if (request != null && !request.conditions().isEmpty()) {
-            throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
-        }
-        if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
-            throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Criteria delegated = queryAbility.queryCriteria(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
         }
         return Criteria.of();
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Sort[] delegated = queryAbility.querySorts(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
+        }
         if (request != null && !request.sorts().isEmpty()) {
             throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());
         }
         return new Sort[0];
+    }
+
+    @GetMapping("/query/schema")
+    @ActionEndpoint(PlatformAction.QUERY)
+    default QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
+        return webScope(() -> {
+            if (service() instanceof QueryAbility<?> queryAbility) {
+                return queryAbility.querySchema();
+            }
+            throw new IllegalArgumentException("query schema is not supported by " + webScopeName());
+        });
     }
 
     @PostMapping("/query")

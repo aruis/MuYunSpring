@@ -10,6 +10,12 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +24,8 @@ import java.util.Optional;
 @Service
 public class ModuleMetadataRelationService extends AbstractAbilityService<ModuleMetadataRelation> implements
         SoftDeleteAbility<ModuleMetadataRelation>,
-        SortAbility<ModuleMetadataRelation> {
+        SortAbility<ModuleMetadataRelation>, QueryAbility<ModuleMetadataRelation>
+{
     public static final String MODULE_ALIAS = "platform.module_metadata_relation";
 
     private final PlatformModuleService moduleService;
@@ -31,6 +38,32 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         this(relationDao, moduleService, metadataService, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("模块标识"))
+                .field(QueryField.of("metadataId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据"))
+                .field(QueryField.of("relationAlias", QueryOperator.EQ).withTitle("关系标识"))
+                .field(QueryField.of("relationRole", QueryOperator.EQ).withTitle("关系角色"))
+                .field(QueryField.of("parentMetadataId", QueryOperator.EQ, QueryOperator.IN).withTitle("父元数据"))
+                .field(QueryField.of("foreignKey", QueryOperator.EQ).withTitle("外键"))
+                .field(QueryField.of("autoPopulate", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("自动填充"))
+                .field(QueryField.of("cascadeDelete", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("级联删除"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public ModuleMetadataRelationService(BaseDao<ModuleMetadataRelation, String> relationDao,
                                          PlatformModuleService moduleService,

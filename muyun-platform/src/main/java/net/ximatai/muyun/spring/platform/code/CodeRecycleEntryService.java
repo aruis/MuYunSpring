@@ -2,9 +2,15 @@ package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +20,8 @@ import java.util.List;
 
 @Service
 public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleEntry> implements
-        SoftDeleteAbility<CodeRecycleEntry> {
+        SoftDeleteAbility<CodeRecycleEntry>,
+        QueryAbility<CodeRecycleEntry> {
     public static final String MODULE_ALIAS = "platform.code_recycle_entry";
     private static final PageRequest ONE = PageRequest.of(1, 1);
 
@@ -131,6 +138,21 @@ public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleE
         if (entry.getStatus() == null) {
             entry.setStatus(CodeRecycleStatus.AVAILABLE);
         }
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN).withTitle("编码规则"))
+                .field(QueryField.of("basisKey", QueryOperator.EQ, QueryOperator.IN).withTitle("分组键"))
+                .field(QueryField.of("periodKey", QueryOperator.EQ, QueryOperator.IN).withTitle("周期键"))
+                .field(QueryField.of("recycledValue", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("回收值").withQuickSearch())
+                .field(QueryField.of("sourceRecordId", QueryOperator.EQ, QueryOperator.IN).withTitle("来源记录"))
+                .field(QueryField.of("status", QueryOperator.EQ, QueryOperator.IN).withTitle("状态"))
+                .defaultSort(Sort.desc("createdAt"))
+                .build();
     }
 
     private String normalizeBucket(String value) {

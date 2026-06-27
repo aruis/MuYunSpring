@@ -1,12 +1,18 @@
 package net.ximatai.muyun.spring.platform.metadata;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +26,8 @@ import java.util.Optional;
 public class MetadataService extends AbstractAbilityService<Metadata> implements
         SoftDeleteAbility<Metadata>,
         EnableAbility<Metadata>,
-        SortAbility<Metadata> {
+        SortAbility<Metadata>,
+        QueryAbility<Metadata> {
     public static final String MODULE_ALIAS = "platform.metadata";
     public static final String DEFAULT_SCHEMA = "public";
 
@@ -59,6 +66,32 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
     @Override
     public void beforeInsert(Metadata metadata) {
         normalizeAndValidate(metadata);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("applicationAlias", QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("所属应用"))
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据标识"))
+                .field(QueryField.of("schemaName", QueryOperator.EQ).withTitle("数据库Schema"))
+                .field(QueryField.of("tableName", QueryOperator.EQ).withTitle("数据库表名"))
+                .field(QueryField.of("dataScopeEnabled", QueryValueType.BOOLEAN, QueryOperator.EQ)
+                        .withTitle("数据权限"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
     }
 
     @Override

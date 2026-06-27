@@ -13,6 +13,11 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,7 +27,8 @@ import java.util.Objects;
 public class PlatformQueryTemplateService extends AbstractAbilityService<PlatformQueryTemplate> implements
         SoftDeleteAbility<PlatformQueryTemplate>,
         EnableAbility<PlatformQueryTemplate>,
-        SortAbility<PlatformQueryTemplate> {
+        SortAbility<PlatformQueryTemplate>, QueryAbility<PlatformQueryTemplate>
+{
     public static final String MODULE_ALIAS = "platform.query_template";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -34,6 +40,20 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
         this.moduleService = moduleService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("标识"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("defaultTemplate", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("默认模板"))
+                .field(QueryField.of("published", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("已发布"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("alias"))
+                .build();
+    }
     @Override
     public void beforeInsert(PlatformQueryTemplate template) {
         normalizeAndValidate(template);

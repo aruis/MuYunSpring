@@ -12,6 +12,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityViewFieldDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +28,8 @@ import java.util.Optional;
 public class MetadataViewFieldService extends AbstractAbilityService<MetadataViewField> implements
         SoftDeleteAbility<MetadataViewField>,
         EnableAbility<MetadataViewField>,
-        SortAbility<MetadataViewField> {
+        SortAbility<MetadataViewField>, QueryAbility<MetadataViewField>
+{
     public static final String MODULE_ALIAS = "platform.metadata_view_field";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
@@ -42,6 +48,32 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
         this(viewFieldDao, viewService, fieldService, relationService, null, null);
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("viewId", QueryOperator.EQ, QueryOperator.IN).withTitle("视图"))
+                .field(QueryField.of("metadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据字段"))
+                .field(QueryField.of("visible", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("可见"))
+                .field(QueryField.of("controlType", QueryOperator.EQ).withTitle("控件类型"))
+                .field(QueryField.of("fieldUiTypeAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("字段UI类型"))
+                .field(QueryField.of("readOnly", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("只读"))
+                .field(QueryField.of("requiredOverride", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("必填覆盖"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     public MetadataViewFieldService(BaseDao<MetadataViewField, String> viewFieldDao,
                                     MetadataViewService viewService,
                                     MetadataFieldService fieldService,

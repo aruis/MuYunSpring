@@ -6,6 +6,11 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +18,8 @@ import java.util.List;
 
 @Service
 public class CodeIssueLogService extends AbstractAbilityService<CodeIssueLog> implements
-        SoftDeleteAbility<CodeIssueLog> {
+        SoftDeleteAbility<CodeIssueLog>,
+        QueryAbility<CodeIssueLog> {
     public static final String MODULE_ALIAS = "platform.code_issue_log";
 
     public CodeIssueLogService(BaseDao<CodeIssueLog, String> issueLogDao) {
@@ -84,6 +90,25 @@ public class CodeIssueLogService extends AbstractAbilityService<CodeIssueLog> im
         if (log.getRetryCount() == null) {
             log.setRetryCount(0);
         }
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN).withTitle("编码规则"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属模块"))
+                .field(QueryField.of("entityAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属对象"))
+                .field(QueryField.of("fieldName", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("字段名").withQuickSearch())
+                .field(QueryField.of("basisKey", QueryOperator.EQ, QueryOperator.IN).withTitle("分组键"))
+                .field(QueryField.of("periodKey", QueryOperator.EQ, QueryOperator.IN).withTitle("周期键"))
+                .field(QueryField.of("generatedValue", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("生成值").withQuickSearch())
+                .field(QueryField.of("status", QueryOperator.EQ, QueryOperator.IN).withTitle("状态"))
+                .field(QueryField.of("retryCount", QueryValueType.INTEGER, QueryOperator.EQ).withTitle("重试次数"))
+                .defaultSort(Sort.desc("createdAt"))
+                .build();
     }
 
     private String normalizeBucket(String value) {

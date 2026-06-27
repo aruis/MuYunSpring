@@ -154,43 +154,6 @@ class IamWebControllerTest {
     }
 
     @Test
-    void shouldRejectUnsupportedStaticQueryConditionsInsteadOfIgnoringThem() throws Exception {
-        mvc.perform(post("/iam.tenant/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "conditions", List.of(Map.of(
-                                        "fieldName", "title",
-                                        "operator", "EQ",
-                                        "values", List.of("Tenant A")
-                                ))
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("query conditions are not supported by iam.tenant"));
-    }
-
-    @Test
-    void shouldRejectUnsupportedStaticQueryCriteriaInsteadOfIgnoringThem() throws Exception {
-        mvc.perform(post("/iam.tenant/query")
-                        .contentType("application/json")
-                        .content(json(Map.of(
-                                "criteria", Map.of(
-                                        "operator", "OR",
-                                        "conditions", List.of(Map.of(
-                                                "fieldName", "title",
-                                                "operator", "EQ",
-                                                "values", List.of("Tenant A")
-                                        ))
-                                )
-                        ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("query criteria are not supported by iam.tenant"));
-    }
-
-    @Test
     void shouldRejectUnsupportedIamQuerySurfacesInsteadOfIgnoringThem() throws Exception {
         currentUser = CurrentUser.tenantUser("user-1", "User", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
@@ -210,7 +173,7 @@ class IamWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("quick search is not supported by iam.position"));
+                .andExpect(jsonPath("$.message").value("quick search field is not supported by iam.position: title"));
     }
 
     @Test

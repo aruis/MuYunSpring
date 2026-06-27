@@ -2,9 +2,15 @@ package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +19,8 @@ import java.util.Objects;
 
 @Service
 public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEntry> implements
-        SoftDeleteAbility<CodeLedgerEntry> {
+        SoftDeleteAbility<CodeLedgerEntry>,
+        QueryAbility<CodeLedgerEntry> {
     public static final String MODULE_ALIAS = "platform.code_ledger_entry";
 
     public CodeLedgerEntryService(BaseDao<CodeLedgerEntry, String> ledgerEntryDao) {
@@ -171,6 +178,26 @@ public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEnt
         if (entry.getLastAction() == null) {
             entry.setLastAction(CodeLedgerAction.ASSIGNED);
         }
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN).withTitle("编码规则"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属模块"))
+                .field(QueryField.of("entityAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属对象"))
+                .field(QueryField.of("fieldName", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("字段名").withQuickSearch())
+                .field(QueryField.of("codeValue", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("编码值").withQuickSearch())
+                .field(QueryField.of("basisKey", QueryOperator.EQ, QueryOperator.IN).withTitle("分组键"))
+                .field(QueryField.of("periodKey", QueryOperator.EQ, QueryOperator.IN).withTitle("周期键"))
+                .field(QueryField.of("sourceRecordId", QueryOperator.EQ, QueryOperator.IN).withTitle("来源记录"))
+                .field(QueryField.of("status", QueryOperator.EQ, QueryOperator.IN).withTitle("状态"))
+                .field(QueryField.of("lastAction", QueryOperator.EQ, QueryOperator.IN).withTitle("最后动作"))
+                .defaultSort(Sort.desc("createdAt"))
+                .build();
     }
 
     private String normalizeBucket(String value) {

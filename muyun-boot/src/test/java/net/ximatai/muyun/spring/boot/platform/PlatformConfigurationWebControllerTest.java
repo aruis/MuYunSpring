@@ -6,6 +6,11 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -161,6 +166,16 @@ class PlatformConfigurationWebControllerTest {
         PlatformModuleActionWebController controller = new PlatformModuleActionWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("actionCode", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformModuleAction action = action("action-1", "platform.sales.order", "submit");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(action), 1, PageRequest.of(1, 20)));
@@ -337,6 +352,15 @@ class PlatformConfigurationWebControllerTest {
         ReflectionTestUtils.setField(controller, "service", service);
         when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
         when(fieldService.select("field-1")).thenReturn(moduleField("field-1", "rel-1"));
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         ModuleMetadataFieldFilter filter = new ModuleMetadataFieldFilter();
         filter.setId("filter-1");
         filter.setModuleMetadataFieldId("field-1");
@@ -442,6 +466,16 @@ class PlatformConfigurationWebControllerTest {
         PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
         ReflectionTestUtils.setField(controller, "service", service);
         when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("viewType", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(metadataView("view-1", "rel-1", EntityViewType.LIST)),
                         1, PageRequest.of(1, 20)));
@@ -572,6 +606,16 @@ class PlatformConfigurationWebControllerTest {
         PlatformFieldTypeWebController controller = new PlatformFieldTypeWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformFieldType fieldType = new PlatformFieldType();
         fieldType.setId("string");
         fieldType.setAlias("string");
@@ -601,6 +645,17 @@ class PlatformConfigurationWebControllerTest {
         DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         DictionaryCategory root = dictionaryCategory("category-1", "platform", "common", null);
         DictionaryCategory child = dictionaryCategory("category-2", "platform", "status", "category-1");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
@@ -682,6 +737,17 @@ class PlatformConfigurationWebControllerTest {
         DictionaryItemWebController controller = new DictionaryItemWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("code", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         DictionaryCategory category = dictionaryCategory("category-1", "platform", "status", null);
         DictionaryItem root = dictionaryItem("item-1", "category-1", "status", "enabled", null);
         DictionaryItem child = dictionaryItem("item-2", "category-1", "status", "active", "item-1");
@@ -780,6 +846,17 @@ class PlatformConfigurationWebControllerTest {
         PlatformUiSetWebController controller = new PlatformUiSetWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformUiSet uiSet = uiSet("ui-set-1", "platform.sales.order", "list");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(uiSet), 1, PageRequest.of(1, 20)));
@@ -830,6 +907,17 @@ class PlatformConfigurationWebControllerTest {
         PlatformQueryTemplateWebController controller = new PlatformQueryTemplateWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformQueryTemplate template = queryTemplate("query-1", "platform.sales.order", "default");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(template), 1, PageRequest.of(1, 20)));
@@ -856,6 +944,17 @@ class PlatformConfigurationWebControllerTest {
         PlatformFieldUiTypeAttributeWebController controller = new PlatformFieldUiTypeAttributeWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("attributeAlias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformFieldUiTypeAttribute attribute = fieldUiTypeAttribute("attr-1", "text", "placeholder");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(attribute), 1, PageRequest.of(1, 20)));
@@ -909,6 +1008,17 @@ class PlatformConfigurationWebControllerTest {
         PlatformFieldUiTypeFieldMappingWebController controller = new PlatformFieldUiTypeFieldMappingWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("sourceKey", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         PlatformFieldUiTypeFieldMapping mapping = fieldUiTypeMapping("mapping-1", "select", "options");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(mapping), 1, PageRequest.of(1, 20)));

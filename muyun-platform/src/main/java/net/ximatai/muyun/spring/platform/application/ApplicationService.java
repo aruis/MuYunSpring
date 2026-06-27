@@ -3,11 +3,17 @@ package net.ximatai.muyun.spring.platform.application;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.ability.BaseDao;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.StandardBusinessService;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.ErrorScope;
 import net.ximatai.muyun.spring.common.exception.ErrorTarget;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -28,7 +34,8 @@ import java.util.Optional;
 public class ApplicationService extends StandardBusinessService<Application> implements
         SoftDeleteAbility<Application>,
         EnableAbility<Application>,
-        SortAbility<Application> {
+        SortAbility<Application>,
+        QueryAbility<Application> {
 
     public static final String MODULE_ALIAS = "platform.application";
 
@@ -54,6 +61,25 @@ public class ApplicationService extends StandardBusinessService<Application> imp
     @Override
     public void normalizeBeforeMutation(Application application) {
         requireAlias(application.getAlias());
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("应用名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
     }
 
     @Override

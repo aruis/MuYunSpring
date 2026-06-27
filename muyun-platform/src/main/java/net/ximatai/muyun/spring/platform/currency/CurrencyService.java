@@ -14,6 +14,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.math.RoundingMode;
@@ -28,13 +33,44 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
         EnableAbility<Currency>,
         SortAbility<Currency>,
         ReferenceAbility<Currency>,
-        CacheAbility<Currency> {
+        CacheAbility<Currency>, QueryAbility<Currency>
+{
     public static final String MODULE_ALIAS = "platform.currency";
 
     public CurrencyService(BaseDao<Currency, String> currencyDao) {
         super(MODULE_ALIAS, Currency.class, currencyDao);
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("code", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("编码").withQuickSearch().withSortable())
+                .field(QueryField.of("numericCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("数字编码").withQuickSearch().withSortable())
+                .field(QueryField.of("symbol", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("符号").withQuickSearch().withSortable())
+                .field(QueryField.of("decimalScale", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("小数位数").withSortable())
+                .field(QueryField.of("roundingMode", QueryOperator.EQ).withTitle("舍入模式"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("code"))
+                .build();
+    }
     @Override
     public void beforeInsert(Currency currency) {
         normalizeAndValidate(currency);

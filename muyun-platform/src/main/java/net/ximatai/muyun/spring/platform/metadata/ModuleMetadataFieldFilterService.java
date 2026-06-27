@@ -7,6 +7,12 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +22,8 @@ import java.util.Optional;
 @Service
 public class ModuleMetadataFieldFilterService extends AbstractAbilityService<ModuleMetadataFieldFilter> implements
         SoftDeleteAbility<ModuleMetadataFieldFilter>,
-        SortAbility<ModuleMetadataFieldFilter> {
+        SortAbility<ModuleMetadataFieldFilter>, QueryAbility<ModuleMetadataFieldFilter>
+{
     public static final String MODULE_ALIAS = "platform.module_metadata_field_filter";
 
     private final ModuleMetadataFieldService moduleFieldService;
@@ -27,6 +34,26 @@ public class ModuleMetadataFieldFilterService extends AbstractAbilityService<Mod
         this(filterDao, moduleFieldService, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("moduleMetadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("模块字段"))
+                .field(QueryField.of("formFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("表单字段"))
+                .field(QueryField.of("referenceFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("引用字段"))
+                .field(QueryField.of("operator", QueryOperator.EQ).withTitle("操作符"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public ModuleMetadataFieldFilterService(BaseDao<ModuleMetadataFieldFilter, String> filterDao,
                                             ModuleMetadataFieldService moduleFieldService,

@@ -19,6 +19,11 @@ import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldUiTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,7 +33,8 @@ import java.util.Objects;
 public class PlatformUiConfigFieldService extends AbstractAbilityService<PlatformUiConfigField> implements
         SoftDeleteAbility<PlatformUiConfigField>,
         EnableAbility<PlatformUiConfigField>,
-        SortAbility<PlatformUiConfigField> {
+        SortAbility<PlatformUiConfigField>, QueryAbility<PlatformUiConfigField>
+{
     public static final String MODULE_ALIAS = "platform.ui_config_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -55,6 +61,22 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         this.metadataFieldService = metadataFieldService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("moduleMetadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("模块字段"))
+                .field(QueryField.of("fieldUiTypeAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("字段UI类型"))
+                .field(QueryField.of("visible", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("可见"))
+                .field(QueryField.of("readOnly", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("只读"))
+                .field(QueryField.of("requiredOverride", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("必填覆盖"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     @Override
     public void beforeInsert(PlatformUiConfigField field) {
         requireDraftUiConfig(field.getUiConfigId());

@@ -7,6 +7,11 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRule;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRuleService;
 import net.ximatai.muyun.spring.platform.writeback.RecordWriteBackRule;
@@ -80,6 +85,16 @@ class RecordLinkageRuleWebControllerTest {
         RecordGenerationRuleWebController controller = new RecordGenerationRuleWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("actionCode", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         RecordGenerationRule rule = generationRule("rule-1", "sales.contract");
         rule.setActionCode("generateInvoice");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))

@@ -1,9 +1,15 @@
 package net.ximatai.muyun.spring.platform.currency;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -11,7 +17,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class TenantCurrencySettingService extends AbstractAbilityService<TenantCurrencySetting> implements
-        SoftDeleteAbility<TenantCurrencySetting> {
+        SoftDeleteAbility<TenantCurrencySetting>,
+        QueryAbility<TenantCurrencySetting> {
     public static final String MODULE_ALIAS = "platform.tenant_currency_setting";
 
     private final CurrencyService currencyService;
@@ -31,6 +38,24 @@ public class TenantCurrencySettingService extends AbstractAbilityService<TenantC
     public void beforeUpdate(TenantCurrencySetting setting) {
         normalizeAndValidate(setting);
         validateImmutableIdentity(setting);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("baseCurrencyCode", QueryOperator.EQ).withTitle("本位币"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("名称").withQuickSearch())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("tenantId"))
+                .build();
     }
 
     public TenantCurrencySetting currentTenantSetting() {

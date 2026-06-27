@@ -2,6 +2,7 @@ package net.ximatai.muyun.spring.platform.module;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.BaseDao;
@@ -9,6 +10,11 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.PlatformManagedProtectionAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -20,12 +26,38 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
         SoftDeleteAbility<PlatformModule>,
         EnableAbility<PlatformModule>,
         TreeAbility<PlatformModule>,
-        PlatformManagedProtectionAbility<PlatformModule> {
+        PlatformManagedProtectionAbility<PlatformModule>,
+        QueryAbility<PlatformModule> {
 
     public static final String MODULE_ALIAS = "platform.module";
 
     public PlatformModuleService(BaseDao<PlatformModule, String> moduleDao) {
         super(MODULE_ALIAS, PlatformModule.class, moduleDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("parentId", QueryOperator.EQ, QueryOperator.IN).withTitle("父模块"))
+                .field(QueryField.of("applicationAlias", QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("所属应用"))
+                .field(QueryField.of("moduleKind", QueryOperator.EQ).withTitle("模块类型"))
+                .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ)
+                        .withTitle("系统管理"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("模块名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
     }
 
     @Override

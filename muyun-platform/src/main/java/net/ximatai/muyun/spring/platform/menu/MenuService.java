@@ -25,6 +25,12 @@ import net.ximatai.muyun.spring.platform.ui.PlatformUiConfigService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSet;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetService;
 import net.ximatai.muyun.spring.platform.ui.PlatformUiSetType;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -40,7 +46,8 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         SoftDeleteAbility<Menu>,
         EnableAbility<Menu>,
         TreeAbility<Menu>,
-        InitialDataAbility<Menu> {
+        InitialDataAbility<Menu>, QueryAbility<Menu>
+{
     public static final String MODULE_ALIAS = "platform.menu";
     public static final String ADMIN_PLATFORM_GROUP_ID = "platform.menu.group.platform";
     public static final String ADMIN_CONFIG_GROUP_ID = "platform.menu.group.config";
@@ -59,6 +66,35 @@ public class MenuService extends AbstractAbilityService<Menu> implements
                 (PlatformUiConfigService) null, null, null);
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("schemeId", QueryOperator.EQ, QueryOperator.IN).withTitle("方案"))
+                .field(QueryField.of("parentId", QueryOperator.EQ, QueryOperator.IN).withTitle("父ID"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("menuType", QueryOperator.EQ).withTitle("菜单类型"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("模块标识"))
+                .field(QueryField.of("route", QueryOperator.EQ).withTitle("路由"))
+                .field(QueryField.of("externalUrl", QueryOperator.EQ).withTitle("外部URL"))
+                .field(QueryField.of("pageMode", QueryOperator.EQ).withTitle("页面模式"))
+                .field(QueryField.of("defaultUiConfigId", QueryOperator.EQ, QueryOperator.IN).withTitle("默认UI配置"))
+                .field(QueryField.of("defaultQueryTemplateId", QueryOperator.EQ, QueryOperator.IN).withTitle("默认查询模板"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     public MenuService(BaseDao<Menu, String> menuDao,
                        MenuSchemeService schemeService,
                        PlatformModuleService moduleService,

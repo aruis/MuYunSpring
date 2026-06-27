@@ -11,6 +11,11 @@ import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,7 +23,8 @@ import java.util.List;
 public class DictionaryItemService extends AbstractAbilityService<DictionaryItem> implements
         SoftDeleteAbility<DictionaryItem>,
         EnableAbility<DictionaryItem>,
-        TreeAbility<DictionaryItem> {
+        TreeAbility<DictionaryItem>, QueryAbility<DictionaryItem>
+{
     public static final String MODULE_ALIAS = "platform.dictionary_item";
 
     private final DictionaryCategoryService categoryService;
@@ -29,6 +35,31 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
         this.categoryService = categoryService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("categoryId", QueryOperator.EQ, QueryOperator.IN).withTitle("分类"))
+                .field(QueryField.of("categoryAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("分类标识"))
+                .field(QueryField.of("code", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("编码").withQuickSearch().withSortable())
+                .field(QueryField.of("parentId", QueryOperator.EQ, QueryOperator.IN).withTitle("父ID"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     @Override
     public void beforeInsert(DictionaryItem item) {
         normalizeAndValidate(item);

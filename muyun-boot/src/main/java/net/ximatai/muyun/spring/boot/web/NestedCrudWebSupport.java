@@ -6,6 +6,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -22,7 +24,15 @@ import java.util.Map;
 
 public abstract class NestedCrudWebSupport<T extends EntityContract, S extends CrudAbility<T>>
         extends WebSupport<S> implements SystemScope<S>, RecordLabelWeb<T> {
-    protected abstract Criteria queryCriteria(WebQueryRequest request);
+    protected Criteria queryCriteria(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Criteria delegated = queryAbility.queryCriteria(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
+        }
+        return Criteria.of();
+    }
 
     protected abstract void appendScope(Criteria criteria, HttpServletRequest request);
 
@@ -31,6 +41,15 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     protected abstract boolean inScope(T record, HttpServletRequest request);
 
     protected Sort[] querySorts(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Sort[] delegated = queryAbility.querySorts(WebQueryRequests.from(request));
+            if (delegated != null) {
+                return delegated;
+            }
+        }
+        if (request != null && !request.sorts().isEmpty()) {
+            throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());
+        }
         return new Sort[0];
     }
 

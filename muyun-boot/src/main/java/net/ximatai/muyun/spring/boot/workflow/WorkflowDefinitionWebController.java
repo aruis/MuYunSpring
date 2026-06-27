@@ -2,11 +2,9 @@ package net.ximatai.muyun.spring.boot.workflow;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -30,7 +28,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = WorkflowDefinitionService.MODULE_ALIAS,
@@ -38,9 +35,6 @@ import java.util.Set;
 @RequestMapping("/platform.module/{moduleAlias}/workflow-definitions")
 public class WorkflowDefinitionWebController
         extends NestedSortableCrudWebSupport<WorkflowDefinition, WorkflowDefinitionService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "moduleAlias", "alias", "approvalEnabled", "actionCode",
-            "definitionStatus", "currentVersionNo", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     private final PlatformModuleService moduleService;
     private final WorkflowPublishFacade publishFacade;
@@ -49,16 +43,6 @@ public class WorkflowDefinitionWebController
                                            WorkflowPublishFacade publishFacade) {
         this.moduleService = Objects.requireNonNull(moduleService, "moduleService must not be null");
         this.publishFacade = Objects.requireNonNull(publishFacade, "publishFacade must not be null");
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return WorkflowConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return WorkflowConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"));
     }
 
     @Override

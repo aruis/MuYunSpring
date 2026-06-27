@@ -11,6 +11,12 @@ import net.ximatai.muyun.spring.common.security.FieldProtectionDefinition;
 import net.ximatai.muyun.spring.common.security.FieldSignatureMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +25,8 @@ import java.util.Optional;
 
 @Service
 public class MetadataFieldProtectionConfigService extends AbstractAbilityService<MetadataFieldProtectionConfig> implements
-        SoftDeleteAbility<MetadataFieldProtectionConfig> {
+        SoftDeleteAbility<MetadataFieldProtectionConfig>, QueryAbility<MetadataFieldProtectionConfig>
+{
     public static final String MODULE_ALIAS = "platform.metadata_field_protection_config";
 
     private final MetadataFieldService fieldService;
@@ -33,6 +40,24 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
         this(configDao, fieldService, fieldTypeService, null, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("metadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据字段"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("encryptionMode", QueryOperator.EQ).withTitle("加密模式"))
+                .field(QueryField.of("signatureMode", QueryOperator.EQ).withTitle("签名模式"))
+                .field(QueryField.of("maskingPolicy", QueryOperator.EQ).withTitle("脱敏策略"))
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .build();
+    }
     public MetadataFieldProtectionConfigService(BaseDao<MetadataFieldProtectionConfig, String> configDao,
                                                 MetadataFieldService fieldService,
                                                 PlatformFieldTypeService fieldTypeService,

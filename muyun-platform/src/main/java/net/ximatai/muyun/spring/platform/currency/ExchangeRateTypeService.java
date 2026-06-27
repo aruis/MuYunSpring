@@ -15,6 +15,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -29,13 +34,38 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
         SortAbility<ExchangeRateType>,
         ReferenceAbility<ExchangeRateType>,
         CacheAbility<ExchangeRateType>,
-        PlatformManagedProtectionAbility<ExchangeRateType> {
+        PlatformManagedProtectionAbility<ExchangeRateType>, QueryAbility<ExchangeRateType>
+{
     public static final String MODULE_ALIAS = "platform.exchange_rate_type";
 
     public ExchangeRateTypeService(BaseDao<ExchangeRateType, String> rateTypeDao) {
         super(MODULE_ALIAS, ExchangeRateType.class, rateTypeDao);
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("code", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("编码").withQuickSearch().withSortable())
+                .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("系统管理"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("code"))
+                .build();
+    }
     @Override
     public void beforeInsert(ExchangeRateType rateType) {
         normalizeAndValidate(rateType);

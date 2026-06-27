@@ -12,6 +12,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +32,8 @@ import java.util.Set;
 public class RecordGenerationRuleService extends AbstractAbilityService<RecordGenerationRule> implements
         SoftDeleteAbility<RecordGenerationRule>,
         EnableAbility<RecordGenerationRule>,
-        SortAbility<RecordGenerationRule> {
+        SortAbility<RecordGenerationRule>, QueryAbility<RecordGenerationRule>
+{
     public static final String MODULE_ALIAS = "platform.record_generation_rule";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -55,6 +61,28 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
         this.actionContributor = actionContributor == null ? Optional.empty() : actionContributor;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("sourceModuleAlias", QueryOperator.EQ).withTitle("源模块"))
+                .field(QueryField.of("targetModuleAlias", QueryOperator.EQ).withTitle("目标模块"))
+                .field(QueryField.of("actionCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("动作编码").withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .build();
+    }
     public RecordGenerationRuleService(BaseDao<RecordGenerationRule, String> ruleDao,
                                        RecordGenerationObjectMappingService objectMappingService,
                                        RecordGenerationFieldMappingService fieldMappingService,

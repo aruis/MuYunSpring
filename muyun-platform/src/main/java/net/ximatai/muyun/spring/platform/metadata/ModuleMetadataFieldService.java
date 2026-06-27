@@ -16,6 +16,11 @@ import net.ximatai.muyun.spring.dynamic.metadata.FieldMeasureUnitMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldMoneyMode;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +34,8 @@ import java.util.Set;
 @Service
 public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMetadataField> implements
         SoftDeleteAbility<ModuleMetadataField>,
-        SortAbility<ModuleMetadataField> {
+        SortAbility<ModuleMetadataField>, QueryAbility<ModuleMetadataField>
+{
     public static final String MODULE_ALIAS = "platform.module_metadata_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -47,6 +53,62 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
         this(moduleMetadataFieldDao, relationService, metadataService, fieldService, null, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("relationId", QueryOperator.EQ, QueryOperator.IN).withTitle("关系"))
+                .field(QueryField.of("metadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据字段"))
+                .field(QueryField.of("cloneable", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("可克隆"))
+                .field(QueryField.of("dictionaryApplicationAlias", QueryOperator.EQ).withTitle("字典应用"))
+                .field(QueryField.of("dictionaryCategoryAlias", QueryOperator.EQ).withTitle("字典分类"))
+                .field(QueryField.of("referenceModuleAlias", QueryOperator.EQ).withTitle("引用模块"))
+                .field(QueryField.of("referenceModuleKeyField", QueryOperator.EQ).withTitle("引用模块键字段"))
+                .field(QueryField.of("referenceModuleLabelField", QueryOperator.EQ).withTitle("引用模块标签字段"))
+                .field(QueryField.of("referenceGenerateRuleId", QueryOperator.EQ, QueryOperator.IN).withTitle("引用生单规则"))
+                .field(QueryField.of("referenceQueryTemplateId", QueryOperator.EQ, QueryOperator.IN).withTitle("引用查询模板"))
+                .field(QueryField.of("unitCategoryAlias", QueryOperator.EQ).withTitle("单位分类"))
+                .field(QueryField.of("unitMode", QueryOperator.EQ).withTitle("单位模式"))
+                .field(QueryField.of("fixedUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("固定单位").withQuickSearch().withSortable())
+                .field(QueryField.of("defaultUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("默认单位").withQuickSearch().withSortable())
+                .field(QueryField.of("unitFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("单位字段"))
+                .field(QueryField.of("baseValueFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("基准值字段"))
+                .field(QueryField.of("baseUnitCategoryAlias", QueryOperator.EQ).withTitle("基准单位分类"))
+                .field(QueryField.of("baseUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("基准单位").withQuickSearch().withSortable())
+                .field(QueryField.of("unitConversionMode", QueryOperator.EQ).withTitle("单位换算模式"))
+                .field(QueryField.of("conversionScopeFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("换算范围字段"))
+                .field(QueryField.of("unitRequired", QueryOperator.EQ).withTitle("单位必填"))
+                .field(QueryField.of("moneyCurrencyMode", QueryOperator.EQ).withTitle("币种模式"))
+                .field(QueryField.of("moneyFixedCurrencyCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("固定币种").withQuickSearch().withSortable())
+                .field(QueryField.of("moneyDefaultCurrencyCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("默认币种").withQuickSearch().withSortable())
+                .field(QueryField.of("moneyCurrencyFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("币种字段"))
+                .field(QueryField.of("moneyBaseAmountFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("基准金额字段"))
+                .field(QueryField.of("moneyBaseCurrencyCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("基准币种").withQuickSearch().withSortable())
+                .field(QueryField.of("moneyRateTypeCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("汇率类型").withQuickSearch().withSortable())
+                .field(QueryField.of("moneyRateDateFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("汇率日期字段"))
+                .field(QueryField.of("moneyExchangeRateFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("汇率字段"))
+                .field(QueryField.of("moneyCurrencyRequired", QueryOperator.EQ).withTitle("币种必填"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     public ModuleMetadataFieldService(BaseDao<ModuleMetadataField, String> moduleMetadataFieldDao,
                                       ModuleMetadataRelationService relationService,
                                       MetadataService metadataService,

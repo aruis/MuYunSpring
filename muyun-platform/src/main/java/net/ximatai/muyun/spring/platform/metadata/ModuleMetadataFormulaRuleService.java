@@ -16,6 +16,11 @@ import net.ximatai.muyun.spring.common.formula.FormulaRuleKind;
 import net.ximatai.muyun.spring.common.formula.FormulaRulePhase;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityFormulaRuleDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +32,8 @@ import java.util.Optional;
 public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<ModuleMetadataFormulaRule> implements
         SoftDeleteAbility<ModuleMetadataFormulaRule>,
         EnableAbility<ModuleMetadataFormulaRule>,
-        SortAbility<ModuleMetadataFormulaRule> {
+        SortAbility<ModuleMetadataFormulaRule>, QueryAbility<ModuleMetadataFormulaRule>
+{
     public static final String MODULE_ALIAS = "platform.module_metadata_formula_rule";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
@@ -43,6 +49,29 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
         this(formulaRuleDao, relationService, fieldService, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("relationId", QueryOperator.EQ, QueryOperator.IN).withTitle("关系"))
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("标识"))
+                .field(QueryField.of("ruleKind", QueryOperator.EQ).withTitle("规则类型"))
+                .field(QueryField.of("rulePhase", QueryOperator.EQ).withTitle("规则阶段"))
+                .field(QueryField.of("targetField", QueryOperator.EQ).withTitle("目标字段"))
+                .field(QueryField.of("severity", QueryOperator.EQ).withTitle("严重级别"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public ModuleMetadataFormulaRuleService(BaseDao<ModuleMetadataFormulaRule, String> formulaRuleDao,
                                             ModuleMetadataRelationService relationService,

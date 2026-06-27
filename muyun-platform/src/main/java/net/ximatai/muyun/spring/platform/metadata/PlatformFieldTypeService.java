@@ -11,6 +11,12 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +27,8 @@ import java.util.Set;
 public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFieldType> implements
         SoftDeleteAbility<PlatformFieldType>,
         EnableAbility<PlatformFieldType>,
-        SortAbility<PlatformFieldType> {
+        SortAbility<PlatformFieldType>, QueryAbility<PlatformFieldType>
+{
     public static final String MODULE_ALIAS = "platform.field_type";
     private final BaseDao<PlatformFieldUiType, String> fieldUiTypeDao;
 
@@ -29,6 +36,35 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
         this(fieldTypeDao, null);
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("标识"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("fieldType", QueryOperator.EQ).withTitle("字段类型"))
+                .field(QueryField.of("defaultLength", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("默认长度").withSortable())
+                .field(QueryField.of("defaultPrecision", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("默认精度").withSortable())
+                .field(QueryField.of("defaultScale", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("默认刻度").withSortable())
+                .field(QueryField.of("defaultQueryOperator", QueryOperator.EQ).withTitle("默认查询操作符"))
+                .field(QueryField.of("defaultUiTypeAlias", QueryOperator.EQ).withTitle("默认UI类型"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public PlatformFieldTypeService(BaseDao<PlatformFieldType, String> fieldTypeDao,
                                     BaseDao<PlatformFieldUiType, String> fieldUiTypeDao) {

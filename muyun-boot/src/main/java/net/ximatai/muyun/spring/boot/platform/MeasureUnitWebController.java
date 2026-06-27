@@ -2,11 +2,9 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
@@ -23,33 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MeasureUnitService.MODULE_ALIAS, title = "平台计量单位")
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-categories/{categoryAlias}/units")
 public class MeasureUnitWebController extends NestedEnabledSortableCrudWebSupport<MeasureUnit, MeasureUnitService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "categoryAlias", "code", "symbol", "scale",
-            "factorToBase", "offsetToBase", "roundingMode", "title", "enabled",
-            "sortOrder", "createdAt", "updatedAt");
-
     private final MeasureUnitConversionService conversionService;
 
     public MeasureUnitWebController(MeasureUnitConversionService conversionService) {
         this.conversionService = conversionService;
     }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"), Sort.asc("title"));
-    }
-
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {
         criteria.eq("applicationAlias", applicationAlias(request));

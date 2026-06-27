@@ -22,6 +22,11 @@ import net.ximatai.muyun.spring.platform.metadata.ModuleMetadataFieldService;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldType;
 import net.ximatai.muyun.spring.platform.metadata.PlatformFieldTypeService;
 import net.ximatai.muyun.spring.platform.metadata.ResolvedModuleMetadataField;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -40,7 +45,8 @@ import java.util.Set;
 public class PlatformQueryItemService extends AbstractAbilityService<PlatformQueryItem> implements
         SoftDeleteAbility<PlatformQueryItem>,
         EnableAbility<PlatformQueryItem>,
-        SortAbility<PlatformQueryItem> {
+        SortAbility<PlatformQueryItem>, QueryAbility<PlatformQueryItem>
+{
     public static final String MODULE_ALIAS = "platform.query_item";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -57,6 +63,22 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         this(queryItemDao, queryTemplateService, moduleFieldService, fieldTypeService, null, new PlatformTimeService());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("parentId", QueryOperator.EQ, QueryOperator.IN).withTitle("父ID"))
+                .field(QueryField.of("moduleMetadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("模块字段"))
+                .field(QueryField.of("operator", QueryOperator.EQ).withTitle("操作符"))
+                .field(QueryField.of("allowExternalValue", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("允许外部值"))
+                .field(QueryField.of("externalValueKey", QueryOperator.EQ).withTitle("外部值Key"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     @Autowired
     public PlatformQueryItemService(BaseDao<PlatformQueryItem, String> queryItemDao,
                                     PlatformQueryTemplateService queryTemplateService,

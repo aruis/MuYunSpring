@@ -10,6 +10,12 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -22,7 +28,8 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         SoftDeleteAbility<MetadataField>,
         EnableAbility<MetadataField>,
         SortAbility<MetadataField>,
-        PlatformManagedProtectionAbility<MetadataField> {
+        PlatformManagedProtectionAbility<MetadataField>, QueryAbility<MetadataField>
+{
     public static final String MODULE_ALIAS = "platform.metadata_field";
 
     private final MetadataService metadataService;
@@ -36,6 +43,41 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
         this(fieldDao, metadataService, fieldTypeService, provider(null), provider(null));
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("metadataId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据"))
+                .field(QueryField.of("fieldName", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("字段名").withQuickSearch().withSortable())
+                .field(QueryField.of("columnName", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("列名").withQuickSearch().withSortable())
+                .field(QueryField.of("fieldTypeAlias", QueryOperator.EQ).withTitle("字段类型标识"))
+                .field(QueryField.of("fieldOwnership", QueryOperator.EQ).withTitle("字段所有权"))
+                .field(QueryField.of("fieldForm", QueryOperator.EQ).withTitle("字段形态"))
+                .field(QueryField.of("ownerFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属字段"))
+                .field(QueryField.of("fieldRole", QueryOperator.EQ).withTitle("字段角色"))
+                .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("系统管理"))
+                .field(QueryField.of("required", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("必填"))
+                .field(QueryField.of("uniqueField", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("唯一"))
+                .field(QueryField.of("indexed", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("索引"))
+                .field(QueryField.of("sortableField", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("可排序"))
+                .field(QueryField.of("titleField", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("标题字段"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     public MetadataFieldService(BaseDao<MetadataField, String> fieldDao,
                                 MetadataService metadataService,
                                 PlatformFieldTypeService fieldTypeService,

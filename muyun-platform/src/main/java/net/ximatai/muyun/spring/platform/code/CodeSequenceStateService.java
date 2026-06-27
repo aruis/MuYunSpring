@@ -2,9 +2,15 @@ package net.ximatai.muyun.spring.platform.code;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
+import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.AbstractAbilityService;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +22,8 @@ import java.util.List;
 
 @Service
 public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenceState> implements
-        SoftDeleteAbility<CodeSequenceState> {
+        SoftDeleteAbility<CodeSequenceState>,
+        QueryAbility<CodeSequenceState> {
     public static final String MODULE_ALIAS = "platform.code_sequence_state";
 
     private final CodeSequenceAllocator sequenceAllocator;
@@ -165,6 +172,20 @@ public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenc
                         .eq("periodKey", state.getPeriodKey()),
                 "Code sequence state already exists for bucket: "
                         + state.getRuleId() + "/" + state.getBasisKey() + "/" + state.getPeriodKey());
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN).withTitle("编码规则"))
+                .field(QueryField.of("basisKey", QueryOperator.EQ, QueryOperator.IN).withTitle("分组键"))
+                .field(QueryField.of("periodKey", QueryOperator.EQ, QueryOperator.IN).withTitle("周期键"))
+                .field(QueryField.of("currentValue", QueryValueType.LONG, QueryOperator.EQ).withTitle("当前值"))
+                .defaultSort(Sort.asc("ruleId"))
+                .defaultSort(Sort.asc("basisKey"))
+                .defaultSort(Sort.asc("periodKey"))
+                .build();
     }
 
     private String normalizeBucket(String value) {

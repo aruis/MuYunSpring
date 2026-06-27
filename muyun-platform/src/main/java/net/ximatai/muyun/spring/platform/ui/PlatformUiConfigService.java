@@ -10,6 +10,11 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,7 +24,8 @@ import java.util.Objects;
 public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiConfig> implements
         SoftDeleteAbility<PlatformUiConfig>,
         EnableAbility<PlatformUiConfig>,
-        SortAbility<PlatformUiConfig> {
+        SortAbility<PlatformUiConfig>, QueryAbility<PlatformUiConfig>
+{
     public static final String MODULE_ALIAS = "platform.ui_config";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -31,6 +37,19 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
         this.uiSetService = uiSetService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("clientType", QueryOperator.EQ).withTitle("客户端类型"))
+                .field(QueryField.of("published", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("已发布"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("clientType"))
+                .build();
+    }
     @Override
     public void beforeInsert(PlatformUiConfig uiConfig) {
         normalizeAndValidate(uiConfig);

@@ -8,6 +8,11 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.platform.OrganizationHierarchyService;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -38,7 +43,8 @@ import java.util.Set;
 public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         SoftDeleteAbility<CodeRule>,
         EnableAbility<CodeRule>,
-        SortAbility<CodeRule> {
+        SortAbility<CodeRule>,
+        QueryAbility<CodeRule> {
     public static final String MODULE_ALIAS = "platform.code_rule";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -185,6 +191,31 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                 .filter(item -> item.rule().getFieldRole() == CodeFieldRole.PRIMARY)
                 .findFirst()
                 .orElse(resolved.isEmpty() ? null : resolved.getFirst());
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属模块"))
+                .field(QueryField.of("entityAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属对象"))
+                .field(QueryField.of("metadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据字段"))
+                .field(QueryField.of("fieldName", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("字段名").withQuickSearch())
+                .field(QueryField.of("fieldRole", QueryOperator.EQ, QueryOperator.IN).withTitle("字段角色"))
+                .field(QueryField.of("mode", QueryOperator.EQ, QueryOperator.IN).withTitle("编码模式"))
+                .field(QueryField.of("orgScopeType", QueryOperator.EQ, QueryOperator.IN).withTitle("组织范围类型"))
+                .field(QueryField.of("orgScopeId", QueryOperator.EQ, QueryOperator.IN).withTitle("组织范围"))
+                .field(QueryField.of("globalDefault", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("全局默认"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("effectiveFrom", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("生效时间"))
+                .field(QueryField.of("effectiveTo", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("失效时间"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
     }
 
     @Override

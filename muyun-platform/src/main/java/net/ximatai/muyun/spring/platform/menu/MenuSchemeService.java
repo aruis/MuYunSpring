@@ -10,6 +10,11 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.initialdata.InitialDataOptions;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.common.exception.AuthenticationRequiredException;
 import net.ximatai.muyun.spring.common.exception.PlatformConfigurationException;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
@@ -30,7 +35,8 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         SoftDeleteAbility<MenuScheme>,
         EnableAbility<MenuScheme>,
         SortAbility<MenuScheme>,
-        InitialDataAbility<MenuScheme> {
+        InitialDataAbility<MenuScheme>,
+        QueryAbility<MenuScheme> {
     public static final String MODULE_ALIAS = "platform.menu_scheme";
     public static final String SYSTEM_SCOPE_ID = "system";
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
@@ -70,6 +76,28 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
     @Override
     public void beforeInsert(MenuScheme scheme) {
         normalizeAndValidate(scheme);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("方案标识").withSortable())
+                .field(QueryField.of("scopeType", QueryOperator.EQ).withTitle("范围类型"))
+                .field(QueryField.of("scopeId", QueryOperator.EQ, QueryOperator.IN).withTitle("范围ID"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("alias"))
+                .build();
     }
 
     @Override

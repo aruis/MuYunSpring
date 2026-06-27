@@ -11,6 +11,11 @@ import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordMutationEventType;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +28,8 @@ import java.util.Objects;
 public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWriteBackRule> implements
         SoftDeleteAbility<RecordWriteBackRule>,
         EnableAbility<RecordWriteBackRule>,
-        SortAbility<RecordWriteBackRule> {
+        SortAbility<RecordWriteBackRule>, QueryAbility<RecordWriteBackRule>
+{
     public static final String MODULE_ALIAS = "platform.record_write_back_rule";
     private static final PageRequest ALL = PageRequest.of(1, 500);
 
@@ -38,6 +44,32 @@ public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWri
         this.fieldRuleService = Objects.requireNonNull(fieldRuleService, "fieldRuleService must not be null");
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("triggerModuleAlias", QueryOperator.EQ).withTitle("触发模块"))
+                .field(QueryField.of("targetModuleAlias", QueryOperator.EQ).withTitle("目标模块"))
+                .field(QueryField.of("eventType", QueryOperator.EQ).withTitle("事件类型"))
+                .field(QueryField.of("cascadeMode", QueryOperator.EQ).withTitle("级联模式"))
+                .field(QueryField.of("triggerMode", QueryOperator.EQ).withTitle("触发模式"))
+                .field(QueryField.of("targetLocateMode", QueryOperator.EQ).withTitle("目标定位模式"))
+                .field(QueryField.of("targetRelationCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("目标关系编码").withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .build();
+    }
     @Transactional
     public RecordWriteBackRule saveRuleTree(RecordWriteBackRule rule) {
         if (rule == null) {

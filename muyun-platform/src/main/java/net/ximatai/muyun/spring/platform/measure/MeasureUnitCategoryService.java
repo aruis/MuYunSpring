@@ -15,6 +15,11 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -28,7 +33,9 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
         EnableAbility<MeasureUnitCategory>,
         SortAbility<MeasureUnitCategory>,
         ReferenceAbility<MeasureUnitCategory>,
-        CacheAbility<MeasureUnitCategory> {
+        CacheAbility<MeasureUnitCategory>,
+        QueryAbility<MeasureUnitCategory>
+{
     public static final String MODULE_ALIAS = "platform.measure_unit_category";
     public static final String SHARED_APPLICATION_ALIAS = "platform";
 
@@ -36,6 +43,33 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
         super(MODULE_ALIAS, MeasureUnitCategory.class, categoryDao);
     }
 
+
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("applicationAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属应用"))
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("标识"))
+                .field(QueryField.of("dimension", QueryOperator.EQ).withTitle("量纲"))
+                .field(QueryField.of("baseUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("基准单位").withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     @Override
     public void beforeInsert(MeasureUnitCategory category) {
         normalizeAndValidate(category);

@@ -2,11 +2,9 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledTreeCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = DictionaryCategoryService.MODULE_ALIAS, title = "平台数据字典类目")
@@ -30,20 +27,6 @@ import java.util.Set;
 @RequestMapping({"/platform.dictionary_category", "/platform.application/{applicationAlias}/dictionary-categories"})
 public class DictionaryCategoryWebController
         extends NestedEnabledTreeCrudWebSupport<DictionaryCategory, DictionaryCategoryService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "alias", "categoryKind", "parentId", "title",
-            "enabled", "sortOrder", "createdAt", "updatedAt");
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"), Sort.asc("title"));
-    }
-
     @Override
     protected Criteria treeScopeCriteria(HttpServletRequest request) {
         String applicationAlias = applicationAlias(request);

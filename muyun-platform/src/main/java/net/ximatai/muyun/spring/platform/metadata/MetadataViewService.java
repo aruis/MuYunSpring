@@ -10,6 +10,11 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +26,8 @@ import java.util.Optional;
 public class MetadataViewService extends AbstractAbilityService<MetadataView> implements
         SoftDeleteAbility<MetadataView>,
         EnableAbility<MetadataView>,
-        SortAbility<MetadataView> {
+        SortAbility<MetadataView>, QueryAbility<MetadataView>
+{
     public static final String MODULE_ALIAS = "platform.metadata_view";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
@@ -34,6 +40,27 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
         this(viewDao, relationService, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("relationId", QueryOperator.EQ, QueryOperator.IN).withTitle("关系"))
+                .field(QueryField.of("viewType", QueryOperator.EQ).withTitle("视图类型"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public MetadataViewService(BaseDao<MetadataView, String> viewDao,
                                ModuleMetadataRelationService relationService,

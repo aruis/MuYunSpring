@@ -13,6 +13,11 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,7 +29,8 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
         SoftDeleteAbility<ExchangeRate>,
         EnableAbility<ExchangeRate>,
         SortAbility<ExchangeRate>,
-        ReferenceAbility<ExchangeRate> {
+        ReferenceAbility<ExchangeRate>, QueryAbility<ExchangeRate>
+{
     public static final String MODULE_ALIAS = "platform.exchange_rate";
 
     private final CurrencyService currencyService;
@@ -38,6 +44,38 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
         this.rateTypeService = rateTypeService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("fromCurrencyCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("来源币种").withQuickSearch().withSortable())
+                .field(QueryField.of("toCurrencyCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("目标币种").withQuickSearch().withSortable())
+                .field(QueryField.of("rateTypeCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("汇率类型").withQuickSearch().withSortable())
+                .field(QueryField.of("effectiveDate", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("生效日期").withSortable())
+                .field(QueryField.of("rate", QueryOperator.EQ).withTitle("汇率"))
+                .field(QueryField.of("source", QueryOperator.EQ).withTitle("来源"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.desc("effectiveDate"))
+                .defaultSort(Sort.asc("fromCurrencyCode"))
+                .defaultSort(Sort.asc("toCurrencyCode"))
+                .build();
+    }
     @Override
     public void beforeInsert(ExchangeRate rate) {
         normalizeAndValidate(rate);

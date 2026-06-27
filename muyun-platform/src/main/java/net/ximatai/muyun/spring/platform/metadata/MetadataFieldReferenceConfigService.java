@@ -12,6 +12,12 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +28,8 @@ import java.util.Set;
 
 @Service
 public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
-        SoftDeleteAbility<MetadataFieldReferenceConfig> {
+        SoftDeleteAbility<MetadataFieldReferenceConfig>, QueryAbility<MetadataFieldReferenceConfig>
+{
     public static final String MODULE_ALIAS = "platform.metadata_field_reference_config";
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
@@ -43,6 +50,27 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
                 Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("metadataFieldId", QueryOperator.EQ, QueryOperator.IN).withTitle("元数据字段"))
+                .field(QueryField.of("relationId", QueryOperator.EQ, QueryOperator.IN).withTitle("关系"))
+                .field(QueryField.of("targetModuleAlias", QueryOperator.EQ).withTitle("目标模块"))
+                .field(QueryField.of("targetMetadataId", QueryOperator.EQ, QueryOperator.IN).withTitle("目标元数据"))
+                .field(QueryField.of("cardinality", QueryOperator.EQ).withTitle("基数"))
+                .field(QueryField.of("autoTitle", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("自动标题"))
+                .field(QueryField.of("titleOutputField", QueryOperator.EQ).withTitle("标题输出字段"))
+                .field(QueryField.of("projectionMappings", QueryOperator.EQ).withTitle("投影映射"))
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .build();
+    }
     @Autowired
     public MetadataFieldReferenceConfigService(BaseDao<MetadataFieldReferenceConfig, String> referenceConfigDao,
                                                MetadataFieldService fieldService,

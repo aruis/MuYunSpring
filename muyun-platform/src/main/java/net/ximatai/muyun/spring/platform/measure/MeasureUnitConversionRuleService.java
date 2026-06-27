@@ -14,6 +14,11 @@ import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -26,7 +31,9 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
         SoftDeleteAbility<MeasureUnitConversionRule>,
         EnableAbility<MeasureUnitConversionRule>,
         SortAbility<MeasureUnitConversionRule>,
-        ReferenceAbility<MeasureUnitConversionRule> {
+        ReferenceAbility<MeasureUnitConversionRule>,
+        QueryAbility<MeasureUnitConversionRule>
+{
     public static final String MODULE_ALIAS = "platform.measure_unit_conversion_rule";
 
     private final MeasureUnitService unitService;
@@ -37,6 +44,49 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
         this.unitService = unitService;
     }
 
+
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("tenantId", QueryOperator.EQ, QueryOperator.IN).withTitle("租户"))
+                .field(QueryField.of("applicationAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("所属应用"))
+                .field(QueryField.of("scopeType", QueryOperator.EQ).withTitle("范围类型"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("模块标识"))
+                .field(QueryField.of("contextObjectType", QueryOperator.EQ).withTitle("上下文对象类型"))
+                .field(QueryField.of("contextObjectId", QueryOperator.EQ, QueryOperator.IN).withTitle("上下文对象ID"))
+                .field(QueryField.of("fromCategoryAlias", QueryOperator.EQ).withTitle("来源分类"))
+                .field(QueryField.of("fromUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("来源单位").withQuickSearch().withSortable())
+                .field(QueryField.of("toCategoryAlias", QueryOperator.EQ).withTitle("目标分类"))
+                .field(QueryField.of("toUnitCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("目标单位").withQuickSearch().withSortable())
+                .field(QueryField.of("factor", QueryOperator.EQ).withTitle("系数"))
+                .field(QueryField.of("priority", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("优先级").withSortable())
+                .field(QueryField.of("effectiveFrom", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("生效开始").withSortable())
+                .field(QueryField.of("effectiveTo", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("生效结束").withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.desc("priority"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
+    }
     @Override
     public void beforeInsert(MeasureUnitConversionRule rule) {
         normalizeAndValidate(rule);

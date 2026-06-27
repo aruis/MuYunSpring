@@ -10,6 +10,12 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.module.PlatformModule;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -18,7 +24,8 @@ import java.util.Objects;
 public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> implements
         SoftDeleteAbility<PlatformUiSet>,
         EnableAbility<PlatformUiSet>,
-        SortAbility<PlatformUiSet> {
+        SortAbility<PlatformUiSet>, QueryAbility<PlatformUiSet>
+{
     public static final String MODULE_ALIAS = "platform.ui_set";
 
     private final PlatformModuleService moduleService;
@@ -29,6 +36,20 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
         this.moduleService = moduleService;
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN).withTitle("标识"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("setType", QueryOperator.EQ).withTitle("配置集类型"))
+                .field(QueryField.of("defaultSet", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("默认配置集"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("alias"))
+                .build();
+    }
     @Override
     public void beforeInsert(PlatformUiSet uiSet) {
         normalizeAndValidate(uiSet);

@@ -16,6 +16,11 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionAccessMode;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityActionDefinition;
 import net.ximatai.muyun.spring.platform.runtime.PlatformDynamicRuntimeRefreshCoordinator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +33,8 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         SoftDeleteAbility<PlatformModuleAction>,
         EnableAbility<PlatformModuleAction>,
         SortAbility<PlatformModuleAction>,
-        PlatformManagedProtectionAbility<PlatformModuleAction> {
+        PlatformManagedProtectionAbility<PlatformModuleAction>, QueryAbility<PlatformModuleAction>
+{
     public static final String MODULE_ALIAS = "platform.module_action";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -40,6 +46,45 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         this(actionDao, moduleService, Optional.empty());
     }
 
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("moduleAlias", QueryOperator.EQ, QueryOperator.IN).withTitle("模块标识"))
+                .field(QueryField.of("actionCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("动作编码").withQuickSearch().withSortable())
+                .field(QueryField.of("entityAlias", QueryOperator.EQ).withTitle("实体标识"))
+                .field(QueryField.of("permissionActionCode", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("权限动作码").withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                .withTitle("名称").withQuickSearch().withSortable())
+                .field(QueryField.of("category", QueryOperator.EQ).withTitle("category"))
+                .field(QueryField.of("actionLevel", QueryOperator.EQ).withTitle("actionLevel"))
+                .field(QueryField.of("accessMode", QueryOperator.EQ).withTitle("访问模式"))
+                .field(QueryField.of("actionAuth", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("操作权限"))
+                .field(QueryField.of("dataAuth", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("数据权限"))
+                .field(QueryField.of("defaultGrantPolicy", QueryOperator.EQ).withTitle("默认授权策略"))
+                .field(QueryField.of("executorType", QueryOperator.EQ).withTitle("执行器类型"))
+                .field(QueryField.of("executorKey", QueryOperator.EQ).withTitle("执行器标识"))
+                .field(QueryField.of("sourceType", QueryOperator.EQ).withTitle("来源类型"))
+                .field(QueryField.of("sourceId", QueryOperator.EQ, QueryOperator.IN).withTitle("来源ID"))
+                .field(QueryField.of("bindingType", QueryOperator.EQ).withTitle("绑定类型"))
+                .field(QueryField.of("bindingId", QueryOperator.EQ, QueryOperator.IN).withTitle("绑定ID"))
+                .field(QueryField.of("bindingAlias", QueryOperator.EQ).withTitle("绑定标识"))
+                .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("系统管理"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("创建时间").withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                        QueryOperator.BETWEEN)
+                .withTitle("更新时间").withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .build();
+    }
     @Autowired
     public PlatformModuleActionService(BaseDao<PlatformModuleAction, String> actionDao,
                                        PlatformModuleService moduleService,
