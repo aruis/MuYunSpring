@@ -18,13 +18,17 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> implements
         SoftDeleteAbility<ExchangeRate>,
         EnableAbility<ExchangeRate>,
         SortAbility<ExchangeRate>,
-        ReferenceAbility<ExchangeRate> {
+        ReferenceAbility<ExchangeRate>,
+        QueryAbility<ExchangeRate> {
     public static final String MODULE_ALIAS = "platform.exchange_rate";
 
     private final CurrencyService currencyService;
@@ -36,6 +40,14 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
         super(MODULE_ALIAS, ExchangeRate.class, exchangeRateDao);
         this.currencyService = currencyService;
         this.rateTypeService = rateTypeService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate", "rate", "source", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("effectiveDate"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("fromCurrencyCode"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("toCurrencyCode"));
     }
 
     @Override

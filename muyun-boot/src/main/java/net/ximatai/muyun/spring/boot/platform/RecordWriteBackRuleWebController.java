@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = RecordWriteBackRuleService.MODULE_ALIAS,
@@ -20,13 +19,9 @@ import java.util.Set;
 @RequestMapping("/platform.module/{moduleAlias}/write-back-rules")
 public class RecordWriteBackRuleWebController
         extends ModuleScopedRuleTreeWebSupport<RecordWriteBackRule, RecordWriteBackRuleService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "triggerModuleAlias", "targetModuleAlias", "eventType", "cascadeMode",
-            "triggerMode", "targetLocateMode", "targetRelationCode",
-            "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     public RecordWriteBackRuleWebController() {
-        super(QUERY_FIELDS, "triggerModuleAlias");
+        super("triggerModuleAlias");
     }
 
     @GetMapping("/viewTree/{id}")

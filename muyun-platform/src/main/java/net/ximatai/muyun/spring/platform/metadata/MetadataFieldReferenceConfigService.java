@@ -19,10 +19,14 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MetadataFieldReferenceConfigService extends AbstractAbilityService<MetadataFieldReferenceConfig> implements
-        SoftDeleteAbility<MetadataFieldReferenceConfig> {
+        SoftDeleteAbility<MetadataFieldReferenceConfig>,
+        QueryAbility<MetadataFieldReferenceConfig> {
     public static final String MODULE_ALIAS = "platform.metadata_field_reference_config";
     private static final Set<String> STANDARD_FIELDS = Set.copyOf(StandardEntitySchema.fieldNames());
 
@@ -59,6 +63,11 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
         this.relationService = relationService;
         this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
                 "runtimeRefreshCoordinator must not be null");
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
     }
 
     @Override

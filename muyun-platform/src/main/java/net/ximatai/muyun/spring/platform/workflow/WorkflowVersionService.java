@@ -6,10 +6,14 @@ import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class WorkflowVersionService extends AbstractAbilityService<WorkflowVersion> implements
-        SoftDeleteAbility<WorkflowVersion> {
+        SoftDeleteAbility<WorkflowVersion>,
+        QueryAbility<WorkflowVersion> {
     public static final String MODULE_ALIAS = "platform.workflow.version";
 
     public WorkflowVersionService(BaseDao<WorkflowVersion, String> workflowVersionDao,
@@ -19,6 +23,12 @@ public class WorkflowVersionService extends AbstractAbilityService<WorkflowVersi
     }
 
     private final WorkflowDefinitionService definitionService;
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "definitionId", "versionNo", "publishStatus", "publishedBy", "publishedAt", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("versionNo"));
+    }
 
     @Override
     public void beforeInsert(WorkflowVersion version) {

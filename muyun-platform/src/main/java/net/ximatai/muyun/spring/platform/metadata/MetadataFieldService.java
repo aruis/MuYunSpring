@@ -16,13 +16,17 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MetadataFieldService extends AbstractAbilityService<MetadataField> implements
         SoftDeleteAbility<MetadataField>,
         EnableAbility<MetadataField>,
         SortAbility<MetadataField>,
-        PlatformManagedProtectionAbility<MetadataField> {
+        PlatformManagedProtectionAbility<MetadataField>,
+        QueryAbility<MetadataField> {
     public static final String MODULE_ALIAS = "platform.metadata_field";
 
     private final MetadataService metadataService;
@@ -68,6 +72,12 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
                 "runtimeRefreshCoordinatorProvider must not be null");
         this.schemaEnsureServiceProvider = Objects.requireNonNull(schemaEnsureServiceProvider,
                 "schemaEnsureServiceProvider must not be null");
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataId", "fieldName", "columnName", "fieldTypeAlias", "fieldOwnership", "fieldForm", "ownerFieldId", "fieldRole", "systemManaged", "required", "uniqueField", "indexed", "sortableField", "titleField", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

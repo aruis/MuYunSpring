@@ -210,7 +210,7 @@ class IamWebControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.code").value(PlatformErrorCodes.VALIDATION_FAILED))
-                .andExpect(jsonPath("$.message").value("quick search is not supported by iam.position"));
+                .andExpect(jsonPath("$.message").value("quick search field is not supported by iam.position: title"));
     }
 
     @Test

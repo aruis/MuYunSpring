@@ -16,12 +16,16 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MetadataViewService extends AbstractAbilityService<MetadataView> implements
         SoftDeleteAbility<MetadataView>,
         EnableAbility<MetadataView>,
-        SortAbility<MetadataView> {
+        SortAbility<MetadataView>,
+        QueryAbility<MetadataView> {
     public static final String MODULE_ALIAS = "platform.metadata_view";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
@@ -41,6 +45,12 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
         super(MODULE_ALIAS, MetadataView.class, viewDao);
         this.relationService = relationService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "relationId", "viewType", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

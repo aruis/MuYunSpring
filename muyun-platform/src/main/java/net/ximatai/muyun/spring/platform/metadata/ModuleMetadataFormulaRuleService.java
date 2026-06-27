@@ -22,12 +22,16 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<ModuleMetadataFormulaRule> implements
         SoftDeleteAbility<ModuleMetadataFormulaRule>,
         EnableAbility<ModuleMetadataFormulaRule>,
-        SortAbility<ModuleMetadataFormulaRule> {
+        SortAbility<ModuleMetadataFormulaRule>,
+        QueryAbility<ModuleMetadataFormulaRule> {
     public static final String MODULE_ALIAS = "platform.module_metadata_formula_rule";
 
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
@@ -52,6 +56,12 @@ public class ModuleMetadataFormulaRuleService extends AbstractAbilityService<Mod
         this.relationService = relationService;
         this.fieldValidator = new MetadataFormulaFieldValidator(relationService, fieldService);
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "relationId", "alias", "ruleKind", "rulePhase", "targetField", "severity", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

@@ -45,4 +45,37 @@ class QuerySchemaTest {
             assertThat(sort.desc()).isFalse();
         });
     }
+
+    @Test
+    void shouldBuildSimpleDescriptorFromStaticServiceFieldConventions() {
+        QueryDescriptor descriptor = QueryDescriptors.simple("platform.application",
+                java.util.List.of("id", "title", "enabled", "sortOrder", "createdAt"),
+                Sort.asc("sortOrder"));
+
+        QuerySchema schema = QuerySchema.from(descriptor);
+
+        assertThat(schema.fields()).extracting(QuerySchema.Field::name)
+                .containsExactly("id", "title", "enabled", "sortOrder", "createdAt");
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("enabled"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.BOOLEAN);
+                    assertThat(field.operators()).containsExactly(QueryOperator.EQ);
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("sortOrder"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.INTEGER);
+                    assertThat(field.sortable()).isTrue();
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("createdAt"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.INSTANT);
+        assertThat(schema.defaultSorts()).singleElement()
+                .satisfies(sort -> {
+                    assertThat(sort.field()).isEqualTo("sortOrder");
+                    assertThat(sort.desc()).isFalse();
+                });
+    }
 }

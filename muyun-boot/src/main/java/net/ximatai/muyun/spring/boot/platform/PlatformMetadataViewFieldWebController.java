@@ -1,10 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import net.ximatai.muyun.spring.platform.metadata.MetadataView;
 import net.ximatai.muyun.spring.platform.metadata.MetadataViewField;
@@ -16,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MetadataViewFieldService.MODULE_ALIAS,
@@ -24,9 +21,6 @@ import java.util.Set;
 @RequestMapping("/platform.module/{moduleAlias}/metadata-relations/{relationId}/views/{viewId}/fields")
 public class PlatformMetadataViewFieldWebController
         extends NestedEnabledSortableCrudWebSupport<MetadataViewField, MetadataViewFieldService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiTypeAlias",
-            "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     private final ModuleMetadataRelationService relationService;
     private final MetadataViewService viewService;
@@ -35,16 +29,6 @@ public class PlatformMetadataViewFieldWebController
                                                   MetadataViewService viewService) {
         this.relationService = relationService;
         this.viewService = viewService;
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"));
     }
 
     @Override

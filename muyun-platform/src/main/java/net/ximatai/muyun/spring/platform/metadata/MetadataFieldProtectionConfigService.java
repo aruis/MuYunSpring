@@ -16,10 +16,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MetadataFieldProtectionConfigService extends AbstractAbilityService<MetadataFieldProtectionConfig> implements
-        SoftDeleteAbility<MetadataFieldProtectionConfig> {
+        SoftDeleteAbility<MetadataFieldProtectionConfig>,
+        QueryAbility<MetadataFieldProtectionConfig> {
     public static final String MODULE_ALIAS = "platform.metadata_field_protection_config";
 
     private final MetadataFieldService fieldService;
@@ -52,6 +56,11 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
         this.fieldConfigDao = fieldConfigDao;
         this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
                 "runtimeRefreshCoordinator must not be null");
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataFieldId", "enabled", "encryptionMode", "signatureMode", "maskingPolicy", "createdAt", "updatedAt"));
     }
 
     @Override

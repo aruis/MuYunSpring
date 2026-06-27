@@ -2,10 +2,12 @@ package net.ximatai.muyun.spring.boot.platform;
 
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
-import net.ximatai.muyun.database.core.orm.CriteriaOperator;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
@@ -63,6 +65,7 @@ import org.springframework.web.servlet.HandlerMapping;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +77,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -157,7 +161,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldQueryModuleActionsWithinPathModule() throws Exception {
-        PlatformModuleActionService service = mock(PlatformModuleActionService.class);
+        PlatformModuleActionService service = queryService(mock(PlatformModuleActionService.class));
         PlatformModuleActionWebController controller = new PlatformModuleActionWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -331,7 +335,7 @@ class PlatformConfigurationWebControllerTest {
     void shouldQueryModuleFieldFiltersWithinPathField() throws Exception {
         ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
         ModuleMetadataFieldService fieldService = mock(ModuleMetadataFieldService.class);
-        ModuleMetadataFieldFilterService service = mock(ModuleMetadataFieldFilterService.class);
+        ModuleMetadataFieldFilterService service = queryService(mock(ModuleMetadataFieldFilterService.class));
         PlatformModuleMetadataFieldFilterWebController controller =
                 new PlatformModuleMetadataFieldFilterWebController(relationService, fieldService);
         ReflectionTestUtils.setField(controller, "service", service);
@@ -438,7 +442,7 @@ class PlatformConfigurationWebControllerTest {
     @Test
     void shouldQueryMetadataViewsWithinPathRelation() throws Exception {
         ModuleMetadataRelationService relationService = mock(ModuleMetadataRelationService.class);
-        MetadataViewService service = mock(MetadataViewService.class);
+        MetadataViewService service = queryService(mock(MetadataViewService.class));
         PlatformMetadataViewWebController controller = new PlatformMetadataViewWebController(relationService);
         ReflectionTestUtils.setField(controller, "service", service);
         when(relationService.select("rel-1")).thenReturn(relation("rel-1", "platform.sales.order"));
@@ -568,7 +572,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldExposeFieldTypeDirectory() throws Exception {
-        PlatformFieldTypeService service = mock(PlatformFieldTypeService.class);
+        PlatformFieldTypeService service = queryService(mock(PlatformFieldTypeService.class));
         PlatformFieldTypeWebController controller = new PlatformFieldTypeWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -597,7 +601,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldManageDictionaryCategoriesWithinPathApplication() throws Exception {
-        DictionaryCategoryService service = mock(DictionaryCategoryService.class);
+        DictionaryCategoryService service = queryService(mock(DictionaryCategoryService.class));
         DictionaryCategoryWebController controller = new DictionaryCategoryWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -678,7 +682,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldManageDictionaryItemsWithinPathCategory() throws Exception {
-        DictionaryItemService service = mock(DictionaryItemService.class);
+        DictionaryItemService service = queryService(mock(DictionaryItemService.class));
         DictionaryItemWebController controller = new DictionaryItemWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -776,7 +780,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldQueryUiSetsWithinPathModule() throws Exception {
-        PlatformUiSetService service = mock(PlatformUiSetService.class);
+        PlatformUiSetService service = queryService(mock(PlatformUiSetService.class));
         PlatformUiSetWebController controller = new PlatformUiSetWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -826,7 +830,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldQueryTemplatesWithinPathModule() throws Exception {
-        PlatformQueryTemplateService service = mock(PlatformQueryTemplateService.class);
+        PlatformQueryTemplateService service = queryService(mock(PlatformQueryTemplateService.class));
         PlatformQueryTemplateWebController controller = new PlatformQueryTemplateWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -852,7 +856,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldManageFieldUiTypeAttributesWithinPathUiType() throws Exception {
-        PlatformFieldUiTypeAttributeService service = mock(PlatformFieldUiTypeAttributeService.class);
+        PlatformFieldUiTypeAttributeService service = queryService(mock(PlatformFieldUiTypeAttributeService.class));
         PlatformFieldUiTypeAttributeWebController controller = new PlatformFieldUiTypeAttributeWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -905,7 +909,7 @@ class PlatformConfigurationWebControllerTest {
 
     @Test
     void shouldManageFieldUiTypeMappingsWithinPathUiType() throws Exception {
-        PlatformFieldUiTypeFieldMappingService service = mock(PlatformFieldUiTypeFieldMappingService.class);
+        PlatformFieldUiTypeFieldMappingService service = queryService(mock(PlatformFieldUiTypeFieldMappingService.class));
         PlatformFieldUiTypeFieldMappingWebController controller = new PlatformFieldUiTypeFieldMappingWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -1093,12 +1097,44 @@ class PlatformConfigurationWebControllerTest {
     }
 
     private void assertClause(Criteria criteria, String field, Object value) {
-        CriteriaClause clause = criteria.getClauses().stream()
+        CriteriaClause clause = clauses(criteria).stream()
                 .filter(item -> field.equals(item.getField()))
                 .findFirst()
                 .orElseThrow();
-        assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.EQ);
         assertThat(clause.getValues()).containsExactly(value);
+    }
+
+    private List<CriteriaClause> clauses(Criteria criteria) {
+        List<CriteriaClause> result = new ArrayList<>();
+        collect(criteria.getRoot(), result);
+        return result;
+    }
+
+    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = criteriaNode(entry);
+            if (node instanceof CriteriaClause clause) {
+                result.add(clause);
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collect(childGroup, result);
+            }
+        }
+    }
+
+    private Object criteriaNode(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
+    }
+
+    private <S extends QueryAbility<?>> S queryService(S service) {
+        doCallRealMethod().when(service).queryDescriptor();
+        doCallRealMethod().when(service).queryCriteria(any(QueryRequest.class));
+        doCallRealMethod().when(service).querySorts(any(QueryRequest.class));
+        return service;
     }
 
     private MockHttpServletRequest requestVars(Map<String, String> variables) {

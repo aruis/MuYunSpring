@@ -1,12 +1,10 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -22,26 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MenuService.MODULE_ALIAS, title = "平台菜单")
 @RequestMapping("/platform.menu-scheme/{schemeId}/menus")
 public class MenuManagementWebController extends NestedEnabledSortableCrudWebSupport<Menu, MenuService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "schemeId", "parentId", "title", "menuType", "moduleAlias", "route", "externalUrl",
-            "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder",
-            "createdAt", "updatedAt");
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"), Sort.asc("title"));
-    }
 
     @Override
     protected void appendScope(Criteria criteria, HttpServletRequest request) {

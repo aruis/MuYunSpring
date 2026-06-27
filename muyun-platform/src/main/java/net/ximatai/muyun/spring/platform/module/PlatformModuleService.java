@@ -15,17 +15,27 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 @Service
 public class PlatformModuleService extends AbstractAbilityService<PlatformModule> implements
         SoftDeleteAbility<PlatformModule>,
         EnableAbility<PlatformModule>,
         TreeAbility<PlatformModule>,
-        PlatformManagedProtectionAbility<PlatformModule> {
+        PlatformManagedProtectionAbility<PlatformModule>,
+        QueryAbility<PlatformModule> {
 
     public static final String MODULE_ALIAS = "platform.module";
 
     public PlatformModuleService(BaseDao<PlatformModule, String> moduleDao) {
         super(MODULE_ALIAS, PlatformModule.class, moduleDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "parentId", "applicationAlias", "moduleKind", "systemManaged", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

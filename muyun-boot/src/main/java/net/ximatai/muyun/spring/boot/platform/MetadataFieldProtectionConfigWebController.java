@@ -1,9 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.platform.metadata.MetadataField;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfig;
 import net.ximatai.muyun.spring.platform.metadata.MetadataFieldProtectionConfigService;
@@ -12,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MetadataFieldProtectionConfigService.MODULE_ALIAS,
@@ -20,19 +18,11 @@ import java.util.Set;
 @RequestMapping("/platform.metadata/{metadataId}/fields/{fieldId}/protection-configs")
 public class MetadataFieldProtectionConfigWebController
         extends NestedCrudWebSupport<MetadataFieldProtectionConfig, MetadataFieldProtectionConfigService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "metadataFieldId", "enabled", "encryptionMode", "signatureMode",
-            "maskingPolicy", "createdAt", "updatedAt");
 
     private final MetadataFieldService fieldService;
 
     public MetadataFieldProtectionConfigWebController(MetadataFieldService fieldService) {
         this.fieldService = fieldService;
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
     }
 
     @Override

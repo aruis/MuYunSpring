@@ -25,11 +25,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMetadataField> implements
         SoftDeleteAbility<ModuleMetadataField>,
-        SortAbility<ModuleMetadataField> {
+        SortAbility<ModuleMetadataField>,
+        QueryAbility<ModuleMetadataField> {
     public static final String MODULE_ALIAS = "platform.module_metadata_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -82,6 +86,12 @@ public class ModuleMetadataFieldService extends AbstractAbilityService<ModuleMet
                 ? null
                 : referenceGenerateRuleValidator.orElse(null);
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "relationId", "metadataFieldId", "cloneable", "dictionaryApplicationAlias", "dictionaryCategoryAlias", "referenceModuleAlias", "referenceModuleKeyField", "referenceModuleLabelField", "referenceGenerateRuleId", "referenceQueryTemplateId", "unitCategoryAlias", "unitMode", "fixedUnitCode", "defaultUnitCode", "unitFieldId", "baseValueFieldId", "baseUnitCategoryAlias", "baseUnitCode", "unitConversionMode", "conversionScopeFieldId", "unitRequired", "moneyCurrencyMode", "moneyFixedCurrencyCode", "moneyDefaultCurrencyCode", "moneyCurrencyFieldId", "moneyBaseAmountFieldId", "moneyBaseCurrencyCode", "moneyRateTypeCode", "moneyRateDateFieldId", "moneyExchangeRateFieldId", "moneyCurrencyRequired", "title", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

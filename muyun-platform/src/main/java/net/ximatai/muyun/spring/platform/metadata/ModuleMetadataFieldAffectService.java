@@ -12,11 +12,15 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ModuleMetadataFieldAffectService extends AbstractAbilityService<ModuleMetadataFieldAffect> implements
         SoftDeleteAbility<ModuleMetadataFieldAffect>,
-        SortAbility<ModuleMetadataFieldAffect> {
+        SortAbility<ModuleMetadataFieldAffect>,
+        QueryAbility<ModuleMetadataFieldAffect> {
     public static final String MODULE_ALIAS = "platform.module_metadata_field_affect";
 
     private final ModuleMetadataFieldService moduleFieldService;
@@ -34,6 +38,12 @@ public class ModuleMetadataFieldAffectService extends AbstractAbilityService<Mod
         super(MODULE_ALIAS, ModuleMetadataFieldAffect.class, affectDao);
         this.moduleFieldService = moduleFieldService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleMetadataFieldId", "referenceFieldId", "targetFieldId", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

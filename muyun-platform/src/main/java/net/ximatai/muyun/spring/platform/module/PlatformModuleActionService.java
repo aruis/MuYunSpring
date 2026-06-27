@@ -22,13 +22,17 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformModuleActionService extends AbstractAbilityService<PlatformModuleAction> implements
         SoftDeleteAbility<PlatformModuleAction>,
         EnableAbility<PlatformModuleAction>,
         SortAbility<PlatformModuleAction>,
-        PlatformManagedProtectionAbility<PlatformModuleAction> {
+        PlatformManagedProtectionAbility<PlatformModuleAction>,
+        QueryAbility<PlatformModuleAction> {
     public static final String MODULE_ALIAS = "platform.module_action";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -47,6 +51,12 @@ public class PlatformModuleActionService extends AbstractAbilityService<Platform
         super(MODULE_ALIAS, PlatformModuleAction.class, actionDao);
         this.moduleService = moduleService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleAlias", "actionCode", "entityAlias", "permissionActionCode", "title", "category", "actionLevel", "accessMode", "actionAuth", "dataAuth", "defaultGrantPolicy", "executorType", "executorKey", "sourceType", "sourceId", "bindingType", "bindingId", "bindingAlias", "systemManaged", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

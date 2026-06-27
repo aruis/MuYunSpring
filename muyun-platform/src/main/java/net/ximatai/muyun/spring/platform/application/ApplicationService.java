@@ -23,12 +23,16 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ApplicationService extends StandardBusinessService<Application> implements
         SoftDeleteAbility<Application>,
         EnableAbility<Application>,
-        SortAbility<Application> {
+        SortAbility<Application>,
+        QueryAbility<Application> {
 
     public static final String MODULE_ALIAS = "platform.application";
 
@@ -49,6 +53,12 @@ public class ApplicationService extends StandardBusinessService<Application> imp
         this.moduleService = moduleService == null ? Optional.empty() : moduleService;
         this.metadataService = metadataService == null ? Optional.empty() : metadataService;
         this.dictionaryCategoryService = dictionaryCategoryService == null ? Optional.empty() : dictionaryCategoryService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

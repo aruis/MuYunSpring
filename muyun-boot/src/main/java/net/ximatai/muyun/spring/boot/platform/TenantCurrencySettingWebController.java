@@ -1,10 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.currency.TenantCurrencySetting;
 import net.ximatai.muyun.spring.platform.currency.TenantCurrencySettingService;
@@ -12,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Supplier;
 
 @RestController
@@ -21,22 +18,10 @@ import java.util.function.Supplier;
 @RequestMapping({"/platform.tenant_currency_setting", "/platform.tenant-currency-settings"})
 public class TenantCurrencySettingWebController
         extends NestedCrudWebSupport<TenantCurrencySetting, TenantCurrencySettingService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "tenantId", "baseCurrencyCode", "title", "createdAt", "updatedAt");
 
     @Override
     public <T> T webScope(Supplier<T> action) {
         return action.get();
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("tenantId"));
     }
 
     @Override

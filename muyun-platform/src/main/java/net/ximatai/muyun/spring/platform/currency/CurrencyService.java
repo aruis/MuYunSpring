@@ -21,6 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CurrencyService extends AbstractAbilityService<Currency> implements
@@ -28,11 +31,19 @@ public class CurrencyService extends AbstractAbilityService<Currency> implements
         EnableAbility<Currency>,
         SortAbility<Currency>,
         ReferenceAbility<Currency>,
-        CacheAbility<Currency> {
+        CacheAbility<Currency>,
+        QueryAbility<Currency> {
     public static final String MODULE_ALIAS = "platform.currency";
 
     public CurrencyService(BaseDao<Currency, String> currencyDao) {
         super(MODULE_ALIAS, Currency.class, currencyDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "code", "numericCode", "symbol", "decimalScale", "roundingMode", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("code"));
     }
 
     @Override

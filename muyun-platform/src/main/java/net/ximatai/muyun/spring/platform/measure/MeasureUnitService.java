@@ -21,6 +21,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> implements
@@ -28,7 +31,8 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
         EnableAbility<MeasureUnit>,
         SortAbility<MeasureUnit>,
         ReferenceAbility<MeasureUnit>,
-        CacheAbility<MeasureUnit> {
+        CacheAbility<MeasureUnit>,
+        QueryAbility<MeasureUnit> {
     public static final String MODULE_ALIAS = "platform.measure_unit";
 
     private final MeasureUnitCategoryService categoryService;
@@ -37,6 +41,13 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
                               MeasureUnitCategoryService categoryService) {
         super(MODULE_ALIAS, MeasureUnit.class, unitDao);
         this.categoryService = categoryService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "applicationAlias", "categoryAlias", "code", "symbol", "scale", "factorToBase", "offsetToBase", "roundingMode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

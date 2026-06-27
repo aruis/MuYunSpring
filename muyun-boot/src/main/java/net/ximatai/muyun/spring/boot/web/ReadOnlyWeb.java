@@ -5,6 +5,8 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -16,6 +18,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
     default Criteria queryCriteria(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Criteria criteria = queryAbility.queryCriteria(WebQueryRequests.from(request));
+            return criteria == null ? Criteria.of() : criteria;
+        }
         if (request != null && !request.conditions().isEmpty()) {
             throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
         }
@@ -26,6 +32,10 @@ public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>>
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Sort[] sorts = queryAbility.querySorts(WebQueryRequests.from(request));
+            return sorts == null ? new Sort[0] : sorts;
+        }
         if (request != null && !request.sorts().isEmpty()) {
             throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());
         }

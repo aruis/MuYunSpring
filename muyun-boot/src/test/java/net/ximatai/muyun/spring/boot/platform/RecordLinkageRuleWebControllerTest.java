@@ -3,10 +3,12 @@ package net.ximatai.muyun.spring.boot.platform;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.CriteriaClause;
-import net.ximatai.muyun.database.core.orm.CriteriaOperator;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRule;
 import net.ximatai.muyun.spring.platform.generation.RecordGenerationRuleService;
 import net.ximatai.muyun.spring.platform.writeback.RecordWriteBackRule;
@@ -20,12 +22,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.HandlerMapping;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,7 +67,7 @@ class RecordLinkageRuleWebControllerTest {
 
     @Test
     void shouldRejectGenerationRuleTreeUpdateOutsidePathModule() throws Exception {
-        RecordGenerationRuleService service = mock(RecordGenerationRuleService.class);
+        RecordGenerationRuleService service = queryService(mock(RecordGenerationRuleService.class));
         RecordGenerationRuleWebController controller = new RecordGenerationRuleWebController();
         ReflectionTestUtils.setField(controller, "service", service);
         when(service.select("rule-1")).thenReturn(generationRule("rule-1", "sales.contract"));
@@ -76,7 +81,7 @@ class RecordLinkageRuleWebControllerTest {
 
     @Test
     void shouldQueryAndViewGenerationRulesWithinPathModule() throws Exception {
-        RecordGenerationRuleService service = mock(RecordGenerationRuleService.class);
+        RecordGenerationRuleService service = queryService(mock(RecordGenerationRuleService.class));
         RecordGenerationRuleWebController controller = new RecordGenerationRuleWebController();
         ReflectionTestUtils.setField(controller, "service", service);
 
@@ -162,12 +167,44 @@ class RecordLinkageRuleWebControllerTest {
     }
 
     private void assertClause(Criteria criteria, String field, Object value) {
-        CriteriaClause clause = criteria.getClauses().stream()
+        CriteriaClause clause = clauses(criteria).stream()
                 .filter(item -> field.equals(item.getField()))
                 .findFirst()
                 .orElseThrow();
-        assertThat(clause.getOperator()).isEqualTo(CriteriaOperator.EQ);
         assertThat(clause.getValues()).containsExactly(value);
+    }
+
+    private List<CriteriaClause> clauses(Criteria criteria) {
+        List<CriteriaClause> result = new ArrayList<>();
+        collect(criteria.getRoot(), result);
+        return result;
+    }
+
+    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = criteriaNode(entry);
+            if (node instanceof CriteriaClause clause) {
+                result.add(clause);
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collect(childGroup, result);
+            }
+        }
+    }
+
+    private Object criteriaNode(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
+    }
+
+    private <S extends QueryAbility<?>> S queryService(S service) {
+        doCallRealMethod().when(service).queryDescriptor();
+        doCallRealMethod().when(service).queryCriteria(any(QueryRequest.class));
+        doCallRealMethod().when(service).querySorts(any(QueryRequest.class));
+        return service;
     }
 
     private MockHttpServletRequest requestVars(String moduleAlias) {

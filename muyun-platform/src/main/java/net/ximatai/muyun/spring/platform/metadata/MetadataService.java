@@ -15,12 +15,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MetadataService extends AbstractAbilityService<Metadata> implements
         SoftDeleteAbility<Metadata>,
         EnableAbility<Metadata>,
-        SortAbility<Metadata> {
+        SortAbility<Metadata>,
+        QueryAbility<Metadata> {
     public static final String MODULE_ALIAS = "platform.metadata";
     public static final String DEFAULT_SCHEMA = "public";
 
@@ -54,6 +58,12 @@ public class MetadataService extends AbstractAbilityService<Metadata> implements
                 "schemaEnsureServiceProvider must not be null");
         this.runtimeRefreshCoordinator = Objects.requireNonNull(runtimeRefreshCoordinator,
                 "runtimeRefreshCoordinator must not be null");
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "applicationAlias", "alias", "schemaName", "tableName", "dataScopeEnabled", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

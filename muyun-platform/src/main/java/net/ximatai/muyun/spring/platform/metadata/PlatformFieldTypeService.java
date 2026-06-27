@@ -16,12 +16,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFieldType> implements
         SoftDeleteAbility<PlatformFieldType>,
         EnableAbility<PlatformFieldType>,
-        SortAbility<PlatformFieldType> {
+        SortAbility<PlatformFieldType>,
+        QueryAbility<PlatformFieldType> {
     public static final String MODULE_ALIAS = "platform.field_type";
     private final BaseDao<PlatformFieldUiType, String> fieldUiTypeDao;
 
@@ -34,6 +38,12 @@ public class PlatformFieldTypeService extends AbstractAbilityService<PlatformFie
                                     BaseDao<PlatformFieldUiType, String> fieldUiTypeDao) {
         super(MODULE_ALIAS, PlatformFieldType.class, fieldTypeDao);
         this.fieldUiTypeDao = fieldUiTypeDao;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "alias", "title", "fieldType", "defaultLength", "defaultPrecision", "defaultScale", "defaultQueryOperator", "defaultUiTypeAlias", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

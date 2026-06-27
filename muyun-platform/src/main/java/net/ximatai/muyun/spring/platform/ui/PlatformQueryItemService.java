@@ -35,12 +35,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformQueryItemService extends AbstractAbilityService<PlatformQueryItem> implements
         SoftDeleteAbility<PlatformQueryItem>,
         EnableAbility<PlatformQueryItem>,
-        SortAbility<PlatformQueryItem> {
+        SortAbility<PlatformQueryItem>,
+        QueryAbility<PlatformQueryItem> {
     public static final String MODULE_ALIAS = "platform.query_item";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -89,6 +93,13 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         this.fieldTypeService = fieldTypeService;
         this.fieldDefinitionCompiler = fieldDefinitionCompiler;
         this.timeService = timeService == null ? new PlatformTimeService() : timeService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("title", "parentId", "moduleMetadataFieldId", "operator", "allowExternalValue", "externalValueKey", "enabled"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override
