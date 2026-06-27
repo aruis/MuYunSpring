@@ -108,6 +108,7 @@ class DataScopeWebTest {
         assertThat(service.scopedActions).containsExactly(PlatformAction.UPDATE, PlatformAction.DELETE);
         assertThat(service.scopedIdCalls).containsExactly(List.of("record-1"), List.of("record-2"));
         assertThat(service.scopedDataAuth).containsExactly(true, true);
+        assertThat(service.selectedIds).containsExactly("record-2");
         assertThat(service.viewAction).isEqualTo(PlatformAction.VIEW);
     }
 
@@ -243,6 +244,7 @@ class DataScopeWebTest {
         private final java.util.ArrayList<PlatformAction> scopedActions = new java.util.ArrayList<>();
         private final java.util.ArrayList<List<String>> scopedIdCalls = new java.util.ArrayList<>();
         private final java.util.ArrayList<Boolean> scopedDataAuth = new java.util.ArrayList<>();
+        private final java.util.ArrayList<String> selectedIds = new java.util.ArrayList<>();
         private PlatformAction queryAction;
         private PlatformAction viewAction;
 
@@ -279,6 +281,15 @@ class DataScopeWebTest {
             viewAction = action;
             DataScopedRecord record = new DataScopedRecord();
             record.setTitle("View " + id);
+            return record;
+        }
+
+        @Override
+        public DataScopedRecord select(String id) {
+            selectedIds.add(id);
+            DataScopedRecord record = new DataScopedRecord();
+            record.setId(id);
+            record.setTitle("Select " + id);
             return record;
         }
 

@@ -28,7 +28,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.util.List;
 
-public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
+public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
+        extends ScopedWeb<S>, RecordLabelWeb<T> {
     default PageResult<T> queryRecords(WebQueryRequest request) {
         WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
         PageRequest pageRequest = PageRequest.of(page.pageNum(), page.pageSize());
@@ -129,21 +130,23 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    default T insert(@RequestBody T record) {
+    default WebRecordResponse<T> insert(@RequestBody T record) {
         return webScope(() -> {
             String id = service().insert(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    default T update(@PathVariable String id, @RequestBody T record) {
+    default WebRecordResponse<T> update(@PathVariable String id, @RequestBody T record) {
         record.setId(id);
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.UPDATE, id);
             service().update(record);
-            return WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), selectForAction(PlatformAction.VIEW, id), FieldOutputContext.VIEW);
+            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 
@@ -152,7 +155,8 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
     default WebCountResponse delete(@PathVariable String id) {
         return webScope(() -> {
             requireDataScopeRecord(PlatformAction.DELETE, id);
-            return new WebCountResponse(service().delete(id));
+            T record = service().select(id);
+            return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
         });
     }
 

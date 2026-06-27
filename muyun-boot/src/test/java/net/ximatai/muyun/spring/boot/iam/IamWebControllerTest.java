@@ -150,7 +150,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(tenant("tenant_b", "Tenant B"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.alias").value("tenant_b"));
+                .andExpect(jsonPath("$.record.alias").value("tenant_b"));
     }
 
     @Test
@@ -329,7 +329,7 @@ class IamWebControllerTest {
                         .contentType("application/json")
                         .content(json(organization(null, "HQ", "Headquarters"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("org-1"));
+                .andExpect(jsonPath("$.record.id").value("org-1"));
     }
 
     @Test
@@ -356,12 +356,12 @@ class IamWebControllerTest {
 	                                  "passwordHash":"client-supplied-hash",
 	                                  "password":"secret2"
 	                                }
-                                """))
+                """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("user-1"))
-                .andExpect(jsonPath("$.username").value("alice"))
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.password").doesNotExist());
+                .andExpect(jsonPath("$.record.id").value("user-1"))
+                .andExpect(jsonPath("$.record.username").value("alice"))
+                .andExpect(jsonPath("$.record.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.record.password").doesNotExist());
     }
 
     @Test

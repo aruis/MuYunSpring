@@ -21,7 +21,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import java.util.Map;
 
 public abstract class NestedCrudWebSupport<T extends EntityContract, S extends CrudAbility<T>>
-        extends WebSupport<S> implements SystemScope<S> {
+        extends WebSupport<S> implements SystemScope<S>, RecordLabelWeb<T> {
     protected abstract Criteria queryCriteria(WebQueryRequest request);
 
     protected abstract void appendScope(Criteria criteria, HttpServletRequest request);
@@ -58,23 +58,26 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    public T insert(HttpServletRequest servletRequest, @RequestBody T record) {
+    public WebRecordResponse<T> insert(HttpServletRequest servletRequest, @RequestBody T record) {
         return webScope(() -> {
             bindScope(record, servletRequest);
             String id = service().insert(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public T update(HttpServletRequest servletRequest, @PathVariable String id, @RequestBody T record) {
+    public WebRecordResponse<T> update(HttpServletRequest servletRequest, @PathVariable String id,
+                                       @RequestBody T record) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
             record.setId(id);
             bindScope(record, servletRequest);
             service().update(record);
-            return WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            T saved = WebOutputSupport.record(service(), service().select(id), FieldOutputContext.VIEW);
+            return new WebRecordResponse<>(saved, successMessage(saved, "已保存"));
         });
     }
 
@@ -82,8 +85,8 @@ public abstract class NestedCrudWebSupport<T extends EntityContract, S extends C
     @ActionEndpoint(PlatformAction.DELETE)
     public WebCountResponse delete(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
-            requireScopedRecord(servletRequest, id);
-            return new WebCountResponse(service().delete(id));
+            T record = requireScopedRecord(servletRequest, id);
+            return new WebCountResponse(service().delete(id), successMessage(record, "已删除"));
         });
     }
 

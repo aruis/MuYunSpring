@@ -122,8 +122,8 @@ class CurrencyWebControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"baseCurrencyCode\":\"CNY\",\"title\":\"Base\"}"))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.tenantId").value("tenant-a"))
-                    .andExpect(jsonPath("$.baseCurrencyCode").value("CNY"));
+                    .andExpect(jsonPath("$.record.tenantId").value("tenant-a"))
+                    .andExpect(jsonPath("$.record.baseCurrencyCode").value("CNY"));
         }
     }
 
