@@ -35,6 +35,49 @@ muyun-iam       租户、组织、用户、角色、权限和身份上下文
 muyun-boot      Spring Boot 启动与装配入口
 ```
 
+## 本地开发启动
+
+本地开发依赖 Java 21、Node.js/npm 和 Docker。后端默认连接 PostgreSQL，仓库不内置嵌入式数据库。
+
+1. 启动 PostgreSQL：
+
+推荐使用仓库根目录的 `compose.yaml`：
+
+```bash
+docker compose up -d
+```
+
+等价的单容器命令如下，适合不使用 Compose 的环境：
+
+```bash
+docker run --name muyun-spring-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=muyun_dev \
+  -e POSTGRES_DB=muyun_spring \
+  -p 54321:5432 \
+  -v muyun-spring-postgres-data:/var/lib/postgresql \
+  -d postgres:18.4-alpine
+```
+
+2. 启动后端：
+
+```bash
+./gradlew :muyun-boot:bootRun --args='--muyun.runtime.mode=development --spring.datasource.url=jdbc:postgresql://127.0.0.1:54321/muyun_spring --spring.datasource.username=postgres --spring.datasource.password=muyun_dev'
+```
+
+后端启动后监听 `http://127.0.0.1:8080`。开发态会按当前 schema 策略初始化或拉齐平台表结构。
+
+3. 启动前端：
+
+```bash
+cd muyun-web
+npm ci
+npm run dev:backend
+```
+
+前端启动后访问 `http://127.0.0.1:5173/`，`backend` 模式会读取 `muyun-web/.env.backend` 并连接本地后端。
+本地初始登录信息为租户 `platform`、用户名 `admin`、密码 `admin123`。
+
 ## 运行验证
 
 ```bash
