@@ -23,12 +23,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformUiConfigFieldService extends AbstractAbilityService<PlatformUiConfigField> implements
         SoftDeleteAbility<PlatformUiConfigField>,
         EnableAbility<PlatformUiConfigField>,
-        SortAbility<PlatformUiConfigField> {
+        SortAbility<PlatformUiConfigField>,
+        QueryAbility<PlatformUiConfigField> {
     public static final String MODULE_ALIAS = "platform.ui_config_field";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -53,6 +57,13 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
         this.fieldTypeService = fieldTypeService;
         this.fieldUiTypeService = fieldUiTypeService;
         this.metadataFieldService = metadataFieldService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiTypeAlias", "visible", "readOnly", "requiredOverride", "enabled"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

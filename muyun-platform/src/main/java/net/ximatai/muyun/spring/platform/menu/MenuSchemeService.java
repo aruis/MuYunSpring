@@ -24,13 +24,17 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implements
         SoftDeleteAbility<MenuScheme>,
         EnableAbility<MenuScheme>,
         SortAbility<MenuScheme>,
-        InitialDataAbility<MenuScheme> {
+        InitialDataAbility<MenuScheme>,
+        QueryAbility<MenuScheme> {
     public static final String MODULE_ALIAS = "platform.menu_scheme";
     public static final String SYSTEM_SCOPE_ID = "system";
     public static final String ADMIN_SCHEME_ID = "platform.menu_scheme.admin";
@@ -65,6 +69,13 @@ public class MenuSchemeService extends AbstractAbilityService<MenuScheme> implem
         this.systemMenuSchemeAccessPolicy = systemMenuSchemeAccessPolicy == null
                 ? SystemMenuSchemeAccessPolicy.DENY_ALL
                 : systemMenuSchemeAccessPolicy;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "alias", "scopeType", "scopeId", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("alias"));
     }
 
     @Override

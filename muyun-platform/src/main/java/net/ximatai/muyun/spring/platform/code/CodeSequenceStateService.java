@@ -13,10 +13,14 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenceState> implements
-        SoftDeleteAbility<CodeSequenceState> {
+        SoftDeleteAbility<CodeSequenceState>,
+        QueryAbility<CodeSequenceState> {
     public static final String MODULE_ALIAS = "platform.code_sequence_state";
 
     private final CodeSequenceAllocator sequenceAllocator;
@@ -138,6 +142,14 @@ public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenc
             case MONTH -> DateTimeFormatter.ofPattern("yyyyMM").format(effectiveAt);
             case DAY -> DateTimeFormatter.ofPattern("yyyyMMdd").format(effectiveAt);
         };
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "currentValue"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("ruleId"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("basisKey"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("periodKey"));
     }
 
     @Override

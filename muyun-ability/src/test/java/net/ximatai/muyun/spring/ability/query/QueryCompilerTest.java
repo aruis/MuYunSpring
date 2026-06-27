@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,32 @@ class QueryCompilerTest {
     }
 
     @Test
+    void shouldCompileLocalDateTimeRangeWithoutUtcInstantCoercion() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(
+                List.of(new QueryCondition("effectiveFrom", QueryOperator.BETWEEN,
+                        List.of("2026-06-26T09:00:00", "2026-06-26T18:00:00"), null)),
+                null,
+                Map.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        );
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(containsCondition(criteria, "effectiveFrom",
+                LocalDateTime.parse("2026-06-26T09:00:00"))).isTrue();
+        assertThat(containsCondition(criteria, "effectiveFrom",
+                LocalDateTime.parse("2026-06-26T18:00:00"))).isTrue();
+    }
+
+    @Test
     void shouldRejectUndeclaredFieldsAndUnsupportedSorts() {
         QueryCompiler compiler = new QueryCompiler(descriptor());
 
@@ -174,6 +201,7 @@ class QueryCompilerTest {
                 .field(QueryField.of("title", QueryOperator.EQ, QueryOperator.LIKE)
                         .withQuickSearch())
                 .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.BETWEEN))
+                .field(QueryField.of("effectiveFrom", QueryValueType.DATETIME, QueryOperator.BETWEEN))
                 .externalCriteria("scope", value -> Criteria.of().eq("departmentId", value))
                 .defaultSort(Sort.asc("code"))
                 .build();

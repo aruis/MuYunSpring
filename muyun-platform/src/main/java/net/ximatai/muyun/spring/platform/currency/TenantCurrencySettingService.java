@@ -8,10 +8,14 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class TenantCurrencySettingService extends AbstractAbilityService<TenantCurrencySetting> implements
-        SoftDeleteAbility<TenantCurrencySetting> {
+        SoftDeleteAbility<TenantCurrencySetting>,
+        QueryAbility<TenantCurrencySetting> {
     public static final String MODULE_ALIAS = "platform.tenant_currency_setting";
 
     private final CurrencyService currencyService;
@@ -20,6 +24,12 @@ public class TenantCurrencySettingService extends AbstractAbilityService<TenantC
                                         CurrencyService currencyService) {
         super(MODULE_ALIAS, TenantCurrencySetting.class, settingDao);
         this.currencyService = currencyService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "baseCurrencyCode", "title", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("tenantId"));
     }
 
     @Override

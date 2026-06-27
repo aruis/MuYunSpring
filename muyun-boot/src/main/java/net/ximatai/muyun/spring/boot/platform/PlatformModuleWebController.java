@@ -1,7 +1,5 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -10,7 +8,6 @@ import net.ximatai.muyun.spring.boot.web.TreeSortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
 import net.ximatai.muyun.spring.boot.web.WebOutputSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.boot.web.WebTreeNode;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -34,7 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = PlatformModuleService.MODULE_ALIAS, title = "平台模块")
@@ -44,9 +40,6 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
         CrudWeb<PlatformModule, PlatformModuleService>,
         EnableWeb<PlatformModule, PlatformModuleService>,
         SystemScope<PlatformModuleService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "parentId", "applicationAlias", "moduleKind", "systemManaged",
-            "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     private PlatformDynamicRuntimeRefreshService runtimeRefreshService;
 
@@ -56,16 +49,6 @@ public class PlatformModuleWebController extends WebSupport<PlatformModuleServic
     }
 
     public PlatformModuleWebController() {
-    }
-
-    @Override
-    public Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    public Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"));
     }
 
     @PostMapping("/sort/{id}")

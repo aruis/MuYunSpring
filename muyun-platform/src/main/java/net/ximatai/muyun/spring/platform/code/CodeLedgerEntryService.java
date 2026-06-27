@@ -10,10 +10,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEntry> implements
-        SoftDeleteAbility<CodeLedgerEntry> {
+        SoftDeleteAbility<CodeLedgerEntry>,
+        QueryAbility<CodeLedgerEntry> {
     public static final String MODULE_ALIAS = "platform.code_ledger_entry";
 
     public CodeLedgerEntryService(BaseDao<CodeLedgerEntry, String> ledgerEntryDao) {
@@ -127,6 +131,12 @@ public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEnt
         entry.setLastAction(action == null ? CodeLedgerAction.RELEASED_BY_GOVERNANCE : action);
         update(entry);
         return select(entry.getId());
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "moduleAlias", "entityAlias", "fieldName", "codeValue", "basisKey", "periodKey", "sourceRecordId", "status", "lastAction"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
     }
 
     @Override

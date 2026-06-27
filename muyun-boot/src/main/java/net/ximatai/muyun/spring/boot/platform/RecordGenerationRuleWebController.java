@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = RecordGenerationRuleService.MODULE_ALIAS,
@@ -20,12 +19,9 @@ import java.util.Set;
 @RequestMapping("/platform.module/{moduleAlias}/generation-rules")
 public class RecordGenerationRuleWebController
         extends ModuleScopedRuleTreeWebSupport<RecordGenerationRule, RecordGenerationRuleService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "sourceModuleAlias", "targetModuleAlias", "actionCode",
-            "title", "enabled", "sortOrder", "createdAt", "updatedAt");
 
     public RecordGenerationRuleWebController() {
-        super(QUERY_FIELDS, "sourceModuleAlias");
+        super("sourceModuleAlias");
     }
 
     @GetMapping("/viewTree/{id}")

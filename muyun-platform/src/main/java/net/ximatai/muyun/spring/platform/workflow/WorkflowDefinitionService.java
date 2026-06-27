@@ -8,16 +8,26 @@ import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDefinition> implements
         SoftDeleteAbility<WorkflowDefinition>,
         EnableAbility<WorkflowDefinition>,
-        SortAbility<WorkflowDefinition> {
+        SortAbility<WorkflowDefinition>,
+        QueryAbility<WorkflowDefinition> {
     public static final String MODULE_ALIAS = "platform.workflow.definition";
 
     public WorkflowDefinitionService(BaseDao<WorkflowDefinition, String> workflowDefinitionDao) {
         super(MODULE_ALIAS, WorkflowDefinition.class, workflowDefinitionDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "applicationAlias", "moduleAlias", "alias", "approvalEnabled", "actionCode", "definitionStatus", "currentVersionNo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

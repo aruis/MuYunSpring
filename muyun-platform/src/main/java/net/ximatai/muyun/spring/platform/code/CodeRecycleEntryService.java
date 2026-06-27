@@ -11,10 +11,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleEntry> implements
-        SoftDeleteAbility<CodeRecycleEntry> {
+        SoftDeleteAbility<CodeRecycleEntry>,
+        QueryAbility<CodeRecycleEntry> {
     public static final String MODULE_ALIAS = "platform.code_recycle_entry";
     private static final PageRequest ONE = PageRequest.of(1, 1);
 
@@ -107,6 +111,12 @@ public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleE
         entry.setStatus(status);
         update(entry);
         return select(id);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "recycledValue", "sourceRecordId", "status"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
     }
 
     @Override

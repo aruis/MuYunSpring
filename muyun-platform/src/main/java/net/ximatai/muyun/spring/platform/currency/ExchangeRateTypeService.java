@@ -21,6 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRateType> implements
@@ -29,11 +32,19 @@ public class ExchangeRateTypeService extends AbstractAbilityService<ExchangeRate
         SortAbility<ExchangeRateType>,
         ReferenceAbility<ExchangeRateType>,
         CacheAbility<ExchangeRateType>,
-        PlatformManagedProtectionAbility<ExchangeRateType> {
+        PlatformManagedProtectionAbility<ExchangeRateType>,
+        QueryAbility<ExchangeRateType> {
     public static final String MODULE_ALIAS = "platform.exchange_rate_type";
 
     public ExchangeRateTypeService(BaseDao<ExchangeRateType, String> rateTypeDao) {
         super(MODULE_ALIAS, ExchangeRateType.class, rateTypeDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "code", "systemManaged", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("code"));
     }
 
     @Override

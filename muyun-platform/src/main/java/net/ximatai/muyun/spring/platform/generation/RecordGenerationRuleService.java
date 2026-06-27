@@ -22,12 +22,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class RecordGenerationRuleService extends AbstractAbilityService<RecordGenerationRule> implements
         SoftDeleteAbility<RecordGenerationRule>,
         EnableAbility<RecordGenerationRule>,
-        SortAbility<RecordGenerationRule> {
+        SortAbility<RecordGenerationRule>,
+        QueryAbility<RecordGenerationRule> {
     public static final String MODULE_ALIAS = "platform.record_generation_rule";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -119,6 +123,12 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
                 .stream()
                 .map(rule -> viewRuleTree(rule.getId()))
                 .toList();
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "sourceModuleAlias", "targetModuleAlias", "actionCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

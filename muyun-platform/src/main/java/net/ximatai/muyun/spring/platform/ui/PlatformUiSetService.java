@@ -13,12 +13,16 @@ import net.ximatai.muyun.spring.platform.module.PlatformModuleService;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> implements
         SoftDeleteAbility<PlatformUiSet>,
         EnableAbility<PlatformUiSet>,
-        SortAbility<PlatformUiSet> {
+        SortAbility<PlatformUiSet>,
+        QueryAbility<PlatformUiSet> {
     public static final String MODULE_ALIAS = "platform.ui_set";
 
     private final PlatformModuleService moduleService;
@@ -27,6 +31,13 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
                                 PlatformModuleService moduleService) {
         super(MODULE_ALIAS, PlatformUiSet.class, uiSetDao);
         this.moduleService = moduleService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("alias", "title", "setType", "defaultSet", "enabled"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("alias"));
     }
 
     @Override

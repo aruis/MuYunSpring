@@ -1,10 +1,8 @@
 package net.ximatai.muyun.spring.boot.platform;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.web.NestedEnabledSortableCrudWebSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversion;
@@ -20,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = MeasureUnitConversionRuleService.MODULE_ALIAS,
@@ -28,27 +25,11 @@ import java.util.Set;
 @RequestMapping("/platform.application/{applicationAlias}/measure-unit-conversion-rules")
 public class MeasureUnitConversionRuleWebController
         extends NestedEnabledSortableCrudWebSupport<MeasureUnitConversionRule, MeasureUnitConversionRuleService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId",
-            "fromCategoryAlias", "fromUnitCode", "toCategoryAlias", "toUnitCode",
-            "factor", "priority", "effectiveFrom", "effectiveTo", "title", "enabled",
-            "sortOrder", "createdAt", "updatedAt");
 
     private final MeasureUnitBusinessConversionService conversionService;
 
     public MeasureUnitConversionRuleWebController(MeasureUnitBusinessConversionService conversionService) {
         this.conversionService = conversionService;
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return PlatformConfigWebQuerySupport.sorts(request, QUERY_FIELDS,
-                Sort.desc("priority"), Sort.asc("sortOrder"), Sort.asc("title"));
     }
 
     @Override

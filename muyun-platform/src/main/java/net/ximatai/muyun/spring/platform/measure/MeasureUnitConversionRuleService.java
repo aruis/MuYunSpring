@@ -20,13 +20,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MeasureUnitConversionRuleService extends AbstractAbilityService<MeasureUnitConversionRule> implements
         SoftDeleteAbility<MeasureUnitConversionRule>,
         EnableAbility<MeasureUnitConversionRule>,
         SortAbility<MeasureUnitConversionRule>,
-        ReferenceAbility<MeasureUnitConversionRule> {
+        ReferenceAbility<MeasureUnitConversionRule>,
+        QueryAbility<MeasureUnitConversionRule> {
     public static final String MODULE_ALIAS = "platform.measure_unit_conversion_rule";
 
     private final MeasureUnitService unitService;
@@ -35,6 +39,14 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
                                             MeasureUnitService unitService) {
         super(MODULE_ALIAS, MeasureUnitConversionRule.class, ruleDao);
         this.unitService = unitService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId", "fromCategoryAlias", "fromUnitCode", "toCategoryAlias", "toUnitCode", "factor", "priority", "effectiveFrom", "effectiveTo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("priority"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

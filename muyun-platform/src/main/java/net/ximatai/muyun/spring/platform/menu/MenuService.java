@@ -34,13 +34,17 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MenuService extends AbstractAbilityService<Menu> implements
         SoftDeleteAbility<Menu>,
         EnableAbility<Menu>,
         TreeAbility<Menu>,
-        InitialDataAbility<Menu> {
+        InitialDataAbility<Menu>,
+        QueryAbility<Menu> {
     public static final String MODULE_ALIAS = "platform.menu";
     public static final String ADMIN_PLATFORM_GROUP_ID = "platform.menu.group.platform";
     public static final String ADMIN_CONFIG_GROUP_ID = "platform.menu.group.config";
@@ -95,6 +99,13 @@ public class MenuService extends AbstractAbilityService<Menu> implements
         this.uiConfigService = uiConfigService;
         this.uiSetService = uiSetService;
         this.queryTemplateService = queryTemplateService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "schemeId", "parentId", "title", "menuType", "moduleAlias", "route", "externalUrl", "pageMode", "defaultUiConfigId", "defaultQueryTemplateId", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

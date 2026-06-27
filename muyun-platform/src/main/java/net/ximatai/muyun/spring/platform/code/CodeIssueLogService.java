@@ -10,10 +10,14 @@ import net.ximatai.muyun.spring.common.exception.PlatformException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CodeIssueLogService extends AbstractAbilityService<CodeIssueLog> implements
-        SoftDeleteAbility<CodeIssueLog> {
+        SoftDeleteAbility<CodeIssueLog>,
+        QueryAbility<CodeIssueLog> {
     public static final String MODULE_ALIAS = "platform.code_issue_log";
 
     public CodeIssueLogService(BaseDao<CodeIssueLog, String> issueLogDao) {
@@ -51,6 +55,12 @@ public class CodeIssueLogService extends AbstractAbilityService<CodeIssueLog> im
         log.setMessage(message);
         insert(log);
         return log;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "moduleAlias", "entityAlias", "fieldName", "basisKey", "periodKey", "generatedValue", "status", "retryCount"),
+                net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
     }
 
     @Override

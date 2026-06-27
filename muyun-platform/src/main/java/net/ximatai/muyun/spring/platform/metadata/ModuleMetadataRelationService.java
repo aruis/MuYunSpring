@@ -14,11 +14,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class ModuleMetadataRelationService extends AbstractAbilityService<ModuleMetadataRelation> implements
         SoftDeleteAbility<ModuleMetadataRelation>,
-        SortAbility<ModuleMetadataRelation> {
+        SortAbility<ModuleMetadataRelation>,
+        QueryAbility<ModuleMetadataRelation> {
     public static final String MODULE_ALIAS = "platform.module_metadata_relation";
 
     private final PlatformModuleService moduleService;
@@ -40,6 +44,12 @@ public class ModuleMetadataRelationService extends AbstractAbilityService<Module
         this.moduleService = moduleService;
         this.metadataService = metadataService;
         this.runtimeRefreshCoordinator = runtimeRefreshCoordinator.orElse(null);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleAlias", "metadataId", "relationAlias", "relationRole", "parentMetadataId", "foreignKey", "autoPopulate", "cascadeDelete", "title", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

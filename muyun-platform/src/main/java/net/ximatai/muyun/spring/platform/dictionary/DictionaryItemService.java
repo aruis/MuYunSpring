@@ -14,11 +14,15 @@ import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 @Service
 public class DictionaryItemService extends AbstractAbilityService<DictionaryItem> implements
         SoftDeleteAbility<DictionaryItem>,
         EnableAbility<DictionaryItem>,
-        TreeAbility<DictionaryItem> {
+        TreeAbility<DictionaryItem>,
+        QueryAbility<DictionaryItem> {
     public static final String MODULE_ALIAS = "platform.dictionary_item";
 
     private final DictionaryCategoryService categoryService;
@@ -27,6 +31,13 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
                                  DictionaryCategoryService categoryService) {
         super(MODULE_ALIAS, DictionaryItem.class, itemDao);
         this.categoryService = categoryService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "categoryId", "categoryAlias", "code", "parentId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

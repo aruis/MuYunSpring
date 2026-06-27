@@ -21,6 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUnitCategory> implements
@@ -28,12 +31,20 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
         EnableAbility<MeasureUnitCategory>,
         SortAbility<MeasureUnitCategory>,
         ReferenceAbility<MeasureUnitCategory>,
-        CacheAbility<MeasureUnitCategory> {
+        CacheAbility<MeasureUnitCategory>,
+        QueryAbility<MeasureUnitCategory> {
     public static final String MODULE_ALIAS = "platform.measure_unit_category";
     public static final String SHARED_APPLICATION_ALIAS = "platform";
 
     public MeasureUnitCategoryService(BaseDao<MeasureUnitCategory, String> categoryDao) {
         super(MODULE_ALIAS, MeasureUnitCategory.class, categoryDao);
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "applicationAlias", "alias", "dimension", "baseUnitCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

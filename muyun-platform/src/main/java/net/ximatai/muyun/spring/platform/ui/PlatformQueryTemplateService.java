@@ -17,12 +17,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PlatformQueryTemplateService extends AbstractAbilityService<PlatformQueryTemplate> implements
         SoftDeleteAbility<PlatformQueryTemplate>,
         EnableAbility<PlatformQueryTemplate>,
-        SortAbility<PlatformQueryTemplate> {
+        SortAbility<PlatformQueryTemplate>,
+        QueryAbility<PlatformQueryTemplate> {
     public static final String MODULE_ALIAS = "platform.query_template";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -32,6 +36,13 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
                                         PlatformModuleService moduleService) {
         super(MODULE_ALIAS, PlatformQueryTemplate.class, queryTemplateDao);
         this.moduleService = moduleService;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("alias", "title", "defaultTemplate", "published", "enabled"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("alias"));
     }
 
     @Override

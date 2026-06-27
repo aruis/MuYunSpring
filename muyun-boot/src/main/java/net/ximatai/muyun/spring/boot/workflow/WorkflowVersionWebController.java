@@ -1,12 +1,10 @@
 package net.ximatai.muyun.spring.boot.workflow;
 
-import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
+import jakarta.servlet.http.HttpServletRequest;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
@@ -25,31 +23,17 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = WorkflowVersionService.MODULE_ALIAS,
         title = "平台工作流版本")
 @RequestMapping("/platform.module/{moduleAlias}/workflow-definitions/{definitionId}/versions")
 public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowVersion, WorkflowVersionService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "definitionId", "versionNo", "publishStatus", "publishedBy", "publishedAt",
-            "createdAt", "updatedAt");
 
     private final WorkflowDefinitionService definitionService;
 
     public WorkflowVersionWebController(WorkflowDefinitionService definitionService) {
         this.definitionService = Objects.requireNonNull(definitionService, "definitionService must not be null");
-    }
-
-    @Override
-    protected Criteria queryCriteria(WebQueryRequest request) {
-        return WorkflowConfigWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    protected Sort[] querySorts(WebQueryRequest request) {
-        return WorkflowConfigWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("versionNo"));
     }
 
     @Override

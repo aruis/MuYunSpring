@@ -18,12 +18,16 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWriteBackRule> implements
         SoftDeleteAbility<RecordWriteBackRule>,
         EnableAbility<RecordWriteBackRule>,
-        SortAbility<RecordWriteBackRule> {
+        SortAbility<RecordWriteBackRule>,
+        QueryAbility<RecordWriteBackRule> {
     public static final String MODULE_ALIAS = "platform.record_write_back_rule";
     private static final PageRequest ALL = PageRequest.of(1, 500);
 
@@ -85,6 +89,12 @@ public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWri
                 .stream()
                 .map(rule -> viewRuleTree(rule.getId()))
                 .toList();
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "triggerModuleAlias", "targetModuleAlias", "eventType", "cascadeMode", "triggerMode", "targetLocateMode", "targetRelationCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

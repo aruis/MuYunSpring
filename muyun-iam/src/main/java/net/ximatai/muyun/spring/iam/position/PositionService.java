@@ -12,13 +12,17 @@ import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.employee.EmployeePositionDao;
 import org.springframework.stereotype.Service;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class PositionService extends TenantStandardBusinessService<Position> implements
         SoftDeleteAbility<Position>,
         EnableAbility<Position>,
         SortAbility<Position>,
-        ReferenceAbility<Position> {
+        ReferenceAbility<Position>,
+        QueryAbility<Position> {
     public static final String MODULE_ALIAS = "iam.position";
 
     private final PositionCategoryService positionCategoryService;
@@ -31,6 +35,13 @@ public class PositionService extends TenantStandardBusinessService<Position> imp
         super(MODULE_ALIAS, Position.class, positionDao, activeTenantVerifier);
         this.positionCategoryService = positionCategoryService;
         this.employeePositionDao = employeePositionDao;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "categoryId", "code", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
 
     @Override

@@ -23,7 +23,6 @@
 | TD-013 | 复杂派生字段读取注入和导入参与范围尚未定稿 | 默认值、校验正则、可复制、写保护、范围查询和虚拟字段基础形态已经补齐到字段配置链、schema 映射、页面查询契约、表单保存边界、公式试算入口和已注入虚拟值展示输出；虚拟字段不会进入动态 SQL 查询、排序、quickSearch 或导出查询；复杂派生行为如果过早进入列表/详情读取自动计算或导入校验，会扩大运行态心智负担 | 进入公式虚拟字段列表/详情自动计算、导入校验派生字段或跨记录聚合派生时，先定义注入时机、失败语义、性能边界和可参与场景，再接入字段配置链 |
 | TD-018 | 业务时区来源尚未模型化到租户、组织和用户主数据 | 当前只提供平台默认时区配置、显式上下文时区和 resolver 扩展点；生产 Spring 路径已复用 `PlatformTimeService`，但尚未定义租户/组织/用户时区字段、优先级配置入口和治理页面 | 进入跨区域组织、用户本地化展示或租户级时区治理时，补齐主数据字段、解析优先级、配置入口和迁移策略 |
 | TD-019 | 非 Spring 手工构造路径不承诺读取 boot 默认时区配置 | 兼容构造器和测试便利构造仍可能 `new PlatformTimeService()` 或按传入 `Clock` 回退；生产 Spring 路径已有契约测试锁住默认时区贯穿动态查询、编码规则和自然日历 | 如果要把平台默认时区提升为所有构造方式的强契约，收紧兼容构造器或提供统一测试工厂，并回收直接 `new PlatformTimeService()` 的生产用法 |
-| TD-027 | 存量静态 Web 查询适配器尚未迁入 `QueryAbility` | `CodeWebQuerySupport`、`PlatformConfigWebQuerySupport`、`WorkflowConfigWebQuerySupport`、`IamWebQuerySupport` 和少量控制器内自定义查询解析仍在 Web 层维护查询字段白名单、操作符编译和值校验；这些实现弱于 `QueryAbility`，且会让静态查询声明继续停留在 Controller 侧 | 后续治理静态配置、编码规则、流程配置或岗位等查询入口时，将可查询字段下沉到 service/ability，复用 `QueryAbility` 的字段类型、默认 operator、时间语义、嵌套 criteria 和排序编译；迁移完成后删除对应旧 support，不再增强旧适配器 |
 
 ## 待讨论决策
 
@@ -53,6 +52,7 @@
 | TD-025 | 后端业务异常提示尚未形成可展示中文口径 | 当前部分业务拒绝原因仍直接抛出英文技术文案，例如岗位分类被岗位引用时返回 `position category is referenced by positions`；前端全局提示会忠实展示后端 message，不在页面侧翻译业务异常 | 进入统一错误码、业务异常本地化、管理端全局提示治理或生产可用性收口时，为业务异常补稳定错误码、中文默认文案和必要参数，明确前端展示 message 与 traceId 的边界 |
 | TD-026 | 应用归属引用保护仍缺少贡献式检查契约 | 当前删除应用时只在 `ApplicationService` 中显式检查模块、元数据和字典类目等已接入引用；仓库内其他 `applicationAlias` 归属模型后续增多时，如果继续扩硬编码清单，容易遗漏并产生孤儿配置数据 | 进入计量单位、工作流、配置包或更多应用归属模型的删除治理时，沉淀应用归属引用检查贡献接口或注册表，由各业务能力贡献引用存在性、展示名称和错误详情，`ApplicationService` 只编排统一拒绝语义 |
 | TD-028 | `QuerySchema` 外部查询值描述仍过于粗糙 | `QuerySchema.ExternalCriteria` 目前只暴露 key，并固定为 `OBJECT` / `PAGE_CONTEXT`，缺少字段结构、来源语义和校验契约；随着静态查询模板、动态页面上下文和外部查询值增多，ability 层可能继续携带页面交付语义 | 后续扩展 external query values 前，引入 `ExternalCriteriaDescriptor` 或等价能力契约，由能力层声明 valueType、来源、对象字段结构和校验边界，Web 层只负责序列化 |
+| TD-029 | 静态查询描述仍依赖字段名约定推断 | `QueryDescriptors.simple` 目前用字段名集合推断 valueType、操作符、标题、quickSearch 和可排序字段，能快速回收旧 Web 查询适配器并改善静态 schema 展示，但业务字段名进入 ability 核心会带来同名不同义、字段漏判和静态/动态查询契约分叉风险 | 静态查询字段继续扩展、出现更多非通用字段类型或查询配置需要对外稳定时，沉淀静态模型 QueryDescriptor 编译器，从 Java 字段类型、模型契约或注解生成查询字段；保留 `simple` 为保守基线或测试便利 |
 
 ## 运维治理触发回收
 

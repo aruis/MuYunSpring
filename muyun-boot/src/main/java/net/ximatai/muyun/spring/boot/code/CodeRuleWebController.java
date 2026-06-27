@@ -1,7 +1,5 @@
 package net.ximatai.muyun.spring.boot.code;
 
-import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
@@ -9,7 +7,6 @@ import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.ReadOnlyWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
-import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.platform.code.CodePreviewResult;
@@ -37,7 +34,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 @PlatformStaticModule(application = "platform", alias = CodeRuleService.MODULE_ALIAS, title = "编码规则")
@@ -47,9 +43,6 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         ReadOnlyWeb<CodeRule, CodeRuleService>,
         EnableWeb<CodeRule, CodeRuleService>,
         SortWeb<CodeRule, CodeRuleService> {
-    private static final Set<String> QUERY_FIELDS = Set.of(
-            "id", "moduleAlias", "entityAlias", "metadataFieldId", "fieldName", "fieldRole", "mode",
-            "orgScopeType", "orgScopeId", "globalDefault", "enabled", "effectiveFrom", "effectiveTo");
 
     private final CodePreviewService previewService;
     private final CodeOpsQueryService opsQueryService;
@@ -66,16 +59,6 @@ public class CodeRuleWebController extends WebSupport<CodeRuleService> implement
         this.previewService = previewService;
         this.opsQueryService = opsQueryService;
         this.opsActionService = opsActionService;
-    }
-
-    @Override
-    public Criteria queryCriteria(WebQueryRequest request) {
-        return CodeWebQuerySupport.criteria(request, QUERY_FIELDS, webScopeName());
-    }
-
-    @Override
-    public Sort[] querySorts(WebQueryRequest request) {
-        return CodeWebQuerySupport.sorts(request, QUERY_FIELDS, Sort.asc("sortOrder"));
     }
 
     @GetMapping("/viewTree/{id}")

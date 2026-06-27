@@ -45,4 +45,58 @@ class QuerySchemaTest {
             assertThat(sort.desc()).isFalse();
         });
     }
+
+    @Test
+    void shouldBuildSimpleDescriptorFromStaticServiceFieldConventions() {
+        QueryDescriptor descriptor = QueryDescriptors.simple("platform.application",
+                java.util.List.of("id", "code", "title", "enabled", "sortOrder", "createdAt"),
+                Sort.asc("sortOrder"));
+
+        QuerySchema schema = QuerySchema.from(descriptor);
+
+        assertThat(schema.fields()).extracting(QuerySchema.Field::name)
+                .containsExactly("id", "code", "title", "enabled", "sortOrder", "createdAt");
+        assertThat(schema.quickSearch().enabled()).isTrue();
+        assertThat(schema.quickSearch().fields()).containsExactly("code", "title");
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("title"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.title()).isEqualTo("名称");
+                    assertThat(field.defaultOperator()).isEqualTo(QueryOperator.LIKE);
+                    assertThat(field.quickSearch()).isTrue();
+                    assertThat(field.sortable()).isTrue();
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("enabled"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.title()).isEqualTo("启用状态");
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.BOOLEAN);
+                    assertThat(field.operators()).containsExactly(QueryOperator.EQ);
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("sortOrder"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.INTEGER);
+                    assertThat(field.sortable()).isTrue();
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("createdAt"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.INSTANT);
+        QueryDescriptor effectiveDescriptor = QueryDescriptors.simple("platform.code_rule",
+                java.util.List.of("effectiveFrom", "effectiveTo"));
+        QuerySchema effectiveSchema = QuerySchema.from(effectiveDescriptor);
+        assertThat(effectiveSchema.fields()).allSatisfy(field -> {
+            assertThat(field.valueType()).isEqualTo(QueryValueType.DATETIME);
+            assertThat(field.operators()).contains(
+                    QueryOperator.GTE,
+                    QueryOperator.LTE,
+                    QueryOperator.BETWEEN);
+        });
+        assertThat(schema.defaultSorts()).singleElement()
+                .satisfies(sort -> {
+                    assertThat(sort.field()).isEqualTo("sortOrder");
+                    assertThat(sort.desc()).isFalse();
+                });
+    }
 }

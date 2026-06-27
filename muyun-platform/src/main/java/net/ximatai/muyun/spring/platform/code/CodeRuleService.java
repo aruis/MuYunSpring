@@ -33,12 +33,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptors;
 
 @Service
 public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
         SoftDeleteAbility<CodeRule>,
         EnableAbility<CodeRule>,
-        SortAbility<CodeRule> {
+        SortAbility<CodeRule>,
+        QueryAbility<CodeRule> {
     public static final String MODULE_ALIAS = "platform.code_rule";
     private static final PageRequest ALL = new PageRequest(0, Integer.MAX_VALUE);
 
@@ -185,6 +189,12 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
                 .filter(item -> item.rule().getFieldRole() == CodeFieldRole.PRIMARY)
                 .findFirst()
                 .orElse(resolved.isEmpty() ? null : resolved.getFirst());
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleAlias", "entityAlias", "metadataFieldId", "fieldName", "fieldRole", "mode", "orgScopeType", "orgScopeId", "globalDefault", "enabled", "effectiveFrom", "effectiveTo"),
+                net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 
     @Override

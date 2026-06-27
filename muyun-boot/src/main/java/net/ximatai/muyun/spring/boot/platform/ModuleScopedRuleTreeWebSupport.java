@@ -8,6 +8,7 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.SystemScope;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
@@ -16,6 +17,7 @@ import net.ximatai.muyun.spring.boot.web.WebPageRequest;
 import net.ximatai.muyun.spring.boot.web.WebPageResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
+import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.capability.EnabledCapable;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
@@ -30,17 +32,14 @@ import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 abstract class ModuleScopedRuleTreeWebSupport<
         T extends EntityContract & EnabledCapable & SortCapable,
         S extends CrudAbility<T> & EnableAbility<T> & SortAbility<T>>
         extends WebSupport<S> implements SystemScope<S> {
-    private final Set<String> queryFields;
     private final String scopeField;
 
-    protected ModuleScopedRuleTreeWebSupport(Set<String> queryFields, String scopeField) {
-        this.queryFields = Set.copyOf(queryFields);
+    protected ModuleScopedRuleTreeWebSupport(String scopeField) {
         this.scopeField = Objects.requireNonNull(scopeField, "scopeField must not be null");
     }
 
@@ -49,15 +48,40 @@ abstract class ModuleScopedRuleTreeWebSupport<
     public WebPageResponse<T> query(HttpServletRequest servletRequest,
                                     @RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
-            Criteria criteria = PlatformConfigWebQuerySupport.criteria(request, queryFields, webScopeName());
+            Criteria criteria = queryCriteria(request);
             criteria.eq(scopeField, moduleAlias(servletRequest));
             WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
             PageResult<T> result = service().pageQuery(
                     criteria,
                     PageRequest.of(page.pageNum(), page.pageSize()),
-                    PlatformConfigWebQuerySupport.sorts(request, queryFields, Sort.asc("sortOrder")));
+                    querySorts(request));
             return WebPageResponse.from(WebOutputSupport.page(service(), result, FieldOutputContext.LIST));
         });
+    }
+
+    protected Criteria queryCriteria(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Criteria criteria = queryAbility.queryCriteria(WebQueryRequests.from(request));
+            return criteria == null ? Criteria.of() : criteria;
+        }
+        if (request != null && !request.conditions().isEmpty()) {
+            throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
+        }
+        if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
+            throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
+        }
+        return Criteria.of();
+    }
+
+    protected Sort[] querySorts(WebQueryRequest request) {
+        if (service() instanceof QueryAbility<?> queryAbility) {
+            Sort[] sorts = queryAbility.querySorts(WebQueryRequests.from(request));
+            return sorts == null ? new Sort[]{Sort.asc("sortOrder")} : sorts;
+        }
+        if (request != null && !request.sorts().isEmpty()) {
+            throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());
+        }
+        return new Sort[]{Sort.asc("sortOrder")};
     }
 
     @PostMapping("/delete/{id}")
