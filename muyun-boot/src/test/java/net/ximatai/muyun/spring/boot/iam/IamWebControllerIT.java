@@ -7,6 +7,12 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -239,6 +245,7 @@ class IamWebControllerIT {
         employee.setTitle("Alice");
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        wireEmployeeQueryAbility();
         when(departmentService.selfAndDescendantIds("org-1", "dept-root"))
                 .thenReturn(List.of("dept-root", "dept-child"));
         when(employeeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
@@ -279,6 +286,7 @@ class IamWebControllerIT {
     void shouldRejectUndeclaredEmployeeQueryFieldsInRealMvcContext() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        wireEmployeeQueryAbility();
 
         mvc.perform(post("/iam.employee/query")
                         .contentType("application/json")
@@ -301,6 +309,7 @@ class IamWebControllerIT {
     void shouldRejectEmployeeQueryTemplateUntilStaticTemplateSourceExists() throws Exception {
         when(currentUserProvider.currentUser())
                 .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        wireEmployeeQueryAbility();
 
         mvc.perform(post("/iam.employee/query")
                         .contentType("application/json")
@@ -653,6 +662,53 @@ class IamWebControllerIT {
         delegation.setDelegateEmployeeId(delegateEmployeeId);
         delegation.setEnabled(Boolean.TRUE);
         return delegation;
+    }
+
+    private void wireEmployeeQueryAbility() {
+        when(employeeService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(invocation -> employeeQueryCompiler().criteria(invocation.getArgument(0)));
+        when(employeeService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(invocation -> employeeQueryCompiler().sorts(invocation.getArgument(0)));
+    }
+
+    private QueryCompiler employeeQueryCompiler() {
+        return new QueryCompiler(QueryDescriptor.builder(EmployeeService.MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN))
+                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN))
+                .field(QueryField.of("departmentId", QueryOperator.EQ, QueryOperator.IN))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ))
+                .field(QueryField.of("employeeNo", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch().withSortable())
+                .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch())
+                .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch())
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ).withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withSortable())
+                .externalCriteria("departmentScope", this::employeeDepartmentScopeCriteria)
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("employeeNo"))
+                .build());
+    }
+
+    private Criteria employeeDepartmentScopeCriteria(Object value) {
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> scope = (java.util.Map<String, Object>) value;
+        String organizationId = String.valueOf(scope.get("organizationId"));
+        String departmentId = String.valueOf(scope.get("departmentId"));
+        boolean includeChildren = Boolean.TRUE.equals(scope.get("includeChildren"));
+        Criteria criteria = Criteria.of().eq("organizationId", organizationId);
+        if (!includeChildren) {
+            return criteria.eq("departmentId", departmentId);
+        }
+        return criteria.in("departmentId", departmentService.selfAndDescendantIds(organizationId, departmentId));
     }
 
     private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
