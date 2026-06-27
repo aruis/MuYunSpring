@@ -110,6 +110,7 @@ export const mockMenuTree: WebTreeNode<MenuRecord>[] = [
               menuType: 'MODULE',
               openMode: 'TAB',
               moduleAlias: 'iam.employee',
+              route: '/iam/employees',
               pageMode: 'LIST',
               enabled: true,
               sortOrder: 50,

@@ -9,6 +9,7 @@ export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
+export { default as RecordQueryListPanel } from './RecordQueryListPanel.vue';
 export { default as RecordStatusSwitch } from './RecordStatusSwitch.vue';
 export { default as RecordStatusTag } from './RecordStatusTag.vue';
 export { default as StaticManagementLayout } from './StaticManagementLayout.vue';
@@ -37,6 +38,7 @@ export { resolveRecordPickerMode } from './recordPickerModel';
 export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
 export type { RecordListExplorerRecord } from './RecordListExplorer.vue';
+export type { QueryListRecord, RecordQueryListColumn } from './RecordQueryListPanel.vue';
 export type { CrudRecordListBase } from './crudRecordListModel';
 export {
   defaultCrudRecordListMatches,

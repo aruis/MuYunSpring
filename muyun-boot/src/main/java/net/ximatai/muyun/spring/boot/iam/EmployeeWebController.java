@@ -29,8 +29,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@PlatformStaticModule(application = "iam", alias = "iam.employee", title = "职员管理")
-@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, order = 50)
+@PlatformStaticModule(application = "iam", alias = "iam.employee", title = "职员管理", route = "/iam/employees")
+@PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "职员管理", order = 50)
 @RequestMapping("/iam.employee")
 public class EmployeeWebController extends WebSupport<EmployeeService> implements
         CrudWeb<Employee, EmployeeService>,

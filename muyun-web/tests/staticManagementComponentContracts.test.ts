@@ -197,6 +197,37 @@ test('department management uses organization as read-only scope and department 
   assert.doesNotMatch(departmentStateSource, /已启用|已停用/);
 });
 
+test('employee management uses organization scope and platform query list panel', () => {
+  const indexSource = readSource('src/platform-components/index.ts');
+  const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+  const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
+  const contractsSource = readSource('src/web-contracts/index.ts');
+
+  assert.match(indexSource, /RecordQueryListPanel/);
+  assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
+  assert.match(panelSource, /querySchema\(\)/);
+  assert.match(panelSource, /externalQueryValues/);
+  assert.match(panelSource, /ready\?: boolean/);
+  assert.match(panelSource, /waitingDescription\?: string/);
+  assert.match(panelSource, /recordsRequestSeq/);
+  assert.match(panelSource, /if \(!queryReady\.value\)/);
+  assert.match(panelSource, /activeConditions\.value = \[\]/);
+  assert.match(panelSource, /quickSearchFields/);
+  assert.match(panelSource, /conditions: activeConditions\.value/);
+  assert.match(panelSource, /page: \{ pageNum: pageNum\.value, pageSize: pageSize\.value \}/);
+  assert.match(employeeViewSource, /moduleAlias: 'iam\.organization'/);
+  assert.match(employeeViewSource, /moduleAlias: 'iam\.employee'/);
+  assert.match(employeeViewSource, /<TreeRecordExplorer/);
+  assert.match(employeeViewSource, /<RecordQueryListPanel/);
+  assert.match(employeeViewSource, /organizationReloadKey/);
+  assert.match(employeeViewSource, /@refresh="refreshOrganizations"/);
+  assert.match(employeeViewSource, /:reload-key="organizationReloadKey"/);
+  assert.match(employeeViewSource, /:ready="Boolean\(selectedOrganization\?\.id\)"/);
+  assert.match(employeeViewSource, /departmentScope/);
+  assert.match(contractsSource, /export interface QuerySchema/);
+  assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
+});
+
 test('static crud state supports business-owned action errors before platform fallback', () => {
   const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');
