@@ -1,5 +1,6 @@
 import type {
   TreeSortRequest,
+  QuerySchema,
   WebCountResponse,
   WebListResponse,
   WebPageResponse,
@@ -9,6 +10,7 @@ import type {
 import type { HttpClient } from '../http';
 
 export interface StaticModuleCrudClient<TRecord> {
+  querySchema(): Promise<QuerySchema>;
   query(request?: WebQueryRequest): Promise<WebPageResponse<TRecord>>;
   view(id: string): Promise<TRecord>;
   insert(record: TRecord): Promise<TRecord>;
@@ -43,6 +45,7 @@ export function createStaticResourceCrudClient<TRecord>(
 ): StaticModuleCrudClient<TRecord> {
   const modulePath = modulePathOf(resourcePath);
   return {
+    querySchema: () => http.request<QuerySchema>({ path: `${modulePath}/query/schema` }),
     query: (request) =>
       http.request<WebPageResponse<TRecord>>({
         method: 'POST',

@@ -64,6 +64,15 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     if (request.url.endsWith('/tree?flat=true')) {
       return Response.json({ records: [] });
     }
+    if (request.url.endsWith('/query/schema')) {
+      return Response.json({
+        scopeName: 'iam.organization',
+        quickSearch: { enabled: false, fields: [], fieldSchemas: [] },
+        fields: [],
+        externalCriteria: [],
+        defaultSorts: [],
+      });
+    }
     if (request.url.endsWith('/insert')) {
       return Response.json({ id: 'org-1', title: '总部' });
     }
@@ -76,16 +85,19 @@ test('static module tree client maps standard CRUD and tree endpoints by module 
     });
 
     await client.treeFlat();
+    await client.querySchema();
     await client.insert({ title: '总部' });
     await client.sort('org-1', { parentId: 'root' });
 
     assert.equal(requests[0].url, 'http://api.local/iam.organization/tree?flat=true');
     assert.equal(requests[0].method, 'GET');
-    assert.equal(requests[1].url, 'http://api.local/iam.organization/insert');
-    assert.equal(requests[1].method, 'POST');
-    assert.deepEqual(await requests[1].json(), { title: '总部' });
-    assert.equal(requests[2].url, 'http://api.local/iam.organization/sort/org-1');
-    assert.deepEqual(await requests[2].json(), { parentId: 'root' });
+    assert.equal(requests[1].url, 'http://api.local/iam.organization/query/schema');
+    assert.equal(requests[1].method, 'GET');
+    assert.equal(requests[2].url, 'http://api.local/iam.organization/insert');
+    assert.equal(requests[2].method, 'POST');
+    assert.deepEqual(await requests[2].json(), { title: '总部' });
+    assert.equal(requests[3].url, 'http://api.local/iam.organization/sort/org-1');
+    assert.deepEqual(await requests[3].json(), { parentId: 'root' });
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -3,6 +3,7 @@ import type { BusinessRoutePageDescriptor, PageDescriptor, RoutePageTarget } fro
 import ApplicationManagementView from '../views/ApplicationManagementView.vue';
 import DepartmentManagementView from '../views/DepartmentManagementView.vue';
 import DictionaryManagementView from '../views/DictionaryManagementView.vue';
+import EmployeeManagementView from '../views/EmployeeManagementView.vue';
 import OrganizationManagementView from '../views/OrganizationManagementView.vue';
 import PositionManagementView from '../views/PositionManagementView.vue';
 import TenantManagementView from '../views/TenantManagementView.vue';
@@ -38,6 +39,11 @@ export const staticBusinessRoutes: StaticBusinessRoute[] = [
     route: '/iam/departments',
     moduleAlias: 'iam.department',
     component: DepartmentManagementView,
+  },
+  {
+    route: '/iam/employees',
+    moduleAlias: 'iam.employee',
+    component: EmployeeManagementView,
   },
   {
     route: '/iam/positions',

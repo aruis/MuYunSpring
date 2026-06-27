@@ -276,6 +276,68 @@ export interface WebQueryRequest {
   sorts?: WebSort[];
   quickSearch?: string;
   quickSearchFields?: string[];
+  externalQueryValues?: Record<string, unknown>;
+}
+
+export type QueryValueType =
+  | 'STRING'
+  | 'TEXT'
+  | 'BOOLEAN'
+  | 'INTEGER'
+  | 'LONG'
+  | 'DECIMAL'
+  | 'INSTANT'
+  | 'DATE'
+  | 'JSON';
+
+export type QueryOperator =
+  | 'EQ'
+  | 'NOT_EQUAL'
+  | 'LIKE'
+  | 'IN'
+  | 'NOT_IN'
+  | 'GT'
+  | 'GTE'
+  | 'LT'
+  | 'LTE'
+  | 'BETWEEN'
+  | 'NULL'
+  | 'NOT_NULL';
+
+export interface QuerySchemaField {
+  name: string;
+  title?: string;
+  valueType: QueryValueType;
+  operators: QueryOperator[];
+  defaultOperator?: QueryOperator;
+  quickSearch?: boolean;
+  sortable?: boolean;
+}
+
+export interface QuerySchemaQuickSearch {
+  enabled: boolean;
+  fields: string[];
+  fieldSchemas: QuerySchemaField[];
+}
+
+export interface QuerySchemaExternalCriteria {
+  key: string;
+  valueType?: string;
+  providedBy?: string;
+}
+
+export interface QuerySchemaDefaultSort {
+  field: string;
+  desc?: boolean;
+}
+
+export interface QuerySchema {
+  scopeName: string;
+  entityAlias?: string;
+  quickSearch: QuerySchemaQuickSearch;
+  fields: QuerySchemaField[];
+  externalCriteria: QuerySchemaExternalCriteria[];
+  defaultSorts: QuerySchemaDefaultSort[];
 }
 
 export interface StandardEntity {
@@ -317,6 +379,14 @@ export interface Organization extends StandardEnabledTreeEntity {
 export interface Department extends StandardEnabledTreeEntity {
   organizationId?: string;
   code?: string;
+}
+
+export interface Employee extends StandardEnabledSortableEntity {
+  organizationId?: string;
+  departmentId?: string;
+  employeeNo?: string;
+  mobile?: string;
+  email?: string;
 }
 
 export interface Application extends StandardEnabledSortableEntity {
