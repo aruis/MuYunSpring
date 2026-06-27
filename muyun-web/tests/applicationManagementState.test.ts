@@ -14,7 +14,7 @@ test('application management state selects first loaded application and creates 
   const context = createContext({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, sortOrder: 10 };
+      return { record: { ...record, sortOrder: 10 } };
     },
   });
   const state = createApplicationManagementState(context, async () => true);
@@ -43,7 +43,7 @@ test('application management state keeps existing alias stable while editing tit
   const context = createContext({
     update: async (id, record) => {
       calls.push({ id, record });
-      return { ...record, title: '平台配置' };
+      return { record: { ...record, title: '平台配置' } };
     },
   });
   const state = createApplicationManagementState(context, async () => true);
@@ -123,8 +123,8 @@ test('application management state ignores duplicate save while saving', async (
   const context = createContext({
     insert: async (record) => {
       calls.push(record);
-      return new Promise<Application>((resolve) => {
-        releaseInsert = () => resolve({ ...record, sortOrder: 10 });
+      return new Promise((resolve) => {
+        releaseInsert = () => resolve({ record: { ...record, sortOrder: 10 } });
       });
     },
   });
@@ -294,8 +294,8 @@ function createContext(
       totalKnown: true,
     }),
     view: async (id) => ({ id, alias: id, title: '平台', enabled: true }),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

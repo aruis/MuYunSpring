@@ -199,14 +199,38 @@ test('department management uses organization as read-only scope and department 
 
 test('employee management uses organization scope and platform query list panel', () => {
   const indexSource = readSource('src/platform-components/index.ts');
+  const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+  const dropdownSource = readSource('src/vue-ui-antdv/components/UiDropdown.vue');
   const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
   const contractsSource = readSource('src/web-contracts/index.ts');
 
   assert.match(indexSource, /RecordQueryListPanel/);
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
   assert.match(panelSource, /querySchema\(\)/);
+  assert.match(panelSource, /emptyQuerySchema/);
+  assert.match(panelSource, /isUnsupportedQuerySchemaError/);
+  assert.match(panelSource, /query schema is not supported by/);
   assert.match(panelSource, /externalQueryValues/);
+  assert.match(panelSource, /actions\?: RecordActionItem\[\]/);
+  assert.match(panelSource, /rowActionsOf\?: \(record: QueryListRecord\) => RecordActionItem\[\]/);
+  assert.match(panelSource, /type\?: 'text' \| 'enabledStatus'/);
+  assert.match(panelSource, /interface QueryListRow/);
+  assert.match(panelSource, /const rows = computed<QueryListRow/);
+  assert.match(panelSource, /function resolveRow/);
+  assert.match(panelSource, /<RecordActionBar/);
+  assert.match(panelSource, /<RecordStatusTag/);
+  assert.match(panelSource, /<UiDropdown/);
+  assert.match(panelSource, /emit\('action', action, event\)/);
+  assert.match(panelSource, /emit\('rowDblclick', row\.record, \$event\)/);
+  assert.match(panelSource, /emit\('rowAction', action, row\.record/);
+  assert.doesNotMatch(panelSource, /primaryRowAction\(record\)/);
+  assert.match(panelSource, /allow-clear/);
+  assert.match(panelSource, /conditionsDisabled/);
+  assert.doesNotMatch(panelSource, />清除</);
+  assert.match(dropdownSource, /scheduleCloseDropdown/);
+  assert.match(dropdownSource, /clearCloseTimer/);
+  assert.match(dropdownSource, /setTimeout/);
   assert.match(panelSource, /ready\?: boolean/);
   assert.match(panelSource, /waitingDescription\?: string/);
   assert.match(panelSource, /recordsRequestSeq/);
@@ -219,6 +243,27 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /moduleAlias: 'iam\.employee'/);
   assert.match(employeeViewSource, /<TreeRecordExplorer/);
   assert.match(employeeViewSource, /<RecordQueryListPanel/);
+  assert.match(employeeViewSource, /employeeListActions/);
+  assert.match(employeeViewSource, /title: '新建职员'/);
+  assert.match(employeeViewSource, /@action="handleEmployeeListAction"/);
+  assert.match(indexSource, /RecordDetailDrawer/);
+  assert.match(drawerSource, /closeOnOutside\?: boolean/);
+  assert.match(drawerSource, /handleDocumentPointerDown/);
+  assert.match(employeeViewSource, /<RecordDetailDrawer/);
+  assert.match(employeeViewSource, /:close-on-outside="employeeDetailMode === 'view'"/);
+  assert.match(employeeViewSource, /:row-actions-of="employeeRowActionsOf"/);
+  assert.match(employeeViewSource, /@row-action="handleEmployeeRowAction"/);
+  assert.match(employeeViewSource, /@row-dblclick="handleEmployeeRowDblclick"/);
+  assert.match(employeeViewSource, /type: 'enabledStatus'/);
+  assert.doesNotMatch(
+    employeeViewSource,
+    /render: \(record\) => \(record\.enabled === false \? '停用' : '启用'\)/,
+  );
+  assert.match(employeeViewSource, /employeeContext\.crud\.insert/);
+  assert.match(employeeViewSource, /employeeContext\.crud\.update/);
+  assert.match(employeeViewSource, /employeeContext\.crud\.delete/);
+  assert.match(employeeViewSource, /employeeReloadKey\.value \+= 1/);
+  assert.match(employeeViewSource, /createOrganizationScopedDepartmentContext/);
   assert.match(employeeViewSource, /organizationReloadKey/);
   assert.match(employeeViewSource, /@refresh="refreshOrganizations"/);
   assert.match(employeeViewSource, /:reload-key="organizationReloadKey"/);

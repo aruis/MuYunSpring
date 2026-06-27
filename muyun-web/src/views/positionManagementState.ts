@@ -160,14 +160,15 @@ export function createPositionManagementState(
     try {
       await categoryContext.runtime.ready;
       const crud = categoryContext.abilities.crud();
-      const saved =
+      const result =
         categoryMode.value === 'edit' && validDraft.id
           ? await crud.update(validDraft.id, validDraft)
           : await crud.insert(validDraft);
+      const saved = result.record;
       selectedCategory.value = saved;
       categoryDraft.value = copyCategory(saved);
       categoryMode.value = 'view';
-      presentCategorySuccess('已保存');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -189,14 +190,13 @@ export function createPositionManagementState(
     try {
       await categoryContext.runtime.ready;
       const enable = categoryContext.abilities.enable();
-      if (selectedCategory.value.enabled === false) {
-        await enable.enable(selectedCategory.value.id);
-      } else {
-        await enable.disable(selectedCategory.value.id);
-      }
+      const result =
+        selectedCategory.value.enabled === false
+          ? await enable.enable(selectedCategory.value.id)
+          : await enable.disable(selectedCategory.value.id);
       selectedCategory.value = await categoryContext.abilities.crud().view(selectedCategory.value.id);
       categoryDraft.value = copyCategory(selectedCategory.value);
-      presentCategorySuccess(selectedCategory.value.enabled === false ? '已停用' : '已启用');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -226,11 +226,11 @@ export function createPositionManagementState(
     categorySaving.value = true;
     try {
       await categoryContext.runtime.ready;
-      await categoryContext.abilities.crud().delete(selectedCategory.value.id);
+      const result = await categoryContext.abilities.crud().delete(selectedCategory.value.id);
       selectedCategory.value = undefined;
       categoryDraft.value = emptyCategoryDraft();
       categoryMode.value = 'view';
-      presentCategorySuccess('已删除');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
       presentCategoryCause(cause);
@@ -339,14 +339,15 @@ export function createPositionManagementState(
     clearPositionFeedback();
     positionSaving.value = true;
     try {
-      const saved =
+      const result =
         positionMode.value === 'edit' && validDraft.id
           ? await positionClient.update(validDraft.id, validDraft)
           : await positionClient.insert(validDraft);
+      const saved = result.record;
       selectedPosition.value = saved;
       positionDraft.value = copyPosition(saved);
       positionMode.value = 'view';
-      presentPositionSuccess('已保存');
+      presentPositionSuccess(result.message ?? '操作成功');
       if (saved.categoryId && saved.categoryId !== selectedCategoryId.value) {
         selectedCategory.value = categories.value.find((category) => category.id === saved.categoryId);
         positions.value = [saved];
@@ -370,13 +371,13 @@ export function createPositionManagementState(
     clearPositionFeedback();
     positionSaving.value = true;
     try {
-      if (selectedPosition.value.enabled === false) {
-        await positionClient.enable(selectedPosition.value.id);
-      } else {
-        await positionClient.disable(selectedPosition.value.id);
-      }
+      const result =
+        selectedPosition.value.enabled === false
+          ? await positionClient.enable(selectedPosition.value.id)
+          : await positionClient.disable(selectedPosition.value.id);
       selectedPosition.value = await positionClient.view(selectedPosition.value.id);
       positionDraft.value = copyPosition(selectedPosition.value);
+      presentPositionSuccess(result.message ?? '操作成功');
       positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);
@@ -405,11 +406,11 @@ export function createPositionManagementState(
     clearPositionFeedback();
     positionSaving.value = true;
     try {
-      await positionClient.delete(selectedPosition.value.id);
+      const result = await positionClient.delete(selectedPosition.value.id);
       selectedPosition.value = undefined;
       positionDraft.value = emptyPositionDraft(selectedCategoryId.value ?? '');
       positionMode.value = selectedCategoryId.value && canCreatePosition.value ? 'create' : 'view';
-      presentPositionSuccess('已删除');
+      presentPositionSuccess(result.message ?? '操作成功');
       positionReloadKey.value += 1;
     } catch (cause) {
       presentPositionCause(cause);

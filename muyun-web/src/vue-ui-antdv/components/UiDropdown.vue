@@ -5,15 +5,17 @@ import type { UiDropdownItem } from '../types';
 
 defineOptions({ name: 'UiDropdown' });
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: UiDropdownItem[];
     selectedKey?: string;
     align?: 'start' | 'end';
+    trigger?: 'click' | 'hover';
   }>(),
   {
     selectedKey: undefined,
     align: 'end',
+    trigger: 'click',
   },
 );
 
@@ -27,28 +29,76 @@ const emit = defineEmits<{
 
 const open = ref(false);
 const root = ref<HTMLElement>();
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
 function toggle() {
+  clearCloseTimer();
   open.value = !open.value;
+}
+
+function openDropdown() {
+  clearCloseTimer();
+  open.value = true;
+}
+
+function closeDropdown() {
+  clearCloseTimer();
+  open.value = false;
+}
+
+function scheduleCloseDropdown() {
+  clearCloseTimer();
+  closeTimer = setTimeout(() => {
+    closeTimer = undefined;
+    open.value = false;
+  }, 120);
+}
+
+function clearCloseTimer() {
+  if (!closeTimer) {
+    return;
+  }
+  clearTimeout(closeTimer);
+  closeTimer = undefined;
+}
+
+function handleTriggerClick() {
+  if (props.trigger === 'click') {
+    toggle();
+    return;
+  }
+  openDropdown();
+}
+
+function handleMouseEnter() {
+  if (props.trigger === 'hover') {
+    openDropdown();
+  }
+}
+
+function handleMouseLeave() {
+  if (props.trigger === 'hover') {
+    scheduleCloseDropdown();
+  }
 }
 
 function select(item: UiDropdownItem) {
   if (item.disabled) {
     return;
   }
-  open.value = false;
   emit('select', item.key);
+  closeDropdown();
 }
 
 function handleDocumentClick(event: MouseEvent) {
   if (!root.value?.contains(event.target as Node)) {
-    open.value = false;
+    closeDropdown();
   }
 }
 
 function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
-    open.value = false;
+    closeDropdown();
   }
 }
 
@@ -58,14 +108,15 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  clearCloseTimer();
   document.removeEventListener('click', handleDocumentClick);
   document.removeEventListener('keydown', handleDocumentKeydown);
 });
 </script>
 
 <template>
-  <div ref="root" class="ui-dropdown">
-    <span class="ui-dropdown-trigger" @click.stop="toggle">
+  <div ref="root" class="ui-dropdown" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
+    <span class="ui-dropdown-trigger" @click.stop="handleTriggerClick">
       <slot :toggle="toggle" />
     </span>
     <div v-if="open" class="ui-dropdown-popup" :class="`align-${align}`" role="menu">

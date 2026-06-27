@@ -28,6 +28,12 @@ export interface WebPageResponse<T> {
 
 export interface WebCountResponse {
   count: number;
+  message?: string;
+}
+
+export interface WebRecordResponse<T> {
+  record: T;
+  message?: string;
 }
 
 export interface WebTreeNode<T> {

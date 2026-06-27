@@ -72,7 +72,7 @@ test('department management state saves root and child departments inside select
   const context = createContext({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, id: `dept-${calls.length}` };
+      return { record: { ...record, id: `dept-${calls.length}` } };
     },
   });
   const state = createDepartmentManagementState(context, async () => true);
@@ -128,8 +128,8 @@ function createContext(
       totalKnown: true,
     }),
     view: async (id) => ({ id, organizationId: 'org-root', code: 'FIN', title: '财务部', enabled: true }),
-    insert: async (record) => ({ ...record, id: 'dept-new' }),
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record: { ...record, id: 'dept-new' } }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

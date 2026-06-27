@@ -108,7 +108,7 @@ test('dictionary management state saves category-bound dictionary items', async 
   const itemClient = createItemClient({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, id: 'item-enabled' };
+      return { record: { ...record, id: 'item-enabled' } };
     },
   });
   const state = createDictionaryManagementState(
@@ -289,7 +289,7 @@ test('dictionary management state rejects item actions without contributed permi
   const itemClient = createItemClient({
     insert: async (record) => {
       calls.push(`insert:${record.code}`);
-      return record;
+      return { record };
     },
     delete: async (id) => {
       calls.push(`delete:${id}`);
@@ -360,7 +360,7 @@ test('dictionary management state creates categories inside current application 
   const categoryClient = createCategoryClient({
     insert: async (record) => {
       calls.push(record);
-      return { ...record, id: 'category-status' };
+      return { record: { ...record, id: 'category-status' } };
     },
   });
   const state = createDictionaryManagementState(
@@ -423,8 +423,8 @@ function createContext(can: (actionCode: string) => boolean = () => true): Modul
       totalKnown: true,
     }),
     view: async (id) => ({ id }),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),
@@ -470,8 +470,8 @@ function createItemClient(
       totalKnown: true,
     }),
     view: async (id) => ({ id }),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),
@@ -496,8 +496,8 @@ function createCategoryClient(
       totalKnown: true,
     }),
     view: async (id) => ({ id }),
-    insert: async (record) => record,
-    update: async (_id, record) => record,
+    insert: async (record) => ({ record }),
+    update: async (_id, record) => ({ record }),
     delete: async () => ({ count: 1 }),
     enable: async () => ({ count: 1 }),
     disable: async () => ({ count: 1 }),

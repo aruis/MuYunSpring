@@ -97,14 +97,15 @@ export function createOrganizationManagementState(
     try {
       await organizationContext.runtime.ready;
       const crud = organizationContext.abilities.crud();
-      const saved =
+      const result =
         mode.value === 'create'
           ? await crud.insert(validDraft)
           : await crud.update(requiredId(validDraft), validDraft);
+      const saved = result.record;
       selected.value = saved;
       draft.value = copyRecord(saved);
       mode.value = 'view';
-      presentActionSuccess('已保存');
+      presentActionSuccess(result.message ?? '操作成功');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -127,15 +128,14 @@ export function createOrganizationManagementState(
       await organizationContext.runtime.ready;
       const crud = organizationContext.abilities.crud();
       const enable = organizationContext.abilities.enable();
-      if (selected.value.enabled === false) {
-        await enable.enable(selected.value.id);
-      } else {
-        await enable.disable(selected.value.id);
-      }
+      const result =
+        selected.value.enabled === false
+          ? await enable.enable(selected.value.id)
+          : await enable.disable(selected.value.id);
       const refreshed = await crud.view(selected.value.id);
       selected.value = refreshed;
       draft.value = copyRecord(refreshed);
-      presentActionSuccess(refreshed.enabled === false ? '已停用' : '已启用');
+      presentActionSuccess(result.message ?? '操作成功');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);
@@ -166,11 +166,11 @@ export function createOrganizationManagementState(
     try {
       await organizationContext.runtime.ready;
       const crud = organizationContext.abilities.crud();
-      await crud.delete(selected.value.id);
+      const result = await crud.delete(selected.value.id);
       selected.value = undefined;
       draft.value = emptyDraft();
       mode.value = 'create';
-      presentActionSuccess('已删除');
+      presentActionSuccess(result.message ?? '操作成功');
       reloadKey.value += 1;
     } catch (cause) {
       presentActionCause(cause);

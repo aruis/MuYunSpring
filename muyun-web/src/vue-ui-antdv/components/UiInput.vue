@@ -9,6 +9,7 @@ defineProps<{
   placeholder?: string;
   disabled?: boolean;
   autofocus?: boolean;
+  allowClear?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +26,7 @@ const emit = defineEmits<{
     :placeholder="placeholder"
     :disabled="disabled"
     :autofocus="autofocus"
+    :allow-clear="allowClear"
     @blur="emit('blur', $event)"
     @focus="emit('focus', $event)"
     @keydown="emit('keydown', $event)"

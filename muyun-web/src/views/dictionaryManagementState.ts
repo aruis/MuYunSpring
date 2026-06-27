@@ -164,14 +164,15 @@ export function createDictionaryManagementState(
     try {
       await categoryContext.runtime.ready;
       const crud = categoryClientOf();
-      const saved =
+      const result =
         categoryMode.value === 'edit' && validDraft.id
           ? await crud.update(validDraft.id, validDraft)
           : await crud.insert(validDraft);
+      const saved = result.record;
       selectedCategory.value = saved;
       categoryDraft.value = copyDictionaryCategory(saved);
       categoryMode.value = 'view';
-      presentCategorySuccess('已保存');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
       resetItemsForCategory();
     } catch (cause) {
@@ -194,14 +195,13 @@ export function createDictionaryManagementState(
     try {
       await categoryContext.runtime.ready;
       const enable = categoryClientOf();
-      if (selectedCategory.value.enabled === false) {
-        await enable.enable(selectedCategory.value.id);
-      } else {
-        await enable.disable(selectedCategory.value.id);
-      }
+      const result =
+        selectedCategory.value.enabled === false
+          ? await enable.enable(selectedCategory.value.id)
+          : await enable.disable(selectedCategory.value.id);
       selectedCategory.value = await categoryClientOf().view(selectedCategory.value.id);
       categoryDraft.value = copyDictionaryCategory(selectedCategory.value);
-      presentCategorySuccess(selectedCategory.value.enabled === false ? '已停用' : '已启用');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
     } catch (cause) {
       handleCategoryError(cause);
@@ -231,11 +231,11 @@ export function createDictionaryManagementState(
     categorySaving.value = true;
     try {
       await categoryContext.runtime.ready;
-      await categoryClientOf().delete(selectedCategory.value.id);
+      const result = await categoryClientOf().delete(selectedCategory.value.id);
       selectedCategory.value = undefined;
       categoryDraft.value = emptyDictionaryCategoryDraft(undefined, currentApplicationAlias());
       categoryMode.value = 'view';
-      presentCategorySuccess('已删除');
+      presentCategorySuccess(result.message ?? '操作成功');
       categoryReloadKey.value += 1;
       resetItemsForCategory();
     } catch (cause) {
@@ -355,14 +355,15 @@ export function createDictionaryManagementState(
     clearItemFeedback();
     itemSaving.value = true;
     try {
-      const saved =
+      const result =
         itemMode.value === 'edit' && validDraft.id
           ? await itemClient().update(validDraft.id, validDraft)
           : await itemClient().insert(validDraft);
+      const saved = result.record;
       selectedItem.value = saved;
       itemDraft.value = copyDictionaryItem(saved);
       itemMode.value = 'view';
-      presentItemSuccess('已保存');
+      presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
     } catch (cause) {
       handleItemError(cause);
@@ -382,13 +383,13 @@ export function createDictionaryManagementState(
     clearItemFeedback();
     itemSaving.value = true;
     try {
-      if (selectedItem.value.enabled === false) {
-        await itemClient().enable(selectedItem.value.id);
-      } else {
-        await itemClient().disable(selectedItem.value.id);
-      }
+      const result =
+        selectedItem.value.enabled === false
+          ? await itemClient().enable(selectedItem.value.id)
+          : await itemClient().disable(selectedItem.value.id);
       selectedItem.value = await itemClient().view(selectedItem.value.id);
       itemDraft.value = copyDictionaryItem(selectedItem.value);
+      presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
     } catch (cause) {
       handleItemError(cause);
@@ -417,11 +418,11 @@ export function createDictionaryManagementState(
     clearItemFeedback();
     itemSaving.value = true;
     try {
-      await itemClient().delete(selectedItem.value.id);
+      const result = await itemClient().delete(selectedItem.value.id);
       selectedItem.value = undefined;
       itemDraft.value = emptyDictionaryItemDraft(selectedCategory.value);
       itemMode.value = selectedCategoryIsDictionary.value && canCreateItem.value ? 'create' : 'view';
-      presentItemSuccess('已删除');
+      presentItemSuccess(result.message ?? '操作成功');
       itemReloadKey.value += 1;
     } catch (cause) {
       handleItemError(cause);

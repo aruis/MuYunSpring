@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { UiButton, UiEmpty, UiInput, UiSelect, UiSpin } from '@muyun/vue-ui-antdv';
+import { UiButton, UiDropdown, UiEmpty, UiInput, UiSelect, UiSpin } from '@muyun/vue-ui-antdv';
+import type { UiDropdownItem } from '@muyun/vue-ui-antdv';
 import type {
   Option,
   OptionValue,
@@ -11,8 +12,15 @@ import type {
   WebQueryRequest,
   WebSort,
 } from '@muyun/web-contracts';
-import type { ModuleContext } from '@muyun/web-core';
+import { normalizeError, type ModuleContext } from '@muyun/web-core';
 import { presentPlatformError } from './platformErrorFeedback';
+import RecordActionBar from './RecordActionBar.vue';
+import RecordStatusTag from './RecordStatusTag.vue';
+import {
+  resolveRecordActions,
+  type RecordActionItem,
+  type ResolvedRecordActionItem,
+} from './recordActionBarModel';
 
 defineOptions({ name: 'RecordQueryListPanel' });
 
@@ -21,6 +29,7 @@ export type QueryListRecord = Record<string, unknown> & { id?: string; enabled?:
 export interface RecordQueryListColumn {
   key: string;
   title: string;
+  type?: 'text' | 'enabledStatus';
   width?: string;
   align?: 'left' | 'center' | 'right';
   render?: (record: QueryListRecord) => string;
@@ -34,14 +43,26 @@ interface ConditionDraft {
   booleanValue?: OptionValue | null;
 }
 
+interface QueryListRow {
+  key: string;
+  record: QueryListRecord;
+  primaryAction?: ResolvedRecordActionItem;
+  secondaryActions: ResolvedRecordActionItem[];
+  dropdownItems: UiDropdownItem[];
+}
+
 const props = withDefaults(
   defineProps<{
     context: ModuleContext<QueryListRecord>;
     title: string;
     columns: RecordQueryListColumn[];
+    actions?: RecordActionItem[];
+    rowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
+    rowActionsTitle?: string;
     rowKey?: string;
     selectedKey?: string;
     reloadKey?: number;
+    refreshTitle?: string;
     pageSize?: number;
     ready?: boolean;
     externalQueryValues?: Record<string, unknown>;
@@ -51,8 +72,12 @@ const props = withDefaults(
   }>(),
   {
     rowKey: 'id',
+    actions: () => [],
+    rowActionsOf: undefined,
+    rowActionsTitle: '操作',
     selectedKey: undefined,
     reloadKey: undefined,
+    refreshTitle: undefined,
     pageSize: 20,
     ready: true,
     externalQueryValues: undefined,
@@ -64,7 +89,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [record: QueryListRecord];
+  rowDblclick: [record: QueryListRecord, event: MouseEvent];
   loaded: [records: QueryListRecord[]];
+  action: [action: RecordActionItem, event: MouseEvent];
+  rowAction: [action: ResolvedRecordActionItem, record: QueryListRecord, event?: MouseEvent];
 }>();
 
 const loading = ref(false);
@@ -95,6 +123,9 @@ const conditionCount = computed(() => activeConditions.value.length);
 const quickSearchEnabled = computed(() => schema.value?.quickSearch.enabled === true);
 const quickSearchDisabled = computed(() => !queryReady.value || !quickSearchEnabled.value);
 const queryActionsDisabled = computed(() => !queryReady.value);
+const conditionsDisabled = computed(() => !queryReady.value || queryFields.value.length === 0);
+const hasRowActions = computed(() => props.rowActionsOf !== undefined);
+const rows = computed<QueryListRow[]>(() => records.value.map(resolveRow));
 const pageSizeOptions: Option[] = [
   { label: '10 条/页', value: 10 },
   { label: '20 条/页', value: 20 },
@@ -144,10 +175,19 @@ async function loadSchemaAndRecords() {
     }
     schema.value = nextSchema;
     activeConditions.value = [];
+    conditionsExpanded.value = false;
     resetConditionDrafts();
     await loadRecords(false);
   } catch (cause) {
     if (requestSeq !== schemaRequestSeq) {
+      return;
+    }
+    if (isUnsupportedQuerySchemaError(cause)) {
+      schema.value = emptyQuerySchema(props.context.moduleAlias);
+      activeConditions.value = [];
+      conditionsExpanded.value = false;
+      resetConditionDrafts();
+      await loadRecords(false);
       return;
     }
     schema.value = undefined;
@@ -225,8 +265,63 @@ function defaultSorts(): WebSort[] {
   }));
 }
 
+function emptyQuerySchema(scopeName: string): QuerySchema {
+  return {
+    scopeName,
+    quickSearch: { enabled: false, fields: [], fieldSchemas: [] },
+    fields: [],
+    externalCriteria: [],
+    defaultSorts: [],
+  };
+}
+
+function isUnsupportedQuerySchemaError(cause: unknown) {
+  const error = normalizeError(cause);
+  return error.message.includes('query schema is not supported by');
+}
+
 function refresh() {
   void loadRecords();
+}
+
+function handleAction(action: RecordActionItem, event: MouseEvent) {
+  emit('action', action, event);
+}
+
+function resolveRow(record: QueryListRecord): QueryListRow {
+  const actions = resolveRecordActions(props.context, props.rowActionsOf?.(record) ?? []);
+  const secondaryActions = actions.slice(1);
+  return {
+    key: recordKey(record),
+    record,
+    primaryAction: actions[0],
+    secondaryActions,
+    dropdownItems: secondaryActions.map(rowActionDropdownItem),
+  };
+}
+
+function rowActionDropdownItem(action: ResolvedRecordActionItem): UiDropdownItem {
+  return {
+    key: action.key,
+    title: action.title,
+    disabled: action.disabled,
+    danger: action.danger,
+  };
+}
+
+function handlePrimaryRowAction(row: QueryListRow, event: MouseEvent) {
+  if (!row.primaryAction || row.primaryAction.disabled) {
+    return;
+  }
+  emit('rowAction', row.primaryAction, row.record, event);
+}
+
+function handleSecondaryRowAction(row: QueryListRow, key: string) {
+  const action = row.secondaryActions.find((item) => item.key === key);
+  if (!action || action.disabled) {
+    return;
+  }
+  emit('rowAction', action, row.record);
 }
 
 function submitQuickSearch() {
@@ -235,18 +330,27 @@ function submitQuickSearch() {
   void loadRecords();
 }
 
-function clearQuickSearch() {
-  quickSearchKeyword.value = '';
+function handleQuickSearchInput(value: string) {
+  quickSearchKeyword.value = value;
+  if (value || !appliedQuickSearch.value) {
+    return;
+  }
   appliedQuickSearch.value = '';
   pageNum.value = 1;
   void loadRecords();
 }
 
 function toggleConditions() {
+  if (conditionsDisabled.value) {
+    return;
+  }
   conditionsExpanded.value = !conditionsExpanded.value;
 }
 
 function addCondition() {
+  if (conditionsDisabled.value) {
+    return;
+  }
   conditionDrafts.value.push(createConditionDraft());
 }
 
@@ -258,6 +362,9 @@ function removeCondition(key: number) {
 }
 
 function applyConditions() {
+  if (conditionsDisabled.value) {
+    return;
+  }
   activeConditions.value = conditionDrafts.value.flatMap(conditionOfDraft);
   pageNum.value = 1;
   void loadRecords();
@@ -402,24 +509,38 @@ defineExpose({ refresh });
 <template>
   <main class="record-query-list-panel">
     <header class="record-query-list-header">
-      <h2>{{ title }}</h2>
+      <UiButton
+        class="record-query-list-title"
+        icon-name="reload"
+        icon-position="end"
+        type="text"
+        :disabled="queryActionsDisabled"
+        :title="refreshTitle ?? `刷新${title}`"
+        @click="refresh"
+      >
+        <span>{{ title }}</span>
+      </UiButton>
       <div class="record-query-list-actions">
+        <RecordActionBar
+          v-if="actions.length > 0"
+          :context="context"
+          :actions="actions"
+          @action="handleAction"
+        />
         <UiInput
-          v-model:value="quickSearchKeyword"
+          :value="quickSearchKeyword"
           class="record-query-list-search"
+          allow-clear
           :disabled="quickSearchDisabled"
           :placeholder="quickSearchPlaceholder"
+          @update:value="handleQuickSearchInput"
           @keydown.enter="submitQuickSearch"
         />
         <UiButton icon-name="search" :disabled="quickSearchDisabled" @click="submitQuickSearch">
           查询
         </UiButton>
-        <UiButton v-if="appliedQuickSearch" type="text" @click="clearQuickSearch">清除</UiButton>
-        <UiButton type="text" icon-name="settings" @click="toggleConditions">
+        <UiButton type="text" icon-name="settings" :disabled="conditionsDisabled" @click="toggleConditions">
           条件<span v-if="conditionCount"> {{ conditionCount }}</span>
-        </UiButton>
-        <UiButton type="text" icon-name="reload" :disabled="queryActionsDisabled" @click="refresh">
-          刷新
         </UiButton>
       </div>
     </header>
@@ -458,42 +579,82 @@ defineExpose({ refresh });
         <UiButton type="text" icon-name="delete" danger @click="removeCondition(draft.key)" />
       </div>
       <div class="record-query-condition-actions">
-        <UiButton type="dashed" icon-name="plus" @click="addCondition">添加条件</UiButton>
-        <UiButton type="primary" :disabled="queryActionsDisabled" @click="applyConditions">应用条件</UiButton>
-        <UiButton type="text" :disabled="queryActionsDisabled" @click="clearConditions">重置</UiButton>
+        <UiButton type="dashed" icon-name="plus" :disabled="conditionsDisabled" @click="addCondition">
+          添加条件
+        </UiButton>
+        <UiButton type="primary" :disabled="conditionsDisabled" @click="applyConditions">应用条件</UiButton>
+        <UiButton type="text" :disabled="conditionsDisabled" @click="clearConditions">重置</UiButton>
       </div>
     </section>
 
-    <UiSpin v-if="loading" tip="加载列表" />
-    <UiEmpty v-else-if="!queryReady" :description="waitingDescription" />
-    <UiEmpty v-else-if="records.length === 0" :description="emptyDescription" />
-    <div v-else class="record-query-list-table-wrap">
-      <table class="record-query-list-table">
-        <thead>
-          <tr>
-            <th
-              v-for="column in columns"
-              :key="column.key"
-              :style="{ width: column.width, textAlign: column.align ?? 'left' }"
+    <section class="record-query-list-body">
+      <UiSpin v-if="loading" tip="加载列表" />
+      <UiEmpty v-else-if="!queryReady" :description="waitingDescription" />
+      <UiEmpty v-else-if="records.length === 0" :description="emptyDescription" />
+      <div v-else class="record-query-list-table-wrap">
+        <table class="record-query-list-table">
+          <thead>
+            <tr>
+              <th
+                v-for="column in columns"
+                :key="column.key"
+                :style="{ width: column.width, textAlign: column.align ?? 'left' }"
+              >
+                {{ column.title }}
+              </th>
+              <th v-if="hasRowActions" class="record-query-list-action-head">
+                {{ rowActionsTitle }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in rows"
+              :key="row.key"
+              :class="{ selected: selectedKey === row.key, muted: row.record.enabled === false }"
+              @click="emit('select', row.record)"
+              @dblclick="emit('rowDblclick', row.record, $event)"
             >
-              {{ column.title }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="record in records"
-            :key="recordKey(record)"
-            :class="{ selected: selectedKey === recordKey(record), muted: record.enabled === false }"
-            @click="emit('select', record)"
-          >
-            <td v-for="column in columns" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
-              {{ cellValue(record, column) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <td v-for="column in columns" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
+                <RecordStatusTag
+                  v-if="column.type === 'enabledStatus'"
+                  :enabled="row.record[column.key] !== false"
+                />
+                <template v-else>
+                  {{ cellValue(row.record, column) }}
+                </template>
+              </td>
+              <td v-if="hasRowActions" class="record-query-list-row-actions" @click.stop>
+                <UiButton
+                  v-if="row.primaryAction"
+                  class="record-query-list-primary-action"
+                  type="text"
+                  :disabled="row.primaryAction.disabled"
+                  :icon-name="row.primaryAction.iconName"
+                  @click="handlePrimaryRowAction(row, $event)"
+                >
+                  {{ row.primaryAction.title }}
+                </UiButton>
+                <UiDropdown
+                  v-if="row.secondaryActions.length > 0"
+                  :items="row.dropdownItems"
+                  trigger="hover"
+                  @select="handleSecondaryRowAction(row, $event)"
+                >
+                  <UiButton
+                    class="record-query-list-more-action"
+                    type="text"
+                    icon-name="down"
+                    title="更多"
+                    aria-label="更多"
+                  />
+                </UiDropdown>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <footer class="record-query-list-pagination">
       <span>共 {{ total }} 条</span>
@@ -520,10 +681,16 @@ defineExpose({ refresh });
 .record-query-list-panel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  align-content: start;
+  grid-template-areas:
+    'header'
+    'conditions'
+    'body'
+    'pagination';
+  align-content: stretch;
   gap: 12px;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   padding: 14px;
   border: 1px solid var(--muyun-border);
   border-radius: 8px;
@@ -531,6 +698,7 @@ defineExpose({ refresh });
 }
 
 .record-query-list-header {
+  grid-area: header;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -538,13 +706,32 @@ defineExpose({ refresh });
   min-width: 0;
 }
 
-.record-query-list-header h2 {
-  margin: 0;
-  overflow: hidden;
+.record-query-list-title {
+  flex: 0 0 auto;
+  margin: -4px 0 -4px -6px;
+  padding: 4px 6px;
   color: var(--muyun-text);
   font-size: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 700;
+}
+
+.record-query-list-title :deep(.ui-button-trailing-icon) {
+  width: 0;
+  margin-inline-start: 0;
+  margin-inline-end: 0;
+  color: var(--muyun-text-muted);
+  opacity: 0;
+  transition:
+    width 0.16s ease,
+    margin 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.record-query-list-title:hover :deep(.ui-button-trailing-icon),
+.record-query-list-title:focus-visible :deep(.ui-button-trailing-icon) {
+  width: 14px;
+  margin-inline-start: 6px;
+  opacity: 1;
 }
 
 .record-query-list-actions,
@@ -556,11 +743,18 @@ defineExpose({ refresh });
   min-width: 0;
 }
 
+.record-query-list-actions {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .record-query-list-search {
-  width: 220px;
+  width: clamp(150px, 20vw, 220px);
 }
 
 .record-query-conditions {
+  grid-area: conditions;
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -594,7 +788,14 @@ defineExpose({ refresh });
   font-size: 14px;
 }
 
+.record-query-list-body {
+  grid-area: body;
+  display: grid;
+  min-height: 0;
+}
+
 .record-query-list-table-wrap {
+  align-self: stretch;
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--muyun-border-subtle);
@@ -625,6 +826,13 @@ defineExpose({ refresh });
   font-weight: 700;
 }
 
+.record-query-list-action-head {
+  width: 92px;
+  color: var(--muyun-text-muted);
+  font-weight: 500;
+  text-align: center;
+}
+
 .record-query-list-table tbody tr {
   cursor: pointer;
 }
@@ -641,7 +849,46 @@ defineExpose({ refresh });
   color: var(--muyun-text-muted);
 }
 
+.record-query-list-row-actions {
+  width: 92px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.record-query-list-row-actions :deep(.ui-dropdown) {
+  margin-left: 2px;
+}
+
+.record-query-list-row-actions :deep(.ant-btn) {
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px;
+  color: var(--muyun-text-muted);
+  font-size: 12px;
+}
+
+.record-query-list-row-actions :deep(.ant-btn:hover),
+.record-query-list-row-actions :deep(.ant-btn:focus-visible) {
+  color: var(--muyun-primary);
+}
+
+.record-query-list-primary-action :deep(.ant-btn-icon) {
+  display: none;
+}
+
+.record-query-list-more-action {
+  width: 24px;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.record-query-list-table tbody tr:hover .record-query-list-more-action,
+.record-query-list-row-actions:focus-within .record-query-list-more-action {
+  opacity: 1;
+}
+
 .record-query-list-pagination {
+  grid-area: pagination;
   justify-content: flex-end;
   color: var(--muyun-text-muted);
   font-size: 13px;
