@@ -1332,6 +1332,62 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldExposeDynamicQuerySchemaWithUiScopedQuickSearchFields() throws Exception {
+        PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
+        ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);
+        MockMvc lowCodeMvc = MockMvcBuilders
+                .standaloneSetup(new DynamicRecordWebController(service, activeTenantVerifier,
+                        codeBusinessPreviewService, referenceGenerationFacade,
+                        snapshotService, null, moduleFieldService))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new PlatformWebExceptionHandler())
+                .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.of(
+                        CurrentUser.tenantUser("user-1", "User", "tenant_a"))))
+                .build();
+        PlatformUiSet uiSet = new PlatformUiSet();
+        uiSet.setId("set-list");
+        uiSet.setModuleAlias(MODULE);
+        uiSet.setAlias("list");
+        uiSet.setSetType(PlatformUiSetType.LIST);
+        PlatformUiConfig uiConfig = new PlatformUiConfig();
+        uiConfig.setId("ui-list");
+        uiConfig.setUiSetId("set-list");
+        uiConfig.setClientType(PlatformUiClientType.WEB);
+        uiConfig.setPublished(true);
+        PlatformUiConfigField codeField = uiField("ui-list", "module-field-code");
+        PlatformUiConfigField amountField = uiField("ui-list", "module-field-amount");
+        when(snapshotService.snapshot(MODULE)).thenReturn(new PlatformPageConfigSnapshot(
+                MODULE,
+                List.of(uiSet),
+                List.of(uiConfig),
+                List.of(codeField, amountField),
+                List.of(),
+                List.of()
+        ));
+        when(moduleFieldService.resolve("module-field-code")).thenReturn(resolvedModuleField(
+                "module-field-code", "code"));
+        when(moduleFieldService.resolve("module-field-amount")).thenReturn(resolvedModuleField(
+                "module-field-amount", "amount", RelationRole.MAIN, "decimal"));
+        when(mainEntity.describe()).thenReturn(DynamicEntityDescriptor.from(entity()));
+
+        lowCodeMvc.perform(get("/{moduleAlias}/query/schema", MODULE)
+                        .param("uiConfigId", "ui-list"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeName").value(MODULE))
+                .andExpect(jsonPath("$.entityAlias").value(ENTITY))
+                .andExpect(jsonPath("$.quickSearch.enabled").value(true))
+                .andExpect(jsonPath("$.quickSearch.fields[0]").value("code"))
+                .andExpect(jsonPath("$.quickSearch.fieldSchemas[?(@.name == 'code')].quickSearch")
+                        .value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.quickSearch.fieldSchemas[?(@.name == 'code')].operators[0]")
+                        .value(org.hamcrest.Matchers.contains("LIKE")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'code')]").isEmpty())
+                .andExpect(jsonPath("$.fields[?(@.name == 'amount')]").isEmpty());
+
+        verify(activeTenantVerifier).verifyActiveTenant("tenant_a");
+    }
+
+    @Test
     void shouldRejectVirtualFieldInQuickSearch() throws Exception {
         PlatformPageConfigSnapshotService snapshotService = mock(PlatformPageConfigSnapshotService.class);
         ModuleMetadataFieldService moduleFieldService = mock(ModuleMetadataFieldService.class);

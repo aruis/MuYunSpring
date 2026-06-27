@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.Set;
 
 public record QueryField(String fieldName,
+                         String title,
                          QueryValueType valueType,
                          Set<QueryOperator> operators,
                          QueryOperator defaultOperator,
@@ -13,6 +14,7 @@ public record QueryField(String fieldName,
         if (fieldName == null || fieldName.isBlank()) {
             throw new IllegalArgumentException("query field name must not be blank");
         }
+        title = title == null || title.isBlank() ? fieldName : title.trim();
         valueType = valueType == null ? QueryValueType.STRING : valueType;
         operators = operators == null || operators.isEmpty()
                 ? EnumSet.of(QueryOperator.EQ)
@@ -31,19 +33,23 @@ public record QueryField(String fieldName,
     public static QueryField of(String fieldName, QueryValueType valueType, QueryOperator first,
                                 QueryOperator... rest) {
         EnumSet<QueryOperator> operators = EnumSet.of(first, rest);
-        return new QueryField(fieldName, valueType, operators, null, false, false);
+        return new QueryField(fieldName, null, valueType, operators, null, false, false);
+    }
+
+    public QueryField withTitle(String title) {
+        return new QueryField(fieldName, title, valueType, operators, defaultOperator, sortable, quickSearch);
     }
 
     public QueryField withDefaultOperator(QueryOperator operator) {
-        return new QueryField(fieldName, valueType, operators, operator, sortable, quickSearch);
+        return new QueryField(fieldName, title, valueType, operators, operator, sortable, quickSearch);
     }
 
     public QueryField withSortable() {
-        return new QueryField(fieldName, valueType, operators, defaultOperator, true, quickSearch);
+        return new QueryField(fieldName, title, valueType, operators, defaultOperator, true, quickSearch);
     }
 
     public QueryField withQuickSearch() {
-        return new QueryField(fieldName, valueType, operators, defaultOperator, sortable, true);
+        return new QueryField(fieldName, title, valueType, operators, defaultOperator, sortable, true);
     }
 
     private static QueryOperator fallbackDefaultOperator(QueryValueType valueType, Set<QueryOperator> operators) {

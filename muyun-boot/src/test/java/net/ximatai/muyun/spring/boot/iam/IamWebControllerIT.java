@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
 import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
+import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -233,6 +234,29 @@ class IamWebControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("employee-1"))
                 .andExpect(jsonPath("$.departmentId").value("dept-1"));
+    }
+
+    @Test
+    void shouldExposeEmployeeQuerySchemaInTenantScope() throws Exception {
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        when(employeeService.querySchema()).thenReturn(QuerySchema.from(employeeQueryDescriptor()));
+
+        mvc.perform(get("/iam.employee/query/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeName").value(EmployeeService.MODULE_ALIAS))
+                .andExpect(jsonPath("$.entityAlias").doesNotExist())
+                .andExpect(jsonPath("$.quickSearch.enabled").value(true))
+                .andExpect(jsonPath("$.quickSearch.fields[0]").value("employeeNo"))
+                .andExpect(jsonPath("$.quickSearch.fieldSchemas[?(@.name == 'employeeNo')].title")
+                        .value(org.hamcrest.Matchers.contains("职员编号")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'employeeNo')].title")
+                        .value(org.hamcrest.Matchers.contains("职员编号")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].valueType")
+                        .value(org.hamcrest.Matchers.contains("BOOLEAN")))
+                .andExpect(jsonPath("$.externalCriteria[0].key").value("departmentScope"));
+
+        verify(employeeService).verifyActiveTenant("tenant_a");
     }
 
     @Test
@@ -672,30 +696,37 @@ class IamWebControllerIT {
     }
 
     private QueryCompiler employeeQueryCompiler() {
-        return new QueryCompiler(QueryDescriptor.builder(EmployeeService.MODULE_ALIAS)
-                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN))
-                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN))
-                .field(QueryField.of("departmentId", QueryOperator.EQ, QueryOperator.IN))
-                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ))
+        return new QueryCompiler(employeeQueryDescriptor());
+    }
+
+    private QueryDescriptor employeeQueryDescriptor() {
+        return QueryDescriptor.builder(EmployeeService.MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("organizationId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属机构"))
+                .field(QueryField.of("departmentId", QueryOperator.EQ, QueryOperator.IN).withTitle("所属部门"))
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
                 .field(QueryField.of("employeeNo", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withQuickSearch().withSortable())
+                        .withTitle("职员编号").withQuickSearch().withSortable())
                 .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withQuickSearch().withSortable())
+                        .withTitle("职员姓名").withQuickSearch().withSortable())
                 .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withQuickSearch())
+                        .withTitle("手机号").withQuickSearch())
                 .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
-                        .withQuickSearch())
-                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ).withSortable())
+                        .withTitle("邮箱").withQuickSearch())
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
                 .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
                                 QueryOperator.BETWEEN)
+                        .withTitle("创建时间")
                         .withSortable())
                 .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
                                 QueryOperator.BETWEEN)
+                        .withTitle("更新时间")
                         .withSortable())
                 .externalCriteria("departmentScope", this::employeeDepartmentScopeCriteria)
                 .defaultSort(Sort.asc("sortOrder"))
                 .defaultSort(Sort.asc("employeeNo"))
-                .build());
+                .build();
     }
 
     private Criteria employeeDepartmentScopeCriteria(Object value) {

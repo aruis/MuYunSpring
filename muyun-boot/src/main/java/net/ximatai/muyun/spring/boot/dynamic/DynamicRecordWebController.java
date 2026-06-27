@@ -10,6 +10,7 @@ import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.OptimisticLockException;
+import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.boot.web.ActionWeb;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -69,6 +70,7 @@ import net.ximatai.muyun.spring.dynamic.runtime.DynamicAssociationViewDiagnosis;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationViewDescriptor;
 import net.ximatai.muyun.spring.dynamic.descriptor.DynamicAssociationRelationOverview;
+import net.ximatai.muyun.spring.dynamic.descriptor.DynamicQuerySchemas;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordService;
@@ -98,6 +100,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -266,6 +269,14 @@ public class DynamicRecordWebController implements
     @Override
     public DynamicEntityOperations service() {
         return recordService.mainEntity(DynamicWebRequest.moduleAlias());
+    }
+
+    @Override
+    @GetMapping("/query/schema")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
+        return webScope(() -> DynamicQuerySchemas.from(DynamicWebRequest.moduleAlias(),
+                service().describe(), quickSearchFieldsForSchema(uiConfigId)));
     }
 
     @Override
@@ -848,6 +859,15 @@ public class DynamicRecordWebController implements
             }
         }
         return requestedFields;
+    }
+
+    private List<String> quickSearchFieldsForSchema(String uiConfigId) {
+        if (!hasText(uiConfigId)) {
+            return List.of();
+        }
+        return quickSearchFields(DynamicWebRequest.moduleAlias(),
+                new WebQueryRequest(null, null, List.of(), null, Map.of(), List.of(),
+                        uiConfigId, null, Map.of(), null, null, List.of(), null));
     }
 
     private void requireDataScopeRecord(PlatformAction action, String id) {
