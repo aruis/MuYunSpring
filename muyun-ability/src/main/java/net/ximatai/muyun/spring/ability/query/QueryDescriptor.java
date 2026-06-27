@@ -4,9 +4,11 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.Sort;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 public final class QueryDescriptor {
@@ -17,8 +19,8 @@ public final class QueryDescriptor {
 
     private QueryDescriptor(Builder builder) {
         this.scopeName = builder.scopeName;
-        this.fields = Map.copyOf(builder.fields);
-        this.externalCriteriaResolvers = Map.copyOf(builder.externalCriteriaResolvers);
+        this.fields = Collections.unmodifiableMap(new LinkedHashMap<>(builder.fields));
+        this.externalCriteriaResolvers = Collections.unmodifiableMap(new LinkedHashMap<>(builder.externalCriteriaResolvers));
         this.defaultSorts = builder.defaultSorts.toArray(Sort[]::new);
     }
 
@@ -34,8 +36,16 @@ public final class QueryDescriptor {
         return fields.get(fieldName);
     }
 
+    public List<QueryField> fields() {
+        return List.copyOf(fields.values());
+    }
+
     public List<QueryField> quickSearchFields() {
         return fields.values().stream().filter(QueryField::quickSearch).toList();
+    }
+
+    public Set<String> externalCriteriaKeys() {
+        return externalCriteriaResolvers.keySet();
     }
 
     public Function<Object, Criteria> externalCriteriaResolver(String key) {

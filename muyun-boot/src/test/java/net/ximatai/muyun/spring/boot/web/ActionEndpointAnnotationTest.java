@@ -17,6 +17,7 @@ class ActionEndpointAnnotationTest {
     @Test
     void shouldDescribeStandardCrudEndpointActionSemantics() throws Exception {
         assertThat(endpoint(CrudWeb.class, "query", WebQueryRequest.class).value()).isEqualTo(PlatformAction.QUERY);
+        assertThat(endpoint(CrudWeb.class, "querySchema", String.class).value()).isEqualTo(PlatformAction.QUERY);
         assertThat(endpoint(CrudWeb.class, "view", String.class).value()).isEqualTo(PlatformAction.VIEW);
         assertThat(endpoint(CrudWeb.class, "insert", EntityContract.class).value()).isEqualTo(PlatformAction.CREATE);
         assertThat(endpoint(CrudWeb.class, "update", String.class, EntityContract.class).value()).isEqualTo(PlatformAction.UPDATE);
@@ -43,6 +44,8 @@ class ActionEndpointAnnotationTest {
     void shouldKeepActionEndpointWhenDynamicControllerOverridesStandardWebMethods() throws Exception {
         assertThat(endpoint(DynamicRecordWebController.class, "sort", String.class, TreeSortWebRequest.class).value())
                 .isEqualTo(PlatformAction.SORT);
+        assertThat(endpoint(DynamicRecordWebController.class, "querySchema", String.class).value())
+                .isEqualTo(PlatformAction.QUERY);
         Class<?> referenceRequestType = Class.forName("net.ximatai.muyun.spring.boot.dynamic.DynamicWebReferenceRequest");
         assertThat(endpoint(DynamicRecordWebController.class, "reference", String.class, referenceRequestType).value())
                 .isEqualTo(PlatformAction.REFERENCE);

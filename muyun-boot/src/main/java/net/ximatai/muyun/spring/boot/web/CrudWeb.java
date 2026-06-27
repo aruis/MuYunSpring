@@ -8,6 +8,7 @@ import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.util.List;
@@ -92,6 +94,17 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>> ext
             return new Sort[]{Sort.asc(PlatformAbilityFields.SORT_FIELD)};
         }
         return new Sort[0];
+    }
+
+    @GetMapping("/query/schema")
+    @ActionEndpoint(PlatformAction.QUERY)
+    default QuerySchema querySchema(@RequestParam(required = false) String uiConfigId) {
+        return webScope(() -> {
+            if (service() instanceof QueryAbility<?> queryAbility) {
+                return queryAbility.querySchema();
+            }
+            throw new IllegalArgumentException("query schema is not supported by " + webScopeName());
+        });
     }
 
     @PostMapping("/query")
