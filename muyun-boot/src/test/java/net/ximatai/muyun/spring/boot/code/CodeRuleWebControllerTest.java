@@ -5,6 +5,11 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserContext;
@@ -207,6 +212,16 @@ class CodeRuleWebControllerTest {
         state.setCurrentValue(12L);
         when(stateService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(state), 1, PageRequest.of(1, 20)));
+        when(stateService.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.desc("currentValue"))
+                .build());
+        when(stateService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(stateService.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(stateService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(stateService.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         when(stateService.select("state-1")).thenReturn(state);
         when(opsActionService.adjustSequenceState("state-1", 120L, "repair")).thenReturn(
                 new CodeSequenceBaselineResult(state, 12L, 120L, 121L, "updated"));
@@ -221,6 +236,16 @@ class CodeRuleWebControllerTest {
         ledger.setStatus(CodeLedgerStatus.ACTIVE);
         when(ledgerService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(ledger), 1, PageRequest.of(1, 20)));
+        when(ledgerService.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.desc("createdAt"))
+                .build());
+        when(ledgerService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(ledgerService.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(ledgerService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(ledgerService.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         when(ledgerService.select("ledger-1")).thenReturn(ledger);
 
         CodeRecycleEntry recycle = new CodeRecycleEntry();
@@ -230,6 +255,16 @@ class CodeRuleWebControllerTest {
         recycle.setStatus(CodeRecycleStatus.AVAILABLE);
         when(recycleService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(recycle), 1, PageRequest.of(1, 20)));
+        when(recycleService.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.desc("recycledAt"))
+                .build());
+        when(recycleService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(recycleService.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(recycleService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(recycleService.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         when(recycleService.select("recycle-1")).thenReturn(recycle);
 
         CodeIssueLog issueLog = new CodeIssueLog();
@@ -242,6 +277,16 @@ class CodeRuleWebControllerTest {
         issueLog.setStatus(CodeIssueLogStatus.SUCCESS);
         when(issueLogService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(issueLog), 1, PageRequest.of(1, 20)));
+        when(issueLogService.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("ruleId", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.desc("createdAt"))
+                .build());
+        when(issueLogService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(issueLogService.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(issueLogService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(issueLogService.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
         when(issueLogService.select("issue-1")).thenReturn(issueLog);
 
         mvc.perform(post("/platform.code_sequence_state/query")

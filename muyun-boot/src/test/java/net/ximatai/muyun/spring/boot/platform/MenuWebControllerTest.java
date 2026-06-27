@@ -4,6 +4,11 @@ import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -129,6 +134,16 @@ class MenuWebControllerTest {
                 .thenReturn(PageResult.of(List.of(scheme), 1, PageRequest.of(1, 20)));
         when(schemeService.insert(any(MenuScheme.class))).thenReturn("scheme-1");
         when(schemeService.select("scheme-1")).thenReturn(scheme);
+        when(schemeService.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .field(QueryField.of("alias", QueryOperator.EQ, QueryOperator.IN))
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(schemeService.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(schemeService.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(schemeService.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(schemeService.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(post("/platform.menu_scheme/query")

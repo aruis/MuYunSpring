@@ -21,20 +21,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface ReadOnlyWeb<T extends EntityContract, S extends CrudAbility<T>> extends ScopedWeb<S> {
     default Criteria queryCriteria(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
-            Criteria delegated = queryAbility.queryCriteria(WebQueryRequests.from(request));
-            if (delegated != null) {
-                return delegated;
-            }
+            return queryAbility.queryCriteria(WebQueryRequests.from(request));
+        }
+        if (request != null && !request.conditions().isEmpty()) {
+            throw new IllegalArgumentException("query conditions are not supported by " + webScopeName());
+        }
+        if (request != null && request.criteria() != null && !request.criteria().isEmpty()) {
+            throw new IllegalArgumentException("query criteria are not supported by " + webScopeName());
         }
         return Criteria.of();
     }
 
     default Sort[] querySorts(WebQueryRequest request) {
         if (service() instanceof QueryAbility<?> queryAbility) {
-            Sort[] delegated = queryAbility.querySorts(WebQueryRequests.from(request));
-            if (delegated != null) {
-                return delegated;
-            }
+            return queryAbility.querySorts(WebQueryRequests.from(request));
         }
         if (request != null && !request.sorts().isEmpty()) {
             throw new IllegalArgumentException("query sorts are not supported by " + webScopeName());

@@ -8,26 +8,14 @@ public interface QueryAbility<T extends EntityContract> {
     QueryDescriptor queryDescriptor();
 
     default QuerySchema querySchema() {
-        QueryDescriptor descriptor = queryDescriptor();
-        if (descriptor == null) {
-            return QuerySchema.EMPTY;
-        }
-        return QuerySchema.from(descriptor);
+        return QuerySchema.from(queryDescriptor());
     }
 
     default Criteria queryCriteria(QueryRequest request) {
-        QueryDescriptor descriptor = queryDescriptor();
-        if (descriptor == null) {
-            return Criteria.of();
-        }
-        return new QueryCompiler(descriptor).criteria(request);
+        return new QueryCompiler(queryDescriptor()).criteria(request);
     }
 
     default Sort[] querySorts(QueryRequest request) {
-        QueryDescriptor descriptor = queryDescriptor();
-        if (descriptor == null) {
-            return new Sort[0];
-        }
-        return new QueryCompiler(descriptor).sorts(request);
+        return new QueryCompiler(queryDescriptor()).sorts(request);
     }
 }

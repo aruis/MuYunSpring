@@ -35,7 +35,7 @@ import java.util.Objects;
 
 abstract class ModuleScopedRuleTreeWebSupport<
         T extends EntityContract & EnabledCapable & SortCapable,
-        S extends CrudAbility<T> & EnableAbility<T> & SortAbility<T>>
+        S extends CrudAbility<T> & EnableAbility<T> & SortAbility<T> & QueryAbility<T>>
         extends WebSupport<S> implements SystemScope<S> {
     private final String scopeField;
 
@@ -48,35 +48,15 @@ abstract class ModuleScopedRuleTreeWebSupport<
     public WebPageResponse<T> query(HttpServletRequest servletRequest,
                                     @RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
-            Criteria criteria = queryCriteria(request);
+            Criteria criteria = service().queryCriteria(WebQueryRequests.from(request));
             criteria.eq(scopeField, moduleAlias(servletRequest));
             WebPageRequest page = request == null ? WebPageRequest.DEFAULT : request.pageOrDefault();
             PageResult<T> result = service().pageQuery(
                     criteria,
                     PageRequest.of(page.pageNum(), page.pageSize()),
-                    querySorts(request));
+                    service().querySorts(WebQueryRequests.from(request)));
             return WebPageResponse.from(WebOutputSupport.page(service(), result, FieldOutputContext.LIST));
         });
-    }
-
-    private Criteria queryCriteria(WebQueryRequest request) {
-        if (service() instanceof QueryAbility<?> queryAbility) {
-            Criteria delegated = queryAbility.queryCriteria(WebQueryRequests.from(request));
-            if (delegated != null) {
-                return delegated;
-            }
-        }
-        return Criteria.of();
-    }
-
-    private Sort[] querySorts(WebQueryRequest request) {
-        if (service() instanceof QueryAbility<?> queryAbility) {
-            Sort[] delegated = queryAbility.querySorts(WebQueryRequests.from(request));
-            if (delegated != null) {
-                return delegated;
-            }
-        }
-        return new Sort[0];
     }
 
     @PostMapping("/delete/{id}")

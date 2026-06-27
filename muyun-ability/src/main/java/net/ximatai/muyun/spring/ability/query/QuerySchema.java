@@ -12,8 +12,6 @@ public record QuerySchema(String scopeName,
                           List<Field> fields,
                           List<ExternalCriteria> externalCriteria,
                           List<DefaultSort> defaultSorts) {
-    public static final QuerySchema EMPTY = new QuerySchema(null, null, QuickSearch.disabled(), List.of(), List.of(), List.of());
-
     public QuerySchema {
         fields = fields == null ? List.of() : List.copyOf(fields);
         externalCriteria = externalCriteria == null ? List.of() : List.copyOf(externalCriteria);

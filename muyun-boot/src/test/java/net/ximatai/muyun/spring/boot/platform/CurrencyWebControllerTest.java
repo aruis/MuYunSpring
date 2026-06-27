@@ -6,6 +6,9 @@ import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.query.QueryCompiler;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.platform.currency.Currency;
 import net.ximatai.muyun.spring.platform.currency.CurrencyConversion;
@@ -90,6 +93,15 @@ class CurrencyWebControllerTest {
         TenantCurrencySetting setting = setting("tenant-a", "CNY");
         when(service.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
                 .thenReturn(PageResult.of(List.of(setting), 1, PageRequest.of(1, 20)));
+        when(service.queryDescriptor()).thenReturn(QueryDescriptor.builder("test")
+                .defaultSort(Sort.asc("sortOrder"))
+                .build());
+        when(service.queryCriteria(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .criteria(inv.getArgument(0)));
+        when(service.querySorts(any(QueryRequest.class)))
+                .thenAnswer(inv -> new QueryCompiler(service.queryDescriptor())
+                        .sorts(inv.getArgument(0)));
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
