@@ -276,7 +276,7 @@ class PlatformMenuInitialDataDeclarationProviderTest {
         assertMenu(OrganizationWebController.class, PlatformMenuGroups.IDENTITY, "", 20);
         assertMenu(DepartmentWebController.class, PlatformMenuGroups.IDENTITY, "部门管理", 30);
         assertMenu(PositionCategoryWebController.class, PlatformMenuGroups.IDENTITY, "岗位管理", 40);
-        assertMenu(EmployeeWebController.class, PlatformMenuGroups.IDENTITY, "", 50);
+        assertMenu(EmployeeWebController.class, PlatformMenuGroups.IDENTITY, "职员管理", 50);
     }
 
     @Test

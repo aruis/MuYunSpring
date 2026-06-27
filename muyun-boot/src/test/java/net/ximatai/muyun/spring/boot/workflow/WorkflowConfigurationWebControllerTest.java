@@ -69,8 +69,8 @@ class WorkflowConfigurationWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.applicationAlias").value("sales"))
-                .andExpect(jsonPath("$.moduleAlias").value("sales.contract"));
+                .andExpect(jsonPath("$.record.applicationAlias").value("sales"))
+                .andExpect(jsonPath("$.record.moduleAlias").value("sales.contract"));
 
         ArgumentCaptor<WorkflowDefinition> captor = ArgumentCaptor.forClass(WorkflowDefinition.class);
         verify(definitionService).insert(captor.capture());
@@ -137,8 +137,8 @@ class WorkflowConfigurationWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.definitionId").value("def-1"))
-                .andExpect(jsonPath("$.publishStatus").value("DRAFT"));
+                .andExpect(jsonPath("$.record.definitionId").value("def-1"))
+                .andExpect(jsonPath("$.record.publishStatus").value("DRAFT"));
 
         ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
         verify(versionService).insert(captor.capture());

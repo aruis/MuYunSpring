@@ -22,7 +22,8 @@ public abstract class NestedEnabledSortableCrudWebSupport<
     public WebCountResponse enable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new WebCountResponse(service().enable(id));
+            int count = service().enable(id);
+            return new WebCountResponse(count, successMessage(service().select(id), "已启用"));
         });
     }
 
@@ -31,7 +32,8 @@ public abstract class NestedEnabledSortableCrudWebSupport<
     public WebCountResponse disable(HttpServletRequest servletRequest, @PathVariable String id) {
         return webScope(() -> {
             requireScopedRecord(servletRequest, id);
-            return new WebCountResponse(service().disable(id));
+            int count = service().disable(id);
+            return new WebCountResponse(count, successMessage(service().select(id), "已停用"));
         });
     }
 

@@ -54,7 +54,7 @@ class MeasureUnitConversionRuleWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.applicationAlias").value("crm"));
+                .andExpect(jsonPath("$.record.applicationAlias").value("crm"));
 
         ArgumentCaptor<MeasureUnitConversionRule> captor =
                 ArgumentCaptor.forClass(MeasureUnitConversionRule.class);
@@ -131,7 +131,7 @@ class MeasureUnitConversionRuleWebControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.applicationAlias").value("platform"));
+                .andExpect(jsonPath("$.record.applicationAlias").value("platform"));
 
         ArgumentCaptor<MeasureUnitConversionRule> captor =
                 ArgumentCaptor.forClass(MeasureUnitConversionRule.class);

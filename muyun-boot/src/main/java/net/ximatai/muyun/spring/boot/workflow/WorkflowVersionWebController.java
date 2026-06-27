@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.web.NestedCrudWebSupport;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
+import net.ximatai.muyun.spring.boot.web.WebRecordResponse;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
@@ -78,7 +79,8 @@ public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowV
     @PostMapping("/insert")
     @ActionEndpoint(PlatformAction.CREATE)
     @ResponseStatus(HttpStatus.CREATED)
-    public WorkflowVersion insert(HttpServletRequest servletRequest, @RequestBody WorkflowVersion record) {
+    public WebRecordResponse<WorkflowVersion> insert(HttpServletRequest servletRequest,
+                                                     @RequestBody WorkflowVersion record) {
         normalizeDraft(record);
         return super.insert(servletRequest, record);
     }
@@ -86,9 +88,9 @@ public class WorkflowVersionWebController extends NestedCrudWebSupport<WorkflowV
     @Override
     @PostMapping("/update/{id}")
     @ActionEndpoint(PlatformAction.UPDATE)
-    public WorkflowVersion update(HttpServletRequest servletRequest,
-                                  @PathVariable String id,
-                                  @RequestBody WorkflowVersion record) {
+    public WebRecordResponse<WorkflowVersion> update(HttpServletRequest servletRequest,
+                                                     @PathVariable String id,
+                                                     @RequestBody WorkflowVersion record) {
         requireDraft(requireScopedRecord(servletRequest, id), "workflow version can only edit draft versions");
         normalizeDraft(record);
         return super.update(servletRequest, id, record);

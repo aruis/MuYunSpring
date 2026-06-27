@@ -198,7 +198,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleAlias":"other.module","actionCode":"submit","title":"Submit"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.moduleAlias").value("platform.sales.order"));
+                .andExpect(jsonPath("$.record.moduleAlias").value("platform.sales.order"));
 
         ArgumentCaptor<PlatformModuleAction> captor = ArgumentCaptor.forClass(PlatformModuleAction.class);
         verify(service).insert(captor.capture());
@@ -281,7 +281,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"metadataFieldId":"other-field","targetMetadataId":"target-metadata"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.metadataFieldId").value("field-1"));
+                .andExpect(jsonPath("$.record.metadataFieldId").value("field-1"));
 
         ArgumentCaptor<MetadataFieldReferenceConfig> captor =
                 ArgumentCaptor.forClass(MetadataFieldReferenceConfig.class);
@@ -378,7 +378,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleMetadataFieldId":"other-field","referenceFieldId":"ref","targetFieldId":"target"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.moduleMetadataFieldId").value("field-1"));
+                .andExpect(jsonPath("$.record.moduleMetadataFieldId").value("field-1"));
 
         ArgumentCaptor<ModuleMetadataFieldAffect> captor = ArgumentCaptor.forClass(ModuleMetadataFieldAffect.class);
         verify(service).insert(captor.capture());
@@ -407,7 +407,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"relationId":"other-rel","alias":"checkAmount","expression":"amount > 0"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.relationId").value("rel-1"));
+                .andExpect(jsonPath("$.record.relationId").value("rel-1"));
 
         ArgumentCaptor<ModuleMetadataFormulaRule> captor = ArgumentCaptor.forClass(ModuleMetadataFormulaRule.class);
         verify(service).insert(captor.capture());
@@ -479,7 +479,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"relationId":"other-rel","viewType":"FORM","title":"Form"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.relationId").value("rel-1"));
+                .andExpect(jsonPath("$.record.relationId").value("rel-1"));
 
         ArgumentCaptor<MetadataView> captor = ArgumentCaptor.forClass(MetadataView.class);
         verify(service).insert(captor.capture());
@@ -539,7 +539,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"viewId":"other-view","metadataFieldId":"field-1","title":"Code"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.viewId").value("view-1"));
+                .andExpect(jsonPath("$.record.viewId").value("view-1"));
 
         ArgumentCaptor<MetadataViewField> captor = ArgumentCaptor.forClass(MetadataViewField.class);
         verify(service).insert(captor.capture());
@@ -630,7 +630,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"applicationAlias":"other","alias":"common","title":"Common"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.applicationAlias").value("platform"));
+                .andExpect(jsonPath("$.record.applicationAlias").value("platform"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
@@ -715,8 +715,8 @@ class PlatformConfigurationWebControllerTest {
                                 {"applicationAlias":"other","categoryAlias":"other","code":"enabled","title":"Enabled"}
                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.categoryId").value("category-1"))
-                .andExpect(jsonPath("$.categoryAlias").value("status"));
+                .andExpect(jsonPath("$.record.categoryId").value("category-1"))
+                .andExpect(jsonPath("$.record.categoryAlias").value("status"));
         mvc.perform(get("/platform.dictionary_category/categories/category-1/items/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("item-1"));
@@ -817,7 +817,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"moduleAlias":"other.module","alias":"list","setType":"LIST","title":"List"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.moduleAlias").value("platform.sales.order"));
+                .andExpect(jsonPath("$.record.moduleAlias").value("platform.sales.order"));
 
         ArgumentCaptor<PlatformUiSet> captor = ArgumentCaptor.forClass(PlatformUiSet.class);
         verify(service).insert(captor.capture());
@@ -877,7 +877,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"fieldUiTypeAlias":"other","attributeAlias":"placeholder","title":"Placeholder"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fieldUiTypeAlias").value("text"));
+                .andExpect(jsonPath("$.record.fieldUiTypeAlias").value("text"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
@@ -930,7 +930,7 @@ class PlatformConfigurationWebControllerTest {
                                 {"fieldUiTypeAlias":"other","sourceKey":"options","title":"Options"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fieldUiTypeAlias").value("select"));
+                .andExpect(jsonPath("$.record.fieldUiTypeAlias").value("select"));
 
         ArgumentCaptor<Criteria> criteria = ArgumentCaptor.forClass(Criteria.class);
         verify(service).pageQuery(criteria.capture(), any(PageRequest.class), any(Sort.class), any(Sort.class));
