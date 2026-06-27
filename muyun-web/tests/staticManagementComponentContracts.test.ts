@@ -233,9 +233,16 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(dropdownSource, /setTimeout/);
   assert.match(panelSource, /ready\?: boolean/);
   assert.match(panelSource, /waitingDescription\?: string/);
+  assert.match(panelSource, /\(\) => props\.ready/);
+  assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
   assert.match(panelSource, /if \(!queryReady\.value\)/);
   assert.match(panelSource, /activeConditions\.value = \[\]/);
+  assert.match(panelSource, /validateConditionDrafts/);
+  assert.match(
+    panelSource,
+    /operator === 'BETWEEN'[\s\S]*valuesOfDraft\(field, operator, draft\)\.length !== 2/,
+  );
   assert.match(panelSource, /quickSearchFields/);
   assert.match(panelSource, /conditions: activeConditions\.value/);
   assert.match(panelSource, /page: \{ pageNum: pageNum\.value, pageSize: pageSize\.value \}/);
@@ -255,6 +262,15 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /@row-action="handleEmployeeRowAction"/);
   assert.match(employeeViewSource, /@row-dblclick="handleEmployeeRowDblclick"/);
   assert.match(employeeViewSource, /type: 'enabledStatus'/);
+  assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
+  assert.match(employeeViewSource, /const canSaveEmployee = computed/);
+  assert.match(employeeViewSource, /const canToggleEmployee = computed/);
+  assert.match(employeeViewSource, /function employeeToggleActionCode/);
+  assert.match(employeeViewSource, /if \(savingEmployee\.value\) \{\s*return;\s*\}/);
+  assert.match(employeeViewSource, /当前用户无权保存职员/);
+  assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
+  assert.match(employeeViewSource, /:disabled="savingEmployee \|\| !canToggleEmployee"/);
+  assert.match(employeeViewSource, /:disabled="employeeFormDisabled"/);
   assert.doesNotMatch(
     employeeViewSource,
     /render: \(record\) => \(record\.enabled === false \? '停用' : '启用'\)/,

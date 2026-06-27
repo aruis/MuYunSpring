@@ -98,6 +98,19 @@ const employeeDetailTitle = computed(() => {
   return employeeTitle(selectedEmployee.value ?? employeeDraft.value);
 });
 const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
+const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
+const canSaveEmployee = computed(() => {
+  if (employeeDetailMode.value === 'create') {
+    return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
+  }
+  return Boolean(selectedEmployee.value?.id) && employeeContext.can('update') === true;
+});
+const canToggleEmployee = computed(() => {
+  if (!selectedEmployee.value?.id) {
+    return false;
+  }
+  return employeeContext.can(employeeToggleActionCode(selectedEmployee.value)) === true;
+});
 const employeeDetailActions = computed<RecordActionItem[]>(() => {
   if (employeeDetailMode.value === 'view') {
     if (!selectedEmployee.value?.id) {
@@ -116,6 +129,7 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
       title: '保存',
       iconName: 'save',
       primary: true,
+      disabled: !canSaveEmployee.value,
       loading: savingEmployee.value,
     },
   ];
@@ -238,9 +252,16 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
 }
 
 async function saveEmployee() {
+  if (savingEmployee.value) {
+    return;
+  }
   const organizationId = selectedOrganizationId.value;
   if (!organizationId) {
     presentPlatformMessage('请先选择机构', { phase: 'validation' });
+    return;
+  }
+  if (!canSaveEmployee.value) {
+    presentPlatformMessage('当前用户无权保存职员', { phase: 'authorization' });
     return;
   }
   const draft = normalizedEmployeeDraft(employeeDraft.value, organizationId);
@@ -272,6 +293,10 @@ async function saveEmployee() {
 async function toggleEmployeeEnabled() {
   const employee = selectedEmployee.value;
   if (!employee?.id || savingEmployee.value) {
+    return;
+  }
+  if (!canToggleEmployee.value) {
+    presentPlatformMessage('当前用户无权变更职员启停状态', { phase: 'authorization' });
     return;
   }
   savingEmployee.value = true;
@@ -354,6 +379,10 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
 
 function employeeTitle(record: Partial<Employee> | QueryListRecord | undefined) {
   return String(record?.title ?? record?.employeeNo ?? record?.id ?? '职员档案');
+}
+
+function employeeToggleActionCode(record: Partial<Employee>) {
+  return record.enabled === false ? 'enable' : 'disable';
 }
 
 function departmentTitle(record: Department) {
@@ -499,13 +528,14 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
         <RecordStatusSwitch
           v-if="employeeDetailMode !== 'view'"
           :enabled="employeeDraft.enabled !== false"
+          :disabled="savingEmployee || !canSaveEmployee"
           :show-label="false"
           @change="employeeDraft.enabled = $event"
         />
         <RecordStatusSwitch
           v-else-if="selectedEmployee"
           :enabled="selectedEmployee.enabled !== false"
-          :disabled="savingEmployee"
+          :disabled="savingEmployee || !canToggleEmployee"
           :loading="savingEmployee"
           :show-label="false"
           @change="toggleEmployeeEnabled"
@@ -530,7 +560,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
             v-model:value="employeeDraft.departmentId"
             :context="scopedDepartmentContext"
             :title-of="departmentTitle"
-            :disabled="employeeReadonly"
+            :disabled="employeeFormDisabled"
             placeholder="请选择部门"
           />
         </label>
@@ -538,7 +568,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
           <span>职员编号</span>
           <UiInput
             v-model:value="employeeDraft.employeeNo"
-            :disabled="employeeReadonly"
+            :disabled="employeeFormDisabled"
             placeholder="请输入职员编号"
           />
         </label>
@@ -546,7 +576,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
           <span>职员姓名</span>
           <UiInput
             v-model:value="employeeDraft.title"
-            :disabled="employeeReadonly"
+            :disabled="employeeFormDisabled"
             placeholder="请输入职员姓名"
           />
         </label>
@@ -554,7 +584,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
           <span>手机号</span>
           <UiInput
             v-model:value="employeeDraft.mobile"
-            :disabled="employeeReadonly"
+            :disabled="employeeFormDisabled"
             placeholder="请输入手机号"
           />
         </label>
@@ -562,7 +592,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
           <span>邮箱</span>
           <UiInput
             v-model:value="employeeDraft.email"
-            :disabled="employeeReadonly"
+            :disabled="employeeFormDisabled"
             placeholder="请输入邮箱"
           />
         </label>

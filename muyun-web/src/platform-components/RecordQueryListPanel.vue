@@ -13,7 +13,7 @@ import type {
   WebSort,
 } from '@muyun/web-contracts';
 import { normalizeError, type ModuleContext } from '@muyun/web-core';
-import { presentPlatformError } from './platformErrorFeedback';
+import { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
 import RecordActionBar from './RecordActionBar.vue';
 import RecordStatusTag from './RecordStatusTag.vue';
 import {
@@ -146,6 +146,20 @@ watch(
 watch(
   () => props.context,
   () => loadSchemaAndRecords(),
+);
+
+watch(
+  () => props.ready,
+  (ready) => {
+    pageNum.value = 1;
+    if (ready) {
+      void loadRecords();
+      return;
+    }
+    records.value = [];
+    total.value = 0;
+    emit('loaded', []);
+  },
 );
 
 watch(
@@ -365,6 +379,11 @@ function applyConditions() {
   if (conditionsDisabled.value) {
     return;
   }
+  const validationMessage = validateConditionDrafts();
+  if (validationMessage) {
+    presentPlatformMessage(validationMessage, { phase: 'validation' });
+    return;
+  }
   activeConditions.value = conditionDrafts.value.flatMap(conditionOfDraft);
   pageNum.value = 1;
   void loadRecords();
@@ -415,6 +434,20 @@ function conditionOfDraft(draft: ConditionDraft): WebQueryCondition[] {
     return [];
   }
   return [{ fieldName: field.name, operator, values }];
+}
+
+function validateConditionDrafts() {
+  for (const draft of conditionDrafts.value) {
+    const field = fieldByName(draft.fieldName);
+    const operator = draft.operator ?? field?.defaultOperator;
+    if (!field || !operator || valueLessOperator(operator)) {
+      continue;
+    }
+    if (operator === 'BETWEEN' && valuesOfDraft(field, operator, draft).length !== 2) {
+      return `${field.title ?? field.name} 需要填写起始和结束两个值`;
+    }
+  }
+  return undefined;
 }
 
 function valuesOfDraft(field: QuerySchemaField, operator: QueryOperator, draft: ConditionDraft): unknown[] {
