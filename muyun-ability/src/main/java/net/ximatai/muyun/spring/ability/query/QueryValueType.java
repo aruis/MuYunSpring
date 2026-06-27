@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability.query;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
@@ -15,6 +16,7 @@ public enum QueryValueType {
     LONG,
     DECIMAL,
     INSTANT,
+    DATETIME,
     DATE,
     JSON;
 
@@ -40,6 +42,7 @@ public enum QueryValueType {
             case LONG -> longValue(value);
             case DECIMAL -> decimalValue(value);
             case INSTANT -> instantValue(value);
+            case DATETIME -> dateTimeValue(value);
             case DATE -> dateValue(value);
             case JSON -> value;
         };
@@ -116,6 +119,16 @@ public enum QueryValueType {
                 throw new IllegalArgumentException("timestamp must be a UTC second instant");
             }
             return requireSecondPrecision(Instant.from(DateTimeFormatter.ISO_INSTANT.parse(trimmed)));
+        }
+        throw new IllegalArgumentException("invalid query value type: " + this);
+    }
+
+    private LocalDateTime dateTimeValue(Object value) {
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof String text) {
+            return LocalDateTime.parse(text.trim());
         }
         throw new IllegalArgumentException("invalid query value type: " + this);
     }

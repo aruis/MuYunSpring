@@ -72,6 +72,16 @@ class QuerySchemaTest {
                 .singleElement()
                 .extracting(QuerySchema.Field::valueType)
                 .isEqualTo(QueryValueType.INSTANT);
+        QueryDescriptor effectiveDescriptor = QueryDescriptors.simple("platform.code_rule",
+                java.util.List.of("effectiveFrom", "effectiveTo"));
+        QuerySchema effectiveSchema = QuerySchema.from(effectiveDescriptor);
+        assertThat(effectiveSchema.fields()).allSatisfy(field -> {
+            assertThat(field.valueType()).isEqualTo(QueryValueType.DATETIME);
+            assertThat(field.operators()).contains(
+                    QueryOperator.GTE,
+                    QueryOperator.LTE,
+                    QueryOperator.BETWEEN);
+        });
         assertThat(schema.defaultSorts()).singleElement()
                 .satisfies(sort -> {
                     assertThat(sort.field()).isEqualTo("sortOrder");

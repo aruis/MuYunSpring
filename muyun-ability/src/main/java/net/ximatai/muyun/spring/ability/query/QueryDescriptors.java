@@ -60,6 +60,10 @@ public final class QueryDescriptors {
             "deletedAt",
             "publishedAt"
     );
+    private static final Set<String> DATE_TIME_FIELDS = Set.of(
+            "effectiveFrom",
+            "effectiveTo"
+    );
     private static final Set<String> DATE_FIELDS = Set.of(
             "effectiveDate"
     );
@@ -82,7 +86,7 @@ public final class QueryDescriptors {
         QueryValueType valueType = valueType(fieldName);
         QueryField field = switch (valueType) {
             case BOOLEAN -> QueryField.of(fieldName, valueType, QueryOperator.EQ);
-            case INTEGER, LONG, DECIMAL, DATE, INSTANT -> QueryField.of(fieldName, valueType,
+            case INTEGER, LONG, DECIMAL, DATE, INSTANT, DATETIME -> QueryField.of(fieldName, valueType,
                     QueryOperator.EQ,
                     QueryOperator.IN,
                     QueryOperator.GT,
@@ -117,6 +121,9 @@ public final class QueryDescriptors {
         }
         if (INSTANT_FIELDS.contains(fieldName) || fieldName.endsWith("At")) {
             return QueryValueType.INSTANT;
+        }
+        if (DATE_TIME_FIELDS.contains(fieldName)) {
+            return QueryValueType.DATETIME;
         }
         if (DATE_FIELDS.contains(fieldName)) {
             return QueryValueType.DATE;
