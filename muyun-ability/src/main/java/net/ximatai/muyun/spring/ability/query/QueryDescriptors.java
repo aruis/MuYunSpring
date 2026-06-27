@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.ability.query;
 import net.ximatai.muyun.database.core.orm.Sort;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 
 public final class QueryDescriptors {
@@ -67,6 +68,93 @@ public final class QueryDescriptors {
     private static final Set<String> DATE_FIELDS = Set.of(
             "effectiveDate"
     );
+    private static final Map<String, String> FIELD_TITLES = Map.ofEntries(
+            Map.entry("id", "ID"),
+            Map.entry("parentId", "上级"),
+            Map.entry("tenantId", "租户"),
+            Map.entry("applicationAlias", "应用别名"),
+            Map.entry("moduleAlias", "模块别名"),
+            Map.entry("metadataId", "元数据"),
+            Map.entry("metadataFieldId", "元数据字段"),
+            Map.entry("moduleMetadataFieldId", "模块字段"),
+            Map.entry("relationId", "关系"),
+            Map.entry("viewId", "视图"),
+            Map.entry("categoryId", "分类"),
+            Map.entry("categoryAlias", "分类别名"),
+            Map.entry("schemeId", "方案"),
+            Map.entry("ruleId", "规则"),
+            Map.entry("alias", "别名"),
+            Map.entry("code", "编码"),
+            Map.entry("title", "名称"),
+            Map.entry("enabled", "启用状态"),
+            Map.entry("sortOrder", "排序号"),
+            Map.entry("createdAt", "创建时间"),
+            Map.entry("updatedAt", "更新时间"),
+            Map.entry("deletedAt", "删除时间"),
+            Map.entry("publishedAt", "发布时间"),
+            Map.entry("effectiveDate", "生效日期"),
+            Map.entry("effectiveFrom", "生效开始"),
+            Map.entry("effectiveTo", "生效结束"),
+            Map.entry("systemManaged", "系统托管"),
+            Map.entry("published", "已发布"),
+            Map.entry("defaultSet", "默认集合"),
+            Map.entry("defaultTemplate", "默认模板"),
+            Map.entry("visible", "可见"),
+            Map.entry("readOnly", "只读"),
+            Map.entry("required", "必填"),
+            Map.entry("requiredOverride", "必填覆盖"),
+            Map.entry("fieldName", "字段名"),
+            Map.entry("columnName", "列名"),
+            Map.entry("fieldTypeAlias", "字段类型"),
+            Map.entry("fieldUiTypeAlias", "字段 UI 类型"),
+            Map.entry("actionCode", "动作编码"),
+            Map.entry("permissionActionCode", "权限动作码"),
+            Map.entry("entityAlias", "实体别名"),
+            Map.entry("fromCurrencyCode", "来源币种"),
+            Map.entry("toCurrencyCode", "目标币种"),
+            Map.entry("rateTypeCode", "汇率类型"),
+            Map.entry("rate", "汇率"),
+            Map.entry("source", "来源"),
+            Map.entry("numericCode", "数字编码"),
+            Map.entry("symbol", "符号"),
+            Map.entry("decimalScale", "小数位"),
+            Map.entry("roundingMode", "舍入模式"),
+            Map.entry("baseCurrencyCode", "本位币"),
+            Map.entry("categoryKind", "分类类型"),
+            Map.entry("employeeNo", "职员编号"),
+            Map.entry("mobile", "手机号"),
+            Map.entry("email", "邮箱")
+    );
+    private static final Set<String> QUICK_SEARCH_FIELDS = Set.of(
+            "title",
+            "code",
+            "alias",
+            "employeeNo",
+            "mobile",
+            "email",
+            "fieldName",
+            "columnName",
+            "actionCode",
+            "permissionActionCode",
+            "generatedValue",
+            "codeValue",
+            "recycledValue",
+            "numericCode",
+            "symbol",
+            "fromCurrencyCode",
+            "toCurrencyCode",
+            "rateTypeCode",
+            "baseUnitCode",
+            "fromUnitCode",
+            "toUnitCode",
+            "fixedUnitCode",
+            "defaultUnitCode",
+            "moneyFixedCurrencyCode",
+            "moneyDefaultCurrencyCode",
+            "moneyBaseCurrencyCode",
+            "moneyRateTypeCode",
+            "targetRelationCode"
+    );
 
     private QueryDescriptors() {
     }
@@ -101,7 +189,14 @@ public final class QueryDescriptors {
                     QueryOperator.IN);
         };
         if (isSortableByConvention(fieldName)) {
-            return field.withSortable();
+            field = field.withSortable();
+        }
+        String title = FIELD_TITLES.get(fieldName);
+        if (title != null) {
+            field = field.withTitle(title);
+        }
+        if (isQuickSearchByConvention(fieldName, valueType)) {
+            field = field.withQuickSearch();
         }
         return field;
     }
@@ -143,5 +238,10 @@ public final class QueryDescriptors {
                 || "priority".equals(fieldName)
                 || "versionNo".equals(fieldName)
                 || "currentVersionNo".equals(fieldName);
+    }
+
+    private static boolean isQuickSearchByConvention(String fieldName, QueryValueType valueType) {
+        return QUICK_SEARCH_FIELDS.contains(fieldName)
+                && (valueType == QueryValueType.STRING || valueType == QueryValueType.TEXT);
     }
 }

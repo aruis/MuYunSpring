@@ -49,16 +49,27 @@ class QuerySchemaTest {
     @Test
     void shouldBuildSimpleDescriptorFromStaticServiceFieldConventions() {
         QueryDescriptor descriptor = QueryDescriptors.simple("platform.application",
-                java.util.List.of("id", "title", "enabled", "sortOrder", "createdAt"),
+                java.util.List.of("id", "code", "title", "enabled", "sortOrder", "createdAt"),
                 Sort.asc("sortOrder"));
 
         QuerySchema schema = QuerySchema.from(descriptor);
 
         assertThat(schema.fields()).extracting(QuerySchema.Field::name)
-                .containsExactly("id", "title", "enabled", "sortOrder", "createdAt");
+                .containsExactly("id", "code", "title", "enabled", "sortOrder", "createdAt");
+        assertThat(schema.quickSearch().enabled()).isTrue();
+        assertThat(schema.quickSearch().fields()).containsExactly("code", "title");
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("title"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.title()).isEqualTo("名称");
+                    assertThat(field.defaultOperator()).isEqualTo(QueryOperator.LIKE);
+                    assertThat(field.quickSearch()).isTrue();
+                    assertThat(field.sortable()).isTrue();
+                });
         assertThat(schema.fields()).filteredOn(field -> field.name().equals("enabled"))
                 .singleElement()
                 .satisfies(field -> {
+                    assertThat(field.title()).isEqualTo("启用状态");
                     assertThat(field.valueType()).isEqualTo(QueryValueType.BOOLEAN);
                     assertThat(field.operators()).containsExactly(QueryOperator.EQ);
                 });
