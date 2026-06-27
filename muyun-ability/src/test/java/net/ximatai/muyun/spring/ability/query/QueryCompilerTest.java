@@ -1,0 +1,226 @@
+package net.ximatai.muyun.spring.ability.query;
+
+import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaClause;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
+import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.database.core.orm.SortDirection;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class QueryCompilerTest {
+    @Test
+    void shouldCompileDeclaredConditionsQuickSearchExternalCriteriaAndSorts() {
+        QueryDescriptor descriptor = descriptor();
+        QueryCompiler compiler = new QueryCompiler(descriptor);
+        QueryRequest request = new QueryRequest(
+                List.of(new QueryCondition("enabled", QueryOperator.EQ, List.of(true), null)),
+                null,
+                Map.of(),
+                List.of(new QuerySort("code", true)),
+                null,
+                null,
+                Map.of("scope", "dept-1"),
+                "alice",
+                List.of(),
+                false,
+                null
+        );
+
+        Criteria criteria = compiler.criteria(request);
+        Sort[] sorts = compiler.sorts(request);
+
+        assertThat(containsCondition(criteria, "enabled", true)).isTrue();
+        assertThat(containsCondition(criteria, "departmentId", "dept-1")).isTrue();
+        assertThat(containsCondition(criteria, "code", "alice")).isTrue();
+        assertThat(containsCondition(criteria, "title", "alice")).isTrue();
+        assertThat(sorts).hasSize(1);
+        assertThat(sorts[0].getField()).isEqualTo("code");
+        assertThat(sorts[0].getDirection()).isEqualTo(SortDirection.DESC);
+    }
+
+    @Test
+    void shouldUseFieldDefaultOperatorAndNormalizeValuesByFieldType() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(
+                List.of(
+                        new QueryCondition("code", null, List.of("A001"), null),
+                        new QueryCondition("enabled", QueryOperator.EQ, List.of("true"), null)
+                ),
+                null,
+                Map.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        );
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(containsCondition(criteria, "code", "A001")).isTrue();
+        assertThat(containsCondition(criteria, "enabled", Boolean.TRUE)).isTrue();
+    }
+
+    @Test
+    void shouldCompileInstantLocalDateRangeWithBusinessTimeZoneAsHalfOpenRange() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(
+                List.of(new QueryCondition("createdAt", QueryOperator.BETWEEN,
+                        List.of("2026-06-26", "2026-06-26"), "Asia/Shanghai")),
+                null,
+                Map.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        );
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(containsCondition(criteria, "createdAt", Instant.parse("2026-06-25T16:00:00Z"))).isTrue();
+        assertThat(containsCondition(criteria, "createdAt", Instant.parse("2026-06-26T16:00:00Z"))).isTrue();
+    }
+
+    @Test
+    void shouldRejectUndeclaredFieldsAndUnsupportedSorts() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+
+        assertThatThrownBy(() -> compiler.criteria(new QueryRequest(
+                List.of(new QueryCondition("secret", QueryOperator.EQ, List.of("x"), null)),
+                null,
+                Map.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        ))).hasMessage("query field is not supported by test.employee: secret");
+
+        assertThatThrownBy(() -> compiler.sorts(new QueryRequest(
+                List.of(),
+                null,
+                Map.of(),
+                List.of(new QuerySort("title", false)),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        ))).hasMessage("query sort is not supported by test.employee: title");
+    }
+
+    @Test
+    void shouldCompileNestedCriteriaTreeWithSameJoinSemanticsAsDynamicQuery() {
+        QueryCriteria nested = new QueryCriteria(
+                QueryGroupOperator.OR,
+                List.of(
+                        new QueryCondition("ownerId", QueryOperator.EQ, List.of("u-1"), null),
+                        new QueryCondition("ownerId", QueryOperator.EQ, List.of("u-2"), null)
+                ),
+                List.of()
+        );
+        QueryCriteria root = new QueryCriteria(
+                QueryGroupOperator.OR,
+                List.of(new QueryCondition("code", QueryOperator.EQ, List.of("C-001"), null)),
+                List.of(new QueryCriteria(
+                        QueryGroupOperator.AND,
+                        List.of(new QueryCondition("status", QueryOperator.EQ, List.of("active"), null)),
+                        List.of(nested)
+                ))
+        );
+
+        Criteria criteria = QueryCompiler.compileCriteriaTree(root, QueryCompilerTest::compileSingle);
+
+        List<CriteriaGroup.Entry> rootEntries = criteria.getRoot().getEntries();
+        assertThat(rootEntries).hasSize(2);
+        assertThat(join(rootEntries.get(0))).isEqualTo("AND");
+        assertThat(join(rootEntries.get(1))).isEqualTo("OR");
+        CriteriaGroup andGroup = (CriteriaGroup) node(rootEntries.get(1));
+        assertThat(andGroup.getEntries()).hasSize(2);
+        assertThat(join(andGroup.getEntries().get(0))).isEqualTo("AND");
+        assertThat(join(andGroup.getEntries().get(1))).isEqualTo("AND");
+        CriteriaGroup nestedOr = (CriteriaGroup) node(andGroup.getEntries().get(1));
+        assertThat(nestedOr.getEntries()).hasSize(2);
+        assertThat(join(nestedOr.getEntries().get(0))).isEqualTo("AND");
+        assertThat(join(nestedOr.getEntries().get(1))).isEqualTo("OR");
+    }
+
+    private static QueryDescriptor descriptor() {
+        return QueryDescriptor.builder("test.employee")
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ))
+                .field(QueryField.of("code", QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch().withSortable())
+                .field(QueryField.of("title", QueryOperator.EQ, QueryOperator.LIKE)
+                        .withQuickSearch())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.BETWEEN))
+                .externalCriteria("scope", value -> Criteria.of().eq("departmentId", value))
+                .defaultSort(Sort.asc("code"))
+                .build();
+    }
+
+    private static Criteria compileSingle(QueryCondition condition) {
+        return Criteria.of().eq(condition.fieldName(), condition.values().getFirst());
+    }
+
+    private boolean containsCondition(Criteria criteria, String fieldName, Object value) {
+        return clauses(criteria).stream()
+                .anyMatch(clause -> fieldName.equals(clause.getField())
+                        && clause.getValues().contains(value));
+    }
+
+    private List<CriteriaClause> clauses(Criteria criteria) {
+        List<CriteriaClause> result = new ArrayList<>();
+        collect(criteria.getRoot(), result);
+        return result;
+    }
+
+    private void collect(CriteriaGroup group, List<CriteriaClause> result) {
+        for (CriteriaGroup.Entry entry : group.getEntries()) {
+            Object node = node(entry);
+            if (node instanceof CriteriaClause clause) {
+                result.add(clause);
+            } else if (node instanceof CriteriaGroup childGroup) {
+                collect(childGroup, result);
+            }
+        }
+    }
+
+    private static Object node(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getNode");
+            return method.invoke(entry);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria node", e);
+        }
+    }
+
+    private static String join(CriteriaGroup.Entry entry) {
+        try {
+            Method method = entry.getClass().getMethod("getJoin");
+            return String.valueOf(method.invoke(entry));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot read criteria join", e);
+        }
+    }
+}
