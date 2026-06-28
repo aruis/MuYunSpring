@@ -229,7 +229,8 @@ class PlatformModelSchemaTest {
         assertThat(uniqueIndexes(mapper.toTable(DictionaryCategory.class)))
                 .contains(List.of("tenant_id", "application_alias", "alias"));
         assertThat(uniqueIndexes(mapper.toTable(DictionaryItem.class)))
-                .contains(List.of("tenant_id", "category_id", "code"));
+                .contains(List.of("tenant_id", "category_id", "code"),
+                        List.of("tenant_id", "category_id", "title"));
     }
 
     @Test

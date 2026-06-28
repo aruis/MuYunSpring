@@ -92,6 +92,18 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void shouldAllowNumericDictionaryItemCodeAsBusinessValue() {
+        categoryService.insert(category("crm", "gender", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+
+        String maleId = itemService.insert(item("crm", "gender", "1", TreeAbility.ROOT_ID));
+
+        assertThat(itemService.resolveItem("crm", "gender", "1").getId()).isEqualTo(maleId);
+        assertThat(itemService.rootItems("crm", "gender"))
+                .extracting(DictionaryItem::getCode)
+                .containsExactly("1");
+    }
+
+    @Test
     void shouldResolveOnlyEnabledDictionaryItemForWriteValidation() {
         String categoryId = categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
         String activeId = itemService.insert(item("crm", "customer_status", "active", TreeAbility.ROOT_ID));
@@ -191,6 +203,33 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void shouldRejectDuplicateItemTitleWithinCategory() {
+        categoryService.insert(category("crm", "gender", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(titledItem("crm", "gender", "1", "男", TreeAbility.ROOT_ID));
+
+        assertThatThrownBy(() -> itemService.insert(titledItem("crm", "gender", "male", "男", TreeAbility.ROOT_ID)))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("title");
+        assertThat(itemService.insert(titledItem("crm", "customer_status", "male", "男", TreeAbility.ROOT_ID)))
+                .isNotBlank();
+    }
+
+    @Test
+    void shouldRejectItemTitleChangesToDuplicateWithinCategory() {
+        categoryService.insert(category("crm", "gender", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(titledItem("crm", "gender", "1", "男", TreeAbility.ROOT_ID));
+        String femaleId = itemService.insert(titledItem("crm", "gender", "2", "女", TreeAbility.ROOT_ID));
+        DictionaryItem changedTitle = titledItem("crm", "gender", "2", "男", TreeAbility.ROOT_ID);
+        changedTitle.setId(femaleId);
+        changedTitle.setVersion(0);
+
+        assertThatThrownBy(() -> itemService.update(changedTitle))
+                .isInstanceOf(PlatformException.class)
+                .hasMessageContaining("title");
+    }
+
+    @Test
     void shouldKeepItemCodeUniqueWithinWholeCategoryTree() {
         categoryService.insert(category("crm", "area", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
         String parentId = itemService.insert(item("crm", "area", "china", TreeAbility.ROOT_ID));
@@ -274,13 +313,21 @@ class DictionaryServiceContractTest {
     }
 
     private DictionaryItem item(String applicationAlias, String categoryAlias, String code, String parentId) {
+        return titledItem(applicationAlias, categoryAlias, code, code, parentId);
+    }
+
+    private DictionaryItem titledItem(String applicationAlias,
+                                      String categoryAlias,
+                                      String code,
+                                      String title,
+                                      String parentId) {
         DictionaryCategory category = categoryService.requireDictionaryCategory(applicationAlias, categoryAlias);
         DictionaryItem item = new DictionaryItem();
         item.setCategoryId(category.getId());
         item.setCategoryAlias(category.getAlias());
         item.setCode(code);
         item.setParentId(parentId);
-        item.setTitle(code);
+        item.setTitle(title);
         return item;
     }
 }
