@@ -43,6 +43,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -59,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -115,6 +117,14 @@ class IamWebControllerIT {
 
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
+
+    @BeforeEach
+    void setUpOptionOutputPassthrough() {
+        lenient().when(employeeService.populateOptionTitlesForOutput(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(employeeService.populateOptionTitlesForOutput(org.mockito.ArgumentMatchers.<List<Employee>>any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void shouldUseInjectedServiceAndCurrentUserTenantInRealMvcContext() throws Exception {
