@@ -15,8 +15,6 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
-import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.util.Preconditions;
 import net.ximatai.muyun.spring.iam.department.Department;
@@ -37,10 +35,6 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         OptionFieldOutputAbility<Employee>,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
-    private static final OptionFieldDefinition GENDER_OPTION_FIELD = OptionFieldResolver.resolve(Employee.class).stream()
-            .filter(field -> "gender".equals(field.fieldName()))
-            .findFirst()
-            .orElseThrow();
 
     private final OrganizationService organizationService;
     private final DepartmentService departmentService;
@@ -124,8 +118,7 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                 .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("职员姓名").withQuickSearch().withSortable())
                 .field(QueryField.of("gender", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
-                        .withTitle("性别")
-                        .withOptionField(GENDER_OPTION_FIELD))
+                        .withTitle("性别"))
                 .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("手机号").withQuickSearch())
                 .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)

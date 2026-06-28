@@ -10,6 +10,8 @@ import net.ximatai.muyun.database.core.annotation.TrueOrFalse;
 import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
+import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionSourceType;
 
 @Getter
 @Setter
@@ -21,9 +23,12 @@ import net.ximatai.muyun.spring.common.initialdata.InitialDataFields;
         operator = {"title", "enabled", "sortOrder"}
 )
 public class Role extends StandardEnabledSortableEntity {
+    @OptionField(type = OptionSourceType.ENUM)
     @Column(name = "role_kind", type = ColumnType.VARCHAR, length = 32, nullable = false, comment = "Role kind",
             defaultVal = @Default(varchar = "standard"))
     private RoleKind roleKind = RoleKind.STANDARD;
+
+    private String roleKindTitle;
 
     @Column(name = "member_role_ids", type = ColumnType.TEXT, comment = "Member role ids for role group")
     private String memberRoleIds;

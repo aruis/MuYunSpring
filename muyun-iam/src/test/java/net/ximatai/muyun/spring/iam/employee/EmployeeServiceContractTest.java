@@ -123,12 +123,12 @@ class EmployeeServiceContractTest {
     }
 
     @Test
-    void shouldExposeGenderOptionBindingInQueryDescriptor() {
+    void shouldExposeGenderOptionBindingInQuerySchema() {
         EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
                 organizationService(), departmentService());
 
-        assertThat(service.queryDescriptor().fields()).anySatisfy(field -> {
-            assertThat(field.fieldName()).isEqualTo("gender");
+        assertThat(service.querySchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("gender");
             assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
             assertThat(field.optionTitleField()).isEqualTo("genderTitle");
         });

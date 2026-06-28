@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.ability.query;
 
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionField;
+import net.ximatai.muyun.spring.common.option.OptionSourceType;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,5 +101,46 @@ class QuerySchemaTest {
                     assertThat(sort.field()).isEqualTo("sortOrder");
                     assertThat(sort.desc()).isFalse();
                 });
+    }
+
+    @Test
+    void shouldMergeStaticOptionFieldMetadataIntoQuerySchema() {
+        QueryDescriptor descriptor = QueryDescriptor.builder("iam.employee")
+                .field(QueryField.of("gender", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("性别")
+                        .withQuickSearch())
+                .build();
+
+        QuerySchema schema = QuerySchema.from(descriptor, EmployeeOptionRecord.class);
+
+        assertThat(schema.fields()).singleElement().satisfies(field -> {
+            assertThat(field.name()).isEqualTo("gender");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
+        assertThat(schema.quickSearch().fieldSchemas()).singleElement()
+                .satisfies(field -> assertThat(field.optionBinding())
+                        .isEqualTo(OptionBinding.dictionary("iam", "gender")));
+    }
+
+    @Test
+    void shouldKeepExplicitQueryOptionBindingWhenStaticOptionFieldAlsoExists() {
+        QueryDescriptor descriptor = QueryDescriptor.builder("iam.employee")
+                .field(QueryField.of("gender", QueryValueType.STRING, QueryOperator.EQ)
+                        .withOptionBinding(OptionBinding.dictionary("crm", "gender")))
+                .build();
+
+        QuerySchema schema = QuerySchema.from(descriptor, EmployeeOptionRecord.class);
+
+        assertThat(schema.fields()).singleElement()
+                .extracting(QuerySchema.Field::optionBinding)
+                .isEqualTo(OptionBinding.dictionary("crm", "gender"));
+    }
+
+    private static class EmployeeOptionRecord {
+        @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
+        private String gender;
+
+        private String genderTitle;
     }
 }

@@ -7,6 +7,13 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
+import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.query.QueryAbility;
+import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
+import net.ximatai.muyun.spring.ability.query.QueryField;
+import net.ximatai.muyun.spring.ability.query.QueryOperator;
+import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.ability.reference.ReferenceAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
@@ -44,7 +51,9 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         EnableAbility<Role>,
         SortAbility<Role>,
         ReferenceAbility<Role>,
-        InitialDataAbility<Role> {
+        InitialDataAbility<Role>,
+        OptionFieldOutputAbility<Role>,
+        QueryAbility<Role> {
     public static final String MODULE_ALIAS = "iam.role";
     public static final String WILDCARD_DATA_SCOPE_MODULE_ALIAS = "iam.data_scope";
     public static final String PLATFORM_SUPER_ADMIN_ROLE_ID = "platform.role.super_admin";
@@ -59,6 +68,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private final EmployeeService employeeService;
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
+    private final StaticOptionFieldTitlePopulator optionFieldTitlePopulator;
 
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
@@ -89,7 +99,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 grantVerifier, userAccountService, employeeService, employeePositionService, null);
     }
 
-    @Autowired
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
                        RoleActionDao roleActionDao,
@@ -99,6 +108,22 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        EmployeeService employeeService,
                        EmployeePositionService employeePositionService,
                        EmployeeAccountService employeeAccountService) {
+        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
+                grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
+                StaticOptionFieldTitlePopulator.NONE);
+    }
+
+    @Autowired
+    public RoleService(RoleDao roleDao,
+                       RoleGrantDao roleGrantDao,
+                       RoleActionDao roleActionDao,
+                       ActiveTenantVerifier activeTenantVerifier,
+                       RoleActionGrantVerifier grantVerifier,
+                       UserAccountService userAccountService,
+                       EmployeeService employeeService,
+                       EmployeePositionService employeePositionService,
+                       EmployeeAccountService employeeAccountService,
+                       StaticOptionFieldTitlePopulator optionFieldTitlePopulator) {
         super(MODULE_ALIAS, Role.class, roleDao, activeTenantVerifier);
         this.roleGrantDao = Objects.requireNonNull(roleGrantDao, "roleGrantDao must not be null");
         this.roleActionDao = Objects.requireNonNull(roleActionDao, "roleActionDao must not be null");
@@ -107,6 +132,40 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
+        this.optionFieldTitlePopulator = optionFieldTitlePopulator == null
+                ? StaticOptionFieldTitlePopulator.NONE : optionFieldTitlePopulator;
+    }
+
+    @Override
+    public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
+        return optionFieldTitlePopulator;
+    }
+
+    @Override
+    public QueryDescriptor queryDescriptor() {
+        return QueryDescriptor.builder(MODULE_ALIAS)
+                .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
+                .field(QueryField.of("roleKind", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("角色类型"))
+                .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
+                        .withTitle("角色名称").withQuickSearch().withSortable())
+                .field(QueryField.of("enabled", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("启用状态"))
+                .field(QueryField.of("publicRole", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("公开角色"))
+                .field(QueryField.of("builtIn", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("内置角色"))
+                .field(QueryField.of("systemManaged", QueryValueType.BOOLEAN, QueryOperator.EQ).withTitle("系统托管"))
+                .field(QueryField.of("sortOrder", QueryValueType.INTEGER, QueryOperator.EQ)
+                        .withTitle("排序号").withSortable())
+                .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("创建时间")
+                        .withSortable())
+                .field(QueryField.of("updatedAt", QueryValueType.INSTANT, QueryOperator.GTE, QueryOperator.LTE,
+                                QueryOperator.BETWEEN)
+                        .withTitle("更新时间")
+                        .withSortable())
+                .defaultSort(Sort.asc("sortOrder"))
+                .defaultSort(Sort.asc("title"))
+                .build();
     }
 
     @Override
