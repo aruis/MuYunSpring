@@ -42,6 +42,7 @@ public interface CrudAbility<T extends EntityContract> {
         PlatformManagedMutationGuard.beforeInsert(this, entity);
         prepareSortDefault(entity);
         validateTreePlacementIfNeeded(entity);
+        PlatformAbilityDispatcher.beforeSave(this, entity);
         String id;
         try (FieldProtectionAbility.FieldProtectionMutation ignored = PlatformAbilityDispatcher.beforePersist(this, entity)) {
             id = getDao().insert(entity);
@@ -101,6 +102,7 @@ public interface CrudAbility<T extends EntityContract> {
             }
             beforeUpdate(entity);
             validateTreePlacementIfNeeded(entity);
+            PlatformAbilityDispatcher.beforeSave(this, entity);
             return updatePreparedRecord(entity, expectedVersion, true);
         });
     }

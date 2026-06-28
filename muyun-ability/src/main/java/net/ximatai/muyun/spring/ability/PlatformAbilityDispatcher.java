@@ -1,12 +1,28 @@
 package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.ability.child.ChildrenAbility;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.ability.reference.ReferencerAbility;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 final class PlatformAbilityDispatcher {
+    private static volatile StaticOptionFieldValueValidator staticOptionFieldValueValidator =
+            StaticOptionFieldValueValidator.NONE;
+
     private PlatformAbilityDispatcher() {
+    }
+
+    static void setStaticOptionFieldValueValidator(StaticOptionFieldValueValidator validator) {
+        staticOptionFieldValueValidator = validator == null ? StaticOptionFieldValueValidator.NONE : validator;
+    }
+
+    static void resetStaticOptionFieldValueValidator() {
+        staticOptionFieldValueValidator = StaticOptionFieldValueValidator.NONE;
+    }
+
+    static <T extends EntityContract> void beforeSave(CrudAbility<T> ability, T entity) {
+        runStaticOptionFieldValidation(ability, entity);
     }
 
     static <T extends EntityContract> void afterInsert(CrudAbility<T> ability, String id, T entity) {
@@ -38,6 +54,14 @@ final class PlatformAbilityDispatcher {
             return fieldProtectionAbility.protectFieldsForStorage(entity);
         }
         return FieldProtectionAbility.FieldProtectionMutation.NONE;
+    }
+
+    private static <T extends EntityContract> void runStaticOptionFieldValidation(CrudAbility<T> ability, T entity) {
+        if (ability == null || entity == null) {
+            return;
+        }
+        Class<?> modelClass = ability.modelClass() == null ? entity.getClass() : ability.modelClass();
+        staticOptionFieldValueValidator.validate(modelClass, entity);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

@@ -1,5 +1,6 @@
 package net.ximatai.muyun.spring.iam.employee;
 
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
@@ -11,6 +12,7 @@ import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,6 +24,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EmployeeServiceContractTest {
+    @AfterEach
+    void resetPlatformAbilityRuntime() {
+        PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
+    }
+
     @Test
     void shouldExposeStableModuleAlias() {
         EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
@@ -111,8 +118,9 @@ class EmployeeServiceContractTest {
         StaticOptionFieldValueValidator validator = mock(StaticOptionFieldValueValidator.class);
         when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
         when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("org-1", "dept-1"));
+        PlatformAbilityRuntime.configureStaticOptionFieldValueValidator(validator);
         EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
-                departmentService, validator);
+                departmentService);
         Employee employee = employee("org-1", "dept-1", "E001", "Alice");
         employee.setGender("1");
 
@@ -152,7 +160,7 @@ class EmployeeServiceContractTest {
     void shouldPopulateGenderTitleThroughStaticOptionFieldPopulator() {
         StaticOptionFieldTitlePopulator populator = mock(StaticOptionFieldTitlePopulator.class);
         EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
-                organizationService(), departmentService(), StaticOptionFieldValueValidator.NONE, populator);
+                organizationService(), departmentService(), populator);
         Employee employee = employee("org-1", "dept-1", "E001", "Alice");
 
         service.populateOptionTitlesForOutput(java.util.List.of(employee));
