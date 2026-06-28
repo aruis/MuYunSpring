@@ -5,6 +5,9 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
+import net.ximatai.muyun.spring.ability.form.FormDescriptor;
+import net.ximatai.muyun.spring.ability.form.FormField;
 import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
@@ -33,6 +36,7 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
         OptionFieldOutputAbility<Employee>,
+        FormAbility<Employee>,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
 
@@ -104,6 +108,20 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     @Override
     public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
         return optionFieldTitlePopulator;
+    }
+
+    @Override
+    public FormDescriptor formDescriptor() {
+        return FormDescriptor.builder(MODULE_ALIAS)
+                .title("职员档案")
+                .field(FormField.of("organizationId").withTitle("所属机构").asRequired())
+                .field(FormField.of("departmentId").withTitle("所属部门").asRequired())
+                .field(FormField.of("employeeNo").withTitle("职员编号").asRequired())
+                .field(FormField.of("title").withTitle("职员姓名").asRequired())
+                .field(FormField.of("gender").withTitle("性别"))
+                .field(FormField.of("mobile").withTitle("手机号"))
+                .field(FormField.of("email").withTitle("邮箱"))
+                .build();
     }
 
     @Override

@@ -7,6 +7,10 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedService;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
+import net.ximatai.muyun.spring.ability.form.FormDescriptor;
+import net.ximatai.muyun.spring.ability.form.FormField;
+import net.ximatai.muyun.spring.ability.form.FormValueType;
 import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
@@ -53,6 +57,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         ReferenceAbility<Role>,
         InitialDataAbility<Role>,
         OptionFieldOutputAbility<Role>,
+        FormAbility<Role>,
         QueryAbility<Role> {
     public static final String MODULE_ALIAS = "iam.role";
     public static final String WILDCARD_DATA_SCOPE_MODULE_ALIAS = "iam.data_scope";
@@ -139,6 +144,21 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     @Override
     public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
         return optionFieldTitlePopulator;
+    }
+
+    @Override
+    public FormDescriptor formDescriptor() {
+        return FormDescriptor.builder(MODULE_ALIAS)
+                .title("角色")
+                .field(FormField.of("roleKind").withTitle("角色类型").asRequired())
+                .field(FormField.of("title").withTitle("角色名称").asRequired())
+                .field(FormField.of("grantSubjectTypes").withTitle("授权主体类型").asRequired())
+                .field(FormField.of("memberRoleIds").withTitle("成员角色"))
+                .field(FormField.of("publicRole", FormValueType.BOOLEAN).withTitle("公开角色"))
+                .field(FormField.of("builtIn", FormValueType.BOOLEAN).withTitle("内置角色").asReadOnly())
+                .field(FormField.of("systemManaged", FormValueType.BOOLEAN).withTitle("系统托管").asReadOnly())
+                .field(FormField.of("description", FormValueType.TEXT).withTitle("角色描述"))
+                .build();
     }
 
     @Override

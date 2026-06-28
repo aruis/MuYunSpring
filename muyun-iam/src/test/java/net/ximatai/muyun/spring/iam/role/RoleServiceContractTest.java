@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
@@ -40,6 +41,18 @@ class RoleServiceContractTest {
         assertThat(service.querySchema().fields()).anySatisfy(field -> {
             assertThat(field.name()).isEqualTo("roleKind");
             assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleKind.class));
+            assertThat(field.optionTitleField()).isEqualTo("roleKindTitle");
+        });
+    }
+
+    @Test
+    void shouldExposeRoleKindEnumOptionBindingInFormSchema() {
+        RoleService service = service(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class));
+
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("roleKind");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleKind.class));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
             assertThat(field.optionTitleField()).isEqualTo("roleKindTitle");
         });
     }

@@ -62,7 +62,7 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 1. `DICTIONARY`：`source` 使用 `applicationAlias.categoryAlias`，业务字段保存字典项目 `code`。租户上下文读取字典选项时，租户字典优先；租户下不存在对应类目时，允许回退读取平台全局字典。
 2. `ENUM`：字段类型或 `enumType` 必须实现 `CodeTitleEnum`，业务字段保存 enum code。集合或数组字段必须显式声明 `selectionMode = MULTIPLE`。
 
-静态查询 schema 会在 `QueryAbility.querySchema()` 中按模型同名字段自动合并 `@OptionField` 元数据。业务 service 的 `QueryDescriptor` 只需要声明查询语义；如果 descriptor 已显式声明 option binding，则以显式声明为准。默认 title 输出字段为 `fieldName + "Title"`，也可通过 `titleOutputField` 定制；关闭 title 输出时 schema 不暴露 `optionTitleField`。
+静态查询 schema 会在 `QueryAbility.querySchema()` 中按模型同名字段自动合并 `@OptionField` 元数据；静态表单 schema 同理在 `FormAbility.formSchema()` 中合并。业务 service 的 `QueryDescriptor` / `FormDescriptor` 只声明查询或表单语义；如果 descriptor 已显式声明 option binding，则以显式声明为准。默认 title 输出字段为 `fieldName + "Title"`，也可通过 `titleOutputField` 定制；关闭 title 输出时 schema 不暴露 `optionTitleField`。
 
 ## 计量单位边界
 

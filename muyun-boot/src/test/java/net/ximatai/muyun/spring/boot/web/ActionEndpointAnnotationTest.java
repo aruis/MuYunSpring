@@ -18,6 +18,7 @@ class ActionEndpointAnnotationTest {
     void shouldDescribeStandardCrudEndpointActionSemantics() throws Exception {
         assertThat(endpoint(CrudWeb.class, "query", WebQueryRequest.class).value()).isEqualTo(PlatformAction.QUERY);
         assertThat(endpoint(CrudWeb.class, "querySchema", String.class).value()).isEqualTo(PlatformAction.QUERY);
+        assertThat(endpoint(CrudWeb.class, "formSchema", String.class).value()).isEqualTo(PlatformAction.VIEW);
         assertThat(endpoint(CrudWeb.class, "view", String.class).value()).isEqualTo(PlatformAction.VIEW);
         assertThat(endpoint(CrudWeb.class, "insert", EntityContract.class).value()).isEqualTo(PlatformAction.CREATE);
         assertThat(endpoint(CrudWeb.class, "update", String.class, EntityContract.class).value()).isEqualTo(PlatformAction.UPDATE);

@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
@@ -130,6 +131,19 @@ class EmployeeServiceContractTest {
         assertThat(service.querySchema().fields()).anySatisfy(field -> {
             assertThat(field.name()).isEqualTo("gender");
             assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
+    }
+
+    @Test
+    void shouldExposeGenderOptionBindingInFormSchema() {
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService());
+
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("gender");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
             assertThat(field.optionTitleField()).isEqualTo("genderTitle");
         });
     }
