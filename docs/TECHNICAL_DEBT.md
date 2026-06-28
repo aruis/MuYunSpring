@@ -53,6 +53,7 @@
 | TD-026 | 应用归属引用保护仍缺少贡献式检查契约 | 当前删除应用时只在 `ApplicationService` 中显式检查模块、元数据和字典类目等已接入引用；仓库内其他 `applicationAlias` 归属模型后续增多时，如果继续扩硬编码清单，容易遗漏并产生孤儿配置数据 | 进入计量单位、工作流、配置包或更多应用归属模型的删除治理时，沉淀应用归属引用检查贡献接口或注册表，由各业务能力贡献引用存在性、展示名称和错误详情，`ApplicationService` 只编排统一拒绝语义 |
 | TD-028 | `QuerySchema` 外部查询值描述仍过于粗糙 | `QuerySchema.ExternalCriteria` 目前只暴露 key，并固定为 `OBJECT` / `PAGE_CONTEXT`，缺少字段结构、来源语义和校验契约；随着静态查询模板、动态页面上下文和外部查询值增多，ability 层可能继续携带页面交付语义 | 后续扩展 external query values 前，引入 `ExternalCriteriaDescriptor` 或等价能力契约，由能力层声明 valueType、来源、对象字段结构和校验边界，Web 层只负责序列化 |
 | TD-029 | 静态查询描述仍依赖字段名约定推断 | `QueryDescriptors.simple` 目前用字段名集合推断 valueType、操作符、标题、quickSearch 和可排序字段，能快速回收旧 Web 查询适配器并改善静态 schema 展示，但业务字段名进入 ability 核心会带来同名不同义、字段漏判和静态/动态查询契约分叉风险 | 静态查询字段继续扩展、出现更多非通用字段类型或查询配置需要对外稳定时，沉淀静态模型 QueryDescriptor 编译器，从 Java 字段类型、模型契约或注解生成查询字段；保留 `simple` 为保守基线或测试便利 |
+| TD-030 | 静态查询字段尚未自动合并 `@OptionField` 元数据 | 当前静态 service 需要在 `QueryDescriptor` 中手动把同名 `QueryField` 与模型上的 `@OptionField` 绑定；单字段接入成本可接受，但多个静态模型接入字典或枚举后会重复声明 option binding、selection mode 和 title 输出字段 | 出现第二个以上静态模型需要选项字段查询 schema 时，沉淀静态查询字段编译/合并能力，从 Java 字段注解自动补齐同名 `QueryField` 的选项元数据，业务 service 只保留查询语义 |
 
 ## 运维治理触发回收
 

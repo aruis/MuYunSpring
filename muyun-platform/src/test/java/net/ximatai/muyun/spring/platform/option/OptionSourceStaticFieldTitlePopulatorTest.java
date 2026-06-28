@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.platform.option;
 
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
+import net.ximatai.muyun.spring.common.option.CodeTitleEnumOptionSourceProvider;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionItem;
@@ -17,7 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OptionSourceStaticFieldTitlePopulatorTest {
     private final OptionSourceStaticFieldTitlePopulator populator =
-            new OptionSourceStaticFieldTitlePopulator(new OptionSourceRegistry(List.of(new GenderSourceProvider())));
+            new OptionSourceStaticFieldTitlePopulator(new OptionSourceRegistry(List.of(
+                    new GenderSourceProvider(),
+                    new CodeTitleEnumOptionSourceProvider()
+            )));
 
     @Test
     void shouldPopulateAutoTitleOutputField() {
@@ -62,6 +67,26 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         assertThat(employee.genderTitle).isNull();
     }
 
+    @Test
+    void shouldPopulateCodeTitleEnumTitleOutputField() {
+        RoleDraft draft = new RoleDraft();
+        draft.kind = TestRoleKind.STANDARD;
+
+        populator.populate(RoleDraft.class, draft);
+
+        assertThat(draft.kindTitle).isEqualTo("标准角色");
+    }
+
+    @Test
+    void shouldPopulateCodeTitleEnumCollectionTitleOutputField() {
+        RoleKindsDraft draft = new RoleKindsDraft();
+        draft.kinds = List.of(TestRoleKind.STANDARD, TestRoleKind.SYSTEM);
+
+        populator.populate(RoleKindsDraft.class, draft);
+
+        assertThat(draft.kindsTitle).containsExactly("标准角色", "系统角色");
+    }
+
     private static class Employee {
         @OptionField(type = OptionSourceType.DICTIONARY, source = "iam.gender")
         private String gender;
@@ -75,6 +100,20 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         private List<String> tags;
 
         private List<String> tagsTitle;
+    }
+
+    private static class RoleDraft {
+        @OptionField(type = OptionSourceType.ENUM)
+        private TestRoleKind kind;
+
+        private String kindTitle;
+    }
+
+    private static class RoleKindsDraft {
+        @OptionField(type = OptionSourceType.ENUM, selectionMode = OptionSelectionMode.MULTIPLE)
+        private List<TestRoleKind> kinds;
+
+        private List<String> kindsTitle;
     }
 
     private static class GenderSourceProvider implements OptionSourceProvider {
@@ -125,6 +164,29 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         @Override
         public OptionSource source(OptionBinding binding) {
             throw new IllegalArgumentException("missing source");
+        }
+    }
+
+    private enum TestRoleKind implements CodeTitleEnum {
+        STANDARD("standard", "标准角色"),
+        SYSTEM("system", "系统角色");
+
+        private final String code;
+        private final String title;
+
+        TestRoleKind(String code, String title) {
+            this.code = code;
+            this.title = title;
+        }
+
+        @Override
+        public String getCode() {
+            return code;
+        }
+
+        @Override
+        public String getTitle() {
+            return title;
         }
     }
 }

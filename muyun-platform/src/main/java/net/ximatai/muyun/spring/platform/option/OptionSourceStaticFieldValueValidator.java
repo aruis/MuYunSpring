@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.option;
 
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionItem;
@@ -81,11 +82,15 @@ public class OptionSourceStaticFieldValueValidator implements StaticOptionFieldV
     }
 
     private String normalizeSingleValue(OptionFieldDefinition definition, Object value) {
-        if (!(value instanceof String code)) {
-            throw new IllegalArgumentException("option field requires string code: " + definition.fieldName());
+        if (value instanceof CodeTitleEnum codeTitleEnum) {
+            return codeTitleEnum.getCode();
         }
-        String trimmed = code.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        if (value instanceof String code) {
+            String trimmed = code.trim();
+            return trimmed.isEmpty() ? null : trimmed;
+        }
+        throw new IllegalArgumentException("option field requires string code or CodeTitleEnum: "
+                + definition.fieldName());
     }
 
     private void validateCode(OptionFieldDefinition definition, OptionSource source, String code) {

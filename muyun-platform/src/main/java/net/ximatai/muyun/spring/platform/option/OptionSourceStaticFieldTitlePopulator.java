@@ -1,6 +1,7 @@
 package net.ximatai.muyun.spring.platform.option;
 
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
 import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
 import net.ximatai.muyun.spring.common.option.OptionItem;
@@ -95,11 +96,14 @@ public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldT
     }
 
     private String code(Object value) {
-        if (!(value instanceof String text)) {
-            return null;
+        if (value instanceof CodeTitleEnum codeTitleEnum) {
+            return codeTitleEnum.getCode();
         }
-        String trimmed = text.trim();
-        return trimmed.isBlank() ? null : trimmed;
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            return trimmed.isBlank() ? null : trimmed;
+        }
+        return null;
     }
 
     private List<?> toValues(Object value) {
