@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OptionSourceStaticFieldTitlePopulatorTest {
     private final OptionSourceStaticFieldTitlePopulator populator =
@@ -55,16 +56,18 @@ class OptionSourceStaticFieldTitlePopulatorTest {
     }
 
     @Test
-    void shouldNotFailOutputWhenOptionSourceIsMissing() {
+    void shouldExposeConfigurationErrorWhenOptionSourceIsMissing() {
         OptionSourceStaticFieldTitlePopulator missingSourcePopulator =
                 new OptionSourceStaticFieldTitlePopulator(new OptionSourceRegistry(List.of(new MissingSourceProvider())));
         Employee employee = new Employee();
         employee.gender = "1";
         employee.genderTitle = "old";
 
-        missingSourcePopulator.populate(Employee.class, employee);
+        assertThatThrownBy(() -> missingSourcePopulator.populate(Employee.class, employee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("missing source");
 
-        assertThat(employee.genderTitle).isNull();
+        assertThat(employee.genderTitle).isEqualTo("old");
     }
 
     @Test

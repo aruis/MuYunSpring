@@ -53,12 +53,8 @@ public class OptionSourceStaticFieldTitlePopulator implements StaticOptionFieldT
     }
 
     private Map<String, String> optionTitles(OptionFieldDefinition definition) {
-        try {
-            return optionSourceRegistry.source(definition.binding()).options(OptionQuery.all()).stream()
-                    .collect(Collectors.toMap(OptionItem::code, OptionItem::title, (left, right) -> left));
-        } catch (RuntimeException ex) {
-            return Map.of();
-        }
+        return optionSourceRegistry.source(definition.binding()).options(OptionQuery.all()).stream()
+                .collect(Collectors.toMap(OptionItem::code, OptionItem::title, (left, right) -> left));
     }
 
     private void populateTitle(Class<?> modelClass,

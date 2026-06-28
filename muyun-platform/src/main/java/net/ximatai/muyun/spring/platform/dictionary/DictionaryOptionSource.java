@@ -49,15 +49,16 @@ public final class DictionaryOptionSource implements OptionSource {
 
     @Override
     public OptionItem resolve(String code) {
-        DictionaryItem item = readWithGlobalFallback(() ->
-                itemService.resolveItem(applicationAlias, categoryAlias, code));
-        if (item == null) {
-            return null;
-        }
-        DictionaryItem parent = itemService.select(item.getParentId());
-        String parentCode = parent == null ? null : parent.getCode();
-        return new OptionItem(item.getCode(), item.getTitle(), Boolean.TRUE.equals(item.getEnabled()),
-                item.getSortOrder(), parentCode);
+        return readWithGlobalFallback(() -> {
+            DictionaryItem item = itemService.resolveItem(applicationAlias, categoryAlias, code);
+            if (item == null) {
+                return null;
+            }
+            DictionaryItem parent = itemService.select(item.getParentId());
+            String parentCode = parent == null ? null : parent.getCode();
+            return new OptionItem(item.getCode(), item.getTitle(), Boolean.TRUE.equals(item.getEnabled()),
+                    item.getSortOrder(), parentCode);
+        });
     }
 
     private <T> T readWithGlobalFallback(Supplier<T> reader) {

@@ -177,6 +177,20 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void optionSourceResolveShouldKeepGlobalFallbackParentCode() {
+        categoryService.insert(category("crm", "area", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        String chinaId = itemService.insert(titledItem("crm", "area", "china", "China", TreeAbility.ROOT_ID));
+        itemService.insert(titledItem("crm", "area", "shanghai", "Shanghai", chinaId));
+        DictionaryOptionSource source = new DictionaryOptionSource("crm", "area", itemService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThat(source.resolve("shanghai"))
+                    .extracting(OptionItem::code, OptionItem::title, OptionItem::parentCode)
+                    .containsExactly("shanghai", "Shanghai", "china");
+        }
+    }
+
+    @Test
     void shouldValidateMultipleDictionaryCodes() {
         categoryService.insert(category("crm", "customer_tag", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
         itemService.insert(item("crm", "customer_tag", "vip", TreeAbility.ROOT_ID));
