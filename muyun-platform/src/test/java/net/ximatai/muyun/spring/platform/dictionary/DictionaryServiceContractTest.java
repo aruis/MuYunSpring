@@ -160,6 +160,23 @@ class DictionaryServiceContractTest {
     }
 
     @Test
+    void optionSourceShouldFallbackToGlobalDictionaryInTenantContext() {
+        categoryService.insert(category("crm", "customer_status", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
+        itemService.insert(titledItem("crm", "customer_status", "active", "Active", TreeAbility.ROOT_ID));
+        DictionaryOptionSource source = new DictionaryOptionSource("crm", "customer_status", itemService);
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-a")) {
+            assertThatThrownBy(() -> itemService.listItems("crm", "customer_status", true))
+                    .isInstanceOf(PlatformException.class)
+                    .hasMessageContaining("crm.customer_status");
+            assertThat(source.options())
+                    .extracting(OptionItem::code, OptionItem::title)
+                    .containsExactly(tuple("active", "Active"));
+            assertThat(source.resolve("active").title()).isEqualTo("Active");
+        }
+    }
+
+    @Test
     void shouldValidateMultipleDictionaryCodes() {
         categoryService.insert(category("crm", "customer_tag", DictionaryCategoryKind.DICTIONARY, TreeAbility.ROOT_ID));
         itemService.insert(item("crm", "customer_tag", "vip", TreeAbility.ROOT_ID));

@@ -4,12 +4,15 @@ import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionItem;
 import net.ximatai.muyun.spring.common.option.OptionQuery;
 import net.ximatai.muyun.spring.common.option.OptionSource;
+import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.common.util.PlatformNameRules;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class DictionaryOptionSource implements OptionSource {
@@ -33,7 +36,8 @@ public final class DictionaryOptionSource implements OptionSource {
     @Override
     public List<OptionItem> options(OptionQuery query) {
         OptionQuery effectiveQuery = query == null ? OptionQuery.enabledOnly() : query;
-        List<DictionaryItem> items = itemService.listItems(applicationAlias, categoryAlias, effectiveQuery.onlyEnabled());
+        List<DictionaryItem> items = readWithGlobalFallback(() ->
+                itemService.listItems(applicationAlias, categoryAlias, effectiveQuery.onlyEnabled()));
         Map<String, DictionaryItem> itemById = items.stream()
                 .collect(Collectors.toMap(DictionaryItem::getId, Function.identity()));
         return items.stream()
@@ -45,7 +49,8 @@ public final class DictionaryOptionSource implements OptionSource {
 
     @Override
     public OptionItem resolve(String code) {
-        DictionaryItem item = itemService.resolveItem(applicationAlias, categoryAlias, code);
+        DictionaryItem item = readWithGlobalFallback(() ->
+                itemService.resolveItem(applicationAlias, categoryAlias, code));
         if (item == null) {
             return null;
         }
@@ -53,6 +58,28 @@ public final class DictionaryOptionSource implements OptionSource {
         String parentCode = parent == null ? null : parent.getCode();
         return new OptionItem(item.getCode(), item.getTitle(), Boolean.TRUE.equals(item.getEnabled()),
                 item.getSortOrder(), parentCode);
+    }
+
+    private <T> T readWithGlobalFallback(Supplier<T> reader) {
+        if (TenantContext.currentTenantId().isEmpty()) {
+            return reader.get();
+        }
+        try {
+            return reader.get();
+        } catch (PlatformException ex) {
+            if (!isMissingCategory(ex)) {
+                throw ex;
+            }
+            try (TenantContext.Scope ignored = TenantContext.bypassTenantFilter(
+                    "read global dictionary option source: " + applicationAlias + "." + categoryAlias)) {
+                return reader.get();
+            }
+        }
+    }
+
+    private boolean isMissingCategory(PlatformException ex) {
+        return ex.getMessage() != null
+                && ex.getMessage().startsWith("Dictionary category requires existing category:");
     }
 
     private OptionItem toOption(DictionaryItem item, Map<String, DictionaryItem> itemById) {
