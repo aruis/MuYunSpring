@@ -2,6 +2,8 @@ package net.ximatai.muyun.spring.ability.query;
 
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SortDirection;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 
 import java.util.Arrays;
 import java.util.List;
@@ -64,9 +66,13 @@ public record QuerySchema(String scopeName,
                         List<QueryOperator> operators,
                         QueryOperator defaultOperator,
                         boolean quickSearch,
-                        boolean sortable) {
+                        boolean sortable,
+                        OptionBinding optionBinding,
+                        OptionSelectionMode selectionMode,
+                        String optionTitleField) {
         public Field {
             operators = operators == null ? List.of() : List.copyOf(operators);
+            optionTitleField = optionTitleField == null || optionTitleField.isBlank() ? null : optionTitleField.trim();
         }
 
         static Field from(QueryField field) {
@@ -77,7 +83,10 @@ public record QuerySchema(String scopeName,
                     List.copyOf(field.operators()),
                     field.defaultOperator(),
                     field.quickSearch(),
-                    field.sortable()
+                    field.sortable(),
+                    field.optionBinding(),
+                    field.selectionMode(),
+                    field.optionTitleField()
             );
         }
     }

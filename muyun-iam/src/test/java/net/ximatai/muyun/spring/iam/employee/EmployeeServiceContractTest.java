@@ -1,6 +1,9 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.department.Department;
@@ -37,6 +40,7 @@ class EmployeeServiceContractTest {
         EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
                 departmentService);
         Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+        employee.setGender(" ");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             service.insert(employee);
@@ -44,6 +48,7 @@ class EmployeeServiceContractTest {
 
         assertThat(employee.getEnabled()).isTrue();
         assertThat(employee.getTenantId()).isEqualTo("tenant_a");
+        assertThat(employee.getGender()).isNull();
         assertThat(employee.getMobile()).isNull();
         verify(organizationService).requireEnabled(eq("org-1"), any());
         verify(departmentService).requireEnabled(eq("dept-1"), any());
@@ -94,6 +99,51 @@ class EmployeeServiceContractTest {
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("same organization");
         }
+    }
+
+    @Test
+    void shouldValidateGenderThroughStaticOptionFieldValidator() {
+        EmployeeDao dao = mock(EmployeeDao.class);
+        when(dao.insert(any())).thenReturn("employee-1");
+        OrganizationService organizationService = organizationService();
+        DepartmentService departmentService = departmentService();
+        StaticOptionFieldValueValidator validator = mock(StaticOptionFieldValueValidator.class);
+        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("org-1", "dept-1"));
+        EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
+                departmentService, validator);
+        Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+        employee.setGender("1");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.insert(employee);
+        }
+
+        verify(validator).validate(Employee.class, employee);
+    }
+
+    @Test
+    void shouldExposeGenderOptionBindingInQueryDescriptor() {
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService());
+
+        assertThat(service.queryDescriptor().fields()).anySatisfy(field -> {
+            assertThat(field.fieldName()).isEqualTo("gender");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
+    }
+
+    @Test
+    void shouldPopulateGenderTitleThroughStaticOptionFieldPopulator() {
+        StaticOptionFieldTitlePopulator populator = mock(StaticOptionFieldTitlePopulator.class);
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService(), StaticOptionFieldValueValidator.NONE, populator);
+        Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+
+        service.populateOptionTitlesForOutput(java.util.List.of(employee));
+
+        verify(populator).populateAll(eq(Employee.class), eq(java.util.List.of(employee)));
     }
 
     @Test

@@ -48,7 +48,10 @@ public final class DynamicQuerySchemas {
                 queryable ? operators(field) : List.of(QueryOperator.LIKE),
                 queryable ? QueryOperator.valueOf(field.query().defaultOperator()) : QueryOperator.LIKE,
                 quickSearch,
-                field.sortable()
+                field.sortable(),
+                field.optionBinding(),
+                field.selectionMode(),
+                null
         );
     }
 
@@ -60,7 +63,10 @@ public final class DynamicQuerySchemas {
                 List.of(QueryOperator.LIKE),
                 QueryOperator.LIKE,
                 true,
-                field.sortable()
+                field.sortable(),
+                field.optionBinding(),
+                field.selectionMode(),
+                null
         );
     }
 

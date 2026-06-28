@@ -19,7 +19,7 @@ class EmployeeModelSchemaTest {
         assertThat(table.getName()).isEqualTo("iam_employee");
         assertThat(columnNames(table))
                 .contains("id", "tenant_id", "organization_id", "department_id", "employee_no",
-                        "title", "mobile", "email", "sort_order", "enabled", "deleted", "version");
+                        "title", "gender", "mobile", "email", "sort_order", "enabled", "deleted", "version");
         assertThat(table.getColumns().stream().filter(column -> "organization_id".equals(column.getName())).findFirst())
                 .get()
                 .satisfies(column -> {
