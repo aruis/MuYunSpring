@@ -8,8 +8,6 @@ import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
 import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormDescriptor;
 import net.ximatai.muyun.spring.ability.form.FormField;
-import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -34,34 +32,21 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         EnableAbility<Employee>,
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
-        OptionFieldOutputAbility<Employee>,
         FormAbility<Employee>,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
 
     private final OrganizationService organizationService;
     private final DepartmentService departmentService;
-    private final StaticOptionFieldTitlePopulator optionFieldTitlePopulator;
 
     @Autowired
     public EmployeeService(EmployeeDao employeeDao,
                            ActiveTenantVerifier activeTenantVerifier,
                            OrganizationService organizationService,
-                           DepartmentService departmentService,
-                           StaticOptionFieldTitlePopulator optionFieldTitlePopulator) {
+                           DepartmentService departmentService) {
         super(MODULE_ALIAS, Employee.class, employeeDao, activeTenantVerifier);
         this.organizationService = organizationService;
         this.departmentService = departmentService;
-        this.optionFieldTitlePopulator = optionFieldTitlePopulator == null
-                ? StaticOptionFieldTitlePopulator.NONE : optionFieldTitlePopulator;
-    }
-
-    public EmployeeService(EmployeeDao employeeDao,
-                           ActiveTenantVerifier activeTenantVerifier,
-                           OrganizationService organizationService,
-                           DepartmentService departmentService) {
-        this(employeeDao, activeTenantVerifier, organizationService, departmentService,
-                StaticOptionFieldTitlePopulator.NONE);
     }
 
     @Override
@@ -88,11 +73,6 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                         .eq("organizationId", employee.getOrganizationId())
                         .eq("employeeNo", employee.getEmployeeNo()),
                 "employeeNo must be unique within organization: " + employee.getEmployeeNo());
-    }
-
-    @Override
-    public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
-        return optionFieldTitlePopulator;
     }
 
     @Override

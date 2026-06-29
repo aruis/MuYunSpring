@@ -11,8 +11,6 @@ import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormDescriptor;
 import net.ximatai.muyun.spring.ability.form.FormField;
 import net.ximatai.muyun.spring.ability.form.FormValueType;
-import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -56,7 +54,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         SortAbility<Role>,
         ReferenceAbility<Role>,
         InitialDataAbility<Role>,
-        OptionFieldOutputAbility<Role>,
         FormAbility<Role>,
         QueryAbility<Role> {
     public static final String MODULE_ALIAS = "iam.role";
@@ -73,7 +70,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
     private final EmployeeService employeeService;
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
-    private final StaticOptionFieldTitlePopulator optionFieldTitlePopulator;
 
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
@@ -104,20 +100,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                 grantVerifier, userAccountService, employeeService, employeePositionService, null);
     }
 
-    public RoleService(RoleDao roleDao,
-                       RoleGrantDao roleGrantDao,
-                       RoleActionDao roleActionDao,
-                       ActiveTenantVerifier activeTenantVerifier,
-                       RoleActionGrantVerifier grantVerifier,
-                       UserAccountService userAccountService,
-                       EmployeeService employeeService,
-                       EmployeePositionService employeePositionService,
-                       EmployeeAccountService employeeAccountService) {
-        this(roleDao, roleGrantDao, roleActionDao, activeTenantVerifier,
-                grantVerifier, userAccountService, employeeService, employeePositionService, employeeAccountService,
-                StaticOptionFieldTitlePopulator.NONE);
-    }
-
     @Autowired
     public RoleService(RoleDao roleDao,
                        RoleGrantDao roleGrantDao,
@@ -127,8 +109,7 @@ public class RoleService extends TenantActiveScopedService<Role> implements
                        UserAccountService userAccountService,
                        EmployeeService employeeService,
                        EmployeePositionService employeePositionService,
-                       EmployeeAccountService employeeAccountService,
-                       StaticOptionFieldTitlePopulator optionFieldTitlePopulator) {
+                       EmployeeAccountService employeeAccountService) {
         super(MODULE_ALIAS, Role.class, roleDao, activeTenantVerifier);
         this.roleGrantDao = Objects.requireNonNull(roleGrantDao, "roleGrantDao must not be null");
         this.roleActionDao = Objects.requireNonNull(roleActionDao, "roleActionDao must not be null");
@@ -137,13 +118,6 @@ public class RoleService extends TenantActiveScopedService<Role> implements
         this.employeeService = employeeService;
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
-        this.optionFieldTitlePopulator = optionFieldTitlePopulator == null
-                ? StaticOptionFieldTitlePopulator.NONE : optionFieldTitlePopulator;
-    }
-
-    @Override
-    public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
-        return optionFieldTitlePopulator;
     }
 
     @Override
