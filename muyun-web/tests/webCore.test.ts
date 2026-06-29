@@ -364,7 +364,7 @@ function runtimeContext() {
     moduleAlias: 'iam.organization',
     title: '组织管理',
     moduleKind: 'STATIC',
-    entryType: 'ROUTE',
+    entryType: 'route',
     entryRoute: '/iam/organizations',
     mainEntityAlias: 'organization',
     capabilities: ['CRUD', 'SOFT_DELETE', 'LIFECYCLE', 'CACHE', 'TREE', 'SORT', 'ENABLE'],

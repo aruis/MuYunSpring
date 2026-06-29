@@ -17,8 +17,8 @@ test('resolvePageDescriptor resolves ROUTE targets as platform routes by default
   const descriptor = resolvePageDescriptor(
     {
       menuId: 'metadata',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: '/platform/metadata',
     },
     { title: 'Metadata' },
@@ -46,8 +46,8 @@ test('getMenuNavigationTarget ignores disabled menus', () => {
     id: 'disabled-runtime',
     schemeId: 'default',
     title: 'Disabled Runtime',
-    menuType: 'MODULE',
-    openMode: 'TAB',
+    menuType: 'module',
+    openMode: 'tab',
     moduleAlias: 'platform.runtime',
     enabled: false,
   });
@@ -60,7 +60,7 @@ test('getMenuNavigationTarget requires explicit open mode for navigation menus',
     id: 'missing-open-mode',
     schemeId: 'default',
     title: 'Missing Open Mode',
-    menuType: 'LINK',
+    menuType: 'link',
     externalUrl: '/crm/customer/list',
   });
 
@@ -71,8 +71,8 @@ test('resolvePageDescriptor keeps path, routeName, and pageKey available for off
   const pathDescriptor = resolvePageDescriptor(
     {
       menuId: 'customer-list',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: '/crm/customer/list',
     },
     { businessRoutePrefixes: ['/crm'] },
@@ -80,8 +80,8 @@ test('resolvePageDescriptor keeps path, routeName, and pageKey available for off
   const routeNameDescriptor = resolvePageDescriptor(
     {
       menuId: 'customer-name',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: 'crm.customer.list',
     },
     { businessRouteNames: ['crm.customer.list'] },
@@ -89,8 +89,8 @@ test('resolvePageDescriptor keeps path, routeName, and pageKey available for off
   const pageKeyDescriptor = resolvePageDescriptor(
     {
       menuId: 'customer-page',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: 'customerList',
     },
     { businessPageKeys: ['customerList'] },
@@ -110,8 +110,8 @@ test('resolvePageDescriptor carries route menu module alias for business module 
     id: 'organization',
     schemeId: 'default',
     title: '组织管理',
-    menuType: 'ROUTE',
-    openMode: 'TAB',
+    menuType: 'route',
+    openMode: 'tab',
     route: '/iam/organizations',
     moduleAlias: 'iam.organization',
   });
@@ -127,8 +127,8 @@ test('resolvePageDescriptor carries route menu module alias for business module 
 test('resolvePageDescriptor resolves MODULE targets as dynamic module descriptors', () => {
   const descriptor = resolvePageDescriptor({
     menuId: 'customer-module',
-    menuType: 'MODULE',
-    openMode: 'TAB',
+    menuType: 'module',
+    openMode: 'tab',
     moduleAlias: 'crm.customer',
     pageMode: 'LIST',
     defaultUiConfigId: 'customer-list-v1',
@@ -158,8 +158,8 @@ test('resolvePageDescriptor resolves configured MODULE targets as business route
   const descriptor = resolvePageDescriptor(
     {
       menuId: 'platform.menu.module.platform.application',
-      menuType: 'MODULE',
-      openMode: 'TAB',
+      menuType: 'module',
+      openMode: 'tab',
       moduleAlias: 'platform.application',
     },
     {
@@ -183,8 +183,8 @@ test('resolvePageDescriptor resolves tenant MODULE target as business route', ()
   const descriptor = resolvePageDescriptor(
     {
       menuId: 'platform.menu.module.iam.tenant',
-      menuType: 'MODULE',
-      openMode: 'TAB',
+      menuType: 'module',
+      openMode: 'tab',
       moduleAlias: 'iam.tenant',
     },
     {
@@ -203,15 +203,15 @@ test('resolvePageDescriptor resolves tenant MODULE target as business route', ()
 test('resolvePageDescriptor resolves LINK targets by open mode', () => {
   const iframeDescriptor = resolvePageDescriptor({
     menuId: 'crm-online',
-    menuType: 'LINK',
-    openMode: 'TAB',
+    menuType: 'link',
+    openMode: 'tab',
     externalUrl: '/crm/customer/list',
     moduleAlias: 'crm.customer',
   });
   const newWindowDescriptor = resolvePageDescriptor({
     menuId: 'external-bi',
-    menuType: 'LINK',
-    openMode: 'WINDOW',
+    menuType: 'link',
+    openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
   });
 
@@ -239,14 +239,14 @@ test('getMenuNavigationTarget carries link module alias for module-first menu en
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'LINK',
-    openMode: 'WINDOW',
+    menuType: 'link',
+    openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
     moduleAlias: 'ops.report',
   });
 
   assert.ok(target);
-  assert.equal(target.menuType, 'LINK');
+  assert.equal(target.menuType, 'link');
   assert.equal(target.moduleAlias, 'ops.report');
 
   const descriptor = resolvePageDescriptor(target);
@@ -257,8 +257,8 @@ test('getMenuNavigationTarget carries link module alias for module-first menu en
 test('pageDescriptorToUrl keeps new-window external links on workbench-owned URLs', () => {
   const descriptor = resolvePageDescriptor({
     menuId: 'external-bi',
-    menuType: 'LINK',
-    openMode: 'WINDOW',
+    menuType: 'link',
+    openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
   });
 
@@ -278,14 +278,14 @@ test('pageDescriptorToUrl keeps new-window external links on workbench-owned URL
 test('resolvePageDescriptor uses explicit LINK open mode instead of url shape', () => {
   const iframeDescriptor = resolvePageDescriptor({
     menuId: 'protocol-relative-tab',
-    menuType: 'LINK',
-    openMode: 'TAB',
+    menuType: 'link',
+    openMode: 'tab',
     externalUrl: '//bi.example.com/report',
   });
   const newWindowDescriptor = resolvePageDescriptor({
     menuId: 'relative-window',
-    menuType: 'LINK',
-    openMode: 'WINDOW',
+    menuType: 'link',
+    openMode: 'window',
     externalUrl: '/crm/customer/list',
   });
 
@@ -300,16 +300,16 @@ test('menu target open mode helpers split tab and window behavior', () => {
     id: 'crm-online',
     schemeId: 'default',
     title: 'CRM Online',
-    menuType: 'LINK',
-    openMode: 'TAB',
+    menuType: 'link',
+    openMode: 'tab',
     externalUrl: '/crm/customer/list',
   });
   const windowTarget = getMenuNavigationTarget({
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'LINK',
-    openMode: 'WINDOW',
+    menuType: 'link',
+    openMode: 'window',
     externalUrl: 'https://bi.example.com/report',
   });
 
@@ -326,8 +326,8 @@ test('createMenuTab rejects window menu targets', () => {
     id: 'external-bi',
     schemeId: 'default',
     title: 'External BI',
-    menuType: 'LINK' as const,
-    openMode: 'WINDOW' as const,
+    menuType: 'link' as const,
+    openMode: 'window' as const,
     externalUrl: 'https://bi.example.com/report',
   };
   const target = getMenuNavigationTarget(menu);
@@ -397,8 +397,8 @@ test('pageDescriptorToUrl and pageDescriptorFromUrl preserve routeName and pageK
   const routeNameDescriptor = resolvePageDescriptor(
     {
       menuId: 'customer-name',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: 'crm.customer.list',
       query: { status: 'active' },
     },
@@ -407,8 +407,8 @@ test('pageDescriptorToUrl and pageDescriptorFromUrl preserve routeName and pageK
   const pageKeyDescriptor = resolvePageDescriptor(
     {
       menuId: 'customer-page',
-      menuType: 'ROUTE',
-      openMode: 'TAB',
+      menuType: 'route',
+      openMode: 'tab',
       route: 'customerList',
     },
     { businessPageKeys: ['customerList'] },

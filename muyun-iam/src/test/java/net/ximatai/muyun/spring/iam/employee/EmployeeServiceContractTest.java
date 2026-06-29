@@ -1,12 +1,18 @@
 package net.ximatai.muyun.spring.iam.employee;
 
+import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
+import net.ximatai.muyun.spring.ability.form.FormControlType;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.organization.Organization;
 import net.ximatai.muyun.spring.iam.organization.OrganizationService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,6 +24,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EmployeeServiceContractTest {
+    @AfterEach
+    void resetPlatformAbilityRuntime() {
+        PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
+    }
+
     @Test
     void shouldExposeStableModuleAlias() {
         EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
@@ -37,6 +48,7 @@ class EmployeeServiceContractTest {
         EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
                 departmentService);
         Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+        employee.setGender(" ");
 
         try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
             service.insert(employee);
@@ -44,6 +56,7 @@ class EmployeeServiceContractTest {
 
         assertThat(employee.getEnabled()).isTrue();
         assertThat(employee.getTenantId()).isEqualTo("tenant_a");
+        assertThat(employee.getGender()).isNull();
         assertThat(employee.getMobile()).isNull();
         verify(organizationService).requireEnabled(eq("org-1"), any());
         verify(departmentService).requireEnabled(eq("dept-1"), any());
@@ -94,6 +107,65 @@ class EmployeeServiceContractTest {
                     .isInstanceOf(PlatformException.class)
                     .hasMessageContaining("same organization");
         }
+    }
+
+    @Test
+    void shouldValidateGenderThroughStaticOptionFieldValidator() {
+        EmployeeDao dao = mock(EmployeeDao.class);
+        when(dao.insert(any())).thenReturn("employee-1");
+        OrganizationService organizationService = organizationService();
+        DepartmentService departmentService = departmentService();
+        StaticOptionFieldValueValidator validator = mock(StaticOptionFieldValueValidator.class);
+        when(organizationService.requireEnabled(eq("org-1"), any())).thenReturn(organization("org-1"));
+        when(departmentService.requireEnabled(eq("dept-1"), any())).thenReturn(department("org-1", "dept-1"));
+        PlatformAbilityRuntime.configureStaticOptionFieldValueValidator(validator);
+        EmployeeService service = new EmployeeService(dao, activeTenantVerifier(), organizationService,
+                departmentService);
+        Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+        employee.setGender("1");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant_a")) {
+            service.insert(employee);
+        }
+
+        verify(validator).validate(Employee.class, employee);
+    }
+
+    @Test
+    void shouldExposeGenderOptionBindingInQuerySchema() {
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService());
+
+        assertThat(service.querySchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("gender");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
+    }
+
+    @Test
+    void shouldExposeGenderOptionBindingInFormSchema() {
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService());
+
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("gender");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
+            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
+        });
+    }
+
+    @Test
+    void shouldPopulateGenderTitleThroughStaticOptionFieldPopulator() {
+        StaticOptionFieldTitlePopulator populator = mock(StaticOptionFieldTitlePopulator.class);
+        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
+                organizationService(), departmentService(), populator);
+        Employee employee = employee("org-1", "dept-1", "E001", "Alice");
+
+        service.populateOptionTitlesForOutput(java.util.List.of(employee));
+
+        verify(populator).populateAll(eq(Employee.class), eq(java.util.List.of(employee)));
     }
 
     @Test

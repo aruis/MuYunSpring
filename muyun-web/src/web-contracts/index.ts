@@ -66,13 +66,13 @@ export interface LoginResult {
   currentUser: CurrentUser;
 }
 
-// Matches current Spring/Jackson enum-name output from /platform.menu/mine.
-export type MenuType = 'GROUP' | 'MODULE' | 'ROUTE' | 'LINK';
+// Matches current Spring/Jackson code output from /platform.menu/mine.
+export type MenuType = 'group' | 'module' | 'route' | 'link';
 
-// Matches current Spring/Jackson enum-name output from menu page mode fields.
+// Matches current Spring/Jackson code output from menu page mode fields.
 export type MenuPageMode = 'LIST' | 'FORM' | 'DETAIL';
 
-export type MenuOpenMode = 'TAB' | 'WINDOW';
+export type MenuOpenMode = 'tab' | 'window';
 
 export interface MenuRecord {
   id: string;
@@ -99,7 +99,7 @@ export type MenuMineResponse = WebListResponse<MenuTreeNode>;
 
 export interface ModuleMenuTarget {
   menuId: string;
-  menuType: 'MODULE';
+  menuType: 'module';
   openMode: MenuOpenMode;
   moduleAlias: string;
   pageMode?: MenuPageMode;
@@ -111,7 +111,7 @@ export interface ModuleMenuTarget {
 
 export interface RouteMenuTarget {
   menuId: string;
-  menuType: 'ROUTE';
+  menuType: 'route';
   openMode: MenuOpenMode;
   route: string;
   moduleAlias?: string;
@@ -121,7 +121,7 @@ export interface RouteMenuTarget {
 
 export interface ExternalLinkMenuTarget {
   menuId: string;
-  menuType: 'LINK';
+  menuType: 'link';
   openMode: MenuOpenMode;
   externalUrl: string;
   moduleAlias?: string;

@@ -53,6 +53,17 @@ Web 维护面按“独立配置根 + 模块聚合子资源”组织：应用、�
 7. Runtime refresh 是配置态到运行态契约的同步边界，负责把模块关系、模块字段消费配置、视图、动作等编译进动态运行态；结构 ensure 是物理结构层，两者职责不同。影响 `ModuleDefinition` 编译结果的配置保存后，平台会在事务提交后自动刷新受影响模块；无事务时立即刷新。自动刷新覆盖模块-元数据关系、模块字段消费配置、引用过滤/带出、公式规则、元数据视图、模块动作，以及元数据字段变更后引用该 metadata 的动态模块。手动 refresh 仍保留为运维入口，并沿用当前运行模式下的 schema migration 默认策略；preview refresh 始终 dry-run。模块级配置包归档偏治理版本定稿和跨环境迁移，不是业务运行的硬前置；UI 配置和查询模板 publish 仍表达用户可见生效，不触发 runtime refresh 或 schema ensure。
 8. 本专题不复盘推进过程，不记录测试流水；稳定契约优先由代码和 contract 测试支撑。
 
+## 静态选项字段
+
+静态模型通过 `@OptionField` 声明字段的选项来源，和动态字段编译后的 option binding 复用同一套前端 schema、保存校验和 title 输出语义。注解只定义抽象契约，具体选项来源由业务层 provider 实现，避免 common 层依赖平台字典业务。
+
+当前稳定来源包括：
+
+1. `DICTIONARY`：`source` 使用 `applicationAlias.categoryAlias`，业务字段保存字典项目 `code`。租户上下文读取字典选项时，租户字典优先；租户下不存在对应类目时，允许回退读取平台全局字典。
+2. `ENUM`：字段类型或 `enumType` 必须实现 `CodeTitleEnum`，业务字段保存 enum code。集合或数组字段必须显式声明 `selectionMode = MULTIPLE`。
+
+静态查询 schema 会在 `QueryAbility.querySchema()` 中按模型同名字段自动合并 `@OptionField` 元数据；静态表单 schema 同理在 `FormAbility.formSchema()` 中合并。业务 service 的 `QueryDescriptor` / `FormDescriptor` 只声明查询或表单语义；如果 descriptor 已显式声明 option binding，则以显式声明为准。默认 title 输出字段为 `fieldName + "Title"`，也可通过 `titleOutputField` 定制；关闭 title 输出时 schema 不暴露 `optionTitleField`。
+
 ## 计量单位边界
 
 计量单位用于给动态字段和静态字段提供稳定单位目录。单位分类表达长度、重量、面积、体积、数量、时间等单位组；单位项目表达分类下的业务保存值、展示符号、默认精度和到分类基准值的线性换算参数。

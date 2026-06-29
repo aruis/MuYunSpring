@@ -76,7 +76,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public MeasureUnit resolveUnit(String applicationAlias, String categoryAlias, String unitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         String validUnitCode = requireCode(unitCode, "measureUnitCode");
         return findOne(categoryScope(validApplicationAlias, validCategoryAlias).eq("code", validUnitCode));
     }
@@ -91,7 +91,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public MeasureUnit requireEnabledUnit(String applicationAlias, String categoryAlias, String unitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         categoryService.requireEnabledCategory(validApplicationAlias, validCategoryAlias);
         MeasureUnit unit = resolveUnit(validApplicationAlias, validCategoryAlias, unitCode);
         if (unit == null || !Boolean.TRUE.equals(unit.getEnabled())) {
@@ -102,7 +102,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public MeasureUnit resolveVisibleUnit(String applicationAlias, String categoryAlias, String unitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         String validUnitCode = requireCode(unitCode, "measureUnitCode");
         MeasureUnitCategory category = categoryService.resolveVisibleCategory(validApplicationAlias, validCategoryAlias);
         if (category == null) {
@@ -121,7 +121,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public MeasureUnit requireEnabledVisibleUnit(String applicationAlias, String categoryAlias, String unitCode) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         String validUnitCode = requireCode(unitCode, "measureUnitCode");
         MeasureUnitCategory category = categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias);
         MeasureUnit unit = resolveUnitInCategoryScope(category, validUnitCode);
@@ -142,7 +142,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public List<MeasureUnit> listUnits(String applicationAlias, String categoryAlias, boolean enabledOnly) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         if (enabledOnly) {
             categoryService.requireEnabledCategory(validApplicationAlias, validCategoryAlias);
         } else {
@@ -157,7 +157,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     public List<MeasureUnit> listVisibleUnits(String applicationAlias, String categoryAlias, boolean enabledOnly) {
         String validApplicationAlias = PlatformNameRules.requireApplicationAlias(applicationAlias);
-        String validCategoryAlias = requireCode(categoryAlias, "measureUnitCategoryAlias");
+        String validCategoryAlias = requireCategoryAlias(categoryAlias);
         MeasureUnitCategory category = enabledOnly
                 ? categoryService.requireEnabledVisibleCategory(validApplicationAlias, validCategoryAlias)
                 : categoryService.requireVisibleCategory(validApplicationAlias, validCategoryAlias);
@@ -170,7 +170,7 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     private void normalizeAndValidate(MeasureUnit unit) {
         String applicationAlias = PlatformNameRules.requireApplicationAlias(unit.getApplicationAlias());
-        String categoryAlias = requireCode(unit.getCategoryAlias(), "measureUnitCategoryAlias");
+        String categoryAlias = requireCategoryAlias(unit.getCategoryAlias());
         MeasureUnitCategory category = categoryService.requireCategory(applicationAlias, categoryAlias);
         String code = requireCode(unit.getCode(), "measureUnitCode");
         unit.setApplicationAlias(category.getApplicationAlias());
@@ -239,5 +239,9 @@ public class MeasureUnitService extends AbstractAbilityService<MeasureUnit> impl
 
     private String requireCode(String value, String name) {
         return PlatformNameRules.requireCode(value, name);
+    }
+
+    private String requireCategoryAlias(String value) {
+        return PlatformNameRules.requireIdentifier(value, "measureUnitCategoryAlias");
     }
 }

@@ -5,6 +5,7 @@ public final class PlatformNameRules {
     public static final int MODULE_ALIAS_MAX_LENGTH = 128;
 
     private static final String IDENTIFIER_PATTERN = "[a-z][a-z0-9_]{0,62}";
+    private static final String CODE_PATTERN = "[A-Za-z0-9][A-Za-z0-9_\\-]{0,62}";
     private static final String FIELD_NAME_PATTERN = "[a-z][A-Za-z0-9]{0,62}";
     private static final String MODULE_ALIAS_SEGMENT_PATTERN = IDENTIFIER_PATTERN;
     private static final String MODULE_ALIAS_PATTERN = MODULE_ALIAS_SEGMENT_PATTERN
@@ -47,7 +48,11 @@ public final class PlatformNameRules {
     }
 
     public static String requireCode(String value, String name) {
-        return requireIdentifier(value, name);
+        requireText(value, name);
+        if (!value.matches(CODE_PATTERN)) {
+            throw new IllegalArgumentException("invalid " + name + ": " + value);
+        }
+        return value;
     }
 
     public static String requireActionCode(String value, String name) {

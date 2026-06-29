@@ -7,6 +7,8 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.CrudAbility;
 import net.ximatai.muyun.spring.ability.DataScopeAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
+import net.ximatai.muyun.spring.ability.form.FormSchema;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
@@ -107,6 +109,17 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
                 return queryAbility.querySchema();
             }
             throw new IllegalArgumentException("query schema is not supported by " + webScopeName());
+        });
+    }
+
+    @GetMapping("/form/schema")
+    @ActionEndpoint(PlatformAction.VIEW)
+    default FormSchema formSchema(@RequestParam(required = false) String uiConfigId) {
+        return webScope(() -> {
+            if (service() instanceof FormAbility<?> formAbility) {
+                return formAbility.formSchema();
+            }
+            throw new IllegalArgumentException("form schema is not supported by " + webScopeName());
         });
     }
 

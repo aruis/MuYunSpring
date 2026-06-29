@@ -3,8 +3,11 @@ package net.ximatai.muyun.spring.iam.role;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.ability.form.FormControlType;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.BusinessPrincipal;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
 import net.ximatai.muyun.spring.common.tenant.TenantContext;
@@ -31,6 +34,42 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RoleServiceContractTest {
+    @Test
+    void shouldExposeRoleKindEnumOptionBindingInQuerySchema() {
+        RoleService service = service(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class));
+
+        assertThat(service.querySchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("roleKind");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleKind.class));
+            assertThat(field.optionTitleField()).isEqualTo("roleKindTitle");
+        });
+    }
+
+    @Test
+    void shouldExposeRoleKindEnumOptionBindingInFormSchema() {
+        RoleService service = service(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class));
+
+        assertThat(service.formSchema().fields()).anySatisfy(field -> {
+            assertThat(field.name()).isEqualTo("roleKind");
+            assertThat(field.optionBinding()).isEqualTo(OptionBinding.enumType(RoleKind.class));
+            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
+            assertThat(field.optionTitleField()).isEqualTo("roleKindTitle");
+        });
+    }
+
+    @Test
+    void shouldPopulateRoleKindTitleThroughStaticOptionFieldPopulator() {
+        StaticOptionFieldTitlePopulator populator = mock(StaticOptionFieldTitlePopulator.class);
+        RoleService service = new RoleService(mock(RoleDao.class), mock(RoleGrantDao.class), mock(RoleActionDao.class),
+                activeTenantVerifier(), RoleActionGrantVerifier.platformActionsOnly(), null, null, null, null,
+                populator);
+        Role role = role("r1", "Role", RoleKind.STANDARD);
+
+        service.populateOptionTitlesForOutput(List.of(role));
+
+        verify(populator).populateAll(Role.class, List.of(role));
+    }
+
     @Test
     void shouldDefaultRoleAsStandardAndNormalizeGroupMembers() {
         RoleDao roleDao = mock(RoleDao.class);

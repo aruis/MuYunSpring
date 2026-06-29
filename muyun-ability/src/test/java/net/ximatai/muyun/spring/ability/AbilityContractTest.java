@@ -41,6 +41,7 @@ class AbilityContractTest {
         CacheRegistry.clearAll();
         ReferenceDependencyRegistryTestAccess.clearAll();
         CacheRegistry.resetPolicy();
+        PlatformAbilityRuntime.resetStaticOptionFieldValueValidator();
         TenantContext.clear();
         clearTransactionState();
     }
@@ -63,6 +64,23 @@ class AbilityContractTest {
         assertThat(organization.getVersion()).isEqualTo(1);
         assertThat(service.select(id)).isNull();
         assertThat(service.selectIgnoreSoftDelete(id)).isSameAs(organization);
+    }
+
+    @Test
+    void crudAbilityShouldRunStaticOptionValidationBeforeInsertAndUpdateOnly() {
+        DemoOrganizationService service = new DemoOrganizationService();
+        List<String> validated = new ArrayList<>();
+        PlatformAbilityRuntime.configureStaticOptionFieldValueValidator((modelClass, entity) ->
+                validated.add(modelClass.getSimpleName() + ":" + ((DemoOrganization) entity).getTitle()));
+
+        DemoOrganization organization = new DemoOrganization("Headquarters", TreeAbility.ROOT_ID);
+        String id = service.insert(organization);
+        DemoOrganization update = new DemoOrganization("Updated", TreeAbility.ROOT_ID);
+        update.setId(id);
+        service.update(update);
+        service.delete(id);
+
+        assertThat(validated).containsExactly("DemoOrganization:Headquarters", "DemoOrganization:Updated");
     }
 
     @Test

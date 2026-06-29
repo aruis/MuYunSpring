@@ -175,8 +175,8 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | `schemeId`    | 所属菜单方案                          |
 | `parentId`    | 父菜单；根菜单使用平台树根节点值      |
 | `title`       | 菜单名称                              |
-| `menuType`    | `GROUP` / `MODULE` / `ROUTE` / `LINK` |
-| `openMode`    | `TAB` / `WINDOW`；分组菜单不配置      |
+| `menuType`    | `group` / `module` / `route` / `link` |
+| `openMode`    | `tab` / `window`；分组菜单不配置      |
 | `moduleAlias` | 模块菜单挂载的模块                    |
 | `route`       | 路由菜单的路由                        |
 | `externalUrl` | 外链菜单的 URL                        |
@@ -247,13 +247,13 @@ UI 字段类型是独立平台资源，不等同于运行态字段类型，也�
 | 二级 | `platform.menu.group.identity` | 组织与权限           | `platform.menu.group.platform` |
 | 二级 | `platform.menu.group.ops`      | 平台运行运维         | `platform.menu.group.platform` |
 
-`@PlatformStaticModule` 声明模块能力和默认入口，未声明入口时默认是动态模块入口，声明 `route` 时是内部路由入口，声明 `externalUrl` 时是外部链接入口。`@PlatformMenu` 只声明该模块是否投影到菜单树，以及父级、打开方式、排序、启停等导航属性；菜单的 `menuType/route/externalUrl` 来自绑定模块的入口配置，`moduleAlias` 是唯一权限和模块上下文锚点。`ROUTE/LINK` 模块入口不承载 `pageMode/defaultUiConfig/defaultQueryTemplate` 等低代码入口配置。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
+`@PlatformStaticModule` 声明模块能力和默认入口，未声明入口时默认是动态模块入口，声明 `route` 时是内部路由入口，声明 `externalUrl` 时是外部链接入口。`@PlatformMenu` 只声明该模块是否投影到菜单树，以及父级、打开方式、排序、启停等导航属性；菜单的 `menuType/route/externalUrl` 来自绑定模块的入口配置，`moduleAlias` 是唯一权限和模块上下文锚点。`route/link` 模块入口不承载 `pageMode/defaultUiConfig/defaultQueryTemplate` 等低代码入口配置。菜单使用 deterministic `id` 做系统托管记录的幂等治理键，例如 `platform.menu.module.platform.module`；这不是普通菜单模型的 alias/code。
 
 注册顺序是先注册静态模块和动作，再执行初始化数据能力。平台菜单只做同方案内治理，不自动删除手工新增菜单，也不把未标注 `@PlatformMenu` 的模块放进菜单。菜单方案的 `alias/scope/tenantId` 和菜单的 `schemeId` 属于不可变身份；如果同 ID 记录已经落在其他方案或身份字段漂移，应显式失败，而不是启动时自动迁移。
 
 菜单方案、默认分组和模块菜单的结构字段由平台持续校准；标题、排序、启停属于运维字段，创建后重启不覆盖运维调整。需要强锁定的系统数据应显式使用 `LOCKED` 策略，不作为默认行为。
 
-前端消费菜单时不应把菜单类型当作权限主体。`MODULE/ROUTE/LINK` 只是模块入口的导航投影，授权、可见性裁剪和页面上下文都以 `moduleAlias` 为准。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
+前端消费菜单时不应把菜单类型当作权限主体。`module/route/link` 只是模块入口的导航投影，授权、可见性裁剪和页面上下文都以 `moduleAlias` 为准。需要父级上下文的嵌套配置资源不应直接标注为顶层 `@PlatformMenu`，应等待聚合页或结构化入口参数明确后再进入菜单。
 
 ## 数据字典
 

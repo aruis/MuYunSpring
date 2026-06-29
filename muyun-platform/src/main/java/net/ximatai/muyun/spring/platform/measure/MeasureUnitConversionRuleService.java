@@ -93,9 +93,9 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
             rule.setScopeType(MeasureUnitConversionScopeType.GLOBAL);
         }
         normalizeScope(rule);
-        rule.setFromCategoryAlias(requireCode(rule.getFromCategoryAlias(), "fromCategoryAlias"));
+        rule.setFromCategoryAlias(requireCategoryAlias(rule.getFromCategoryAlias(), "fromCategoryAlias"));
         rule.setFromUnitCode(requireCode(rule.getFromUnitCode(), "fromUnitCode"));
-        rule.setToCategoryAlias(requireCode(rule.getToCategoryAlias(), "toCategoryAlias"));
+        rule.setToCategoryAlias(requireCategoryAlias(rule.getToCategoryAlias(), "toCategoryAlias"));
         rule.setToUnitCode(requireCode(rule.getToUnitCode(), "toUnitCode"));
         unitService.requireVisibleUnit(rule.getApplicationAlias(), rule.getFromCategoryAlias(), rule.getFromUnitCode());
         unitService.requireVisibleUnit(rule.getApplicationAlias(), rule.getToCategoryAlias(), rule.getToUnitCode());
@@ -279,5 +279,9 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
 
     private String requireCode(String value, String name) {
         return PlatformNameRules.requireCode(value, name);
+    }
+
+    private String requireCategoryAlias(String value, String name) {
+        return PlatformNameRules.requireIdentifier(value, name);
     }
 }

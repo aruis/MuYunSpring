@@ -27,6 +27,8 @@ class PlatformNameRulesTest {
     void shouldValidateIdentifierCodeAndDatabaseName() {
         assertThat(PlatformNameRules.requireIdentifier("customer_status", "metadataAlias")).isEqualTo("customer_status");
         assertThat(PlatformNameRules.requireCode("active", "dictionaryItemCode")).isEqualTo("active");
+        assertThat(PlatformNameRules.requireCode("1", "dictionaryItemCode")).isEqualTo("1");
+        assertThat(PlatformNameRules.requireCode("A-01", "measureUnitCode")).isEqualTo("A-01");
         assertThat(PlatformNameRules.requireActionCode("item_create", "actionCode")).isEqualTo("item_create");
         assertThat(PlatformNameRules.requireDatabaseName("crm_customer", "tableName")).isEqualTo("crm_customer");
 
@@ -36,6 +38,12 @@ class PlatformNameRulesTest {
         assertThatThrownBy(() -> PlatformNameRules.requireIdentifier(null, "metadataAlias"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("metadataAlias");
+        assertThatThrownBy(() -> PlatformNameRules.requireCode("-1", "dictionaryItemCode"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionaryItemCode");
+        assertThatThrownBy(() -> PlatformNameRules.requireCode("active.code", "dictionaryItemCode"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dictionaryItemCode");
         assertThatThrownBy(() -> PlatformNameRules.requireDatabaseName("crm.customer", "tableName"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("tableName");

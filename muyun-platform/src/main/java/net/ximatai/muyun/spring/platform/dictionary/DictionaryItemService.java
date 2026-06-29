@@ -157,6 +157,10 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
                         .eq("categoryId", item.getCategoryId())
                         .eq("code", item.getCode()),
                 "dictionary item code must be unique within category: " + item.getCode());
+        rejectDuplicate(item, Criteria.of()
+                        .eq("categoryId", item.getCategoryId())
+                        .eq("title", item.getTitle()),
+                "dictionary item title must be unique within category: " + item.getTitle());
         validateParentCategory(item);
     }
 

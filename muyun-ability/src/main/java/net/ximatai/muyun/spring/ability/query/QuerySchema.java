@@ -2,9 +2,16 @@ package net.ximatai.muyun.spring.ability.query;
 
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.database.core.orm.SortDirection;
+import net.ximatai.muyun.spring.common.option.OptionBinding;
+import net.ximatai.muyun.spring.common.option.OptionFieldDefinition;
+import net.ximatai.muyun.spring.common.option.OptionFieldResolver;
+import net.ximatai.muyun.spring.common.option.OptionSelectionMode;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public record QuerySchema(String scopeName,
                           String entityAlias,
@@ -20,13 +27,18 @@ public record QuerySchema(String scopeName,
     }
 
     public static QuerySchema from(QueryDescriptor descriptor) {
+        return from(descriptor, null);
+    }
+
+    public static QuerySchema from(QueryDescriptor descriptor, Class<?> modelClass) {
+        Map<String, OptionFieldDefinition> optionFields = optionFields(modelClass);
         List<Field> fields = descriptor.fields().stream()
-                .map(Field::from)
+                .map(field -> Field.from(mergeOptionField(field, optionFields)))
                 .toList();
         return new QuerySchema(
                 descriptor.scopeName(),
                 null,
-                QuickSearch.from(descriptor),
+                QuickSearch.from(descriptor, optionFields),
                 fields,
                 descriptor.externalCriteriaKeys().stream()
                         .map(ExternalCriteria::pageContextObject)
@@ -35,6 +47,26 @@ public record QuerySchema(String scopeName,
                         .map(DefaultSort::from)
                         .toList()
         );
+    }
+
+    private static QueryField mergeOptionField(QueryField field, Map<String, OptionFieldDefinition> optionFields) {
+        if (field.optionBinding() != null || optionFields.isEmpty()) {
+            return field;
+        }
+        OptionFieldDefinition definition = optionFields.get(field.fieldName());
+        return definition == null ? field : field.withOptionField(definition);
+    }
+
+    private static Map<String, OptionFieldDefinition> optionFields(Class<?> modelClass) {
+        if (modelClass == null) {
+            return Map.of();
+        }
+        return OptionFieldResolver.resolve(modelClass).stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        OptionFieldDefinition::fieldName,
+                        Function.identity(),
+                        (left, right) -> left
+                ));
     }
 
     public record QuickSearch(boolean enabled,
@@ -46,8 +78,12 @@ public record QuerySchema(String scopeName,
         }
 
         static QuickSearch from(QueryDescriptor descriptor) {
+            return from(descriptor, Map.of());
+        }
+
+        static QuickSearch from(QueryDescriptor descriptor, Map<String, OptionFieldDefinition> optionFields) {
             List<Field> fieldSchemas = descriptor.quickSearchFields().stream()
-                    .map(Field::from)
+                    .map(field -> Field.from(mergeOptionField(field, optionFields)))
                     .toList();
             List<String> fields = fieldSchemas.stream().map(Field::name).toList();
             return new QuickSearch(!fields.isEmpty(), fields, fieldSchemas);
@@ -64,9 +100,13 @@ public record QuerySchema(String scopeName,
                         List<QueryOperator> operators,
                         QueryOperator defaultOperator,
                         boolean quickSearch,
-                        boolean sortable) {
+                        boolean sortable,
+                        OptionBinding optionBinding,
+                        OptionSelectionMode selectionMode,
+                        String optionTitleField) {
         public Field {
             operators = operators == null ? List.of() : List.copyOf(operators);
+            optionTitleField = optionTitleField == null || optionTitleField.isBlank() ? null : optionTitleField.trim();
         }
 
         static Field from(QueryField field) {
@@ -77,7 +117,10 @@ public record QuerySchema(String scopeName,
                     List.copyOf(field.operators()),
                     field.defaultOperator(),
                     field.quickSearch(),
-                    field.sortable()
+                    field.sortable(),
+                    field.optionBinding(),
+                    field.selectionMode(),
+                    field.optionTitleField()
             );
         }
     }

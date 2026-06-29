@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -43,6 +44,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -59,6 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,6 +80,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
         CurrentUserWebFilter.class,
+        MuYunSpringJacksonConfiguration.class,
         PlatformWebExceptionHandler.class
 })
 class IamWebControllerIT {
@@ -115,6 +119,14 @@ class IamWebControllerIT {
 
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
+
+    @BeforeEach
+    void setUpOptionOutputPassthrough() {
+        lenient().when(employeeService.populateOptionTitlesForOutput(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(employeeService.populateOptionTitlesForOutput(org.mockito.ArgumentMatchers.<List<Employee>>any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void shouldUseInjectedServiceAndCurrentUserTenantInRealMvcContext() throws Exception {
@@ -553,7 +565,7 @@ class IamWebControllerIT {
         mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
                         .contentType("application/json")
                         .content("""
-                                {"subjectType":"USER_ACCOUNT","subjectId":"user-2"}
+                                {"subjectType":"userAccount","subjectId":"user-2"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value("grant-1"));
@@ -561,7 +573,7 @@ class IamWebControllerIT {
         mvc.perform(get("/iam.role/{roleId}/grants", "role-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].subjectType").value("USER_ACCOUNT"))
+                .andExpect(jsonPath("$[0].subjectType").value("userAccount"))
                 .andExpect(jsonPath("$[0].subjectId").value("user-2"));
 
         mvc.perform(post("/iam.role/{roleId}/grants/{grantId}/delete", "role-1", "grant-1"))
@@ -574,8 +586,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"OWNER",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"owner",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -587,8 +599,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"DEPARTMENT_AND_CHILDREN",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"departmentAndChildren",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -649,8 +661,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"CUSTOM",
-                                  "tenantScopePolicy":"CURRENT_TENANT",
+                                  "dataScopePolicy":"custom",
+                                  "tenantScopePolicy":"currentTenant",
                                   "scopeCondition":"authUserId = ${userId}"
                                 }
                 """))

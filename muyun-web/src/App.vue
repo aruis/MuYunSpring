@@ -112,7 +112,7 @@ async function handleLogout() {
 }
 
 function handleSelectMenu(menu: MenuRecord, target: MenuNavigationTarget) {
-  if (target.openMode === 'WINDOW') {
+  if (target.openMode === 'window') {
     openWindow(menuTargetUrl(menu, target));
     return;
   }

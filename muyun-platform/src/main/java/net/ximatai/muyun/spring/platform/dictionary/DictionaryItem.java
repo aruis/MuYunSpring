@@ -12,6 +12,7 @@ import net.ximatai.muyun.spring.common.model.standard.StandardEnabledTreeEntity;
 @Setter
 @Table(name = "platform_dictionary_item", comment = "Platform dictionary item")
 @CompositeIndex(columns = {"tenant_id", "category_id", "code"}, unique = true)
+@CompositeIndex(columns = {"tenant_id", "category_id", "title"}, unique = true)
 public class DictionaryItem extends StandardEnabledTreeEntity {
     @Column(name = "category_id", type = ColumnType.VARCHAR, length = 64, nullable = false, comment = "Dictionary category id")
     private String categoryId;

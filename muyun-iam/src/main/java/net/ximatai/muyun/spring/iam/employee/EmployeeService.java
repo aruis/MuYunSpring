@@ -5,6 +5,11 @@ import net.ximatai.muyun.spring.ability.EnableAbility;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.spring.ability.TenantStandardBusinessService;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
+import net.ximatai.muyun.spring.ability.form.FormDescriptor;
+import net.ximatai.muyun.spring.ability.form.FormField;
+import net.ximatai.muyun.spring.ability.option.OptionFieldOutputAbility;
+import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -29,20 +34,34 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         EnableAbility<Employee>,
         SortAbility<Employee>,
         ReferenceAbility<Employee>,
+        OptionFieldOutputAbility<Employee>,
+        FormAbility<Employee>,
         QueryAbility<Employee> {
     public static final String MODULE_ALIAS = "iam.employee";
 
     private final OrganizationService organizationService;
     private final DepartmentService departmentService;
+    private final StaticOptionFieldTitlePopulator optionFieldTitlePopulator;
 
     @Autowired
     public EmployeeService(EmployeeDao employeeDao,
                            ActiveTenantVerifier activeTenantVerifier,
                            OrganizationService organizationService,
-                           DepartmentService departmentService) {
+                           DepartmentService departmentService,
+                           StaticOptionFieldTitlePopulator optionFieldTitlePopulator) {
         super(MODULE_ALIAS, Employee.class, employeeDao, activeTenantVerifier);
         this.organizationService = organizationService;
         this.departmentService = departmentService;
+        this.optionFieldTitlePopulator = optionFieldTitlePopulator == null
+                ? StaticOptionFieldTitlePopulator.NONE : optionFieldTitlePopulator;
+    }
+
+    public EmployeeService(EmployeeDao employeeDao,
+                           ActiveTenantVerifier activeTenantVerifier,
+                           OrganizationService organizationService,
+                           DepartmentService departmentService) {
+        this(employeeDao, activeTenantVerifier, organizationService, departmentService,
+                StaticOptionFieldTitlePopulator.NONE);
     }
 
     @Override
@@ -51,6 +70,7 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
         employee.setDepartmentId(Preconditions.requireText(employee.getDepartmentId(), "departmentId"));
         employee.setEmployeeNo(Preconditions.requireText(employee.getEmployeeNo(), "employeeNo"));
         employee.setTitle(Preconditions.requireText(employee.getTitle(), "employeeName"));
+        employee.setGender(normalizeBlank(employee.getGender()));
         employee.setMobile(normalizeBlank(employee.getMobile()));
         employee.setEmail(normalizeBlank(employee.getEmail()));
     }
@@ -71,6 +91,25 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
     }
 
     @Override
+    public StaticOptionFieldTitlePopulator optionFieldTitlePopulator() {
+        return optionFieldTitlePopulator;
+    }
+
+    @Override
+    public FormDescriptor formDescriptor() {
+        return FormDescriptor.builder(MODULE_ALIAS)
+                .title("职员档案")
+                .field(FormField.of("organizationId").withTitle("所属机构").asRequired())
+                .field(FormField.of("departmentId").withTitle("所属部门").asRequired())
+                .field(FormField.of("employeeNo").withTitle("职员编号").asRequired())
+                .field(FormField.of("title").withTitle("职员姓名").asRequired())
+                .field(FormField.of("gender").withTitle("性别"))
+                .field(FormField.of("mobile").withTitle("手机号"))
+                .field(FormField.of("email").withTitle("邮箱"))
+                .build();
+    }
+
+    @Override
     public QueryDescriptor queryDescriptor() {
         return QueryDescriptor.builder(MODULE_ALIAS)
                 .field(QueryField.of("id", QueryOperator.EQ, QueryOperator.IN).withTitle("ID"))
@@ -81,6 +120,8 @@ public class EmployeeService extends TenantStandardBusinessService<Employee> imp
                         .withTitle("职员编号").withQuickSearch().withSortable())
                 .field(QueryField.of("title", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("职员姓名").withQuickSearch().withSortable())
+                .field(QueryField.of("gender", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.IN)
+                        .withTitle("性别"))
                 .field(QueryField.of("mobile", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)
                         .withTitle("手机号").withQuickSearch())
                 .field(QueryField.of("email", QueryValueType.STRING, QueryOperator.EQ, QueryOperator.LIKE)

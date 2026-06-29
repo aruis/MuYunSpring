@@ -23,7 +23,7 @@ export interface ModuleRuntimeContext {
   moduleAlias: string;
   title?: string;
   moduleKind?: 'STATIC' | 'DYNAMIC';
-  entryType?: 'MODULE' | 'ROUTE' | 'LINK';
+  entryType?: 'module' | 'route' | 'link';
   entryRoute?: string;
   entryExternalUrl?: string;
   mainEntityAlias?: string;

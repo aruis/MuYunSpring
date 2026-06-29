@@ -82,7 +82,8 @@ public class DictionaryCategoryService extends AbstractAbilityService<Dictionary
                         .eq("applicationAlias", validApplicationAlias)
                         .eq("alias", validCategoryAlias));
         if (category == null) {
-            throw new PlatformException("Dictionary category requires existing category: " + validCategoryAlias);
+            throw new PlatformException("Dictionary category requires existing category: "
+                    + validApplicationAlias + "." + validCategoryAlias);
         }
         if (category.getCategoryKind() != DictionaryCategoryKind.DICTIONARY) {
             throw new PlatformException("Dictionary items require DICTIONARY category: " + validCategoryAlias);

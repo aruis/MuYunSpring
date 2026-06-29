@@ -1,9 +1,11 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.BearerTokenCurrentUserProvider;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -52,7 +55,9 @@ class MenuWebControllerTest {
     void shouldExposeCurrentUserVisibleMenuTreeWithoutSchemeInput() throws Exception {
         MenuService menuService = mock(MenuService.class);
         MenuWebController controller = new MenuWebController(menuService);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         Menu root = menu("root-1", "scheme-1", "业务中心", null, MenuType.GROUP);
         Menu child = menu("menu-1", "scheme-1", "客户", "crm.customer", MenuType.MODULE);
         when(menuService.currentUserVisibleRootMenus()).thenReturn(List.of(root));
@@ -62,7 +67,7 @@ class MenuWebControllerTest {
         mvc.perform(get("/platform.menu/mine"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
-                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("TAB"))
+                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("tab"))
                 .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
     }
 
@@ -72,6 +77,7 @@ class MenuWebControllerTest {
         UserSessionService sessionService = mock(UserSessionService.class);
         MenuWebController controller = new MenuWebController(menuService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
                 .addFilters(new CurrentUserWebFilter(new BearerTokenCurrentUserProvider(sessionService)))
                 .build();
         CurrentUser currentUser = CurrentUser.tenantUser("user-1", "alice", "tenant-a", "dept-1");
@@ -94,7 +100,7 @@ class MenuWebControllerTest {
                         .header("Authorization", "Bearer token-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
-                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("TAB"))
+                .andExpect(jsonPath("$.records[0].children[0].record.openMode").value("tab"))
                 .andExpect(jsonPath("$.records[0].children[0].record.moduleAlias").value("crm.customer"));
 
         verify(sessionService).currentUser("token-1");
@@ -105,6 +111,7 @@ class MenuWebControllerTest {
         MenuService menuService = mock(MenuService.class);
         MenuWebController controller = new MenuWebController(menuService);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
                 .setControllerAdvice(new PlatformWebExceptionHandler())
                 .build();
         when(menuService.currentUserVisibleRootMenus())
@@ -130,7 +137,9 @@ class MenuWebControllerTest {
         when(schemeService.insert(any(MenuScheme.class))).thenReturn("scheme-1");
         when(schemeService.select("scheme-1")).thenReturn(scheme);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(post("/platform.menu_scheme/query")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -142,7 +151,7 @@ class MenuWebControllerTest {
         mvc.perform(post("/platform.menu_scheme/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"alias":"default","scopeType":"TENANT","title":"Default"}
+                                {"alias":"default","scopeType":"tenant","title":"Default"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.record.id").value("scheme-1"));
@@ -167,7 +176,9 @@ class MenuWebControllerTest {
         when(menuService.insert(any(Menu.class))).thenReturn("menu-2");
         when(menuService.select("menu-2")).thenReturn(inserted);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(get("/platform.menu-scheme/scheme-1/menus/tree"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.records[0].record.id").value("root-1"))
@@ -175,7 +186,7 @@ class MenuWebControllerTest {
         mvc.perform(post("/platform.menu-scheme/scheme-1/menus/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"schemeId":"other-scheme","parentId":"root-1","title":"订单","menuType":"MODULE","moduleAlias":"crm.order"}
+                                {"schemeId":"other-scheme","parentId":"root-1","title":"订单","menuType":"module","moduleAlias":"crm.order"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.record.schemeId").value("scheme-1"));
@@ -224,5 +235,11 @@ class MenuWebControllerTest {
         scheme.setScopeId("tenant-a");
         scheme.setEnabled(Boolean.TRUE);
         return scheme;
+    }
+
+    private MappingJackson2HttpMessageConverter codeTitleEnumConverter() {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
+        return new MappingJackson2HttpMessageConverter(objectMapper);
     }
 }
