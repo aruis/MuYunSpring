@@ -1,9 +1,19 @@
 package net.ximatai.muyun.spring.ability.query;
 
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.spring.common.model.contract.CodeTitleEnum;
 
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public final class QueryDescriptors {
@@ -159,9 +169,15 @@ public final class QueryDescriptors {
     private QueryDescriptors() {
     }
 
-    public static QueryDescriptor simple(String scopeName, Collection<String> fields, Sort... defaultSorts) {
+    public static QueryDescriptor fromModel(String scopeName,
+                                            Class<?> modelClass,
+                                            Collection<String> fields,
+                                            Sort... defaultSorts) {
+        if (modelClass == null) {
+            throw new IllegalArgumentException("query model class must not be null");
+        }
         QueryDescriptor.Builder builder = QueryDescriptor.builder(scopeName);
-        fields.forEach(field -> builder.field(field(field)));
+        fields.forEach(field -> builder.field(field(modelClass, field)));
         if (defaultSorts != null) {
             for (Sort sort : defaultSorts) {
                 builder.defaultSort(sort);
@@ -170,8 +186,19 @@ public final class QueryDescriptors {
         return builder.build();
     }
 
-    public static QueryField field(String fieldName) {
+    private static QueryField field(String fieldName) {
         QueryValueType valueType = valueType(fieldName);
+        return field(fieldName, valueType);
+    }
+
+    public static QueryField field(Class<?> modelClass, String fieldName) {
+        QueryValueType valueType = findField(modelClass, fieldName)
+                .map(QueryDescriptors::valueType)
+                .orElseGet(() -> valueType(fieldName));
+        return field(fieldName, valueType);
+    }
+
+    private static QueryField field(String fieldName, QueryValueType valueType) {
         QueryField field = switch (valueType) {
             case BOOLEAN -> QueryField.of(fieldName, valueType, QueryOperator.EQ);
             case INTEGER, LONG, DECIMAL, DATE, INSTANT, DATETIME -> QueryField.of(fieldName, valueType,
@@ -199,6 +226,75 @@ public final class QueryDescriptors {
             field = field.withQuickSearch();
         }
         return field;
+    }
+
+    private static QueryValueType valueType(Field field) {
+        Class<?> type = box(field.getType());
+        if (type == Boolean.class) {
+            return QueryValueType.BOOLEAN;
+        }
+        if (type == Integer.class || type == Short.class || type == Byte.class) {
+            return QueryValueType.INTEGER;
+        }
+        if (type == Long.class || type == BigInteger.class) {
+            return QueryValueType.LONG;
+        }
+        if (type == BigDecimal.class || type == Double.class || type == Float.class) {
+            return QueryValueType.DECIMAL;
+        }
+        if (type == LocalDate.class) {
+            return QueryValueType.DATE;
+        }
+        if (type == Instant.class) {
+            return QueryValueType.INSTANT;
+        }
+        if (type == LocalDateTime.class || type == OffsetDateTime.class || type == ZonedDateTime.class) {
+            return QueryValueType.DATETIME;
+        }
+        if (CodeTitleEnum.class.isAssignableFrom(type) || type.isEnum()) {
+            return QueryValueType.STRING;
+        }
+        return valueType(field.getName());
+    }
+
+    private static Optional<Field> findField(Class<?> modelClass, String fieldName) {
+        Class<?> current = modelClass;
+        while (current != null && current != Object.class) {
+            try {
+                return Optional.of(current.getDeclaredField(fieldName));
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Class<?> box(Class<?> type) {
+        if (!type.isPrimitive()) {
+            return type;
+        }
+        if (type == boolean.class) {
+            return Boolean.class;
+        }
+        if (type == int.class) {
+            return Integer.class;
+        }
+        if (type == long.class) {
+            return Long.class;
+        }
+        if (type == short.class) {
+            return Short.class;
+        }
+        if (type == byte.class) {
+            return Byte.class;
+        }
+        if (type == double.class) {
+            return Double.class;
+        }
+        if (type == float.class) {
+            return Float.class;
+        }
+        return type;
     }
 
     private static QueryValueType valueType(String fieldName) {

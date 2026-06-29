@@ -37,7 +37,7 @@ public class PlatformUiConfigService extends AbstractAbilityService<PlatformUiCo
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("title", "clientType", "published", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfig.class, java.util.List.of("title", "clientType", "published", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("clientType"));
     }

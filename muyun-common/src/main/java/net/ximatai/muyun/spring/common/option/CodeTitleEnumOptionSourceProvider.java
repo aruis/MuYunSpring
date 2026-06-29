@@ -9,13 +9,8 @@ public final class CodeTitleEnumOptionSourceProvider implements OptionSourceProv
     }
 
     @Override
-    public boolean supports(OptionBinding binding) {
-        return binding != null && sourceType().equals(binding.sourceType());
-    }
-
-    @Override
     public OptionSource source(OptionBinding binding) {
-        if (!supports(binding)) {
+        if (binding == null || !sourceType().equals(binding.sourceType())) {
             throw new IllegalArgumentException("unsupported enum option binding: " + binding);
         }
         Class<?> rawType = loadType(binding.source());

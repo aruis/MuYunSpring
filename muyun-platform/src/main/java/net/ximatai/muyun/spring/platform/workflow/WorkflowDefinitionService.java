@@ -26,7 +26,7 @@ public class WorkflowDefinitionService extends AbstractAbilityService<WorkflowDe
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "applicationAlias", "moduleAlias", "alias", "approvalEnabled", "actionCode", "definitionStatus", "currentVersionNo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, WorkflowDefinition.class, java.util.List.of("id", "applicationAlias", "moduleAlias", "alias", "approvalEnabled", "actionCode", "definitionStatus", "currentVersionNo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

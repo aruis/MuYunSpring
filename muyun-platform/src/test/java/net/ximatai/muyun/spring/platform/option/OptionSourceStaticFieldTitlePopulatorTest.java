@@ -126,11 +126,6 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         }
 
         @Override
-        public boolean supports(OptionBinding binding) {
-            return OptionBinding.dictionary("iam", "gender").equals(binding);
-        }
-
-        @Override
         public OptionSource source(OptionBinding binding) {
             return new OptionSource() {
                 @Override
@@ -157,11 +152,6 @@ class OptionSourceStaticFieldTitlePopulatorTest {
         @Override
         public String sourceType() {
             return OptionBinding.DICTIONARY_SOURCE;
-        }
-
-        @Override
-        public boolean supports(OptionBinding binding) {
-            return true;
         }
 
         @Override

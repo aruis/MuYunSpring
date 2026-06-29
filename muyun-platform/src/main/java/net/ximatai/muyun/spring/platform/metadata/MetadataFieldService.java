@@ -76,7 +76,7 @@ public class MetadataFieldService extends AbstractAbilityService<MetadataField> 
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataId", "fieldName", "columnName", "fieldTypeAlias", "fieldOwnership", "fieldForm", "ownerFieldId", "fieldRole", "systemManaged", "required", "uniqueField", "indexed", "sortableField", "titleField", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataField.class, java.util.List.of("id", "metadataId", "fieldName", "columnName", "fieldTypeAlias", "fieldOwnership", "fieldForm", "ownerFieldId", "fieldRole", "systemManaged", "required", "uniqueField", "indexed", "sortableField", "titleField", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

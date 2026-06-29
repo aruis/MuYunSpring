@@ -305,11 +305,6 @@ class DynamicExchangeTemplatePlanBuilderTest {
             }
 
             @Override
-            public boolean supports(OptionBinding binding) {
-                return binding != null && OptionBinding.DICTIONARY_SOURCE.equals(binding.sourceType());
-            }
-
-            @Override
             public OptionSource source(OptionBinding binding) {
                 return new OptionSource() {
                     @Override

@@ -97,7 +97,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("title", "parentId", "moduleMetadataFieldId", "operator", "allowExternalValue", "externalValueKey", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformQueryItem.class, java.util.List.of("title", "parentId", "moduleMetadataFieldId", "operator", "allowExternalValue", "externalValueKey", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }

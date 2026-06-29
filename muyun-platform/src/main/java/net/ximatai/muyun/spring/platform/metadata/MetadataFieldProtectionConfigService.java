@@ -60,7 +60,7 @@ public class MetadataFieldProtectionConfigService extends AbstractAbilityService
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataFieldId", "enabled", "encryptionMode", "signatureMode", "maskingPolicy", "createdAt", "updatedAt"));
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldProtectionConfig.class, java.util.List.of("id", "metadataFieldId", "enabled", "encryptionMode", "signatureMode", "maskingPolicy", "createdAt", "updatedAt"));
     }
 
     @Override

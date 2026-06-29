@@ -32,7 +32,7 @@ public class PlatformFieldUiTypeFieldMappingService extends AbstractAbilityServi
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "fieldUiTypeAlias", "sourceKey", "title", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformFieldUiTypeFieldMapping.class, java.util.List.of("id", "fieldUiTypeAlias", "sourceKey", "title", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sourceKey"));
     }

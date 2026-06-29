@@ -75,7 +75,7 @@ public class MetadataViewFieldService extends AbstractAbilityService<MetadataVie
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiTypeAlias", "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataViewField.class, java.util.List.of("id", "viewId", "metadataFieldId", "visible", "controlType", "fieldUiTypeAlias", "readOnly", "requiredOverride", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

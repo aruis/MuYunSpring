@@ -42,7 +42,7 @@ public class MeasureUnitCategoryService extends AbstractAbilityService<MeasureUn
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "applicationAlias", "alias", "dimension", "baseUnitCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MeasureUnitCategory.class, java.util.List.of("id", "tenantId", "applicationAlias", "alias", "dimension", "baseUnitCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }
