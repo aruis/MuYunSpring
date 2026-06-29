@@ -54,6 +54,7 @@
 | TD-028 | `QuerySchema` 外部查询值描述仍过于粗糙 | `QuerySchema.ExternalCriteria` 目前只暴露 key，并固定为 `OBJECT` / `PAGE_CONTEXT`，缺少字段结构、来源语义和校验契约；随着静态查询模板、动态页面上下文和外部查询值增多，ability 层可能继续携带页面交付语义 | 后续扩展 external query values 前，引入 `ExternalCriteriaDescriptor` 或等价能力契约，由能力层声明 valueType、来源、对象字段结构和校验边界，Web 层只负责序列化 |
 | TD-029 | 静态查询描述仍依赖字段名约定推断 | `QueryDescriptors.simple` 目前用字段名集合推断 valueType、操作符、标题、quickSearch 和可排序字段，能快速回收旧 Web 查询适配器并改善静态 schema 展示，但业务字段名进入 ability 核心会带来同名不同义、字段漏判和静态/动态查询契约分叉风险 | 静态查询字段继续扩展、出现更多非通用字段类型或查询配置需要对外稳定时，沉淀静态模型 QueryDescriptor 编译器，从 Java 字段类型、模型契约或注解生成查询字段；保留 `simple` 为保守基线或测试便利 |
 | TD-030 | `OptionSourceProvider.supports()` 与 `OptionSourceRegistry` 分派语义不一致 | 当前 registry 实际按 `sourceType` 唯一分派 option source，但 `supports()` 接口语义更像 provider 对完整 binding 的支持判断；新增 option source 时容易误判扩展点行为，未来同一 `sourceType` 多 provider、fallback 或更细粒度匹配也会缺少清晰契约 | 扩展新的 option source 类型、允许同类 source 多实现、或收敛 option provider SPI 时，明确选择一种模型：要么把 registry 契约收紧为按 `sourceType` 唯一注册并调整接口命名，要么让 `supports()` 真正参与完整 binding 分派 |
+| TD-031 | `OptionField` 保存校验尚未进入统一 CRUD 生命周期 | 静态模型已经能通过 `@OptionField` 声明选项来源，并复用表单 schema 和 title 输出语义；但保存时字段值是否属于有效选项仍主要依赖业务 service 显式调用，普通静态业务容易漏接校验，动态与静态链路也缺少统一的字段契约兜底 | 当更多静态业务接入 `@OptionField`、动态字段保存校验需要和静态链路对齐，或 CRUD 生命周期 hook 收口时，把 option 值合法性纳入通用保存校验链路；优先作为字段契约校验的一部分，不单独引入过重的能力声明 |
 
 ## 运维治理触发回收
 
