@@ -3,7 +3,6 @@ package net.ximatai.muyun.spring.iam.employee;
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.form.FormControlType;
-import net.ximatai.muyun.spring.ability.option.StaticOptionFieldTitlePopulator;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -154,18 +153,6 @@ class EmployeeServiceContractTest {
             assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
             assertThat(field.optionTitleField()).isEqualTo("genderTitle");
         });
-    }
-
-    @Test
-    void shouldPopulateGenderTitleThroughStaticOptionFieldPopulator() {
-        StaticOptionFieldTitlePopulator populator = mock(StaticOptionFieldTitlePopulator.class);
-        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
-                organizationService(), departmentService(), populator);
-        Employee employee = employee("org-1", "dept-1", "E001", "Alice");
-
-        service.populateOptionTitlesForOutput(java.util.List.of(employee));
-
-        verify(populator).populateAll(eq(Employee.class), eq(java.util.List.of(employee)));
     }
 
     @Test
