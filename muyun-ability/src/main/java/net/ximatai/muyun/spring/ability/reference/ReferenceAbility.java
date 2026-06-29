@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.PageRequests;
 import net.ximatai.muyun.spring.ability.security.FieldProtectionAbility;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.model.title.TitleFieldResolver;
@@ -46,7 +47,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         LinkedHashSet<String> normalizedIds = new LinkedHashSet<>(ids);
         List<T> entities = getDao().query(
                 activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
-                new PageRequest(0, Integer.MAX_VALUE)
+                PageRequests.all()
         ).stream().peek(this::restoreReferenceProtectedFields).toList();
         Map<String, String> loadedTitles = new LinkedHashMap<>();
         for (T entity : entities) {
@@ -69,7 +70,7 @@ public interface ReferenceAbility<T extends EntityContract & TitledCapable> exte
         LinkedHashSet<String> normalizedFields = new LinkedHashSet<>(fieldNames);
         List<T> entities = getDao().query(
                 activeCriteria(Criteria.of().in(StandardEntitySchema.ID_FIELD, List.copyOf(normalizedIds))),
-                new PageRequest(0, Integer.MAX_VALUE)
+                PageRequests.all()
         ).stream().peek(this::restoreReferenceProtectedFields).toList();
         Map<String, Map<String, Object>> loaded = new LinkedHashMap<>();
         for (T entity : entities) {

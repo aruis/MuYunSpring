@@ -36,6 +36,22 @@ class DynamicWebQueryMapperTest {
     }
 
     @Test
+    void shouldMapCollectionWebQueryOperators() {
+        var conditions = DynamicWebQueryMapper.queryConditions(List.of(
+                new WebQueryCondition("tags", "CONTAINS", List.of("vip")),
+                new WebQueryCondition("tags", "CONTAINS_ANY", List.of("vip", "trial")),
+                new WebQueryCondition("tags", "CONTAINS_ALL", List.of("vip", "paid")),
+                new WebQueryCondition("tags", "EMPTY", List.of()),
+                new WebQueryCondition("tags", "NOT_EMPTY", List.of())
+        ));
+
+        assertThat(conditions).extracting(DynamicQueryCondition::operator)
+                .containsExactly(DynamicQueryOperator.CONTAINS, DynamicQueryOperator.CONTAINS_ANY,
+                        DynamicQueryOperator.CONTAINS_ALL, DynamicQueryOperator.EMPTY,
+                        DynamicQueryOperator.NOT_EMPTY);
+    }
+
+    @Test
     void shouldNormalizeDynamicPageAndSorts() {
         var page = DynamicWebQueryMapper.page(new WebPageRequest(0, 999));
         var sorts = DynamicWebQueryMapper.sorts(List.of(

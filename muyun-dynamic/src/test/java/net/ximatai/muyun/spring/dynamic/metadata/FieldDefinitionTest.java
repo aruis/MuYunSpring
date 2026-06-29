@@ -78,6 +78,52 @@ class FieldDefinitionTest {
     }
 
     @Test
+    void shouldExposeJsonSetValueShapeAndPreserveAcrossFluentMethods() {
+        FieldDefinition field = FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                .jsonSet()
+                .column("tag_values")
+                .queryable(DynamicQueryOperator.CONTAINS, Set.of(DynamicQueryOperator.CONTAINS))
+                .defaultUiType("multi_select");
+
+        assertThat(field.valueShape()).isEqualTo(FieldValueShape.JSON_SET);
+        assertThat(field.columnName()).isEqualTo("tag_values");
+        assertThat(field.queryDefinition().operators()).containsExactly(DynamicQueryOperator.CONTAINS);
+        assertThat(field.defaultUiTypeAlias()).isEqualTo("multi_select");
+    }
+
+    @Test
+    void shouldValidateJsonSetValueShapeContract() {
+        ModuleDefinitionValidator validator = new ModuleDefinitionValidator();
+
+        validator.validateEntity(new EntityDefinition(
+                "customer",
+                "crm_customer",
+                "Customer",
+                java.util.List.of(FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                        .jsonSet()
+                        .queryable(DynamicQueryOperator.CONTAINS, Set.of(DynamicQueryOperator.CONTAINS)))
+        ));
+
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "customer",
+                "crm_customer",
+                "Customer",
+                java.util.List.of(FieldDefinition.string("tags", "Tags").jsonSet())
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("JSON_SET value shape requires JSON field");
+        assertThatThrownBy(() -> validator.validateEntity(new EntityDefinition(
+                "customer",
+                "crm_customer",
+                "Customer",
+                java.util.List.of(FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                        .queryable(DynamicQueryOperator.CONTAINS, Set.of(DynamicQueryOperator.CONTAINS)))
+        )))
+                .isInstanceOf(ModuleDefinitionException.class)
+                .hasMessageContaining("collection query operators require JSON_SET value shape");
+    }
+
+    @Test
     void shouldRejectQueryOperatorUnsupportedByFieldType() {
         assertThatThrownBy(() -> FieldDefinition.decimal("amount", "Amount")
                 .queryable(DynamicQueryOperator.LIKE, Set.of(DynamicQueryOperator.LIKE)))

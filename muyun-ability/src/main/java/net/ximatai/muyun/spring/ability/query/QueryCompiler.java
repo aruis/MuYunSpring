@@ -162,6 +162,11 @@ public final class QueryCompiler {
             case BETWEEN -> appendBetween(criteria, field, operator, condition);
             case NULL -> criteria.isNull(fieldName);
             case NOT_NULL -> criteria.isNotNull(fieldName);
+            case CONTAINS -> criteria.contains(fieldName, singleValue(field, operator, values));
+            case CONTAINS_ANY -> criteria.containsAny(fieldName, listValues(field, operator, values));
+            case CONTAINS_ALL -> criteria.containsAll(fieldName, listValues(field, operator, values));
+            case EMPTY -> criteria.isEmpty(fieldName);
+            case NOT_EMPTY -> criteria.isNotEmpty(fieldName);
         }
     }
 
@@ -243,7 +248,11 @@ public final class QueryCompiler {
                 .filter(value -> value != null && (!(value instanceof String text) || !text.isBlank()))
                 .map(field.valueType()::normalize)
                 .toList();
-        if (list.isEmpty() && operator != QueryOperator.NULL && operator != QueryOperator.NOT_NULL) {
+        if (list.isEmpty()
+                && operator != QueryOperator.NULL
+                && operator != QueryOperator.NOT_NULL
+                && operator != QueryOperator.EMPTY
+                && operator != QueryOperator.NOT_EMPTY) {
             throw new IllegalArgumentException("query operator requires non-empty values: "
                     + field.fieldName() + "." + operator);
         }

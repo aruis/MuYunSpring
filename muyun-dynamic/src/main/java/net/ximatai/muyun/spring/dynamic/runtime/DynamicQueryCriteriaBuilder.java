@@ -71,6 +71,11 @@ public final class DynamicQueryCriteriaBuilder {
             case LTE -> criteria.lte(field.fieldName(), singleValue(field, condition, values));
             case NULL -> criteria.isNull(field.fieldName());
             case NOT_NULL -> criteria.isNotNull(field.fieldName());
+            case CONTAINS -> criteria.contains(field.fieldName(), singleValue(field, condition, values));
+            case CONTAINS_ANY -> criteria.containsAny(field.fieldName(), listValues(field, condition, values));
+            case CONTAINS_ALL -> criteria.containsAll(field.fieldName(), listValues(field, condition, values));
+            case EMPTY -> criteria.isEmpty(field.fieldName());
+            case NOT_EMPTY -> criteria.isNotEmpty(field.fieldName());
         }
     }
 

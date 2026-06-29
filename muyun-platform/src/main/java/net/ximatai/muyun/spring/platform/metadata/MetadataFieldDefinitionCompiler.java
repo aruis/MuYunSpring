@@ -97,6 +97,9 @@ public class MetadataFieldDefinitionCompiler {
                     dictionaryConfig.getDictionaryCategoryAlias(),
                     dictionaryConfig.getSelectionMode());
         }
+        if (isJsonSetFieldType(fieldType)) {
+            definition = definition.jsonSet();
+        }
         return definition;
     }
 
@@ -132,6 +135,11 @@ public class MetadataFieldDefinitionCompiler {
         return field.getFieldForm() == MetadataFieldForm.VIRTUAL
                 ? FieldStorageForm.VIRTUAL
                 : FieldStorageForm.PHYSICAL;
+    }
+
+    private boolean isJsonSetFieldType(PlatformFieldType fieldType) {
+        return fieldType.getFieldType() == net.ximatai.muyun.spring.dynamic.metadata.FieldType.JSON
+                && "json_set".equals(fieldType.getAlias());
     }
 
     private FieldBehaviorDefinition behavior(PlatformFieldType fieldType,

@@ -16,10 +16,14 @@ import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityReferenceDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityRelationDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicQueryOperator;
+import net.ximatai.muyun.spring.dynamic.metadata.FieldType;
 import net.ximatai.muyun.spring.dynamic.metadata.ModuleDefinition;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRefreshResult;
 import net.ximatai.muyun.spring.dynamic.refresh.DynamicModuleRuntimeRefresher;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityOperations;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicEntityService;
+import net.ximatai.muyun.spring.dynamic.runtime.DynamicQueryCondition;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecord;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordDao;
 import net.ximatai.muyun.spring.dynamic.runtime.DynamicRecordRuntime;
@@ -46,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -410,8 +415,10 @@ class DynamicSchemaServiceIT {
                     .isEqualTo(6);
 
             assertThatThrownBy(() -> service.count(Criteria.of().eq("missingField", "x")))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("unknown dynamic field or column");
+                    .isInstanceOf(OrmException.class)
+                    .hasMessageContaining("missingField")
+                    .extracting("code")
+                    .isEqualTo(OrmException.Code.INVALID_CRITERIA);
             assertThatThrownBy(() -> service.count(Criteria.of().raw(SqlRawCondition.of("\"name\" = ?", Map.of()))))
                     .isInstanceOf(OrmException.class)
                     .extracting("code")
@@ -442,6 +449,76 @@ class DynamicSchemaServiceIT {
         assertThat(result.migrations()).containsKey("contract");
         assertThat(recordService.select("sales.contract", "contract", id).getValue("code")).isEqualTo("C-REFRESH-001");
         assertThat(recordService.count("sales.contract", "contract", Criteria.of().eq("code", "C-REFRESH-001"))).isEqualTo(1);
+    }
+
+    @Test
+    void shouldQueryDynamicJsonCollectionFieldOnRealDatabase() {
+        String suffix = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String tableName = "app_contract_json_" + suffix;
+        String moduleAlias = "sales.json_" + suffix;
+        ModuleDefinition module = new ModuleDefinition(
+                moduleAlias,
+                "Json Contract",
+                List.of(new EntityDefinition(
+                        "contract",
+                        tableName,
+                        "Contract",
+                        List.of(
+                                FieldDefinition.string("code", "Code").length(64).required().unique(),
+                                FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                                        .jsonSet()
+                                        .queryable(DynamicQueryOperator.CONTAINS, Set.of(
+                                                DynamicQueryOperator.CONTAINS,
+                                                DynamicQueryOperator.CONTAINS_ANY,
+                                                DynamicQueryOperator.CONTAINS_ALL,
+                                                DynamicQueryOperator.EMPTY,
+                                                DynamicQueryOperator.NOT_EMPTY
+                                        ))
+                        )
+                ))
+        );
+        DynamicRecordRuntime runtime = new DynamicRecordRuntime(operations);
+        new DynamicModuleRuntimeRefresher(schemaService, runtime).refresh(module);
+        DynamicRecordService recordService = new DynamicRecordService(runtime);
+        DynamicEntityOperations records = recordService.entity(moduleAlias, "contract");
+
+        try (TenantContext.Scope ignored = TenantContext.use("tenant-json")) {
+            records.create(records.newRecord()
+                    .setValue("code", "C-JSON-001")
+                    .setValue("tags", List.of("vip", "paid")));
+            records.create(records.newRecord()
+                    .setValue("code", "C-JSON-002")
+                    .setValue("tags", List.of("trial")));
+            records.create(records.newRecord()
+                    .setValue("code", "C-JSON-003")
+                    .setValue("tags", List.of()));
+
+            assertThat(records.list(records.queryCriteria(List.of(
+                                    DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS, "vip")
+                            )), PageRequest.of(1, 10)))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-JSON-001");
+            assertThat(records.list(records.queryCriteria(List.of(
+                                    DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS_ANY, "vip", "trial")
+                            )), PageRequest.of(1, 10), Sort.asc("code")))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-JSON-001", "C-JSON-002");
+            assertThat(records.list(records.queryCriteria(List.of(
+                                    DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS_ALL, "vip", "paid")
+                            )), PageRequest.of(1, 10)))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-JSON-001");
+            assertThat(records.list(records.queryCriteria(List.of(
+                                    new DynamicQueryCondition("tags", DynamicQueryOperator.EMPTY, List.of())
+                            )), PageRequest.of(1, 10)))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-JSON-003");
+            assertThat(records.list(records.queryCriteria(List.of(
+                                    new DynamicQueryCondition("tags", DynamicQueryOperator.NOT_EMPTY, List.of())
+                            )), PageRequest.of(1, 10), Sort.asc("code")))
+                    .extracting(record -> record.getValue("code"))
+                    .containsExactly("C-JSON-001", "C-JSON-002");
+        }
     }
 
     @Test

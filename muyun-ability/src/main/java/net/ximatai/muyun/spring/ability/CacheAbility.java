@@ -62,7 +62,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
         }
         List<T> cached = CacheRegistry.allCache(allCacheNamespace());
         if (cached == null) {
-            cached = getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE)).stream()
+            cached = getDao().query(activeCriteria(Criteria.of()), PageRequests.all()).stream()
                     .map(this::copyForCache)
                     .toList();
             CacheRegistry.putAllCache(allCacheNamespace(), cached);
@@ -112,7 +112,7 @@ public interface CacheAbility<T extends EntityContract> extends CrudAbility<T> {
     }
 
     private List<T> selectAllWithoutCache() {
-        return getDao().query(activeCriteria(Criteria.of()), new PageRequest(0, Integer.MAX_VALUE)).stream()
+        return getDao().query(activeCriteria(Criteria.of()), PageRequests.all()).stream()
                 .map(this::copyForCache)
                 .peek(record -> PlatformAbilityDispatcher.afterSelect(this, record))
                 .peek(this::afterSelect)

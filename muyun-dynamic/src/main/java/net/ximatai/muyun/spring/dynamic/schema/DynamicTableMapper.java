@@ -7,6 +7,7 @@ import net.ximatai.muyun.spring.common.schema.PlatformUniqueIndexes;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldColumnMetadata;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
@@ -72,7 +73,7 @@ public class DynamicTableMapper {
 
     private Column toColumn(FieldDefinition field) {
         Column column = Column.of(field.columnName())
-                .setType(field.type().toColumnType())
+                .setType(DynamicFieldColumnMetadata.columnType(field))
                 .setComment(field.name())
                 .setNullable(!field.isRequired())
                 .setIndexed(field.isIndexed() || field.isSortable());

@@ -142,6 +142,24 @@ class DynamicQueryCriteriaBuilderTest {
     }
 
     @Test
+    void shouldBuildCollectionCriteriaOperatorsForJsonFields() {
+        DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(entity());
+
+        Criteria criteria = builder.build(List.of(
+                DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS, "vip"),
+                DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS_ANY, "vip", "trial"),
+                DynamicQueryCondition.of("tags", DynamicQueryOperator.CONTAINS_ALL, "vip", "paid"),
+                new DynamicQueryCondition("tags", DynamicQueryOperator.EMPTY, List.of()),
+                new DynamicQueryCondition("tags", DynamicQueryOperator.NOT_EMPTY, List.of())
+        ));
+
+        assertThat(criteria.getClauses()).extracting(clause -> clause.getOperator())
+                .containsExactly(CriteriaOperator.CONTAINS, CriteriaOperator.CONTAINS_ANY,
+                        CriteriaOperator.CONTAINS_ALL, CriteriaOperator.IS_EMPTY,
+                        CriteriaOperator.IS_NOT_EMPTY);
+    }
+
+    @Test
     void shouldRejectInvalidDateAndTimestampQueryValues() {
         DynamicQueryCriteriaBuilder builder = new DynamicQueryCriteriaBuilder(timeEntity());
 
@@ -171,6 +189,15 @@ class DynamicQueryCriteriaBuilderTest {
                 FieldDefinition.string("status", "Status")
                         .queryable(DynamicQueryOperator.EQ, Set.of(DynamicQueryOperator.EQ,
                                 DynamicQueryOperator.IN, DynamicQueryOperator.NOT_IN)),
+                FieldDefinition.of("tags", FieldType.JSON, "Tags")
+                        .jsonSet()
+                        .queryable(DynamicQueryOperator.CONTAINS, Set.of(
+                                DynamicQueryOperator.CONTAINS,
+                                DynamicQueryOperator.CONTAINS_ANY,
+                                DynamicQueryOperator.CONTAINS_ALL,
+                                DynamicQueryOperator.EMPTY,
+                                DynamicQueryOperator.NOT_EMPTY
+                        )),
                 FieldDefinition.text("remark", "Remark")
         ));
     }

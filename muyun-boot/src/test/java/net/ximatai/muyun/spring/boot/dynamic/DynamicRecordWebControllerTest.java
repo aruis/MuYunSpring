@@ -1012,6 +1012,41 @@ class DynamicRecordWebControllerTest {
     }
 
     @Test
+    void shouldPassCollectionQueryOperatorsFromHttpRequestToDynamicCriteria() throws Exception {
+        Criteria criteria = Criteria.of().containsAny("tags", List.of("vip", "trial"));
+        DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
+        record.setId("contract-1");
+        when(mainEntity.queryCriteria(any())).thenReturn(criteria);
+        when(mainEntity.pageQuery(eq(criteria), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(record), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/{moduleAlias}/query", MODULE)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "conditions": [
+                                    {"fieldName": "tags", "operator": "CONTAINS", "values": ["vip"]},
+                                    {"fieldName": "tags", "operator": "CONTAINS_ANY", "values": ["vip", "trial"]},
+                                    {"fieldName": "tags", "operator": "CONTAINS_ALL", "values": ["vip", "paid"]},
+                                    {"fieldName": "tags", "operator": "EMPTY", "values": []},
+                                    {"fieldName": "tags", "operator": "NOT_EMPTY", "values": []}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("contract-1"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<DynamicQueryCondition>> conditions = ArgumentCaptor.forClass(List.class);
+        verify(mainEntity).queryCriteria(conditions.capture());
+        assertThat(conditions.getValue()).extracting(DynamicQueryCondition::operator)
+                .containsExactly(DynamicQueryOperator.CONTAINS, DynamicQueryOperator.CONTAINS_ANY,
+                        DynamicQueryOperator.CONTAINS_ALL, DynamicQueryOperator.EMPTY,
+                        DynamicQueryOperator.NOT_EMPTY);
+        assertThat(conditions.getValue().get(1).values()).isEqualTo(List.of("vip", "trial"));
+    }
+
+    @Test
     void shouldBuildNestedMainEntityQueryCriteriaTree() throws Exception {
         DynamicRecord record = new DynamicRecord(entity()).setValue("code", "C-001");
         record.setId("contract-1");
