@@ -121,11 +121,6 @@ class OptionSourceStaticFieldValueValidatorTest {
         }
 
         @Override
-        public boolean supports(OptionBinding binding) {
-            return OptionBinding.dictionary("iam", "gender").equals(binding);
-        }
-
-        @Override
         public OptionSource source(OptionBinding binding) {
             return new OptionSource() {
                 @Override

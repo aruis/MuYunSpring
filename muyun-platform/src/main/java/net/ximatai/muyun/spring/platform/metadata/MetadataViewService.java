@@ -49,7 +49,7 @@ public class MetadataViewService extends AbstractAbilityService<MetadataView> im
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "relationId", "viewType", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataView.class, java.util.List.of("id", "relationId", "viewType", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

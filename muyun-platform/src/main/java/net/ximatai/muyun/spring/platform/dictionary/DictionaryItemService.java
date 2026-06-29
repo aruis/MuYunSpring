@@ -35,7 +35,7 @@ public class DictionaryItemService extends AbstractAbilityService<DictionaryItem
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "categoryId", "categoryAlias", "code", "parentId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, DictionaryItem.class, java.util.List.of("id", "categoryId", "categoryAlias", "code", "parentId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }

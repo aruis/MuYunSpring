@@ -44,7 +44,7 @@ public class ExchangeRateService extends AbstractAbilityService<ExchangeRate> im
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate", "rate", "source", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, ExchangeRate.class, java.util.List.of("id", "fromCurrencyCode", "toCurrencyCode", "rateTypeCode", "effectiveDate", "rate", "source", "tenantId", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.desc("effectiveDate"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("fromCurrencyCode"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("toCurrencyCode"));

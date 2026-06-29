@@ -42,7 +42,7 @@ public class ModuleMetadataFieldAffectService extends AbstractAbilityService<Mod
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleMetadataFieldId", "referenceFieldId", "targetFieldId", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, ModuleMetadataFieldAffect.class, java.util.List.of("id", "moduleMetadataFieldId", "referenceFieldId", "targetFieldId", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

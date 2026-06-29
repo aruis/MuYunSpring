@@ -34,7 +34,7 @@ public class PlatformModuleService extends AbstractAbilityService<PlatformModule
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "parentId", "applicationAlias", "moduleKind", "systemManaged", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformModule.class, java.util.List.of("id", "parentId", "applicationAlias", "moduleKind", "systemManaged", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

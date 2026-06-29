@@ -193,7 +193,7 @@ public class CodeRuleService extends AbstractAbilityService<CodeRule> implements
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "moduleAlias", "entityAlias", "metadataFieldId", "fieldName", "fieldRole", "mode", "orgScopeType", "orgScopeId", "globalDefault", "enabled", "effectiveFrom", "effectiveTo"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, CodeRule.class, java.util.List.of("id", "moduleAlias", "entityAlias", "metadataFieldId", "fieldName", "fieldRole", "mode", "orgScopeType", "orgScopeId", "globalDefault", "enabled", "effectiveFrom", "effectiveTo"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

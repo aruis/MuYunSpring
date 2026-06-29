@@ -43,7 +43,7 @@ public class MeasureUnitConversionRuleService extends AbstractAbilityService<Mea
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId", "fromCategoryAlias", "fromUnitCode", "toCategoryAlias", "toUnitCode", "factor", "priority", "effectiveFrom", "effectiveTo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MeasureUnitConversionRule.class, java.util.List.of("id", "tenantId", "applicationAlias", "scopeType", "moduleAlias", "contextObjectType", "contextObjectId", "fromCategoryAlias", "fromUnitCode", "toCategoryAlias", "toUnitCode", "factor", "priority", "effectiveFrom", "effectiveTo", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.desc("priority"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));

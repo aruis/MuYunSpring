@@ -127,7 +127,7 @@ public class RecordGenerationRuleService extends AbstractAbilityService<RecordGe
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "sourceModuleAlias", "targetModuleAlias", "actionCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, RecordGenerationRule.class, java.util.List.of("id", "sourceModuleAlias", "targetModuleAlias", "actionCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

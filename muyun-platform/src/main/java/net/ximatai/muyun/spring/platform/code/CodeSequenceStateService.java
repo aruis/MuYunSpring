@@ -146,7 +146,7 @@ public class CodeSequenceStateService extends AbstractAbilityService<CodeSequenc
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "currentValue"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, CodeSequenceState.class, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "currentValue"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("ruleId"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("basisKey"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("periodKey"));

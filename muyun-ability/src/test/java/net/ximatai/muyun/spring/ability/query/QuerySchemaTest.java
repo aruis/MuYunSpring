@@ -4,7 +4,12 @@ import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.option.OptionField;
 import net.ximatai.muyun.spring.common.option.OptionSourceType;
+import net.ximatai.muyun.spring.common.model.standard.StandardEnabledSortableEntity;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,8 +55,9 @@ class QuerySchemaTest {
     }
 
     @Test
-    void shouldBuildSimpleDescriptorFromStaticServiceFieldConventions() {
-        QueryDescriptor descriptor = QueryDescriptors.simple("platform.application",
+    void shouldBuildDescriptorFromModelFieldsAndStaticConventions() {
+        QueryDescriptor descriptor = QueryDescriptors.fromModel("platform.application",
+                TypedQueryRecord.class,
                 java.util.List.of("id", "code", "title", "enabled", "sortOrder", "createdAt"),
                 Sort.asc("sortOrder"));
 
@@ -86,7 +92,8 @@ class QuerySchemaTest {
                 .singleElement()
                 .extracting(QuerySchema.Field::valueType)
                 .isEqualTo(QueryValueType.INSTANT);
-        QueryDescriptor effectiveDescriptor = QueryDescriptors.simple("platform.code_rule",
+        QueryDescriptor effectiveDescriptor = QueryDescriptors.fromModel("platform.code_rule",
+                TypedQueryRecord.class,
                 java.util.List.of("effectiveFrom", "effectiveTo"));
         QuerySchema effectiveSchema = QuerySchema.from(effectiveDescriptor);
         assertThat(effectiveSchema.fields()).allSatisfy(field -> {
@@ -101,6 +108,56 @@ class QuerySchemaTest {
                     assertThat(sort.field()).isEqualTo("sortOrder");
                     assertThat(sort.desc()).isFalse();
                 });
+    }
+
+    @Test
+    void shouldBuildStaticDescriptorFromModelFieldTypes() {
+        QueryDescriptor descriptor = QueryDescriptors.fromModel("test.invoice",
+                TypedQueryRecord.class,
+                java.util.List.of("title", "enabled", "sortOrder", "customFlag", "customAmount",
+                        "businessDate", "localChangedAt", "code"),
+                Sort.asc("sortOrder"));
+
+        QuerySchema schema = QuerySchema.from(descriptor);
+
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("title"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.STRING);
+                    assertThat(field.quickSearch()).isTrue();
+                });
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("enabled"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.BOOLEAN);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("sortOrder"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.INTEGER);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("customFlag"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.BOOLEAN);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("customAmount"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.DECIMAL);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("businessDate"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.DATE);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("localChangedAt"))
+                .singleElement()
+                .extracting(QuerySchema.Field::valueType)
+                .isEqualTo(QueryValueType.DATETIME);
+        assertThat(schema.fields()).filteredOn(field -> field.name().equals("code"))
+                .singleElement()
+                .satisfies(field -> {
+                    assertThat(field.valueType()).isEqualTo(QueryValueType.STRING);
+                    assertThat(field.quickSearch()).isTrue();
+                });
+        assertThat(schema.defaultSorts()).singleElement()
+                .satisfies(sort -> assertThat(sort.field()).isEqualTo("sortOrder"));
     }
 
     @Test
@@ -142,5 +199,19 @@ class QuerySchemaTest {
         private String gender;
 
         private String genderTitle;
+    }
+
+    private static class TypedQueryRecord extends StandardEnabledSortableEntity {
+        private boolean customFlag;
+
+        private BigDecimal customAmount;
+
+        private LocalDate businessDate;
+
+        private LocalDateTime localChangedAt;
+
+        private LocalDateTime effectiveFrom;
+
+        private LocalDateTime effectiveTo;
     }
 }

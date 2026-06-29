@@ -35,7 +35,7 @@ public class PlatformUiSetService extends AbstractAbilityService<PlatformUiSet> 
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("alias", "title", "setType", "defaultSet", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiSet.class, java.util.List.of("alias", "title", "setType", "defaultSet", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("alias"));
     }

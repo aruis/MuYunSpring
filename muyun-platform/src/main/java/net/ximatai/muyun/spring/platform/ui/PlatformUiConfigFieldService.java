@@ -61,7 +61,7 @@ public class PlatformUiConfigFieldService extends AbstractAbilityService<Platfor
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiTypeAlias", "visible", "readOnly", "requiredOverride", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformUiConfigField.class, java.util.List.of("title", "moduleMetadataFieldId", "fieldUiTypeAlias", "visible", "readOnly", "requiredOverride", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("title"));
     }

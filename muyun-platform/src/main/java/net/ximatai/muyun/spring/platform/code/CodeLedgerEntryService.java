@@ -135,7 +135,7 @@ public class CodeLedgerEntryService extends AbstractAbilityService<CodeLedgerEnt
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "moduleAlias", "entityAlias", "fieldName", "codeValue", "basisKey", "periodKey", "sourceRecordId", "status", "lastAction"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, CodeLedgerEntry.class, java.util.List.of("id", "ruleId", "moduleAlias", "entityAlias", "fieldName", "codeValue", "basisKey", "periodKey", "sourceRecordId", "status", "lastAction"),
                 net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
     }
 

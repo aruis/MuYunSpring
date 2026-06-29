@@ -40,7 +40,7 @@ public class PlatformQueryTemplateService extends AbstractAbilityService<Platfor
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("alias", "title", "defaultTemplate", "published", "enabled"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, PlatformQueryTemplate.class, java.util.List.of("alias", "title", "defaultTemplate", "published", "enabled"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("alias"));
     }

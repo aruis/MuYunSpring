@@ -93,7 +93,7 @@ public class RecordWriteBackRuleService extends AbstractAbilityService<RecordWri
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "triggerModuleAlias", "targetModuleAlias", "eventType", "cascadeMode", "triggerMode", "targetLocateMode", "targetRelationCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, RecordWriteBackRule.class, java.util.List.of("id", "triggerModuleAlias", "targetModuleAlias", "eventType", "cascadeMode", "triggerMode", "targetLocateMode", "targetRelationCode", "title", "enabled", "sortOrder", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("sortOrder"));
     }
 

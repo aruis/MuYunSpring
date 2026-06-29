@@ -28,7 +28,7 @@ public class TenantCurrencySettingService extends AbstractAbilityService<TenantC
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "tenantId", "baseCurrencyCode", "title", "createdAt", "updatedAt"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, TenantCurrencySetting.class, java.util.List.of("id", "tenantId", "baseCurrencyCode", "title", "createdAt", "updatedAt"),
                 net.ximatai.muyun.database.core.orm.Sort.asc("tenantId"));
     }
 

@@ -115,7 +115,7 @@ public class CodeRecycleEntryService extends AbstractAbilityService<CodeRecycleE
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "recycledValue", "sourceRecordId", "status"),
+        return QueryDescriptors.fromModel(MODULE_ALIAS, CodeRecycleEntry.class, java.util.List.of("id", "ruleId", "basisKey", "periodKey", "recycledValue", "sourceRecordId", "status"),
                 net.ximatai.muyun.database.core.orm.Sort.desc("createdAt"));
     }
 

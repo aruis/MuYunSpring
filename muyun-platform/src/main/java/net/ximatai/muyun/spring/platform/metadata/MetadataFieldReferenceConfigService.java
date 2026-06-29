@@ -67,7 +67,7 @@ public class MetadataFieldReferenceConfigService extends AbstractAbilityService<
 
     @Override
     public QueryDescriptor queryDescriptor() {
-        return QueryDescriptors.simple(MODULE_ALIAS, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
+        return QueryDescriptors.fromModel(MODULE_ALIAS, MetadataFieldReferenceConfig.class, java.util.List.of("id", "metadataFieldId", "relationId", "targetModuleAlias", "targetMetadataId", "cardinality", "autoTitle", "titleOutputField", "projectionMappings", "createdAt", "updatedAt"));
     }
 
     @Override
