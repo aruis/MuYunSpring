@@ -8,6 +8,8 @@ import type {
   QueryOperator,
   QuerySchema,
   QuerySchemaField,
+  ResolvedViewDescriptor,
+  ViewDefinition,
   WebQueryCondition,
   WebQueryRequest,
   WebSort,
@@ -55,7 +57,7 @@ const props = withDefaults(
   defineProps<{
     context: ModuleContext<QueryListRecord>;
     title: string;
-    columns: RecordQueryListColumn[];
+    columns?: RecordQueryListColumn[];
     actions?: RecordActionItem[];
     rowActionsOf?: (record: QueryListRecord) => RecordActionItem[];
     rowActionsTitle?: string;
@@ -72,6 +74,7 @@ const props = withDefaults(
   }>(),
   {
     rowKey: 'id',
+    columns: () => [],
     actions: () => [],
     rowActionsOf: undefined,
     rowActionsTitle: '操作',
@@ -101,6 +104,7 @@ const records = ref<QueryListRecord[]>([]);
 const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(props.pageSize);
+const runtimeViews = ref<Array<ViewDefinition | ResolvedViewDescriptor>>([]);
 const quickSearchKeyword = ref('');
 const appliedQuickSearch = ref('');
 const conditionsExpanded = ref(false);
@@ -126,6 +130,12 @@ const queryActionsDisabled = computed(() => !queryReady.value);
 const conditionsDisabled = computed(() => !queryReady.value || queryFields.value.length === 0);
 const hasRowActions = computed(() => props.rowActionsOf !== undefined);
 const rows = computed<QueryListRow[]>(() => records.value.map(resolveRow));
+const tableColumns = computed<RecordQueryListColumn[]>(() => {
+  if (props.columns && props.columns.length > 0) {
+    return props.columns;
+  }
+  return columnsFromRuntimeListView(runtimeViews.value);
+});
 const pageSizeOptions: Option[] = [
   { label: '10 条/页', value: 10 },
   { label: '20 条/页', value: 20 },
@@ -182,7 +192,7 @@ async function loadSchemaAndRecords() {
   const requestSeq = ++schemaRequestSeq;
   loading.value = true;
   try {
-    await props.context.runtime.ready;
+    runtimeViews.value = await loadRuntimeViews();
     const nextSchema = await props.context.crud.querySchema();
     if (requestSeq !== schemaRequestSeq) {
       return;
@@ -213,6 +223,18 @@ async function loadSchemaAndRecords() {
     if (requestSeq === schemaRequestSeq) {
       loading.value = false;
     }
+  }
+}
+
+async function loadRuntimeViews(): Promise<Array<ViewDefinition | ResolvedViewDescriptor>> {
+  if (props.columns && props.columns.length > 0) {
+    return [];
+  }
+  try {
+    const runtimeContext = await props.context.runtime.ready;
+    return runtimeContext.uiDescriptor?.views ?? runtimeContext.uiDefinition?.views ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -525,6 +547,30 @@ function cellValue(record: QueryListRecord, column: RecordQueryListColumn) {
   return column.render?.(record) ?? String(record[column.key] ?? '');
 }
 
+function columnsFromRuntimeListView(
+  views: Array<ViewDefinition | ResolvedViewDescriptor> | undefined,
+): RecordQueryListColumn[] {
+  const view =
+    views?.find((item) => item.viewKind === 'LIST' && item.viewCode === 'default_list') ??
+    views?.find((item) => item.viewKind === 'LIST');
+  if (!view) {
+    return [];
+  }
+  return view.fields
+    .filter((field) => field.visible?.constant !== false)
+    .map((field) => ({
+      key: field.fieldRef.fieldName,
+      title: field.label ?? field.fieldRef.fieldName,
+      type: field.uiType === 'enabledStatus' ? 'enabledStatus' : 'text',
+      width: field.width,
+      align: columnAlign(field.align),
+    }));
+}
+
+function columnAlign(align: string | undefined): RecordQueryListColumn['align'] {
+  return align === 'center' || align === 'right' ? align : 'left';
+}
+
 function goPage(nextPage: number) {
   pageNum.value = Math.min(Math.max(1, nextPage), pages.value);
   void loadRecords();
@@ -629,7 +675,7 @@ defineExpose({ refresh });
           <thead>
             <tr>
               <th
-                v-for="column in columns"
+                v-for="column in tableColumns"
                 :key="column.key"
                 :style="{ width: column.width, textAlign: column.align ?? 'left' }"
               >
@@ -648,7 +694,11 @@ defineExpose({ refresh });
               @click="emit('select', row.record)"
               @dblclick="emit('rowDblclick', row.record, $event)"
             >
-              <td v-for="column in columns" :key="column.key" :style="{ textAlign: column.align ?? 'left' }">
+              <td
+                v-for="column in tableColumns"
+                :key="column.key"
+                :style="{ textAlign: column.align ?? 'left' }"
+              >
                 <RecordStatusTag
                   v-if="column.type === 'enabledStatus'"
                   :enabled="row.record[column.key] !== false"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   RecordActionBar,
   RecordDetailDrawer,
@@ -11,7 +11,6 @@ import {
   TreeRecordExplorer,
   type QueryListRecord,
   type RecordActionItem,
-  type RecordQueryListColumn,
   type ResolvedRecordActionItem,
   presentPlatformError,
   presentPlatformMessage,
@@ -21,9 +20,11 @@ import type {
   Department,
   Employee,
   Organization,
+  ResolvedViewFieldDescriptor,
   WebListResponse,
   WebQueryRequest,
   WebTreeNode,
+  ViewFieldDefinition,
 } from '@muyun/web-contracts';
 import {
   useModuleContext,
@@ -35,10 +36,28 @@ import {
 defineOptions({ name: 'EmployeeManagementView' });
 
 type EmployeeDetailMode = 'view' | 'create' | 'edit';
+type EmployeeFormFieldName =
+  | 'organizationId'
+  | 'departmentId'
+  | 'employeeNo'
+  | 'title'
+  | 'mobile'
+  | 'email'
+  | 'enabled';
+
+interface EmployeeFormFieldUi {
+  label: string;
+  required: boolean;
+  readOnly: boolean;
+  visible: boolean;
+}
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
 const employeeContext = useModuleContext<Employee>({ moduleAlias: 'iam.employee' });
+const employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
+  new Map(),
+);
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
@@ -68,19 +87,6 @@ const employeeExternalQueryValues = computed<Record<string, unknown> | undefined
   };
 });
 
-const employeeColumns: RecordQueryListColumn[] = [
-  { key: 'employeeNo', title: '职员编号', width: '150px' },
-  { key: 'title', title: '职员姓名', width: '150px' },
-  { key: 'mobile', title: '手机号', width: '150px' },
-  { key: 'email', title: '邮箱' },
-  {
-    key: 'enabled',
-    title: '状态',
-    type: 'enabledStatus',
-    width: '90px',
-    align: 'center',
-  },
-];
 const employeeListActions = computed<RecordActionItem[]>(() => [
   {
     key: 'create',
@@ -134,6 +140,48 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
     },
   ];
 });
+
+onMounted(loadEmployeeFormDefinition);
+
+async function loadEmployeeFormDefinition() {
+  try {
+    const runtimeContext = await employeeContext.runtime.ready;
+    const formView = (runtimeContext.uiDescriptor?.views ?? runtimeContext.uiDefinition?.views)?.find(
+      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
+    );
+    employeeFormFieldDefinitions.value = new Map(
+      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    );
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+  }
+}
+
+function employeeFormField(fieldName: EmployeeFormFieldName): EmployeeFormFieldUi {
+  const field = employeeFormFieldDefinitions.value.get(fieldName);
+  return {
+    label: field?.label ?? employeeFormFieldFallback[fieldName].label,
+    required: field?.required?.constant ?? employeeFormFieldFallback[fieldName].required,
+    readOnly: field?.readOnly?.constant ?? employeeFormFieldFallback[fieldName].readOnly,
+    visible: field?.visible?.constant ?? employeeFormFieldFallback[fieldName].visible,
+  };
+}
+
+function employeeFormLabel(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).label;
+}
+
+function employeeFormRequired(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).required;
+}
+
+function employeeFormVisible(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).visible;
+}
+
+function employeeFormFieldDisabled(fieldName: EmployeeFormFieldName) {
+  return employeeFormDisabled.value || employeeFormField(fieldName).readOnly;
+}
 
 function handleOrganizationsLoaded(records: Organization[]) {
   if (!selectedOrganization.value && records.length > 0) {
@@ -389,6 +437,16 @@ function departmentTitle(record: Department) {
   return record.title ?? record.code ?? record.id ?? '未命名部门';
 }
 
+const employeeFormFieldFallback: Record<EmployeeFormFieldName, EmployeeFormFieldUi> = {
+  organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
+  departmentId: { label: '所属部门', required: true, readOnly: false, visible: true },
+  employeeNo: { label: '职员编号', required: true, readOnly: false, visible: true },
+  title: { label: '职员姓名', required: true, readOnly: false, visible: true },
+  mobile: { label: '手机号', required: false, readOnly: false, visible: true },
+  email: { label: '邮箱', required: false, readOnly: false, visible: true },
+  enabled: { label: '启用状态', required: false, readOnly: false, visible: true },
+};
+
 function createOrganizationScopedDepartmentContext(
   context: ModuleContext<Department>,
   organizationId: string | undefined,
@@ -502,7 +560,6 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
       class="employee-list-panel"
       :context="employeeListContext"
       title="职员列表"
-      :columns="employeeColumns"
       :actions="employeeListActions"
       :row-actions-of="employeeRowActionsOf"
       :selected-key="selectedEmployeeKey"
@@ -528,7 +585,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
         <RecordStatusSwitch
           v-if="employeeDetailMode !== 'view'"
           :enabled="employeeDraft.enabled !== false"
-          :disabled="savingEmployee || !canSaveEmployee"
+          :disabled="savingEmployee || !canSaveEmployee || employeeFormFieldDisabled('enabled')"
           :show-label="false"
           @change="employeeDraft.enabled = $event"
         />
@@ -550,49 +607,67 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
       </template>
 
       <form class="employee-form" @submit.prevent="saveEmployee">
-        <label>
-          <span>所属机构</span>
+        <label v-if="employeeFormVisible('organizationId')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('organizationId') }}
+            <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
+          </span>
           <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
         </label>
-        <label>
-          <span>所属部门</span>
+        <label v-if="employeeFormVisible('departmentId')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('departmentId') }}
+            <strong v-if="employeeFormRequired('departmentId')" aria-hidden="true">*</strong>
+          </span>
           <RecordPicker
             v-model:value="employeeDraft.departmentId"
             :context="scopedDepartmentContext"
             :title-of="departmentTitle"
-            :disabled="employeeFormDisabled"
+            :disabled="employeeFormFieldDisabled('departmentId')"
             placeholder="请选择部门"
           />
         </label>
-        <label>
-          <span>职员编号</span>
+        <label v-if="employeeFormVisible('employeeNo')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('employeeNo') }}
+            <strong v-if="employeeFormRequired('employeeNo')" aria-hidden="true">*</strong>
+          </span>
           <UiInput
             v-model:value="employeeDraft.employeeNo"
-            :disabled="employeeFormDisabled"
+            :disabled="employeeFormFieldDisabled('employeeNo')"
             placeholder="请输入职员编号"
           />
         </label>
-        <label>
-          <span>职员姓名</span>
+        <label v-if="employeeFormVisible('title')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('title') }}
+            <strong v-if="employeeFormRequired('title')" aria-hidden="true">*</strong>
+          </span>
           <UiInput
             v-model:value="employeeDraft.title"
-            :disabled="employeeFormDisabled"
+            :disabled="employeeFormFieldDisabled('title')"
             placeholder="请输入职员姓名"
           />
         </label>
-        <label>
-          <span>手机号</span>
+        <label v-if="employeeFormVisible('mobile')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('mobile') }}
+            <strong v-if="employeeFormRequired('mobile')" aria-hidden="true">*</strong>
+          </span>
           <UiInput
             v-model:value="employeeDraft.mobile"
-            :disabled="employeeFormDisabled"
+            :disabled="employeeFormFieldDisabled('mobile')"
             placeholder="请输入手机号"
           />
         </label>
-        <label>
-          <span>邮箱</span>
+        <label v-if="employeeFormVisible('email')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('email') }}
+            <strong v-if="employeeFormRequired('email')" aria-hidden="true">*</strong>
+          </span>
           <UiInput
             v-model:value="employeeDraft.email"
-            :disabled="employeeFormDisabled"
+            :disabled="employeeFormFieldDisabled('email')"
             placeholder="请输入邮箱"
           />
         </label>
@@ -629,6 +704,17 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
   gap: 6px;
   color: var(--muyun-text-muted);
   font-size: 13px;
+}
+
+.employee-form-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.employee-form-label strong {
+  color: #d92d20;
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {

@@ -3,6 +3,8 @@ package net.ximatai.muyun.spring.boot.iam;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
 import net.ximatai.muyun.spring.boot.web.SortWeb;
@@ -35,7 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class EmployeeWebController extends WebSupport<EmployeeService> implements
         CrudWeb<Employee, EmployeeService>,
         EnableWeb<Employee, EmployeeService>,
-        SortWeb<Employee, EmployeeService> {
+        SortWeb<Employee, EmployeeService>,
+        StaticModuleUiContributor {
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeDelegationService employeeDelegationService;
@@ -47,6 +50,30 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
         this.employeeDelegationService = employeeDelegationService;
+    }
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(EmployeeService.MODULE_ALIAS)
+                .listView(list -> list
+                        .title("职员列表")
+                        .field("employeeNo", field -> field.label("职员编号").width("150px"))
+                        .field("title", field -> field.label("职员姓名").width("150px"))
+                        .field("mobile", field -> field.label("手机号").width("150px"))
+                        .field("email", field -> field.label("邮箱"))
+                        .field("enabled", field -> field.label("状态").uiType("enabledStatus")
+                                .width("90px").align("center")))
+                .formView(form -> form
+                        .title("职员档案")
+                        .field("organizationId", field -> field.label("所属机构").required().readOnly())
+                        .field("departmentId", field -> field.label("所属部门").required())
+                        .field("employeeNo", field -> field.label("职员编号").required())
+                        .field("title", field -> field.label("职员姓名").required())
+                        .field("gender", field -> field.label("性别"))
+                        .field("mobile", field -> field.label("手机号"))
+                        .field("email", field -> field.label("邮箱"))
+                        .field("enabled", field -> field.label("启用状态").uiType("enabledStatus")))
+                .build();
     }
 
     @GetMapping("/{employeeId}/accounts")

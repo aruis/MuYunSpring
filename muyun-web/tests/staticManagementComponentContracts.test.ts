@@ -234,6 +234,15 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /ready\?: boolean/);
   assert.match(panelSource, /waitingDescription\?: string/);
   assert.match(panelSource, /\(\) => props\.ready/);
+  assert.match(panelSource, /runtimeViews = ref<Array<ViewDefinition \| ResolvedViewDescriptor>>\(\[\]\)/);
+  assert.match(panelSource, /runtimeViews\.value = await loadRuntimeViews\(\)/);
+  assert.match(panelSource, /async function loadRuntimeViews/);
+  assert.match(panelSource, /if \(props\.columns && props\.columns\.length > 0\)/);
+  assert.match(panelSource, /catch \{\s*return \[\];\s*\}/);
+  assert.match(panelSource, /tableColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(panelSource, /columnsFromRuntimeListView/);
+  assert.match(panelSource, /field\.fieldRef\.fieldName/);
+  assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
   assert.match(panelSource, /if \(!queryReady\.value\)/);
@@ -261,7 +270,23 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /:row-actions-of="employeeRowActionsOf"/);
   assert.match(employeeViewSource, /@row-action="handleEmployeeRowAction"/);
   assert.match(employeeViewSource, /@row-dblclick="handleEmployeeRowDblclick"/);
-  assert.match(employeeViewSource, /type: 'enabledStatus'/);
+  assert.doesNotMatch(employeeViewSource, /employeeColumns/);
+  assert.doesNotMatch(employeeViewSource, /:columns="employeeColumns"/);
+  assert.doesNotMatch(employeeViewSource, /type: 'enabledStatus'/);
+  assert.match(employeeViewSource, /onMounted\(loadEmployeeFormDefinition\)/);
+  assert.match(employeeViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(
+    employeeViewSource,
+    /employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition \| ResolvedViewFieldDescriptor>>/,
+  );
+  assert.match(employeeViewSource, /function employeeFormLabel/);
+  assert.match(employeeViewSource, /function employeeFormRequired/);
+  assert.match(employeeViewSource, /function employeeFormFieldDisabled/);
+  assert.match(employeeViewSource, /employeeFormLabel\('employeeNo'\)/);
+  assert.match(employeeViewSource, /employeeFormRequired\('departmentId'\)/);
+  assert.match(employeeViewSource, /employeeFormFieldDisabled\('departmentId'\)/);
+  assert.doesNotMatch(employeeViewSource, /<span>所属部门<\/span>/);
+  assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
   assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
   assert.match(employeeViewSource, /const canSaveEmployee = computed/);
   assert.match(employeeViewSource, /const canToggleEmployee = computed/);
@@ -270,7 +295,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /当前用户无权保存职员/);
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
   assert.match(employeeViewSource, /:disabled="savingEmployee \|\| !canToggleEmployee"/);
-  assert.match(employeeViewSource, /:disabled="employeeFormDisabled"/);
+  assert.match(employeeViewSource, /:disabled="employeeFormFieldDisabled\('employeeNo'\)"/);
   assert.doesNotMatch(
     employeeViewSource,
     /render: \(record\) => \(record\.enabled === false \? '停用' : '启用'\)/,
@@ -286,6 +311,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /:ready="Boolean\(selectedOrganization\?\.id\)"/);
   assert.match(employeeViewSource, /departmentScope/);
   assert.match(contractsSource, /export interface QuerySchema/);
+  assert.match(contractsSource, /export interface ModuleUiDefinition/);
+  assert.match(contractsSource, /export interface ViewDefinition/);
+  assert.match(contractsSource, /export interface ViewFieldDefinition/);
   assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
 });
 

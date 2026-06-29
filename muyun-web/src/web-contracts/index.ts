@@ -346,6 +346,70 @@ export interface QuerySchema {
   defaultSorts: QuerySchemaDefaultSort[];
 }
 
+export type ModuleViewKind = 'LIST' | 'FORM' | 'DETAIL';
+
+export type ModuleUiClientType = 'WEB';
+
+export interface UiRule<T> {
+  constant?: T;
+}
+
+export interface ViewFieldRef {
+  relationCode?: string;
+  fieldName: string;
+  fieldId?: string;
+}
+
+export interface ViewFieldDefinition {
+  fieldRef: ViewFieldRef;
+  label?: string;
+  visible?: UiRule<boolean>;
+  required?: UiRule<boolean>;
+  readOnly?: UiRule<boolean>;
+  uiType?: string;
+  width?: string;
+  align?: 'left' | 'center' | 'right' | string;
+  fixed?: boolean;
+}
+
+export interface ResolvedViewFieldDescriptor {
+  fieldRef: ViewFieldRef;
+  label?: string;
+  visible?: UiRule<boolean>;
+  required?: UiRule<boolean>;
+  readOnly?: UiRule<boolean>;
+  uiType?: string;
+  width?: string;
+  align?: 'left' | 'center' | 'right' | string;
+  fixed?: boolean;
+}
+
+export interface ViewDefinition {
+  viewCode: string;
+  viewKind: ModuleViewKind;
+  clientType?: ModuleUiClientType;
+  title?: string;
+  fields: ViewFieldDefinition[];
+}
+
+export interface ResolvedViewDescriptor {
+  viewCode: string;
+  viewKind: ModuleViewKind;
+  clientType?: ModuleUiClientType;
+  title?: string;
+  fields: ResolvedViewFieldDescriptor[];
+}
+
+export interface ModuleUiDefinition {
+  moduleAlias: string;
+  views: ViewDefinition[];
+}
+
+export interface ResolvedModuleUiDescriptor {
+  moduleAlias: string;
+  views: ResolvedViewDescriptor[];
+}
+
 export interface StandardEntity {
   id?: string;
   tenantId?: string;

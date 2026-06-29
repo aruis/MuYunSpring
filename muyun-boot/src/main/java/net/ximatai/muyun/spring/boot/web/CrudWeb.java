@@ -11,6 +11,8 @@ import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormSchema;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiFormSchemaAdapter;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -21,6 +23,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.ResolvableType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -116,11 +119,26 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.VIEW)
     default FormSchema formSchema(@RequestParam(required = false) String uiConfigId) {
         return webScope(() -> {
+            if (this instanceof StaticModuleUiContributor contributor) {
+                FormSchema schema = ModuleUiFormSchemaAdapter.formSchema(contributor.moduleUiDefinition(),
+                        formSchemaModelClass());
+                if (schema != null) {
+                    return schema;
+                }
+            }
             if (service() instanceof FormAbility<?> formAbility) {
                 return formAbility.formSchema();
             }
             throw new IllegalArgumentException("form schema is not supported by " + webScopeName());
         });
+    }
+
+    private Class<?> formSchemaModelClass() {
+        Class<?> modelClass = service().modelClass();
+        if (modelClass != null) {
+            return modelClass;
+        }
+        return ResolvableType.forClass(CrudWeb.class, getClass()).resolveGeneric(0);
     }
 
     @PostMapping("/query")

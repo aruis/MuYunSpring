@@ -93,6 +93,7 @@ public class PlatformModuleRuntimeContextService {
         List<PlatformModuleRuntimeAction> actions = actions(validModuleAlias, moduleKind, staticDefinition,
                 dynamicDescriptor);
         Set<EntityCapability> capabilities = capabilities(staticDefinition, dynamicDescriptor, actions);
+        ModuleUiDefinition uiDefinition = uiDefinition(staticDefinition);
         return new PlatformModuleRuntimeContext(
                 validModuleAlias,
                 title(module, staticDefinition, dynamicDescriptor, validModuleAlias),
@@ -103,8 +104,16 @@ public class PlatformModuleRuntimeContextService {
                 mainEntityAlias(staticDefinition, dynamicDescriptor),
                 capabilities,
                 abilityCodes(capabilities),
-                actions
+                actions,
+                uiDefinition,
+                staticDefinition
+                        .map(ModuleUiDescriptorCompiler::compile)
+                        .orElseGet(() -> ModuleUiDescriptorCompiler.compile(uiDefinition))
         );
+    }
+
+    private ModuleUiDefinition uiDefinition(Optional<StaticModuleDefinition> staticDefinition) {
+        return staticDefinition.map(StaticModuleDefinition::uiDefinition).orElse(null);
     }
 
     private DynamicModuleDescriptor dynamicDescriptor(PlatformModule module, String moduleAlias) {

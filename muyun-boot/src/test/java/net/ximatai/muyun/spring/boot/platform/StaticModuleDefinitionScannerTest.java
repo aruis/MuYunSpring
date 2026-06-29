@@ -131,6 +131,23 @@ class StaticModuleDefinitionScannerTest {
                 assertThat(definition.actions()).filteredOn(action -> action.actionCode().equals("employeeDelegatedToMe"))
                         .singleElement()
                         .satisfies(action -> assertCustomRecordAction(action, "employeeDelegatedToMe", "职员受托代办"));
+                assertThat(definition.uiDefinition()).isNotNull();
+                assertThat(definition.uiDefinition().views()).hasSize(2);
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_list"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.LIST);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("employeeNo", "title", "mobile", "email", "enabled");
+                        });
+                assertThat(definition.uiDefinition().views()).filteredOn(view -> view.viewCode().equals("default_form"))
+                        .singleElement()
+                        .satisfies(view -> {
+                            assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                            assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                    .containsExactly("organizationId", "departmentId", "employeeNo", "title",
+                                            "gender", "mobile", "email", "enabled");
+                        });
             });
             assertThat(byAlias.get("iam.position_category")).satisfies(definition -> {
                 assertThat(definition.applicationAlias()).isEqualTo("iam");

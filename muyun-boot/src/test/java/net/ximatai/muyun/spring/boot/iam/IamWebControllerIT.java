@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.query.QueryCompiler;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -259,6 +260,33 @@ class IamWebControllerIT {
                 .andExpect(jsonPath("$.externalCriteria[0].key").value("departmentScope"));
 
         verify(employeeService).verifyActiveTenant("tenant_a");
+    }
+
+    @Test
+    void shouldExposeEmployeeFormSchemaFromStaticUiDefinition() throws Exception {
+        assertThat(FormAbility.class.isAssignableFrom(EmployeeService.class)).isFalse();
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(get("/iam.employee/form/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeName").value(EmployeeService.MODULE_ALIAS))
+                .andExpect(jsonPath("$.title").value("职员档案"))
+                .andExpect(jsonPath("$.fields[0].name").value("organizationId"))
+                .andExpect(jsonPath("$.fields[0].title").value("所属机构"))
+                .andExpect(jsonPath("$.fields[0].required").value(true))
+                .andExpect(jsonPath("$.fields[0].readOnly").value(true))
+                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].controlType")
+                        .value(org.hamcrest.Matchers.contains("SWITCH")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].controlType")
+                        .value(org.hamcrest.Matchers.contains("SELECT")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.sourceType")
+                        .value(org.hamcrest.Matchers.contains("dictionary")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.source")
+                        .value(org.hamcrest.Matchers.contains("iam.gender")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionTitleField")
+                        .value(org.hamcrest.Matchers.contains("genderTitle")));
+
     }
 
     @Test

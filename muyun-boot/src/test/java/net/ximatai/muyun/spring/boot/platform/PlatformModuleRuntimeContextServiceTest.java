@@ -57,7 +57,12 @@ class PlatformModuleRuntimeContextServiceTest {
                         StaticModuleActionDefinition.platformAction(PlatformAction.ENABLE),
                         StaticModuleActionDefinition.platformAction(PlatformAction.DISABLE)
                 ),
-                List.of()
+                List.of(),
+                ModuleUiDefinition.builder("iam.organization")
+                        .listView(list -> list
+                                .title("组织列表")
+                                .field("title", field -> field.label("组织名称")))
+                        .build()
         );
         PlatformModuleRuntimeContextService service = new PlatformModuleRuntimeContextService(
                 moduleService,
@@ -93,6 +98,23 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.actions()).extracting(PlatformModuleRuntimeAction::actionCode)
                 .containsExactly("menu", "view", "tree", "enable", "disable");
         assertThat(context.actions()).allSatisfy(action -> assertThat(action.authorized()).isTrue());
+        assertThat(context.uiDefinition()).isNotNull();
+        assertThat(context.uiDefinition().views()).singleElement()
+                .satisfies(view -> {
+                    assertThat(view.viewCode()).isEqualTo("default_list");
+                    assertThat(view.fields()).singleElement()
+                            .satisfies(field -> assertThat(field.fieldRef().fieldName()).isEqualTo("title"));
+                });
+        assertThat(context.uiDescriptor()).isNotNull();
+        assertThat(context.uiDescriptor().views()).singleElement()
+                .satisfies(view -> {
+                    assertThat(view.viewCode()).isEqualTo("default_list");
+                    assertThat(view.fields()).singleElement()
+                            .satisfies(field -> {
+                                assertThat(field.fieldRef().fieldName()).isEqualTo("title");
+                                assertThat(field.label()).isEqualTo("组织名称");
+                            });
+                });
     }
 
     @Test

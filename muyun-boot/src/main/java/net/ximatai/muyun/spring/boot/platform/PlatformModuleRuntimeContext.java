@@ -17,6 +17,36 @@ public record PlatformModuleRuntimeContext(
         String mainEntityAlias,
         Set<EntityCapability> capabilities,
         Set<String> abilities,
-        List<PlatformModuleRuntimeAction> actions
+        List<PlatformModuleRuntimeAction> actions,
+        ModuleUiDefinition uiDefinition,
+        ResolvedModuleUiDescriptor uiDescriptor
 ) {
+    public PlatformModuleRuntimeContext(String moduleAlias,
+                                        String title,
+                                        ModuleKind moduleKind,
+                                        ModuleEntryType entryType,
+                                        String entryRoute,
+                                        String entryExternalUrl,
+                                        String mainEntityAlias,
+                                        Set<EntityCapability> capabilities,
+                                        Set<String> abilities,
+        List<PlatformModuleRuntimeAction> actions) {
+        this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
+                capabilities, abilities, actions, null, null);
+    }
+
+    public PlatformModuleRuntimeContext(String moduleAlias,
+                                        String title,
+                                        ModuleKind moduleKind,
+                                        ModuleEntryType entryType,
+                                        String entryRoute,
+                                        String entryExternalUrl,
+                                        String mainEntityAlias,
+                                        Set<EntityCapability> capabilities,
+                                        Set<String> abilities,
+                                        List<PlatformModuleRuntimeAction> actions,
+                                        ModuleUiDefinition uiDefinition) {
+        this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
+                capabilities, abilities, actions, uiDefinition, ModuleUiDescriptorCompiler.compile(uiDefinition));
+    }
 }
