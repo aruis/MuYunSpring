@@ -70,11 +70,19 @@ public final class DynamicRecordMapping implements RuntimeColumnMapper {
     }
 
     public String resolveQueryableColumn(String fieldOrColumn) {
+        requireQueryAllowed(fieldOrColumn);
+        return resolveColumn(fieldOrColumn);
+    }
+
+    public void requireQueryAllowed(String fieldOrColumn) {
         if (protectedStorageFields.contains(fieldOrColumn)) {
             throw new IllegalArgumentException("protected storage field cannot be used in dynamic query or sort: "
                     + fieldOrColumn);
         }
-        return resolveColumn(fieldOrColumn);
+    }
+
+    public boolean hasProtectedStorageFields() {
+        return !protectedStorageFields.isEmpty();
     }
 
     private void put(String field, String column) {

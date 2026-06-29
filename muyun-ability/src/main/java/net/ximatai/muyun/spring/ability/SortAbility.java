@@ -2,7 +2,6 @@ package net.ximatai.muyun.spring.ability;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.common.model.capability.SortCapable;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
@@ -66,7 +65,7 @@ public interface SortAbility<T extends SortCapable> extends CrudAbility<T> {
     }
 
     default List<T> sortedList(Criteria criteria) {
-        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return getDao().query(activeCriteria(criteria), PageRequests.all(), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     default Criteria sortScope(T entity) {

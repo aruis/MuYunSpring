@@ -125,6 +125,41 @@ class QueryCompilerTest {
     }
 
     @Test
+    void shouldCompileCollectionCriteriaOperators() {
+        QueryCompiler compiler = new QueryCompiler(descriptor());
+        QueryRequest request = new QueryRequest(
+                List.of(
+                        new QueryCondition("tags", QueryOperator.CONTAINS, List.of("vip"), null),
+                        new QueryCondition("tags", QueryOperator.CONTAINS_ANY, List.of("vip", "trial"), null),
+                        new QueryCondition("tags", QueryOperator.CONTAINS_ALL, List.of("vip", "paid"), null),
+                        new QueryCondition("tags", QueryOperator.EMPTY, List.of(), null),
+                        new QueryCondition("tags", QueryOperator.NOT_EMPTY, List.of(), null)
+                ),
+                null,
+                Map.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of(),
+                false,
+                null
+        );
+
+        Criteria criteria = compiler.criteria(request);
+
+        assertThat(clauses(criteria)).extracting(CriteriaClause::getOperator)
+                .containsExactly(
+                        net.ximatai.muyun.database.core.orm.CriteriaOperator.CONTAINS,
+                        net.ximatai.muyun.database.core.orm.CriteriaOperator.CONTAINS_ANY,
+                        net.ximatai.muyun.database.core.orm.CriteriaOperator.CONTAINS_ALL,
+                        net.ximatai.muyun.database.core.orm.CriteriaOperator.IS_EMPTY,
+                        net.ximatai.muyun.database.core.orm.CriteriaOperator.IS_NOT_EMPTY
+                );
+    }
+
+    @Test
     void shouldRejectUndeclaredFieldsAndUnsupportedSorts() {
         QueryCompiler compiler = new QueryCompiler(descriptor());
 
@@ -202,6 +237,9 @@ class QueryCompilerTest {
                         .withQuickSearch())
                 .field(QueryField.of("createdAt", QueryValueType.INSTANT, QueryOperator.BETWEEN))
                 .field(QueryField.of("effectiveFrom", QueryValueType.DATETIME, QueryOperator.BETWEEN))
+                .field(QueryField.of("tags", QueryValueType.JSON, QueryOperator.CONTAINS,
+                        QueryOperator.CONTAINS_ANY, QueryOperator.CONTAINS_ALL,
+                        QueryOperator.EMPTY, QueryOperator.NOT_EMPTY))
                 .externalCriteria("scope", value -> Criteria.of().eq("departmentId", value))
                 .defaultSort(Sort.asc("code"))
                 .build();

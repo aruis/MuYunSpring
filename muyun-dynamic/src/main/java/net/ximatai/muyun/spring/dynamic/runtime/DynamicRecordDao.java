@@ -1,16 +1,22 @@
 package net.ximatai.muyun.spring.dynamic.runtime;
 
 import net.ximatai.muyun.database.core.IDatabaseOperations;
+import net.ximatai.muyun.database.core.builder.ColumnType;
 import net.ximatai.muyun.database.core.orm.Criteria;
+import net.ximatai.muyun.database.core.orm.CriteriaClause;
+import net.ximatai.muyun.database.core.orm.CriteriaGroup;
+import net.ximatai.muyun.database.core.orm.CriteriaOperator;
 import net.ximatai.muyun.database.core.orm.DatabaseValueConverter;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.RuntimeTableGateway;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.database.core.orm.TableMeta;
 import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.schema.StandardEntitySchema;
 import net.ximatai.muyun.spring.ability.BaseDao;
 import net.ximatai.muyun.spring.dynamic.metadata.DynamicAbilityFields;
+import net.ximatai.muyun.spring.dynamic.metadata.DynamicFieldColumnMetadata;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldCompanionRules;
@@ -47,8 +53,10 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
         this.entity = entity;
         this.schema = entity.schemaName();
         this.mapping = new DynamicRecordMapping(entity);
-        this.tableGateway = new RuntimeTableGateway(this.operations, this.schema, entity.tableName(),
-                mapping::resolveQueryableColumn, valueConverter);
+        DatabaseValueConverter normalizedValueConverter = valueConverter == null
+                ? DatabaseValueConverter.DEFAULT
+                : valueConverter;
+        this.tableGateway = new RuntimeTableGateway(this.operations, tableMeta(), normalizedValueConverter);
     }
 
     @Override
@@ -59,7 +67,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     @Override
     public String insert(DynamicRecord record) {
         requireSameEntity(record);
-        Object id = operations.insertItem(schema, entity.tableName(), toColumnMap(record, false), StandardEntitySchema.ID_COLUMN);
+        Object id = tableGateway.insert(toColumnMap(record, false));
         if (id != null) {
             record.setId(String.valueOf(id));
         }
@@ -100,7 +108,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
             where.put(StandardEntitySchema.TENANT_ID_COLUMN, record.getTenantId());
         }
         where.put(StandardEntitySchema.ID_COLUMN, record.getId());
-        return operations.patchUpdateItemWhere(schema, entity.tableName(), body, where, StandardEntitySchema.ID_COLUMN);
+        return tableGateway.patchWhere(body, where);
     }
 
     @Override
@@ -120,6 +128,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
     @Override
     public List<DynamicRecord> query(Criteria criteria, PageRequest pageRequest, Sort... sorts) {
         Objects.requireNonNull(pageRequest, "pageRequest must not be null");
+        validateQueryable(criteria, sorts);
         return tableGateway.queryColumns(criteria, pageRequest, sorts).stream()
                 .map(this::fromColumnMap)
                 .toList();
@@ -127,6 +136,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public List<DynamicRecord> list(Criteria criteria, Sort... sorts) {
+        validateQueryable(criteria, sorts);
         return tableGateway.listColumns(criteria, sorts).stream()
                 .map(this::fromColumnMap)
                 .toList();
@@ -149,6 +159,7 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     @Override
     public long count(Criteria criteria) {
+        validateQueryable(criteria);
         return tableGateway.count(criteria);
     }
 
@@ -159,6 +170,69 @@ public class DynamicRecordDao implements BaseDao<DynamicRecord, String> {
 
     private DynamicRecord loadById(String id) {
         return query(Criteria.of().eq(StandardEntitySchema.ID_FIELD, id), new PageRequest(0, 1)).stream().findFirst().orElse(null);
+    }
+
+    private void validateQueryable(Criteria criteria, Sort... sorts) {
+        validateQueryable(criteria);
+        if (sorts == null) {
+            return;
+        }
+        for (Sort sort : sorts) {
+            if (sort != null) {
+                mapping.requireQueryAllowed(sort.getField());
+            }
+        }
+    }
+
+    private void validateQueryable(Criteria criteria) {
+        if (criteria == null || criteria.isEmpty()) {
+            return;
+        }
+        validateQueryableNode(criteria.getRoot());
+    }
+
+    private void validateQueryableNode(Object node) {
+        if (node instanceof CriteriaClause clause) {
+            if (clause.getOperator() == CriteriaOperator.RAW && mapping.hasProtectedStorageFields()) {
+                throw new IllegalArgumentException(
+                        "raw criteria cannot be used when dynamic entity has protected storage fields");
+            }
+            if (clause.getField() != null) {
+                mapping.requireQueryAllowed(clause.getField());
+            }
+            return;
+        }
+        if (node instanceof CriteriaGroup group) {
+            group.getEntries().forEach(entry -> validateQueryableNode(entry.getNode()));
+        }
+    }
+
+    private TableMeta tableMeta() {
+        TableMeta.Builder builder = TableMeta.builder(schema, entity.tableName())
+                .id(StandardEntitySchema.ID_FIELD, StandardEntitySchema.ID_COLUMN, ColumnType.VARCHAR, String.class)
+                .field(StandardEntitySchema.TENANT_ID_FIELD, StandardEntitySchema.TENANT_ID_COLUMN, ColumnType.VARCHAR, String.class)
+                .field(StandardEntitySchema.VERSION_FIELD, StandardEntitySchema.VERSION_COLUMN, ColumnType.INT, Integer.class)
+                .field(StandardEntitySchema.DELETED_FIELD, StandardEntitySchema.DELETED_COLUMN, ColumnType.BOOLEAN, Boolean.class)
+                .field(StandardEntitySchema.DELETED_AT_FIELD, StandardEntitySchema.DELETED_AT_COLUMN, ColumnType.TIMESTAMP, Instant.class)
+                .field(StandardEntitySchema.CREATED_BY_FIELD, StandardEntitySchema.CREATED_BY_COLUMN, ColumnType.VARCHAR, String.class)
+                .field(StandardEntitySchema.CREATED_AT_FIELD, StandardEntitySchema.CREATED_AT_COLUMN, ColumnType.TIMESTAMP, Instant.class)
+                .field(StandardEntitySchema.UPDATED_BY_FIELD, StandardEntitySchema.UPDATED_BY_COLUMN, ColumnType.VARCHAR, String.class)
+                .field(StandardEntitySchema.UPDATED_AT_FIELD, StandardEntitySchema.UPDATED_AT_COLUMN, ColumnType.TIMESTAMP, Instant.class);
+        persistentFields().forEach(field -> addFieldMeta(builder, field));
+        return builder.build();
+    }
+
+    private void addFieldMeta(TableMeta.Builder builder, FieldDefinition field) {
+        if (DynamicFieldColumnMetadata.isJsonSetField(field)) {
+            builder.jsonSet(field.code(), field.columnName(), List.class, String.class);
+            return;
+        }
+        builder.field(
+                field.code(),
+                field.columnName(),
+                DynamicFieldColumnMetadata.columnType(field),
+                DynamicFieldColumnMetadata.fieldJavaType(field)
+        );
     }
 
     private Map<String, Object> toColumnMap(DynamicRecord record, boolean includeId) {

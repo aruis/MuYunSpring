@@ -18,7 +18,12 @@ public enum DynamicQueryOperator {
     LT,
     LTE,
     NULL,
-    NOT_NULL;
+    NOT_NULL,
+    CONTAINS,
+    CONTAINS_ANY,
+    CONTAINS_ALL,
+    EMPTY,
+    NOT_EMPTY;
 
     public static Set<DynamicQueryOperator> defaultOperators(FieldType fieldType) {
         return switch (fieldType) {
@@ -38,7 +43,10 @@ public enum DynamicQueryOperator {
     }
 
     public boolean supports(FieldType fieldType) {
-        return defaultOperators(fieldType).contains(this);
+        return switch (this) {
+            case CONTAINS, CONTAINS_ANY, CONTAINS_ALL, EMPTY, NOT_EMPTY -> fieldType == FieldType.JSON;
+            default -> defaultOperators(fieldType).contains(this);
+        };
     }
 
     public static List<DynamicQueryOperator> ordered(Set<DynamicQueryOperator> operators) {

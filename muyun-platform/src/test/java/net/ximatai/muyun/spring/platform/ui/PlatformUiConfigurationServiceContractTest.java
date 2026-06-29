@@ -1077,6 +1077,40 @@ class PlatformUiConfigurationServiceContractTest {
     }
 
     @Test
+    void shouldCompileCollectionQueryOperatorsForJsonTemplateItems() {
+        seedFieldType("json_set", FieldType.JSON, DynamicQueryOperator.EQ,
+                DynamicQueryOperator.CONTAINS, DynamicQueryOperator.CONTAINS_ANY,
+                DynamicQueryOperator.CONTAINS_ALL, DynamicQueryOperator.EMPTY,
+                DynamicQueryOperator.NOT_EMPTY);
+        seedUiType("multi_select", "json_set");
+        String tagsField = seedModuleField("crm.customer", "customer", "tags", "tags", "json_set");
+        String templateId = queryTemplateService.insert(queryTemplate("crm.customer", "json_query", true));
+        String groupId = queryItemService.insert(queryGroup(templateId, TreeAbility.ROOT_ID, PlatformQueryGroupOperator.AND));
+        PlatformQueryItem contains = queryLeaf(templateId, groupId, tagsField, DynamicQueryOperator.CONTAINS);
+        contains.setDefaultValue("vip");
+        queryItemService.insert(contains);
+        PlatformQueryItem any = queryLeaf(templateId, groupId, tagsField, DynamicQueryOperator.CONTAINS_ANY);
+        any.setDefaultValue("vip,trial");
+        queryItemService.insert(any);
+        PlatformQueryItem all = queryLeaf(templateId, groupId, tagsField, DynamicQueryOperator.CONTAINS_ALL);
+        all.setDefaultValue("vip,paid");
+        queryItemService.insert(all);
+        PlatformQueryItem empty = queryLeaf(templateId, groupId, tagsField, DynamicQueryOperator.EMPTY);
+        empty.setDefaultValue(null);
+        queryItemService.insert(empty);
+        PlatformQueryItem notEmpty = queryLeaf(templateId, groupId, tagsField, DynamicQueryOperator.NOT_EMPTY);
+        notEmpty.setDefaultValue(null);
+        queryItemService.insert(notEmpty);
+
+        Criteria criteria = queryItemService.compile(templateId);
+
+        assertThat(clauses(criteria)).extracting(CriteriaClause::getOperator)
+                .containsExactly(CriteriaOperator.CONTAINS, CriteriaOperator.CONTAINS_ANY,
+                        CriteriaOperator.CONTAINS_ALL, CriteriaOperator.IS_EMPTY,
+                        CriteriaOperator.IS_NOT_EMPTY);
+    }
+
+    @Test
     void shouldRejectQueryItemCyclesAndDetachedTrees() {
         seedFieldType("string", FieldType.STRING, DynamicQueryOperator.LIKE);
         seedUiType("text", "string");

@@ -5,6 +5,7 @@ import net.ximatai.muyun.database.core.metadata.DBInfo;
 import net.ximatai.muyun.database.core.orm.Criteria;
 import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.Sort;
+import net.ximatai.muyun.database.core.orm.SqlRawCondition;
 import net.ximatai.muyun.spring.ability.CacheRegistry;
 import net.ximatai.muyun.spring.ability.event.RuntimeEventPublisher;
 import net.ximatai.muyun.spring.ability.security.FieldCryptoProvider;
@@ -204,6 +205,11 @@ class DynamicRecordRuntimeTest {
                 PageRequest.of(1, 10)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("protected storage field cannot be used in dynamic query or sort: secret_signature");
+        assertThatThrownBy(() -> entityService.pageQuery(
+                Criteria.of().raw(SqlRawCondition.of("\"secret_signature\" = :signature", Map.of("signature", "sig"))),
+                PageRequest.of(1, 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("raw criteria cannot be used when dynamic entity has protected storage fields");
     }
 
     @Test

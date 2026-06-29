@@ -2,10 +2,10 @@ package net.ximatai.muyun.spring.ability.child;
 
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.ability.CrudAbility;
+import net.ximatai.muyun.spring.ability.PageRequests;
 import net.ximatai.muyun.spring.ability.SoftDeleteAbility;
 import net.ximatai.muyun.spring.ability.SortAbility;
 import net.ximatai.muyun.database.core.orm.Criteria;
-import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 
 import java.util.List;
@@ -40,7 +40,7 @@ public interface ChildAbility<C extends EntityContract> extends CrudAbility<C> {
         if (this instanceof SortAbility<?> sortAbility) {
             return sortedChildRows(sortAbility, criteria);
         }
-        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE));
+        return getDao().query(activeCriteria(criteria), PageRequests.all());
     }
 
     default C selectIgnoreSoftDeleteIfPossible(String id) {

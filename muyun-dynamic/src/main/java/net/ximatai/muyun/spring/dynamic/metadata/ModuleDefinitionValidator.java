@@ -252,6 +252,8 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("field type must not be null: " + field.code());
         }
         validateStorageForm(field);
+        validateValueShape(field);
+        validateCollectionQueryShape(field);
         if (field.defaultUiTypeAlias() != null && !field.defaultUiTypeAlias().isBlank()) {
             requireIdentifier(field.defaultUiTypeAlias(), "field default UI type alias");
         }
@@ -341,6 +343,34 @@ public class ModuleDefinitionValidator {
             throw new ModuleDefinitionException("virtual field cannot define measure unit or money storage behavior: "
                     + field.code());
         }
+    }
+
+    private void validateValueShape(FieldDefinition field) {
+        if (field.valueShape() == FieldValueShape.DEFAULT) {
+            return;
+        }
+        if (field.valueShape() == FieldValueShape.JSON_SET && field.type() != FieldType.JSON) {
+            throw new ModuleDefinitionException("JSON_SET value shape requires JSON field: " + field.code());
+        }
+    }
+
+    private void validateCollectionQueryShape(FieldDefinition field) {
+        if (!usesCollectionQueryOperator(field)) {
+            return;
+        }
+        if (field.valueShape() != FieldValueShape.JSON_SET) {
+            throw new ModuleDefinitionException("collection query operators require JSON_SET value shape: "
+                    + field.code());
+        }
+    }
+
+    private boolean usesCollectionQueryOperator(FieldDefinition field) {
+        Set<DynamicQueryOperator> operators = field.queryDefinition().operators();
+        return operators.contains(DynamicQueryOperator.CONTAINS)
+                || operators.contains(DynamicQueryOperator.CONTAINS_ANY)
+                || operators.contains(DynamicQueryOperator.CONTAINS_ALL)
+                || operators.contains(DynamicQueryOperator.EMPTY)
+                || operators.contains(DynamicQueryOperator.NOT_EMPTY);
     }
 
     private void validateMeasureUnit(EntityDefinition entity, FieldDefinition field, List<FieldDefinition> fields) {

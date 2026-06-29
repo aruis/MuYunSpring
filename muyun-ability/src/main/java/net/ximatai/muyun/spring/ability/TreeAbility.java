@@ -24,7 +24,7 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
             return List.of();
         }
         Criteria criteria = activeCriteria(Criteria.of().eq(PlatformAbilityFields.TREE_PARENT_FIELD, parentId));
-        return getDao().query(criteria, new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return getDao().query(criteria, PageRequests.all(), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     /**
@@ -40,7 +40,7 @@ public interface TreeAbility<T extends TreeCapable> extends SortAbility<T> {
             return List.of();
         }
         Criteria criteria = scopedTreeCriteria(scopeCriteria, parentId);
-        return getDao().query(activeCriteria(criteria), new PageRequest(0, Integer.MAX_VALUE), Sort.asc(PlatformAbilityFields.SORT_FIELD));
+        return getDao().query(activeCriteria(criteria), PageRequests.all(), Sort.asc(PlatformAbilityFields.SORT_FIELD));
     }
 
     /**

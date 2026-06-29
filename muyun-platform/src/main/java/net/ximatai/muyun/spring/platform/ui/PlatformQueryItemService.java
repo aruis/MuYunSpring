@@ -303,7 +303,7 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         PlatformFieldType fieldType = fieldTypeService.requireFieldType(moduleField.fieldTypeAlias());
         validateCurrentQueryDefinition(moduleField, fieldType, item);
         Object value = resolveQueryValue(item, externalValues);
-        if (isEmptyValue(value) && !isNullOperator(item.getOperator())) {
+        if (isEmptyValue(value) && !isNoValueOperator(item.getOperator())) {
             visiting.remove(item.getId());
             return criteria;
         }
@@ -410,6 +410,11 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
             case LTE -> criteria.lte(fieldName, singleValue(operator, value));
             case NULL -> criteria.isNull(fieldName);
             case NOT_NULL -> criteria.isNotNull(fieldName);
+            case CONTAINS -> criteria.contains(fieldName, singleValue(operator, value));
+            case CONTAINS_ANY -> criteria.containsAny(fieldName, listValues(operator, value));
+            case CONTAINS_ALL -> criteria.containsAll(fieldName, listValues(operator, value));
+            case EMPTY -> criteria.isEmpty(fieldName);
+            case NOT_EMPTY -> criteria.isNotEmpty(fieldName);
         }
     }
 
@@ -446,7 +451,9 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         }
         if (value instanceof String text && (operator == DynamicQueryOperator.IN
                 || operator == DynamicQueryOperator.NOT_IN
-                || operator == DynamicQueryOperator.BETWEEN)) {
+                || operator == DynamicQueryOperator.BETWEEN
+                || operator == DynamicQueryOperator.CONTAINS_ANY
+                || operator == DynamicQueryOperator.CONTAINS_ALL)) {
             return List.of(text.split(",")).stream()
                     .map(String::trim)
                     .filter(v -> !v.isBlank())
@@ -480,8 +487,11 @@ public class PlatformQueryItemService extends AbstractAbilityService<PlatformQue
         return false;
     }
 
-    private boolean isNullOperator(DynamicQueryOperator operator) {
-        return operator == DynamicQueryOperator.NULL || operator == DynamicQueryOperator.NOT_NULL;
+    private boolean isNoValueOperator(DynamicQueryOperator operator) {
+        return operator == DynamicQueryOperator.NULL
+                || operator == DynamicQueryOperator.NOT_NULL
+                || operator == DynamicQueryOperator.EMPTY
+                || operator == DynamicQueryOperator.NOT_EMPTY;
     }
 
     private void requireDraftQueryTemplate(String queryTemplateId) {
