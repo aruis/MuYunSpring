@@ -14,6 +14,7 @@ import net.ximatai.muyun.spring.ability.query.QueryOperator;
 import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
+import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -79,6 +80,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
         CurrentUserWebFilter.class,
+        MuYunSpringJacksonConfiguration.class,
         PlatformWebExceptionHandler.class
 })
 class IamWebControllerIT {
@@ -563,7 +565,7 @@ class IamWebControllerIT {
         mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
                         .contentType("application/json")
                         .content("""
-                                {"subjectType":"USER_ACCOUNT","subjectId":"user-2"}
+                                {"subjectType":"userAccount","subjectId":"user-2"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value("grant-1"));
@@ -571,7 +573,7 @@ class IamWebControllerIT {
         mvc.perform(get("/iam.role/{roleId}/grants", "role-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].subjectType").value("USER_ACCOUNT"))
+                .andExpect(jsonPath("$[0].subjectType").value("userAccount"))
                 .andExpect(jsonPath("$[0].subjectId").value("user-2"));
 
         mvc.perform(post("/iam.role/{roleId}/grants/{grantId}/delete", "role-1", "grant-1"))
@@ -584,8 +586,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"OWNER",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"owner",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -597,8 +599,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"DEPARTMENT_AND_CHILDREN",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"departmentAndChildren",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -659,8 +661,8 @@ class IamWebControllerIT {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"CUSTOM",
-                                  "tenantScopePolicy":"CURRENT_TENANT",
+                                  "dataScopePolicy":"custom",
+                                  "tenantScopePolicy":"currentTenant",
                                   "scopeCondition":"authUserId = ${userId}"
                                 }
                 """))

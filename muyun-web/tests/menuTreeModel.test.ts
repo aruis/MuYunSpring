@@ -15,7 +15,7 @@ const menus: MenuTreeNode[] = [
       id: 'platform',
       schemeId: 'default',
       title: '平台管理',
-      menuType: 'GROUP',
+      menuType: 'group',
     },
     children: [
       {
@@ -23,7 +23,7 @@ const menus: MenuTreeNode[] = [
           id: 'config',
           schemeId: 'default',
           title: '平台配置',
-          menuType: 'GROUP',
+          menuType: 'group',
         },
         children: [
           {
@@ -31,8 +31,8 @@ const menus: MenuTreeNode[] = [
               id: 'dictionary',
               schemeId: 'default',
               title: '字典管理',
-              menuType: 'MODULE',
-              openMode: 'TAB',
+              menuType: 'module',
+              openMode: 'tab',
               moduleAlias: 'platform.dictionary_category',
             },
             children: [
@@ -41,8 +41,8 @@ const menus: MenuTreeNode[] = [
                   id: 'dictionary-items',
                   schemeId: 'default',
                   title: '字典项',
-                  menuType: 'MODULE',
-                  openMode: 'TAB',
+                  menuType: 'module',
+                  openMode: 'tab',
                   moduleAlias: 'platform.dictionary_item',
                   enabled: false,
                 },
@@ -64,7 +64,7 @@ test('createWorkbenchMenuNodes annotates navigable state without changing tree s
   assert.equal(root.navigable, false);
   assert.equal(root.hasChildren, true);
   assert.equal(dictionary.navigable, true);
-  assert.equal(dictionary.target?.menuType, 'MODULE');
+  assert.equal(dictionary.target?.menuType, 'module');
   assert.equal(dictionaryItems.navigable, false);
   assert.equal(dictionaryItems.target, undefined);
 });

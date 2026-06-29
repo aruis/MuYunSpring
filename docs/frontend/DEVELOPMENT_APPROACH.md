@@ -99,7 +99,7 @@ Workbench
 
 `muyun-web/.env.backend.local` 仍可写入 `VITE_MUYUN_AUTH_TOKEN=<token>` 作为自动化或特殊调试兜底，也可写入登录页本地预填项；这些值只应保留在本机配置中。
 
-这轮联调暂不把 `MODULE` 菜单接到 `/platform.menu/{menuId}/entry`。该接口需要明确系统用户、租户上下文、动态模块 UI 配置和 PageHost 语义后再进入下一轮。
+这轮联调暂不把 `module` 菜单接到 `/platform.menu/{menuId}/entry`。该接口需要明确系统用户、租户上下文、动态模块 UI 配置和 PageHost 语义后再进入下一轮。
 
 ## 每轮推进步骤
 

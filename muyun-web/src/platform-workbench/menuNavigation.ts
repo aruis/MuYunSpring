@@ -36,10 +36,10 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     return undefined;
   }
 
-  if (menu.menuType === 'MODULE' && menu.openMode && menu.moduleAlias) {
+  if (menu.menuType === 'module' && menu.openMode && menu.moduleAlias) {
     return {
       menuId: menu.id,
-      menuType: 'MODULE',
+      menuType: 'module',
       openMode: menu.openMode,
       moduleAlias: menu.moduleAlias,
       pageMode: menu.pageMode,
@@ -49,10 +49,10 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     };
   }
 
-  if (menu.menuType === 'ROUTE' && menu.openMode && menu.route) {
+  if (menu.menuType === 'route' && menu.openMode && menu.route) {
     return {
       menuId: menu.id,
-      menuType: 'ROUTE',
+      menuType: 'route',
       openMode: menu.openMode,
       route: menu.route,
       moduleAlias: menu.moduleAlias,
@@ -60,10 +60,10 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
     };
   }
 
-  if (menu.menuType === 'LINK' && menu.openMode && menu.externalUrl) {
+  if (menu.menuType === 'link' && menu.openMode && menu.externalUrl) {
     return {
       menuId: menu.id,
-      menuType: 'LINK',
+      menuType: 'link',
       openMode: menu.openMode,
       externalUrl: menu.externalUrl,
       moduleAlias: menu.moduleAlias,
@@ -75,18 +75,18 @@ export function getMenuNavigationTarget(menu: MenuRecord): MenuNavigationTarget 
 }
 
 export function isTabMenuTarget(target: MenuNavigationTarget): boolean {
-  return target.openMode === 'TAB';
+  return target.openMode === 'tab';
 }
 
 export function isWindowMenuTarget(target: MenuNavigationTarget): boolean {
-  return target.openMode === 'WINDOW';
+  return target.openMode === 'window';
 }
 
 export function resolvePageDescriptor(
   target: MenuNavigationTarget,
   options: PageDescriptorResolveOptions = {},
 ): PageDescriptor {
-  if (target.menuType === 'MODULE') {
+  if (target.menuType === 'module') {
     const businessRoute = options.businessModuleRoutes?.[target.moduleAlias];
     if (businessRoute) {
       return {
@@ -121,7 +121,7 @@ export function resolvePageDescriptor(
     };
   }
 
-  if (target.menuType === 'ROUTE') {
+  if (target.menuType === 'route') {
     const routeTarget = routeTargetOf(target.route, target.query, target.moduleAlias);
     const pageType = isBusinessRouteTarget(routeTarget, options) ? 'business-route' : 'platform-route';
     const descriptorBase = {
@@ -143,7 +143,7 @@ export function resolvePageDescriptor(
       : { ...descriptorBase, pageType, hostType: 'platform-route-host' };
   }
 
-  if (target.openMode === 'TAB') {
+  if (target.openMode === 'tab') {
     return {
       pageType: 'remote-url',
       openMode: 'iframe',

@@ -1,5 +1,7 @@
 package net.ximatai.muyun.spring.boot.platform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversion;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitBusinessConversionService;
 import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionContext;
@@ -9,6 +11,7 @@ import net.ximatai.muyun.spring.platform.measure.MeasureUnitConversionScopeType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -39,13 +42,15 @@ class MeasureUnitConversionRuleWebControllerTest {
         when(service.insert(any(MeasureUnitConversionRule.class))).thenReturn("rule-1");
         when(service.select("rule-1")).thenReturn(inserted);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(post("/platform.application/crm/measure-unit-conversion-rules/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "applicationAlias":"other",
-                                  "scopeType":"GLOBAL",
+                                  "scopeType":"global",
                                   "fromCategoryAlias":"quantity",
                                   "fromUnitCode":"box",
                                   "toCategoryAlias":"quantity",
@@ -76,7 +81,9 @@ class MeasureUnitConversionRuleWebControllerTest {
                         new BigDecimal("2"), "quantity", "box", "quantity", "bottle",
                         new BigDecimal("24"), List.of("rule-1")));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(post("/platform.application/crm/measure-unit-conversion-rules/convert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -116,13 +123,15 @@ class MeasureUnitConversionRuleWebControllerTest {
         when(service.insert(any(MeasureUnitConversionRule.class))).thenReturn("rule-1");
         when(service.select("rule-1")).thenReturn(inserted);
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(post("/platform.measure_unit/conversion-rules/insert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "applicationAlias":"crm",
-                                  "scopeType":"GLOBAL",
+                                  "scopeType":"global",
                                   "fromCategoryAlias":"quantity",
                                   "fromUnitCode":"box",
                                   "toCategoryAlias":"quantity",
@@ -153,7 +162,9 @@ class MeasureUnitConversionRuleWebControllerTest {
                         new BigDecimal("2"), "quantity", "box", "quantity", "bottle",
                         new BigDecimal("24"), List.of("rule-1")));
 
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(codeTitleEnumConverter())
+                .build();
         mvc.perform(post("/platform.measure_unit/conversion-rules/convert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -192,5 +203,11 @@ class MeasureUnitConversionRuleWebControllerTest {
         rule.setFactor(new BigDecimal("12"));
         rule.setTitle("box to bottle");
         return rule;
+    }
+
+    private MappingJackson2HttpMessageConverter codeTitleEnumConverter() {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
+        return new MappingJackson2HttpMessageConverter(objectMapper);
     }
 }

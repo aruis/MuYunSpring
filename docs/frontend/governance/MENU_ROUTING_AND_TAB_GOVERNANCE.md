@@ -94,10 +94,10 @@ MenuRecord
 
 | 字段或语义                                     | 当前作用                                                  | 风险与观察点                                                                                                         |
 | ---------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `menuType`                                     | 区分分组、模块、路由、外链等入口类型。                    | 如果继续扩展 online app 或 micro app，不宜把所有新入口都塞进 `LINK`。                                                |
+| `menuType`                                     | 区分分组、模块、路由、外链等入口类型。                    | 如果继续扩展 online app 或 micro app，不宜把所有新入口都塞进 `link`。                                                |
 | `route`                                        | 表达平台 route、offline 业务 path、routeName 或 pageKey。 | 字段容易过载；新增能力应通过结构化 target 或 resolver 规则区分语义。                                                 |
-| `openMode`                                     | 表达菜单入口在 Workbench 页签还是外部窗口打开。           | 使用 `TAB` / `WINDOW`，不按 URL 形态隐式推断承载方式；`GROUP` 不配置。                                               |
-| `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | URL 只表达目标，不表达打开方式；`LINK + TAB` 由前端编译为 iframe，`LINK + WINDOW` 打开新窗口。                       |
+| `openMode`                                     | 表达菜单入口在 Workbench 页签还是外部窗口打开。           | 使用 `tab` / `window`，不按 URL 形态隐式推断承载方式；`group` 不配置。                                               |
+| `externalUrl`                                  | 表达 online 业务页面或外部系统 URL。                      | URL 只表达目标，不表达打开方式；`link + tab` 由前端编译为 iframe，`link + window` 打开新窗口。                       |
 | `moduleAlias`                                  | 表达动态模块入口。                                        | 动态页面如果需要稳定指向元数据、视图或页面配置，应避免只靠 loose params。                                            |
 | `pageMode`                                     | 表达动态模块列表、表单、详情等模式。                      | 应与动态运行器支持的页面模式保持枚举一致。                                                                           |
 | `defaultUiConfigId` / `defaultQueryTemplateId` | 表达默认页面配置和查询模板。                              | 如果页面入口长期由 alias 管理，后续可能需要 alias 或版本语义，避免跨环境 ID 不稳定。                                 |
@@ -111,7 +111,7 @@ MenuRecord
 3. 页面入口需要参与配置校验、权限、审计或配置包迁移，但只存在不可校验的 JSON 或 URL。
 4. URL 恢复需要跨菜单方案、跨租户或跨环境稳定，但只依赖当前菜单树 `menuId`。
 
-后端菜单 `openMode` 是业务打开方式，只表达 `TAB` 或 `WINDOW`。前端 resolver 再结合 `menuType` 编译成内部 `PageDescriptor.openMode`：`MODULE + TAB` 进入 dynamic runner，`ROUTE + TAB` 进入 route host，`LINK + TAB` 进入 iframe，`WINDOW` 入口点击时打开新窗口。不要根据 URL 是相对路径、同源地址还是绝对地址推断打开方式。
+后端菜单 `openMode` 是业务打开方式，只表达 `tab` 或 `window`。前端 resolver 再结合 `menuType` 编译成内部 `PageDescriptor.openMode`：`module + tab` 进入 dynamic runner，`route + tab` 进入 route host，`link + tab` 进入 iframe，`window` 入口点击时打开新窗口。不要根据 URL 是相对路径、同源地址还是绝对地址推断打开方式。
 
 建议长期保留以下 host 概念：
 
@@ -372,17 +372,17 @@ Vue Router 不承担以下职责：
 Workbench 在处理菜单点击时，应先根据 `MenuNavigationTarget` 选择 host：
 
 ```text
-ROUTE  -> PlatformRouteHost 或 BusinessRouteHost
-MODULE -> DynamicModuleHost
-LINK   -> ExternalPageHost
+route  -> PlatformRouteHost 或 BusinessRouteHost
+module -> DynamicModuleHost
+link   -> ExternalPageHost
 APP    -> MicroAppHost
 ```
 
-当前 `web-contracts` 已有 `ROUTE / MODULE / LINK`。是否增加 `APP` 或更明确的 external app target，应在 online 承载方案定型后再进入契约。
+当前 `web-contracts` 已有 `route / module / link`。是否增加 `APP` 或更明确的 external app target，应在 online 承载方案定型后再进入契约。
 
 动态模块不应被设计成大量伪静态业务路由。动态模块只需要少量固定 route 进入运行器，页面变化由元数据驱动。
 
-MODULE 的最小 descriptor 应稳定包含：
+module 的最小 descriptor 应稳定包含：
 
 ```text
 pageType: dynamic-module
@@ -398,16 +398,16 @@ params:
   entryParamsJson?
 ```
 
-第一阶段可以不实现完整动态页面运行器，但不能让 MODULE target 在各处自由拼字段。
+第一阶段可以不实现完整动态页面运行器，但不能让 module target 在各处自由拼字段。
 
 ## 解析示例
 
-ROUTE 指向平台内置页面时：
+route 指向平台内置页面时：
 
 ```text
 MenuNavigationTarget
-  menuType: ROUTE
-  openMode: TAB
+  menuType: route
+  openMode: tab
   route: /platform/metadata
 
 PageDescriptor
@@ -417,12 +417,12 @@ PageDescriptor
   tabPolicy.identity: by-menu
 ```
 
-ROUTE 指向 offline 业务页面时：
+route 指向 offline 业务页面时：
 
 ```text
 MenuNavigationTarget
-  menuType: ROUTE
-  openMode: TAB
+  menuType: route
+  openMode: tab
   route: crm.customer.list
 
 PageDescriptor
@@ -433,12 +433,12 @@ PageDescriptor
   tabPolicy.identity: by-target
 ```
 
-MODULE 指向动态模块时：
+module 指向动态模块时：
 
 ```text
 MenuNavigationTarget
-  menuType: MODULE
-  openMode: TAB
+  menuType: module
+  openMode: tab
   moduleAlias: crm.customer
   pageMode: LIST
   defaultUiConfigId: customer-list-v1
@@ -452,12 +452,12 @@ PageDescriptor
   tabPolicy.identity: by-menu
 ```
 
-LINK 指向 online 业务页面时：
+link 指向 online 业务页面时：
 
 ```text
 MenuNavigationTarget
-  menuType: LINK
-  openMode: TAB
+  menuType: link
+  openMode: tab
   externalUrl: /crm/customer/list
 
 PageDescriptor
@@ -495,13 +495,13 @@ PageDescriptor
 - [x] 建立 `MenuNavigationTarget -> PageDescriptor` 的 resolver。
 - [x] 建立 `PageDescriptor -> MenuTab` 的转换规则。
 - [x] 建立 `PageDescriptor -> URL` 和 `URL -> PageDescriptor` 的最小规则。
-- [x] ROUTE、MODULE、LINK 都能生成明确 descriptor。
+- [x] route、module、link 都能生成明确 descriptor。
 
 验收：
 
-- [x] ROUTE 可以解析为平台内置 route descriptor。
-- [x] MODULE 可以解析为最小 dynamic descriptor。
-- [x] LINK 可以解析为 external descriptor。
+- [x] route 可以解析为平台内置 route descriptor。
+- [x] module 可以解析为最小 dynamic descriptor。
+- [x] link 可以解析为 external descriptor。
 - [x] `path` 是 offline route 的首要可读入口标识。
 - [x] `routeName` 或 `pageKey` 至少预留一种 manifest 解析能力。
 - [x] URL 生成结果可读，能表达业务含义。
@@ -520,10 +520,10 @@ PageDescriptor
 
 验收：
 
-- [x] 平台 ROUTE 菜单能进入 PlatformRouteHost。
-- [x] 业务 ROUTE 菜单能进入 BusinessRouteHost。
-- [x] MODULE 菜单能进入 DynamicModuleHost 占位。
-- [x] LINK 菜单能进入 ExternalPageHost 占位。
+- [x] 平台 route 菜单能进入 PlatformRouteHost。
+- [x] 业务 route 菜单能进入 BusinessRouteHost。
+- [x] module 菜单能进入 DynamicModuleHost 占位。
+- [x] link 菜单能进入 ExternalPageHost 占位。
 - [x] `App.vue` 不再直接散落 target 类型判断。
 - [x] PageHost outlet 有构建验证和 host 分发测试。
 
@@ -589,7 +589,7 @@ PageDescriptor
 
 验收：
 
-- [ ] 菜单通过 `LINK.externalUrl=/crm/customer/list` 或结构化 `target.url=/crm/customer/list` 可打开 online 页面。
+- [ ] 菜单通过 `link.externalUrl=/crm/customer/list` 或结构化 `target.url=/crm/customer/list` 可打开 online 页面。
 - [ ] iframe 页面可更新 tab title。
 - [ ] iframe 页面不接协议时可以降级显示。
 - [ ] 新窗口模式可配置。

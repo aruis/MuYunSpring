@@ -6,6 +6,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
@@ -27,8 +28,10 @@ import net.ximatai.muyun.spring.iam.position.PositionDao;
 import net.ximatai.muyun.spring.iam.position.PositionService;
 import net.ximatai.muyun.spring.iam.role.DataScopePolicy;
 import net.ximatai.muyun.spring.iam.role.GrantableAction;
+import net.ximatai.muyun.spring.iam.role.Role;
 import net.ximatai.muyun.spring.iam.role.RoleGrant;
 import net.ximatai.muyun.spring.iam.role.RoleGrantSubjectType;
+import net.ximatai.muyun.spring.iam.role.RoleKind;
 import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
@@ -48,6 +51,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -82,6 +86,7 @@ class IamWebControllerTest {
 
     @BeforeEach
     void setUp() {
+        objectMapper.registerModule(new MuYunSpringJacksonConfiguration().codeTitleEnumJacksonModule());
         currentUser = null;
         tenantDao = mock(TenantDao.class);
         organizationDao = mock(OrganizationDao.class);
@@ -118,6 +123,7 @@ class IamWebControllerTest {
                         roleController
                 )
                 .setControllerAdvice(new PlatformWebExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .addFilters(new CurrentUserWebFilter(() -> java.util.Optional.ofNullable(currentUser)))
                 .build();
     }
@@ -365,6 +371,33 @@ class IamWebControllerTest {
     }
 
     @Test
+    void shouldCreateRoleWithCodeTitleEnumCodeThroughStandardCrudContract() throws Exception {
+        currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
+        Role saved = new Role();
+        saved.setId("role-1");
+        saved.setTitle("Position Role");
+        saved.setRoleKind(RoleKind.POSITION_TEMPLATE);
+        when(roleService.insert(any())).thenAnswer(invocation -> {
+            Role incoming = invocation.getArgument(0);
+            assertThat(incoming.getRoleKind()).isEqualTo(RoleKind.POSITION_TEMPLATE);
+            return "role-1";
+        });
+        when(roleService.select("role-1")).thenReturn(saved);
+
+        mvc.perform(post("/iam.role/insert")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "title":"Position Role",
+                                  "roleKind":"positionTemplate"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.record.id").value("role-1"))
+                .andExpect(jsonPath("$.record.roleKind").value("positionTemplate"));
+    }
+
+    @Test
     void shouldKeepExistingPasswordHashWhenUpdatingUserThroughStandardCrudContract() throws Exception {
         currentUser = CurrentUser.tenantUser("admin-1", "Admin", "tenant_a");
         when(tenantDao.query(any(Criteria.class), any(PageRequest.class))).thenReturn(List.of(tenant("tenant_a", "Tenant A")));
@@ -454,14 +487,14 @@ class IamWebControllerTest {
         mvc.perform(post("/iam.role/{roleId}/grants", "role-1")
                         .contentType("application/json")
                         .content("""
-                                {"subjectType":"USER_ACCOUNT","subjectId":"user-2"}
+                                {"subjectType":"userAccount","subjectId":"user-2"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value("grant-1"));
         mvc.perform(get("/iam.role/{roleId}/grants", "role-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("grant-1"))
-                .andExpect(jsonPath("$[0].subjectType").value("USER_ACCOUNT"))
+                .andExpect(jsonPath("$[0].subjectType").value("userAccount"))
                 .andExpect(jsonPath("$[0].subjectId").value("user-2"));
         mvc.perform(post("/iam.role/{roleId}/grants/{grantId}/delete", "role-1", "grant-1"))
                 .andExpect(status().isOk())
@@ -472,8 +505,8 @@ class IamWebControllerTest {
                                 {
                                   "moduleAlias":"sales.contract",
                                   "actionCode":"query",
-                                  "dataScopePolicy":"OWNER",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"owner",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -490,8 +523,8 @@ class IamWebControllerTest {
                         .content("""
                                 {
                                   "actionCode":"query",
-                                  "dataScopePolicy":"OWNER",
-                                  "tenantScopePolicy":"CURRENT_TENANT"
+                                  "dataScopePolicy":"owner",
+                                  "tenantScopePolicy":"currentTenant"
                                 }
                                 """))
                 .andExpect(status().isOk())
