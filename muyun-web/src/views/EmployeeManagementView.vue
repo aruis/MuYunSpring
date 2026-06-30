@@ -9,6 +9,7 @@ import {
   RecordQueryListPanel,
   RecordStatusSwitch,
   TreeRecordExplorer,
+  createScopedTreeModuleContext,
   type QueryListRecord,
   type RecordActionItem,
   type RecordFormFieldFallback,
@@ -28,17 +29,9 @@ import type {
   Employee,
   Organization,
   ResolvedViewFieldDescriptor,
-  WebListResponse,
-  WebQueryRequest,
-  WebTreeNode,
   ViewFieldDefinition,
 } from '@muyun/web-contracts';
-import {
-  useModuleContext,
-  type ModuleAbilities,
-  type ModuleContext,
-  type StaticModuleTreeClient,
-} from '@muyun/web-core';
+import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 
 defineOptions({ name: 'EmployeeManagementView' });
 
@@ -74,7 +67,12 @@ const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
 const employeeListContext = computed(() => employeeContext as unknown as ModuleContext<QueryListRecord>);
 const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
 const scopedDepartmentContext = computed(() =>
-  createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
+  createScopedTreeModuleContext(departmentContext, {
+    scopeFieldName: 'organizationId',
+    scopeValue: selectedOrganizationId.value,
+    treePath: '/iam.department/tree',
+    sortPath: '/iam.department/sort',
+  }),
 );
 const employeeFormPickerConfigs = computed<Record<EmployeeFormPickerFieldName, RecordFormFieldPickerConfig>>(
   () => ({
@@ -445,88 +443,6 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
     controlType: 'enabledStatus',
   },
 };
-
-function createOrganizationScopedDepartmentContext(
-  context: ModuleContext<Department>,
-  organizationId: string | undefined,
-): ModuleContext<Department> {
-  const treeClient = createOrganizationScopedDepartmentTreeClient(context, organizationId);
-  const abilities: ModuleAbilities<Department> = {
-    ...context.abilities,
-    tree: () => treeClient,
-    tryTree: () => (context.abilities.hasTree() ? treeClient : undefined),
-  };
-  return {
-    ...context,
-    abilities,
-  };
-}
-
-function createOrganizationScopedDepartmentTreeClient(
-  context: ModuleContext<Department>,
-  organizationId: string | undefined,
-): StaticModuleTreeClient<Department> {
-  return {
-    ...context.crud,
-    query: (request) => context.crud.query(scopedDepartmentQuery(request, organizationId)),
-    tree: () => {
-      if (!organizationId) {
-        return emptyTreeResponse<Department>();
-      }
-      return context.http.request<WebListResponse<WebTreeNode<Department>>>({
-        path: '/iam.department/tree',
-        query: { organizationId },
-      });
-    },
-    treeFlat: (options) => {
-      if (!organizationId) {
-        return emptyListResponse<Department>();
-      }
-      const rootId = options?.rootId;
-      const path = rootId ? `/iam.department/tree/${encodeURIComponent(rootId)}` : '/iam.department/tree';
-      return context.http.request<WebListResponse<Department>>({
-        path,
-        query: {
-          organizationId,
-          flat: true,
-          includeSelf: options?.includeSelf,
-        },
-      });
-    },
-    subtree: (id, options) =>
-      context.http.request<WebListResponse<WebTreeNode<Department>>>({
-        path: `/iam.department/tree/${encodeURIComponent(id)}`,
-        query: options,
-      }),
-    sort: (id, request) =>
-      context.http.request({
-        method: 'POST',
-        path: `/iam.department/sort/${encodeURIComponent(id)}`,
-        body: request,
-      }),
-  };
-}
-
-function scopedDepartmentQuery(request: WebQueryRequest | undefined, organizationId: string | undefined) {
-  if (!organizationId) {
-    return request;
-  }
-  return {
-    ...request,
-    conditions: [
-      ...(request?.conditions ?? []),
-      { fieldName: 'organizationId', operator: 'EQ', values: [organizationId] },
-    ],
-  };
-}
-
-async function emptyTreeResponse<TRecord>(): Promise<WebListResponse<WebTreeNode<TRecord>>> {
-  return { records: [] };
-}
-
-async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
-  return { records: [] };
-}
 </script>
 
 <template>

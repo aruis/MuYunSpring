@@ -186,8 +186,9 @@ test('department management uses organization as read-only scope and department 
   assert.equal(matchCount(departmentViewSource, /<TreeRecordExplorer/g), 2);
   assert.match(departmentViewSource, /moduleAlias: 'iam\.organization'/);
   assert.match(departmentViewSource, /moduleAlias: 'iam\.department'/);
-  assert.match(departmentViewSource, /createOrganizationScopedDepartmentContext/);
-  assert.match(departmentViewSource, /path: '\/iam\.department\/tree'/);
+  assert.match(departmentViewSource, /createScopedTreeModuleContext/);
+  assert.match(departmentViewSource, /treePath: '\/iam\.department\/tree'/);
+  assert.match(departmentViewSource, /sortPath: '\/iam\.department\/sort'/);
   assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
   assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
   assert.match(departmentViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
@@ -382,7 +383,11 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /employeeContext\.crud\.delete/);
   assert.doesNotMatch(employeeViewSource, /presentPlatformMessage\(result\.message \?\? '操作成功'/);
   assert.match(employeeViewSource, /employeeReloadKey\.value \+= 1/);
-  assert.match(employeeViewSource, /createOrganizationScopedDepartmentContext/);
+  assert.match(indexSource, /createScopedTreeModuleContext/);
+  assert.match(employeeViewSource, /createScopedTreeModuleContext/);
+  assert.match(employeeViewSource, /treePath: '\/iam\.department\/tree'/);
+  assert.match(employeeViewSource, /sortPath: '\/iam\.department\/sort'/);
+  assert.doesNotMatch(employeeViewSource, /createOrganizationScopedDepartmentContext/);
   assert.match(employeeViewSource, /organizationReloadKey/);
   assert.match(employeeViewSource, /@refresh="refreshOrganizations"/);
   assert.match(employeeViewSource, /:reload-key="organizationReloadKey"/);
