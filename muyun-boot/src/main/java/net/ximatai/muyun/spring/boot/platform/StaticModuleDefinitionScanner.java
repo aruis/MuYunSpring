@@ -42,14 +42,14 @@ public class StaticModuleDefinitionScanner {
             if (module == null) {
                 continue;
             }
-            StaticModuleDefinition definition = definition(beanClass, module);
+            StaticModuleDefinition definition = definition(bean, beanClass, module);
             definitions.put(definition.moduleAlias(), definition);
         }
         addActionContributions(definitions);
         return List.copyOf(definitions.values());
     }
 
-    private StaticModuleDefinition definition(Class<?> beanClass, PlatformStaticModule module) {
+    private StaticModuleDefinition definition(Object bean, Class<?> beanClass, PlatformStaticModule module) {
         validateScopeAlias(beanClass, module);
         return new StaticModuleDefinition(
                 module.application(),
@@ -61,8 +61,24 @@ public class StaticModuleDefinitionScanner {
                 module.externalUrl(),
                 java.util.Set.of(module.capabilities()),
                 actions(beanClass, java.util.Set.of(module.capabilities())),
-                entities(beanClass, module)
+                entities(beanClass, module),
+                uiDefinition(bean, module)
         );
+    }
+
+    private ModuleUiDefinition uiDefinition(Object bean, PlatformStaticModule module) {
+        if (!(bean instanceof StaticModuleUiContributor contributor)) {
+            return null;
+        }
+        ModuleUiDefinition uiDefinition = contributor.moduleUiDefinition();
+        if (uiDefinition == null) {
+            return null;
+        }
+        if (!module.alias().equals(uiDefinition.moduleAlias())) {
+            throw new IllegalStateException("static module UI definition alias must match module alias: "
+                    + module.alias() + " != " + uiDefinition.moduleAlias());
+        }
+        return uiDefinition;
     }
 
     private ModuleEntryType entryType(PlatformStaticModule module) {
@@ -188,7 +204,8 @@ public class StaticModuleDefinitionScanner {
                     target.entryExternalUrl(),
                     target.capabilities(),
                     List.copyOf(merged.values()),
-                    target.entities()
+                    target.entities(),
+                    target.uiDefinition()
             ));
         }
     }

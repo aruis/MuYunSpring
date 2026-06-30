@@ -201,11 +201,25 @@ test('employee management uses organization scope and platform query list panel'
   const indexSource = readSource('src/platform-components/index.ts');
   const drawerSource = readSource('src/platform-components/RecordDetailDrawer.vue');
   const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+  const formFieldsSource = readSource('src/platform-components/RecordFormFields.vue');
+  const runtimeContextSource = readSource('src/web-core/module/runtimeContext.ts');
   const dropdownSource = readSource('src/vue-ui-antdv/components/UiDropdown.vue');
   const employeeViewSource = readSource('src/views/EmployeeManagementView.vue');
   const contractsSource = readSource('src/web-contracts/index.ts');
 
   assert.match(indexSource, /RecordQueryListPanel/);
+  assert.match(indexSource, /RecordFormFields/);
+  assert.match(formFieldsSource, /RecordStatusSwitch/);
+  assert.match(formFieldsSource, /RecordPicker/);
+  assert.match(formFieldsSource, /pickerConfigs\?: Record<string, RecordFormFieldPickerConfig>/);
+  assert.match(formFieldsSource, /field\?\.uiType === 'enabledStatus'/);
+  assert.match(formFieldsSource, /field\?\.uiType === 'recordPicker'/);
+  assert.match(formFieldsSource, /booleanFieldValue/);
+  assert.match(formFieldsSource, /field\.controlType === 'recordPicker' && field\.pickerConfig/);
+  assert.match(
+    formFieldsSource,
+    /'update:field': \[fieldName: string, value: string \| boolean \| undefined\]/,
+  );
   assert.match(panelSource, /defineOptions\(\{ name: 'RecordQueryListPanel' \}\)/);
   assert.match(panelSource, /querySchema\(\)/);
   assert.match(panelSource, /emptyQuerySchema/);
@@ -213,6 +227,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /query schema is not supported by/);
   assert.match(panelSource, /externalQueryValues/);
   assert.match(panelSource, /actions\?: RecordActionItem\[\]/);
+  assert.match(panelSource, /standardCrudActions\?: boolean/);
+  assert.match(panelSource, /standardCrudRowActions\?: boolean/);
+  assert.match(panelSource, /function standardCrudRowActionsOf/);
   assert.match(panelSource, /rowActionsOf\?: \(record: QueryListRecord\) => RecordActionItem\[\]/);
   assert.match(panelSource, /type\?: 'text' \| 'enabledStatus'/);
   assert.match(panelSource, /interface QueryListRow/);
@@ -234,6 +251,19 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /ready\?: boolean/);
   assert.match(panelSource, /waitingDescription\?: string/);
   assert.match(panelSource, /\(\) => props\.ready/);
+  assert.match(panelSource, /runtimeViews = ref<ResolvedViewDescriptor\[\]>\(\[\]\)/);
+  assert.match(panelSource, /runtimeViews\.value = await loadRuntimeViews\(\)/);
+  assert.match(panelSource, /async function loadRuntimeViews/);
+  assert.match(panelSource, /if \(props\.columns && props\.columns\.length > 0\)/);
+  assert.doesNotMatch(panelSource, /catch \{\s*return \[\];\s*\}/);
+  assert.match(
+    panelSource,
+    /presentPlatformError\(cause, \{ source: 'record-query-list-panel', phase: 'load' \}\)/,
+  );
+  assert.match(panelSource, /tableColumns = computed<RecordQueryListColumn\[\]>/);
+  assert.match(panelSource, /columnsFromRuntimeListView/);
+  assert.match(panelSource, /field\.fieldRef\.fieldName/);
+  assert.match(panelSource, /field\.uiType === 'enabledStatus'/);
   assert.match(panelSource, /emit\('loaded', \[\]\)/);
   assert.match(panelSource, /recordsRequestSeq/);
   assert.match(panelSource, /if \(!queryReady\.value\)/);
@@ -250,27 +280,76 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /moduleAlias: 'iam\.employee'/);
   assert.match(employeeViewSource, /<TreeRecordExplorer/);
   assert.match(employeeViewSource, /<RecordQueryListPanel/);
-  assert.match(employeeViewSource, /employeeListActions/);
-  assert.match(employeeViewSource, /title: '新建职员'/);
+  assert.match(employeeViewSource, /standard-crud-actions/);
+  assert.match(employeeViewSource, /create-title="新建职员"/);
   assert.match(employeeViewSource, /@action="handleEmployeeListAction"/);
   assert.match(indexSource, /RecordDetailDrawer/);
   assert.match(drawerSource, /closeOnOutside\?: boolean/);
   assert.match(drawerSource, /handleDocumentPointerDown/);
   assert.match(employeeViewSource, /<RecordDetailDrawer/);
   assert.match(employeeViewSource, /:close-on-outside="employeeDetailMode === 'view'"/);
-  assert.match(employeeViewSource, /:row-actions-of="employeeRowActionsOf"/);
+  assert.match(employeeViewSource, /standard-crud-row-actions/);
+  assert.doesNotMatch(employeeViewSource, /employeeRowActionsOf/);
   assert.match(employeeViewSource, /@row-action="handleEmployeeRowAction"/);
   assert.match(employeeViewSource, /@row-dblclick="handleEmployeeRowDblclick"/);
-  assert.match(employeeViewSource, /type: 'enabledStatus'/);
+  assert.doesNotMatch(employeeViewSource, /employeeColumns/);
+  assert.doesNotMatch(employeeViewSource, /:columns="employeeColumns"/);
+  assert.doesNotMatch(employeeViewSource, /type: 'enabledStatus'/);
+  assert.match(employeeViewSource, /onMounted\(loadEmployeeFormDefinition\)/);
+  assert.match(employeeViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(
+    employeeViewSource,
+    /employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition \| ResolvedViewFieldDescriptor>>/,
+  );
+  assert.match(employeeViewSource, /<RecordFormFields/);
+  assert.match(employeeViewSource, /const employeeStandardFormFields = computed/);
+  assert.match(employeeViewSource, /Array\.from\(employeeFormFieldDefinitions\.value\.keys\(\)\)/);
+  assert.match(employeeViewSource, /fieldName !== 'organizationId'/);
+  assert.doesNotMatch(
+    employeeViewSource,
+    /const employeeStandardFormFields[\s\S]*'departmentId'[\s\S]*'enabled'/,
+  );
+  assert.match(employeeViewSource, /gender: '请输入性别'/);
+  assert.match(employeeViewSource, /gender: draft\.gender\?\.trim\(\) \|\| undefined/);
+  assert.match(employeeViewSource, /gender: \{ label: '性别'/);
+  assert.match(employeeViewSource, /employeeFormPickerConfigs/);
+  assert.match(
+    employeeViewSource,
+    /context: scopedDepartmentContext\.value as unknown as ModuleContext<RecordPickerRecord>/,
+  );
+  assert.match(employeeViewSource, /:picker-configs="employeeFormPickerConfigs"/);
+  assert.match(employeeViewSource, /@update:field="updateEmployeeDraftField"/);
+  assert.match(employeeViewSource, /employeeDetailMode === 'view' && selectedEmployee/);
+  assert.doesNotMatch(employeeViewSource, /employeeDetailMode !== 'view'[\s\S]*employeeDraft\.enabled/);
+  assert.doesNotMatch(employeeViewSource, /<RecordPicker[\s\S]*v-model:value="employeeDraft\.departmentId"/);
+  assert.doesNotMatch(employeeViewSource, /employeeFormLabel\('employeeNo'\)/);
+  assert.doesNotMatch(employeeViewSource, /employeeFormRequired\('employeeNo'\)/);
+  assert.match(employeeViewSource, /departmentId: \{ label: '所属部门', required: true/);
+  assert.doesNotMatch(employeeViewSource, /function employeeFormFieldDisabled/);
+  assert.doesNotMatch(employeeViewSource, /<span>所属部门<\/span>/);
+  assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
   assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
   assert.match(employeeViewSource, /const canSaveEmployee = computed/);
   assert.match(employeeViewSource, /const canToggleEmployee = computed/);
   assert.match(employeeViewSource, /function employeeToggleActionCode/);
-  assert.match(employeeViewSource, /if \(savingEmployee\.value\) \{\s*return;\s*\}/);
+  assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
+  assert.match(employeeViewSource, /executeStaticRecordAction/);
+  assert.match(
+    employeeViewSource,
+    /validateContext: \(\) => \(selectedOrganizationId\.value \? undefined : '请先选择机构'\)/,
+  );
+  assert.match(employeeViewSource, /canSave: \(\) => canSaveEmployee\.value/);
+  assert.match(employeeViewSource, /validateRecord: \(draft\) =>/);
   assert.match(employeeViewSource, /当前用户无权保存职员/);
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
+  assert.match(employeeViewSource, /canExecute: \(\) => canToggleEmployee\.value/);
+  assert.match(employeeViewSource, /employeeContext\.crud\.enable\(employee\.id!\)/);
+  assert.match(employeeViewSource, /employeeContext\.crud\.disable\(employee\.id!\)/);
+  assert.match(employeeViewSource, /confirm: \(target\) =>[\s\S]*title: '删除职员'/);
+  assert.match(employeeViewSource, /content: `确认删除职员/);
+  assert.match(employeeViewSource, /employeeContext\.crud\.delete\(String\(target\.id\)\)/);
   assert.match(employeeViewSource, /:disabled="savingEmployee \|\| !canToggleEmployee"/);
-  assert.match(employeeViewSource, /:disabled="employeeFormDisabled"/);
+  assert.doesNotMatch(employeeViewSource, /:disabled="employeeFormFieldDisabled\('employeeNo'\)"/);
   assert.doesNotMatch(
     employeeViewSource,
     /render: \(record\) => \(record\.enabled === false \? '停用' : '启用'\)/,
@@ -278,6 +357,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /employeeContext\.crud\.insert/);
   assert.match(employeeViewSource, /employeeContext\.crud\.update/);
   assert.match(employeeViewSource, /employeeContext\.crud\.delete/);
+  assert.doesNotMatch(employeeViewSource, /presentPlatformMessage\(result\.message \?\? '操作成功'/);
   assert.match(employeeViewSource, /employeeReloadKey\.value \+= 1/);
   assert.match(employeeViewSource, /createOrganizationScopedDepartmentContext/);
   assert.match(employeeViewSource, /organizationReloadKey/);
@@ -286,6 +366,14 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /:ready="Boolean\(selectedOrganization\?\.id\)"/);
   assert.match(employeeViewSource, /departmentScope/);
   assert.match(contractsSource, /export interface QuerySchema/);
+  assert.match(contractsSource, /export interface ModuleUiDefinition/);
+  assert.match(contractsSource, /export interface ViewDefinition/);
+  assert.match(contractsSource, /export interface ViewFieldDefinition/);
+  assert.match(contractsSource, /gender\?: string/);
+  assert.match(contractsSource, /schemaVersion: string/);
+  assert.doesNotMatch(runtimeContextSource, /uiDefinition\?:/);
+  assert.doesNotMatch(panelSource, /uiDefinition/);
+  assert.doesNotMatch(employeeViewSource, /uiDefinition/);
   assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
 });
 

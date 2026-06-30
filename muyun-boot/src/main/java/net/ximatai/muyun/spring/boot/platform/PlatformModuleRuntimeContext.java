@@ -17,6 +17,35 @@ public record PlatformModuleRuntimeContext(
         String mainEntityAlias,
         Set<EntityCapability> capabilities,
         Set<String> abilities,
-        List<PlatformModuleRuntimeAction> actions
+        List<PlatformModuleRuntimeAction> actions,
+        ResolvedModuleUiDescriptor uiDescriptor
 ) {
+    public PlatformModuleRuntimeContext(String moduleAlias,
+                                        String title,
+                                        ModuleKind moduleKind,
+                                        ModuleEntryType entryType,
+                                        String entryRoute,
+                                        String entryExternalUrl,
+                                        String mainEntityAlias,
+                                        Set<EntityCapability> capabilities,
+                                        Set<String> abilities,
+        List<PlatformModuleRuntimeAction> actions) {
+        this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
+                capabilities, abilities, actions, (ResolvedModuleUiDescriptor) null);
+    }
+
+    public PlatformModuleRuntimeContext(String moduleAlias,
+                                        String title,
+                                        ModuleKind moduleKind,
+                                        ModuleEntryType entryType,
+                                        String entryRoute,
+                                        String entryExternalUrl,
+                                        String mainEntityAlias,
+                                        Set<EntityCapability> capabilities,
+                                        Set<String> abilities,
+                                        List<PlatformModuleRuntimeAction> actions,
+                                        ModuleUiDefinition uiDefinition) {
+        this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
+                capabilities, abilities, actions, ModuleUiDescriptorCompiler.compile(uiDefinition));
+    }
 }

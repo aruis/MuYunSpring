@@ -7,6 +7,7 @@ import net.ximatai.muyun.database.core.orm.PageRequest;
 import net.ximatai.muyun.database.core.orm.PageResult;
 import net.ximatai.muyun.database.core.orm.Sort;
 import net.ximatai.muyun.spring.ability.TreeAbility;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.query.QueryCompiler;
 import net.ximatai.muyun.spring.ability.query.QueryDescriptor;
 import net.ximatai.muyun.spring.ability.query.QueryField;
@@ -15,12 +16,17 @@ import net.ximatai.muyun.spring.ability.query.QueryRequest;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
 import net.ximatai.muyun.spring.ability.query.QueryValueType;
 import net.ximatai.muyun.spring.boot.MuYunSpringJacksonConfiguration;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.web.CurrentUserWebFilter;
 import net.ximatai.muyun.spring.boot.web.PlatformWebExceptionHandler;
+import net.ximatai.muyun.spring.common.platform.EntityCapability;
 import net.ximatai.muyun.spring.common.exception.PlatformErrorCodes;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
 import net.ximatai.muyun.spring.common.identity.CurrentUser;
 import net.ximatai.muyun.spring.common.identity.CurrentUserProvider;
+import net.ximatai.muyun.spring.dynamic.metadata.StaticEntityDefinitionCompiler;
 import net.ximatai.muyun.spring.iam.department.Department;
 import net.ximatai.muyun.spring.iam.department.DepartmentService;
 import net.ximatai.muyun.spring.iam.employee.Employee;
@@ -44,6 +50,7 @@ import net.ximatai.muyun.spring.iam.role.RolePermissionMatrix;
 import net.ximatai.muyun.spring.iam.role.RoleService;
 import net.ximatai.muyun.spring.iam.role.TenantScopePolicy;
 import net.ximatai.muyun.spring.iam.tenant.TenantService;
+import net.ximatai.muyun.spring.platform.module.ModuleEntryType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -55,6 +62,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -79,7 +87,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         CurrentUserWebFilter.class,
         MuYunSpringJacksonConfiguration.class,
-        PlatformWebExceptionHandler.class
+        PlatformWebExceptionHandler.class,
+        StaticRecordReadProjectionService.class
 })
 class IamWebControllerIT {
     @Autowired
@@ -105,6 +114,9 @@ class IamWebControllerIT {
 
     @MockitoBean
     private EmployeeDelegationService employeeDelegationService;
+
+    @MockitoBean
+    private StaticModuleDefinitionCatalog staticModuleDefinitionCatalog;
 
     @MockitoBean
     private PositionService positionService;
@@ -262,6 +274,33 @@ class IamWebControllerIT {
     }
 
     @Test
+    void shouldExposeEmployeeFormSchemaFromStaticUiDefinition() throws Exception {
+        assertThat(FormAbility.class.isAssignableFrom(EmployeeService.class)).isFalse();
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+
+        mvc.perform(get("/iam.employee/form/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeName").value(EmployeeService.MODULE_ALIAS))
+                .andExpect(jsonPath("$.title").value("职员档案"))
+                .andExpect(jsonPath("$.fields[0].name").value("organizationId"))
+                .andExpect(jsonPath("$.fields[0].title").value("所属机构"))
+                .andExpect(jsonPath("$.fields[0].required").value(true))
+                .andExpect(jsonPath("$.fields[0].readOnly").value(true))
+                .andExpect(jsonPath("$.fields[?(@.name == 'enabled')].controlType")
+                        .value(org.hamcrest.Matchers.contains("SWITCH")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].controlType")
+                        .value(org.hamcrest.Matchers.contains("SELECT")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.sourceType")
+                        .value(org.hamcrest.Matchers.contains("dictionary")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionBinding.source")
+                        .value(org.hamcrest.Matchers.contains("iam.gender")))
+                .andExpect(jsonPath("$.fields[?(@.name == 'gender')].optionTitleField")
+                        .value(org.hamcrest.Matchers.contains("genderTitle")));
+
+    }
+
+    @Test
     void shouldQueryEmployeesWithDeclaredConditionsQuickSearchAndDepartmentScope() throws Exception {
         Employee employee = new Employee();
         employee.setId("employee-1");
@@ -306,6 +345,43 @@ class IamWebControllerIT {
         assertThat(containsCondition(criteria.getValue(), "departmentId", "dept-child")).isTrue();
         assertThat(containsCondition(criteria.getValue(), "title", "Alice")).isTrue();
         assertThat(sorts.getValue()).hasSize(1);
+    }
+
+    @Test
+    void shouldProjectEmployeeQueryResponseByResolvedListView() throws Exception {
+        Employee employee = new Employee();
+        employee.setId("employee-1");
+        employee.setTenantId("tenant_a");
+        employee.setVersion(7);
+        employee.setOrganizationId("org-1");
+        employee.setDepartmentId("dept-child");
+        employee.setEmployeeNo("E001");
+        employee.setTitle("Alice");
+        employee.setMobile("13800000000");
+        employee.setEmail("alice@example.test");
+        employee.setEnabled(Boolean.TRUE);
+        when(currentUserProvider.currentUser())
+                .thenReturn(Optional.of(CurrentUser.tenantUser("user-1", "User", "tenant_a")));
+        wireEmployeeQueryAbility();
+        when(staticModuleDefinitionCatalog.find(EmployeeService.MODULE_ALIAS))
+                .thenReturn(Optional.of(employeeStaticModuleDefinition()));
+        when(employeeService.pageQuery(any(Criteria.class), any(PageRequest.class), any(Sort[].class)))
+                .thenReturn(PageResult.of(List.of(employee), 1, PageRequest.of(1, 20)));
+
+        mvc.perform(post("/iam.employee/query")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.records[0].id").value("employee-1"))
+                .andExpect(jsonPath("$.records[0].employeeNo").value("E001"))
+                .andExpect(jsonPath("$.records[0].title").value("Alice"))
+                .andExpect(jsonPath("$.records[0].mobile").value("13800000000"))
+                .andExpect(jsonPath("$.records[0].email").value("alice@example.test"))
+                .andExpect(jsonPath("$.records[0].enabled").value(true))
+                .andExpect(jsonPath("$.records[0].organizationId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].departmentId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.records[0].version").doesNotExist());
     }
 
     @Test
@@ -695,6 +771,27 @@ class IamWebControllerIT {
                 .thenAnswer(invocation -> employeeQueryCompiler().criteria(invocation.getArgument(0)));
         when(employeeService.querySorts(any(QueryRequest.class)))
                 .thenAnswer(invocation -> employeeQueryCompiler().sorts(invocation.getArgument(0)));
+    }
+
+    private StaticModuleDefinition employeeStaticModuleDefinition() {
+        EmployeeWebController controller = new EmployeeWebController(
+                employeePositionService,
+                employeeAccountService,
+                employeeDelegationService
+        );
+        return new StaticModuleDefinition(
+                "iam",
+                EmployeeService.MODULE_ALIAS,
+                "职员管理",
+                null,
+                ModuleEntryType.ROUTE,
+                "/iam/employees",
+                null,
+                Set.of(EntityCapability.CRUD),
+                List.of(),
+                List.of(new StaticEntityDefinitionCompiler().compile("employee", "职员管理", Employee.class)),
+                controller.moduleUiDefinition()
+        );
     }
 
     private QueryCompiler employeeQueryCompiler() {

@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   RecordActionBar,
   RecordDetailDrawer,
   RecordExplorerPanel,
+  RecordFormFields,
   RecordMetaSection,
-  RecordPicker,
   RecordQueryListPanel,
   RecordStatusSwitch,
   TreeRecordExplorer,
   type QueryListRecord,
   type RecordActionItem,
-  type RecordQueryListColumn,
+  type RecordFormFieldFallback,
+  type RecordFormFieldPickerConfig,
+  type RecordFormRecord,
+  type RecordPickerRecord,
   type ResolvedRecordActionItem,
+  executeStaticFormSave,
+  executeStaticRecordAction,
   presentPlatformError,
   presentPlatformMessage,
 } from '@muyun/platform-components';
@@ -21,9 +26,11 @@ import type {
   Department,
   Employee,
   Organization,
+  ResolvedViewFieldDescriptor,
   WebListResponse,
   WebQueryRequest,
   WebTreeNode,
+  ViewFieldDefinition,
 } from '@muyun/web-contracts';
 import {
   useModuleContext,
@@ -35,10 +42,30 @@ import {
 defineOptions({ name: 'EmployeeManagementView' });
 
 type EmployeeDetailMode = 'view' | 'create' | 'edit';
+type EmployeeFormFieldName =
+  | 'organizationId'
+  | 'departmentId'
+  | 'employeeNo'
+  | 'title'
+  | 'gender'
+  | 'mobile'
+  | 'email'
+  | 'enabled';
+type EmployeeFormPickerFieldName = 'departmentId';
+
+interface EmployeeFormFieldUi {
+  label: string;
+  required: boolean;
+  readOnly: boolean;
+  visible: boolean;
+}
 
 const organizationContext = useModuleContext<Organization>({ moduleAlias: 'iam.organization' });
 const departmentContext = useModuleContext<Department>({ moduleAlias: 'iam.department' });
 const employeeContext = useModuleContext<Employee>({ moduleAlias: 'iam.employee' });
+const employeeFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
+  new Map(),
+);
 const organizationSearchKeyword = ref('');
 const organizationReloadKey = ref(0);
 const employeeReloadKey = ref(0);
@@ -55,6 +82,16 @@ const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
 const scopedDepartmentContext = computed(() =>
   createOrganizationScopedDepartmentContext(departmentContext, selectedOrganizationId.value),
 );
+const employeeFormPickerConfigs = computed<Record<EmployeeFormPickerFieldName, RecordFormFieldPickerConfig>>(
+  () => ({
+    departmentId: {
+      context: scopedDepartmentContext.value as unknown as ModuleContext<RecordPickerRecord>,
+      reloadKey: organizationReloadKey.value,
+      placeholder: '请选择部门',
+      titleOf: (record) => departmentTitle(record as Department),
+    },
+  }),
+);
 const employeeExternalQueryValues = computed<Record<string, unknown> | undefined>(() => {
   const organizationId = selectedOrganizationId.value;
   if (!organizationId) {
@@ -67,30 +104,6 @@ const employeeExternalQueryValues = computed<Record<string, unknown> | undefined
     },
   };
 });
-
-const employeeColumns: RecordQueryListColumn[] = [
-  { key: 'employeeNo', title: '职员编号', width: '150px' },
-  { key: 'title', title: '职员姓名', width: '150px' },
-  { key: 'mobile', title: '手机号', width: '150px' },
-  { key: 'email', title: '邮箱' },
-  {
-    key: 'enabled',
-    title: '状态',
-    type: 'enabledStatus',
-    width: '90px',
-    align: 'center',
-  },
-];
-const employeeListActions = computed<RecordActionItem[]>(() => [
-  {
-    key: 'create',
-    actionCode: 'create',
-    title: '新建职员',
-    primary: true,
-    disabled: !selectedOrganizationId.value,
-    iconName: 'plus',
-  },
-]);
 const employeeDetailTitle = computed(() => {
   if (employeeDetailMode.value === 'create') {
     return '新建职员';
@@ -99,6 +112,9 @@ const employeeDetailTitle = computed(() => {
 });
 const employeeReadonly = computed(() => employeeDetailMode.value === 'view');
 const employeeFormDisabled = computed(() => employeeReadonly.value || savingEmployee.value);
+const employeeStandardFormFields = computed(() =>
+  Array.from(employeeFormFieldDefinitions.value.keys()).filter((fieldName) => fieldName !== 'organizationId'),
+);
 const canSaveEmployee = computed(() => {
   if (employeeDetailMode.value === 'create') {
     return Boolean(selectedOrganizationId.value) && employeeContext.can('create') === true;
@@ -135,6 +151,62 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
   ];
 });
 
+onMounted(loadEmployeeFormDefinition);
+
+async function loadEmployeeFormDefinition() {
+  try {
+    const runtimeContext = await employeeContext.runtime.ready;
+    const formView = runtimeContext.uiDescriptor?.views?.find(
+      (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
+    );
+    employeeFormFieldDefinitions.value = new Map(
+      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    );
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+  }
+}
+
+function employeeFormField(fieldName: EmployeeFormFieldName): EmployeeFormFieldUi {
+  const field = employeeFormFieldDefinitions.value.get(fieldName);
+  return {
+    label: field?.label ?? employeeFormFieldFallback[fieldName].label,
+    required: field?.required?.constant ?? employeeFormFieldFallback[fieldName].required,
+    readOnly: field?.readOnly?.constant ?? employeeFormFieldFallback[fieldName].readOnly,
+    visible: field?.visible?.constant ?? employeeFormFieldFallback[fieldName].visible,
+  };
+}
+
+function employeeFormLabel(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).label;
+}
+
+function employeeFormRequired(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).required;
+}
+
+function employeeFormVisible(fieldName: EmployeeFormFieldName) {
+  return employeeFormField(fieldName).visible;
+}
+
+function updateEmployeeDraftField(fieldName: string, value: string | boolean | undefined) {
+  employeeDraft.value = {
+    ...employeeDraft.value,
+    [fieldName]: value,
+  };
+}
+
+function employeeFormPlaceholder(fieldName: string) {
+  const placeholders: Partial<Record<EmployeeFormFieldName, string>> = {
+    employeeNo: '请输入职员编号',
+    title: '请输入职员姓名',
+    gender: '请输入性别',
+    mobile: '请输入手机号',
+    email: '请输入邮箱',
+  };
+  return placeholders[fieldName as EmployeeFormFieldName];
+}
+
 function handleOrganizationsLoaded(records: Organization[]) {
   if (!selectedOrganization.value && records.length > 0) {
     selectedOrganization.value = records[0];
@@ -160,14 +232,6 @@ function handleEmployeeListAction(action: RecordActionItem) {
   if (action.key === 'create') {
     startCreateEmployee();
   }
-}
-
-function employeeRowActionsOf(): RecordActionItem[] {
-  return [
-    { key: 'view', title: '查看' },
-    { key: 'edit', actionCode: 'update', title: '修改', iconName: 'edit' },
-    { key: 'delete', actionCode: 'delete', title: '删除', iconName: 'delete', danger: true },
-  ];
 }
 
 function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
@@ -252,104 +316,78 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
 }
 
 async function saveEmployee() {
-  if (savingEmployee.value) {
-    return;
-  }
-  const organizationId = selectedOrganizationId.value;
-  if (!organizationId) {
-    presentPlatformMessage('请先选择机构', { phase: 'validation' });
-    return;
-  }
-  if (!canSaveEmployee.value) {
-    presentPlatformMessage('当前用户无权保存职员', { phase: 'authorization' });
-    return;
-  }
-  const draft = normalizedEmployeeDraft(employeeDraft.value, organizationId);
-  if (!draft.departmentId || !draft.employeeNo || !draft.title) {
-    presentPlatformMessage('请填写部门、职员编号和职员姓名', { phase: 'validation' });
-    return;
-  }
-  savingEmployee.value = true;
-  try {
-    const result =
-      employeeDetailMode.value === 'edit' && selectedEmployee.value?.id
-        ? await employeeContext.crud.update(selectedEmployee.value.id, draft)
-        : await employeeContext.crud.insert(draft);
-    const saved = result.record;
-    selectedEmployee.value = saved;
-    employeeDraft.value = copyEmployee(saved);
-    selectedEmployeeKey.value = saved.id;
-    employeeDetailMode.value = 'view';
-    employeeDetailOpen.value = true;
-    employeeReloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', { tone: 'success' });
-  } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
-  } finally {
-    savingEmployee.value = false;
-  }
+  await executeStaticFormSave<Employee>({
+    loading: savingEmployee,
+    mode: employeeDetailMode.value === 'edit' ? 'edit' : 'create',
+    source: 'employee-management',
+    validateContext: () => (selectedOrganizationId.value ? undefined : '请先选择机构'),
+    canSave: () => canSaveEmployee.value,
+    deniedMessage: '当前用户无权保存职员',
+    createRecord: () => normalizedEmployeeDraft(employeeDraft.value, selectedOrganizationId.value ?? ''),
+    validateRecord: (draft) =>
+      draft.departmentId && draft.employeeNo && draft.title ? undefined : '请填写部门、职员编号和职员姓名',
+    save: (draft, mode) =>
+      mode === 'edit' && selectedEmployee.value?.id
+        ? employeeContext.crud.update(selectedEmployee.value.id, draft)
+        : employeeContext.crud.insert(draft),
+    onSaved: ({ record }) => {
+      selectedEmployee.value = record;
+      employeeDraft.value = copyEmployee(record);
+      selectedEmployeeKey.value = record.id;
+      employeeDetailMode.value = 'view';
+      employeeDetailOpen.value = true;
+      employeeReloadKey.value += 1;
+    },
+  });
 }
 
 async function toggleEmployeeEnabled() {
-  const employee = selectedEmployee.value;
-  if (!employee?.id || savingEmployee.value) {
-    return;
-  }
-  if (!canToggleEmployee.value) {
-    presentPlatformMessage('当前用户无权变更职员启停状态', { phase: 'authorization' });
-    return;
-  }
-  savingEmployee.value = true;
-  try {
-    const result =
+  await executeStaticRecordAction({
+    loading: savingEmployee,
+    source: 'employee-management',
+    record: () => (selectedEmployee.value && selectedEmployee.value.id ? selectedEmployee.value : undefined),
+    canExecute: () => canToggleEmployee.value,
+    deniedMessage: '当前用户无权变更职员启停状态',
+    execute: (employee) =>
       employee.enabled === false
-        ? await employeeContext.crud.enable(employee.id)
-        : await employeeContext.crud.disable(employee.id);
-    const refreshed = await employeeContext.crud.view(employee.id);
-    selectedEmployee.value = refreshed;
-    employeeDraft.value = copyEmployee(refreshed);
-    employeeReloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', {
-      tone: 'success',
-    });
-  } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
-  } finally {
-    savingEmployee.value = false;
-  }
+        ? employeeContext.crud.enable(employee.id!)
+        : employeeContext.crud.disable(employee.id!),
+    onExecuted: async (_, employee) => {
+      const refreshed = await employeeContext.crud.view(employee.id!);
+      selectedEmployee.value = refreshed;
+      employeeDraft.value = copyEmployee(refreshed);
+      employeeReloadKey.value += 1;
+    },
+  });
 }
 
 async function removeEmployee(record: Partial<Employee> | QueryListRecord | undefined) {
-  const id = String(record?.id ?? '');
-  if (!id || savingEmployee.value) {
-    return;
-  }
-  const confirmed = await confirmAction({
-    title: '删除职员',
-    content: `确认删除职员「${employeeTitle(record)}」？`,
-    okText: '删除',
-    danger: true,
+  await executeStaticRecordAction({
+    loading: savingEmployee,
+    source: 'employee-management',
+    record: () => (record?.id ? record : undefined),
+    canExecute: () => employeeContext.can('delete') === true,
+    deniedMessage: '当前用户无权删除职员',
+    confirm: (target) =>
+      confirmAction({
+        title: '删除职员',
+        content: `确认删除职员「${employeeTitle(target)}」？`,
+        okText: '删除',
+        danger: true,
+      }),
+    execute: (target) => employeeContext.crud.delete(String(target.id)),
+    onExecuted: (_, target) => {
+      const id = String(target.id);
+      if (selectedEmployeeKey.value === id) {
+        selectedEmployeeKey.value = undefined;
+        selectedEmployee.value = undefined;
+        employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+        employeeDetailOpen.value = false;
+        employeeDetailMode.value = 'view';
+      }
+      employeeReloadKey.value += 1;
+    },
   });
-  if (!confirmed) {
-    return;
-  }
-  savingEmployee.value = true;
-  try {
-    const result = await employeeContext.crud.delete(id);
-    if (selectedEmployeeKey.value === id) {
-      selectedEmployeeKey.value = undefined;
-      selectedEmployee.value = undefined;
-      employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
-      employeeDetailOpen.value = false;
-      employeeDetailMode.value = 'view';
-    }
-    employeeReloadKey.value += 1;
-    presentPlatformMessage(result.message ?? '操作成功', { tone: 'success' });
-  } catch (cause) {
-    presentPlatformError(cause, { source: 'employee-management', phase: 'action' });
-  } finally {
-    savingEmployee.value = false;
-  }
 }
 
 function createEmployeeDraft(organizationId: string | undefined): Partial<Employee> {
@@ -371,6 +409,7 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     departmentId: draft.departmentId?.trim(),
     employeeNo: draft.employeeNo?.trim(),
     title: draft.title?.trim(),
+    gender: draft.gender?.trim() || undefined,
     mobile: draft.mobile?.trim() || undefined,
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
@@ -388,6 +427,20 @@ function employeeToggleActionCode(record: Partial<Employee>) {
 function departmentTitle(record: Department) {
   return record.title ?? record.code ?? record.id ?? '未命名部门';
 }
+
+const employeeFormFieldFallback: Record<
+  EmployeeFormFieldName,
+  EmployeeFormFieldUi & RecordFormFieldFallback
+> = {
+  organizationId: { label: '所属机构', required: true, readOnly: true, visible: true },
+  departmentId: { label: '所属部门', required: true, readOnly: false, visible: true },
+  employeeNo: { label: '职员编号', required: true, readOnly: false, visible: true },
+  title: { label: '职员姓名', required: true, readOnly: false, visible: true },
+  gender: { label: '性别', required: false, readOnly: false, visible: true },
+  mobile: { label: '手机号', required: false, readOnly: false, visible: true },
+  email: { label: '邮箱', required: false, readOnly: false, visible: true },
+  enabled: { label: '启用状态', required: false, readOnly: false, visible: true },
+};
 
 function createOrganizationScopedDepartmentContext(
   context: ModuleContext<Department>,
@@ -502,9 +555,9 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
       class="employee-list-panel"
       :context="employeeListContext"
       title="职员列表"
-      :columns="employeeColumns"
-      :actions="employeeListActions"
-      :row-actions-of="employeeRowActionsOf"
+      standard-crud-actions
+      create-title="新建职员"
+      standard-crud-row-actions
       :selected-key="selectedEmployeeKey"
       :reload-key="employeeReloadKey"
       :ready="Boolean(selectedOrganization?.id)"
@@ -526,14 +579,7 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
     >
       <template #status>
         <RecordStatusSwitch
-          v-if="employeeDetailMode !== 'view'"
-          :enabled="employeeDraft.enabled !== false"
-          :disabled="savingEmployee || !canSaveEmployee"
-          :show-label="false"
-          @change="employeeDraft.enabled = $event"
-        />
-        <RecordStatusSwitch
-          v-else-if="selectedEmployee"
+          v-if="employeeDetailMode === 'view' && selectedEmployee"
           :enabled="selectedEmployee.enabled !== false"
           :disabled="savingEmployee || !canToggleEmployee"
           :loading="savingEmployee"
@@ -550,52 +596,23 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
       </template>
 
       <form class="employee-form" @submit.prevent="saveEmployee">
-        <label>
-          <span>所属机构</span>
+        <label v-if="employeeFormVisible('organizationId')">
+          <span class="employee-form-label">
+            {{ employeeFormLabel('organizationId') }}
+            <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
+          </span>
           <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
         </label>
-        <label>
-          <span>所属部门</span>
-          <RecordPicker
-            v-model:value="employeeDraft.departmentId"
-            :context="scopedDepartmentContext"
-            :title-of="departmentTitle"
-            :disabled="employeeFormDisabled"
-            placeholder="请选择部门"
-          />
-        </label>
-        <label>
-          <span>职员编号</span>
-          <UiInput
-            v-model:value="employeeDraft.employeeNo"
-            :disabled="employeeFormDisabled"
-            placeholder="请输入职员编号"
-          />
-        </label>
-        <label>
-          <span>职员姓名</span>
-          <UiInput
-            v-model:value="employeeDraft.title"
-            :disabled="employeeFormDisabled"
-            placeholder="请输入职员姓名"
-          />
-        </label>
-        <label>
-          <span>手机号</span>
-          <UiInput
-            v-model:value="employeeDraft.mobile"
-            :disabled="employeeFormDisabled"
-            placeholder="请输入手机号"
-          />
-        </label>
-        <label>
-          <span>邮箱</span>
-          <UiInput
-            v-model:value="employeeDraft.email"
-            :disabled="employeeFormDisabled"
-            placeholder="请输入邮箱"
-          />
-        </label>
+        <RecordFormFields
+          :record="employeeDraft as RecordFormRecord"
+          :fields="employeeFormFieldDefinitions"
+          :field-names="employeeStandardFormFields"
+          :fallback="employeeFormFieldFallback"
+          :picker-configs="employeeFormPickerConfigs"
+          :disabled="employeeFormDisabled"
+          :placeholder-of="employeeFormPlaceholder"
+          @update:field="updateEmployeeDraftField"
+        />
       </form>
       <RecordMetaSection v-if="employeeDetailMode !== 'create'" :record="employeeDraft" show-sort-order />
     </RecordDetailDrawer>
@@ -624,11 +641,22 @@ async function emptyListResponse<TRecord>(): Promise<WebListResponse<TRecord>> {
   gap: 12px;
 }
 
-.employee-form label {
+.employee-form > label {
   display: grid;
   gap: 6px;
   color: var(--muyun-text-muted);
   font-size: 13px;
+}
+
+.employee-form-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.employee-form-label strong {
+  color: #d92d20;
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {

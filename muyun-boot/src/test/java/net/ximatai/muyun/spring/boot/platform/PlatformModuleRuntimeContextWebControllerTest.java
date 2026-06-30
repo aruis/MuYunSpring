@@ -42,7 +42,10 @@ class PlatformModuleRuntimeContextWebControllerTest {
                 "organization",
                 Set.of(EntityCapability.CRUD, EntityCapability.TREE),
                 Set.of("crud", "tree"),
-                List.of()
+                List.of(),
+                ModuleUiDefinition.builder("iam.organization")
+                        .listView(list -> list.field("title", field -> field.label("组织名称")))
+                        .build()
         ));
         MockMvc mvc = mvc(service);
 
@@ -50,7 +53,16 @@ class PlatformModuleRuntimeContextWebControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.moduleAlias").value("iam.organization"))
                 .andExpect(jsonPath("$.entryRoute").value("/iam/organizations"))
-                .andExpect(jsonPath("$.abilities[?(@ == 'tree')]").exists());
+                .andExpect(jsonPath("$.abilities[?(@ == 'tree')]").exists())
+                .andExpect(jsonPath("$.uiDefinition").doesNotExist())
+                .andExpect(jsonPath("$.uiDescriptor.schemaVersion").value(ResolvedModuleUiDescriptor.SCHEMA_VERSION))
+                .andExpect(jsonPath("$.uiDescriptor.moduleAlias").value("iam.organization"))
+                .andExpect(jsonPath("$.uiDescriptor.views[0].viewCode").value("default_list"))
+                .andExpect(jsonPath("$.uiDescriptor.views[0].fields[0].fieldRef.fieldName").value("title"))
+                .andExpect(jsonPath("$.uiDescriptor.views[0].fields[0].columnName").doesNotExist())
+                .andExpect(jsonPath("$.uiDescriptor.views[0].fields[0].tableName").doesNotExist())
+                .andExpect(jsonPath("$.uiDescriptor.views[0].fields[0].sql").doesNotExist())
+                .andExpect(jsonPath("$.sourceKind").doesNotExist());
     }
 
     @Test

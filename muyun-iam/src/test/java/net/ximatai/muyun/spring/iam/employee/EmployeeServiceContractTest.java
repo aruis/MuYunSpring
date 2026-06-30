@@ -1,8 +1,8 @@
 package net.ximatai.muyun.spring.iam.employee;
 
 import net.ximatai.muyun.spring.ability.PlatformAbilityRuntime;
+import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.common.exception.PlatformException;
-import net.ximatai.muyun.spring.ability.form.FormControlType;
 import net.ximatai.muyun.spring.ability.option.StaticOptionFieldValueValidator;
 import net.ximatai.muyun.spring.common.option.OptionBinding;
 import net.ximatai.muyun.spring.common.tenant.ActiveTenantVerifier;
@@ -143,16 +143,8 @@ class EmployeeServiceContractTest {
     }
 
     @Test
-    void shouldExposeGenderOptionBindingInFormSchema() {
-        EmployeeService service = new EmployeeService(mock(EmployeeDao.class), activeTenantVerifier(),
-                organizationService(), departmentService());
-
-        assertThat(service.formSchema().fields()).anySatisfy(field -> {
-            assertThat(field.name()).isEqualTo("gender");
-            assertThat(field.optionBinding()).isEqualTo(OptionBinding.dictionary("iam", "gender"));
-            assertThat(field.controlType()).isEqualTo(FormControlType.SELECT);
-            assertThat(field.optionTitleField()).isEqualTo("genderTitle");
-        });
+    void shouldNotExposeFormSchemaFromServiceAbility() {
+        assertThat(FormAbility.class.isAssignableFrom(EmployeeService.class)).isFalse();
     }
 
     @Test

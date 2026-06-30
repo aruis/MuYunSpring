@@ -88,6 +88,7 @@ npm run dev:backend
 
 - [开发原则](docs/DEVELOPMENT_PRINCIPLES.md)：项目长期取舍、推进方式和测试策略。
 - [动静一体核心设计](docs/architecture/DYNAMIC_STATIC_UNIFIED_CORE.md)：静态模块与动态模块如何共享平台底座。
+- [UI 声明与读投影设计](docs/architecture/UI_DECLARATION_AND_READ_PROJECTION.md)：静态 UI 声明、resolved descriptor、Web bootstrap 和读投影边界。
 - [平台能力清单](docs/architecture/ABILITY_CATALOG.md)：业务接入时优先复用的能力索引。
 - [命名与边界](docs/architecture/NAMING_AND_BOUNDARIES.md)：Gradle 子项目、Java 包、平台模块别名和动态边界。
 - [平台配置与元数据自举](docs/architecture/PLATFORM_CONFIG_BOOTSTRAP.md)：应用、模块、元数据、字段、菜单和字典的配置闭环。

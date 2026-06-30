@@ -19,15 +19,30 @@ public record StaticModuleDefinition(
         String entryExternalUrl,
         Set<EntityCapability> capabilities,
         List<StaticModuleActionDefinition> actions,
-        List<EntityDefinition> entities
+        List<EntityDefinition> entities,
+        ModuleUiDefinition uiDefinition
 ) {
+    public StaticModuleDefinition(String applicationAlias,
+                                  String moduleAlias,
+                                  String title,
+                                  String parentModuleAlias,
+                                  ModuleEntryType entryType,
+                                  String entryRoute,
+                                  String entryExternalUrl,
+                                  Set<EntityCapability> capabilities,
+                                  List<StaticModuleActionDefinition> actions,
+                                  List<EntityDefinition> entities) {
+        this(applicationAlias, moduleAlias, title, parentModuleAlias, entryType, entryRoute, entryExternalUrl,
+                capabilities, actions, entities, null);
+    }
+
     public StaticModuleDefinition(String applicationAlias,
                                   String moduleAlias,
                                   String title,
                                   String parentModuleAlias,
                                   List<StaticModuleActionDefinition> actions) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
-                Set.of(), actions, List.of());
+                Set.of(), actions, List.of(), null);
     }
 
     public StaticModuleDefinition(String applicationAlias,
@@ -37,7 +52,7 @@ public record StaticModuleDefinition(
                                   Set<EntityCapability> capabilities,
                                   List<StaticModuleActionDefinition> actions) {
         this(applicationAlias, moduleAlias, title, parentModuleAlias, ModuleEntryType.MODULE, null, null,
-                capabilities, actions, List.of());
+                capabilities, actions, List.of(), null);
     }
 
     public StaticModuleDefinition {
@@ -62,6 +77,10 @@ public record StaticModuleDefinition(
         capabilities = normalizeCapabilities(capabilities);
         actions = actions == null ? List.of() : List.copyOf(actions);
         entities = entities == null ? List.of() : List.copyOf(entities);
+        if (uiDefinition != null && !moduleAlias.equals(uiDefinition.moduleAlias())) {
+            throw new IllegalArgumentException("static module UI definition alias must match module alias: "
+                    + moduleAlias + " != " + uiDefinition.moduleAlias());
+        }
     }
 
     public boolean supports(EntityCapability capability) {

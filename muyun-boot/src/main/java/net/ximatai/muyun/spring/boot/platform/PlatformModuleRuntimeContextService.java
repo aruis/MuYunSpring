@@ -103,7 +103,10 @@ public class PlatformModuleRuntimeContextService {
                 mainEntityAlias(staticDefinition, dynamicDescriptor),
                 capabilities,
                 abilityCodes(capabilities),
-                actions
+                actions,
+                staticDefinition
+                        .map(ModuleUiDescriptorCompiler::compile)
+                        .orElse(null)
         );
     }
 

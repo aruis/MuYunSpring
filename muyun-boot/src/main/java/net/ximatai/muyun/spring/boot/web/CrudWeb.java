@@ -11,6 +11,9 @@ import net.ximatai.muyun.spring.ability.form.FormAbility;
 import net.ximatai.muyun.spring.ability.form.FormSchema;
 import net.ximatai.muyun.spring.ability.query.QueryAbility;
 import net.ximatai.muyun.spring.ability.query.QuerySchema;
+import net.ximatai.muyun.spring.boot.platform.ModuleUiFormSchemaAdapter;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
+import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.query.WebQueryRequests;
 import net.ximatai.muyun.spring.common.model.contract.EntityContract;
 import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
@@ -21,6 +24,7 @@ import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.common.security.FieldOutputContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.ResolvableType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +47,10 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
             return result;
         }
         return service().pageQuery(queryCriteria(request), pageRequest, querySorts(request));
+    }
+
+    default StaticRecordReadProjectionService staticRecordReadProjectionService() {
+        return null;
     }
 
     default List<T> queryListRecords(WebQueryRequest request) {
@@ -116,6 +124,13 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
     @ActionEndpoint(PlatformAction.VIEW)
     default FormSchema formSchema(@RequestParam(required = false) String uiConfigId) {
         return webScope(() -> {
+            if (this instanceof StaticModuleUiContributor contributor) {
+                FormSchema schema = ModuleUiFormSchemaAdapter.formSchema(contributor.moduleUiDefinition(),
+                        formSchemaModelClass());
+                if (schema != null) {
+                    return schema;
+                }
+            }
             if (service() instanceof FormAbility<?> formAbility) {
                 return formAbility.formSchema();
             }
@@ -123,16 +138,35 @@ public interface CrudWeb<T extends EntityContract, S extends CrudAbility<T>>
         });
     }
 
+    private Class<?> formSchemaModelClass() {
+        Class<?> modelClass = service().modelClass();
+        if (modelClass != null) {
+            return modelClass;
+        }
+        return ResolvableType.forClass(CrudWeb.class, getClass()).resolveGeneric(0);
+    }
+
     @PostMapping("/query")
     @ActionEndpoint(PlatformAction.QUERY)
     default WebPageResponse<T> query(@RequestBody(required = false) WebQueryRequest request) {
         return webScope(() -> {
+            WebPageResponse<T> response;
             if (request != null && request.unpagedEnabled()) {
                 List<T> records = WebOutputSupport.records(service(), queryListRecords(request), FieldOutputContext.LIST);
-                return WebPageResponse.fromList(records);
+                response = WebPageResponse.fromList(records);
+            } else {
+                response = WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST));
             }
-            return WebPageResponse.from(WebOutputSupport.page(service(), queryRecords(request), FieldOutputContext.LIST));
+            return projectStaticDefaultList(response);
         });
+    }
+
+    private WebPageResponse<T> projectStaticDefaultList(WebPageResponse<T> response) {
+        StaticRecordReadProjectionService projectionService = staticRecordReadProjectionService();
+        if (projectionService == null || !(this instanceof StaticModuleUiContributor contributor)) {
+            return response;
+        }
+        return projectionService.projectDefaultList(contributor.moduleUiDefinition().moduleAlias(), response, service());
     }
 
     @GetMapping("/view/{id}")
