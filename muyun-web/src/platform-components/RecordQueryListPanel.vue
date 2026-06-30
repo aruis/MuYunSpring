@@ -110,6 +110,7 @@ const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(props.pageSize);
 const runtimeViews = ref<ResolvedViewDescriptor[]>([]);
+const descriptorLoadError = ref(false);
 const quickSearchKeyword = ref('');
 const appliedQuickSearch = ref('');
 const conditionsExpanded = ref(false);
@@ -216,6 +217,7 @@ watch(
 async function loadSchemaAndRecords() {
   const requestSeq = ++schemaRequestSeq;
   loading.value = true;
+  descriptorLoadError.value = false;
   try {
     runtimeViews.value = await loadRuntimeViews();
     const nextSchema = await props.context.crud.querySchema();
@@ -255,8 +257,13 @@ async function loadRuntimeViews(): Promise<ResolvedViewDescriptor[]> {
   if (props.columns && props.columns.length > 0) {
     return [];
   }
-  const runtimeContext = await props.context.runtime.ready;
-  return runtimeContext.uiDescriptor?.views ?? [];
+  try {
+    const runtimeContext = await props.context.runtime.ready;
+    return runtimeContext.uiDescriptor?.views ?? [];
+  } catch (cause) {
+    descriptorLoadError.value = true;
+    throw cause;
+  }
 }
 
 async function loadRecords(updateLoading = true) {
@@ -696,6 +703,7 @@ defineExpose({ refresh });
     <section class="record-query-list-body">
       <UiSpin v-if="loading" tip="加载列表" />
       <UiEmpty v-else-if="!queryReady" :description="waitingDescription" />
+      <UiEmpty v-else-if="descriptorLoadError" description="列表声明加载失败，请稍后重试" />
       <UiEmpty v-else-if="records.length === 0" :description="emptyDescription" />
       <div v-else class="record-query-list-table-wrap">
         <table class="record-query-list-table">

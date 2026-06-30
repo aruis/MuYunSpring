@@ -156,7 +156,8 @@ test('three-column management pages use the platform detail panel', () => {
   assert.equal(matchCount(departmentViewSource, /<RecordDetailPanel/g), 1);
   assert.match(positionViewSource, /v-if="positionMode !== 'view'"[\s\S]*:enabled="positionDraft\.enabled"/);
   assert.match(dictionaryViewSource, /v-if="itemMode !== 'view'"[\s\S]*:enabled="itemDraft\.enabled"/);
-  assert.match(departmentViewSource, /v-if="mode !== 'view'"[\s\S]*:enabled="draft\.enabled"/);
+  assert.match(departmentViewSource, /<RecordFormFields[\s\S]*:record="draft as RecordFormRecord"/);
+  assert.doesNotMatch(departmentViewSource, /:enabled="draft\.enabled"/);
   assert.doesNotMatch(positionViewSource, /v-if="positionMode === 'create'"/);
   assert.doesNotMatch(dictionaryViewSource, /v-if="itemMode === 'create'"/);
   assert.doesNotMatch(departmentViewSource, /v-if="mode\.startsWith\('create'\)"/);
@@ -188,12 +189,20 @@ test('department management uses organization as read-only scope and department 
   assert.match(departmentViewSource, /createOrganizationScopedDepartmentContext/);
   assert.match(departmentViewSource, /path: '\/iam\.department\/tree'/);
   assert.match(departmentViewSource, /:actions-of="departmentTreeActionsOf"/);
-  assert.match(departmentViewSource, /<RecordPicker[\s\S]*v-model:value="draft\.parentId"/);
-  assert.match(departmentViewSource, /parentRecordConstraints\(draft\.id\)/);
+  assert.match(departmentViewSource, /onMounted\(loadDepartmentFormDefinition\)/);
+  assert.match(departmentViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(departmentViewSource, /<RecordFormFields/);
+  assert.match(departmentViewSource, /departmentFormPickerConfigs/);
+  assert.match(departmentViewSource, /constraints: parentRecordConstraints\(draft\.value\.id\)/);
+  assert.match(departmentViewSource, /:picker-configs="departmentFormPickerConfigs"/);
+  assert.match(departmentViewSource, /@update:field="updateDepartmentDraftField"/);
+  assert.doesNotMatch(departmentViewSource, /<RecordPicker\s[\s\S]*v-model:value="draft\.parentId"/);
   assert.doesNotMatch(departmentViewSource, /OrganizationManagementView/);
   assert.doesNotMatch(departmentViewSource, /EnabledSelect/);
-  assert.doesNotMatch(departmentViewSource, /启用状态/);
+  assert.doesNotMatch(departmentViewSource, /<RecordStatusSwitch\s[\s\S]{0,240}:enabled="draft\.enabled"/);
   assert.match(departmentStateSource, /resetDepartmentsForOrganization/);
+  assert.match(departmentStateSource, /executeStaticFormSave<Department>/);
+  assert.match(departmentStateSource, /executeStaticRecordAction/);
   assert.doesNotMatch(departmentStateSource, /已启用|已停用/);
 });
 
@@ -255,6 +264,9 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(panelSource, /runtimeViews\.value = await loadRuntimeViews\(\)/);
   assert.match(panelSource, /async function loadRuntimeViews/);
   assert.match(panelSource, /if \(props\.columns && props\.columns\.length > 0\)/);
+  assert.match(panelSource, /descriptorLoadError = ref\(false\)/);
+  assert.match(panelSource, /descriptorLoadError\.value = true/);
+  assert.match(panelSource, /列表声明加载失败，请稍后重试/);
   assert.doesNotMatch(panelSource, /catch \{\s*return \[\];\s*\}/);
   assert.match(
     panelSource,
@@ -410,7 +422,6 @@ test('platform error feedback respects global error presentation slots', () => {
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.success[\s\S]*right: 20px/);
   assert.match(uiFeedbackSource, /\.muyun-global-feedback\.error[\s\S]*left: 50%/);
   assert.match(staticCrudStateSource, /tone: 'success'/);
-  assert.match(departmentStateSource, /tone: 'success'/);
   assert.match(organizationStateSource, /tone: 'success'/);
   assert.match(positionStateSource, /tone: 'success'/);
   assert.match(dictionaryStateSource, /tone: 'success'/);
