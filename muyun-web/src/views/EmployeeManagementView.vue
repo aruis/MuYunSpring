@@ -388,7 +388,7 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
     employeeDetailLoadFailed.value = false;
-    await loadEmployeeDetailDepartment(fullRecord.departmentId, requestSeq);
+    await loadEmployeeDetailDepartment(fullRecord, requestSeq);
   } catch (cause) {
     if (canCommitRequest()) {
       employeeDetailLoadFailed.value = true;
@@ -454,14 +454,9 @@ async function saveEmployee() {
         ? employeeContext.crud.update(selectedEmployee.value.id, draft)
         : employeeContext.crud.insert(draft),
     onSaved: ({ record }) => {
-      selectedEmployee.value = record;
-      employeeDraft.value = copyEmployee(record);
-      selectedEmployeeKey.value = record.id;
-      employeeDetailMode.value = 'view';
-      employeeDetailOpen.value = true;
-      employeeDetailLoadFailed.value = false;
+      const requestSeq = commitEmployeeDetailRecord(record);
       employeeReloadKey.value += 1;
-      void loadEmployeeDetailDepartment(record.departmentId);
+      void loadEmployeeDetailDepartment(record, requestSeq);
     },
   });
 }
@@ -479,9 +474,8 @@ async function toggleEmployeeEnabled() {
         : employeeContext.crud.disable(employee.id!),
     onExecuted: async (_, employee) => {
       const refreshed = await employeeContext.crud.view(employee.id!);
-      selectedEmployee.value = refreshed;
-      employeeDraft.value = copyEmployee(refreshed);
-      await loadEmployeeDetailDepartment(refreshed.departmentId);
+      const requestSeq = commitEmployeeDetailRecord(refreshed);
+      await loadEmployeeDetailDepartment(refreshed, requestSeq);
       employeeReloadKey.value += 1;
     },
   });
@@ -546,21 +540,48 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
   } as Employee;
 }
 
+function commitEmployeeDetailRecord(record: Employee) {
+  selectedEmployee.value = record;
+  employeeDraft.value = copyEmployee(record);
+  selectedEmployeeKey.value = record.id;
+  employeeDetailMode.value = 'view';
+  employeeDetailOpen.value = true;
+  loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
+  const requestSeq = employeeDetailRequestSeq.value + 1;
+  employeeDetailRequestSeq.value = requestSeq;
+  return requestSeq;
+}
+
+function canCommitEmployeeDetailSideEffect(recordId: string | undefined, requestSeq: number) {
+  return (
+    Boolean(recordId) &&
+    shouldCommitEmployeeDetailRequest({
+      activeRequestSeq: employeeDetailRequestSeq.value,
+      requestSeq,
+      selectedEmployeeKey: selectedEmployeeKey.value,
+      recordId: recordId ?? '',
+    })
+  );
+}
+
 async function loadEmployeeDetailDepartment(
-  departmentId: string | undefined,
+  record: Partial<Employee>,
   requestSeq = employeeDetailRequestSeq.value,
 ) {
   employeeDetailDepartment.value = undefined;
+  const employeeId = record.id;
+  const departmentId = record.departmentId;
   if (!departmentId) {
     return;
   }
   try {
     const department = await departmentContext.crud.view(departmentId);
-    if (employeeDetailRequestSeq.value === requestSeq) {
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
       employeeDetailDepartment.value = department;
     }
   } catch (cause) {
-    if (employeeDetailRequestSeq.value === requestSeq) {
+    if (canCommitEmployeeDetailSideEffect(employeeId, requestSeq)) {
       presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
     }
   }

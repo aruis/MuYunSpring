@@ -460,7 +460,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /if \(canCommitRequest\(\)\) \{\s*employeeDetailLoadFailed\.value = true/);
   assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
   assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
-  assert.match(employeeViewSource, /employeeDetailRequestSeq\.value === requestSeq/);
+  assert.match(employeeViewSource, /function canCommitEmployeeDetailSideEffect/);
+  assert.match(employeeViewSource, /activeRequestSeq: employeeDetailRequestSeq\.value/);
+  assert.match(employeeViewSource, /selectedEmployeeKey: selectedEmployeeKey\.value/);
+  assert.match(employeeViewSource, /if \(canCommitEmployeeDetailSideEffect\(employeeId, requestSeq\)\)/);
   assert.match(employeeViewSource, /function cancelEmployeeDetail\(\)/);
   assert.match(
     employeeViewSource,
@@ -494,10 +497,18 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /canSave: \(\) => canSaveEmployee\.value/);
   assert.match(employeeViewSource, /validateRecord: \(draft\) =>/);
   assert.match(employeeViewSource, /当前用户无权保存职员/);
+  assert.match(
+    employeeViewSource,
+    /onSaved: \(\{ record \}\) => \{\s*const requestSeq = commitEmployeeDetailRecord\(record\)[\s\S]*void loadEmployeeDetailDepartment\(record, requestSeq\)/,
+  );
   assert.match(employeeViewSource, /当前用户无权变更职员启停状态/);
   assert.match(employeeViewSource, /canExecute: \(\) => canToggleEmployee\.value/);
   assert.match(employeeViewSource, /employeeContext\.crud\.enable\(employee\.id!\)/);
   assert.match(employeeViewSource, /employeeContext\.crud\.disable\(employee\.id!\)/);
+  assert.match(
+    employeeViewSource,
+    /const refreshed = await employeeContext\.crud\.view\(employee\.id!\);\s*const requestSeq = commitEmployeeDetailRecord\(refreshed\);\s*await loadEmployeeDetailDepartment\(refreshed, requestSeq\)/,
+  );
   assert.match(employeeViewSource, /confirm: \(target\) =>[\s\S]*title: '删除职员'/);
   assert.match(employeeViewSource, /content: `确认删除职员/);
   assert.match(employeeViewSource, /employeeContext\.crud\.delete\(String\(target\.id\)\)/);
