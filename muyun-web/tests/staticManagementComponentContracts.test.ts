@@ -135,9 +135,13 @@ test('dictionary management uses record form fields for category and item forms'
   const dictionaryViewSource = readSource('src/views/DictionaryManagementView.vue');
 
   assert.equal(matchCount(dictionaryViewSource, /<RecordFormFields/g), 2);
-  assert.match(dictionaryViewSource, /onMounted\(loadCategoryFormDefinition\)/);
+  assert.match(dictionaryViewSource, /onMounted\(loadDictionaryFormDefinitions\)/);
   assert.match(dictionaryViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'default_form'/);
+  assert.match(dictionaryViewSource, /view\.viewKind === 'FORM' && view\.viewCode === 'item_default_form'/);
   assert.match(dictionaryViewSource, /categoryFormFieldDefinitions/);
+  assert.match(dictionaryViewSource, /itemFormFieldDefinitions/);
+  assert.match(dictionaryViewSource, /:field-names="itemFormFieldNames"/);
+  assert.match(dictionaryViewSource, /:fields="itemFormFieldDefinitions"/);
   assert.match(dictionaryViewSource, /categoryKind: \{[\s\S]*controlType: 'select'/);
   assert.match(dictionaryViewSource, /enabled: \{[\s\S]*controlType: 'enabledStatus'/);
   assert.match(dictionaryViewSource, /itemFormFieldFallback/);

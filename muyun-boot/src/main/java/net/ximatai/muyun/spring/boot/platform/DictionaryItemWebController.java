@@ -34,7 +34,23 @@ import java.util.Objects;
         "/platform.application/{applicationAlias}/dictionary-categories/{categoryAlias}/items"
 })
 public class DictionaryItemWebController
-        extends NestedEnabledTreeCrudWebSupport<DictionaryItem, DictionaryItemService> {
+        extends NestedEnabledTreeCrudWebSupport<DictionaryItem, DictionaryItemService>
+        implements StaticModuleUiContributor {
+
+    private static final String RESOURCE = "item";
+
+    @Override
+    public ModuleUiDefinition moduleUiDefinition() {
+        return ModuleUiDefinition.builder(DictionaryCategoryService.MODULE_ALIAS)
+                .formView("item_default_form", form -> form
+                        .title("字典项")
+                        .field(RESOURCE, "categoryId", field -> field.label("所属类目").readOnly())
+                        .field(RESOURCE, "code", field -> field.label("字典项编码").required())
+                        .field(RESOURCE, "title", field -> field.label("字典项名称").required())
+                        .field(RESOURCE, "parentId", field -> field.label("上级字典项").uiType("recordPicker"))
+                        .field(RESOURCE, "enabled", field -> field.label("启用状态").uiType("enabledStatus")))
+                .build();
+    }
 
     @Override
     protected Criteria treeScopeCriteria(HttpServletRequest request) {

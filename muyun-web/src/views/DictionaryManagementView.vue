@@ -57,6 +57,9 @@ const selectedApplicationAlias = ref<string>();
 const categoryFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
   new Map(),
 );
+const itemFormFieldDefinitions = ref<Map<string, ViewFieldDefinition | ResolvedViewFieldDescriptor>>(
+  new Map(),
+);
 
 const itemClients = new Map<string, StaticModuleTreeClient<DictionaryItem>>();
 const categoryClients = new Map<string, StaticModuleTreeClient<DictionaryCategory>>();
@@ -151,6 +154,7 @@ const categoryKindOptions = [
   { label: '字典', value: 'DICTIONARY' },
   { label: '目录', value: 'FOLDER' },
 ];
+const itemFormFieldNames: DictionaryItemFormFieldName[] = ['categoryTitle', 'code', 'title', 'parentId'];
 const categoryActions = computed<RecordActionItem[]>(() => {
   if (categoryMode.value !== 'view') {
     return [
@@ -211,16 +215,22 @@ watch(selectedApplicationAlias, () => {
 });
 
 onMounted(loadApplications);
-onMounted(loadCategoryFormDefinition);
+onMounted(loadDictionaryFormDefinitions);
 
-async function loadCategoryFormDefinition() {
+async function loadDictionaryFormDefinitions() {
   try {
     const runtimeContext = await categoryContext.runtime.ready;
-    const formView = runtimeContext.uiDescriptor?.views?.find(
+    const categoryFormView = runtimeContext.uiDescriptor?.views?.find(
       (view) => view.viewKind === 'FORM' && view.viewCode === 'default_form',
     );
+    const itemFormView = runtimeContext.uiDescriptor?.views?.find(
+      (view) => view.viewKind === 'FORM' && view.viewCode === 'item_default_form',
+    );
     categoryFormFieldDefinitions.value = new Map(
-      formView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+      categoryFormView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
+    );
+    itemFormFieldDefinitions.value = new Map(
+      itemFormView?.fields.map((field) => [field.fieldRef.fieldName, field]) ?? [],
     );
   } catch (cause) {
     presentPlatformError(cause, { source: 'dictionary-management', phase: 'load' });
@@ -607,6 +617,8 @@ const itemFormFieldFallback: Record<DictionaryItemFormFieldName, RecordFormField
       <form v-else class="item-form" @submit.prevent="saveItem">
         <RecordFormFields
           :record="itemFormRecord"
+          :field-names="itemFormFieldNames"
+          :fields="itemFormFieldDefinitions"
           :fallback="itemFormFieldFallback"
           :picker-configs="itemFormPickerConfigs"
           :disabled="itemReadonly"

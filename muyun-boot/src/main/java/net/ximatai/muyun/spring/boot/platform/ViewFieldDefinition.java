@@ -26,6 +26,10 @@ public record ViewFieldDefinition(ViewFieldRef fieldRef,
         return new Builder(ViewFieldRef.main(fieldName));
     }
 
+    public static Builder field(String relationCode, String fieldName) {
+        return new Builder(ViewFieldRef.relation(relationCode, fieldName));
+    }
+
     public static final class Builder {
         private final ViewFieldRef fieldRef;
         private String label;
