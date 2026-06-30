@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { UiInput } from '@muyun/vue-ui-antdv';
+import { UiInput, UiSelect } from '@muyun/vue-ui-antdv';
 import RecordStatusSwitch from './RecordStatusSwitch.vue';
 import RecordPicker from './RecordPicker.vue';
 import {
@@ -24,6 +24,7 @@ const props = withDefaults(
     fallback?: Record<string, RecordFormFieldFallback>;
     pickerConfigs?: Record<string, RecordFormFieldPickerConfig>;
     disabled?: boolean;
+    disabledOf?: (fieldName: string, field: RecordFormFieldState) => boolean;
     placeholderOf?: (fieldName: string, field: RecordFormFieldState) => string | undefined;
   }>(),
   {
@@ -33,12 +34,13 @@ const props = withDefaults(
     fallback: () => ({}),
     pickerConfigs: () => ({}),
     disabled: false,
+    disabledOf: undefined,
     placeholderOf: undefined,
   },
 );
 
 const emit = defineEmits<{
-  'update:field': [fieldName: string, value: string | boolean | undefined];
+  'update:field': [fieldName: string, value: string | number | boolean | undefined];
 }>();
 
 const resolvedFieldNames = computed(
@@ -69,7 +71,11 @@ function booleanFieldValue(fieldName: string) {
   return props.record[fieldName] !== false;
 }
 
-function updateField(fieldName: string, value: string | boolean | undefined) {
+function fieldDisabled(field: RecordFormFieldState) {
+  return props.disabled || field.readOnly || props.disabledOf?.(field.fieldName, field) === true;
+}
+
+function updateField(fieldName: string, value: string | number | boolean | undefined) {
   emit('update:field', fieldName, value);
 }
 </script>
@@ -83,7 +89,7 @@ function updateField(fieldName: string, value: string | boolean | undefined) {
     <RecordStatusSwitch
       v-if="field.controlType === 'enabledStatus'"
       :enabled="booleanFieldValue(field.fieldName)"
-      :disabled="disabled || field.readOnly"
+      :disabled="fieldDisabled(field)"
       :show-label="false"
       @change="updateField(field.fieldName, $event)"
     />
@@ -94,7 +100,7 @@ function updateField(fieldName: string, value: string | boolean | undefined) {
       :reload-key="field.pickerConfig.reloadKey"
       :mode="field.pickerConfig.mode"
       :placeholder="field.placeholder"
-      :disabled="disabled || field.readOnly"
+      :disabled="fieldDisabled(field)"
       :allow-clear="field.pickerConfig.allowClear"
       :constraints="field.pickerConfig.constraints"
       :title-of="field.pickerConfig.titleOf"
@@ -102,10 +108,19 @@ function updateField(fieldName: string, value: string | boolean | undefined) {
       :filter-option="field.pickerConfig.filterOption"
       @update:value="updateField(field.fieldName, $event)"
     />
+    <UiSelect
+      v-else-if="field.controlType === 'select' && field.options"
+      :value="fieldValue(field.fieldName)"
+      :options="field.options"
+      :placeholder="field.placeholder"
+      :disabled="fieldDisabled(field)"
+      :allow-clear="!field.required"
+      @update:value="updateField(field.fieldName, $event ?? undefined)"
+    />
     <UiInput
       v-else
       :value="fieldValue(field.fieldName)"
-      :disabled="disabled || field.readOnly"
+      :disabled="fieldDisabled(field)"
       :placeholder="field.placeholder"
       @update:value="updateField(field.fieldName, $event)"
     />

@@ -23,7 +23,7 @@
 4. `executeStaticRecordAction` 已承接启停和删除动作的重复提交保护、权限提示、确认后的 loading、成功反馈和异常反馈。
 5. `EmployeeManagementView` 不再硬编码职员列表列；普通表单字段顺序来自 resolved form view，页面仅保留机构 scope 展示、部门选择器上下文、保存载荷归一和启停/删除业务分支。
 6. `DepartmentManagementView` 已复用 resolved form view、`RecordFormFields`、统一保存动作、记录动作执行器和 scope/tree 组合门面；页面仍保留机构树 scope、父部门 picker 约束和树形操作编排。
-7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树；页面仍保留应用选择、类目/条目状态编排和业务表单。
+7. `DictionaryManagementView` 已复用静态树资源上下文门面承接应用 scope 下的字典类目树和类目 scope 下的字典项树，并复用 `RecordFormFields` 承接类目和条目表单；页面仍保留应用选择、类目/条目状态编排和保存 payload 归一。
 8. `RecordQueryListPanel` 在 descriptor 加载失败时进入明确失败态，不把声明加载失败伪装成空列表。
 
 ## 仍属业务编排
@@ -43,8 +43,7 @@
 1. 字段级授权配置和角色授权存储模型。
 2. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
 3. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路。
-4. `platform.dictionary` 后续继续验证分类和条目表单能否接入 resolved form view 与 `RecordFormFields`。
-5. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
+4. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
 
 ## 验收证据
 

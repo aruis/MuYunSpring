@@ -288,6 +288,18 @@ class StaticModuleDefinitionScannerTest {
                         assertThat(action.permissionActionCode()).isEqualTo("item_view");
                         assertThat(action.title()).isEqualTo("查询字典项");
                     });
+            assertThat(byAlias.get("platform.dictionary_category").uiDefinition()).isNotNull();
+            assertThat(byAlias.get("platform.dictionary_category").uiDefinition().views())
+                    .filteredOn(view -> view.viewCode().equals("default_form"))
+                    .singleElement()
+                    .satisfies(view -> {
+                        assertThat(view.viewKind()).isEqualTo(ModuleViewKind.FORM);
+                        assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                                .containsExactly("applicationAlias", "alias", "categoryKind", "title", "enabled");
+                        assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("categoryKind"))
+                                .singleElement()
+                                .satisfies(field -> assertThat(field.uiType()).isEqualTo("select"));
+                    });
         }
     }
 

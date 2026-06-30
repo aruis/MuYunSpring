@@ -1,10 +1,10 @@
-import type { ResolvedViewFieldDescriptor, ViewFieldDefinition } from '@muyun/web-contracts';
+import type { Option, ResolvedViewFieldDescriptor, ViewFieldDefinition } from '@muyun/web-contracts';
 import type { ModuleContext } from '@muyun/web-core';
 import type { PickerConstraint, RecordPickerRecord } from './recordPickerConstraints';
 
 export type RecordFormFieldDescriptor = ViewFieldDefinition | ResolvedViewFieldDescriptor;
 export type RecordFormRecord = Record<string, unknown>;
-export type RecordFormFieldControlType = 'input' | 'enabledStatus' | 'recordPicker';
+export type RecordFormFieldControlType = 'input' | 'select' | 'enabledStatus' | 'recordPicker';
 
 export interface RecordFormFieldFallback {
   label: string;
@@ -13,6 +13,7 @@ export interface RecordFormFieldFallback {
   visible?: boolean;
   controlType?: RecordFormFieldControlType;
   placeholder?: string;
+  options?: Option[];
 }
 
 export interface RecordFormFieldPickerConfig {
@@ -36,6 +37,7 @@ export interface RecordFormFieldState {
   controlType: RecordFormFieldControlType;
   pickerConfig?: RecordFormFieldPickerConfig;
   placeholder?: string;
+  options?: Option[];
 }
 
 export interface ResolveRecordFormFieldNamesOptions {
@@ -93,6 +95,7 @@ export function resolveRecordFormFieldState(
   };
   return {
     ...baseState,
+    ...(fallback?.options ? { options: fallback.options } : {}),
     placeholder:
       options.placeholderOf?.(fieldName, baseState) ?? fallback?.placeholder ?? pickerConfig?.placeholder,
   };
@@ -107,6 +110,9 @@ function controlTypeOf(
   }
   if (field?.uiType === 'recordPicker') {
     return 'recordPicker';
+  }
+  if (field?.uiType === 'select') {
+    return 'select';
   }
   return fallback?.controlType ?? 'input';
 }
