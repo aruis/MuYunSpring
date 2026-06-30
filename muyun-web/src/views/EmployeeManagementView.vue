@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import {
   RecordActionBar,
   RecordDetailDrawer,
+  RecordDetailFields,
   RecordExplorerPanel,
   RecordFormFields,
   RecordMetaSection,
@@ -56,6 +57,7 @@ const employeeDetailOpen = ref(false);
 const employeeDetailMode = ref<EmployeeDetailMode>('view');
 const savingEmployee = ref(false);
 const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
+const employeeDetailDepartment = ref<Department>();
 
 const employeeListContext = computed(() => employeeContext as unknown as ModuleContext<QueryListRecord>);
 const selectedOrganizationId = computed(() => selectedOrganization.value?.id);
@@ -170,6 +172,23 @@ function updateEmployeeDraftField(fieldName: string, value: string | number | bo
   };
 }
 
+function employeeDetailDisplayValue(
+  fieldName: string,
+  value: unknown,
+): string | number | boolean | undefined | null {
+  if (fieldName === 'organizationId') {
+    return selectedOrganization.value?.title ?? selectedOrganization.value?.id ?? String(value ?? '');
+  }
+  if (fieldName === 'departmentId') {
+    const department = employeeDetailDepartment.value;
+    if (department && department.id === value) {
+      return departmentTitle(department);
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
 function handleOrganizationsLoaded(records: Organization[]) {
   if (!selectedOrganization.value && records.length > 0) {
     selectedOrganization.value = records[0];
@@ -180,6 +199,7 @@ function selectOrganization(record: Organization) {
   selectedOrganization.value = record;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
+  employeeDetailDepartment.value = undefined;
   closeEmployeeDetail();
 }
 
@@ -224,6 +244,7 @@ function startCreateEmployee() {
   selectedEmployee.value = undefined;
   selectedEmployeeKey.value = undefined;
   employeeDetailMode.value = 'create';
+  employeeDetailDepartment.value = undefined;
   employeeDetailOpen.value = true;
 }
 
@@ -233,6 +254,7 @@ function closeEmployeeDetail() {
   }
   employeeDetailOpen.value = false;
   employeeDetailMode.value = 'view';
+  employeeDetailDepartment.value = undefined;
   employeeDraft.value = selectedEmployee.value
     ? copyEmployee(selectedEmployee.value)
     : createEmployeeDraft(selectedOrganizationId.value);
@@ -252,6 +274,7 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
     const fullRecord = await employeeContext.crud.view(id);
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
+    await loadEmployeeDetailDepartment(fullRecord.departmentId);
   } catch (cause) {
     presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
   }
@@ -300,6 +323,7 @@ async function saveEmployee() {
       employeeDetailMode.value = 'view';
       employeeDetailOpen.value = true;
       employeeReloadKey.value += 1;
+      void loadEmployeeDetailDepartment(record.departmentId);
     },
   });
 }
@@ -319,6 +343,7 @@ async function toggleEmployeeEnabled() {
       const refreshed = await employeeContext.crud.view(employee.id!);
       selectedEmployee.value = refreshed;
       employeeDraft.value = copyEmployee(refreshed);
+      await loadEmployeeDetailDepartment(refreshed.departmentId);
       employeeReloadKey.value += 1;
     },
   });
@@ -345,6 +370,7 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         selectedEmployeeKey.value = undefined;
         selectedEmployee.value = undefined;
         employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+        employeeDetailDepartment.value = undefined;
         employeeDetailOpen.value = false;
         employeeDetailMode.value = 'view';
       }
@@ -377,6 +403,18 @@ function normalizedEmployeeDraft(draft: Partial<Employee>, organizationId: strin
     email: draft.email?.trim() || undefined,
     enabled: draft.enabled !== false,
   } as Employee;
+}
+
+async function loadEmployeeDetailDepartment(departmentId: string | undefined) {
+  employeeDetailDepartment.value = undefined;
+  if (!departmentId) {
+    return;
+  }
+  try {
+    employeeDetailDepartment.value = await departmentContext.crud.view(departmentId);
+  } catch (cause) {
+    presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
+  }
 }
 
 function employeeTitle(record: Partial<Employee> | QueryListRecord | undefined) {
@@ -503,7 +541,16 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
         />
       </template>
 
-      <form class="employee-form" @submit.prevent="saveEmployee">
+      <RecordDetailFields
+        v-if="employeeDetailMode === 'view'"
+        :record="employeeDraft as RecordFormRecord"
+        :fields="employeeFormFieldDefinitions"
+        :fallback="employeeFormFieldFallback"
+        :picker-configs="employeeFormPickerConfigs"
+        :display-of="employeeDetailDisplayValue"
+      />
+
+      <form v-else class="employee-form" @submit.prevent="saveEmployee">
         <label v-if="employeeFormVisible('organizationId')">
           <span class="employee-form-label">
             {{ employeeFormLabel('organizationId') }}

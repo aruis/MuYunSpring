@@ -373,6 +373,7 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /create-title="新建职员"/);
   assert.match(employeeViewSource, /@action="handleEmployeeListAction"/);
   assert.match(indexSource, /RecordDetailDrawer/);
+  assert.match(indexSource, /RecordDetailFields/);
   assert.match(drawerSource, /closeOnOutside\?: boolean/);
   assert.match(drawerSource, /handleDocumentPointerDown/);
   assert.match(employeeViewSource, /<RecordDetailDrawer/);
@@ -391,6 +392,11 @@ test('employee management uses organization scope and platform query list panel'
     /employeeFormFieldDefinitions = ref\(resolveRecordFormFields\(undefined\)\)/,
   );
   assert.match(employeeViewSource, /<RecordFormFields/);
+  assert.match(employeeViewSource, /<RecordDetailFields/);
+  assert.match(employeeViewSource, /v-if="employeeDetailMode === 'view'"/);
+  assert.match(employeeViewSource, /<form v-else class="employee-form"/);
+  assert.match(employeeViewSource, /:display-of="employeeDetailDisplayValue"/);
+  assert.match(employeeViewSource, /function employeeDetailDisplayValue/);
   assert.match(employeeViewSource, /resolveRecordFormFieldState/);
   assert.match(employeeViewSource, /:exclude-field-names="\['organizationId'\]"/);
   assert.doesNotMatch(employeeViewSource, /const employeeStandardFormFields = computed/);

@@ -1,0 +1,59 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { resolveRecordDetailDisplayValue } from '../src/platform-components/recordDetailFieldModel.ts';
+import type { RecordFormFieldState } from '../src/platform-components/recordFormFieldModel.ts';
+
+test('record detail display resolves select label and empty text through default rules', () => {
+  const field = formField('gender', {
+    controlType: 'select',
+    options: [
+      { label: '男', value: 'MALE' },
+      { label: '女', value: 'FEMALE' },
+    ],
+  });
+
+  assert.equal(resolveRecordDetailDisplayValue(field, { gender: 'MALE' }), '男');
+  assert.equal(resolveRecordDetailDisplayValue(field, { gender: '' }), '-');
+  assert.equal(resolveRecordDetailDisplayValue(field, { gender: '' }, { emptyText: '未填写' }), '未填写');
+});
+
+test('record detail display keeps default rules when custom resolver does not handle a field', () => {
+  const field = formField('gender', {
+    controlType: 'select',
+    options: [{ label: '女', value: 'FEMALE' }],
+  });
+
+  assert.equal(
+    resolveRecordDetailDisplayValue(field, { gender: 'FEMALE' }, { displayOf: () => undefined }),
+    '女',
+  );
+});
+
+test('record detail display resolves record picker object with configured title', () => {
+  const field = formField('department', {
+    controlType: 'recordPicker',
+    pickerConfig: {
+      context: {} as never,
+      titleOf: (record) => `${record.code} ${record.title}`,
+    },
+  });
+
+  assert.equal(
+    resolveRecordDetailDisplayValue(field, {
+      department: { id: 'dept-1', code: 'D01', title: '研发部' },
+    }),
+    'D01 研发部',
+  );
+});
+
+function formField(fieldName: string, options: Partial<RecordFormFieldState> = {}): RecordFormFieldState {
+  return {
+    fieldName,
+    label: fieldName,
+    required: false,
+    readOnly: false,
+    visible: true,
+    controlType: 'input',
+    ...options,
+  };
+}
