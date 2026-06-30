@@ -50,7 +50,7 @@ class DynamicModuleUiDefinitionAdapterTest {
 
         assertThat(definition.moduleAlias()).isEqualTo("crm.customer");
         assertThat(definition.views()).extracting(ViewDefinition::viewCode)
-                .containsExactly("ui-list-web", "ui-form-web");
+                .containsExactly("customer_list", "customer_form");
         ViewDefinition listView = definition.views().get(0);
         assertThat(listView.viewKind()).isEqualTo(ModuleViewKind.LIST);
         assertThat(listView.title()).isEqualTo("客户列表");
