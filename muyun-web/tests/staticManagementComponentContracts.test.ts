@@ -424,9 +424,17 @@ test('employee management uses organization scope and platform query list panel'
   assert.doesNotMatch(employeeViewSource, /<span>职员编号<\/span>/);
   assert.match(employeeViewSource, /const employeeFormDisabled = computed/);
   assert.match(employeeViewSource, /const loadingEmployeeDetail = ref\(false\)/);
+  assert.match(employeeViewSource, /const employeeDetailLoadFailed = ref\(false\)/);
   assert.match(employeeViewSource, /const employeeDetailRequestSeq = ref\(0\)/);
   assert.match(employeeViewSource, /isEmployeeFormDisabled/);
+  assert.match(employeeViewSource, /shouldShowEmployeeDetailContent/);
   assert.match(employeeViewSource, /selectedEmployeeId: selectedEmployee\.value\?\.id/);
+  assert.match(
+    employeeViewSource,
+    /const currentDetailId = String\(selectedEmployee\.value\?\.id \?\? employeeDraft\.value\.id \?\? ''\)/,
+  );
+  assert.match(employeeViewSource, /employeeDetailOpen\.value && currentDetailId !== nextKey/);
+  assert.match(employeeViewSource, /employeeDetailOpen\.value = false/);
   assert.match(employeeViewSource, /const canSaveEmployee = computed/);
   assert.match(employeeViewSource, /if \(loadingEmployeeDetail\.value\) \{\s*return false;\s*\}/);
   assert.match(employeeViewSource, /const canToggleEmployee = computed/);
@@ -440,10 +448,19 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /const requestSeq = employeeDetailRequestSeq\.value \+ 1/);
   assert.match(employeeViewSource, /employeeDetailRequestSeq\.value = requestSeq/);
   assert.match(employeeViewSource, /shouldCommitEmployeeDetailRequest/);
+  assert.match(employeeViewSource, /const canCommitRequest = \(\) =>/);
+  assert.match(employeeViewSource, /if \(!canCommitRequest\(\)\)/);
+  assert.match(employeeViewSource, /if \(canCommitRequest\(\)\) \{\s*employeeDetailLoadFailed\.value = true/);
   assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
   assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
   assert.match(employeeViewSource, /employeeDetailRequestSeq\.value === requestSeq/);
   assert.match(employeeViewSource, /if \(!selectedEmployee\.value \|\| loadingEmployeeDetail\.value\)/);
+  assert.match(employeeViewSource, /function retryEmployeeDetail/);
+  assert.match(employeeViewSource, /<UiSpin v-if="loadingEmployeeDetail"/);
+  assert.match(employeeViewSource, /v-else-if="employeeDetailLoadFailed"/);
+  assert.match(employeeViewSource, /<UiError title="详情加载失败"/);
+  assert.match(employeeViewSource, /@click="retryEmployeeDetail"/);
+  assert.match(employeeViewSource, /v-else-if="showEmployeeDetailContent"/);
   assert.match(employeeViewSource, /executeStaticFormSave<Employee>/);
   assert.match(employeeViewSource, /executeStaticRecordAction/);
   assert.match(

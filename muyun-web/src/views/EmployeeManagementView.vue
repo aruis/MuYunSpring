@@ -25,12 +25,13 @@ import {
   resolveRecordFormFields,
   resolveRecordFormFieldState,
 } from '@muyun/platform-components';
-import { UiInput, confirmAction } from '@muyun/vue-ui-antdv';
+import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui-antdv';
 import type { Department, Employee, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import {
   isEmployeeFormDisabled,
   shouldCommitEmployeeDetailRequest,
+  shouldShowEmployeeDetailContent,
   type EmployeeDetailMode,
 } from './employeeDetailStateModel';
 
@@ -60,6 +61,7 @@ const selectedEmployee = ref<Employee>();
 const employeeDetailOpen = ref(false);
 const employeeDetailMode = ref<EmployeeDetailMode>('view');
 const loadingEmployeeDetail = ref(false);
+const employeeDetailLoadFailed = ref(false);
 const savingEmployee = ref(false);
 const employeeDetailRequestSeq = ref(0);
 const employeeDraft = ref<Partial<Employee>>(createEmployeeDraft(undefined));
@@ -108,6 +110,14 @@ const employeeFormDisabled = computed(() =>
     mode: employeeDetailMode.value,
     loadingDetail: loadingEmployeeDetail.value,
     saving: savingEmployee.value,
+    selectedEmployeeId: selectedEmployee.value?.id,
+  }),
+);
+const showEmployeeDetailContent = computed(() =>
+  shouldShowEmployeeDetailContent({
+    mode: employeeDetailMode.value,
+    loadingDetail: loadingEmployeeDetail.value,
+    loadFailed: employeeDetailLoadFailed.value,
     selectedEmployeeId: selectedEmployee.value?.id,
   }),
 );
@@ -215,6 +225,7 @@ function selectOrganization(record: Organization) {
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
   loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
   employeeDetailDepartment.value = undefined;
   closeEmployeeDetail();
 }
@@ -224,7 +235,19 @@ function refreshOrganizations() {
 }
 
 function selectEmployee(record: QueryListRecord) {
-  selectedEmployeeKey.value = String(record.id ?? '');
+  const nextKey = String(record.id ?? '');
+  const currentDetailId = String(selectedEmployee.value?.id ?? employeeDraft.value.id ?? '');
+  selectedEmployeeKey.value = nextKey;
+  if (employeeDetailOpen.value && currentDetailId !== nextKey) {
+    employeeDetailRequestSeq.value += 1;
+    loadingEmployeeDetail.value = false;
+    employeeDetailLoadFailed.value = false;
+    employeeDetailDepartment.value = undefined;
+    selectedEmployee.value = undefined;
+    employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
+    employeeDetailOpen.value = false;
+    employeeDetailMode.value = 'view';
+  }
 }
 
 function handleEmployeeListAction(action: RecordActionItem) {
@@ -261,6 +284,7 @@ function startCreateEmployee() {
   selectedEmployeeKey.value = undefined;
   employeeDetailMode.value = 'create';
   loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
   employeeDetailRequestSeq.value += 1;
   employeeDetailDepartment.value = undefined;
   employeeDetailOpen.value = true;
@@ -272,6 +296,7 @@ function closeEmployeeDetail() {
   }
   employeeDetailRequestSeq.value += 1;
   loadingEmployeeDetail.value = false;
+  employeeDetailLoadFailed.value = false;
   employeeDetailOpen.value = false;
   employeeDetailMode.value = 'view';
   employeeDetailDepartment.value = undefined;
@@ -292,29 +317,32 @@ async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailM
   employeeDraft.value = copyEmployee(record as Employee);
   employeeDetailDepartment.value = undefined;
   loadingEmployeeDetail.value = true;
+  employeeDetailLoadFailed.value = false;
   const requestSeq = employeeDetailRequestSeq.value + 1;
   employeeDetailRequestSeq.value = requestSeq;
+  const canCommitRequest = () =>
+    shouldCommitEmployeeDetailRequest({
+      activeRequestSeq: employeeDetailRequestSeq.value,
+      requestSeq,
+      selectedEmployeeKey: selectedEmployeeKey.value,
+      recordId: id,
+    });
   try {
     const fullRecord = await employeeContext.crud.view(id);
-    if (
-      !shouldCommitEmployeeDetailRequest({
-        activeRequestSeq: employeeDetailRequestSeq.value,
-        requestSeq,
-        selectedEmployeeKey: selectedEmployeeKey.value,
-        recordId: id,
-      })
-    ) {
+    if (!canCommitRequest()) {
       return;
     }
     selectedEmployee.value = fullRecord;
     employeeDraft.value = copyEmployee(fullRecord);
+    employeeDetailLoadFailed.value = false;
     await loadEmployeeDetailDepartment(fullRecord.departmentId, requestSeq);
   } catch (cause) {
-    if (employeeDetailRequestSeq.value === requestSeq) {
+    if (canCommitRequest()) {
+      employeeDetailLoadFailed.value = true;
       presentPlatformError(cause, { source: 'employee-management', phase: 'load' });
     }
   } finally {
-    if (employeeDetailRequestSeq.value === requestSeq) {
+    if (canCommitRequest()) {
       loadingEmployeeDetail.value = false;
     }
   }
@@ -342,6 +370,15 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
   }
 }
 
+function retryEmployeeDetail() {
+  const id = String(employeeDraft.value.id ?? selectedEmployeeKey.value ?? '');
+  if (!id) {
+    return;
+  }
+  const mode = employeeDetailMode.value === 'create' ? 'view' : employeeDetailMode.value;
+  void openEmployeeDetail({ ...employeeDraft.value, id } as QueryListRecord, mode);
+}
+
 async function saveEmployee() {
   await executeStaticFormSave<Employee>({
     loading: savingEmployee,
@@ -363,6 +400,7 @@ async function saveEmployee() {
       selectedEmployeeKey.value = record.id;
       employeeDetailMode.value = 'view';
       employeeDetailOpen.value = true;
+      employeeDetailLoadFailed.value = false;
       employeeReloadKey.value += 1;
       void loadEmployeeDetailDepartment(record.departmentId);
     },
@@ -412,6 +450,7 @@ async function removeEmployee(record: Partial<Employee> | QueryListRecord | unde
         selectedEmployee.value = undefined;
         employeeDraft.value = createEmployeeDraft(selectedOrganizationId.value);
         loadingEmployeeDetail.value = false;
+        employeeDetailLoadFailed.value = false;
         employeeDetailRequestSeq.value += 1;
         employeeDetailDepartment.value = undefined;
         employeeDetailOpen.value = false;
@@ -592,34 +631,42 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
         />
       </template>
 
-      <RecordDetailFields
-        v-if="employeeDetailMode === 'view'"
-        :record="employeeDraft as RecordFormRecord"
-        :fields="employeeFormFieldDefinitions"
-        :fallback="employeeFormFieldFallback"
-        :picker-configs="employeeFormPickerConfigs"
-        :display-of="employeeDetailDisplayValue"
-      />
+      <UiSpin v-if="loadingEmployeeDetail" class="employee-detail-state" tip="加载职员详情" />
+      <div v-else-if="employeeDetailLoadFailed" class="employee-detail-state">
+        <UiError title="详情加载失败" message="无法加载职员详情，请重试" />
+        <UiButton type="primary" icon-name="reload" @click="retryEmployeeDetail">重试</UiButton>
+      </div>
 
-      <form v-else class="employee-form" @submit.prevent="saveEmployee">
-        <label v-if="employeeFormVisible('organizationId')">
-          <span class="employee-form-label">
-            {{ employeeFormLabel('organizationId') }}
-            <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
-          </span>
-          <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
-        </label>
-        <RecordFormFields
+      <template v-else-if="showEmployeeDetailContent">
+        <RecordDetailFields
+          v-if="employeeDetailMode === 'view'"
           :record="employeeDraft as RecordFormRecord"
           :fields="employeeFormFieldDefinitions"
-          :exclude-field-names="['organizationId']"
           :fallback="employeeFormFieldFallback"
           :picker-configs="employeeFormPickerConfigs"
-          :disabled="employeeFormDisabled"
-          @update:field="updateEmployeeDraftField"
+          :display-of="employeeDetailDisplayValue"
         />
-      </form>
-      <RecordMetaSection v-if="employeeDetailMode !== 'create'" :record="employeeDraft" show-sort-order />
+
+        <form v-else class="employee-form" @submit.prevent="saveEmployee">
+          <label v-if="employeeFormVisible('organizationId')">
+            <span class="employee-form-label">
+              {{ employeeFormLabel('organizationId') }}
+              <strong v-if="employeeFormRequired('organizationId')" aria-hidden="true">*</strong>
+            </span>
+            <UiInput :value="selectedOrganization?.title ?? selectedOrganization?.id ?? '-'" disabled />
+          </label>
+          <RecordFormFields
+            :record="employeeDraft as RecordFormRecord"
+            :fields="employeeFormFieldDefinitions"
+            :exclude-field-names="['organizationId']"
+            :fallback="employeeFormFieldFallback"
+            :picker-configs="employeeFormPickerConfigs"
+            :disabled="employeeFormDisabled"
+            @update:field="updateEmployeeDraftField"
+          />
+        </form>
+        <RecordMetaSection v-if="employeeDetailMode !== 'create'" :record="employeeDraft" show-sort-order />
+      </template>
     </RecordDetailDrawer>
   </section>
 </template>
@@ -662,6 +709,13 @@ const employeeFormFieldFallback: Record<EmployeeFormFieldName, RecordFormFieldFa
 .employee-form-label strong {
   color: #d92d20;
   font-weight: 600;
+}
+
+.employee-detail-state {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 180px;
 }
 
 @media (max-width: 900px) {
