@@ -78,7 +78,7 @@ AND quickSearch
 
 ## 边界说明
 
-1. 静态模块 UI 声明不另建页面内核；后续按统一 resolved descriptor 和读投影路线接入页面交付，职员样板阶段结果见 [职员管理静态 UI 接入收口记录](EMPLOYEE_STATIC_UI_INTEGRATION_CHECKLIST.md)。
+1. 静态模块 UI 声明不另建页面内核；后续按统一 resolved descriptor 和读投影路线接入页面交付，职员、部门样板阶段结果见 [静态 UI 样板接入收口记录](STATIC_UI_SAMPLE_INTEGRATION_STATUS.md)。
 2. 页面配置以 `moduleAlias` 和元数据字段稳定 ID 为锚点，不引入平行字段身份。
 3. 菜单入口不负责权限本身；菜单剪枝、动作授权和数据范围由身份权限专题负责。
 4. 附件接口不保存 MIME、大小、上传人等文件事实。
