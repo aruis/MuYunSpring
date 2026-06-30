@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
   shouldCommitEmployeeDetailRequest,
   shouldShowEmployeeDetailContent,
@@ -93,4 +94,9 @@ test('employee detail content hides temporary records while loading or failed', 
     }),
     true,
   );
+});
+
+test('employee detail context cannot switch while saving', () => {
+  assert.equal(canSwitchEmployeeDetailContext({ saving: true }), false);
+  assert.equal(canSwitchEmployeeDetailContext({ saving: false }), true);
 });

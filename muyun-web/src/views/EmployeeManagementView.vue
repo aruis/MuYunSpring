@@ -29,6 +29,7 @@ import { UiButton, UiError, UiInput, UiSpin, confirmAction } from '@muyun/vue-ui
 import type { Department, Employee, Organization } from '@muyun/web-contracts';
 import { useModuleContext, type ModuleContext } from '@muyun/web-core';
 import {
+  canSwitchEmployeeDetailContext,
   isEmployeeFormDisabled,
   shouldCommitEmployeeDetailRequest,
   shouldShowEmployeeDetailContent,
@@ -142,8 +143,15 @@ const employeeDetailActions = computed<RecordActionItem[]>(() => {
       return [];
     }
     return [
-      { key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit' },
-      { key: 'delete', actionCode: 'delete', title: '删除', iconName: 'delete', danger: true },
+      { key: 'edit', actionCode: 'update', title: '编辑', iconName: 'edit', disabled: savingEmployee.value },
+      {
+        key: 'delete',
+        actionCode: 'delete',
+        title: '删除',
+        iconName: 'delete',
+        danger: true,
+        disabled: savingEmployee.value,
+      },
     ];
   }
   return [
@@ -190,6 +198,10 @@ function employeeFormVisible(fieldName: EmployeeFormFieldName) {
   return employeeFormField(fieldName).visible;
 }
 
+function canLeaveEmployeeDetailContext() {
+  return canSwitchEmployeeDetailContext({ saving: savingEmployee.value });
+}
+
 function updateEmployeeDraftField(fieldName: string, value: string | number | boolean | undefined) {
   employeeDraft.value = {
     ...employeeDraft.value,
@@ -221,6 +233,9 @@ function handleOrganizationsLoaded(records: Organization[]) {
 }
 
 function selectOrganization(record: Organization) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   selectedOrganization.value = record;
   selectedEmployeeKey.value = undefined;
   selectedEmployee.value = undefined;
@@ -235,6 +250,9 @@ function refreshOrganizations() {
 }
 
 function selectEmployee(record: QueryListRecord) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   const nextKey = String(record.id ?? '');
   const currentDetailId = String(selectedEmployee.value?.id ?? employeeDraft.value.id ?? '');
   selectedEmployeeKey.value = nextKey;
@@ -251,12 +269,18 @@ function selectEmployee(record: QueryListRecord) {
 }
 
 function handleEmployeeListAction(action: RecordActionItem) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'create') {
     startCreateEmployee();
   }
 }
 
 function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: QueryListRecord) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'view') {
     void openEmployeeDetail(record, 'view');
     return;
@@ -271,10 +295,16 @@ function handleEmployeeRowAction(action: ResolvedRecordActionItem, record: Query
 }
 
 function handleEmployeeRowDblclick(record: QueryListRecord) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   void openEmployeeDetail(record, 'view');
 }
 
 function startCreateEmployee() {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (!selectedOrganizationId.value) {
     presentPlatformMessage('请先选择机构', { phase: 'validation' });
     return;
@@ -306,6 +336,9 @@ function closeEmployeeDetail() {
 }
 
 async function openEmployeeDetail(record: QueryListRecord, mode: EmployeeDetailMode) {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   const id = String(record.id ?? '');
   if (!id) {
     return;
@@ -357,6 +390,9 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
     void saveEmployee();
     return;
   }
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   if (action.key === 'edit') {
     if (!selectedEmployee.value || loadingEmployeeDetail.value) {
       return;
@@ -371,6 +407,9 @@ function handleEmployeeDetailAction(action: RecordActionItem) {
 }
 
 function retryEmployeeDetail() {
+  if (!canLeaveEmployeeDetailContext()) {
+    return;
+  }
   const id = String(employeeDraft.value.id ?? selectedEmployeeKey.value ?? '');
   if (!id) {
     return;

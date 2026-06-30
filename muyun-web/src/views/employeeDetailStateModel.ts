@@ -21,6 +21,10 @@ export interface EmployeeDetailContentState {
   selectedEmployeeId?: string;
 }
 
+export interface EmployeeDetailContextSwitchState {
+  saving: boolean;
+}
+
 export function isEmployeeFormDisabled(state: EmployeeFormDisabledState) {
   if (state.mode === 'view' || state.loadingDetail || state.saving) {
     return true;
@@ -37,4 +41,8 @@ export function shouldShowEmployeeDetailContent(state: EmployeeDetailContentStat
     return true;
   }
   return !state.loadingDetail && !state.loadFailed && Boolean(state.selectedEmployeeId);
+}
+
+export function canSwitchEmployeeDetailContext(state: EmployeeDetailContextSwitchState) {
+  return !state.saving;
 }

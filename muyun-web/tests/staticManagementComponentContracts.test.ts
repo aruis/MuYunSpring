@@ -428,6 +428,12 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /const employeeDetailRequestSeq = ref\(0\)/);
   assert.match(employeeViewSource, /isEmployeeFormDisabled/);
   assert.match(employeeViewSource, /shouldShowEmployeeDetailContent/);
+  assert.match(employeeViewSource, /canSwitchEmployeeDetailContext/);
+  assert.match(employeeViewSource, /function canLeaveEmployeeDetailContext\(\)/);
+  assert.match(employeeViewSource, /canSwitchEmployeeDetailContext\(\{ saving: savingEmployee\.value \}\)/);
+  assert.match(employeeViewSource, /if \(!canLeaveEmployeeDetailContext\(\)\) \{\s*return;\s*\}/);
+  assert.match(employeeViewSource, /key: 'edit'[\s\S]*disabled: savingEmployee\.value/);
+  assert.match(employeeViewSource, /key: 'delete'[\s\S]*disabled: savingEmployee\.value/);
   assert.match(employeeViewSource, /selectedEmployeeId: selectedEmployee\.value\?\.id/);
   assert.match(
     employeeViewSource,
@@ -454,6 +460,10 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(employeeViewSource, /loadingEmployeeDetail\.value = false/);
   assert.match(employeeViewSource, /async function loadEmployeeDetailDepartment\([\s\S]*requestSeq/);
   assert.match(employeeViewSource, /employeeDetailRequestSeq\.value === requestSeq/);
+  assert.match(
+    employeeViewSource,
+    /function handleEmployeeDetailAction[\s\S]*if \(!canLeaveEmployeeDetailContext\(\)\) \{\s*return;\s*\}[\s\S]*if \(action\.key === 'edit'\)/,
+  );
   assert.match(employeeViewSource, /if \(!selectedEmployee\.value \|\| loadingEmployeeDetail\.value\)/);
   assert.match(employeeViewSource, /function retryEmployeeDetail/);
   assert.match(employeeViewSource, /<UiSpin v-if="loadingEmployeeDetail"/);
