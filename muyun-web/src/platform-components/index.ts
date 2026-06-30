@@ -7,6 +7,7 @@ export { default as RecordActionBar } from './RecordActionBar.vue';
 export { default as RecordDetailDrawer } from './RecordDetailDrawer.vue';
 export { default as RecordDetailPanel } from './RecordDetailPanel.vue';
 export { default as RecordExplorerPanel } from './RecordExplorerPanel.vue';
+export { default as RecordFormFields } from './RecordFormFields.vue';
 export { default as RecordListExplorer } from './RecordListExplorer.vue';
 export { default as RecordMetaSection } from './RecordMetaSection.vue';
 export { default as RecordPicker } from './RecordPicker.vue';
@@ -40,6 +41,13 @@ export type { RecordPickerMode } from './recordPickerModel';
 export type { RecordActionItem, ResolvedRecordActionItem } from './recordActionBarModel';
 export type { RecordListExplorerRecord } from './RecordListExplorer.vue';
 export type { QueryListRecord, RecordQueryListColumn } from './RecordQueryListPanel.vue';
+export type {
+  RecordFormFieldDescriptor,
+  RecordFormFieldFallback,
+  RecordFormFieldPickerConfig,
+  RecordFormFieldState,
+  RecordFormRecord,
+} from './RecordFormFields.vue';
 export type { CrudRecordListBase } from './crudRecordListModel';
 export {
   defaultCrudRecordListMatches,
@@ -48,8 +56,10 @@ export {
 } from './crudRecordListModel';
 export { resolveRecordActions } from './recordActionBarModel';
 export { presentPlatformError, presentPlatformMessage } from './platformErrorFeedback';
+export { executeStaticFormSave, executeStaticRecordAction } from './staticFormActionFlow';
 export { useFlatCrudManagementState } from './staticCrudManagementState';
 export type { PlatformActionErrorHandler, PlatformErrorFeedbackContext } from './platformErrorFeedback';
+export type { StaticFormSaveMode, StaticFormSaveOptions, StaticRecordActionOptions } from './staticFormActionFlow';
 export type {
   StaticCrudCardMode,
   StaticCrudConfirmAction,

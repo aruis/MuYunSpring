@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue';
-import type { ModuleUiDefinition, ResolvedModuleUiDescriptor } from '@muyun/web-contracts';
+import type { ResolvedModuleUiDescriptor } from '@muyun/web-contracts';
 import { normalizeError, type AppError } from '../errors';
 import type { HttpClient } from '../http';
 import type { ModuleAbilityCode } from './abilityCodes';
@@ -31,7 +31,6 @@ export interface ModuleRuntimeContext {
   capabilities: string[];
   abilities?: string[];
   actions: ModuleRuntimeAction[];
-  uiDefinition?: ModuleUiDefinition;
   uiDescriptor?: ResolvedModuleUiDescriptor;
 }
 

@@ -406,7 +406,10 @@ export interface ModuleUiDefinition {
 }
 
 export interface ResolvedModuleUiDescriptor {
+  schemaVersion: string;
   moduleAlias: string;
+  moduleKind?: 'STATIC' | 'DYNAMIC';
+  title?: string;
   views: ResolvedViewDescriptor[];
 }
 

@@ -6,6 +6,10 @@ import java.util.List;
 
 public record RecordReadProjection(String moduleAlias,
                                    String viewCode,
+                                   String actionCode,
+                                   String permissionCode,
+                                   String permissionActionCode,
+                                   List<String> fieldReadPolicies,
                                    List<ViewFieldRef> outputFields,
                                    List<String> requiredPlatformFields,
                                    List<String> postReadTransforms) {
@@ -15,9 +19,24 @@ public record RecordReadProjection(String moduleAlias,
             throw new IllegalArgumentException("record read projection view code must not be blank");
         }
         viewCode = viewCode.trim();
+        actionCode = actionCode == null || actionCode.isBlank() ? null : actionCode.trim();
+        permissionCode = permissionCode == null || permissionCode.isBlank() ? null : permissionCode.trim();
+        permissionActionCode = permissionActionCode == null || permissionActionCode.isBlank()
+                ? null
+                : permissionActionCode.trim();
+        fieldReadPolicies = fieldReadPolicies == null ? List.of() : List.copyOf(fieldReadPolicies);
         outputFields = outputFields == null ? List.of() : List.copyOf(outputFields);
         requiredPlatformFields = requiredPlatformFields == null ? List.of() : List.copyOf(requiredPlatformFields);
         postReadTransforms = postReadTransforms == null ? List.of() : List.copyOf(postReadTransforms);
+    }
+
+    public RecordReadProjection(String moduleAlias,
+                                String viewCode,
+                                List<ViewFieldRef> outputFields,
+                                List<String> requiredPlatformFields,
+                                List<String> postReadTransforms) {
+        this(moduleAlias, viewCode, null, null, null, List.of(), outputFields, requiredPlatformFields,
+                postReadTransforms);
     }
 
     public List<String> readFields() {

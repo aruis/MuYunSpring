@@ -4,6 +4,7 @@ import net.ximatai.muyun.spring.boot.platform.PlatformMenu;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuGroups;
 import net.ximatai.muyun.spring.boot.platform.PlatformStaticModule;
 import net.ximatai.muyun.spring.boot.platform.ModuleUiDefinition;
+import net.ximatai.muyun.spring.boot.platform.StaticRecordReadProjectionService;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleUiContributor;
 import net.ximatai.muyun.spring.boot.web.CrudWeb;
 import net.ximatai.muyun.spring.boot.web.EnableWeb;
@@ -11,8 +12,12 @@ import net.ximatai.muyun.spring.boot.web.SortWeb;
 import net.ximatai.muyun.spring.boot.web.SortWebRequest;
 import net.ximatai.muyun.spring.boot.web.WebCountResponse;
 import net.ximatai.muyun.spring.boot.web.WebListResponse;
+import net.ximatai.muyun.spring.boot.web.WebPageResponse;
+import net.ximatai.muyun.spring.boot.web.WebQueryRequest;
 import net.ximatai.muyun.spring.boot.web.WebSupport;
 import net.ximatai.muyun.spring.common.platform.CustomActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.ActionEndpoint;
+import net.ximatai.muyun.spring.common.platform.PlatformAction;
 import net.ximatai.muyun.spring.common.platform.PlatformActionLevel;
 import net.ximatai.muyun.spring.iam.employee.Employee;
 import net.ximatai.muyun.spring.iam.employee.EmployeeAccount;
@@ -30,6 +35,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @PlatformStaticModule(application = "iam", alias = "iam.employee", title = "职员管理", route = "/iam/employees")
 @PlatformMenu(parent = PlatformMenuGroups.IDENTITY, title = "职员管理", order = 50)
@@ -42,6 +49,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
     private final EmployeePositionService employeePositionService;
     private final EmployeeAccountService employeeAccountService;
     private final EmployeeDelegationService employeeDelegationService;
+    private StaticRecordReadProjectionService staticRecordReadProjectionService;
 
     @Autowired
     public EmployeeWebController(EmployeePositionService employeePositionService,
@@ -50,6 +58,11 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
         this.employeePositionService = employeePositionService;
         this.employeeAccountService = employeeAccountService;
         this.employeeDelegationService = employeeDelegationService;
+    }
+
+    @Autowired(required = false)
+    void setStaticRecordReadProjectionService(StaticRecordReadProjectionService staticRecordReadProjectionService) {
+        this.staticRecordReadProjectionService = staticRecordReadProjectionService;
     }
 
     @Override
@@ -66,7 +79,7 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                 .formView(form -> form
                         .title("职员档案")
                         .field("organizationId", field -> field.label("所属机构").required().readOnly())
-                        .field("departmentId", field -> field.label("所属部门").required())
+                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker"))
                         .field("employeeNo", field -> field.label("职员编号").required())
                         .field("title", field -> field.label("职员姓名").required())
                         .field("gender", field -> field.label("性别"))
@@ -74,6 +87,17 @@ public class EmployeeWebController extends WebSupport<EmployeeService> implement
                         .field("email", field -> field.label("邮箱"))
                         .field("enabled", field -> field.label("启用状态").uiType("enabledStatus")))
                 .build();
+    }
+
+    @Override
+    @PostMapping("/query")
+    @ActionEndpoint(PlatformAction.QUERY)
+    public WebPageResponse<Employee> query(@RequestBody(required = false) WebQueryRequest request) {
+        WebPageResponse<Employee> response = CrudWeb.super.query(request);
+        if (staticRecordReadProjectionService == null) {
+            return response;
+        }
+        return staticRecordReadProjectionService.projectDefaultList(EmployeeService.MODULE_ALIAS, response, service());
     }
 
     @GetMapping("/{employeeId}/accounts")

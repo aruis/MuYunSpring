@@ -22,12 +22,14 @@ class ModuleUiDescriptorCompilerTest {
                         .field("enabled", field -> field.label("状态").uiType("enabledStatus").align("center")))
                 .formView(form -> form
                         .title("职员档案")
-                        .field("organizationId", field -> field.label("所属机构").required().readOnly()))
+                        .field("organizationId", field -> field.label("所属机构").required().readOnly())
+                        .field("departmentId", field -> field.label("所属部门").required().uiType("recordPicker")))
                 .build();
 
         ResolvedModuleUiDescriptor descriptor = ModuleUiDescriptorCompiler.compile(definition);
 
         assertThat(descriptor.moduleAlias()).isEqualTo("iam.employee");
+        assertThat(descriptor.schemaVersion()).isEqualTo(ResolvedModuleUiDescriptor.SCHEMA_VERSION);
         assertThat(descriptor.views()).hasSize(2);
         assertThat(descriptor.views()).filteredOn(view -> view.viewCode().equals("default_list"))
                 .singleElement()
@@ -43,12 +45,17 @@ class ModuleUiDescriptorCompilerTest {
                 });
         assertThat(descriptor.views()).filteredOn(view -> view.viewCode().equals("default_form"))
                 .singleElement()
-                .satisfies(view -> assertThat(view.fields()).singleElement()
-                        .satisfies(field -> {
-                            assertThat(field.fieldRef().fieldName()).isEqualTo("organizationId");
-                            assertThat(field.required().constant()).isTrue();
-                            assertThat(field.readOnly().constant()).isTrue();
-                        }));
+                .satisfies(view -> {
+                    assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
+                            .containsExactly("organizationId", "departmentId");
+                    assertThat(view.fields()).first()
+                            .satisfies(field -> {
+                                assertThat(field.required().constant()).isTrue();
+                                assertThat(field.readOnly().constant()).isTrue();
+                            });
+                    assertThat(view.fields()).last()
+                            .satisfies(field -> assertThat(field.uiType()).isEqualTo("recordPicker"));
+                });
     }
 
     @Test
@@ -62,6 +69,8 @@ class ModuleUiDescriptorCompilerTest {
 
         ResolvedModuleUiDescriptor descriptor = ModuleUiDescriptorCompiler.compile(staticDefinition(uiDefinition));
 
+        assertThat(descriptor.moduleKind()).isEqualTo(net.ximatai.muyun.spring.platform.module.ModuleKind.STATIC);
+        assertThat(descriptor.title()).isEqualTo("职员管理");
         assertThat(descriptor.views()).singleElement()
                 .satisfies(view -> assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                         .containsExactly("employeeNo", "title", "enabled"));

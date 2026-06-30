@@ -147,6 +147,9 @@ class StaticModuleDefinitionScannerTest {
                             assertThat(view.fields()).extracting(field -> field.fieldRef().fieldName())
                                     .containsExactly("organizationId", "departmentId", "employeeNo", "title",
                                             "gender", "mobile", "email", "enabled");
+                            assertThat(view.fields()).filteredOn(field -> field.fieldRef().fieldName().equals("departmentId"))
+                                    .singleElement()
+                                    .satisfies(field -> assertThat(field.uiType()).isEqualTo("recordPicker"));
                         });
             });
             assertThat(byAlias.get("iam.position_category")).satisfies(definition -> {

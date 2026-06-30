@@ -18,7 +18,6 @@ public record PlatformModuleRuntimeContext(
         Set<EntityCapability> capabilities,
         Set<String> abilities,
         List<PlatformModuleRuntimeAction> actions,
-        ModuleUiDefinition uiDefinition,
         ResolvedModuleUiDescriptor uiDescriptor
 ) {
     public PlatformModuleRuntimeContext(String moduleAlias,
@@ -32,7 +31,7 @@ public record PlatformModuleRuntimeContext(
                                         Set<String> abilities,
         List<PlatformModuleRuntimeAction> actions) {
         this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
-                capabilities, abilities, actions, null, null);
+                capabilities, abilities, actions, (ResolvedModuleUiDescriptor) null);
     }
 
     public PlatformModuleRuntimeContext(String moduleAlias,
@@ -47,6 +46,6 @@ public record PlatformModuleRuntimeContext(
                                         List<PlatformModuleRuntimeAction> actions,
                                         ModuleUiDefinition uiDefinition) {
         this(moduleAlias, title, moduleKind, entryType, entryRoute, entryExternalUrl, mainEntityAlias,
-                capabilities, abilities, actions, uiDefinition, ModuleUiDescriptorCompiler.compile(uiDefinition));
+                capabilities, abilities, actions, ModuleUiDescriptorCompiler.compile(uiDefinition));
     }
 }

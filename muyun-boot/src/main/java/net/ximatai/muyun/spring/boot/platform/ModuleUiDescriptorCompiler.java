@@ -3,6 +3,7 @@ package net.ximatai.muyun.spring.boot.platform;
 import net.ximatai.muyun.spring.common.schema.PlatformAbilityFields;
 import net.ximatai.muyun.spring.dynamic.metadata.EntityDefinition;
 import net.ximatai.muyun.spring.dynamic.metadata.FieldDefinition;
+import net.ximatai.muyun.spring.platform.module.ModuleKind;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class ModuleUiDescriptorCompiler {
         }
         validateFields(definition);
         return new ModuleUiCompilationResult(
-                compile(definition.uiDefinition()),
+                compile(definition.uiDefinition(), ModuleKind.STATIC, definition.title()),
                 readModel(definition)
         );
     }
@@ -40,8 +41,17 @@ public final class ModuleUiDescriptorCompiler {
         if (definition == null) {
             return null;
         }
+        return compile(definition, null, null);
+    }
+
+    private static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                      ModuleKind moduleKind,
+                                                      String title) {
         return new ResolvedModuleUiDescriptor(
+                ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),
+                moduleKind,
+                title,
                 definition.views().stream()
                         .map(ModuleUiDescriptorCompiler::compileView)
                         .toList()

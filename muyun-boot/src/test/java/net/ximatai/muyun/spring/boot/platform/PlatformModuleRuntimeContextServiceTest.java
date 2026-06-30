@@ -98,14 +98,10 @@ class PlatformModuleRuntimeContextServiceTest {
         assertThat(context.actions()).extracting(PlatformModuleRuntimeAction::actionCode)
                 .containsExactly("menu", "view", "tree", "enable", "disable");
         assertThat(context.actions()).allSatisfy(action -> assertThat(action.authorized()).isTrue());
-        assertThat(context.uiDefinition()).isNotNull();
-        assertThat(context.uiDefinition().views()).singleElement()
-                .satisfies(view -> {
-                    assertThat(view.viewCode()).isEqualTo("default_list");
-                    assertThat(view.fields()).singleElement()
-                            .satisfies(field -> assertThat(field.fieldRef().fieldName()).isEqualTo("title"));
-                });
         assertThat(context.uiDescriptor()).isNotNull();
+        assertThat(context.uiDescriptor().schemaVersion()).isEqualTo(ResolvedModuleUiDescriptor.SCHEMA_VERSION);
+        assertThat(context.uiDescriptor().moduleKind()).isEqualTo(ModuleKind.STATIC);
+        assertThat(context.uiDescriptor().title()).isEqualTo("组织管理");
         assertThat(context.uiDescriptor().views()).singleElement()
                 .satisfies(view -> {
                     assertThat(view.viewCode()).isEqualTo("default_list");
