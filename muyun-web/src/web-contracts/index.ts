@@ -280,6 +280,8 @@ export interface WebQueryRequest {
   criteria?: unknown;
   queryForm?: Record<string, unknown>;
   sorts?: WebSort[];
+  uiConfigId?: string;
+  queryTemplateId?: string;
   quickSearch?: string;
   quickSearchFields?: string[];
   externalQueryValues?: Record<string, unknown>;

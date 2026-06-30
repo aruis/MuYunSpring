@@ -44,9 +44,18 @@ public final class ModuleUiDescriptorCompiler {
         return compile(definition, null, null);
     }
 
-    private static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
-                                                      ModuleKind moduleKind,
-                                                      String title) {
+    public static ResolvedModuleUiDescriptor compile(ModuleUiDefinition definition,
+                                                     ModuleKind moduleKind,
+                                                     String title) {
+        if (definition == null) {
+            return null;
+        }
+        return compileResolved(definition, moduleKind, title);
+    }
+
+    private static ResolvedModuleUiDescriptor compileResolved(ModuleUiDefinition definition,
+                                                              ModuleKind moduleKind,
+                                                              String title) {
         return new ResolvedModuleUiDescriptor(
                 ResolvedModuleUiDescriptor.SCHEMA_VERSION,
                 definition.moduleAlias(),

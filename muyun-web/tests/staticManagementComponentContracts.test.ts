@@ -469,6 +469,27 @@ test('employee management uses organization scope and platform query list panel'
   assert.match(contractsSource, /externalQueryValues\?: Record<string, unknown>/);
 });
 
+test('dynamic module host uses shared descriptor driven list and form runners', () => {
+  const hostSource = readSource('src/platform-workbench/hosts/DynamicModuleHost.vue');
+
+  assert.match(hostSource, /useModuleContext<QueryListRecord>/);
+  assert.match(hostSource, /<RecordQueryListPanel/);
+  assert.match(hostSource, /<RecordFormFields/);
+  assert.match(hostSource, /resolveRecordFormFields\(runtimeContext\.uiDescriptor, view\?\.viewCode\)/);
+  assert.match(hostSource, /:ui-config-id="descriptor\.target\.defaultUiConfigId"/);
+  assert.match(hostSource, /:query-template-id="descriptor\.target\.defaultQueryTemplateId"/);
+  assert.doesNotMatch(hostSource, /等待接入页面 bootstrap 与列表查询/);
+});
+
+test('record query list panel forwards dynamic ui config and query template ids', () => {
+  const panelSource = readSource('src/platform-components/RecordQueryListPanel.vue');
+
+  assert.match(panelSource, /uiConfigId\?: string/);
+  assert.match(panelSource, /queryTemplateId\?: string/);
+  assert.match(panelSource, /request\.uiConfigId = props\.uiConfigId/);
+  assert.match(panelSource, /request\.queryTemplateId = props\.queryTemplateId/);
+});
+
 test('static crud state supports business-owned action errors before platform fallback', () => {
   const stateSource = readSource('src/platform-components/staticCrudManagementState.ts');
   const feedbackSource = readSource('src/platform-components/platformErrorFeedback.ts');

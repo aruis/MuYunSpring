@@ -4,7 +4,7 @@
 
 ## 当前阶段状态
 
-子资源表单契约阶段已完成阶段性收口。已完成非字典子资源样板、子资源默认表单 view code 命名门面、relation 字段编译失败契约、`/form/schema` 兼容出口来源收口，以及动态发布快照到源无关 UI 定义的最小身份边界。剩余工作不再继续横向铺静态页面，后续进入动态真实 Web 链路、SQL 列投影和字段级授权等专项。
+子资源表单契约阶段已完成阶段性收口。已完成非字典子资源样板、子资源默认表单 view code 命名门面、relation 字段编译失败契约、`/form/schema` 兼容出口来源收口，以及动态发布快照到源无关 UI 定义的最小身份边界。动态真实 Web 链路已完成第一步：动态模块 runtime context 返回共用 `ResolvedModuleUiDescriptor`，动态 host 复用列表和表单字段运行器展示列表与只读表单。剩余工作不再继续横向铺静态页面，后续进入动态保存 envelope、SQL 列投影和字段级授权等专项。
 
 ## 已稳定契约
 
@@ -22,6 +22,7 @@
 12. 子资源默认表单 view code 使用稳定命名门面生成，约定为 `<resource>_default_form`，后端声明和前端读取不各自拼接字符串。
 13. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线；动态 viewCode 使用 UI set alias，`uiConfigId` 只作为发布配置、请求校验和页面执行上下文。
 14. `/form/schema` 只消费当前模块的静态 UI 定义；子资源 controller 贡献给父模块的 UI view 不作为当前 controller 自身表单 schema 来源。
+15. 动态模块 runtime context 已按发布快照生成 `ResolvedModuleUiDescriptor`；动态 host 通过 `RecordQueryListPanel` 和 `RecordFormFields` 消费同一套 descriptor，列表查询会把 `uiConfigId` 和 `queryTemplateId` 放入标准查询请求顶层。
 
 ## 前端样板现状
 
@@ -51,8 +52,9 @@
 
 1. 字段级授权配置和角色授权存储模型。
 2. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
-3. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路；当前只完成源无关 `ModuleUiDefinition` 适配契约。
-4. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
+3. 动态保存 envelope 与动作态表单执行器；当前动态 host 只承诺列表与只读表单展示，不承诺动态表单保存。
+4. 动态记录读投影与 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
+5. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
 
 ## 验收证据
 
@@ -60,8 +62,9 @@
 2. 后端测试覆盖 `StaticRecordReadProjectionService`、字段保护输出策略、action 权限上下文和字段级可读策略。
 3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`，并锁定动态 viewCode 与 `uiConfigId` 的身份边界。
 4. 后端测试覆盖 `/form/schema` 兼容出口只读取当前模块静态 UI 定义，子资源 UI 贡献不会污染当前 controller 表单 schema。
-5. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView`、`DepartmentManagementView`、`DictionaryManagementView` 和 `PositionManagementView` 接入契约。
-6. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
+5. 后端测试覆盖动态模块 runtime context 可从发布快照输出 `ResolvedModuleUiDescriptor`。
+6. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、动态 host、`EmployeeManagementView`、`DepartmentManagementView`、`DictionaryManagementView` 和 `PositionManagementView` 接入契约。
+7. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
 
 ## 删除条件
 

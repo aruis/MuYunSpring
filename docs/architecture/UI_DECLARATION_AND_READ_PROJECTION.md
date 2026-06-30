@@ -20,7 +20,7 @@
 
 当前没有上线兼容成本，后续推进按“先立契约，再接真实链路，再扩展场景”的生产化顺序执行。SQL 列投影不是第一优先级；Web 契约、安全边界和字段事实先稳定，后续 SQL 裁剪只作为性能优化接入。
 
-当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单；`iam.position` 已验证非字典子资源表单可通过父模块 descriptor 和 `RecordFormFields` 复用同一套字段运行器。子资源表单样板已沉淀为稳定接入契约：子资源 view 归属父模块 descriptor，view code 由 resource 命名门面生成，字段按 relationCode 关联子资源实体事实并在编译期失败。后续不继续横向铺更多静态页面，优先推进动态发布快照接入共用 descriptor 的真实 Web 链路、SQL 列投影和字段级授权治理。
+当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单；`iam.position` 已验证非字典子资源表单可通过父模块 descriptor 和 `RecordFormFields` 复用同一套字段运行器。子资源表单样板已沉淀为稳定接入契约：子资源 view 归属父模块 descriptor，view code 由 resource 命名门面生成，字段按 relationCode 关联子资源实体事实并在编译期失败。动态发布快照已接入模块 runtime context：发布快照先归一为 `ModuleUiDefinition`，再编译为 `ResolvedModuleUiDescriptor`，动态模块 host 可复用 `RecordQueryListPanel` 和 `RecordFormFields` 展示列表与只读表单。后续不继续横向铺更多静态页面，优先补动态保存 envelope、SQL 列投影和字段级授权治理。
 
 ### 阶段 1：协议冻结
 
@@ -71,15 +71,15 @@
 
 1. 动态 UI 配置发布快照不是前端协议，必须先转换为 `ModuleUiDefinition` 或等价源无关定义，再编译为 `ResolvedModuleUiDescriptor`。
 2. 动态字段 ID、字段名、关系和 viewCode 已有最小稳定映射；子表、虚拟字段和发布版本继续进入治理链路。
-3. 动态模块和静态模块共用 descriptor、读投影、动作和前端运行器协议。
+3. 动态模块和静态模块共用 descriptor、读投影、动作和前端运行器协议；当前动态 runtime context 已返回共用 descriptor，动态 host 已复用列表运行器和表单字段运行器。
 4. descriptor 应带版本号、来源版本、编译时间和校验结果，支持 preview/dry-run 编译。
 5. 治理接口应能检查字段缺失、引用失效、字典缺失、动作不可达、权限配置缺口和发布快照不可用。
 6. 编译结果缓存、失效策略、配置发布、运行态切换和审计留痕应有明确边界。
 
 验收口径：
 
-1. 至少一个动态模块通过同一运行器展示列表和表单。
-2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试；当前已覆盖动态快照到 `ModuleUiDefinition` 的最小适配、字段 ID、relation 和 viewCode 身份边界。
+1. 至少一个动态模块通过同一运行器展示列表和表单；当前已完成最小只读展示链路，保存 envelope 和动作态表单仍是后续工作。
+2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试；当前已覆盖动态快照到 `ModuleUiDefinition` 的最小适配、字段 ID、relation、viewCode 身份边界和 runtime context 返回 descriptor。
 3. preview/dry-run、健康检查、缓存失效和版本切换有 API 或 contract test 证据。
 
 ## 核心分层
@@ -427,7 +427,7 @@ id, version, tenant_id, employee_no, title, organization_id
 5. 先输出最小 `ResolvedModuleUiDescriptor`，随后补齐后端内部 `ResolvedModuleReadModel`。
 6. Web bootstrap 返回 resolved views。
 7. 增加 `RecordReadProjection` 内部模型，先用于列表字段校验和输出裁剪。
-8. 已补动态配置到 `ModuleUiDefinition` 的最小适配契约，覆盖 `uiConfigId`、发布快照、字段 ID、relation 与 viewCode 身份边界。
+8. 已补动态配置到 `ModuleUiDefinition` 的最小适配契约，覆盖 `uiConfigId`、发布快照、字段 ID、relation 与 viewCode 身份边界，并接入动态模块 runtime context 返回 `ResolvedModuleUiDescriptor`。
 9. 静态模块主线不再以 service 层 `FormAbility` 作为 UI schema 来源；`/form/schema` 仅作为兼容出口保留。
 
 第一阶段暂不做：

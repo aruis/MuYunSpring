@@ -6,6 +6,7 @@ import net.ximatai.muyun.spring.boot.iam.StaticModuleActionRegistry;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapRunner;
 import net.ximatai.muyun.spring.boot.platform.InitialDataBootstrapTask;
 import net.ximatai.muyun.spring.boot.platform.PlatformBootstrapTask;
+import net.ximatai.muyun.spring.boot.platform.PlatformDictionaryInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.PlatformMenuInitialDataDeclarationProvider;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinition;
 import net.ximatai.muyun.spring.boot.platform.StaticModuleDefinitionCatalog;
@@ -25,6 +26,9 @@ import net.ximatai.muyun.spring.ability.initialdata.InitialDataAbility;
 import net.ximatai.muyun.spring.ability.TenantActiveScopedAbility;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataExecutor;
 import net.ximatai.muyun.spring.platform.initialdata.InitialDataDeclarationProvider;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryCategoryService;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryInitialDataDeclarations;
+import net.ximatai.muyun.spring.platform.dictionary.DictionaryItemService;
 import net.ximatai.muyun.spring.platform.menu.MenuService;
 import net.ximatai.muyun.spring.platform.menu.SystemMenuSchemeAccessPolicy;
 import net.ximatai.muyun.spring.platform.module.PlatformModuleActionService;
@@ -139,5 +143,19 @@ public class MuYunSpringIdentityConfiguration {
             MenuService menuService,
             ApplicationContext applicationContext) {
         return new PlatformMenuInitialDataDeclarationProvider(menuService, applicationContext);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(PlatformDictionaryInitialDataDeclarationProvider.class)
+    public PlatformDictionaryInitialDataDeclarationProvider platformDictionaryInitialDataDeclarationProvider(
+            DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations) {
+        return new PlatformDictionaryInitialDataDeclarationProvider(dictionaryInitialDataDeclarations);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(DictionaryInitialDataDeclarations.class)
+    public DictionaryInitialDataDeclarations dictionaryInitialDataDeclarations(DictionaryCategoryService categoryService,
+                                                                               DictionaryItemService itemService) {
+        return new DictionaryInitialDataDeclarations(categoryService, itemService);
     }
 }

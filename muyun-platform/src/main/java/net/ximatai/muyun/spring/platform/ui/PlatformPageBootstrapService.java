@@ -177,6 +177,12 @@ public class PlatformPageBootstrapService {
         return PlatformUiSetType.LIST;
     }
 
+    public PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot,
+                                                    PlatformUiClientType clientType) {
+        PlatformUiClientType requestedClientType = clientType == null ? PlatformUiClientType.WEB : clientType;
+        return resolveConfig(snapshot, requestedClientType, null);
+    }
+
     private PlatformResolvedPageConfig resolveConfig(PlatformPageConfigSnapshot snapshot,
                                                      PlatformUiClientType clientType,
                                                      String defaultUiConfigId) {
