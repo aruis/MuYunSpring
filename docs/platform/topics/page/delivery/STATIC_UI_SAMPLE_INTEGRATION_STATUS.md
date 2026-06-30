@@ -2,6 +2,10 @@
 
 本文记录静态业务前后端打通样板的阶段性收口结果。稳定路线已回收到 [UI 声明与读投影设计](../../../architecture/UI_DECLARATION_AND_READ_PROJECTION.md)，本文只保留样板现状、仍需专项治理的边界和删除条件。
 
+## 当前阶段状态
+
+子资源表单契约阶段已进入收尾状态。已完成非字典子资源样板、子资源默认表单 view code 命名门面、relation 字段编译失败契约，以及动态发布快照到源无关 UI 定义的最小身份边界。剩余工作不再继续横向铺静态页面，后续进入动态真实 Web 链路、SQL 列投影和字段级授权等专项。
+
 ## 已稳定契约
 
 1. 静态 service 不承载 UI schema，`FormAbility` 不再作为职员表单 schema 来源。
@@ -16,7 +20,7 @@
 10. `createStaticTreeResourceModuleContext` 已作为前端静态树资源上下文门面，负责把动态资源路径下的 tree client 接回 `ModuleContext` 并提供空 scope 默认态。
 11. 静态子资源动作贡献可同步合并子资源实体事实和 UI view，用于把父模块下的子资源表单纳入同一套 descriptor。
 12. 子资源默认表单 view code 使用稳定命名门面生成，约定为 `<resource>_default_form`，后端声明和前端读取不各自拼接字符串。
-13. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线。
+13. 动态发布快照已有最小归一证据：可转换为静态声明共用的 `ModuleUiDefinition` 主线；动态 viewCode 使用 UI set alias，`uiConfigId` 只作为发布配置、请求校验和页面执行上下文。
 
 ## 前端样板现状
 
@@ -46,14 +50,14 @@
 
 1. 字段级授权配置和角色授权存储模型。
 2. `RecordReadProjection` 的 SQL 列投影阶段，包含后端白名单解析后的 `selectColumns`。
-3. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路。
+3. 动态发布快照接入共用 descriptor、读投影和前端运行器的真实 Web 链路；当前只完成源无关 `ModuleUiDefinition` 适配契约。
 4. 动作后的页面状态同步如果在多个模块重复出现，再抽为更高层页面状态运行器；不要只为单个样板提前抽象。
 
 ## 验收证据
 
 1. 后端测试覆盖静态 UI 声明扫描、descriptor 编译、runtime context 协议、读投影计划和 `/iam.employee/query`、`/iam.department/query` 输出裁剪。
 2. 后端测试覆盖 `StaticRecordReadProjectionService`、字段保护输出策略、action 权限上下文和字段级可读策略。
-3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`。
+3. 后端测试覆盖动态配置最小样例可归一到同一套 `ModuleUiDefinition`，并锁定动态 viewCode 与 `uiConfigId` 的身份边界。
 4. 前端测试覆盖 `RecordQueryListPanel`、`RecordFormFields`、表单字段解析模型、scope/tree 组合门面、静态树资源上下文门面、标准 CRUD 动作、保存动作执行器、记录动作执行器、`EmployeeManagementView`、`DepartmentManagementView`、`DictionaryManagementView` 和 `PositionManagementView` 接入契约。
 5. 阶段验证命令：`npm test --prefix muyun-web`、`npm run build --prefix muyun-web`、`./gradlew test`、涉及真实 WebController 链路时补跑对应 `integrationTest`、`git diff --check`。
 

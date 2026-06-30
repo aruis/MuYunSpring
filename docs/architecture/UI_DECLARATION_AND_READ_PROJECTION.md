@@ -20,14 +20,14 @@
 
 当前没有上线兼容成本，后续推进按“先立契约，再接真实链路，再扩展场景”的生产化顺序执行。SQL 列投影不是第一优先级；Web 契约、安全边界和字段事实先稳定，后续 SQL 裁剪只作为性能优化接入。
 
-当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单；`iam.position` 已验证非字典子资源表单可通过父模块 descriptor 和 `RecordFormFields` 复用同一套字段运行器。下一步不继续横向铺更多页面，优先把子资源表单样板沉淀为稳定接入规范，并推进动态发布快照接入共用 descriptor 的真实链路。
+当前静态样板状态：`iam.employee` 已验证普通列表、声明表单、组织 scope、部门引用选择、统一保存和记录动作流；`iam.department` 已验证树形业务、机构 scope、父子选择、声明表单、统一保存和记录动作流；`platform.dictionary` 已验证应用 scope 下的类目树、类目 scope 下的条目树、父子选择、主资源表单和子资源表单；`iam.position` 已验证非字典子资源表单可通过父模块 descriptor 和 `RecordFormFields` 复用同一套字段运行器。子资源表单样板已沉淀为稳定接入契约：子资源 view 归属父模块 descriptor，view code 由 resource 命名门面生成，字段按 relationCode 关联子资源实体事实并在编译期失败。后续不继续横向铺更多静态页面，优先推进动态发布快照接入共用 descriptor 的真实 Web 链路、SQL 列投影和字段级授权治理。
 
 ### 阶段 1：协议冻结
 
 1. `ResolvedModuleUiDescriptor` 成为唯一前端运行协议，`ModuleUiDefinition` 只存在于后端来源层。
 2. `/form/schema` 从静态模块 UI 主线退出；短期保留时也只能由 resolved form view 派生。
 3. descriptor 必须明确版本、模块身份、视图、字段、动作、端点、字段能力和视图能力。
-4. 字段引用统一支持主表字段、关系字段、动态 `fieldId` 和虚拟字段。
+4. 字段引用统一支持主表字段、关系字段和动态 `fieldId`；虚拟字段作为后续字段能力治理进入。
 5. 字段事实编译应覆盖 Java model、注解、Ability、平台标准字段、`@OptionField`、引用、字典、枚举、单位、金额和字段保护。
 6. `visible`、`required`、`readOnly` 要区分数据契约、页面声明、权限态和动作态来源；UI 声明不能绕过数据契约底线。
 
@@ -35,7 +35,7 @@
 
 1. 前端不读取 `uiDefinition` 兜底，静态页面入口只消费 `uiDescriptor`。
 2. descriptor 不包含物理列、SQL 片段或来源态配置。
-3. 字段缺失、字段能力冲突、只读必填无默认值等问题在编译期明确失败。
+3. 字段缺失和子资源 relation 缺失在编译期明确失败；字段能力冲突、只读必填无默认值等更细约束进入后续字段能力治理。
 
 ### 阶段 2：读写链路生产化
 
@@ -70,7 +70,7 @@
 ### 阶段 4：动态归一与治理
 
 1. 动态 UI 配置发布快照不是前端协议，必须先转换为 `ModuleUiDefinition` 或等价源无关定义，再编译为 `ResolvedModuleUiDescriptor`。
-2. 动态字段 ID、字段名、关系、子表、虚拟字段和发布版本都要有稳定映射。
+2. 动态字段 ID、字段名、关系和 viewCode 已有最小稳定映射；子表、虚拟字段和发布版本继续进入治理链路。
 3. 动态模块和静态模块共用 descriptor、读投影、动作和前端运行器协议。
 4. descriptor 应带版本号、来源版本、编译时间和校验结果，支持 preview/dry-run 编译。
 5. 治理接口应能检查字段缺失、引用失效、字典缺失、动作不可达、权限配置缺口和发布快照不可用。
@@ -79,7 +79,7 @@
 验收口径：
 
 1. 至少一个动态模块通过同一运行器展示列表和表单。
-2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试。
+2. 动态 UI 配置字段、静态字段声明和 resolved descriptor 有互相映射测试；当前已覆盖动态快照到 `ModuleUiDefinition` 的最小适配、字段 ID、relation 和 viewCode 身份边界。
 3. preview/dry-run、健康检查、缓存失效和版本切换有 API 或 contract test 证据。
 
 ## 核心分层
